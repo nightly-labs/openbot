@@ -46,6 +46,8 @@ export const messages = defineMessages("error.import", {
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
   "error.import.skillKept":
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
+  "error.import.skillRenamed":
+    '{name}: the name of the skill "{skill}" is too similar to the name of another skill, so it is saved as "{renamed}".',
   // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles":
     "This folder has no Hermes profiles. Choose the Hermes folder, which holds config.yaml or SOUL.md.",

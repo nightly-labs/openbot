@@ -45,6 +45,8 @@ export const messages = {
   "error.import.hostBusy": "서버가 다른 내보내기 파일을 읽고 있어요. 몇 분 후 다시 시도해 주세요.",
   "error.import.skillKept":
     '{name}: 서버에 이미 스킬 "{skill}"이(가) 있어서 에이전트가 그 스킬을 사용해요. 관리자에게 업데이트를 요청해 주세요.',
+  "error.import.skillRenamed":
+    '{name}: 스킬 "{skill}"의 이름이 다른 스킬의 이름과 너무 비슷해서 "{renamed}"(으)로 저장돼요.',
   "error.import.hermesNoProfiles":
     "이 폴더에는 Hermes 프로필이 없어요. config.yaml 또는 SOUL.md가 있는 Hermes 폴더를 선택해 주세요.",
   "error.import.hermesClosed": "Hermes 프로필이 더 이상 열려 있지 않아요. 다시 읽어 주세요.",

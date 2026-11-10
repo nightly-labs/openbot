@@ -42,6 +42,7 @@ export const messages = {
   "error.import.remoteZipTooLarge": "导入到已加入的服务器时，导出文件必须是小于 100 MB 的 .zip。",
   "error.import.hostBusy": "服务器正在读取其他导出，请几分钟后重试。",
   "error.import.skillKept": "{name}：服务器已有技能“{skill}”，因该助手会使用该技能。请联系管理员更新它。",
+  "error.import.skillRenamed": "{name}：技能“{skill}”的名称与另一个技能的名称过于相似，因此保存为“{renamed}”。",
   // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles": "该文件夹中没有 Hermes 配置。请选择包含 config.yaml 或 SOUL.md 的 Hermes 文件夹。",
   "error.import.hermesClosed": "这些 Hermes 配置已不再打开，请重新读取。",

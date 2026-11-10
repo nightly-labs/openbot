@@ -1,4 +1,6 @@
 import { Deferred, Effect, Exit, Result } from "effect";
+import { zipSync } from "fflate";
+import { parseDocument } from "yaml";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 // Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
 // of a joined client with `agent-import-v1`.
@@ -10,7 +12,7 @@ import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } 
 // be written is a warning, not a failed step, so the agent still imports. Group chats become channels
 // after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -56,6 +58,7 @@ import {
 import { validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
+import { inspectArchive, SKILL_FRONTMATTER } from "./skill-package";
 
 /** Skill folders are copied here, published to the local library, and removed again. */
 const SKILL_STAGING = ".openbot/import-skills";
@@ -151,6 +154,8 @@ interface ImportContext {
   actor: ChannelActor;
   timezone: string;
   reviseSkills: boolean;
+  /** The digest of each skill that an imported agent of this run has, by slug. */
+  skills: Map<string, string>;
 }
 
 /** The owner of the exports the local user stages. A member's owner is the member id. */
@@ -368,6 +373,7 @@ export class AgentImportService {
         actor: caller?.actor ?? this.channelActor(),
         timezone: caller?.timezone && validTimezone(caller.timezone) ? caller.timezone : this.timezone(),
         reviseSkills: caller?.reviseSkills ?? true,
+        skills: new Map(),
       });
     }).pipe(
       Effect.ensuring(
@@ -530,7 +536,30 @@ export class AgentImportService {
     };
     // Every skill is checked before the agent exists, so a bad one publishes nothing.
     const skills: Array<{ files: Array<readonly [string, Uint8Array]>; slug: string }> = [];
-    for (const skill of source.skills) skills.push(yield* readSkillEffect(archive, under(skill)));
+    const planned = new Map(context.skills);
+    for (const path of source.skills) {
+      const skill = yield* readSkillEffect(archive, under(path));
+      const digest = skillDigest(skill.files);
+      const earlier = planned.get(skill.slug);
+      if (earlier === undefined || earlier === digest) {
+        planned.set(skill.slug, digest);
+        skills.push(skill);
+        continue;
+      }
+      // A different skill of this import has a name with the same slug. This one gets a new name,
+      // so that it does not replace that skill.
+      const library = yield* this.skills
+        .library()
+        .list()
+        .pipe(Effect.mapError((error) => archiveFailure(error.cause)));
+      const taken = new Set([...planned.keys(), ...library.map((candidate) => candidate.slug)]);
+      const renamed = yield* archiveSync(() => renameSkill(skill.files, taken));
+      warnings.push(
+        sourceText("error.import.skillRenamed", { name: source.name, skill: renamed.from, renamed: renamed.name }),
+      );
+      planned.set(renamed.slug, digest);
+      skills.push(renamed);
+    }
     const files = source.files ? under(source.files) : [];
 
     const published: Array<{ id: string; revision: number }> = [];
@@ -652,6 +681,7 @@ export class AgentImportService {
                 .setAvatar(agent.id, avatar)
                 .pipe(Effect.mapError((error) => archiveFailure(error.cause)))
                 .pipe(Effect.uninterruptible);
+            for (const [slug, digest] of planned) context.skills.set(slug, digest);
             completed = true;
             return agent;
           } catch (error) {
@@ -668,6 +698,35 @@ export class AgentImportService {
             }).pipe(Effect.orDie),
     );
   });
+}
+
+/** The same digest for the same files, in any order. */
+function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): string {
+  const hash = createHash("sha256");
+  for (const [name, data] of [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    hash.update(`${name}\0${data.byteLength}\0`).update(data);
+  return hash.digest("hex");
+}
+
+/** The skill with ` 2`, ` 3`, ... after its frontmatter name, at the first number whose slug is free. */
+function renameSkill(files: ReadonlyArray<readonly [string, Uint8Array]>, taken: ReadonlySet<string>) {
+  const index = files.findIndex(([name]) => name === "SKILL.md");
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(files[index]?.[1]);
+  const match = text.match(SKILL_FRONTMATTER);
+  const frontmatter = parseDocument(match?.[1] ?? "");
+  const from = String(frontmatter.get("name")).trim();
+  // A slug keeps 64 characters, so a long name is cut to keep the number in its slug.
+  const base = from.slice(0, 56).trimEnd();
+  for (let number = 2; number <= taken.size + 2; number++) {
+    const name = `${base} ${number}`;
+    frontmatter.set("name", name);
+    const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
+    const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
+    const renamed = files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file));
+    const { slug } = inspectArchive(zipSync(Object.fromEntries(renamed)));
+    if (!taken.has(slug)) return { files: renamed, slug, from, name };
+  }
+  throw new Error(sourceText("error.skill.localNameTaken"));
 }
 
 /** A zip made by compressing a folder puts everything in that folder. */
