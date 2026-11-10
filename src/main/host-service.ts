@@ -1057,6 +1057,25 @@ export class HostService extends EventEmitter<HostEvents> {
   );
 
   /**
+   * Registers this host for the signed-in account without publishing it, as `configure` does. A
+   * host with no name gets the name that a phone connection gives it. A webhook route needs the
+   * machine token that the registration gives (#6029).
+   */
+  readonly register = Effect.fn("HostService.register")(function* (this: HostService) {
+    // After a sign-in, `applySignedInAccount` binds the account's host a moment later. Its status
+    // change starts the next route sync, so the host is not made a second time here.
+    if (this.#boundAccountId !== this.#signedInAccountId()) return;
+    if (!this.#options.store.configured) {
+      yield* this.configure({ serverName: "OpenBot" });
+      return;
+    }
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()));
+  }).bind(this);
+
+  /**
    * Every remote step runs under the signed-in account's authentication, so one that started
    * for a host the account no longer has would register or upload on the wrong account's
    * behalf. The store's own guards stop the local half; this stops the network half.
