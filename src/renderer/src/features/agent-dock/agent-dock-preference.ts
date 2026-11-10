@@ -20,6 +20,8 @@ export interface AgentDockPreference {
   edge: AgentDockEdge;
   /** The dock slides into the edge while nobody uses it. */
   autoHide: boolean;
+  /** While hidden, a thin strip stays at the edge in place of the whole edge. */
+  edgeStrip: boolean;
   /** Work that the agents finished shows beside the dock for a short time. */
   results: boolean;
   /** Where the user dragged the dock on each display, the newest last. */
@@ -33,6 +35,8 @@ const DEFAULT_PREFERENCE: AgentDockPreference = {
   display: { kind: "window" },
   edge: "right",
   autoHide: false,
+  // The dock stays full by default; the strip is a choice in Settings.
+  edgeStrip: false,
   results: true,
   offsets: [],
 };
@@ -55,6 +59,7 @@ const preferenceSchema = z
       .catch(DEFAULT_PREFERENCE.display),
     edge: z.enum(["left", "right"]).catch(DEFAULT_PREFERENCE.edge),
     autoHide: z.boolean().catch(DEFAULT_PREFERENCE.autoHide),
+    edgeStrip: z.boolean().catch(DEFAULT_PREFERENCE.edgeStrip),
     results: z.boolean().catch(DEFAULT_PREFERENCE.results),
     offsets: z
       .array(z.object({ displayId: z.number().int().nonnegative(), offset: z.number().min(0).max(1) }))

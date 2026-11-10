@@ -13,7 +13,8 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
 import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
-import { STORY_SERVERS } from "../src/preview/fixtures";
+import { PlatformProvider } from "../src/platform";
+import { STORY_AGENTS, STORY_SERVERS } from "../src/preview/fixtures";
 import { createMockBilling } from "../src/preview/mock-billing";
 import type { MockVoiceOptions } from "../src/preview/mock-voice";
 import { createMockOpenBot } from "./mock-openbot";
@@ -47,6 +48,12 @@ const storyUpdateStatus: UpdateStatus = {
   errorCode: null,
 };
 
+const storyAgentDock = {
+  server: { id: STORY_SERVERS[0].id, name: STORY_SERVERS[0].name },
+  agents: STORY_AGENTS,
+  hiddenAgentIds: new Set<string>(),
+};
+
 function SettingsModalStory(props: {
   initialOpen: boolean;
   /** Adds the Hosted servers tab with a stopped server and a server whose plan ended. */
@@ -61,6 +68,8 @@ function SettingsModalStory(props: {
   voice?: MockVoiceOptions;
   /** Whether Codex can open live voice. */
   codexLiveAccess?: CodexLiveAccess;
+  /** Adds the Agent dock tab with the agents of the first server. */
+  agentDock?: boolean;
 }) {
   const previousApi = window.openbot;
   const billingApi = createMockBilling();
@@ -152,7 +161,7 @@ function SettingsModalStory(props: {
   }
 
   return (
-    <>
+    <PlatformProvider>
       <SettingsPageStory
         title="Settings"
         controls={
@@ -217,11 +226,12 @@ function SettingsModalStory(props: {
             billingApi={billingApi}
             hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
             onAddHostedServer={props.hostedServers ? fn() : undefined}
+            agentDock={props.agentDock ? storyAgentDock : undefined}
           />
         )}
       </SettingsPageStory>
       <Toaster />
-    </>
+    </PlatformProvider>
   );
 }
 
@@ -351,6 +361,11 @@ export const VoiceCodexSignIn: Story = {
 /** The install guide for each phone, the sign-in code and the connected phones. */
 export const MobileConnect: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
+};
+
+/** The agent dock above the other apps, with the switches for hiding it in the screen edge. */
+export const AgentDock: Story = {
+  render: () => <SettingsModalStory initialOpen agentDock initialTab="agent-dock" />,
 };
 
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */

@@ -252,6 +252,9 @@ export const messages = {
   "settings.agentDock.edge.left": "左侧",
   "settings.agentDock.autoHide.title": "不使用时隐藏",
   "settings.agentDock.autoHide.description": "停靠栏会滑入边缘。将指针移到边缘即可显示。",
+  "settings.agentDock.edgeStrip.title": "在边缘显示细条",
+  "settings.agentDock.edgeStrip.description":
+    "停靠栏隐藏后，边缘会留下一条细条。将指针移近即可显示停靠栏。当代理向你提问时，细条上会有一道彩色波浪经过。",
   "settings.agentDock.results.title": "显示已完成的工作",
   "settings.agentDock.results.description": "智能体完成的结果会在停靠栏旁短暂显示。",
   "settings.agentDock.agents.title": "停靠栏中的智能体",

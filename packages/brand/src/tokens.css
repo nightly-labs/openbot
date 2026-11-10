@@ -83,6 +83,18 @@
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
+  /* The wash front of the theme change, as a band that goes up the agent dock's edge strip while an
+     agent asks something. It is the same light in both themes. */
+  --openbot-wash-front: linear-gradient(
+    to top,
+    rgba(111, 255, 196, 0),
+    #6fffc4 20%,
+    #6db8ff 38%,
+    #bb66ff 56%,
+    #ff66c0 74%,
+    #ffb875 88%,
+    rgba(255, 184, 117, 0)
+  );
   /* The color picker draws real colors, so these stay the same in both themes: the rim and the
      ends of the saturation area, and the hue spectrum. */
   --openbot-color-picker-light: #ffffff;

@@ -272,6 +272,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Gauche",
   "settings.agentDock.autoHide.title": "Masquer quand inutilisé",
   "settings.agentDock.autoHide.description": "Le dock glisse dans le bord. Amenez le pointeur au bord pour l’afficher.",
+  "settings.agentDock.edgeStrip.title": "Afficher une bande au bord",
+  "settings.agentDock.edgeStrip.description":
+    "Une fine bande reste là où le dock se cache. Approchez le pointeur pour afficher le dock. Une vague de couleur monte dans la bande quand un agent vous pose une question.",
   "settings.agentDock.results.title": "Afficher le travail terminé",
   "settings.agentDock.results.description": "Les résultats des agents s’affichent un instant à côté du dock.",
   "settings.agentDock.agents.title": "Agents dans le dock",

@@ -263,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Sinistra",
   "settings.agentDock.autoHide.title": "Nascondi quando non in uso",
   "settings.agentDock.autoHide.description": "Il dock scivola nel bordo. Porta il puntatore sul bordo per mostrarlo.",
+  "settings.agentDock.edgeStrip.title": "Mostra una striscia sul bordo",
+  "settings.agentDock.edgeStrip.description":
+    "Una striscia sottile resta dove il dock si nasconde. Avvicina il puntatore per mostrare il dock. Un'onda di colore sale lungo la striscia quando un agente ti chiede qualcosa.",
   "settings.agentDock.results.title": "Mostra il lavoro finito",
   "settings.agentDock.results.description": "I risultati degli agenti compaiono per poco accanto al dock.",
   "settings.agentDock.agents.title": "Agenti nel dock",

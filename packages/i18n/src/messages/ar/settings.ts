@@ -261,6 +261,9 @@ export const messages = {
   "settings.agentDock.edge.left": "اليسار",
   "settings.agentDock.autoHide.title": "إخفاء عند عدم الاستخدام",
   "settings.agentDock.autoHide.description": "ينزلق الشريط داخل الحافة. حرّك المؤشر إلى الحافة لإظهاره.",
+  "settings.agentDock.edgeStrip.title": "إظهار شريط رفيع عند الحافة",
+  "settings.agentDock.edgeStrip.description":
+    "يبقى شريط رفيع حيث يختفي الشريط. قرّب المؤشر منه لإظهار الشريط. تمر موجة ألوان على الشريط عندما يسألك وكيل عن شيء.",
   "settings.agentDock.results.title": "عرض العمل المنجز",
   "settings.agentDock.results.description": "تظهر نتائج الوكلاء لوقت قصير بجانب الشريط.",
   "settings.agentDock.agents.title": "الوكلاء على الشريط",

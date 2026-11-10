@@ -264,6 +264,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Ocultar cuando no se usa",
   "settings.agentDock.autoHide.description":
     "El dock se desliza dentro del borde. Lleva el puntero al borde para mostrarlo.",
+  "settings.agentDock.edgeStrip.title": "Mostrar una franja en el borde",
+  "settings.agentDock.edgeStrip.description":
+    "Una franja fina queda donde se oculta el dock. Acerca el puntero para mostrar el dock. Una ola de color sube por la franja cuando un agente te pregunta algo.",
   "settings.agentDock.results.title": "Mostrar trabajo terminado",
   "settings.agentDock.results.description": "Los resultados de los agentes aparecen un momento junto al dock.",
   "settings.agentDock.agents.title": "Agentes en el dock",

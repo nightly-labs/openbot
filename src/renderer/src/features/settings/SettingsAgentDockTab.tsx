@@ -155,6 +155,14 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
             description={i18n.t("settings.agentDock.autoHide.description")}
           />
           <SwitchField
+            data-settings-row="settings.agentDock.edgeStrip.title"
+            checked={preference().edgeStrip}
+            disabled={!aboveApps() || !preference().autoHide}
+            onChange={(edgeStrip) => setAgentDockPreference({ edgeStrip })}
+            label={i18n.t("settings.agentDock.edgeStrip.title")}
+            description={i18n.t("settings.agentDock.edgeStrip.description")}
+          />
+          <SwitchField
             data-settings-row="settings.agentDock.results.title"
             checked={preference().results}
             disabled={!preference().shown}
