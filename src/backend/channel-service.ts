@@ -1629,10 +1629,12 @@ export class ChannelService {
               new Error(
                 `${error.message} Routing answer: ${response.length} characters, fields ${
                   keys ? JSON.stringify(keys.slice(0, 8).map((key) => key.slice(0, 40))) : "none"
-                }.`,
+                }. The lead takes the request.`,
               ),
             );
-            throw new ChannelRoutingError(sourceText("error.backend.channelRoutingUnreadable"));
+            // An unreadable answer is an unclear routing, which the prompt gives to the lead. It paused
+            // the task for the person to reassign before, when a lead answered in prose (#6277).
+            decision = { agentId: lead.id };
           }
           if ("taskId" in decision) {
             const existing = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
