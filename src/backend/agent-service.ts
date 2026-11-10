@@ -5775,16 +5775,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const stoppedTurnId = this.#stoppedTurn(agent.id, task?.taskId ?? null);
     const steerTurnId = snapshot.activeTurnId !== stoppedTurnId ? snapshot.activeTurnId : null;
     if (!steerTurnId) return null;
-    if ((agent.busyMessageMode ?? this.#busyMessageMode()) !== "steer") return "recipient-queues";
+    // These reasons come first, so the sender is not told to select Steer when Steer would not help.
+    // Only a message sent to steer gets a reason on its row.
+    const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
     if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
-      if (explain) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
+      if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return "provider-unsupported";
     }
     // A routine run's own session ends with the run, so a chat message waits for the next turn.
     if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
-      if (explain) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
+      if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
       return "routine-run";
     }
+    if (!steers) return "recipient-queues";
     const steer = this.#steerSentMessage(agent, snapshot.threadId ?? agent.threadId, deliveryId, steerTurnId, explain);
     if (wait) return yield* steer;
     // The message is already queued, and the sender is answered without the wait for the provider.
