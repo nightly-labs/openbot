@@ -743,14 +743,15 @@ Before creating the first tag or any later release:
 14. confirm `CHANGELOG.md` and `.github/release-announcement.json` describe the version and the
     working tree is clean;
 15. create and push the version commit, and create the tag locally, only after CI passes on `main`;
-16. read the running Signal commit from `curl -fsS https://signal.openbot.run/health/live`. If it is
-    missing or `unknown`, or if `git diff --quiet <running commit> <new tag> -- remote packages/contracts/src/signal-protocol`
-    finds changes, deploy Signal from the local tag before you push the tag. Compare with the running
+16. read the running Signal commit of both machines from `curl -fsS https://signal1.openbot.run/health/live`
+    and `curl -fsS https://signal2.openbot.run/health/live`, not from `signal.openbot.run`, which reaches only
+    the entry machine. If a commit is missing or `unknown`, or if `git diff --quiet <running commit> <new tag> -- remote packages/contracts/src/signal-protocol`
+    finds changes for either commit, deploy Signal from the local tag before you push the tag. Compare with the running
     commit, not with the previous tag: an earlier release can have left Signal behind. Pushing the tag starts the
     release workflow, and nothing in it waits for Signal. Use the Signal-only procedure in
     [remote-session-deployment.md](remote-session-deployment.md#deployment-procedure--requires-separate-approval);
     the `.agents/skills/signal-deploy/` skill adds the checks before and after it.
-    Confirm that `curl -fsS https://signal.openbot.run/health/live` shows the tag commit. A client
+    Confirm that `/health/live` of `signal1.openbot.run` and of `signal2.openbot.run` shows the tag commit. A client
     that needs a newer Signal fails until then: v0.33.0 shipped webhook routines while Signal was older
     than #1520, so every webhook route answered 404 (#1661);
 17. push the tag.
