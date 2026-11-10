@@ -10,7 +10,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
-import { useUsageLimitAsk } from "../conversation/usage-limit-ask";
+import { trackUsageLimitShown, useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
   remoteRoutineRecovery,
@@ -100,21 +100,23 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   // owns it, asks where that member's work goes, as the agent's own chat does. Before, the channel only
   // went quiet.
   const usageLimitAskFor = useUsageLimitAsk();
+  // The first held agent that asks: one that the user chose to wait for asks no more.
   const usageLimitAsk = createMemo(() => {
     const page = channels.state.page;
     if (page?.channel.id !== props.channelId || page.channel.archived) return undefined;
     const limits = usageLimits();
-    const heldId = page.tasks
-      .filter((task) => task.state === "queued")
-      .map((task) => task.ownerAgentId ?? page.channel.leadAgentId)
-      .find((agentId) => agentId !== null && agentId in limits);
-    return heldId
-      ? usageLimitAskFor(
-          agentList().find((agent) => agent.id === heldId),
-          true,
-        )
-      : undefined;
+    for (const task of page.tasks) {
+      const agentId = task.ownerAgentId ?? page.channel.leadAgentId;
+      if (task.state !== "queued" || !agentId || !(agentId in limits)) continue;
+      const ask = usageLimitAskFor(
+        agentList().find((agent) => agent.id === agentId),
+        true,
+      );
+      if (ask) return { agentId, ask };
+    }
+    return undefined;
   });
+  trackUsageLimitShown(usageLimitAsk);
   // A named function, not a ternary in the prop: the compiler makes a memo for a ternary, and the
   // composer reads this prop in an effect, where Solid cannot make a memo.
   const shownAgentStatus = (): AgentStatus =>
@@ -156,7 +158,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       prompt={view.prompt()}
       promptUiBlock={view.promptUiBlock()}
       approval={view.approval()}
-      usageLimitAsk={usageLimitAsk()}
+      usageLimitAsk={usageLimitAsk()?.ask}
       browserTakeover={view.browserTakeover()}
       activeTurnId={view.activeTurnId()}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}

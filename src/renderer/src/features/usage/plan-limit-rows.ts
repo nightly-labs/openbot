@@ -10,8 +10,9 @@ import { withHostAccountUsage } from "../agents/host-provider-accounts";
 
 /**
  * One row per provider account of the active server, for the rail rings. A model that the plan
- * refused adds a used-up line with its own name to its account: a limit of one model, such as a
- * separate weekly limit, is not in the account's 5-hour and weekly windows, which then show usage left.
+ * refused adds a used-up line with its own name to its account, and the ring shows it: a limit of one
+ * model, such as a separate weekly limit, is not in the account's 5-hour and weekly windows, which
+ * then show usage left.
  */
 export function usePlanLimitRows() {
   const text = useText();
@@ -54,7 +55,16 @@ export function usePlanLimitRows() {
             resetsAtLabel: formatUsageReset(resetsAt, text),
           };
         });
-      return windows.length ? { ...row, windows: [...row.windows, ...windows] } : row;
+      // The used-up model stops work first, so the ring and the chip show it, as for a used-up Cursor window.
+      return windows.length
+        ? {
+            ...row,
+            windows: [...row.windows, ...windows],
+            ringWindows: windows,
+            remainingPercent: 0,
+            tone: usageTone(0),
+          }
+        : row;
     });
   });
 }

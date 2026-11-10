@@ -7,6 +7,7 @@ import {
   type UsageLimitAskCardProps,
   usageLimitAskOptions,
 } from "@openbot/ui/features/conversation/BackupModels";
+import { createEffect } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { useTurns } from "../../turns";
 import { useAgents } from "../agents/agents-context";
@@ -84,4 +85,23 @@ export function useUsageLimitAsk() {
       },
     };
   };
+}
+
+/**
+ * One "shown" for each limit that asks, also when the user opens the chat again; a new reset time is
+ * a new limit.
+ */
+export function trackUsageLimitShown(shown: () => { agentId: string; ask: UsageLimitAskCardProps } | undefined) {
+  const tracked = new Set<string>();
+  createEffect(
+    () => {
+      const value = shown();
+      return value ? { key: `${value.agentId}:${value.ask.resetsAt ?? ""}`, provider: value.ask.provider } : null;
+    },
+    (value) => {
+      if (!value || tracked.has(value.key)) return;
+      tracked.add(value.key);
+      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: value.provider });
+    },
+  );
 }

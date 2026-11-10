@@ -1314,20 +1314,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
               // does, and the channel keeps the task queued for the reset.
-              // A refused routing turn uses the one try that a person's message gave the member.
-              Effect.tapError((failure) =>
-                failure instanceof GenerationUsageLimitError
-                  ? Effect.andThen(
-                      Effect.sync(() => this.#usageLimits.tryStarted(selected.id)),
-                      this.#usageLimits.reached(selected.id, failure.resetsAt, selected.model),
-                    )
-                  : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
-                    ? Effect.andThen(
-                        Effect.sync(() => this.#usageLimits.tryStarted(selected.id)),
-                        this.#usageLimits.reached(selected.id, null, selected.model),
-                      )
-                    : Effect.void,
+              // A routing turn uses the one try that a person's message gave the lead, refused or not:
+              // the member that it picks gets its own. A summary is not that turn.
+              Effect.ensuring(
+                Effect.sync(() => {
+                  if (!background) this.#usageLimits.tryStarted(selected.id);
+                }),
               ),
+              Effect.tapError((failure) => {
+                const resetsAt =
+                  failure instanceof GenerationUsageLimitError
+                    ? failure.resetsAt
+                    : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
+                      ? null
+                      : undefined;
+                return resetsAt === undefined
+                  ? Effect.void
+                  : this.#usageLimits.reached(selected.id, resetsAt, selected.model);
+              }),
             );
         }).pipe(toChannelOperationError),
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),

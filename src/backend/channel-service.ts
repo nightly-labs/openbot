@@ -246,6 +246,12 @@ export class ChannelService {
   /** Turns that the provider started with no delivery. Their rows are no task's reply. */
   readonly #providerTurns = new Set<string>();
   readonly #deletedChannels = new Set<string>();
+  /**
+   * Tasks from a person's message whose owner has not had its one try at a usage limit. The try
+   * goes to the owner once, also to a member that routing picks later: a held task that wakes again
+   * gets no new try.
+   */
+  readonly #tryTasks = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
   /** The active assignments last seen per channel, so turn traffic reports no new hold. */
   readonly #activeAssignments = new Map<string, string>();
@@ -636,9 +642,11 @@ export class ChannelService {
         const summary = this.#summaries.get(channelId);
         if (summary) yield* Fiber.interrupt(summary);
         yield* Effect.gen({ self: this }, function* () {
+          const tasks = yield* channelSync(() => this.store.tasks(channelId));
+          for (const task of tasks) this.#tryTasks.delete(task.id);
           yield* this.interruptTasks(
             channelId,
-            (yield* channelSync(() => this.store.tasks(channelId))).filter((task) => !terminal(task)),
+            tasks.filter((task) => !terminal(task)),
           );
           if (pump) yield* Fiber.await(pump);
           const agentIds = new Set(
@@ -1009,11 +1017,12 @@ export class ChannelService {
         ),
       );
       const { current, continued, affected, resumed, message, result, tasks } = stored;
-      // A person wrote, so the lead and each member that the message reaches may start one turn while a
-      // spent plan holds them, as in their own chat: the person can have bought more usage, and no
-      // reading shows that before the reset.
-      for (const agentId of new Set([current.leadAgentId, ...tasks.map((item) => item.ownerAgentId)]))
-        if (agentId) this.hooks.retry?.(agentId);
+      // A person wrote, so the agents that the message reaches may start one turn while a spent plan
+      // holds them, as in their own chat: the person can have bought more usage, and no reading shows
+      // that before the reset. The lead routes a task with no owner, and each owner gets its try when
+      // the task reaches it.
+      for (const item of tasks) this.#tryTasks.add(item.id);
+      if (current.leadAgentId && tasks.some((item) => !item.ownerAgentId)) this.hooks.retry?.(current.leadAgentId);
       this.publish(current.id);
       yield* this.interruptTasks(
         current.id,
@@ -1794,6 +1803,7 @@ export class ChannelService {
           this.hooks.routingFailed?.({ channelId, taskId: task.id, lead, error });
           if (shown === null) this.hooks.error(error);
           const detail = shown ?? sourceText("error.backend.channelRoutingFailed");
+          this.#tryTasks.delete(task.id);
           yield* channelSync(() =>
             this.store.update(channel, {
               tasks: [{ ...task, state: "paused", error: detail }],
@@ -1812,6 +1822,7 @@ export class ChannelService {
         }
       }
       const owner = task.ownerAgentId;
+      if (owner && this.#tryTasks.delete(task.id)) this.hooks.retry?.(owner);
       if (owner && this.hooks.usageLimited?.(owner)) {
         yield* channelSync(() => this.#heldByLimit(channelId, task, owner));
         continue;

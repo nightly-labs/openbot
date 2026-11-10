@@ -18,8 +18,7 @@ import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/B
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { sidebarAgentWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
+import { createMemo } from "solid-js";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -65,7 +64,7 @@ import {
   desktopAgentMessageDeleteAccess,
   readerCanDeleteMessage,
 } from "./message-delete-access";
-import { useUsageLimitAsk } from "./usage-limit-ask";
+import { trackUsageLimitShown, useUsageLimitAsk } from "./usage-limit-ask";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -496,20 +495,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     if (!agent || !queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
     return usageLimitAskFor(agent);
   });
-  // One "shown" for each limit that asks, also when the user opens the agent again; a new reset time is a
-  // new limit.
-  const shownUsageLimits = new Set<string>();
-  createEffect(
-    () => {
-      const ask = usageLimitAsk();
-      return ask ? { key: `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}`, provider: ask.provider } : null;
-    },
-    (shown) => {
-      if (!shown || shownUsageLimits.has(shown.key)) return;
-      shownUsageLimits.add(shown.key);
-      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: shown.provider });
-    },
-  );
+  trackUsageLimitShown(() => {
+    const ask = usageLimitAsk();
+    const agent = activeAgent();
+    return ask && agent ? { agentId: agent.id, ask } : undefined;
+  });
 
   return (
     <>
