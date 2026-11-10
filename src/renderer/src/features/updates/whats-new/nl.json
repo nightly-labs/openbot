@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini installeert en werkt weer bij op Windows. In 0.67.0 stopte het met een fout over een link of een speciaal bestand.",
+          "Een agent die een bericht stuurt naar een bezige teamgenoot, weet nu of het bericht in de lopende taak van die teamgenoot is terechtgekomen. Wacht het bericht, dan kan de agent je vertellen waarom.",
+          "Tijdens Computerbesturing zeggen agents niet meer dat hun cursor niet beschikbaar is. OpenBot tekent de cursor waar de agent klikt, scrolt of beweegt."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.0",
     "date": "2026-11-10",
     "notices": [
