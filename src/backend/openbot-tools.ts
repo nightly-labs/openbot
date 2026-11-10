@@ -766,7 +766,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "send_feedback",
     description:
-      "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, the system, your provider and model, and the recent errors of this chat. The first call can return similar open issues: then call it again, with same_as for the same problem. The user reads the text and approves it before it is sent.",
+      "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, system, model and errors. The user reads the text and approves it before it is sent.",
     shape: {
       kind: z
         .enum(["bug", "idea"])
@@ -777,15 +777,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .string()
         .min(1)
         .max(200)
-        .describe(
-          "A short summary in plain English, without a prefix, also when the chat is in another language. Name the feature and the symptom.",
-        ),
+        .describe("A short summary in plain English, without a prefix: the feature and the symptom."),
       text: z
         .string()
         .min(1)
         .max(1000)
         .describe(
-          "In one to three plain sentences, in the user's language and words. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
+          "In one to three plain sentences, in the user's language. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
         ),
       details: z
         .string()
@@ -796,31 +794,20 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         )
         .optional(),
       type: z.enum(FEATURE_REQUEST_TYPES).describe("Ideas only. Your choice from the chat.").optional(),
-      area: z
-        .enum(BUG_REPORT_AREAS)
-        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
-        .optional(),
-      severity: z
-        .enum(BUG_REPORT_SEVERITIES)
-        .describe("Bugs only. Your choice from the chat. Leave it out when it is not clear.")
-        .optional(),
+      area: z.enum(BUG_REPORT_AREAS).describe("Bugs only, when the chat makes it clear.").optional(),
+      severity: z.enum(BUG_REPORT_SEVERITIES).describe("Bugs only, when the chat makes it clear.").optional(),
       found_by: z
         .enum(FEEDBACK_FINDERS)
         .describe(
-          "user (the default): the user told you about the problem. agent: you found it yourself while you worked, such as an OpenBot tool that failed.",
+          "Default user. agent: you found it yourself; send that unasked only when OpenBot fails again after one retry, not for the user's code, network, accounts or provider limits.",
         )
         .optional(),
-      surface: z
-        .enum(FEEDBACK_SURFACES)
-        .describe("Where the user saw the problem, when the chat tells it. Leave it out when it is not clear.")
-        .optional(),
+      surface: z.enum(FEEDBACK_SURFACES).describe("Where the user saw it, when the chat makes it clear.").optional(),
       same_as: z
         .number()
         .int()
         .positive()
-        .describe(
-          "The number of an open issue from the similar issues that is the same problem. The report becomes a comment on it, so write what this user adds to that issue.",
-        )
+        .describe("A similar issue that is the same problem. The report becomes a comment on it.")
         .optional(),
     },
   },
