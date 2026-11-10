@@ -1351,6 +1351,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       performAction: async () => undefined,
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
+      setInputRegion: async () => undefined,
+      setXWayland: async () => undefined,
       onCloseChat: () => () => undefined,
       listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
       drag: async () => undefined,
@@ -1374,6 +1376,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       performHaptic: async () => undefined,
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
+      setInputRegion: async () => undefined,
+      setXWayland: async () => undefined,
     },
     // The preview has no Apple apps to ask, so every app answers as allowed.
     macAutomation: {
@@ -2565,6 +2569,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgent: async (input: UpdateAgentInput) => {
         const current = agents.find((agent) => agent.id === input.agentId);
         if (!current) throw new Error("Agent not found");
+        if (input.ultrafast !== undefined && input.fastMode === undefined) throw new Error("Invalid fast mode value.");
         const {
           agentId: _agentId,
           busyMessageMode,
@@ -2597,6 +2602,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         else if (taskLimit) updated.taskLimit = taskLimit;
         if (chatColor === null) delete updated.chatColor;
         else if (chatColor) updated.chatColor = chatColor;
+        // As the store does: each fast mode change names the tier, and Ultrafast needs fast mode.
+        if (updates.fastMode !== undefined && !(updates.fastMode && updates.ultrafast)) delete updated.ultrafast;
+        if (!updated.fastMode) delete updated.ultrafast;
         agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
         emitAgentEvent({ type: "agents-changed", agents });
         emitTasks(updated.id);

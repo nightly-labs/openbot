@@ -15,7 +15,7 @@ import type { MessagingStore } from "../messaging-store";
 import { maskedNumber, whatsAppCredentials, whatsAppIdentity } from "./whatsapp-driver";
 import { userJid } from "./whatsapp-events";
 import type { WhatsAppConnectionHandle, WhatsAppPolicy, WhatsAppRuntime } from "./whatsapp-runtime";
-import { WhatsAppPairingRequests, type WhatsAppSenderRules } from "./whatsapp-senders";
+import { WhatsAppPairingRequests, type WhatsAppSenderRules, whatsAppNumberForms } from "./whatsapp-senders";
 
 export class WhatsAppConnectFailed extends Schema.TaggedError<WhatsAppConnectFailed>()("WhatsAppConnectFailed", {
   cause: Schema.Defect(),
@@ -23,6 +23,8 @@ export class WhatsAppConnectFailed extends Schema.TaggedError<WhatsAppConnectFai
 
 /** How long a link waits for the phone. WhatsApp shows about six QR codes in that time. */
 const LINK_TIMEOUT_MS = 3 * 60_000;
+/** How long adding a contact waits for WhatsApp to name the form of its number. */
+const REGISTERED_NUMBER_TIMEOUT_MS = 5_000;
 
 const IDLE: WhatsAppLinkState = { status: "idle", qr: null, code: null, workspaceId: null, error: null };
 
@@ -178,10 +180,27 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     sender: WhatsAppSender,
   ) {
     const connectionId = yield* this.#connectionId(workspaceId);
+    const id = sender.kind === "contact" ? yield* this.#registeredNumber(connectionId, sender.id) : sender.id;
     if (this.#store.allowedSenders(connectionId).length >= MESSAGING_LIMITS.allowedSenders)
       return yield* failure("error.messaging.whatsappTooManySenders");
-    this.#store.addAllowedSender(connectionId, sender);
+    this.#store.addAllowedSender(connectionId, { ...sender, id });
   });
+
+  /**
+   * The form of a contact's number that WhatsApp has, so that posts reach the contact. The number as it
+   * was typed when it has only one form, when the number is not connected, or when WhatsApp does not
+   * answer in time.
+   */
+  #registeredNumber(connectionId: string, number: string): Effect.Effect<string> {
+    const session = this.#handle(connectionId)?.session;
+    const forms = whatsAppNumberForms(number);
+    if (!session || forms.length === 1) return Effect.succeed(number);
+    return session.registered(forms).pipe(
+      Effect.map((jids) => forms.find((form) => jids.includes(userJid(form))) ?? number),
+      Effect.timeoutOrElse({ duration: REGISTERED_NUMBER_TIMEOUT_MS, orElse: () => Effect.succeed(number) }),
+      Effect.catch(() => Effect.succeed(number)),
+    );
+  }
 
   readonly removeSender = Effect.fn("WhatsAppConnect.removeSender")(function* (
     this: WhatsAppConnect,

@@ -53,6 +53,8 @@ export const messages = {
     "Este servidor acepta una exportación de hasta 100 MB. Actualiza OpenBot en el servidor para importar una exportación más grande.",
   "error.import.skillKept":
     "{name}: el servidor ya tiene la habilidad «{skill}», por lo que el agente usa esa habilidad. Pide a un administrador que la actualice.",
+  "error.import.skillRenamed":
+    "{name}: el nombre de la habilidad «{skill}» se parece demasiado al de otra habilidad, por lo que se guarda como «{renamed}».",
   "error.import.transferRemoteTooLarge":
     "Un archivo de transferencia para un servidor al que te uniste debe ocupar menos de 100 MB. Desactiva los archivos del espacio de trabajo o exporta menos agentes.",
   "error.import.transferNotFile": "Este archivo no es un archivo de transferencia de OpenBot.",

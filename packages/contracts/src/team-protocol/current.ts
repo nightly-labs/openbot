@@ -53,6 +53,7 @@ import {
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -79,6 +80,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
+import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
@@ -243,6 +245,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
@@ -266,6 +269,7 @@ export {
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
@@ -502,7 +506,9 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
 ] as const;
 
@@ -685,7 +691,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY &&
+    capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
     capability !== CHAT_HISTORY_CAPABILITY &&
+    capability !== CHANNEL_PICTURE_CAPABILITY &&
     capability !== AGENT_IMPORT_V2_CAPABILITY,
 );
 /**
@@ -743,7 +751,9 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -885,7 +895,9 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CUSTOM_PROVIDER_EDIT_CAPABILITY &&
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY &&
+      capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
       capability !== CHAT_HISTORY_CAPABILITY &&
+      capability !== CHANNEL_PICTURE_CAPABILITY &&
       capability !== AGENT_IMPORT_V2_CAPABILITY,
   );
 }

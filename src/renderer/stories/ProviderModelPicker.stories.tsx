@@ -40,6 +40,18 @@ export const AllEffortLevels: Story = {
   },
 };
 
+/** A Codex model that offers Fast and Ultrafast, with Ultrafast on. */
+export const Ultrafast: Story = {
+  args: {
+    value: "gpt-5.6-sol",
+    reasoningEffort: "high",
+    onReasoningEffortChange: fn(),
+    fastMode: true,
+    ultrafast: true,
+    onFastModeChange: fn(),
+  },
+};
+
 export const Field: Story = {
   args: { variant: "field", label: "Model" },
 };
@@ -228,6 +240,27 @@ export const CustomTabWithModels: Story = {
       ["opencode/example-free", "OpenCode Zen/Example Free"],
       ["openai/gpt", "OpenAI/GPT"],
     ]),
+  },
+};
+
+/** Saved endpoints that wait for OpenCode to restart: their models come after the current task. */
+export const CustomTabPending: Story = {
+  args: {
+    provider: "opencode",
+    value: "opencode/example",
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: true }] },
+    customProviders,
+    onAddCustomProvider: fn(),
+    onManageProviders: fn(),
+    modelOptions: openCodeCatalog([["opencode/example", "OpenCode Zen/Example"]]),
+  },
+};
+
+/** OpenCode read the saved endpoints but lists none of their models, so no restart brings them. */
+export const CustomTabUnlisted: Story = {
+  args: {
+    ...CustomTabPending.args,
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: false }] },
   },
 };
 

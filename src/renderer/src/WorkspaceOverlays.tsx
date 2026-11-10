@@ -1,3 +1,4 @@
+import { INSTALL_SERVER_SCRIPT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type CentralAuthUser,
   LOCAL_SERVER_ID,
@@ -28,6 +29,9 @@ import { useAgents } from "./features/agents/agents-context";
 import { desktopBrowserProfileCalls } from "./features/browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "./features/browser/stores/browser-profiles-store";
 import { useConnectors } from "./features/connectors/connectors-context";
+import { appendDraftText, EMPTY_DRAFT } from "./features/conversation/composer-draft";
+import { useConversationController } from "./features/conversation/conversation-controller-context";
+import { composerDraftKey } from "./features/conversation/conversation-keys";
 import { conversationPort } from "./features/conversation/conversation-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
@@ -42,6 +46,7 @@ import {
   HostedServerUpsell,
   hostedUpsellRoutineCreated,
 } from "./features/servers/hosted-server-upsell-controller";
+import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
@@ -49,6 +54,7 @@ import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import { serversPort } from "./features/servers/servers-port";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { settingsPort } from "./features/settings/settings-port";
@@ -111,6 +117,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <JoinServer account={props.account} />
       <AddServer />
       <CreateLocalServer />
+      <InstallServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -245,16 +252,73 @@ function CreateLocalServer() {
   );
 }
 
+/** A server on another computer of the user, from one command that installs it and signs it in. */
+function InstallServer() {
+  const { servers, activeServer, installServerOpen, setInstallServerOpen } = useServers();
+  const { select } = useServerActions();
+  const { activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
+  const { selectAgent } = useNavigation();
+  const controller = useConversationController();
+  /* The task goes to the agent of the open chat, when its composer can take another line. */
+  const agentTarget = createMemo(() => {
+    const server = activeServer();
+    const agent = activeAgent();
+    if (!server || !agent || agentStatus().phase !== "ready" || (agentSetupOpen() && creatingAgent())) return undefined;
+    // The host makes the command for its own account: on a server of another person it is not this user's.
+    if (!server.thisComputer && server.role !== "owner") return undefined;
+    if (controller.submitting() || controller.voicePhase() !== "idle" || controller.editingDeliveryId())
+      return undefined;
+    return { serverId: server.id, agentId: agent.id };
+  });
+  function setUpWithAgent(): (() => void) | undefined {
+    const target = agentTarget();
+    if (!target) return undefined;
+    return () => {
+      selectAgent(target.agentId);
+      const task = currentText().t("server.install.sshAgentPrompt");
+      const key = composerDraftKey(target);
+      controller.setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        /* An earlier press left the same task, or an old task with a command in it. The new task replaces it. */
+        const next =
+          draft.text.trim() === task.trim() || draft.text.includes(INSTALL_SERVER_SCRIPT_URL)
+            ? { ...draft, text: task }
+            : appendDraftText(draft, task);
+        return { ...current, [key]: next };
+      });
+      setInstallServerOpen(false);
+      controller.setComposerFocusRequest((value) => value + 1);
+    };
+  }
+  return (
+    <InstallServerOverlay
+      open={installServerOpen()}
+      servers={servers()}
+      createClaim={() => appPort().hostedServers.createServerClaim()}
+      retryConnection={(serverId) => serversPort().servers.retryConnection(serverId)}
+      onSetUpWithAgent={setUpWithAgent()}
+      onOpenServer={select}
+      onClose={() => setInstallServerOpen(false)}
+    />
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select, createLocal } = useServerActions();
+  const { select, createLocal, installServer } = useServerActions();
   const { openAppSettings } = useSettings();
   const onCreateLocal =
     createLocal &&
     (() => {
       setAddServerOpen(false);
       createLocal();
+    });
+  const onInstallServer =
+    installServer &&
+    (() => {
+      setAddServerOpen(false);
+      installServer();
     });
 
   return (
@@ -275,6 +339,7 @@ function AddServer() {
         setJoinServerOpen(true);
       }}
       onCreateLocal={onCreateLocal}
+      onInstallServer={onInstallServer}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -845,9 +910,10 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider) }
+              ? { onSignIn: (provider) => void connection.connect(provider), history: true }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? {}
+                ? // Only the transfer in parts carries the chat history.
+                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1") }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

@@ -72,6 +72,8 @@ export const messages = {
     "Il canale ha un avvio di assegnazione non confermato. Controlla il risultato prima di eliminarlo.",
   "error.backend.channelNotFound": "Canale non trovato.",
   "error.backend.channelMemberUnavailable": "Un membro del canale non è disponibile.",
+  "error.backend.channelInstructionsTooLong":
+    "Riduci le istruzioni a 2.000 caratteri. Le istruzioni più lunghe non vengono salvate.",
   "error.backend.channelWaitBeforeNewConversation":
     "Attendi che il lavoro in questo canale finisca, poi avvia una nuova conversazione.",
   "error.backend.channelWaitBeforeCompact": "Attendi che il lavoro in questo canale finisca, poi compattalo.",
@@ -251,6 +253,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "La risposta dell'accesso non è arrivata in tempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot non ha potuto leggere le informazioni di accesso di questo server. Controlla l’indirizzo del server e riprova.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Il server di accesso ha inviato una risposta che OpenBot non può leggere. Se il servizio ti fornisce una chiave API o un token, aggiungilo nelle impostazioni di questo server, poi verifica di nuovo la connessione.",
   "error.backend.mcpServerExited":
     "Il server si è fermato prima di rispondere. Esegui il comando in un terminale per vedere l'errore.",
   "error.backend.mcpServerFailedToStart": "Il server non si è avviato: {reason}",

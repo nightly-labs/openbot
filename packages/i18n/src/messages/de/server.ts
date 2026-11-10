@@ -123,6 +123,24 @@ export const messages = {
     "OpenBot stoppt den Server und verschiebt seine Agenten, Chats und Dateien in den Papierkorb.",
   "server.local.deleting": "Server wird gelöscht…",
   "server.local.deletedTitle": "{name} gelöscht",
+  "server.install.title": "Neuer Server auf einem anderen Computer",
+  "server.install.description":
+    "Führe diesen Befehl auf einem Linux-Computer oder VPS aus, der dir gehört. Er installiert OpenBot und fügt den Server zu diesem Konto hinzu.",
+  "server.install.making": "Befehl für dieses Konto wird erstellt…",
+  "server.install.failed": "OpenBot konnte keinen Befehl erstellen. Prüfe die Internetverbindung.",
+  "server.install.copyForAgent": "Für einen KI-Agenten kopieren",
+  "server.install.expiresIn": "Funktioniert einmal. Läuft in {time} ab.",
+  "server.install.newCommand": "Neuer Befehl",
+  "server.install.waiting": "Warte, bis der Befehl auf deinem Server läuft…",
+  "server.install.starting": "{name} ist angemeldet. Server wird gestartet…",
+  "server.install.connected": "{name} ist verbunden.",
+  "server.install.offline": "{name} ist offline.",
+  "server.install.expired": "Dieser Befehl ist abgelaufen. Erstelle einen neuen.",
+  "server.install.agentPrompt":
+    'Installiere OpenBot auf diesem Linux-Server und melde ihn bei meinem OpenBot-Konto an.\nFühre diesen Befehl als root aus. Er stellt keine Fragen und dauert einige Minuten:\n\n{command}\n\nEr endet mit der Zeile "OpenBot is connected to your account." und dem Exit-Code 0.\nDer Befehl funktioniert einmal, 15 Minuten lang. Speichere ihn nirgends.',
+  "server.install.setUpWithAgent": "Mit einem Agenten einrichten",
+  "server.install.sshAgentPrompt":
+    "Verbinde dich per SSH mit meinem Linux-Server und installiere dort OpenBot als Server.\n\nSSH-Adresse (user@host):",
   "server.add.limit.title": "Dieses Konto hat die maximale Anzahl von Servern",
   "server.add.limit.description": {
     one: "Ein Konto kann {count} kostenpflichtigen Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",

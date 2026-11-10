@@ -314,6 +314,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Recarregar modelos",
   "mobile.agent.runtime.loadingModels": "Carregando modelos…",
   "mobile.agent.runtime.noModels": "Nenhum modelo disponível para este provedor.",
+  "mobile.agent.runtime.searchModels": "Buscar modelos",
+  "mobile.agent.runtime.noMatches": "Nenhum modelo corresponde à sua busca.",
   "mobile.agent.runtime.usageLimit": "Limite de uso atingido",
   "mobile.agent.runtime.usageLimitWindow": "Limite ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Renova em {time}",
@@ -537,6 +539,7 @@ export const messages = {
   "mobile.agent.list.openPinnedWithTitle": "Abrir chat fixado com {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
   "mobile.agent.list.unread": { one: "{count} mensagem não lida", other: "{count} mensagens não lidas" },
+  "mobile.agent.list.unreadThreads": "Mensagens não lidas em tópicos",
   "mobile.agent.list.waiting.title": "Precisa de você",
   "mobile.agent.list.waiting.label": {
     one: "Precisa de você, {count} agente",

@@ -57,7 +57,8 @@ const summary = fields({
   ),
 });
 
-const preview = fields({
+/** The stage preview. `instance-transfer-chunks-v1` finish answers the same shape. */
+export const INSTANCE_TRANSFER_PREVIEW = fields({
   token: identifier,
   appVersion: string(64),
   exportedAt: nullable(string(64)),
@@ -95,7 +96,7 @@ export const INSTANCE_TRANSFER_CODECS: ReadonlyMap<string, OptionalRouteCodec> =
     adminRoute(fields({ agentIds: list(identifier, 100), includeFiles: boolean, includeSettings: boolean }), empty),
   ],
   // The request body is the raw `.zip`, so its decoder never reads it.
-  [INSTANCE_TRANSFER_ROUTES.stage, adminRoute(empty, preview)],
+  [INSTANCE_TRANSFER_ROUTES.stage, adminRoute(empty, INSTANCE_TRANSFER_PREVIEW)],
   [
     INSTANCE_TRANSFER_ROUTES.apply,
     adminRoute(

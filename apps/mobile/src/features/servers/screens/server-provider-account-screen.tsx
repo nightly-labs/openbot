@@ -11,6 +11,10 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import LogOut from "lucide-react-native/icons/log-out";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
@@ -28,6 +32,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -219,6 +224,7 @@ function AccountPage({
           <SettingsRow
             disclosure={false}
             disabled={pending !== null}
+            leading={<RowIcon icon={RefreshCw} tone="accent" />}
             onPress={() =>
               // The sign-in page runs the relayed sign-in and comes back here when it ends.
               openSignIn({ serverId, provider, method: "relay", account: account.id })
@@ -235,6 +241,7 @@ function AccountPage({
           <SettingsRow
             disclosure={false}
             disabled={pending !== null}
+            leading={<RowIcon icon={RotateCcw} tone="accent" />}
             onPress={() =>
               Alert.alert(
                 t("mobile.server.providers.resetUsageTitle", { name }),
@@ -270,6 +277,7 @@ function AccountPage({
           <SettingsRow
             disclosure={false}
             disabled={pending !== null}
+            leading={<RowIcon icon={LogOut} tone="danger" />}
             onPress={() =>
               Alert.alert(
                 t("mobile.server.providers.disconnectTitle", { name }),
@@ -300,6 +308,7 @@ function AccountPage({
           <SettingsRow
             disclosure={false}
             disabled={pending !== null}
+            leading={<RowIcon icon={Trash2} tone="danger" />}
             onPress={() =>
               Alert.alert(
                 t("mobile.server.providers.removeAccountTitle", { name }),

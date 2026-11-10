@@ -612,14 +612,25 @@ export type TeamChannelsApi = Pick<
   | "listChannelRoutineRuns"
 >;
 
+/**
+ * A host with channel-picture-v1 names a channel image by its `openbot-avatar:` URL, which a browser
+ * cannot open. Without it, the channel shows its icon or its member faces.
+ */
+function withoutHostImage<T extends { imageUrl?: string | null }>(channel: T): T {
+  return channel.imageUrl ? { ...channel, imageUrl: null } : channel;
+}
+
 /** Every channel route is a POST with the channel in the body, except the list. */
 export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
   return {
-    listChannels: () => request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries),
-    readChannel: (input) => post(CHANNEL_ROUTES.read, decodeChannelPage, input),
-    channelCommand: (command) => post(CHANNEL_ROUTES.command, decodeChannel, command),
+    listChannels: async () => (await request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries)).map(withoutHostImage),
+    readChannel: async (input) => {
+      const page = await post(CHANNEL_ROUTES.read, decodeChannelPage, input);
+      return { ...page, channel: withoutHostImage(page.channel) };
+    },
+    channelCommand: async (command) => withoutHostImage(await post(CHANNEL_ROUTES.command, decodeChannel, command)),
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),

@@ -199,6 +199,11 @@ export const messages = {
   "settings.notch.show.title": "在 MacBook 刘海处显示状态",
   "settings.notch.show.titleTopOfScreen": "在屏幕顶部显示状态",
   "settings.notch.show.description": "在每个屏幕顶部显示助手活动和需要关注的事项。",
+  "settings.notch.xwayland.title": "需要重新启动",
+  "settings.notch.xwayland.description":
+    "在 Wayland 上，OpenBot 必须使用 XWayland 才能在其他应用上方显示灵动岛。在此之前，灵动岛不会显示。",
+  "settings.notch.xwayland.unsupported": "在没有 XWayland 的 Wayland 上，灵动岛无法显示在其他应用上方。",
+  "settings.notch.xwayland.restart": "重新启动",
   "settings.notch.idle.title": "空闲时显示灵动岛",
   "settings.notch.idle.description": "没有活跃状态时显示 OpenBot 标志和问候语。",
   "settings.notch.displays.title": "在其他显示器上显示",
@@ -222,6 +227,12 @@ export const messages = {
   "settings.agentDock.placement.description": "选择“在其他应用上方”后，OpenBot 在后台时停靠栏也会显示在屏幕上。",
   "settings.agentDock.placement.screen": "在其他应用上方",
   "settings.agentDock.placement.window": "在 OpenBot 窗口中",
+  "settings.agentDock.xwayland.title": "需要重新启动",
+  "settings.agentDock.xwayland.description":
+    "在 Wayland 上，OpenBot 必须使用 XWayland 才能在其他应用上方显示停靠栏。在此之前，停靠栏显示在 OpenBot 窗口中。",
+  "settings.agentDock.xwayland.unsupported":
+    "在没有 XWayland 的 Wayland 上，停靠栏无法显示在其他应用上方。它显示在 OpenBot 窗口中。",
+  "settings.agentDock.xwayland.restart": "重新启动",
   "settings.agentDock.display.title": "显示器",
   "settings.agentDock.display.description": "如果该显示器未连接，停靠栏会移到 OpenBot 窗口所在的显示器。",
   "settings.agentDock.display.window": "跟随 OpenBot 窗口",
@@ -645,7 +656,6 @@ export const messages = {
   "settings.transfer.old.text": "把它的助手和服务器设置保存到文件。",
   "settings.transfer.new.title": "导入到该服务器",
   "settings.transfer.new.text": "从文件添加助手和服务器设置。",
-  "settings.transfer.notMoved": "API 密钥、登录状态、连接器、应用偏好和对话记录不会迁移，请在新服务器上重新设置。",
   "settings.transfer.back": "返回",
   "settings.transfer.loading": "正在读取你的助手…",
   "settings.transfer.summary.label": "文件内容",

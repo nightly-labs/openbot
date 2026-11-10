@@ -72,6 +72,7 @@ export const messages = {
     "Kanalda onaylanmamış bir görev başlangıcı var. Silmeden önce sonucunu kontrol edin.",
   "error.backend.channelNotFound": "Kanal bulunamadı.",
   "error.backend.channelMemberUnavailable": "Bir kanal üyesi kullanılamıyor.",
+  "error.backend.channelInstructionsTooLong": "Talimatları 2.000 karaktere kısaltın. Daha uzun talimatlar kaydedilmez.",
   "error.backend.channelWaitBeforeNewConversation":
     "Bu kanaldaki iş bitene kadar bekleyin, sonra yeni bir konuşma başlatın.",
   "error.backend.channelWaitBeforeCompact": "Bu kanaldaki iş bitene kadar bekleyin, sonra kanalı sıkıştırın.",
@@ -235,6 +236,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "Oturum açma yanıtı zamanında gelmedi.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot bu sunucunun oturum açma bilgilerini okuyamadı. Sunucu adresini denetleyin ve yeniden deneyin.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Oturum açma sunucusu OpenBot'un okuyamadığı bir yanıt gönderdi. Hizmet size bir API anahtarı veya belirteç veriyorsa bunu bu sunucunun ayarlarına ekleyin, ardından bağlantıyı yeniden test edin.",
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",

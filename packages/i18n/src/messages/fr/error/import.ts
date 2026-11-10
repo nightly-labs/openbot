@@ -54,6 +54,8 @@ export const messages = {
     "Ce serveur accepte un export de 100 Mo au maximum. Mettez à jour OpenBot sur le serveur pour importer un export plus grand.",
   "error.import.skillKept":
     "{name} : le serveur a déjà la compétence « {skill} », l’agent utilise donc celle-ci. Demandez à un administrateur de la mettre à jour.",
+  "error.import.skillRenamed":
+    "{name} : le nom de la compétence « {skill} » est trop proche de celui d’une autre compétence, elle est donc enregistrée sous « {renamed} ».",
   "error.import.transferRemoteTooLarge":
     "Un fichier de transfert pour un serveur rejoint doit faire moins de 100 Mo. Désactivez les fichiers des espaces de travail ou exportez moins d’agents.",
   "error.import.transferNotFile": "Ce fichier n’est pas un fichier de transfert OpenBot.",

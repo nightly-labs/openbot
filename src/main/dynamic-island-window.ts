@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import type {
+  AgentDockInputRect,
   DynamicIslandAction,
   DynamicIslandNotchSize,
   DynamicIslandPreference,
@@ -40,14 +41,6 @@ const MACBOOK_NOTCH_REFERENCE = {
 } as const;
 const MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE = 0.01;
 
-/**
- * The platforms that show the island. A Windows display has no notch: the built-in display gets the
- * notch shape at the top edge, and other displays get the floating island, as on a Mac.
- */
-function dynamicIslandSupported(platform: NodeJS.Platform): boolean {
-  return platform === "darwin" || platform === "win32";
-}
-
 /** A Dynamic Island operation that failed. The cause is what the renderer reads. */
 export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>()("DynamicIslandFailed", {
   cause: Schema.Defect(),
@@ -55,8 +48,17 @@ export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>
 
 export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFailed);
 
+/**
+ * The window that holds the island. `panel` is a macOS panel and `tool` a Windows tool window: each lets
+ * the pointer through and forwards its moves. A Windows display has no notch: the built-in display gets
+ * the notch shape at the top edge, and other displays get the floating island, as on a Mac. `x11` is a
+ * dock window on X11 or XWayland: its shape takes the pointer, so it follows the island. Null: this
+ * process can put no window above the other apps, as on native Wayland.
+ */
+type DynamicIslandWindowKind = "panel" | "tool" | "x11";
+
 export interface DynamicIslandWindowControllerOptions {
-  platform: NodeJS.Platform;
+  windowKind: DynamicIslandWindowKind | null;
   preferencePath: string;
   /** The preference before the user saves one. Development builds start with the island off. */
   defaultPreference?: DynamicIslandPreference;
@@ -82,6 +84,8 @@ export class DynamicIslandWindowController {
   readonly #criticalActions = new Map<string, Deferred.Deferred<void, DynamicIslandFailed>>();
   readonly #notchSizes = new Map<number, { width: number; height: number }>();
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  /** X11: the parts of each window that the island renderer reported last. */
+  readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
   readonly #windowReconciliation = Semaphore.makeUnsafe(1);
   #destroyed = false;
@@ -111,7 +115,7 @@ export class DynamicIslandWindowController {
   /** The notch of the built-in display, or null when there is no built-in display or it has no notch. */
   get builtInDisplayGeometry(): DynamicIslandNotchSize | null {
     const builtIn = this.#options.getDisplays().find((display) => display.internal);
-    return (builtIn && dynamicIslandNotchSizeForDisplay(builtIn, this.#options.platform)) ?? null;
+    return (builtIn && this.#notchSize(builtIn)) ?? null;
   }
 
   get mainRendererIds(): ReadonlySet<number> {
@@ -162,10 +166,11 @@ export class DynamicIslandWindowController {
     if (interactive) this.#interactiveDisplays.add(displayId);
     else this.#interactiveDisplays.delete(displayId);
     const display = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
-    const bounds = display ? dynamicIslandWindowBounds(display, this.#options.platform) : undefined;
+    const bounds = display ? this.#islandBounds(display) : undefined;
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
-    window.setIgnoreMouseEvents(!interactive, { forward: true });
+    if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
+    else window.setIgnoreMouseEvents(!interactive, { forward: true });
     // On macOS, focusability also allows the panel to become a main window in AltTab. The panel is
     // focusable only while a text field on it needs key input. A panel becomes key without
     // activating the app, so the main window stays where it is.
@@ -183,24 +188,55 @@ export class DynamicIslandWindowController {
         // rather than replaying the rectangle captured when the pointer left.
         const current = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
         if (!current) return;
-        window.setBounds(
-          this.#windowBounds(current, dynamicIslandWindowBounds(current, this.#options.platform), false),
-          false,
-        );
+        window.setBounds(this.#windowBounds(current, this.#islandBounds(current), false), false);
+        if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
       }, DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS),
     );
   }
 
-  #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
-    if (interactive) return bounds;
-    const compactHeight = dynamicIslandCompactHeight(
-      dynamicIslandNotchSizeForDisplay(display, this.#options.platform)?.height,
-      this.#preference.heightPercent,
+  /**
+   * X11: only these parts of the window take the pointer, and only they show. While the island is open
+   * or animates shut, all of the window does: the expanded island changes its size at each frame.
+   */
+  setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
+    if (this.#options.windowKind !== "x11") return;
+    const entry = [...this.#windows].find(
+      ([, candidate]) => !candidate.isDestroyed() && candidate.webContents.id === rendererId,
     );
+    if (!entry) return;
+    const [displayId, window] = entry;
+    this.#inputRegions.set(displayId, rects);
+    this.#applyShape(displayId, window);
+  }
+
+  #applyShape(displayId: number, window: BrowserWindow): void {
+    if (this.#interactiveDisplays.has(displayId) || this.#collapseTimers.has(displayId)) {
+      const { width, height } = window.getBounds();
+      window.setShape([{ x: 0, y: 0, width, height }]);
+      return;
+    }
+    window.setShape(this.#inputRegions.get(displayId) ?? []);
+  }
+
+  /** On X11 the island stays below the top panel of the desktop, as the clock and the tray do. */
+  #islandBounds(display: Pick<Display, "bounds" | "workArea">): Rectangle {
+    return dynamicIslandWindowBounds(display, this.#options.windowKind === "panel" ? "screen" : "work-area");
+  }
+
+  #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
+    // X11: the window keeps its full size, and its shape follows the island. A resize at each hover
+    // would also make the window manager place the window again.
+    if (interactive || this.#options.windowKind === "x11") return bounds;
+    const compactHeight = dynamicIslandCompactHeight(this.#notchSize(display)?.height, this.#preference.heightPercent);
     return {
       ...bounds,
       height: Math.max(DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT, compactHeight + DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM),
     };
+  }
+
+  /** Only a MacBook has a notch. */
+  #notchSize(display: Pick<Display, "bounds" | "internal">): DynamicIslandNotchSize | undefined {
+    return this.#options.windowKind === "panel" ? dynamicIslandNotchSizeForDisplay(display, "darwin") : undefined;
   }
 
   #cancelCollapse(displayId: number): void {
@@ -280,7 +316,7 @@ export class DynamicIslandWindowController {
   readonly #reconcileWindows = Effect.fn("DynamicIsland.reconcileWindows")(function* (
     this: DynamicIslandWindowController,
   ) {
-    if (this.#destroyed || !dynamicIslandSupported(this.#options.platform) || !this.#preference.enabled) {
+    if (this.#destroyed || this.#options.windowKind === null || !this.#preference.enabled) {
       this.destroyWindows();
       return;
     }
@@ -299,14 +335,15 @@ export class DynamicIslandWindowController {
       this.#windows.delete(displayId);
       this.#interactiveDisplays.delete(displayId);
       this.#notchSizes.delete(displayId);
+      this.#inputRegions.delete(displayId);
       this.#cancelCollapse(displayId);
       if (!window.isDestroyed()) window.destroy();
     }
 
     for (const display of displays) {
       if (this.#destroyed) return;
-      const bounds = dynamicIslandWindowBounds(display, this.#options.platform);
-      const notchSize = dynamicIslandNotchSizeForDisplay(display, this.#options.platform);
+      const bounds = this.#islandBounds(display);
+      const notchSize = this.#notchSize(display);
       const current = this.#windows.get(display.id);
       if (current && !current.isDestroyed()) {
         current.setBounds(
@@ -322,7 +359,7 @@ export class DynamicIslandWindowController {
             this.#rememberNotchSize(display.id, notchSize);
           }
         }
-        current.showInactive();
+        this.#show(current);
         continue;
       }
       yield* this.#createDisplayWindow(display, bounds).pipe(
@@ -337,6 +374,12 @@ export class DynamicIslandWindowController {
       );
     }
   }).bind(this);
+
+  #show(window: BrowserWindow): void {
+    window.showInactive();
+    // An X11 window manager reads the desktop of a window when it maps it: before, the setting is lost.
+    if (this.#options.windowKind === "x11") window.setVisibleOnAllWorkspaces(true);
+  }
 
   /** A window that cannot be created or loaded fails here, so that the other displays still get theirs. */
   #createDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
@@ -354,7 +397,7 @@ export class DynamicIslandWindowController {
     window.setAlwaysOnTop(true, "status");
     // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
     // defined on Windows, so a call there throws.
-    if (this.#options.platform === "darwin") {
+    if (this.#options.windowKind === "panel") {
       window.excludedFromShownWindowsMenu = true;
       window.setWindowButtonVisibility(false);
       window.setVisibleOnAllWorkspaces(true, {
@@ -363,21 +406,26 @@ export class DynamicIslandWindowController {
       });
       window.setHiddenInMissionControl(true);
     }
+    if (this.#options.windowKind === "x11") {
+      // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
+      window.setShape([]);
+    } else {
+      window.setIgnoreMouseEvents(true, { forward: true });
+    }
     window.setFocusable(false);
-    window.setIgnoreMouseEvents(true, { forward: true });
     window.webContents.on("did-finish-load", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, this.#presentation);
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
-      const notchSize = dynamicIslandNotchSizeForDisplay(currentDisplay, this.#options.platform);
+      const notchSize = this.#notchSize(currentDisplay);
       if (sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
         this.#rememberNotchSize(display.id, notchSize);
       }
     });
     window.once("ready-to-show", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
-      window.showInactive();
+      this.#show(window);
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
     // macOS moves a window off a display that goes away, for example when the displays sleep, and
@@ -387,7 +435,7 @@ export class DynamicIslandWindowController {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const current = this.#options.getDisplays().find((candidate) => candidate.id === display.id);
       if (!current) return;
-      const bounds = dynamicIslandWindowBounds(current, this.#options.platform);
+      const bounds = this.#islandBounds(current);
       const { x, y } = window.getBounds();
       if (x === bounds.x && y === bounds.y) return;
       const interactive = this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id);
@@ -398,6 +446,7 @@ export class DynamicIslandWindowController {
         this.#windows.delete(display.id);
         this.#interactiveDisplays.delete(display.id);
         this.#notchSizes.delete(display.id);
+        this.#inputRegions.delete(display.id);
         this.#cancelCollapse(display.id);
       }
     });
@@ -437,6 +486,7 @@ export class DynamicIslandWindowController {
     this.#windows.clear();
     this.#interactiveDisplays.clear();
     this.#notchSizes.clear();
+    this.#inputRegions.clear();
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
     }
@@ -478,15 +528,16 @@ function criticalActionKey(action: CriticalAction): string {
 
 /**
  * On macOS the island sits in the menu bar, at the top of the display. On Windows it starts below a
- * taskbar at the top of the display, because the taskbar is also a topmost window.
+ * taskbar at the top of the display, because the taskbar is also a topmost window. On X11 it stays below
+ * the top panel of the desktop, as the clock and the tray do.
  */
 function dynamicIslandWindowBounds(
   display: Pick<Display, "bounds" | "workArea">,
-  platform: NodeJS.Platform,
+  top: "screen" | "work-area",
 ): Rectangle {
   return {
     x: Math.round(display.bounds.x + (display.bounds.width - DYNAMIC_ISLAND_WINDOW_SIZE.width) / 2),
-    y: platform === "win32" ? display.workArea.y : display.bounds.y,
+    y: top === "work-area" ? display.workArea.y : display.bounds.y,
     ...DYNAMIC_ISLAND_WINDOW_SIZE,
   };
 }

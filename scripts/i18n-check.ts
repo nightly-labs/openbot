@@ -47,6 +47,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelHistoryArriving",
   // A channel task from v0.59.0 can keep this text as its stored error.
   "error.backend.channelHistoryLeadRequired",
+  // A channel task from v0.66.0 or earlier can keep this text as its stored error, and an older host sends it.
+  "error.backend.channelRoutingUnreadable",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

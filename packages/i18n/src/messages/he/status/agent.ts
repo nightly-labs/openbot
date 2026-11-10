@@ -28,6 +28,9 @@ export const messages = {
   "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
   "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
   "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
+  "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
   "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",

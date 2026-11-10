@@ -3,6 +3,7 @@ import type {
   AgentDefaults,
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockInputRect,
   AgentDockPresentation,
   AgentMemoryLimitPreference,
   AgentProviderId,
@@ -38,6 +39,7 @@ import type {
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAgentDockInteractiveInput,
+  SetAgentDockXWaylandInput,
   SetAnalyticsPreferenceInput,
   SetAppAppearancePreferenceInput,
   SetAppInterfaceSizePreferenceInput,
@@ -57,8 +59,10 @@ import {
   isAgentDefaults,
   isAgentDockAction,
   isAgentDockDragPhase,
+  isAgentDockInputRegion,
   isAgentDockInteractive,
   isAgentDockPresentation,
+  isAgentDockXWayland,
   isAgentMemoryLimit,
   isAgentModel,
   isAgentProvider,
@@ -341,6 +345,26 @@ export function parseAgentDockAction(input: unknown): AgentDockAction {
 export function parseAgentDockInteractive(input: unknown): SetAgentDockInteractiveInput {
   if (isAgentDockInteractive(input)) return input;
   throw new Error("Agent dock interaction state is required.");
+}
+
+export function parseAgentDockXWayland(input: unknown): SetAgentDockXWaylandInput {
+  if (isAgentDockXWayland(input)) return input;
+  throw new Error("Agent dock XWayland state is required.");
+}
+
+export function parseAgentDockInputRegion(input: unknown): AgentDockInputRect[] {
+  if (isAgentDockInputRegion(input)) return input;
+  throw new Error("Agent dock input region is invalid.");
+}
+
+export function parseDynamicIslandXWayland(input: unknown): SetAgentDockXWaylandInput {
+  if (isAgentDockXWayland(input)) return input;
+  throw new Error("Dynamic Island XWayland state is required.");
+}
+
+export function parseDynamicIslandInputRegion(input: unknown): AgentDockInputRect[] {
+  if (isAgentDockInputRegion(input)) return input;
+  throw new Error("Dynamic Island input region is invalid.");
 }
 
 export function parseAgentDockDragPhase(input: unknown): AgentDockDragPhase {

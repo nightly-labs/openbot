@@ -30,6 +30,9 @@ export const messages = defineMessages("status.agent", {
     "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
   "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
   "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.serverInstallCommand":
+    "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
+  "status.agent.serverInstallCard": "Install command for the server {name}",
   "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
@@ -119,4 +122,5 @@ export const messages = defineMessages("status.agent", {
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
+  "status.agent.importedChatTitle": "Imported chat",
 });

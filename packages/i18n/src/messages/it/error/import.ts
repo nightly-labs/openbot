@@ -53,6 +53,8 @@ export const messages = {
     "Questo server accetta un'esportazione fino a 100 MB. Aggiorna OpenBot sul server per importare un'esportazione più grande.",
   "error.import.skillKept":
     "{name}: il server ha già la skill «{skill}», quindi l'agente usa quella skill. Chiedi a un amministratore di aggiornarla.",
+  "error.import.skillRenamed":
+    "{name}: il nome della skill «{skill}» è troppo simile a quello di un'altra skill, quindi viene salvata come «{renamed}».",
   "error.import.transferRemoteTooLarge":
     "Un file di trasferimento per un server a cui ti sei unito deve pesare meno di 100 MB. Disattiva i file del workspace o esporta meno agenti.",
   "error.import.transferNotFile": "Questo file non è un file di trasferimento OpenBot.",

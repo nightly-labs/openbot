@@ -46,6 +46,7 @@ export const messages = {
     "يقبل هذا الخادم تصديرًا حتى 100 MB. حدّث OpenBot على الخادم لاستيراد تصدير أكبر.",
   "error.import.skillKept":
     "{name}: لدى الخادم المهارة «{skill}» بالفعل، لذا يستخدم الوكيل تلك المهارة. اطلب من مسؤول تحديثها.",
+  "error.import.skillRenamed": "{name}: اسم المهارة «{skill}» قريب جدًا من اسم مهارة أخرى، لذا حُفظت باسم «{renamed}».",
   "error.import.hermesNoProfiles":
     "لا يحتوي هذا المجلد على ملفات تعريف Hermes. اختر مجلد Hermes الذي يحتوي على config.yaml أو SOUL.md.",
   "error.import.hermesClosed": "لم تعد ملفات تعريف Hermes مفتوحة. اقرأها مرة أخرى.",

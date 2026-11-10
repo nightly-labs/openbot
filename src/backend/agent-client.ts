@@ -63,9 +63,9 @@ export interface AgentClient {
    */
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   /**
-   * Hides a thread that a replacement session took over from the provider's own thread list, and
-   * keeps its history readable. Optional, because only a provider that shows its threads to the user
-   * in another app has a list to keep clean.
+   * Hides a thread that a replacement session took over, or that a deleted agent leaves, from the
+   * provider's own thread list, and keeps its history readable. Optional, because only a provider
+   * that shows its threads to the user in another app has a list to keep clean.
    */
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   /**

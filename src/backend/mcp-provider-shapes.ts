@@ -466,7 +466,11 @@ export type ClaudeMcpServer =
   | { type: "stdio"; command: string; args: string[]; env: Record<string, string>; cwd?: string }
   | { type: "http"; url: string; headers: Record<string, string> };
 
-export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<Record<string, ClaudeMcpServer>> {
+/** `userAgent` goes on each http entry whose row has no `User-Agent` of its own. */
+export function claudeMcpServers(
+  servers: readonly UsableMcpServer[],
+  userAgent?: string,
+): McpHandoff<Record<string, ClaudeMcpServer>> {
   const record: Record<string, ClaudeMcpServer> = {};
   const dropped: McpServerDrop[] = [];
   for (const server of servers) {
@@ -484,9 +488,14 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandof
             env: mcpLaunchEnvironment(server),
             ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
-        : { type: "http", url: server.url, headers: mcpHandoffHeaders(server) };
+        : { type: "http", url: server.url, headers: withUserAgent(mcpHandoffHeaders(server), userAgent) };
   }
   return { servers: record, dropped };
+}
+
+function withUserAgent(headers: Record<string, string>, userAgent: string | undefined): Record<string, string> {
+  if (!userAgent || Object.keys(headers).some((key) => key.toLowerCase() === "user-agent")) return headers;
+  return { ...headers, "User-Agent": userAgent };
 }
 
 /**

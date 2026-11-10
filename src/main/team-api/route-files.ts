@@ -192,15 +192,18 @@ export async function sendFile(
   path: string,
   tooLarge: string | null,
   headers: (size: number) => OutgoingHttpHeaders,
+  /** Sends only these bytes of the file, or fewer when the file is shorter. */
+  range: { start: number; length: number } | null = null,
 ): Promise<"handled"> {
   const file = await open(path, "r");
+  const start = range?.start ?? 0;
   let size: number;
   let head: OutgoingHttpHeaders;
   try {
     const metadata = await file.stat();
     if (!metadata.isFile()) throw new Error("The requested path is not a file.");
     if (tooLarge !== null && metadata.size > ATTACHMENT_LIMITS.fileBytes) throw new HttpError(413, tooLarge);
-    size = metadata.size;
+    size = range ? Math.max(0, Math.min(range.length, metadata.size - start)) : metadata.size;
     head = headers(size);
   } catch (error) {
     await file.close();
@@ -212,7 +215,7 @@ export async function sendFile(
     response.end();
     return "handled";
   }
-  const stream = file.createReadStream({ start: 0, end: size - 1 });
+  const stream = file.createReadStream({ start, end: start + size - 1 });
   try {
     await pipeline(stream, response, { end: false });
   } catch (error) {

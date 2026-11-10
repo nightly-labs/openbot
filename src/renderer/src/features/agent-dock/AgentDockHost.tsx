@@ -63,26 +63,55 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 /**
  * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it is not macOS or Windows.
+ * known yet, or it has no dock. On Linux with Wayland windows, the dock above other apps waits for a
+ * start on XWayland, and shows in the window until then.
  */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
   return () => {
-    const os = platform.appInfo()?.platform;
-    if ((os !== "darwin" && os !== "win32") || !preference().shown) return null;
-    return preference().placement;
+    const info = platform.appInfo();
+    if (!info || !preference().shown) return null;
+    const placement = preference().placement;
+    return placement === "screen" && info.aboveAppsSupport ? "window" : placement;
   };
 }
 
 /**
- * The agent dock of the active server, on macOS and Windows. Each server has its own dock. By default the dock
+ * The agent dock of the active server, on macOS, Windows and Linux. Each server has its own dock. By default the dock
  * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
  * what it shows. The user can keep it in the main window instead.
  */
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
+  const platform = usePlatform();
+  const preference = useAgentDockPreference();
+
+  /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
+     session uses Wayland again. A dock that the user turns on again on XWayland keeps it; a dock that
+     was on at start does not, so a start on XWayland for another reason stays a single start. On
+     Wayland, only the restart in the settings turns it on. */
+  let wasOn: boolean | undefined;
+  createEffect(
+    () => {
+      const info = platform.appInfo();
+      if (info?.platform !== "linux") return undefined;
+      return {
+        on: preference().shown && preference().placement === "screen",
+        onWayland: info.aboveAppsSupport !== undefined,
+      };
+    },
+    (state) => {
+      if (state === undefined) return;
+      const turnedOn = state.on && wasOn === false;
+      wasOn = state.on;
+      if (state.on && (!turnedOn || state.onWayland)) return;
+      void agentDockPort()
+        .agentDock.setXWayland({ enabled: state.on })
+        .catch(() => undefined);
+    },
+  );
 
   /* The window hides when no server is active, when the dock is off or in the main window, and when
      this renderer goes away. */
@@ -260,17 +289,27 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 
   /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
   const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
-  /* The rows of the shown channel. The reader's own messages carry no sender, so they show as their own. */
+  /* The dock shows a message with no sender as the reader's own. A signed-in reader's messages carry their sender. */
+  const ownCopies = new WeakMap<AgentMessage, AgentMessage>();
+  const asOwn = (message: AgentMessage): AgentMessage => {
+    if (message.author !== "you" || !message.senderMember || !isOwnSender(message.senderMember.id)) return message;
+    /* A copy stays the same while the text, the kind and the files of its message stay: the chat reads it
+       again for each streamed word of an answer, and a new copy would draw the row again. */
+    const copy = ownCopies.get(message);
+    if (copy && copy.body === message.body && copy.kind === message.kind && copy.attachments === message.attachments)
+      return copy;
+    const { senderMember: _own, ...own } = message;
+    ownCopies.set(message, own);
+    return own;
+  };
+  /* The rows of the shown channel. */
   const channelMessages = createMemo((): AgentMessage[] => {
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map((row) => {
-      if (row.author !== "you" || !row.senderMember || !isOwnSender(row.senderMember.id)) return row;
-      const { senderMember: _own, ...own } = row;
-      return own;
-    });
+    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn);
   });
+  const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
 
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel => {
     if (seat.kind === "channel") {
@@ -283,7 +322,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     }
     const state = agentStates()[seat.id];
     return {
-      messages: conversations[seat.id]?.messages ?? [],
+      messages: agentMessages(seat.id),
       working: Boolean(workingTurns()[seat.id]),
       wait: state?.kind === "waiting" ? state.reason : null,
     };
@@ -366,6 +405,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     results,
     chat,
     channelMessages,
+    agentMessages,
     openSeat,
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
@@ -450,7 +490,6 @@ function WindowAgentDock(props: { serverId: string }) {
  * Main sends the messages typed in the dock, so `send` does not come here.
  */
 function ScreenAgentDock(props: { serverId: string }) {
-  const { conversations } = useConversation();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const { openAppSettings } = useSettings();
@@ -478,7 +517,7 @@ function ScreenAgentDock(props: { serverId: string }) {
       availableChannels: dock.availableChannels().slice(0, AGENT_DOCK_LIMITS.channels).map(plainChannel),
       agents: dock.agents().slice(0, INPUT_LIMITS.agents).map(dockAgent),
       chats: openChats(dock.openSeat(), dock.chat, (seat) =>
-        seat.kind === "channel" ? dock.channelMessages() : (conversations[seat.id]?.messages ?? []),
+        seat.kind === "channel" ? dock.channelMessages() : dock.agentMessages(seat.id),
       ),
       results: dock.results(),
     }),

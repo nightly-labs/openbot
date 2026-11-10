@@ -57,6 +57,11 @@ export interface HostWebhookRelay {
   setAccountActive(active: boolean): void;
   /** Applies route changes to the open relay connection. */
   refresh(): void;
+  /**
+   * Registers this host for the account when it has no ID or no machine token, without publishing
+   * it (#6029). A sync calls it once, before the first route that it registers.
+   */
+  ensureHost(): Effect.Effect<void>;
   registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict>;
   revokeRoute(routeId: string): Effect.Effect<void, { readonly cause: unknown }>;
 }
@@ -490,6 +495,7 @@ export class HostEventsService implements HostEventsApi {
       }
       const current = yield* eventStep(() => routes.list());
       const updatedOwners = new Map<string, WebhookRouteOwner>();
+      let hostChecked = false;
       for (const route of current) {
         if (!isCurrent()) return true;
         if (this.#options.accountPrincipal() === null) {
@@ -497,6 +503,11 @@ export class HostEventsService implements HostEventsApi {
           return true;
         }
         if (!options.all && route.url !== null) continue;
+        if (!hostChecked) {
+          hostChecked = true;
+          yield* relay.ensureHost();
+          if (!isCurrent()) return true;
+        }
         const ownerKey = `${route.owner.kind}:${route.owner.id}`;
         let { routeId, url } = route;
         let registered = yield* Effect.result(relay.registerRoute(routeId));

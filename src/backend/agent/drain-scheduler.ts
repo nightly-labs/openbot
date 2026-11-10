@@ -973,7 +973,9 @@ export class DrainScheduler {
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
-                ...(client.provider === "codex" ? this.#codexServiceTier(agent) : {}),
+                ...(client.provider === "codex" || client.provider === "claude"
+                  ? this.#serviceTier(agent, client.provider)
+                  : {}),
               },
               decodeTurnResponse,
             )
@@ -1182,7 +1184,11 @@ export class DrainScheduler {
   /** Sends the agent that asked the note that its request failed. A failed note does not stop the drain. */
   #answerFailedRequest(deliveryId: string, agentId: string): Effect.Effect<void> {
     return this.#mailbox
-      .answerFailedRequest(deliveryId, (taskId) => this.#tasks.threadId(taskId) !== null)
+      .answerFailedRequest(
+        deliveryId,
+        (taskId) => this.#tasks.threadId(taskId) !== null,
+        (id) => this.#store.list().some((agent) => agent.id === id),
+      )
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),
@@ -1278,10 +1284,10 @@ export class DrainScheduler {
   }
 
   /** The agent's account lists a model that only it serves, with its fast tier, before the catalogue (#5217). */
-  #codexServiceTier(agent: AgentSummary): { serviceTier?: string | null } {
+  #serviceTier(agent: AgentSummary, provider: "codex" | "claude"): { serviceTier?: string | null } {
     const current = this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
-    return codexServiceTier(current, [
-      ...this.#providers.accountModels("codex", current.providerAccountId),
+    return serviceTier(current, provider, [
+      ...this.#providers.accountModels(provider, current.providerAccountId),
       ...this.#providers.listModels(),
     ]);
   }
@@ -1294,18 +1300,22 @@ export class DeliveryStartFailed extends Schema.TaggedError<DeliveryStartFailed>
 const { sync: drainStep, rewrap: toDeliveryStartFailed } = causeHelpers(DeliveryStartFailed);
 
 /**
- * The Codex service tier of a turn. Codex keeps the tier for the next turns of the thread. An agent
- * that never set fast mode sends nothing, so Codex keeps its own tier; `null` returns the thread to
- * the standard tier, also for a model with no fast tier. While the catalog does not know the model,
- * such as before Codex lists its models, the turn sends nothing and keeps the tier of the thread.
+ * The Codex or Claude service tier of a turn. The provider keeps the tier for the next turns of the
+ * thread. An agent that never set fast mode sends nothing, so the provider keeps its own tier; `null`
+ * returns the thread to the standard tier, also for a model with no fast tier. While the catalog does
+ * not know the model, such as before the CLI lists its models, the turn sends nothing and keeps the
+ * tier of the thread.
  */
-function codexServiceTier(
-  agent: Pick<AgentSummary, "fastMode" | "model">,
+function serviceTier(
+  agent: Pick<AgentSummary, "fastMode" | "ultrafast" | "model">,
+  provider: "codex" | "claude",
   models: readonly AgentModelOption[],
 ): { serviceTier?: string | null } {
   if (agent.fastMode === undefined) return {};
   if (!agent.fastMode) return { serviceTier: null };
-  const model = models.find((candidate) => candidate.provider === "codex" && candidate.id === agent.model);
+  const model = models.find((candidate) => candidate.provider === provider && candidate.id === agent.model);
   if (!model) return {};
+  // Ultrafast on a model or account without the tier runs at Fast, the next fastest tier.
+  if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? model.fastServiceTier ?? null };
   return { serviceTier: model.fastServiceTier ?? null };
 }

@@ -123,6 +123,24 @@ export const messages = {
     "O OpenBot para o servidor e move os agentes, chats e arquivos dele para a lixeira.",
   "server.local.deleting": "Excluindo servidor…",
   "server.local.deletedTitle": "{name} excluído",
+  "server.install.title": "Novo servidor em outro computador",
+  "server.install.description":
+    "Execute este comando em um computador Linux ou VPS que seja seu. Ele instala o OpenBot e adiciona o servidor a esta conta.",
+  "server.install.making": "Criando um comando para esta conta…",
+  "server.install.failed": "O OpenBot não conseguiu criar um comando. Verifique a conexão com a internet.",
+  "server.install.copyForAgent": "Copiar para um agente de IA",
+  "server.install.expiresIn": "Funciona uma vez. Expira em {time}.",
+  "server.install.newCommand": "Novo comando",
+  "server.install.waiting": "Aguardando o comando ser executado no seu servidor…",
+  "server.install.starting": "{name} entrou. Iniciando o servidor…",
+  "server.install.connected": "{name} está conectado.",
+  "server.install.offline": "{name} está offline.",
+  "server.install.expired": "Este comando expirou. Crie um novo.",
+  "server.install.agentPrompt":
+    'Instale o OpenBot neste servidor Linux e conecte-o à minha conta do OpenBot.\nExecute este comando como root. Ele não faz perguntas e leva alguns minutos:\n\n{command}\n\nEle termina com a linha "OpenBot is connected to your account." e o código de saída 0.\nO comando funciona uma vez, por 15 minutos. Não o salve em lugar nenhum.',
+  "server.install.setUpWithAgent": "Configurar com um agente",
+  "server.install.sshAgentPrompt":
+    "Conecte-se por SSH ao meu servidor Linux e instale o OpenBot nele como servidor.\n\nEndereço SSH (user@host):",
   "server.add.limit.title": "Esta conta atingiu o número máximo de servidores",
   "server.add.limit.description": {
     one: "Uma conta pode ter {count} servidor pago. Para adicionar um servidor, exclua um primeiro.",

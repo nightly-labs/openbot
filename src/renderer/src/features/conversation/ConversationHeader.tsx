@@ -36,6 +36,7 @@ export function ConversationHeader() {
     browserControlAgent,
     channel,
     fastMode,
+    ultrafast,
     fastModeChange,
     props,
     runningTurnRuntime,
@@ -132,6 +133,7 @@ export function ConversationHeader() {
           void selectAndConfirmModel(model, provider, accountId, effort),
         onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
         fastMode: fastMode(),
+        ultrafast: ultrafast(),
         onFastModeChange: fastModeChange(),
       }}
       remoteControl={

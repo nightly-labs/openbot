@@ -199,6 +199,7 @@ import {
   decodeRemoteNetworkRouteState,
   decodeRemoteSessionReusePreference,
   decodeSentMessageStats,
+  decodeServerClaim,
   decodeSpeechAudio,
   decodeSpeechModelStatus,
   decodeSpeechSettings,
@@ -822,6 +823,8 @@ const openbotApi: OpenBotDesktopApi = {
     performAction: decodeVoid,
     action: decodeAgentDockAction,
     setInteractive: decodeVoid,
+    setInputRegion: decodeVoid,
+    setXWayland: decodeVoid,
     closeChat: decodeVoid,
     listDisplays: decodeAgentDockDisplays,
     drag: decodeVoid,
@@ -840,6 +843,8 @@ const openbotApi: OpenBotDesktopApi = {
     performHaptic: decodeVoid,
     action: decodeDynamicIslandAction,
     setInteractive: decodeVoid,
+    setInputRegion: decodeVoid,
+    setXWayland: decodeVoid,
   }),
   computerUse: bridgeGroup(IPC_ENDPOINTS.computerUse, {
     getState: decodeComputerUseState,
@@ -1098,6 +1103,7 @@ const openbotApi: OpenBotDesktopApi = {
     delete: decodeVoid,
     wake: decodeHostedServer,
     restart: decodeHostedServer,
+    createServerClaim: decodeServerClaim,
   }),
   localServers: bridgeGroup(IPC_ENDPOINTS.localServers, {
     create: decodeServer,

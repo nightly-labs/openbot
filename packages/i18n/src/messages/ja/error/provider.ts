@@ -262,6 +262,8 @@ export const messages = {
     "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
   "error.provider.cursorChecksum": "Cursor ランタイムのチェックサムが一致しません。",
   "error.provider.cursorReleaseShape": "Cursor のリリースの形式が予期しないものです。",
@@ -304,6 +306,8 @@ export const messages = {
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageTooSmall":
+    "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.museMcpStartupFault":

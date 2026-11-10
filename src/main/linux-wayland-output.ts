@@ -7,11 +7,18 @@
 // asks the compositor for its globals. With no `wl_output` and an X11 display (XWayland), it starts
 // OpenBot again with `--ozone-platform=x11` and exits: the X11 platform does not wait for a monitor.
 // When the monitor is on again, the window shows through XWayland. The next start uses Wayland again.
+//
+// The agent dock and the Dynamic Island above other apps need X11 windows: a Wayland client cannot set
+// its position, stay above other windows or show on all workspaces. When the user chooses one of them
+// on a Wayland session, each start goes to XWayland in the same way, until the user turns it off.
 
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { endianness } from "node:os";
 import { isAbsolute, join } from "node:path";
+import type { AboveAppsSupport } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
@@ -20,6 +27,19 @@ const logger = createOpenBotLogger("main");
 
 /** Set on the new process only, so that it logs why it uses X11 and never starts again itself. */
 const RESTART_MARKER = "OPENBOT_XWAYLAND_RESTART";
+/** Why a process started again on XWayland: no monitor, or a window above other apps. */
+export type XWaylandRestartReason = "monitor" | "above-apps";
+/** The windows above other apps that need XWayland on a Wayland session. */
+export type AboveAppsFeature = "agent-dock" | "dynamic-island";
+/**
+ * In `userData`, one file for each feature: the user put it above other apps, so each Wayland start
+ * uses XWayland. One file for each, so that a feature that the user turns off does not take XWayland
+ * from the other one.
+ */
+const ABOVE_APPS_XWAYLAND_FILES: Record<AboveAppsFeature, string> = {
+  "agent-dock": "agent-dock-xwayland",
+  "dynamic-island": "dynamic-island-xwayland",
+};
 const PROBE_TIMEOUT = "2 seconds";
 
 // Object ids of the probe: 1 is `wl_display`; the client picks 2 for the registry and 3 for the callback.
@@ -35,6 +55,10 @@ const readUInt32 = littleEndian ? Buffer.prototype.readUInt32LE : Buffer.prototy
 const writeUInt32 = littleEndian ? Buffer.prototype.writeUInt32LE : Buffer.prototype.writeUInt32BE;
 
 class WaylandProbeFailure extends Schema.TaggedError<WaylandProbeFailure>()("WaylandProbeFailure", {
+  cause: Schema.Defect(),
+}) {}
+
+class AboveAppsXWaylandFailure extends Schema.TaggedError<AboveAppsXWaylandFailure>()("AboveAppsXWaylandFailure", {
   cause: Schema.Defect(),
 }) {}
 
@@ -120,7 +144,10 @@ function listWaylandGlobals(socketPath: string): Effect.Effect<ReadonlySet<strin
   });
 }
 
-function startOnX11(environment: NodeJS.ProcessEnv): Effect.Effect<void, WaylandProbeFailure> {
+function startOnX11(
+  environment: NodeJS.ProcessEnv,
+  reason: XWaylandRestartReason,
+): Effect.Effect<void, WaylandProbeFailure> {
   return Effect.callback<void, WaylandProbeFailure>((resume) => {
     // An AppImage mounts itself for each start, and the mount of this process goes away with it.
     const executable = environment.APPIMAGE || process.execPath;
@@ -128,7 +155,7 @@ function startOnX11(environment: NodeJS.ProcessEnv): Effect.Effect<void, Wayland
     const child = spawn(executable, [...process.argv.slice(1), X11_ARGUMENT], {
       detached: true,
       stdio: ["ignore", "inherit", "inherit"],
-      env: { ...environment, [RESTART_MARKER]: "1" },
+      env: { ...environment, [RESTART_MARKER]: reason },
     });
     child.once("error", (cause) => resume(Effect.fail(new WaylandProbeFailure({ cause }))));
     child.once("spawn", () => {
@@ -139,15 +166,20 @@ function startOnX11(environment: NodeJS.ProcessEnv): Effect.Effect<void, Wayland
 }
 
 /**
- * True in the process that the restart below started. Agents do not inherit the marker. A relaunch
- * takes the arguments of `argv`, so the restart argument goes out of it: the next start probes again.
+ * Why this process started on XWayland, or null when no restart below started it. Agents do not inherit
+ * the marker. A relaunch takes the arguments of `argv`, so the restart argument goes out of it: the next
+ * start decides again.
  */
-export function takeXWaylandRestartMarker(environment: NodeJS.ProcessEnv, argv: string[]): boolean {
-  const restarted = environment[RESTART_MARKER] !== undefined;
+export function takeXWaylandRestartMarker(
+  environment: NodeJS.ProcessEnv,
+  argv: string[],
+): XWaylandRestartReason | null {
+  const marker = environment[RESTART_MARKER];
   delete environment[RESTART_MARKER];
+  if (marker === undefined) return null;
   const index = argv.lastIndexOf(X11_ARGUMENT);
-  if (restarted && index > 0) argv.splice(index, 1);
-  return restarted;
+  if (index > 0) argv.splice(index, 1);
+  return marker === "above-apps" ? "above-apps" : "monitor";
 }
 
 /**
@@ -159,6 +191,107 @@ export function ozonePlatformArguments(): string[] {
   const platform = app.commandLine.getSwitchValue("ozone-platform");
   return platform ? [`--ozone-platform=${platform}`] : [];
 }
+
+/** True when this Linux process draws its windows with X11: on an X server, or on XWayland. */
+export function usesX11Windows(): boolean {
+  return process.platform === "linux" && app.commandLine.getSwitchValue("ozone-platform") !== "wayland";
+}
+
+/**
+ * The window of the agent dock and the Dynamic Island: a macOS panel, a Windows tool window or an X11
+ * dock window. Null where they do not show: on Wayland windows, and on a server. A server has no user at
+ * its screen. On its virtual display the island and the dock would draw in software for nobody, and a
+ * computer-use agent would see them in its screenshots.
+ */
+export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" | null {
+  if (server) return null;
+  if (process.platform === "darwin") return "panel";
+  if (process.platform === "win32") return "tool";
+  return usesX11Windows() ? "x11" : null;
+}
+
+/**
+ * Whether the agent dock and the Dynamic Island can show above other apps. Missing: they can. On Wayland, only after a restart on
+ * XWayland, which needs a packaged app and an X11 display. A development build only quits on a restart.
+ */
+export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
+  if (process.platform !== "linux" || usesX11Windows()) return undefined;
+  // An explicit `--ozone-platform=wayland` stays on each start, so a restart would come back to Wayland.
+  return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
+}
+
+/** True when this process draws its windows on XWayland in a Wayland session. */
+function onXWayland(): boolean {
+  return usesX11Windows() && Boolean(process.env.WAYLAND_DISPLAY?.trim() || process.env.XDG_SESSION_TYPE === "wayland");
+}
+
+/**
+ * Keeps the start on XWayland for a feature that the user turned on again on XWayland, after a turn-off
+ * removed the restart file. Elsewhere it changes nothing and does not restart.
+ */
+export const keepAboveAppsXWayland = Effect.fn("keepAboveAppsXWayland")(function* (
+  userDataPath: string,
+  feature: AboveAppsFeature,
+) {
+  if (process.platform !== "linux" || !onXWayland()) return;
+  yield* Effect.tryPromise({
+    try: () => writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), ""),
+    catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
+  });
+});
+
+/**
+ * On: each start on Wayland goes to XWayland, and OpenBot starts again now. Already on XWayland, it only
+ * keeps that for the next start. Off: when the other feature does not need it, the next start uses
+ * Wayland again. The window stays on XWayland until then.
+ */
+export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* (
+  userDataPath: string,
+  feature: AboveAppsFeature,
+  enabled: boolean,
+) {
+  if (process.platform !== "linux") return;
+  const file = join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]);
+  if (!enabled) {
+    yield* Effect.tryPromise({
+      try: () => rm(file, { force: true }),
+      catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
+    });
+    return;
+  }
+  if (aboveAppsScreenSupport() !== "restart") return yield* keepAboveAppsXWayland(userDataPath, feature);
+  yield* Effect.tryPromise({
+    try: () => writeFile(file, ""),
+    catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
+  });
+  logger.info(`The ${feature} shows above other apps, so OpenBot starts again on XWayland.`);
+  // An AppImage mounts itself for each start, and the mount of this process goes away with it.
+  const execPath = process.env.APPIMAGE;
+  app.relaunch(execPath ? { execPath, args: process.argv.slice(1) } : { args: process.argv.slice(1) });
+  app.quit();
+});
+
+/**
+ * True when the user put the agent dock or the Dynamic Island above other apps on Wayland, a new OpenBot process on XWayland
+ * has started, and this one must exit before Chromium connects to Wayland. Run it before the
+ * single-instance lock, with the final `userData` path.
+ */
+export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAboveApps")(function* (
+  environment: NodeJS.ProcessEnv,
+  userDataPath: string,
+) {
+  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY) return false;
+  if (!Object.values(ABOVE_APPS_XWAYLAND_FILES).some((file) => existsSync(join(userDataPath, file)))) return false;
+  return yield* startOnX11(environment, "above-apps").pipe(
+    Effect.as(true),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        logger.warn("Could not start OpenBot on XWayland for the windows above other apps:", toLogValue(error.cause));
+        return false;
+      }),
+    ),
+  );
+});
 
 /**
  * True when a new OpenBot process on XWayland has started, and this one must exit before Chromium
@@ -185,7 +318,7 @@ export const restartOnXWaylandWithoutMonitor = Effect.fn("restartOnXWaylandWitho
     logger.warn("The Wayland session has no monitor and no XWayland. OpenBot starts when a monitor is on.");
     return false;
   }
-  return yield* startOnX11(environment).pipe(
+  return yield* startOnX11(environment, "monitor").pipe(
     Effect.as(true),
     Effect.catch((error) =>
       Effect.sync(() => {

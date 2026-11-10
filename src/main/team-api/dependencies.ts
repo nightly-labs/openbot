@@ -356,10 +356,13 @@ export type TeamApiAgentImport = Pick<
   "stageUpload" | "openUpload" | "writeUpload" | "stageParts" | "apply" | "discard"
 >;
 
-/** Its presence is what `#protocolSupport` advertises `instance-transfer-v1` on. Only admins use it. */
+/**
+ * Its presence is what `#protocolSupport` advertises `instance-transfer-v1` and
+ * `instance-transfer-chunks-v1` on. Only admins use it.
+ */
 export type TeamApiInstanceTransfer = Pick<
   InstanceTransferService,
-  "summary" | "exportForMember" | "stageUpload" | "apply" | "discard"
+  "summary" | "exportForMember" | "stageUpload" | "apply" | "discard" | "chunks"
 >;
 
 /**

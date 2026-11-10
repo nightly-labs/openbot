@@ -44,8 +44,8 @@ import {
   SelectTrigger,
   SelectValue,
   SlidersHorizontal,
-  Switch,
   Tabs,
+  Text,
   Tooltip,
   Zap,
 } from "@openbot/ui";
@@ -83,9 +83,13 @@ interface ProviderModelPickerProps {
   icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort | undefined;
   onReasoningEffortChange?: ((effort: AgentReasoningEffort) => void) | undefined;
-  /** Fast mode. The picker shows its switch only for a model with a fast tier, and only with `onFastModeChange`. */
+  /**
+   * Fast mode. The picker shows its Speed select only for a model with a fast tier, and only with
+   * `onFastModeChange`. With `ultrafast`, the agent asks for the Ultrafast tier in place of Fast.
+   */
   fastMode?: boolean | undefined;
-  onFastModeChange?: ((fastMode: boolean) => void) | undefined;
+  ultrafast?: boolean | undefined;
+  onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
   disabled?: boolean | undefined;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
@@ -288,6 +292,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const harnesses = [...new Set(customIds().values())];
     const available = harnesses.find((harness) => status(harness).state === "available");
     return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
+  };
+  /**
+   * True when each provider that runs a saved endpoint has read every one of them, so an endpoint
+   * without models was left out by the provider and no restart will bring them. A host that does not
+   * report it counts as still reading.
+   */
+  const endpointsRead = (): boolean => {
+    const harnesses = new Set<string>(customIds().values());
+    const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
+    return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
   };
   /**
    * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
@@ -567,15 +581,31 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const accounts = railAccounts(props.provider);
     return accounts.length ? providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID) : null;
   };
-  /** Fast mode, only while the model has a fast tier: another model runs at standard speed. */
-  const triggerFast = () =>
-    props.foreignProvider === undefined &&
-    (selectedFixed()?.fast === true ||
-      (props.fastMode === true && props.onFastModeChange !== undefined && Boolean(selectedModel()?.fastServiceTier)));
+  /** The saved speed. It can name a tier that the model does not have. */
+  const savedSpeed = (): Speed =>
+    props.fastMode !== true ? "standard" : props.ultrafast === true ? "ultrafast" : "fast";
+  /**
+   * The tier that the next turn uses. A model without a fast tier runs at the standard tier, and
+   * Ultrafast on a model without that tier runs at Fast.
+   */
+  const speed = (): Speed => {
+    const model = selectedModel();
+    const saved = savedSpeed();
+    if (saved === "standard" || !model?.fastServiceTier) return "standard";
+    return saved === "ultrafast" && model.ultrafastServiceTier ? "ultrafast" : "fast";
+  };
+  /** The speed in the trigger, only while the model has the tier: another model runs at standard speed. */
+  const triggerSpeed = (): Speed => {
+    if (props.foreignProvider !== undefined) return "standard";
+    if (selectedFixed()?.fast === true) return "fast";
+    return props.onFastModeChange ? speed() : "standard";
+  };
+  const triggerSpeedName = () => {
+    const value = triggerSpeed();
+    return value === "standard" ? null : speedName(value, t);
+  };
   const triggerSummary = () =>
-    [triggerModelName(), triggerEffort(), triggerFast() ? t("provider.picker.fast") : null, triggerAccount()]
-      .filter(Boolean)
-      .join(" · ");
+    [triggerModelName(), triggerEffort(), triggerSpeedName(), triggerAccount()].filter(Boolean).join(" · ");
 
   return (
     <div
@@ -632,11 +662,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 </span>
               )}
             </Show>
-            <Show when={triggerFast()}>
-              <span class="provider-model-trigger-effort provider-model-trigger-fast">
-                <Zap aria-hidden="true" />
-                <SwapLabel text={t("provider.picker.fast")} motion={TRIGGER_SWAP} />
-              </span>
+            <Show when={triggerSpeedName()}>
+              {(name) => (
+                <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                  <Zap aria-hidden="true" />
+                  <SwapLabel text={name()} motion={TRIGGER_SWAP} />
+                </span>
+              )}
             </Show>
             <Show when={triggerAccount()}>
               {(account) => (
@@ -1107,11 +1139,36 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}
-                                <span>
-                                  {props.customProviders?.length
-                                    ? t("provider.picker.customPending")
-                                    : t("provider.picker.customEmpty")}
-                                </span>
+                                <Show
+                                  when={props.customProviders?.length && endpointsRead()}
+                                  fallback={
+                                    <span>
+                                      {props.customProviders?.length
+                                        ? t("provider.picker.customPending")
+                                        : t("provider.picker.customEmpty")}
+                                    </span>
+                                  }
+                                >
+                                  <span>
+                                    {t("provider.picker.customUnlisted", { name: railName(endpointStatus().id, t) })}
+                                  </span>
+                                  <Show when={props.onManageProviders}>
+                                    {(manageProviders) => (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="outline"
+                                        onClick={() => {
+                                          trigger?.focus({ preventScroll: true });
+                                          setOpen(false);
+                                          if (trigger) manageProviders()(trigger);
+                                        }}
+                                      >
+                                        {t("provider.picker.editEndpoints")}
+                                      </Button>
+                                    )}
+                                  </Show>
+                                </Show>
                               </Show>
                             </div>
                           </Show>
@@ -1185,13 +1242,42 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </Show>
                     <Show when={ownsSelection() && selectedModel()?.fastServiceTier && props.onFastModeChange}>
                       <div class="provider-model-effort">
-                        <span>{t("provider.picker.fast")}</span>
-                        <Switch
-                          aria-label={t("provider.picker.fastLabel")}
-                          checked={props.fastMode === true}
-                          disabled={props.disabled || effortLocked()}
-                          onChange={(next) => props.onFastModeChange?.(next)}
-                        />
+                        <span>{t("provider.picker.speed")}</span>
+                        <Select<SpeedOption>
+                          class="provider-model-effort-select"
+                          options={selectedModel()?.ultrafastServiceTier ? ALL_SPEEDS : FAST_SPEEDS}
+                          optionValue="id"
+                          optionTextValue={(option) => speedName(option.id, t)}
+                          value={SPEED_OPTIONS[speed()]}
+                          sameWidth={false}
+                          placement="bottom-end"
+                          onChange={(option) => {
+                            if (!option || option.id === savedSpeed() || props.disabled || effortLocked()) return;
+                            props.onFastModeChange?.(option.id !== "standard", option.id === "ultrafast");
+                          }}
+                          itemComponent={(item) => (
+                            <SelectItem item={item.item} class="provider-model-speed-item">
+                              <span class="provider-model-speed-name">{speedName(item.item.rawValue.id, t)}</span>
+                              <Text variant="caption" tone="muted">
+                                {t(SPEED_TEXT[item.item.rawValue.id])}
+                              </Text>
+                            </SelectItem>
+                          )}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t("provider.picker.speed")}
+                            disabled={props.disabled || effortLocked()}
+                          >
+                            <SelectValue<SpeedOption>>
+                              {(state) => {
+                                const option = state.selectedOption();
+                                return option ? speedName(option.id, t) : null;
+                              }}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent class="provider-model-effort-content provider-model-speed-content" />
+                        </Select>
                       </div>
                     </Show>
                   </Tabs.Content>
@@ -1298,6 +1384,36 @@ function fixedModelSettingsText(settings: FixedModelSettings | null, t: AppTrans
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+type Speed = "standard" | "fast" | "ultrafast";
+
+interface SpeedOption {
+  id: Speed;
+}
+
+// Constant arrays: a Select that gets a new options array on each change can loop.
+const SPEED_OPTIONS: Record<Speed, SpeedOption> = {
+  standard: { id: "standard" },
+  fast: { id: "fast" },
+  ultrafast: { id: "ultrafast" },
+};
+const FAST_SPEEDS: SpeedOption[] = [SPEED_OPTIONS.standard, SPEED_OPTIONS.fast];
+const ALL_SPEEDS: SpeedOption[] = [...FAST_SPEEDS, SPEED_OPTIONS.ultrafast];
+
+const SPEED_NAME: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standard",
+  fast: "provider.picker.fast",
+  ultrafast: "provider.picker.ultrafast",
+};
+const SPEED_TEXT: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standardText",
+  fast: "provider.picker.fastText",
+  ultrafast: "provider.picker.ultrafastText",
+};
+
+function speedName(speed: Speed, t: AppTranslate): string {
+  return t(SPEED_NAME[speed]);
 }
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {

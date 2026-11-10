@@ -22,6 +22,43 @@ server shows in the server list of that account. Its name is "OpenBot"; give ano
 Then connect a provider from the app, as on a hosted server (see
 [Providers](hosted-servers.md#providers)).
 
+### Install from the app
+
+In the desktop app, select Add server, then Other options, then New server on another computer.
+The app shows one command with a one-time claim of your account:
+
+```sh
+{ echo OPENBOT_CLAIM=<claim>; curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh; } | sudo bash -s
+```
+
+Run it on the server, or give it to an AI agent there with Copy for an AI agent. It asks no
+questions. It installs OpenBot, signs the server in with the claim (`openbot login --claim`), waits
+until the server is online, and ends with "OpenBot is connected to your account." and exit code 0.
+The app sees the new server in the server list and shows Open server.
+
+- The account service makes the claim for the signed-in user with `POST /v2/server-claims` (at most
+  20 claims in 15 minutes). The claim works once, for 15 minutes. The service keeps only its hash.
+- The claim goes to the install script on standard input, in a line before the script. It is not an
+  argument or a sudo variable, because sudo logs both (`COMMAND=` and `ENV=` in `/var/log/auth.log`
+  and the journal), and `ps` shows arguments to each user. A command that you paste stays in the
+  history of your shell. Make a new command when it expired or when somebody else saw it.
+- The install refuses a claim on a server that is signed in already. Run `sudo openbot logout` first.
+
+### Install from a chat
+
+An agent can install the server over SSH. Write the request in a chat, for example "Install
+OpenBot on root@203.0.113.7 and name it Office server", or select Set up with an agent in the
+install dialog: it puts a short request into the composer of the open chat.
+
+The agent calls the OpenBot tool `create_server_install_command` with the server name. The owner
+of the agent's server approves each command. The tool then makes a claim, as the dialog does, and
+gives the command with `--name` only to the agent. The agent runs it as root over SSH.
+
+The chat shows a card with the name. It waits for a new server with that name, then shows Open
+server when the server is online. The card keeps only the name and the expiry time. The claim is
+not in the chat, and OpenBot logs redact it. The agent's own tool history keeps the command; the
+claim in it stops working after one use or 15 minutes.
+
 ### Hermes Agent
 
 OpenBot uses the Hermes Agent of the service user, as it uses the user's own Hermes on a desktop
@@ -87,6 +124,7 @@ Install options go after `sudo bash -s --`:
 | `--user <name>` | the installed user, else `openbot` | The user that runs OpenBot and its agents. The install makes it when it does not exist, with its home folder in `/var/lib/<name>`. |
 | `--auth-api-url <origin>` | the installed one, else the URL in the build | Another account server, for example the `test` Worker or a [self-hosted account service](self-hosting.md). |
 | `--display-size <W>x<H>` | the installed one, else `1280x800` | The size of the virtual display that computer use reads (see [Display size](#display-size)). |
+| `--name <name>` | `OpenBot` | The server name, with a claim from the app (see [Install from the app](#install-from-the-app)). |
 
 Run the install again to reinstall or upgrade. The data stays in the home folder of the service
 user. A reinstall keeps the user and the account server, because the sign-in belongs to them, and

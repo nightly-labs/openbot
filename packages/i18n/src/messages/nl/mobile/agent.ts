@@ -313,6 +313,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Modellen opnieuw laden",
   "mobile.agent.runtime.loadingModels": "Modellen laden…",
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
+  "mobile.agent.runtime.searchModels": "Modellen zoeken",
+  "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
   "mobile.agent.runtime.usageLimitWindow": "Limiet ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Reset op {time}",
@@ -530,6 +532,7 @@ export const messages = {
   "mobile.agent.list.openPinnedWithTitle": "Open vastgezette chat met {name}, {title}",
   "mobile.agent.list.withState": "{label}. {state}",
   "mobile.agent.list.unread": { one: "{count} ongelezen bericht", other: "{count} ongelezen berichten" },
+  "mobile.agent.list.unreadThreads": "Ongelezen berichten in threads",
   "mobile.agent.list.waiting.title": "Wacht op jou",
   "mobile.agent.list.waiting.label": {
     one: "Wacht op jou, {count} agent",

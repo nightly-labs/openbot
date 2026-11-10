@@ -147,6 +147,17 @@ function appVersion(): string {
   return Application.nativeBuildVersion ? `${version} (${Application.nativeBuildVersion})` : version;
 }
 
+/**
+ * The JavaScript bundle that runs, such as `embedded, channel production, runtime 5d8a2bf4...`. An
+ * over-the-air update shows its ID in place of `embedded`. Support needs it: two phones with the same
+ * app version and build can run different bundles.
+ */
+function bundleName(): string {
+  if (!Updates.isEnabled) return "no update server";
+  const bundle = Updates.isEmbeddedLaunch ? "embedded" : (Updates.updateId ?? "unknown");
+  return `${bundle}, channel ${Updates.channel ?? "none"}, runtime ${Updates.runtimeVersion ?? "none"}`;
+}
+
 /** Such as `iOS 27.0, iPhone 16 Plus (iPhone17,4)`. The identifier names the exact hardware. */
 function systemName(): string {
   const { modelName, modelId } = Device;
@@ -162,6 +173,7 @@ export function supportLogFileText(): string {
     "OpenBot support log",
     `Saved: ${new Date().toISOString()}`,
     `App: ${appVersion()}`,
+    `Bundle: ${bundleName()}`,
     `System: ${systemName()}`,
     `Entries: ${entries.length}`,
     "",
@@ -229,7 +241,7 @@ export function installSupportLog(): void {
   installed = true;
   restoreWhenIdle();
   supportLog.subscribe(schedulePersist);
-  supportLog.add("info", "app", `Started OpenBot ${appVersion()} on ${systemName()}`);
+  supportLog.add("info", "app", `Started OpenBot ${appVersion()} on ${systemName()}, bundle ${bundleName()}`);
   captureConsole();
   captureErrors();
   captureFetch();

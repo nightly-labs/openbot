@@ -116,6 +116,10 @@ export const messages = {
   "composer.error.changeModel": "モデルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeEffort": "推論レベルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeFastMode": "高速モードを変更できませんでした。もう一度お試しください。",
+  "composer.fastMode.confirmTitle": "高速モードをオンにしますか？",
+  "composer.fastMode.confirmDescription":
+    "Claude の応答が速くなりますが、トークンあたりの料金が高くなります。Claude サブスクリプションでは、プランの使用量が残っていても、高速モードは常に使用クレジットを使います。",
+  "composer.fastMode.confirm": "オンにする",
   "composer.context.label": "コンテキスト使用率 {percent}",
   "composer.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "composer.context.labelCompacting": "コンテキストを圧縮しています",

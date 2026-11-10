@@ -11,13 +11,15 @@ import { useEffect } from "react";
 import { AppState, Linking } from "react-native";
 import { create } from "zustand";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { supportLog } from "@/features/support/model/support-log";
 import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
 import { currentAppVersion, refreshMobileFeatures, useLatestAppVersion } from "@/shared/lib/mobile-features";
 import { isIOS } from "@/shared/lib/platform";
 
 /**
  * An update the app can offer. `ready` is an over-the-air bundle that `expo-updates` has already
- * downloaded: a restart installs it without the store. `store` is a newer native version, which only
+ * downloaded, or a downloaded instruction to go back to the bundle of the binary: a restart installs
+ * it without the store. `store` is a newer native version, which only
  * the store can install.
  */
 export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: string; version: string };
@@ -35,6 +37,34 @@ const NOTES_TIMEOUT_MS = 10_000;
 const NOTES_STALE_MS = 10 * 60_000;
 
 const key = "openbot.mobile.appUpdate.dismissed.v1";
+
+// `expo-updates` asks the update server only at a cold start, and a phone can keep the app in memory
+// for days. So the app asks again when it comes back to the foreground, at most this often.
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
+// The cold start of this process asked already.
+let lastUpdateCheck = Date.now();
+let updateCheckRuns = false;
+
+/**
+ * Asks the update server for a newer bundle, or for the instruction to go back to the bundle of the
+ * binary, and downloads it. `Updates.useUpdates` reports the download, and the home header then
+ * offers the restart. A development build and Expo Go have no update server.
+ */
+async function checkForDownloadableUpdate(): Promise<void> {
+  if (__DEV__ || !Updates.isEnabled || updateCheckRuns) return;
+  if (Date.now() - lastUpdateCheck < UPDATE_CHECK_INTERVAL_MS) return;
+  lastUpdateCheck = Date.now();
+  updateCheckRuns = true;
+  try {
+    const result = await Updates.checkForUpdateAsync();
+    if (result.isAvailable || result.isRollBackToEmbedded) await Updates.fetchUpdateAsync();
+  } catch (error) {
+    // The phone is offline, or the server did not answer. The next return to the app tries again.
+    supportLog.add("warn", "app", `The update check failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    updateCheckRuns = false;
+  }
+}
 
 /** The update that the user put off with Later. A newer update shows again. */
 const useDismissedAppUpdate = create<{ dismissed: string | null; ready: boolean }>(() => ({
@@ -60,6 +90,16 @@ export async function dismissAppUpdate(update: AppUpdate): Promise<void> {
 }
 
 /**
+ * The ID of a downloaded bundle. A rollback has no bundle of its own: it sends the app back to the
+ * bundle of its binary, and the restart installs that in the same way.
+ */
+function downloadedUpdateId(update: Updates.UpdateInfo): string {
+  return update.type === Updates.UpdateInfoType.NEW
+    ? `ota:${update.updateId}`
+    : `ota:rollback:${update.createdAt.toISOString()}`;
+}
+
+/**
  * The update to offer on home, or null. A downloaded bundle comes first, because it installs in
  * place. The account server names the newest store version; it reads again when the app comes back
  * to the foreground, at most once a minute.
@@ -75,6 +115,12 @@ export function useAppUpdate(): AppUpdate | null {
     void loadDismissedAppUpdate();
   }, []);
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void checkForDownloadableUpdate();
+    });
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
     if (!apiUrl) return;
     void refreshMobileFeatures(apiUrl);
     const subscription = AppState.addEventListener("change", (state) => {
@@ -87,8 +133,8 @@ export function useAppUpdate(): AppUpdate | null {
   if (dismissed === undefined) return null;
   const current = currentAppVersion();
   const update: AppUpdate | null =
-    isUpdatePending && downloadedUpdate?.type === Updates.UpdateInfoType.NEW
-      ? { kind: "ready", id: `ota:${downloadedUpdate.updateId}` }
+    isUpdatePending && downloadedUpdate
+      ? { kind: "ready", id: downloadedUpdateId(downloadedUpdate) }
       : latest && current && isNewerMobileVersion(latest, current)
         ? { kind: "store", id: `store:${latest}`, version: latest }
         : null;

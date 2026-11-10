@@ -207,6 +207,12 @@ export const messages = defineMessages("settings", {
   "settings.notch.show.title": "Show status in the MacBook notch",
   "settings.notch.show.titleTopOfScreen": "Show status at the top of the screen",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
+  "settings.notch.xwayland.title": "Restart needed",
+  "settings.notch.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the Dynamic Island above other apps. Until then, the island does not show.",
+  "settings.notch.xwayland.unsupported":
+    "On Wayland without XWayland, the Dynamic Island cannot show above other apps.",
+  "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
   "settings.notch.displays.title": "Show on additional displays",
@@ -231,6 +237,12 @@ export const messages = defineMessages("settings", {
     "Above other apps keeps the dock on screen when OpenBot is in the background.",
   "settings.agentDock.placement.screen": "Above other apps",
   "settings.agentDock.placement.window": "In the OpenBot window",
+  "settings.agentDock.xwayland.title": "Restart needed",
+  "settings.agentDock.xwayland.description":
+    "On Wayland, OpenBot must use XWayland to show the dock above other apps. Until then, the dock shows in the OpenBot window.",
+  "settings.agentDock.xwayland.unsupported":
+    "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
+  "settings.agentDock.xwayland.restart": "Restart",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "If that display is not connected, the dock goes to the display of the OpenBot window.",
@@ -730,8 +742,8 @@ export const messages = defineMessages("settings", {
   "settings.transfer.old.text": "Save its agents and server settings to a file.",
   "settings.transfer.new.title": "Import into this server",
   "settings.transfer.new.text": "Add the agents and server settings from a file.",
-  "settings.transfer.notMoved":
-    "API keys, sign-ins, connectors, app preferences, and chat history are not moved. Set them up again on the new server.",
+  "settings.transfer.notMovedSecrets":
+    "API keys, sign-ins, connectors, and app preferences are not moved. Set them up again on the new server.",
   "settings.transfer.back": "Back",
   "settings.transfer.loading": "Reading your agents…",
   "settings.transfer.summary.label": "What the file contains",
@@ -747,6 +759,9 @@ export const messages = defineMessages("settings", {
   "settings.transfer.export.settings": "Include server settings",
   "settings.transfer.export.settingsDescription":
     "MCP servers, custom model providers, sidebar sections, and routine flows.",
+  "settings.transfer.export.history": "Include chat history",
+  "settings.transfer.export.historyDescription":
+    "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
   "settings.transfer.export.hideAgents": "Hide agents",
   "settings.transfer.export.agentsLabel": "Agents to export",

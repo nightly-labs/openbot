@@ -198,6 +198,11 @@ export const messages = {
   "settings.notch.show.title": "הצגת סטטוס בחריץ של ה-MacBook",
   "settings.notch.show.titleTopOfScreen": "הצגת סטטוס בראש המסך",
   "settings.notch.show.description": "הצגת פעילות סוכנים ופריטים שדורשים תשומת לב בראש כל תצוגה.",
+  "settings.notch.xwayland.title": "נדרשת הפעלה מחדש",
+  "settings.notch.xwayland.description":
+    "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את ה-Dynamic Island מעל אפליקציות אחרות. עד אז, האי לא מוצג.",
+  "settings.notch.xwayland.unsupported": "ב-Wayland בלי XWayland, ה-Dynamic Island לא יכול להופיע מעל אפליקציות אחרות.",
+  "settings.notch.xwayland.restart": "הפעלה מחדש",
   "settings.notch.idle.title": "הצגת האי במצב סרק",
   "settings.notch.idle.description": "הצגת הלוגו של OpenBot וברכה כשאין סטטוס פעיל.",
   "settings.notch.displays.title": "הצגה בתצוגות נוספות",
@@ -221,6 +226,12 @@ export const messages = {
   "settings.agentDock.placement.description": "מעל אפליקציות אחרות משאיר את המעגן על המסך כש-OpenBot ברקע.",
   "settings.agentDock.placement.screen": "מעל אפליקציות אחרות",
   "settings.agentDock.placement.window": "בחלון OpenBot",
+  "settings.agentDock.xwayland.title": "נדרשת הפעלה מחדש",
+  "settings.agentDock.xwayland.description":
+    "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את המעגן מעל אפליקציות אחרות. עד אז, המעגן מוצג בחלון OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "ב-Wayland בלי XWayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
+  "settings.agentDock.xwayland.restart": "הפעלה מחדש",
   "settings.agentDock.display.title": "תצוגה",
   "settings.agentDock.display.description": "אם התצוגה הזו אינה מחוברת, המעגן עובר לתצוגה של חלון OpenBot.",
   "settings.agentDock.display.window": "עם חלון OpenBot",
@@ -674,8 +685,6 @@ export const messages = {
   "settings.transfer.old.text": "שמירת הסוכנים והגדרות השרת בקובץ.",
   "settings.transfer.new.title": "ייבוא לשרת הזה",
   "settings.transfer.new.text": "הוספת הסוכנים והגדרות השרת מקובץ.",
-  "settings.transfer.notMoved":
-    "מפתחות API, התחברויות, מחברים, העדפות אפליקציה והיסטוריית צ'אט אינם מועברים. יש להגדיר אותם שוב בשרת החדש.",
   "settings.transfer.back": "חזרה",
   "settings.transfer.loading": "קורא את הסוכנים שלך…",
   "settings.transfer.summary.label": "מה הקובץ מכיל",

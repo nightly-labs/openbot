@@ -37,6 +37,8 @@ export interface RemoteTeamHost {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
+  storageGb?: number;
   /**
    * When the host last changed its key, from a handover that both keys signed. Absent when the host
    * kept its first key or the account service sends no handovers.
@@ -192,6 +194,7 @@ export class RemoteTeamDirectoryClient {
               return [];
             const memberLimit = candidate.memberLimit;
             const hosted = candidate.hosted;
+            const storageGb = candidate.storageGb;
             if (
               (memberLimit !== undefined &&
                 (!isNumber(memberLimit) || !Number.isSafeInteger(memberLimit) || memberLimit < 1)) ||
@@ -226,6 +229,8 @@ export class RemoteTeamDirectoryClient {
                 ...(memberLimit === undefined ? {} : { memberLimit }),
                 // A bad value drops only the flag, so the server stays in the list.
                 ...(isBoolean(hosted) ? { hosted } : {}),
+                // A bad value drops only the storage, as for the flag.
+                ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
               },
             ];

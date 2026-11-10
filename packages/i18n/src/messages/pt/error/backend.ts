@@ -77,6 +77,8 @@ export const messages = {
     "O canal tem uma tarefa atribuída cujo início não foi confirmado. Verifique o resultado antes de excluí-lo.",
   "error.backend.channelNotFound": "Canal não encontrado.",
   "error.backend.channelMemberUnavailable": "Um membro do canal está indisponível.",
+  "error.backend.channelInstructionsTooLong":
+    "Encurte as instruções para 2.000 caracteres. Instruções mais longas não são salvas.",
   "error.backend.channelWaitBeforeNewConversation":
     "Aguarde o trabalho neste canal terminar e depois inicie uma nova conversa.",
   "error.backend.channelWaitBeforeCompact": "Aguarde o trabalho neste canal terminar e depois compacte-o.",
@@ -250,6 +252,8 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "A resposta do login não chegou a tempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "O OpenBot não conseguiu ler as informações de login deste servidor. Verifique o endereço do servidor e tente novamente.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "O servidor de login enviou uma resposta que o OpenBot não consegue ler. Se o serviço fornecer uma chave de API ou um token, adicione-o nas configurações deste servidor e teste a conexão novamente.",
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",

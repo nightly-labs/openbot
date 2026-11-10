@@ -22,6 +22,7 @@ import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { usePlatform } from "../../platform";
 import { agentDockPort } from "../agent-dock/agent-dock-port";
 import {
   type AgentDockPlacement,
@@ -30,6 +31,7 @@ import {
   setAgentDockSeats,
   useAgentDockPreference,
 } from "../agent-dock/agent-dock-preference";
+import { XWaylandRestartRow } from "./XWaylandRestartRow";
 
 /** What the tab shows of the active server. The dock of each server has its own agents. */
 export interface AgentDockSettingsModel {
@@ -51,6 +53,10 @@ const EDGE_LABEL = {
 export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; selectMount?: HTMLElement | undefined }) {
   const i18n = useI18n();
   const preference = useAgentDockPreference();
+  const platform = usePlatform();
+  /** Linux with Wayland windows: the dock above other apps needs a start on XWayland. */
+  const screenSupport = () =>
+    preference().shown && preference().placement === "screen" ? platform.appInfo()?.aboveAppsSupport : undefined;
   /** The display, the edge and hiding apply to the dock above the other apps. */
   const aboveApps = () => preference().shown && preference().placement === "screen";
   const seats = createMemo(() => {
@@ -99,6 +105,16 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
               />
             </ItemActions>
           </Item>
+          <XWaylandRestartRow
+            support={screenSupport()}
+            keys={{
+              title: "settings.agentDock.xwayland.title",
+              description: "settings.agentDock.xwayland.description",
+              unsupported: "settings.agentDock.xwayland.unsupported",
+              restart: "settings.agentDock.xwayland.restart",
+            }}
+            onRestart={() => agentDockPort().agentDock.setXWayland({ enabled: true })}
+          />
           <Item data-settings-row="settings.agentDock.display.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.agentDock.display.title")}</ItemTitle>

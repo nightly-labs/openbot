@@ -4,6 +4,9 @@ import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import LogOut from "lucide-react-native/icons/log-out";
+import PlugZap from "lucide-react-native/icons/plug-zap";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
@@ -23,6 +26,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -356,7 +360,12 @@ function McpServerForm({
         </SettingsRow>
       </SettingsSection>
       <SettingsSection footer={test ? testMessage(test) : t("mobile.server.mcp.testDescription")}>
-        <SettingsRow disclosure={false} disabled={busy || !valid} onPress={runTest}>
+        <SettingsRow
+          disclosure={false}
+          disabled={busy || !valid}
+          leading={<RowIcon icon={PlugZap} tone="accent" />}
+          onPress={runTest}
+        >
           <Typography.Paragraph className="text-accent">
             {test?.status === "testing" ? t("mobile.server.mcp.testing") : t("mobile.server.mcp.test")}
           </Typography.Paragraph>
@@ -367,6 +376,7 @@ function McpServerForm({
           <SettingsRow
             disclosure={false}
             disabled={busy}
+            leading={<RowIcon icon={LogOut} tone="accent" />}
             onPress={() =>
               void perform(async () => {
                 setSignIns(await signOutMcpServer(saved.id, serverId));
@@ -387,6 +397,7 @@ function McpServerForm({
           <SettingsRow
             disclosure={false}
             disabled={busy}
+            leading={<RowIcon icon={Trash2} tone="danger" />}
             onPress={() =>
               Alert.alert(t("mobile.server.mcp.removeTitle", { name: saved.name }), t("mobile.server.mcp.removeBody"), [
                 { text: t("common.cancel"), style: "cancel" },

@@ -247,6 +247,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
   "error.provider.cursorChecksum": "Cursor runtime checksum mismatch.",
   "error.provider.cursorReleaseShape": "The Cursor release has an unexpected shape.",
@@ -283,6 +285,8 @@ export const messages = defineMessages("error.provider", {
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageTooSmall":
+    "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.museMcpStartupFault":

@@ -339,6 +339,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "إعادة محاولة النماذج",
   "mobile.agent.runtime.loadingModels": "جارٍ تحميل النماذج…",
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
+  "mobile.agent.runtime.searchModels": "البحث في النماذج",
+  "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",
   "mobile.agent.runtime.usageLimitWindow": "حد {window}",
   "mobile.agent.runtime.usageLimitResets": "{limit} · يُعاد التعيين {time}",
@@ -584,6 +586,7 @@ export const messages = {
     many: "{count} رسالة غير مقروءة",
     other: "{count} رسالة غير مقروءة",
   },
+  "mobile.agent.list.unreadThreads": "رسائل غير مقروءة في السلاسل",
   "mobile.agent.list.waiting.title": "يحتاج إليك",
   "mobile.agent.list.waiting.label": {
     zero: "يحتاج إليك، لا وكلاء",

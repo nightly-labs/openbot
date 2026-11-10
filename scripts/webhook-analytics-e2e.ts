@@ -221,6 +221,7 @@ const events = new HostEventsService({
     setEnabled: () => {},
     setAccountActive: () => {},
     refresh: () => {},
+    ensureHost: () => Effect.void,
     registerRoute: (routeId) => Effect.succeed(`${RELAY_ORIGIN}/v1/webhooks/${routeId}`),
     revokeRoute: () => Effect.void,
   },

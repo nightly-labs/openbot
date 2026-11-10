@@ -74,6 +74,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   TelegramCallError,
+  WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
@@ -1702,8 +1703,9 @@ export class MessagingService {
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
+    const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => ({ places })),
+      Effect.map((places) => (whatsApp && !places.length ? { places, note: WHATSAPP_NO_PLACES } : { places })),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1983,8 +1985,11 @@ export class MessagingService {
       else if (placeholder)
         yield* this.#say(adapter, post.target, placeholder, sourceText("status.messaging.noAnswer"));
     }).pipe(
-      Effect.tapError(() =>
+      Effect.tapError((failure) =>
         Effect.gen({ self: this }, function* () {
+          // WhatsApp refuses each new attempt too, and each one counts against the number: give up.
+          if (failure instanceof MessagingOperationFailed && failure.cause instanceof WhatsAppRefusedError)
+            return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
           this.#finalFailures.set(key, failures);
           // An answer goes out in parts, and some of them can be on the platform already, so it is
@@ -2373,9 +2378,32 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
   };
 }
 
+/** Why a WhatsApp number has no places: it lists only the chats that the user allowed, not all its chats. */
+const WHATSAPP_NO_PLACES =
+  "OpenBot posts only to WhatsApp chats that the user allowed, and this number allows none. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
+
+/** A WhatsApp number that is not linked, or whose connection is down now: for a post and for its places. */
+const WHATSAPP_NOT_CONNECTED =
+  "WhatsApp is not connected on this number now. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
+
+/** What the user does when OpenBot itself stops a WhatsApp post, by the code of the WhatsApp adapter. */
+const WHATSAPP_LOCAL_REFUSALS = new Map([
+  [
+    "place_not_allowed",
+    "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
+  ],
+  ["not_connected", WHATSAPP_NOT_CONNECTED],
+  ["not_linked", WHATSAPP_NOT_CONNECTED],
+]);
+
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
+  // A new attempt is refused too, and counts against the number at WhatsApp.
+  if (cause instanceof WhatsAppRefusedError)
+    return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
+  const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
+  if (local) return local;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code

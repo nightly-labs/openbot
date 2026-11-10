@@ -112,6 +112,10 @@ export const messages = {
   "composer.error.changeModel": "모델을 변경할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.changeEffort": "추론 강도를 변경할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.changeFastMode": "빠른 모드를 변경할 수 없었어요. 다시 시도해 주세요.",
+  "composer.fastMode.confirmTitle": "빠른 모드를 켤까요?",
+  "composer.fastMode.confirmDescription":
+    "Claude가 더 빠르게 답하지만 토큰당 비용이 더 높아요. Claude 구독에서는 요금제 사용량이 남아 있어도 빠른 모드가 항상 사용 크레딧을 써요.",
+  "composer.fastMode.confirm": "켜기",
   "composer.context.label": "컨텍스트 {percent} 사용",
   "composer.context.labelEstimated": "컨텍스트 약 {percent} 사용",
   "composer.context.labelCompacting": "컨텍스트 압축 중",

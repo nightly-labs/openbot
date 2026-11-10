@@ -35,6 +35,8 @@ export interface RemoteHostSummary {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
+  storageGb?: number;
 }
 
 export interface RemoteInviteRecord {
@@ -180,6 +182,8 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
     // A bad limit drops only the limit, so the host list still loads.
     const memberLimit = host.memberLimit;
     const validLimit = isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1;
+    const storageGb = host.storageGb;
+    const validStorage = isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1;
     return {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
@@ -192,6 +196,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       ...(validLimit ? { memberLimit } : {}),
       // A bad value drops only the flag, as for the limit.
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
+      ...(validStorage ? { storageGb } : {}),
     };
   });
 }

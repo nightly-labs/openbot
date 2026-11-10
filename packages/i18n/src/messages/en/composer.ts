@@ -113,6 +113,10 @@ export const messages = defineMessages("composer", {
   "composer.error.changeModel": "Could not change model. Try again.",
   "composer.error.changeEffort": "Could not change effort. Try again.",
   "composer.error.changeFastMode": "Could not change fast mode. Try again.",
+  "composer.fastMode.confirmTitle": "Turn on fast mode?",
+  "composer.fastMode.confirmDescription":
+    "Claude answers faster, but each token costs more. With a Claude subscription, fast mode always uses usage credits, also when your plan has usage left.",
+  "composer.fastMode.confirm": "Turn on",
   "composer.context.label": "Context {percent} full",
   "composer.context.labelEstimated": "Context about {percent} full",
   "composer.context.labelCompacting": "Compacting context",

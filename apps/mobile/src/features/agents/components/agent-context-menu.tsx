@@ -33,7 +33,7 @@ function useAgentMenuActions(agent: MobileAgent) {
     if (actionPending.current) return;
     actionPending.current = true;
     try {
-      if (action === "delete") await workspace().deleteAgent(agent.id);
+      if (action === "delete") await workspace().deleteAgent(agent.id, agent.serverId);
       else await workspace().duplicateAgent(agent.id);
       void haptics.notification();
     } catch (error) {

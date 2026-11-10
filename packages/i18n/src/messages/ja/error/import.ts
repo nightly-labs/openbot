@@ -55,6 +55,8 @@ export const messages = {
     "このサーバーが受け付けるエクスポートは 100 MB までです。より大きなエクスポートをインポートするには、サーバーの OpenBot をアップデートしてください。",
   "error.import.skillKept":
     "{name}: サーバーにはすでにスキル「{skill}」があるため、エージェントはそのスキルを使います。更新は管理者に依頼してください。",
+  "error.import.skillRenamed":
+    "{name}: スキル「{skill}」の名前は別のスキルの名前に似すぎているため、「{renamed}」として保存されます。",
   "error.import.transferRemoteTooLarge":
     "参加しているサーバーの移行ファイルは 100 MB 未満である必要があります。ワークスペースのファイルをオフにするか、エクスポートするエージェントを減らしてください。",
   "error.import.transferNotFile": "このファイルは OpenBot の移行ファイルではありません。",

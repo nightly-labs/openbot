@@ -711,6 +711,21 @@
   background: var(--ui-menu-item-hover);
 }
 
+/* Each speed has a name and a description, so the list is wider than the select, and wraps. */
+.provider-model-speed-content {
+  width: 300px;
+}
+
+.provider-model-speed-item .ui-select-item-label {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.provider-model-speed-name {
+  color: var(--openbot-text-primary);
+}
+
 /* The check of the selected model is a filled circle on the left, as in the menus. */
 .provider-model-option {
   position: relative;

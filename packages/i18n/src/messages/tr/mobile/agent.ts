@@ -323,6 +323,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Modelleri tekrar dene",
   "mobile.agent.runtime.loadingModels": "Modeller yükleniyor…",
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
+  "mobile.agent.runtime.searchModels": "Modellerde ara",
+  "mobile.agent.runtime.noMatches": "Aramanızla eşleşen model yok.",
   "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
   "mobile.agent.runtime.usageLimitWindow": "{window} sınırı",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} tarihinde sıfırlanır",
@@ -543,6 +545,7 @@ export const messages = {
     one: "{count} okunmamış mesaj",
     other: "{count} okunmamış mesaj",
   },
+  "mobile.agent.list.unreadThreads": "Mesaj dizilerinde okunmamış mesajlar",
   "mobile.agent.list.waiting.title": "Size ihtiyacı var",
   "mobile.agent.list.waiting.label": {
     one: "Size ihtiyacı var, {count} ajan",

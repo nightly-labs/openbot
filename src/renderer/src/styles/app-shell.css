@@ -1755,6 +1755,12 @@ textarea {
   font-weight: 650;
 }
 
+/* "Unread" uses the "Needs you" heading with a neutral count: the warning colour belongs to waits. */
+.sidebar-unread-group .sidebar-waiting-group-count {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-readable);
+}
+
 .sidebar-hidden-group-count {
   margin-inline-start: var(--openbot-space-1);
   font-variant-numeric: tabular-nums;
@@ -1819,7 +1825,25 @@ textarea {
 }
 
 /* The rows fade in under the folder headers that stay at the top, so no row is cut at a header's
-   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top. */
+   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top.
+   These properties do not inherit: the list sets them while it scrolls, and an inherited change
+   restyles every row under it (issue 6019). */
+@property --agent-list-stuck-height {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --agent-list-fade-top {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --agent-list-fade-bottom {
+  syntax: "*";
+  inherits: false;
+}
+
 .sidebar .agent-list:is(.scroll-fade-top, .scroll-fade-bottom) {
   --agent-list-fade-top: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
   --agent-list-fade-bottom: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));

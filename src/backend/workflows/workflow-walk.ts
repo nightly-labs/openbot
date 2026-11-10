@@ -32,6 +32,7 @@ import {
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
+import { runtimeFields } from "./workflow-graph";
 import { isOpenStep, type StoredWorkflowStep } from "./workflow-run-store";
 
 /** Node kinds and settings that this version cannot run. The canvas does not offer them. */
@@ -90,6 +91,42 @@ export function runScope(
   }
   // In graph order: a reused step written after the one of a node behind it would make that node due.
   return { nodes, reused: new Set(graphOrder(graph.nodes, forward, reused)) };
+}
+
+/**
+ * The earlier answers that a run from a node can give again. An answer is out of date when its node
+ * reads other fields or other inputs than in the graph that it ran with, or when such a node is
+ * before it, so that an edit before the start node takes effect. A trigger gives its event again,
+ * whatever its fields. When `ranWith` does not know the graph of an answer, the answer stays.
+ */
+export function currentAnswers(
+  graph: WorkflowGraph,
+  answered: ReadonlyMap<string, StoredWorkflowStep>,
+  ranWith: (step: StoredWorkflowStep) => WorkflowGraph | undefined,
+): Map<string, StoredWorkflowStep> {
+  const changed = [...answered.values()].flatMap((step) => {
+    const earlier = ranWith(step);
+    return earlier && nodeChanged(step.nodeId, earlier, graph) ? [step.nodeId] : [];
+  });
+  const loops = workflowLoopEdges(graph.nodes, graph.edges);
+  const next = outgoing(graph.edges.filter((edge) => !loops.has(edge.id)));
+  const stale = new Set(changed.flatMap((id) => [...reach(id, next)]));
+  return new Map([...answered].filter(([id]) => !stale.has(id)));
+}
+
+function nodeChanged(id: string, earlier: WorkflowGraph, current: WorkflowGraph): boolean {
+  const before = earlier.nodes.find((node) => node.id === id);
+  const now = current.nodes.find((node) => node.id === id);
+  if (!before || !now || before.kind !== now.kind) return true;
+  return now.kind !== "trigger" && readsOf(before, earlier) !== readsOf(now, current);
+}
+
+/** What a step reads in a run: its run fields and the edges into it, in input order. */
+function readsOf(node: WorkflowNode, graph: WorkflowGraph): string {
+  const inputs = graph.edges
+    .filter((edge) => edge.to === node.id)
+    .map((edge) => [edge.from, edge.type, edge.branch ?? null]);
+  return JSON.stringify([runtimeFields(node), inputs]);
 }
 
 export type WalkAction = { nodeId: string; action: "run"; inputs: string[] } | { nodeId: string; action: "skip" };
@@ -321,14 +358,16 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 /** The prompt of a condition. The model must answer one word. */
 export function conditionPrompt(rule: string, input: string): string {
   return [
-    "You judge one condition of a workflow. Read the input, then answer with one word: yes or no.",
+    "You judge one condition of a workflow. Read the input, then answer with one English word: yes or no. Answer in English also when the condition or the input uses another language.",
     `Condition: ${rule.trim() || "The input is not empty."}`,
     `--- input ---\n${input || "(empty)"}`,
   ].join("\n\n");
 }
 
-/** The answer of a condition, or null when the model did not answer yes or no. */
+/** The answer of a condition, or null when the model did not answer yes or no. "true" and "false" count too. */
 export function conditionAnswer(text: string): "yes" | "no" | null {
   const word = /^[^a-z]*([a-z]+)/iu.exec(text.trim())?.[1]?.toLowerCase();
-  return word === "yes" || word === "no" ? word : null;
+  if (word === "yes" || word === "true") return "yes";
+  if (word === "no" || word === "false") return "no";
+  return null;
 }

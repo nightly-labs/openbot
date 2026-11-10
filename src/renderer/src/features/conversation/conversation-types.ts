@@ -45,6 +45,7 @@ import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agen
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
 
 /**
@@ -156,6 +157,11 @@ export interface ConversationProps {
   onOpenMcpSignIn?: ((mcpServerId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
   mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
+  /**
+   * The server list that an install command card watches until its new server is online. Absent where
+   * this client cannot open a server; the card then stays a marker.
+   */
+  serverInstall?: ServerInstallWatch | undefined;
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"] | undefined;
 
   agentStatus: AgentStatus;

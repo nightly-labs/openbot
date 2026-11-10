@@ -221,6 +221,8 @@ interface AcpTurn {
   failureCause: CauseCode | null;
   /** The page where the user fixes the account that failed this turn (`accountLink`), or null. */
   accountLink: string | null;
+  /** The agent removed the session when this turn failed (`AcpFlavor.sdkHarness.sessionLost`). */
+  sessionLost: boolean;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -327,6 +329,15 @@ export interface AcpHistoryPersistence {
  * session again from its own store, so an idle session costs only a slower first message.
  */
 const ACP_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
+
+/**
+ * The shortest wait for the start of a session's own process (`AcpFlavor.sessionProcesses`), the
+ * long start wait of `ProviderRuntime`. The Windows Gemini server unpacks about 310 MB at each start,
+ * and a reopened session starts one after each idle release. On a busy computer that took 23 to 55 s,
+ * and the 30 s request timeout failed the turn at each attempt (#6246). The start holds back only its
+ * own session, and a process that ends fails it at once.
+ */
+const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
 
 /** An agent that reports no context size gets the instructions again after this many prompts. */
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
@@ -586,7 +597,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initialized: Deferred.Deferred<void, ProviderClientOperationError> | null = null;
   #scope = Scope.makeUnsafe();
   #initialization: InitializeResponse | null = null;
-  /** How long the agent's own process had to start, which each session's process gets too. */
+  /** How long the agent's own process had to start. A session's process gets at least `ACP_SESSION_PROCESS_START_TIMEOUT_MS`. */
   #startTimeoutMs: number | null = null;
   #models: AcpModel[] = [];
   #lastTurnStartedAt = 0;
@@ -1031,8 +1042,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A session with a process of its own fails with how that process ended.
     const transport = (sessionId ? this.#threads.get(sessionId)?.transport : null) ?? this.#transport;
     const ended = transport.ended;
+    let result = yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs));
+    // A session open or a settings change that a lost turn refused did not run, so it goes again once.
+    if (
+      Result.isFailure(result) &&
+      sessionId &&
+      (method === "turn/start" || method === "thread/resume") &&
+      (yield* this.#discardLostTurns(sessionId, result.failure.cause))
+    )
+      result = yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs));
     try {
-      return providerResult(yield* Effect.result(this.#requestEffect(method, params, decoder, timeoutMs)));
+      return providerResult(result);
     } catch (error) {
       if (error instanceof TimeoutError)
         yield* Effect.forkIn(
@@ -1416,7 +1436,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread?.transport === transport) thread.needsResume = true;
     });
     this.#openingSessionProcesses.add(transport);
-    const startTimeout = this.#startTimeout(this.#startTimeoutMs ?? this.#requestTimeoutMs);
+    const startTimeout = this.#startTimeout(
+      Math.max(this.#startTimeoutMs ?? this.#requestTimeoutMs, ACP_SESSION_PROCESS_START_TIMEOUT_MS),
+    );
     yield* Effect.gen({ self: this }, function* () {
       yield* providerSync(() => {
         // A stop that started before this spawn did not see the process. In the same step, so no stop starts between.
@@ -2231,6 +2253,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       signInLost: false,
       failureCause: null,
       accountLink: null,
+      sessionLost: false,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2282,7 +2305,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
       const send = () => this.#sendPrompt(thread, turn, prompt, params);
-      let response = providerResult(yield* send());
+      let sent = yield* send();
+      // A prompt that the agent took and then lost is not sent again: it can have run.
+      if (
+        Result.isFailure(sent) &&
+        thread.activeTurn === turn &&
+        !turn.stopped &&
+        (yield* this.#discardLostTurns(thread.id, sent.failure.cause)) &&
+        this.#flavor.lostTurns?.unsent.test(failureText(sent.failure.cause)) &&
+        // The user can stop the turn while the discard runs.
+        thread.activeTurn === turn &&
+        !turn.stopped
+      )
+        sent = yield* send();
+      let response = providerResult(sent);
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
@@ -2326,6 +2362,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
             turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
             turn.providerError = sdkHarness.turnFailure(detail);
+            turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
       }
@@ -2349,6 +2386,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // A session's own process that ended names how it ended, as the agent's process does.
       const transport = thread.transport;
       const failure = transport && !turn.stopped ? (yield* this.#explainSessionEnd(transport, error)).cause : error;
+      // A prompt that failed because the model gave no answer ends as a turn with no answer does:
+      // quietly when the turn needs no answer, and else with a plain message (#6073).
+      if (!turn.stopped && this.#flavor.emptyAnswerError?.test(failureText(failure))) {
+        if (turn.answerOptional) {
+          yield* this.#completeTurn(thread, turn, "completed", null);
+          return;
+        }
+        turn.failureCause = "empty_answer";
+        yield* this.#completeTurn(
+          thread,
+          turn,
+          "failed",
+          sourceText("error.provider.acpNoAnswer", { provider: this.#label }),
+        );
+        return;
+      }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
     }
   });
@@ -2440,6 +2493,30 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#configuration.applyConfig(thread, model, null, this.#models);
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
+  });
+
+  /**
+   * Discards the turns that the agent lost, when it refused a request of this session because of
+   * them. True when the discard ran, so the refused request can go again once.
+   */
+  readonly #discardLostTurns = Effect.fn("AcpAgentClient.discardLostTurns")(function* (
+    this: AcpAgentClient,
+    sessionId: string,
+    error: unknown,
+  ): Effect.fn.Return<boolean> {
+    const lostTurns = this.#flavor.lostTurns;
+    if (!lostTurns || !(error instanceof RequestError) || !lostTurns.refusal.test(failureText(error))) return false;
+    const transport = this.#threads.get(sessionId)?.transport ?? this.#transport;
+    const discarded = yield* Effect.result(transport.run(lostTurns.discard(sessionId), this.#requestTimeoutMs));
+    if (Result.isFailure(discarded)) {
+      logger.warn("OpenBot could not discard the turns that an ACP agent lost.", {
+        provider: this.provider,
+        reason: this.#redact(failureText(discarded.failure.cause)),
+      });
+      return false;
+    }
+    logger.info("OpenBot discarded the turns that an ACP agent lost.", { provider: this.provider });
+    return true;
   });
 
   /**
@@ -3151,7 +3228,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (status !== "completed") thread.backgroundSkipUntil = Date.now() + ACP_STOPPED_OUTPUT_MS;
     // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
     // so only new input can reload the session, including input already waiting in the queue.
-    if (status === "failed" && isSessionNotFound(error, thread.id, this.#flavor)) {
+    if (status === "failed" && (turn.sessionLost || isSessionNotFound(error, thread.id, this.#flavor))) {
       this.#forgetMissingSession(thread.id);
     }
     this.#completeThought(thread, turn);

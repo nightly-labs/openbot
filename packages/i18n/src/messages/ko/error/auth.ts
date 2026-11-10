@@ -19,6 +19,7 @@ export const messages = {
   "error.auth.serviceTimeout": "계정 서비스가 제때 응답하지 않았어요. 다시 시도해 주세요.",
   "error.auth.serviceStatus": "계정 서비스에서 오류({status})가 발생했어요. 나중에 다시 시도해 주세요.",
   "error.auth.invalidHostedServer": "계정 서비스가 올바르지 않은 호스팅 서버를 반환했어요.",
+  "error.auth.invalidServerClaim": "계정 서비스가 올바르지 않은 서버 코드를 반환했어요.",
   "error.auth.codeNotSent": "OpenBot이 로그인 코드를 보내지 못했어요.",
   "error.auth.deliveryTimeout":
     "OpenBot이 전송 여부를 제때 확인하지 못했어요. 코드가 도착할 수도 있으니, 다시 보내기 전에 전송 여부를 확인해 주세요.",

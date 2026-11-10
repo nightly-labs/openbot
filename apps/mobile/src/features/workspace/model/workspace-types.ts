@@ -720,7 +720,8 @@ export interface MobileWorkspaceContextValue {
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
   setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
-  deleteAgent: (agentId: string) => Promise<void>;
+  /** Deletes an agent on `serverId`, or on the active server. */
+  deleteAgent: (agentId: string, serverId?: string) => Promise<void>;
   duplicateAgent: (agentId: string) => Promise<void>;
   saveAgentMemory: (agentId: string, text: string, serverId: string, memoryId?: string) => Promise<void>;
   deleteAgentMemory: (agentId: string, memoryId: string, serverId: string) => Promise<void>;

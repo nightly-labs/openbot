@@ -6,6 +6,7 @@ import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository
 import { Effect, Fiber, Schema } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
+import { toToolOperationFailed } from "../backend/agent/tool-operation";
 import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
@@ -243,7 +244,11 @@ import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryRepor
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
-import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
+import {
+  applyHostedServerAccount,
+  type HostedServerEnvironment,
+  hostedServerStorageGb,
+} from "./hosted-server-bootstrap";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
@@ -255,7 +260,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
-import { ozonePlatformArguments } from "./linux-wayland-output";
+import { aboveAppsWindowKind, ozonePlatformArguments } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -367,7 +372,7 @@ import {
   configureServerLogoProtocols,
 } from "./session-configuration";
 import { readSetupState, writeSetupState } from "./setup-store";
-import { SidebarPinStore } from "./sidebar-pin-store";
+import { OWNER_PIN_KEY, SidebarPinStore } from "./sidebar-pin-store";
 import { SignInRelayClient } from "./sign-in-relay-client";
 import { agentPrintedLink, SignInRelayHost } from "./sign-in-relay-host";
 import { SignalIngress } from "./signal-ingress";
@@ -1059,8 +1064,9 @@ export async function createApplicationServices({
   // two lazy getters, so the gap is visible and bounded.
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
+  const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
   const dynamicIsland = new DynamicIslandWindowController({
-    platform: process.platform,
+    windowKind,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
     // Only the dev server build starts with the island off, the same builds as the agent dock default.
     ...(process.env.ELECTRON_RENDERER_URL
@@ -1091,7 +1097,7 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
   const agentDock = new AgentDockWindowController({
-    platform: process.platform,
+    windowKind,
     createWindow: createAgentDockWindow,
     loadWindow: loadAgentDockRenderer,
     screen,
@@ -1966,6 +1972,8 @@ export async function createApplicationServices({
         : resolve(__dirname, "../../resources/plugin-catalog"),
     ),
   );
+  /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
+  let hostedStorageGb: number | null = null;
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -1994,6 +2002,10 @@ export async function createApplicationServices({
     }),
     feedbackFacts: feedbackFacts(),
     feedback: feedbackSender(centralAuth),
+    serverClaims: {
+      signedIn: () => centralAuth.getState().status === "signed_in",
+      create: () => hostedServers.createServerClaim().pipe(toToolOperationFailed),
+    },
     marketplaceAppServer: (appId) => {
       const listed = catalogPluginServers.filter((server) => server.slug === appId);
       const [server] = listed;
@@ -2021,6 +2033,7 @@ export async function createApplicationServices({
           getSources: (options) => desktopCapturer.getSources(options),
         }),
     hostMemory,
+    hostedStorageGb: () => hostedStorageGb,
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2579,6 +2592,21 @@ export async function createApplicationServices({
     account: centralAuth,
     ingress: signalIngress,
     hostId: () => teamStore.getIdentity()?.serverId ?? null,
+    // A route needs this computer registered for the account, also when it is not published (#6029).
+    // The sync runs only while signed in, after `host` below exists.
+    ensureHost: () => {
+      const hostId = teamStore.getIdentity()?.serverId;
+      if (hostId && centralAuth.hostSiteCredential(hostId)) return Effect.void;
+      return host
+        .register()
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("This host could not be registered for webhooks.", toLogValue(failure.cause)),
+            ),
+          ),
+        );
+    },
   });
   // Analytics starts later in this function. A request before then is not reported.
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
@@ -2650,6 +2678,24 @@ export async function createApplicationServices({
         Effect.sync(() => {
           hostedServerSignedIn = true;
         }),
+      ),
+      // In the background, so the start does not wait for it. Until it answers, the agent instructions
+      // name no disk limit.
+      Effect.tap(() =>
+        Effect.forkDetach(
+          hostedServerStorageGb(centralAuth, environment.hostId).pipe(
+            Effect.tap((storageGb) =>
+              Effect.sync(() => {
+                hostedStorageGb = storageGb;
+              }),
+            ),
+            Effect.catch((error) =>
+              Effect.sync(() =>
+                logger.warn("Could not read the plan storage of the hosted server.", toLogValue(error)),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   if (hostedServer) {
@@ -2769,6 +2815,26 @@ export async function createApplicationServices({
     agents: service,
     skills: { library: () => skills.requireLocalLibrary(), installLocal: (input) => skills.installLocal(input) },
     sharedRoot: store.sharedRoot,
+    channelActor: () => host.channelActor(),
+    webhookRoutines: {
+      list: (owner) => events.listRoutines({ owner }),
+      save: (input) => events.saveRoutine(input),
+    },
+    preferences: {
+      notificationLevel: (agentId) => agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY).get(agentId) ?? null,
+      setNotificationLevel: (agentId, level) => agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, { agentId, level }),
+      pinned: (agentId) =>
+        sidebarPins.snapshot(OWNER_PIN_KEY).items.some((pin) => pin.kind === "agent" && pin.id === agentId),
+      pin: (agentId) =>
+        sidebarPins.set(OWNER_PIN_KEY, [...sidebarPins.snapshot(OWNER_PIN_KEY).items, { kind: "agent", id: agentId }]),
+      autoApproves: (agentId) => approvalAutomation.autoApproves(agentId),
+      setAutoApprove: (agentId, autoApprove) => approvalAutomation.set({ agentId, autoApprove }),
+      // Only the agent's own keys: Vault keys belong to the computer.
+      apiKeyNames: (agentId) =>
+        agentApiKeys
+          .list(agentId)
+          .pipe(Effect.map((keys) => keys.filter((key) => key.source !== "vault").map((key) => key.name))),
+    },
     appVersion: app.getVersion(),
     uploadDirectory: join(app.getPath("userData"), "instance-transfer-uploads"),
     timezone: () => serverTimezone.effective(),
@@ -2783,6 +2849,16 @@ export async function createApplicationServices({
       mutateSidebar: (action) => sidebarLayout.mutate(action, service.sidebarChatIds()),
       routineFlowLinks: (agentId) => routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.links)),
       connectRoutineFlow: (input) => routineFlowRuntime.connect(input),
+      routineFlowPositions: (agentId) =>
+        routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.positions)),
+      saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
+      workflows: {
+        workflows: () =>
+          workflowRuntime
+            .listWithGraphs()
+            .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
+        createWorkflow: (input) => workflowRuntime.create(input),
+      },
       signedInProviders: () =>
         (service.getStatus().providers ?? [])
           .filter((provider) => provider.state === "available" && !provider.off)

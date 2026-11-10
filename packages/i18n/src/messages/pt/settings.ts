@@ -205,6 +205,12 @@ export const messages = {
   "settings.notch.show.titleTopOfScreen": "Mostrar o status no topo da tela",
   "settings.notch.show.description":
     "Mostre a atividade dos agentes e os itens que precisam de atenção na parte superior de cada tela.",
+  "settings.notch.xwayland.title": "Reinício necessário",
+  "settings.notch.xwayland.description":
+    "No Wayland, o OpenBot precisa usar o XWayland para mostrar a Dynamic Island acima de outros apps. Até lá, a ilha não aparece.",
+  "settings.notch.xwayland.unsupported":
+    "No Wayland sem XWayland, a Dynamic Island não pode aparecer acima de outros apps.",
+  "settings.notch.xwayland.restart": "Reiniciar",
   "settings.notch.idle.title": "Mostrar ilha ociosa",
   "settings.notch.idle.description": "Mostre o logotipo do OpenBot e a saudação quando não houver status ativo.",
   "settings.notch.displays.title": "Mostrar em telas adicionais",
@@ -229,6 +235,12 @@ export const messages = {
     "“Sobre outros apps” mantém o dock na tela quando o OpenBot está em segundo plano.",
   "settings.agentDock.placement.screen": "Sobre outros apps",
   "settings.agentDock.placement.window": "Na janela do OpenBot",
+  "settings.agentDock.xwayland.title": "Reinício necessário",
+  "settings.agentDock.xwayland.description":
+    "No Wayland, o OpenBot precisa usar o XWayland para mostrar o dock acima de outros apps. Até lá, o dock aparece na janela do OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "No Wayland sem XWayland, o dock não pode aparecer acima de outros apps. Ele aparece na janela do OpenBot.",
+  "settings.agentDock.xwayland.restart": "Reiniciar",
   "settings.agentDock.display.title": "Tela",
   "settings.agentDock.display.description":
     "Se essa tela não estiver conectada, o dock vai para a tela da janela do OpenBot.",
@@ -666,8 +678,6 @@ export const messages = {
   "settings.transfer.old.text": "Salve os agentes e as configurações do servidor em um arquivo.",
   "settings.transfer.new.title": "Importar neste servidor",
   "settings.transfer.new.text": "Adicione os agentes e as configurações do servidor de um arquivo.",
-  "settings.transfer.notMoved":
-    "Chaves de API, logins, conectores, preferências do app e o histórico de chat não são movidos. Configure-os de novo no novo servidor.",
   "settings.transfer.back": "Voltar",
   "settings.transfer.loading": "Lendo seus agentes…",
   "settings.transfer.summary.label": "O que o arquivo contém",

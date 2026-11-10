@@ -3,8 +3,12 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("error.agent", {
   "error.agent.historyUnavailable":
     "History is unavailable for this request. Read recent history again, or use channel_history for channel work.",
+  "error.agent.historyArgumentsInvalid":
+    "Incorrect history arguments: {detail} Correct the arguments and try again. openbot.tool_describe gives the schema.",
   "error.agent.toolRequestInvalid":
     "Invalid tool discovery arguments. Use the declared schema and an original qualified tool name.",
+  "error.agent.toolCallArgumentsNotObject":
+    "The tool did not run. In tool_call, arguments must be a JSON object, not text. Send the call again with arguments as an object.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",

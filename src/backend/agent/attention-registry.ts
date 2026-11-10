@@ -86,6 +86,7 @@ import {
   mcpElicitationResult,
   mcpToolCallConsent,
   promptQuestions,
+  promptQuestionsProblem,
   promptResolution,
   questionPromptText,
   uiBlockPromptResult,
@@ -1593,13 +1594,16 @@ export class AttentionRegistry {
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
     const args = getRecord(request.params, "arguments");
     const questions = promptQuestions(args);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !validPromptQuestions(questions)) {
+    const problem = promptQuestionsProblem(questions);
+    if (!threadId || !turnId || !agentId || !publicThreadId || problem) {
       client.respond(request.id, {
         success: false,
         contentItems: [
           {
             type: "inputText",
-            text: "OpenBot could not create a user question.",
+            text: problem
+              ? `OpenBot could not create a user question: ${problem} Correct the arguments and retry.`
+              : "OpenBot could not create a user question.",
           },
         ],
       });

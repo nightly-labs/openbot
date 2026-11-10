@@ -17,7 +17,9 @@
 // It changes one thing on the way back. The answer to a tool call gets one more text item, a JSON
 // copy of its `structuredContent`, because some providers show the model only the text and the
 // driver's text is a summary with nothing in it to act on. `cua-driver-structured-text.ts` says
-// what the copy holds. Every other answer, and every other byte of a changed one, passes unchanged.
+// what the copy holds. A refused call also gets its reason in `structuredContent`, because Codex
+// shows the model only that. Every other answer, and every other byte of a changed one, passes
+// unchanged.
 //
 // It also times each tool call, from the request line to the end of its answer line, and logs the
 // tool name and the milliseconds. That is the driver's share of a slow Computer Use step; the rest
@@ -263,8 +265,9 @@ class CallAnswerLines extends Transform {
 
 /** One whole answer line, ending in its newline, with the copy added when there is one to add. */
 function withCopy(line: Buffer): Buffer {
-  // Most answers have no structured result, and this search costs far less than the parse.
-  if (!line.includes('"structuredContent"')) return line;
+  // Most answers have no structured result and are no refusal or error, and this search costs far less than the parse.
+  if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
+    return line;
   const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
   return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
 }

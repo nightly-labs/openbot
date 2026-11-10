@@ -264,6 +264,8 @@ export const messages = {
     "Gemini no puede usar este modelo ahora. Elige otro modelo y vuelve a intentarlo.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "El servicio Gemini de Google no completó la solicitud. Vuelve a intentarlo en unos minutos.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini perdió la conexión con su agente y se detuvo. Envía un mensaje para continuar.",
   "error.provider.cursorArchivePath": "El archivo de Cursor contiene un archivo inesperado.",
   "error.provider.cursorChecksum": "La suma de comprobación del entorno de ejecución de Cursor no coincide.",
   "error.provider.cursorReleaseShape": "La versión de Cursor tiene una estructura inesperada.",
@@ -301,6 +303,8 @@ export const messages = {
     "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
   "error.provider.foreignReasoning":
     "{provider} no aceptó el razonamiento anterior de este chat porque lo recibió otra cuenta o clave de API. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
+  "error.provider.imageTooSmall":
+    "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
     "OpenCode rechazó la solicitud y no indicó la causa. Esto puede ocurrir en un chat largo o después de cambiar de modelo. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo o un esfuerzo menor.",
   "error.provider.museMcpStartupFault":

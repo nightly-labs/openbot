@@ -256,6 +256,8 @@ export const messages = {
     "Gemini kan dit model nu niet gebruiken. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
   "error.provider.cursorChecksum": "Checksum van de Cursor-runtime komt niet overeen.",
   "error.provider.cursorReleaseShape": "De Cursor-release heeft een onverwachte vorm.",
@@ -293,6 +295,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageTooSmall":
+    "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":

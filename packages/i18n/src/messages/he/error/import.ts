@@ -45,6 +45,8 @@ export const messages = {
   "error.import.remoteZipTooLargeOldHost":
     "השרת הזה מקבל ייצוא של עד 100 MB. יש לעדכן את OpenBot בשרת כדי לייבא ייצוא גדול יותר.",
   "error.import.skillKept": '{name}: בשרת כבר יש את המיומנות "{skill}", ולכן הסוכן משתמש בה. יש לבקש ממנהל לעדכן אותה.',
+  "error.import.skillRenamed":
+    '{name}: השם של המיומנות "{skill}" דומה מדי לשם של מיומנות אחרת, ולכן היא נשמרת בשם "{renamed}".',
   "error.import.hermesNoProfiles":
     "בתיקייה הזו אין פרופילי Hermes. יש לבחור את תיקיית Hermes, שמכילה את config.yaml או את SOUL.md.",
   "error.import.hermesClosed": "פרופילי Hermes אינם פתוחים עוד. יש לקרוא אותם שוב.",

@@ -30,9 +30,9 @@ import type { AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import {
   claudeModelName,
-  codexFastServiceTier,
   isOpencodeModelUnusableWithStoredKey,
   modelsAfterOpenCodeDiscoveryFailure,
+  serviceTierFields,
 } from "./agent/provider-models";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_USAGE_PROMPT, antigravityRateLimits } from "./antigravity-usage";
@@ -621,7 +621,7 @@ interface ProviderModelCatalog {
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string };
+  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
   /** False drops a model that the stored API key cannot use. Runs only while a key is stored. */
   usableWithStoredKey?(id: string, name: string): boolean;
   /**
@@ -836,7 +836,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: codexFastServiceTier },
+    catalog: { paged: true, modelFields: serviceTierFields },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new CodexAppServerClient(cli.executable, requestTimeoutMs, {
@@ -872,7 +872,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
-    catalog: { modelName: claudeModelName },
+    catalog: { modelName: claudeModelName, modelFields: serviceTierFields },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new ClaudeAgentClient(
@@ -951,8 +951,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
     // Grok 1.0.70 starts on its two built-in models when its sign-in has expired, renews the sign-in,
-    // and then fetches its catalogue. A `model/list` in between misses the newer models.
-    catalog: { partialListAtStart: true },
+    // and then fetches its catalogue. A `model/list` in between misses the newer models, so the list
+    // is read once more after each start, also when no agent is on a missing model yet (#6318).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "opencode",
@@ -1479,7 +1480,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: { kind: "external" },
     // A custom agent can need more than 5 s to start and open a probe session in `initialize` and
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
-    catalog: { slowList: true },
+    // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
+    // the list is read once more after each start.
+    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(

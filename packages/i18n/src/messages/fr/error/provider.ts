@@ -272,6 +272,8 @@ export const messages = {
     "Gemini ne peut pas utiliser ce modèle pour le moment. Choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
   "error.provider.cursorChecksum": "La somme de contrôle de l’environnement d’exécution Cursor ne correspond pas.",
   "error.provider.cursorReleaseShape": "La version Cursor a une forme inattendue.",
@@ -313,6 +315,8 @@ export const messages = {
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
+  "error.provider.imageTooSmall":
+    "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.museMcpStartupFault":

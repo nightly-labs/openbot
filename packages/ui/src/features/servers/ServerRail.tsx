@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   Eye,
   Plus,
+  Server,
   ServerGradientLogo,
   Tooltip,
 } from "@openbot/ui";
@@ -85,6 +86,8 @@ interface ServerRailProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   /** Opens the dialog that creates a server on this computer. With it, the plus button opens a menu. */
   onCreateLocal?: (() => void) | undefined;
+  /** Opens the dialog with the command that installs a server on another computer. With it, the plus button opens a menu. */
+  onInstallServer?: (() => void) | undefined;
   /** The server on this computer while the user hides it. With it, the plus button opens a menu. */
   hiddenLocal?: HiddenLocalServer | undefined;
 }
@@ -365,7 +368,7 @@ export function ServerRail(props: ServerRailProps) {
         </Show>
         <Show when={props.onAdd}>
           <Show
-            when={props.onCreateLocal || props.hiddenLocal}
+            when={props.onCreateLocal || props.onInstallServer || props.hiddenLocal}
             fallback={
               <Tooltip.Root
                 placement="right"
@@ -394,6 +397,7 @@ export function ServerRail(props: ServerRailProps) {
               addLabel={addServerLabel(props)}
               onAdd={() => props.onAdd?.()}
               onCreateLocal={props.onCreateLocal}
+              onInstallServer={props.onInstallServer}
               hiddenLocal={props.hiddenLocal}
             />
           </Show>
@@ -414,6 +418,7 @@ function ServerRailAddMenu(props: {
   addLabel: AppTextKey;
   onAdd: () => void;
   onCreateLocal?: (() => void) | undefined;
+  onInstallServer?: (() => void) | undefined;
   hiddenLocal?: HiddenLocalServer | undefined;
 }) {
   const { t } = useText();
@@ -454,6 +459,16 @@ function ServerRailAddMenu(props: {
                       <Plus />
                     </span>
                     <span>{t("server.local.createTitle")}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
+              <Show when={props.onInstallServer}>
+                {(onInstallServer) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={onInstallServer()}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Server />
+                    </span>
+                    <span>{t("server.install.title")}</span>
                   </DropdownMenu.Item>
                 )}
               </Show>

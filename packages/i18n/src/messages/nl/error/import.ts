@@ -53,6 +53,8 @@ export const messages = {
     "Deze server accepteert een export tot 100 MB. Werk OpenBot op de server bij om een grotere export te importeren.",
   "error.import.skillKept":
     "{name}: de server heeft de vaardigheid “{skill}” al, dus de agent gebruikt die vaardigheid. Vraag een beheerder om deze bij te werken.",
+  "error.import.skillRenamed":
+    "{name}: de naam van de vaardigheid “{skill}” lijkt te veel op de naam van een andere vaardigheid, dus deze wordt opgeslagen als “{renamed}”.",
   "error.import.hermesNoProfiles":
     "Deze map heeft geen Hermes-profielen. Kies de Hermes-map, met config.yaml of SOUL.md.",
   "error.import.hermesClosed": "De Hermes-profielen zijn niet meer open. Lees ze opnieuw.",

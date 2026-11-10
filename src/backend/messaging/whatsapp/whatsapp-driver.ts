@@ -37,6 +37,7 @@ import {
 } from "./whatsapp-events";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
+import { allowsContact } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
@@ -64,6 +65,12 @@ const IMAGE_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
+};
+
+/** WhatsApp opens a document by its type, so a generic type makes a ".bin" file. Attachments store HTML as plain text. */
+const DOCUMENT_TYPES: Record<string, string> = {
+  ".htm": "text/html",
+  ".html": "text/html",
 };
 
 /** The stored values of one linked number. `whatsappStoreKey` opens its store, the others name it. */
@@ -253,7 +260,7 @@ class WhatsAppAdapter implements MessagingAdapter {
             : {
                 document: { url: file.path },
                 fileName: file.name.slice(0, 255) || "file",
-                mimetype: "application/octet-stream",
+                mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
           yield* this.#send(target, content);
           return true;
@@ -406,7 +413,7 @@ class WhatsAppAdapter implements MessagingAdapter {
       const user = isJidGroup(chatJid) ? null : userPart(chatJid);
       const allowed = isJidGroup(chatJid)
         ? rules.groups.has(chatJid)
-        : user === identity.number || (user !== null && rules.contacts.has(user));
+        : user === identity.number || (user !== null && allowsContact(rules, user));
       return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
     });
   }

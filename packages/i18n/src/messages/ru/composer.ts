@@ -117,6 +117,10 @@ export const messages = {
   "composer.error.changeModel": "Не удалось сменить модель. Повторите попытку.",
   "composer.error.changeEffort": "Не удалось изменить уровень усилий. Повторите попытку.",
   "composer.error.changeFastMode": "Не удалось изменить быстрый режим. Повторите попытку.",
+  "composer.fastMode.confirmTitle": "Включить быстрый режим?",
+  "composer.fastMode.confirmDescription":
+    "Claude отвечает быстрее, но каждый токен стоит дороже. С подпиской Claude быстрый режим всегда расходует кредиты использования, даже если в тарифе ещё осталось использование.",
+  "composer.fastMode.confirm": "Включить",
   "composer.context.label": "Контекст заполнен на {percent}",
   "composer.context.labelEstimated": "Контекст заполнен примерно на {percent}",
   "composer.context.labelCompacting": "Сжатие контекста",

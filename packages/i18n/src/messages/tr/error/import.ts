@@ -51,6 +51,8 @@ export const messages = {
     "Bu sunucu en fazla 100 MB'lık bir dışa aktarım kabul ediyor. Daha büyük bir dışa aktarımı içe aktarmak için sunucudaki OpenBot'u güncelleyin.",
   "error.import.skillKept":
     '{name}: sunucu zaten "{skill}" becerisine sahip, bu yüzden ajan bu beceriyi kullanıyor. Bir yöneticiden güncellemesini isteyin.',
+  "error.import.skillRenamed":
+    '{name}: "{skill}" becerisinin adı başka bir becerinin adına çok benziyor, bu yüzden "{renamed}" olarak kaydedildi.',
   "error.import.transferRemoteTooLarge":
     "Katılınan bir sunucu için aktarım dosyası 100 MB'tan küçük olmalıdır. Çalışma alanı dosyalarını kapatın veya daha az ajan dışa aktarın.",
   "error.import.transferNotFile": "Bu dosya bir OpenBot aktarım dosyası değil.",

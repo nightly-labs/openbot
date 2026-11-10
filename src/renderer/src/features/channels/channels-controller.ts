@@ -69,8 +69,9 @@ export interface ChannelsEnvironment {
    */
   isolationSupported: () => boolean;
   /**
-   * Whether this reader can change the picture of a channel. Only this computer keeps a channel
-   * picture: the Team API does not carry it, so a joined server and the browser client cannot.
+   * Whether this reader can change the picture of a channel. The host keeps a channel picture, and
+   * only a phone with `channel-picture-v1` changes it over the Team API, so a joined server and the
+   * browser client cannot.
    */
   pictureSupported: () => boolean;
   /**

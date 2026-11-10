@@ -20,6 +20,7 @@ export const messages = {
   "error.auth.serviceTimeout": "O serviço de contas não respondeu a tempo. Tente novamente.",
   "error.auth.serviceStatus": "O serviço de contas retornou um erro ({status}). Tente novamente mais tarde.",
   "error.auth.invalidHostedServer": "O serviço de contas retornou um servidor hospedado inválido.",
+  "error.auth.invalidServerClaim": "O serviço de contas retornou um código de servidor inválido.",
   "error.auth.codeNotSent": "O OpenBot não conseguiu enviar o código de login.",
   "error.auth.deliveryTimeout":
     "O OpenBot não conseguiu confirmar a entrega a tempo. O código ainda pode chegar; verifique a entrega antes de enviar novamente.",

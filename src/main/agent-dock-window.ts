@@ -9,6 +9,7 @@ import type {
   AgentDockDisplayInfo,
   AgentDockDragPhase,
   AgentDockEdge,
+  AgentDockInputRect,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
@@ -37,13 +38,16 @@ export class AgentDockFailed extends Schema.TaggedError<AgentDockFailed>()("Agen
 
 export const { rewrap: toAgentDockFailed } = causeHelpers(AgentDockFailed);
 
-/** The platforms that show the dock window. On Windows it is a tool window above the other apps. */
-function agentDockSupported(platform: NodeJS.Platform): boolean {
-  return platform === "darwin" || platform === "win32";
-}
+/**
+ * The window that holds the dock. `panel` is a macOS panel and `tool` a Windows tool window: each lets
+ * the pointer through and forwards its moves. `x11` is a dock window on X11 or XWayland: its shape takes
+ * the pointer, so it follows the dock. Null: this process can put no window at a screen edge above the
+ * other apps, as on native Wayland.
+ */
+type AgentDockWindowKind = "panel" | "tool" | "x11";
 
 export interface AgentDockWindowControllerOptions {
-  platform: NodeJS.Platform;
+  windowKind: AgentDockWindowKind | null;
   createWindow: (bounds: Rectangle) => BrowserWindow;
   loadWindow: (window: BrowserWindow) => Promise<void>;
   /** The displays that can hold the dock. */
@@ -187,10 +191,18 @@ export class AgentDockWindowController {
   setInteractive(rendererId: number, input: SetAgentDockInteractiveInput): void {
     const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
     if (!window) return;
-    window.setIgnoreMouseEvents(!input.interactive, { forward: true });
+    // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
+    if (this.#options.windowKind !== "x11") window.setIgnoreMouseEvents(!input.interactive, { forward: true });
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !window.isFocused()) window.focus();
+  }
+
+  /** X11: only these parts of the window take the pointer, and only they show. */
+  setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
+    if (this.#options.windowKind !== "x11") return;
+    const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
+    window?.setShape(rects);
   }
 
   /**
@@ -303,7 +315,7 @@ export class AgentDockWindowController {
     return this.#reconciliation
       .withPermit(
         Effect.suspend(() => {
-          if (this.#destroyed || !agentDockSupported(this.#options.platform)) {
+          if (this.#destroyed || this.#options.windowKind === null) {
             this.#destroyWindow();
             return Effect.void;
           }
@@ -327,7 +339,7 @@ export class AgentDockWindowController {
             current.displayId = display.id;
             const bounds = this.#boundsFor(display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
-            if (!current.window.isVisible()) current.window.showInactive();
+            if (!current.window.isVisible()) this.#show(current.window);
           }
           for (const entry of spare) this.#closeWindow(entry.window);
           return Effect.forEach(opens, (display) =>
@@ -355,14 +367,19 @@ export class AgentDockWindowController {
         window.setAlwaysOnTop(true, "floating");
         // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
         // defined on Windows, so a call there throws.
-        if (this.#options.platform === "darwin") {
+        if (this.#options.windowKind === "panel") {
           window.excludedFromShownWindowsMenu = true;
           window.setWindowButtonVisibility(false);
           window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
           window.setHiddenInMissionControl(true);
         }
+        if (this.#options.windowKind === "x11") {
+          // Until the dock renderer reports its shape, no part of the window takes the pointer or shows.
+          window.setShape([]);
+        } else {
+          window.setIgnoreMouseEvents(true, { forward: true });
+        }
         window.setFocusable(false);
-        window.setIgnoreMouseEvents(true, { forward: true });
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
           // A reloaded dock renderer has no open chat and no drag.
@@ -374,7 +391,7 @@ export class AgentDockWindowController {
         });
         window.once("ready-to-show", () => {
           if (!owned() || this.#presentation === null) return;
-          window.showInactive();
+          this.#show(window);
         });
         // macOS can move a window off a display that goes away. Put the dock back at its place on its edge.
         window.on("move", () => {
@@ -399,6 +416,12 @@ export class AgentDockWindowController {
         }).pipe(Effect.tapError(() => Effect.sync(() => this.#closeWindow(window)))),
       ),
     );
+  }
+
+  #show(window: BrowserWindow): void {
+    window.showInactive();
+    // An X11 window manager reads the desktop of a window when it maps it: before, the setting is lost.
+    if (this.#options.windowKind === "x11") window.setVisibleOnAllWorkspaces(true);
   }
 
   destroy(): void {

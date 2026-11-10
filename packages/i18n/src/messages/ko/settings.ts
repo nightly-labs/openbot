@@ -201,6 +201,12 @@ export const messages = {
   "settings.notch.show.title": "MacBook 노치에 상태 표시",
   "settings.notch.show.titleTopOfScreen": "화면 상단에 상태 표시",
   "settings.notch.show.description": "각 디스플레이 상단에 에이전트 활동과 확인이 필요한 항목을 표시해요.",
+  "settings.notch.xwayland.title": "다시 시작 필요",
+  "settings.notch.xwayland.description":
+    "Wayland에서는 다른 앱 위에 Dynamic Island를 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 아일랜드는 표시되지 않습니다.",
+  "settings.notch.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 Dynamic Island를 다른 앱 위에 표시할 수 없습니다.",
+  "settings.notch.xwayland.restart": "다시 시작",
   "settings.notch.idle.title": "대기 상태 아일랜드 표시",
   "settings.notch.idle.description": "활성 상태가 없을 때 OpenBot 로고와 인사말을 표시해요.",
   "settings.notch.displays.title": "추가 디스플레이에 표시",
@@ -225,6 +231,12 @@ export const messages = {
     "'다른 앱 위'를 선택하면 OpenBot이 백그라운드에 있어도 독이 화면에 표시됩니다.",
   "settings.agentDock.placement.screen": "다른 앱 위",
   "settings.agentDock.placement.window": "OpenBot 창 안",
+  "settings.agentDock.xwayland.title": "다시 시작 필요",
+  "settings.agentDock.xwayland.description":
+    "Wayland에서는 다른 앱 위에 독을 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 독은 OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.restart": "다시 시작",
   "settings.agentDock.display.title": "디스플레이",
   "settings.agentDock.display.description":
     "해당 디스플레이가 연결되어 있지 않으면 독이 OpenBot 창의 디스플레이로 이동합니다.",
@@ -647,8 +659,6 @@ export const messages = {
   "settings.transfer.old.text": "에이전트와 서버 설정을 파일로 저장해요.",
   "settings.transfer.new.title": "이 서버로 가져오기",
   "settings.transfer.new.text": "파일에서 에이전트와 서버 설정을 추가해요.",
-  "settings.transfer.notMoved":
-    "API 키, 로그인 정보, 커넥터, 앱 환경설정, 채팅 기록은 옮겨지지 않아요. 새 서버에서 다시 설정해 주세요.",
   "settings.transfer.back": "뒤로",
   "settings.transfer.loading": "에이전트를 읽는 중…",
   "settings.transfer.summary.label": "파일에 포함된 내용",

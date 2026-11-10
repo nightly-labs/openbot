@@ -124,6 +124,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "S’exécute dans l’app de bureau {name} à l’adresse {address}.",
   "marketplace.app.setup.desktopConnected": "Connecté à {address}.",
   "marketplace.app.setup.open": "Aucune connexion ni clé requise.",
+  "marketplace.app.blocked.update":
+    "{host} utilise une ancienne version d’OpenBot qui ne peut pas connecter d’apps. Mettez à jour OpenBot sur {host}, ou demandez à son propriétaire de le faire.",
+  "marketplace.app.blocked.member":
+    "Seul un propriétaire ou un admin de {host} peut y connecter des apps. Demandez-lui de connecter {name}, ou de mettre à jour OpenBot sur {host} pour que les membres puissent connecter des apps.",
   "marketplace.app.connectAgain": "Reconnecter",
   "marketplace.app.automation.askOnInstall": "Demander l’accès à macOS à l’installation",
   "marketplace.app.automation.title": "Accès aux apps Apple",

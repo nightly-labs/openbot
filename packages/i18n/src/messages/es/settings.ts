@@ -206,6 +206,12 @@ export const messages = {
   "settings.notch.show.titleTopOfScreen": "Mostrar el estado en la parte superior de la pantalla",
   "settings.notch.show.description":
     "Mostrar la actividad de los agentes y los elementos que necesitan atención en la parte superior de cada pantalla.",
+  "settings.notch.xwayland.title": "Hay que reiniciar",
+  "settings.notch.xwayland.description":
+    "En Wayland, OpenBot debe usar XWayland para mostrar la Dynamic Island sobre otras apps. Hasta entonces, la isla no aparece.",
+  "settings.notch.xwayland.unsupported":
+    "En Wayland sin XWayland, la Dynamic Island no puede aparecer sobre otras apps.",
+  "settings.notch.xwayland.restart": "Reiniciar",
   "settings.notch.idle.title": "Mostrar la isla inactiva",
   "settings.notch.idle.description": "Mostrar el logotipo de OpenBot y el saludo cuando no hay un estado activo.",
   "settings.notch.displays.title": "Mostrar en pantallas adicionales",
@@ -231,6 +237,12 @@ export const messages = {
     "«Sobre otras apps» mantiene el dock en pantalla cuando OpenBot está en segundo plano.",
   "settings.agentDock.placement.screen": "Sobre otras apps",
   "settings.agentDock.placement.window": "En la ventana de OpenBot",
+  "settings.agentDock.xwayland.title": "Hay que reiniciar",
+  "settings.agentDock.xwayland.description":
+    "En Wayland, OpenBot debe usar XWayland para mostrar el dock sobre otras apps. Hasta entonces, el dock aparece en la ventana de OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "En Wayland sin XWayland, el dock no puede aparecer sobre otras apps. Aparece en la ventana de OpenBot.",
+  "settings.agentDock.xwayland.restart": "Reiniciar",
   "settings.agentDock.display.title": "Pantalla",
   "settings.agentDock.display.description":
     "Si esa pantalla no está conectada, el dock pasa a la pantalla de la ventana de OpenBot.",
@@ -674,8 +686,6 @@ export const messages = {
   "settings.transfer.old.text": "Guarda sus agentes y los ajustes del servidor en un archivo.",
   "settings.transfer.new.title": "Importar en este servidor",
   "settings.transfer.new.text": "Añade los agentes y los ajustes del servidor desde un archivo.",
-  "settings.transfer.notMoved":
-    "Las claves de API, los inicios de sesión, los conectores, las preferencias de la app y el historial de chats no se trasladan. Vuelve a configurarlos en el servidor nuevo.",
   "settings.transfer.back": "Atrás",
   "settings.transfer.loading": "Leyendo tus agentes…",
   "settings.transfer.summary.label": "Contenido del archivo",

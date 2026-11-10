@@ -2,7 +2,7 @@ import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isImageTooSmallDiagnostic, isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
@@ -28,12 +28,10 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
  * the JavaScript error class, so the user read the generic text with no provider name (#2850).
  * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
  */
+export const OPENCODE_INTERNAL_FAILURE = "Internal error: Internal service failure";
+
 export function isOpenCodeInternalFailure(error: unknown): boolean {
-  return (
-    error instanceof RequestError &&
-    error.code === -32603 &&
-    error.message === "Internal error: Internal service failure"
-  );
+  return error instanceof RequestError && error.code === -32603 && error.message === OPENCODE_INTERNAL_FAILURE;
 }
 
 /**
@@ -113,6 +111,8 @@ function openCodeRequestFailure(
     return sourceText("error.provider.opencodeKeyExpired");
   // A spent usage limit shows in OpenCode's own words, which the turn also reads for a plan window.
   if (isUsageLimitDiagnostic(reason)) return redact(reason);
+  // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
+  if (isImageTooSmallDiagnostic(reason)) return redact(reason);
   // The part stays in the session, so each turn on this model fails until the user picks another.
   // The provider's text says nothing more to the user; it goes to the log.
   if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {

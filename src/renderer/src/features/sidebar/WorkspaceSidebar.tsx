@@ -264,6 +264,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
                 onSelect: serverActions.select,
                 onAdd: serverActions.add,
                 onCreateLocal: serverActions.addMenuCreateLocal(),
+                onInstallServer: serverActions.addMenuInstallServer(),
                 addCreatesServer: serverActions.addCreatesServer(),
                 hiddenLocal: serverActions.hiddenLocal(),
                 ...serverActions.callbacks,
@@ -282,6 +283,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         agentMoods={agentMoods()}
         layout={sidebarLayout()}
         layoutMutable={activeServerSupportsCapability("sidebar-layout")}
+        chatOrder={layout.sidebarChatOrder()}
+        onChatOrderChange={layout.setSidebarChatOrder}
         foldersSupported={activeServerSupportsCapability("sidebar-folders-v1")}
         collapsedSectionIds={collapsedSidebarSectionIds()}
         onMutateLayout={mutateSidebarLayout}

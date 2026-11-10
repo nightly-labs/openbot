@@ -13,6 +13,7 @@ import {
   Moon,
   PanelLeft,
   Plus,
+  Server,
 } from "@openbot/ui";
 import { SwapLabel } from "@openbot/ui/components/SwapLabel";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
@@ -54,6 +55,8 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   /** Opens the dialog that creates a server on this computer. Without it, the menu does not show the item. */
   onCreateLocal?: (() => void) | undefined;
+  /** Opens the dialog with the command that installs a server on another computer. Without it, the menu does not show the item. */
+  onInstallServer?: (() => void) | undefined;
   /** The server on this computer while the user hides it. Without it, the menu does not show the item. */
   hiddenLocal?: HiddenLocalServer | undefined;
   /** The compact sidebar hides the server name. The rail stays visible then. */
@@ -281,6 +284,16 @@ export function ServerMenu(props: ServerMenuProps) {
                       <Plus />
                     </span>
                     <span>{t("server.local.createTitle")}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
+              <Show when={props.onInstallServer}>
+                {(onInstallServer) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelect={() => onInstallServer()()}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Server />
+                    </span>
+                    <span>{t("server.install.title")}</span>
                   </DropdownMenu.Item>
                 )}
               </Show>
