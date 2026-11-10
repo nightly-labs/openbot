@@ -1512,7 +1512,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Whether the agent can resume without replaying its transcript, and OpenBot uses that resume. */
   get #supportsSessionResume(): boolean {
     if (this.#flavor.loadInsteadOfResume) return false;
-    return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
+    return (
+      this.#flavor.canResumeSession === true ||
+      this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null
+    );
   }
 
   /**
