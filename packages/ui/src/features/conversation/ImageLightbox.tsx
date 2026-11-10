@@ -239,23 +239,42 @@ function drawPng(source: CanvasImageSource, width: number, height: number): Prom
   return canvas.convertToBlob({ type: "image/png" });
 }
 
-/** The clipboard takes images as PNG, so the copy draws the shown image again. */
+/**
+ * The clipboard takes images as PNG. A PNG file goes as it is, and other files are drawn again. An
+ * attachment comes from another origin, and a canvas cannot read such an image, so the copy reads
+ * the file. When the file does not load or decode, the copy draws the shown image.
+ */
 async function pngImage(image: HTMLImageElement): Promise<Blob> {
-  try {
-    return await drawPng(image, image.naturalWidth, image.naturalHeight);
-  } catch (cause) {
-    // A canvas cannot read an image from another origin, such as an attachment, so its file loads again.
-    if (!(cause instanceof DOMException && cause.name === "SecurityError")) throw cause;
-  }
-  const file = await (await fetch(image.currentSrc)).blob();
-  if (file.type === "image/png") return file;
-  const bitmap = await createImageBitmap(file);
+  const file = await fetch(image.currentSrc).then(
+    (response) => (response.ok ? response.blob() : undefined),
+    () => undefined,
+  );
+  if (file?.type === "image/png") return file;
+  const bitmap = file && (await createImageBitmap(file).catch(() => undefined));
+  if (!bitmap) return drawPng(image, image.naturalWidth, image.naturalHeight);
   try {
     return await drawPng(bitmap, bitmap.width, bitmap.height);
   } finally {
     bitmap.close();
   }
 }
+
+/** Text that the user selected in the viewer, such as the file name. Text behind the viewer does not count. */
+const selectsText = (viewer: Node) => {
+  const selection = window.getSelection();
+  return Boolean(selection?.toString()) && viewer.contains(selection?.anchorNode ?? null);
+};
+
+/** Command or Ctrl with C, also on a layout without Latin letters, such as Russian. */
+const isCopyKey = (event: KeyboardEvent) => {
+  const key = event.key.toLowerCase();
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    (key === "c" || (!/^[a-z]$/.test(key) && event.code === "KeyC"))
+  );
+};
 
 const FADE_KEYFRAMES: Keyframe[] = [
   { opacity: 0, transform: "scale(0.96)" },
@@ -389,8 +408,8 @@ export function ImageLightbox(props: {
   /** Copies the shown image. The copy button shows the check and tells a screen reader, also for the key. */
   const copy = () => {
     const entry = current();
-    const image = zoomImage(entry);
-    if (!entry || !image || !copyable) return;
+    const image = entry ? imageElements.get(entry.id) : undefined;
+    if (!entry || !image?.isConnected || !copyable) return;
     // The item takes the PNG as a promise, so the write keeps the press's permission while it draws.
     navigator.clipboard.write([new ClipboardItem({ "image/png": pngImage(image) })]).then(
       () => {
@@ -658,20 +677,13 @@ export function ImageLightbox(props: {
           }}
           // The native menu copies the image under the pointer, so the message's own menu does not open.
           onContextMenu={(event: MouseEvent) => event.stopPropagation()}
-          onKeyDown={(event: KeyboardEvent) => {
+          onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
             const offset = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
             if (offset !== undefined) step(offset);
             else if (event.key === "Home") go(0, -1);
             else if (event.key === "End") go(images().length - 1, 1);
             // Copy takes the image, unless the user selected text, such as the file name.
-            else if (
-              (event.metaKey || event.ctrlKey) &&
-              !event.altKey &&
-              !event.shiftKey &&
-              event.key.toLowerCase() === "c" &&
-              !window.getSelection()?.toString()
-            )
-              copy();
+            else if (isCopyKey(event) && !selectsText(event.currentTarget)) copy();
             // With Command, Ctrl or Alt, the keys are the app's own zoom shortcuts.
             else if (event.metaKey || event.ctrlKey || event.altKey) return;
             else if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);

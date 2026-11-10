@@ -197,7 +197,12 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
         if (!event.isTrusted) return;
         const target = event.target instanceof Element ? event.target : null;
         const link = Boolean(target?.closest("a[href]"));
-        const image = target instanceof HTMLImageElement && target.closest(".message-author-avatar") === null;
+        // The native menu copies only a loaded image, and icons and avatars keep the message menu.
+        const image =
+          target instanceof HTMLImageElement &&
+          target.complete &&
+          target.naturalWidth > 0 &&
+          target.closest(".message-author-avatar, [aria-hidden='true']") === null;
         if (event.shiftKey || link || image || selected) event.stopPropagation();
       },
       { capture: true },
