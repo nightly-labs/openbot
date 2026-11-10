@@ -182,20 +182,12 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-
-/** An export file on this phone, read when it is sent. */
-export interface AgentExportFile {
-  name: string;
-  size: number;
-  readAll: () => Promise<string>;
-  readPart: (offset: number, length: number) => Promise<string>;
-}
-
 import type {
   HostLocalServer,
   HostLocalServerList,
   MessagingConnectorPage,
 } from "@openbot/team-client/team-admin-requests";
+import type { AgentExportParts } from "@openbot/team-client/team-api-requests";
 import type { NewAgentInput } from "@/features/agents/model/agent-initial-message";
 import type { MobileBrowserTab } from "@/features/browser/model/browser-tabs";
 import type { BrowserViewBridgeEvent, RemoteBrowserViewSession } from "@/features/browser/model/browser-view-bridge";
@@ -205,6 +197,12 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
+
+/** An export file on this phone, read when it is sent. */
+export interface AgentExportFile extends AgentExportParts {
+  /** The whole file as Base64. */
+  readAll: () => Promise<string>;
+}
 
 type MobileServerKind = "local" | "remote";
 /** The message that `message-delete-v1` deletes. */
@@ -570,6 +568,8 @@ export interface MobileWorkspaceContextValue {
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
   /** The text of a CSV password export. The host adds its logins and answers only the counts. */
   importVaultCsv: (csv: string, serverId: string) => Promise<VaultHostImportResult>;
+  /** Throws when the host takes an export of this size only with a newer OpenBot. Nothing goes to the host. */
+  checkAgentExport: (size: number, serverId: string) => void;
   /**
    * Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. A host
    * with `agent-import-v2` gets it in parts; an older host takes up to 100 MB.

@@ -248,8 +248,13 @@ export class AgentImportService {
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#prepareUploadDirectory(directory);
       const disk = yield* this.freeDiskBytes(directory);
+      // From here to the `set`, nothing waits, so a concurrent open sees this upload. Another open by
+      // the same owner can have ended during the reads above: it is released, as an earlier upload is.
+      const earlier = [...this.#uploads].filter(([, other]) => other.owner === owner);
       // The other uploads still need the bytes they do not have yet.
-      const reserved = [...this.#uploads.values()].reduce((total, other) => total + other.size - other.received, 0);
+      const reserved = [...this.#uploads.values()]
+        .filter((other) => other.owner !== owner)
+        .reduce((total, other) => total + other.size - other.received, 0);
       const free = disk === null ? null : Math.max(0, disk - reserved);
       if (free !== null && size > free)
         return yield* archiveFailure(
@@ -260,11 +265,20 @@ export class AgentImportService {
             }),
           ),
         );
-      const path = join(directory, `${randomUUID()}.zip`);
-      yield* archiveCall(() => writeFile(path, new Uint8Array(), { flag: "wx", mode: 0o600 }));
       const uploadId = randomUUID();
-      const upload: PartUpload = { owner, path, size, received: 0, writing: false, expiry: null };
+      const upload: PartUpload = {
+        owner,
+        path: join(directory, `${randomUUID()}.zip`),
+        size,
+        received: 0,
+        writing: false,
+        expiry: null,
+      };
       this.#uploads.set(uploadId, upload);
+      yield* Effect.forEach(earlier, ([id, other]) => this.#dropUpload(id, other), { discard: true });
+      yield* archiveCall(() => writeFile(upload.path, new Uint8Array(), { flag: "wx", mode: 0o600 })).pipe(
+        Effect.tapError(() => this.#dropUpload(uploadId, upload)),
+      );
       this.#keepUpload(uploadId, upload);
       return uploadId;
     }).pipe(
@@ -296,14 +310,28 @@ export class AgentImportService {
       const bytes = yield* archiveCall(() => read());
       if (bytes.length === 0 || upload.received + bytes.length > upload.size)
         return yield* archiveFailure(new Error("The part does not fit the size of the upload."));
+      const closed = () => this.#uploads.get(uploadId) !== upload;
       yield* archiveCall(async () => {
         const handle = await open(upload.path, "r+");
         try {
-          await handle.write(bytes, 0, bytes.length, offset);
+          let written = 0;
+          while (written < bytes.length) {
+            const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, offset + written);
+            if (bytesWritten === 0) throw Object.assign(new Error("The part was not written."), { code: "EIO" });
+            written += bytesWritten;
+          }
         } finally {
           await handle.close();
         }
-      }).pipe(Effect.uninterruptible);
+      }).pipe(
+        Effect.uninterruptible,
+        // A new open or the idle expiry can release the upload, and remove its file, during the write.
+        Effect.catch((error) => (closed() ? Effect.void : Effect.fail(error))),
+      );
+      if (closed()) {
+        yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
+        return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+      }
       upload.received += bytes.length;
       this.#keepUpload(uploadId, upload);
       return upload.received;

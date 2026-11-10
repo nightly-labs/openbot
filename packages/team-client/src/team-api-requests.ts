@@ -436,15 +436,21 @@ function decodeUploadId(value: unknown): string {
   return value.uploadId;
 }
 
+/** An export that is read one part at a time. */
+export interface AgentExportParts {
+  name: string;
+  size: number;
+  /** Up to `length` bytes from `offset`, as Base64. */
+  readPart: (offset: number, length: number) => Promise<string>;
+}
+
 /**
- * Sends a Grok Bot export of any size to the host in parts, and answers its preview. `readPart` gives
- * the bytes from `offset`, at most `length`, as Base64. Send it only to a host that serves
- * `agent-import-v2`; `apply` and `discard` stay the v1 calls.
+ * Sends a Grok Bot export of any size to the host in parts, and answers its preview. Send it only to
+ * a host that serves `agent-import-v2`; `apply` and `discard` stay the v1 calls.
  */
 export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInParts")(function* (
   request: TeamApiRequest,
-  file: { name: string; size: number; readPart: (offset: number, length: number) => Promise<string> },
-  onProgress?: (fraction: number) => void,
+  file: AgentExportParts,
 ): Effect.fn.Return<AgentImportPreview, TeamRequestError> {
   const uploadId = yield* teamCall(() =>
     request("POST", AGENT_IMPORT_V2_ROUTES.open, decodeUploadId, { size: file.size }),
@@ -455,7 +461,6 @@ export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInP
     const upload = { name: file.name, mimeType: "application/zip", base64, maxBytes: AGENT_IMPORT_V2_CHUNK_BYTES };
     yield* teamCall(() => request("POST", agentImportV2ChunkPath(uploadId, offset), ignoreResponse, undefined, upload));
     offset += length;
-    onProgress?.(offset / file.size);
   }
   return yield* teamCall(() =>
     request("POST", AGENT_IMPORT_V2_ROUTES.stage, decodeRemoteAgentImportPreview, { uploadId }),

@@ -434,6 +434,7 @@ type HostRequestActions = Pick<
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
+  | "checkAgentExport"
   | "stageAgentImport"
   | "applyAgentImport"
   | "discardAgentImport"
@@ -786,10 +787,23 @@ export function createHostRequestActions({
     deleteVaultItem: async (id, serverId) =>
       runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
+    checkAgentExport: (size, serverId) => {
+      if (!has(serverId, AGENT_IMPORT_V2_CAPABILITY) && size > AGENT_IMPORT_UPLOAD_BYTES)
+        throw new Error(sourceText("error.import.remoteZipTooLargeOldHost"));
+    },
     stageAgentImport: async (file, serverId, onProgress) => {
-      if (has(serverId, AGENT_IMPORT_V2_CAPABILITY))
-        return runTeamRequest(stageAgentImportInParts(agentImportApi(serverId), file, onProgress));
-      if (file.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(sourceText("error.import.remoteZipTooLargeOldHost"));
+      if (has(serverId, AGENT_IMPORT_V2_CAPABILITY)) {
+        // The progress of each part's upload, as a fraction of the whole export.
+        let part = { offset: 0, length: 0 };
+        const request = agentImportApi(serverId, (fraction) =>
+          onProgress?.((part.offset + fraction * part.length) / file.size),
+        );
+        const readPart = (offset: number, length: number) => {
+          part = { offset, length };
+          return file.readPart(offset, length);
+        };
+        return runTeamRequest(stageAgentImportInParts(request, { name: file.name, size: file.size, readPart }));
+      }
       const upload = { name: file.name, mimeType: "application/zip", base64: await file.readAll() };
       return runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload));
     },

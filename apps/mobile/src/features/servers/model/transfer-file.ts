@@ -4,6 +4,7 @@ import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import type { AgentExportFile } from "@/features/workspace/model/workspace-types";
 import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { currentText } from "@/shared/lib/text";
 
@@ -11,13 +12,7 @@ import { currentText } from "@/shared/lib/text";
 const ZIP_TYPES = ["application/zip", "application/x-zip-compressed", "application/octet-stream"];
 
 /** A picked `.zip` file. This phone keeps its copy until `release`, and reads it when it is sent. */
-export interface PickedZip {
-  name: string;
-  size: number;
-  /** The whole file as Base64. */
-  readAll: () => Promise<string>;
-  /** Up to `length` bytes from `offset`, as Base64. */
-  readPart: (offset: number, length: number) => Promise<string>;
+export interface PickedZip extends AgentExportFile {
   release: () => void;
 }
 
