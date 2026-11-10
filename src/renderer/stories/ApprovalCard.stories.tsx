@@ -101,6 +101,13 @@ const sentFacts = {
   os: "macOS 26.1 (arm64)",
   provider: "Claude (Claude Code)",
   providerVersion: "2.3.1",
+  model: "claude-opus-5-5",
+  effort: "high",
+  host: "Desktop app",
+  surface: null,
+  foundBy: "user",
+  recentErrors: "",
+  sameAs: null,
 } as const;
 const bugReport: BugReport = {
   kind: "bug",
@@ -138,6 +145,19 @@ export const SendIdea: Story = {
   args: {
     agentName: "Chief",
     approval: feedbackApproval(feedbackPreview(featureRequest), sourceText("status.agent.sendIdea")),
+  },
+};
+/** A bug with the chat's recent errors, added to an open issue that has the same problem. */
+export const ReportProblemWithErrors: Story = {
+  args: {
+    agentName: "Chief",
+    approval: feedbackApproval(
+      feedbackPreview({
+        ...bugReport,
+        recentErrors: "openbot.history_search: The query is too long.\nThe provider stopped: 529 Overloaded",
+        sameAs: 6812,
+      }),
+    ),
   },
 };
 /** After Send: the card keeps its loader until GitHub opens the issue. */

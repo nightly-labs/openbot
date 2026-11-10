@@ -2044,7 +2044,9 @@ export async function createApplicationServices({
         );
       },
     }),
-    feedbackFacts: feedbackFacts(),
+    feedbackFacts: feedbackFacts(
+      hostedServer ? "Hosted server" : serverModeEnvironment || localServerChild ? "Server" : "Desktop app",
+    ),
     feedback: feedbackSender(centralAuth),
     serverClaims: {
       signedIn: () => centralAuth.getState().status === "signed_in",
