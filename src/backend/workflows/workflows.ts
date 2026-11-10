@@ -139,6 +139,7 @@ import {
   agentStepText,
   conditionAnswer,
   conditionPrompt,
+  currentAnswers,
   fieldText,
   inputText,
   modelStepPrompt,
@@ -1270,7 +1271,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             fromNodeId: from && from.kind !== "trigger" ? from.id : null,
           };
           const workflowId = detail.summary.id;
-          const answered = runs.latestDone(workflowId);
+          const answered = currentAnswers(detail.graph, runs.latestDone(workflowId), (runId) => runs.run(runId)?.graph);
           const scope = runScope(detail.graph, start, new Set(answered.keys()));
           if (detail.graph.nodes.some((node) => scope.nodes.has(node.id) && unsupportedNode(node)))
             return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
