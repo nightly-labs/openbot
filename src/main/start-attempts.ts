@@ -141,10 +141,13 @@ export class StartAttempts {
     };
   }
 
-  /** The start failed. The first failure stays, and a later quit does not replace it. */
+  /**
+   * The start failed. The first failure stays, and a later quit does not replace it. After a quit
+   * started, an error of the teardown is not a failed start.
+   */
   failed(failure: Exclude<StartFailure, "crash">): void {
     const attempt = this.#record.attempt;
-    if (!attempt || attempt.state === "failed") return;
+    if (attempt?.state !== "starting") return;
     this.#update({ attempt: { ...attempt, state: "failed", failure } });
   }
 
