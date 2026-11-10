@@ -232,8 +232,8 @@ path part that looks like a code, such as a reset token, with `:id`) or a press 
 with a 1 second limit). A press outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
 never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
-`openbot-browsing-steps-v1.json` (no migration), at most 300 per agent. The next memory review of the
-agent reads the newest 80 in a `<user_browsing>` block, with secrets redacted, and deletes the steps
+`openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
+agent reads all of them in a `<user_browsing>` block, with secrets redacted, and deletes the steps
 that it read after its result decodes. A step that no review read goes after 30 days (at start and at
 each change). Turning the setting off deletes the file, and deleting an agent deletes its steps. Only
 the review reads the steps; the agent has no tool to search them. Browsing alone does not start a

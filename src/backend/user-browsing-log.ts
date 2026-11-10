@@ -8,10 +8,11 @@ const logger = createOpenBotLogger("user-browsing");
 
 /** A step that no memory review read is deleted after this time. */
 export const USER_BROWSING_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-/** The most steps kept for one agent. The oldest go first. */
-const STEPS_PER_AGENT = 300;
-/** The most steps that one memory review reads: the newest ones. */
-const STEPS_PER_REVIEW = 80;
+/**
+ * The most steps kept for one agent, which is also the most that one memory review reads. The
+ * oldest go first, so the log keeps no step that a review would not read.
+ */
+const STEPS_PER_AGENT = 80;
 /** The most characters of each text of a step. */
 export const USER_BROWSING_TEXT_CHARACTERS = 80;
 const PATH_CHARACTERS = 120;
@@ -161,7 +162,7 @@ export class UserBrowsingLog {
       Effect.andThen(
         Effect.sync(() => {
           const since = this.#now() - USER_BROWSING_RETENTION_MS;
-          return (this.#steps.get(agentId) ?? []).filter((step) => step.at > since).slice(-STEPS_PER_REVIEW);
+          return (this.#steps.get(agentId) ?? []).filter((step) => step.at > since);
         }),
       ),
     );
