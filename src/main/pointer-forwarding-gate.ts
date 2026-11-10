@@ -83,7 +83,13 @@ export class PointerForwardingGate {
       if (!entry.ignoring) continue;
       if (this.#inZone(window, entry, cursor)) {
         entry.outside = 0;
-        if (!entry.forwarding) this.#forward(window, entry, true);
+        if (!entry.forwarding) {
+          this.#forward(window, entry, true);
+          // Electron forwards only the moves after this. A cursor that stopped in the zone, as after a
+          // flick to the screen edge, would give the page no move, so the page gets the one it missed.
+          const bounds = window.getBounds();
+          window.webContents.sendInputEvent({ type: "mouseMove", x: cursor.x - bounds.x, y: cursor.y - bounds.y });
+        }
         continue;
       }
       entry.outside += 1;
