@@ -348,6 +348,7 @@ import type {
   TeamApiRoutineRunPlaces,
 } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
+import { WEBRTC_FRAME_BODY_BUDGET } from "../src/main/team-api/request-helpers";
 import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
 import { VaultService } from "../src/main/vault-service";
@@ -1172,6 +1173,9 @@ const fakeAgents: TeamApiAgents = {
 // (`agent-thread-pages-v1`) reach the side threads in this run. The thread holds one message before
 // `message-7`, and no other message.
 // The thread list has one thread with a waiting message (`agent-thread-queue-v1`) and one without.
+// With `longThreadQueue`, the waiting thread holds 20 messages of 100,000 characters: more than one
+// WebRTC frame.
+let longThreadQueue = false;
 const fakeAgentTasks: TeamApiAgentTasks = {
   listAgents: () => agents,
   listTasks: (agentId) => {
@@ -1222,7 +1226,15 @@ const fakeAgentTasks: TeamApiAgentTasks = {
         },
       ],
     };
-    return { agentId, tasks: [task("task-queued", [waiting]), task("task-idle", [])], limit: 10 };
+    const queue = longThreadQueue
+      ? Array.from({ length: 20 }, (_, index) => ({
+          ...waiting,
+          id: `delivery-long-${index}`,
+          text: "x".repeat(100_000),
+          position: index + 1,
+        }))
+      : [waiting];
+    return { agentId, tasks: [task("task-queued", queue), task("task-idle", [])], limit: 10 };
   },
   readTask: unused("readTask"),
   readTaskPage: (input) => {
@@ -9135,6 +9147,20 @@ try {
         attachments.length === 1 &&
         field(attachments[0], "previewUrl") === null,
       [summary(listed)],
+    );
+    longThreadQueue = true;
+    const long = await call("POST", AGENT_THREAD_QUEUE_ROUTES.list, { token: bobToken, ...v9, json: listBody });
+    longThreadQueue = false;
+    const longDeliveries = field(long.body, "threads", 0, "deliveries");
+    check(
+      "a thread queue larger than one WebRTC frame answers with its first messages, in order, inside the frame",
+      long.status === 200 &&
+        Buffer.byteLength(long.text) <= WEBRTC_FRAME_BODY_BUDGET &&
+        Array.isArray(longDeliveries) &&
+        longDeliveries.length > 0 &&
+        longDeliveries.length < 20 &&
+        longDeliveries.every((entry, index) => field(entry, "id") === `delivery-long-${index}`),
+      [summary(long)],
     );
     const reordered = await call("POST", AGENT_THREAD_QUEUE_ROUTES.reorder, { token: bobToken, ...v9, json: order });
     const stale = await call("POST", AGENT_THREAD_QUEUE_ROUTES.reorder, {

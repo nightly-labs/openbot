@@ -8,7 +8,14 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents, TeamApiAgentTasks } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAgentLevel, requireListedAgent, stringArray, stringField } from "./request-helpers";
+import {
+  readJson,
+  requireAgentLevel,
+  requireListedAgent,
+  stringArray,
+  stringField,
+  WEBRTC_FRAME_BODY_BUDGET,
+} from "./request-helpers";
 
 /**
  * The waiting messages of each side thread of an agent, and their order in one thread, from a joined
@@ -49,7 +56,7 @@ export async function routeAgentThreadQueue(
           attachments: delivery.attachments.map((attachment) => ({ ...attachment, previewUrl: null })),
         })),
       }));
-    return json(200, { agentId, threads });
+    return json(200, { agentId, threads: inFrame(agentId, threads) });
   }
   try {
     await runCauseEffect(
@@ -73,3 +80,29 @@ const REFUSALS = () => [
   sourceText("error.backend.queueOrderStale"),
   sourceText("error.backend.useChannelTaskControlsWork"),
 ];
+
+/**
+ * The threads and deliveries that fit in one WebRTC frame, in queue order, as the queue window of
+ * `route-agent-queue.ts` keeps them. A long queue then shows its first messages and does not fail.
+ */
+function inFrame<Delivery>(
+  agentId: string,
+  threads: readonly { taskId: string; deliveries: Delivery[] }[],
+): { taskId: string; deliveries: Delivery[] }[] {
+  let bytes = Buffer.byteLength(JSON.stringify({ agentId, threads: [] }));
+  const kept: { taskId: string; deliveries: Delivery[] }[] = [];
+  for (const thread of threads) {
+    bytes += Buffer.byteLength(JSON.stringify({ taskId: thread.taskId, deliveries: [] })) + 1;
+    if (bytes > WEBRTC_FRAME_BODY_BUDGET) break;
+    const deliveries: Delivery[] = [];
+    for (const delivery of thread.deliveries) {
+      const next = bytes + Buffer.byteLength(JSON.stringify(delivery)) + 1;
+      if (next > WEBRTC_FRAME_BODY_BUDGET) break;
+      bytes = next;
+      deliveries.push(delivery);
+    }
+    kept.push({ taskId: thread.taskId, deliveries });
+    if (deliveries.length < thread.deliveries.length) break;
+  }
+  return kept;
+}

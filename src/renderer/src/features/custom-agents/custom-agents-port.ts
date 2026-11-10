@@ -11,12 +11,12 @@ import {
 } from "@openbot/contracts/ipc";
 
 /** What the custom agents context reaches in main: the ACP agents the user added. */
-export interface CustomAgentsPort {
+interface CustomAgentsPort {
   customAgents: OpenBotDesktopApi["customAgents"];
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
-export function customAgentsPort(): CustomAgentsPort {
+function customAgentsPort(): CustomAgentsPort {
   return window.openbot;
 }
 

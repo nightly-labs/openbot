@@ -45,7 +45,7 @@ export function createSidebarAlertCards(
   };
 }
 
-export type SidebarAlertCardsState = ReturnType<typeof createSidebarAlertCards>;
+type SidebarAlertCardsState = ReturnType<typeof createSidebarAlertCards>;
 
 interface SidebarAlertCardsProps {
   cards: SidebarAlertCardsState;

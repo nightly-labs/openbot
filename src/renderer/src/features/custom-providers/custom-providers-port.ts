@@ -33,12 +33,12 @@ export function hostCustomProvidersApi(
 }
 
 /** What the detection store reaches in main: the scans of one computer and their settings. */
-export interface ProviderDetectionPort {
+interface ProviderDetectionPort {
   providerDetection: OpenBotDesktopApi["providerDetection"];
 }
 
 /** Read on each call, like `customProvidersPort`. */
-export function providerDetectionPort(): ProviderDetectionPort {
+function providerDetectionPort(): ProviderDetectionPort {
   return window.openbot;
 }
 
