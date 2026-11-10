@@ -239,9 +239,9 @@ lead routes it. A channel without a lead refuses a request that names nobody
 (`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
 post as an agent. The tool call id gives the operation id, so a retried call posts no second
 message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
-`channel_transfer`. It is also refused in a turn that answers a teammate request from an external
-chat (`answersMessagingRequest`): no channel result comes back, so the person would get no answer
-(#6160). The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
+`channel_transfer`. It is also refused in an external chat thread and in a turn that answers a
+teammate request from one (`answersMessagingRequest`): no channel result comes back, so the person
+would get no answer (#6160). The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
 an agent chat opens the channel with the message text in its composer. Attachments stay behind.
 
 A workflow output with the target `chat-channel` posts its result as a note (`ChannelService.postNote`).

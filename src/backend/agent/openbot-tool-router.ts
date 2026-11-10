@@ -1425,9 +1425,12 @@ export class OpenBotToolRouter {
     if (params.tool === "send_to_channel") {
       if (channelId) return openBotToolFailure("Use channel_assign or channel_transfer for channel work.");
       // A channel result does not come back, so the person in the external chat would get no answer (#6160).
-      if (this.#mailbox.answersMessagingRequest(senderAgentId, params.turnId))
+      if (
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#mailbox.answersMessagingRequest(senderAgentId, params.turnId)
+      )
         return openBotToolFailure(
-          "This request came from an external chat, and a channel result cannot go back to it. Do the work here: ask the channel members with send_message, then answer your teammate.",
+          "This request came from an external chat, and a channel result cannot go back to it. Ask the channel members with send_message instead, then answer the one who asked.",
         );
       const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
       const channel = yield* this.#channels.handoff({
