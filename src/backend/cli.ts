@@ -380,7 +380,7 @@ export const resolveAntigravityCli: (input?: {
 );
 
 /** Antigravity CLI 1.5.4 prints `1.5.4`. */
-export function parseAntigravityVersion(output: string): string {
+function parseAntigravityVersion(output: string): string {
   const version = /^\s*(\d+\.\d+\.\d+)\s*$/u.exec(output)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
   return version;

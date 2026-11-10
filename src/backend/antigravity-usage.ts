@@ -59,7 +59,7 @@ const QuotaBucket = Schema.Struct({
 });
 
 /** The `retrieveUserQuotaSummary` answer. Fields that OpenBot does not read are left out. */
-export const AntigravityQuotaSummary = Schema.Struct({
+const AntigravityQuotaSummary = Schema.Struct({
   groups: Schema.optional(
     Schema.Array(
       Schema.Struct({
@@ -70,7 +70,7 @@ export const AntigravityQuotaSummary = Schema.Struct({
     ),
   ),
 });
-export type AntigravityQuotaSummary = typeof AntigravityQuotaSummary.Type;
+type AntigravityQuotaSummary = typeof AntigravityQuotaSummary.Type;
 
 const decodeTokenFile = Schema.decodeUnknownOption(Schema.fromJsonString(TokenFile));
 
@@ -147,7 +147,7 @@ function antigravityUserAgent(version: string): string {
  * group's room does not say that it can run. When Google lists no models at all, the Gemini group
  * covers every model. `groups` holds every group that has a window.
  */
-export function antigravityRateLimits(
+function antigravityRateLimits(
   summary: AntigravityQuotaSummary,
   model: string | null = null,
 ): AccountRateLimitsReadResult {

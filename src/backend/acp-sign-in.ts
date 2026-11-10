@@ -40,7 +40,7 @@ function serverReason(error: unknown): string | null {
 export type AcpArgv = readonly string[] | ((env: Readonly<Record<string, string | undefined>>) => readonly string[]);
 
 /** The command line of an ACP server for the environment `env`. */
-export function acpArgv(argv: AcpArgv, env: Readonly<Record<string, string | undefined>>): readonly string[] {
+function acpArgv(argv: AcpArgv, env: Readonly<Record<string, string | undefined>>): readonly string[] {
   return typeof argv === "function" ? argv(env) : argv;
 }
 
