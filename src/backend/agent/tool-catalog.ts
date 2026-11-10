@@ -276,12 +276,14 @@ function requireTool(name: string, catalog = BUILTIN_TOOL_CATALOG) {
   return tool;
 }
 
-const JSON_ESCAPES = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
+// A model that leaves out one level of escapes writes a line break as a control character, so a `\n` or `\t`
+// in such text is part of a Windows path, such as `C:\new` or `C:\temp`.
+const KEPT_ESCAPES = new Set(['"', "\\", "/"]);
 
 /**
- * Inside the strings of JSON text, escapes each backslash that does not start a valid escape and each
- * control character. Models write a Windows path such as `C:\Users` or a line break in `arguments`
- * text without the escape that JSON needs, so the text did not parse (#6243).
+ * Inside the strings of JSON text, escapes each control character and each backslash that does not
+ * start a quote, backslash, slash or `\u` escape. Models write a Windows path such as `C:\Users` or a
+ * line break in `arguments` text without the escape that JSON needs, so the text did not parse (#6243).
  */
 function repairJsonText(text: string): string {
   let repaired = "";
@@ -294,7 +296,7 @@ function repairJsonText(text: string): string {
     } else if (char === "\\") {
       const next = text.charAt(index + 1);
       const unicode = next === "u" && /^[0-9a-fA-F]{4}$/.test(text.slice(index + 2, index + 6));
-      if (JSON_ESCAPES.has(next) || unicode) {
+      if (KEPT_ESCAPES.has(next) || unicode) {
         repaired += char + next;
         index++;
       } else {
