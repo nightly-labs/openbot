@@ -2113,28 +2113,51 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
    * again until it opens again, as on the desktop.
    */
   const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
+  /**
+   * Marks a chat unread. The open chat stays unread until it opens again; another chat marks itself
+   * read only when it opens. A failure releases the hold.
+   */
+  async function markAgentUnread(agentId: string, write: () => Promise<void>) {
+    const holds = agentId === workspace.state.selectedId;
+    if (holds) setHeldUnreadAgentId(agentId);
+    try {
+      await write();
+    } catch (error) {
+      if (holds) setHeldUnreadAgentId(null);
+      actionToast.error(t("chat.errorStatus.readState"), {
+        description: text.errorMessage(error, t("webClient.error.requestFailed")),
+        report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
+      });
+    }
+  }
+  const unreadFromSupported = () =>
+    workspace.state.status === "online" && workspace.state.capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY);
   /** With `conversation-unread-from-v1`: marks one message of the open chat and the messages after it unread. */
   const markUnreadFrom = createMemo(() => {
-    if (
-      workspace.state.status !== "online" ||
-      !workspace.state.capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY)
-    )
-      return undefined;
+    if (!unreadFromSupported()) return undefined;
     return async (messageId: string) => {
       const agentId = workspace.state.selectedId;
-      if (!agentId) return;
-      setHeldUnreadAgentId(agentId);
-      try {
-        await workspace.markUnreadFrom(agentId, messageId);
-      } catch (error) {
-        setHeldUnreadAgentId(null);
-        actionToast.error(t("chat.errorStatus.readState"), {
-          description: text.errorMessage(error, t("webClient.error.requestFailed")),
-          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
-        });
-      }
+      if (agentId) await markAgentUnread(agentId, () => workspace.markUnreadFrom(agentId, messageId));
     };
   });
+  /** The agents with an unread badge, for which the sidebar agent menu offers Mark read. */
+  const sidebarUnreadAgentIds = createMemo(
+    () => new Set(Object.entries(workspace.state.reads).flatMap(([id, read]) => (read.unreadCount > 0 ? [id] : []))),
+  );
+  const markSidebarAgentRead = () =>
+    workspace.state.status === "online"
+      ? (agentId: string) =>
+          void workspace.markAgentRead(agentId).catch(() =>
+            actionToast.error(t("chat.unread.markReadFailed"), {
+              report: { operation: "other", source: "action", cause_code: "unknown" },
+            }),
+          )
+      : undefined;
+  /** With `conversation-unread-from-v1`: marks the newest agent reply of a chat unread from the sidebar. */
+  const markSidebarAgentUnread = () =>
+    unreadFromSupported()
+      ? (agentId: string) => void markAgentUnread(agentId, () => workspace.markLatestReplyUnread(agentId))
+      : undefined;
   /**
    * As on the desktop: for an agent whose provider cannot steer, puts a queued message first and stops
    * the running turn, so the message runs as the next turn.
@@ -2827,6 +2850,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           }
                         : undefined
                     }
+                    unreadAgentIds={sidebarUnreadAgentIds()}
+                    onMarkAgentRead={markSidebarAgentRead()}
+                    onMarkAgentUnread={markSidebarAgentUnread()}
                     hasUnread={
                       workspace.state.agents.some(
                         (agent) =>
