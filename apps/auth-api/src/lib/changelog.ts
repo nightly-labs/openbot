@@ -88,6 +88,8 @@ const SHARED_DATE_HEADING = /^## \[[^\]]+\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$/;
 const STORE_DATE = /(\d{4}-\d{2}-\d{2}) \((iOS|Android)\)/g;
 /** `Skipped (Android)`: a store that will never ship the version, as `scripts/release-notes.ts` writes it. */
 const STORE_SKIPPED = /Skipped \((iOS|Android)\)/g;
+/** `1.4.8.1`: an over-the-air update of the store version `1.4.8`, as `scripts/release-notes.ts` writes it. */
+const OTA_VERSION = /^\d+\.\d+\.\d+\.\d+$/;
 const STORE_NAMES: Record<string, MobileStore> = { iOS: "ios", Android: "android" };
 const MOBILE_STORES: readonly MobileStore[] = ["ios", "android"];
 const GROUP_HEADING = /^### (.+)$/;
@@ -174,7 +176,10 @@ export function parseChangelog(
       const [, version = "", written = ""] = heading;
       // A date the page cannot format would stop the whole page from rendering.
       const firstDate = isRealDate(written) ? written : "";
-      const availability = stores ? storeAvailability(line, firstDate) : [];
+      // No store reviews an over-the-air update, so a store that its heading does not name never gets it.
+      const availability = (stores ? storeAvailability(line, firstDate) : []).filter(
+        (entry) => entry.date !== "" || !OTA_VERSION.test(version),
+      );
       group = undefined;
       // A mobile version that no store made available, because each one reviews or skipped it.
       const unavailable = stores && availability.every((entry) => entry.date === "");

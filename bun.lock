@@ -221,6 +221,18 @@
         "typescript": "catalog:",
       },
     },
+    "apps/mobile-updates": {
+      "name": "@openbot/mobile-updates",
+      "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "catalog:",
+        "typescript": "catalog:",
+        "wrangler": "catalog:",
+      },
+    },
     "apps/site-router": {
       "name": "@openbot/site-router",
       "version": "0.0.0",
@@ -1147,6 +1159,8 @@
     "@openbot/logging": ["@openbot/logging@workspace:packages/logging"],
 
     "@openbot/mobile": ["@openbot/mobile@workspace:apps/mobile"],
+
+    "@openbot/mobile-updates": ["@openbot/mobile-updates@workspace:apps/mobile-updates"],
 
     "@openbot/remote-api": ["@openbot/remote-api@workspace:remote/api"],
 
