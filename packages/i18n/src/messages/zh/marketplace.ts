@@ -344,8 +344,9 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
   "marketplace.plugin.postiz.tagline": "社交媒体排程",
   "marketplace.plugin.postiz.description":
-    "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含它。智能体可以立即发布帖子，因此请在批准前检查每个帖子。如果是自托管的 Postiz，请在 MCP 服务器设置中添加一个 MCP 服务器，地址为你的 Postiz 地址加上 /mcp。",
-  "marketplace.plugin.postiz.app": "通过 Postiz 的 MCP 服务器和 API 密钥处理频道、草稿、已排程的帖子和媒体。",
+    "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
+  "marketplace.plugin.postiz.app":
+    "通过 Postiz 的 MCP 服务器，用浏览器登录或 API 密钥处理频道、草稿、已排程的帖子和媒体。",
   "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
   "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
   "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",

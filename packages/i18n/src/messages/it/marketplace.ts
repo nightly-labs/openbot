@@ -382,9 +382,9 @@ export const messages = {
     "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.postiz.tagline": "Pianificazione social",
   "marketplace.plugin.postiz.description":
-    "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz la includono. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo. Per un Postiz self-hosted, aggiungi un server MCP con il tuo indirizzo Postiz seguito da /mcp nelle impostazioni dei server MCP.",
+    "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Accedi al tuo account Postiz dal browser, oppure incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz includono l'accesso alle API. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
   "marketplace.plugin.postiz.app":
-    "Canali, bozze, post programmati e contenuti multimediali, tramite il server MCP di Postiz con una chiave API.",
+    "Canali, bozze, post programmati e contenuti multimediali, tramite il server MCP di Postiz con accesso dal browser o una chiave API.",
   "marketplace.plugin.postiz.prompt.channels": "Quali canali social sono collegati a Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Quali post sono programmati per la prossima settimana?",
   "marketplace.plugin.postiz.prompt.draft":

@@ -381,9 +381,9 @@ export const messages = {
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
   "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
   "marketplace.plugin.postiz.description":
-    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。セルフホストの Postiz では、MCP サーバー設定で Postiz のアドレスの末尾に /mcp を付けた MCP サーバーを追加してください。",
+    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
   "marketplace.plugin.postiz.app":
-    "API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
+    "ブラウザでのサインインまたは API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
   "marketplace.plugin.postiz.prompt.channels": "Postiz に接続されている SNS チャンネルはどれですか?",
   "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
   "marketplace.plugin.postiz.prompt.draft":

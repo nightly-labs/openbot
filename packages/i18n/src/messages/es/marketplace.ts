@@ -385,9 +385,9 @@ export const messages = {
     "Prepara un borrador de campaña para la nueva colección, pero no lo envíes.",
   "marketplace.plugin.postiz.tagline": "Programación de redes sociales",
   "marketplace.plugin.postiz.description":
-    "Postiz permite a los agentes listar tus canales de redes sociales y redactar, programar y publicar posts en más de 30 redes, como X, LinkedIn, Instagram y TikTok. Los agentes también pueden subir archivos multimedia y crear imágenes y vídeos con IA. Pega la clave de API de Settings › Developers en Postiz. Todos los planes de Postiz en la nube la incluyen. Los agentes pueden publicar un post al instante, así que revisa cada post antes de aprobarlo. Para un Postiz autoalojado, añade un servidor MCP con tu dirección de Postiz seguida de /mcp en los ajustes de servidores MCP.",
+    "Postiz permite a los agentes listar tus canales de redes sociales y redactar, programar y publicar posts en más de 30 redes, como X, LinkedIn, Instagram y TikTok. Los agentes también pueden subir archivos multimedia y crear imágenes y vídeos con IA. Inicia sesión en tu cuenta de Postiz en el navegador o pega la clave de API de Settings › Developers en Postiz. Todos los planes de Postiz en la nube incluyen acceso a la API. Los agentes pueden publicar un post al instante, así que revisa cada post antes de aprobarlo.",
   "marketplace.plugin.postiz.app":
-    "Canales, borradores, posts programados y multimedia, mediante el servidor MCP de Postiz con una clave de API.",
+    "Canales, borradores, posts programados y multimedia, mediante el servidor MCP de Postiz con inicio de sesión en el navegador o una clave de API.",
   "marketplace.plugin.postiz.prompt.channels": "¿Qué canales de redes sociales están conectados a Postiz?",
   "marketplace.plugin.postiz.prompt.week": "¿Qué posts están programados para la próxima semana?",
   "marketplace.plugin.postiz.prompt.draft":

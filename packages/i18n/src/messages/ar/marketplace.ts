@@ -382,8 +382,9 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
   "marketplace.plugin.postiz.tagline": "جدولة منشورات التواصل الاجتماعي",
   "marketplace.plugin.postiz.description":
-    "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمنه. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه. لخادم Postiz مستضاف ذاتيًا، أضف خادم MCP بعنوان Postiz الخاص بك متبوعًا بـ ‎/mcp في إعدادات خوادم MCP.",
-  "marketplace.plugin.postiz.app": "القنوات والمسودات والمنشورات المجدولة والوسائط، عبر خادم MCP من Postiz بمفتاح API.",
+    "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. سجّل الدخول إلى حسابك في Postiz عبر المتصفح، أو الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمن الوصول إلى API. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.postiz.app":
+    "القنوات والمسودات والمنشورات المجدولة والوسائط، عبر خادم MCP من Postiz بتسجيل الدخول في المتصفح أو بمفتاح API.",
   "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
   "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
   "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",

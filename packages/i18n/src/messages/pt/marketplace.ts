@@ -367,9 +367,9 @@ export const messages = {
     "Crie um rascunho de campanha para a nova coleção, mas não a envie.",
   "marketplace.plugin.postiz.tagline": "Agendamento de redes sociais",
   "marketplace.plugin.postiz.description":
-    "O Postiz permite que os agentes listem os seus canais de redes sociais e redijam, agendem e publiquem posts em mais de 30 redes, como X, LinkedIn, Instagram e TikTok. Os agentes também podem enviar mídia e criar imagens e vídeos com IA. Cole a chave de API de Settings › Developers no Postiz. Todos os planos em nuvem do Postiz a incluem. Os agentes podem publicar um post na hora, então revise cada post antes de aprová-lo. Para um Postiz auto-hospedado, adicione um servidor MCP com o seu endereço do Postiz seguido de /mcp nas configurações de servidores MCP.",
+    "O Postiz permite que os agentes listem os seus canais de redes sociais e redijam, agendem e publiquem posts em mais de 30 redes, como X, LinkedIn, Instagram e TikTok. Os agentes também podem enviar mídia e criar imagens e vídeos com IA. Entre na sua conta do Postiz pelo navegador ou cole a chave de API de Settings › Developers no Postiz. Todos os planos em nuvem do Postiz incluem acesso à API. Os agentes podem publicar um post na hora, então revise cada post antes de aprová-lo.",
   "marketplace.plugin.postiz.app":
-    "Canais, rascunhos, posts agendados e mídia, pelo servidor MCP do Postiz com uma chave de API.",
+    "Canais, rascunhos, posts agendados e mídia, pelo servidor MCP do Postiz com login no navegador ou uma chave de API.",
   "marketplace.plugin.postiz.prompt.channels": "Quais canais de redes sociais estão conectados ao Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Quais posts estão agendados para a próxima semana?",
   "marketplace.plugin.postiz.prompt.draft": "Redija um post no LinkedIn sobre a nossa nova versão, mas não o agende.",

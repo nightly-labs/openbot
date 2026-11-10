@@ -26,12 +26,12 @@ export const POSTIZ_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Is the Postiz MCP server official?",
       answer:
-        "Yes. Postiz runs the MCP server at mcp.postiz.com and documents it on docs.postiz.com. Postiz is open source under the AGPL-3.0 license. A self-hosted Postiz has the same server at its own address, followed by /mcp.",
+        "Yes. Postiz runs the MCP server at mcp.postiz.com and documents it on docs.postiz.com. Postiz is open source under the AGPL-3.0 license. A self-hosted Postiz has the same server at its backend address, followed by /mcp.",
     },
     {
-      question: "Which key does the Postiz plugin need?",
+      question: "How do I connect Postiz?",
       answer:
-        "The API key of your Postiz workspace, from Settings › Developers in Postiz. Type the key in the connect dialog in OpenBot. OpenBot sends it as a bearer token in the Authorization header. The key does not expire; rotate it in Postiz if it leaks. The plugin catalog holds no secret.",
+        "Sign in to your Postiz account through the browser. OpenBot keeps the token in encrypted storage. You can also type the API key from Settings › Developers in Postiz in the connect dialog. OpenBot sends it as a bearer token in the Authorization header. The plugin catalog holds no secret.",
     },
     {
       question: "Does the Postiz MCP server cost anything?",
@@ -41,7 +41,7 @@ export const POSTIZ_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "Can an agent publish without asking?",
       answer:
-        "The schedulePostTool tool can publish a post immediately. Whether the agent asks first depends on its permission mode in OpenBot, so review each post before you approve it. No Postiz tool deletes posts or connects or removes channels.",
+        "The schedulePostTool tool can publish a post immediately. Whether the agent asks first depends on its permission mode in OpenBot, so review each post before you approve it.",
     },
     {
       question: "What data does Postiz get?",
@@ -52,6 +52,10 @@ export const POSTIZ_PLUGIN_GUIDE: PluginGuide = {
   sources: [
     { label: "Postiz: MCP setup", url: "https://docs.postiz.com/mcp/setup" },
     { label: "Postiz: MCP tools", url: "https://docs.postiz.com/mcp/tools" },
+    {
+      label: "Postiz: MCP server source",
+      url: "https://github.com/gitroomhq/postiz-app/blob/main/libraries/nestjs-libraries/src/chat/start.mcp.ts",
+    },
     { label: "Postiz: Developers settings", url: "https://docs.postiz.com/general/settings/developers" },
     { label: "Postiz: Plans", url: "https://docs.postiz.com/cloud/plans" },
     { label: "Postiz: Privacy policy", url: "https://postiz.com/privacy" },

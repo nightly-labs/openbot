@@ -1344,7 +1344,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Postiz",
     tagline: "Social media scheduling",
     description:
-      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include it. Agents can publish a post immediately, so review each post before you approve it. For a self-hosted Postiz, add an MCP server with your Postiz address followed by /mcp in the MCP servers settings.",
+      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
     category: "automation",
     creatorName: "Postiz",
     version: "1.0.0",
@@ -1361,12 +1361,14 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       {
         id: "app-postiz-mcp",
         name: "Postiz",
-        description: "Channels, drafts, scheduled posts and media, over Postiz's MCP server with an API key.",
+        description:
+          "Channels, drafts, scheduled posts and media, over Postiz's MCP server with browser sign-in or an API key.",
         server: {
           name: "postiz",
           transport: "http",
-          url: "https://mcp.postiz.com/mcp",
+          url: "https://mcp.postiz.com/mcp-oauth-dynamic",
           auth: [
+            { id: "postiz-oauth", kind: "link", label: "Sign in" },
             {
               id: "postiz-key",
               kind: "key",
@@ -1377,7 +1379,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
                   label: "API key",
                   header: "Authorization",
                   prefix: "Bearer ",
-                  hint: "Postiz Settings → Developers → Your API key",
+                  hint: "Postiz Settings › Developers › Your API key",
                 },
               ],
               docsUrl: "https://docs.postiz.com/general/settings/developers",

@@ -344,8 +344,9 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
   "marketplace.plugin.postiz.tagline": "소셜 미디어 예약",
   "marketplace.plugin.postiz.description":
-    "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요. 자체 호스팅 Postiz는 MCP 서버 설정에서 Postiz 주소 뒤에 /mcp를 붙인 MCP 서버를 추가하세요.",
-  "marketplace.plugin.postiz.app": "API 키로 Postiz의 MCP 서버를 통해 채널, 초안, 예약 게시물, 미디어를 다룹니다.",
+    "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. 브라우저에서 Postiz 계정에 로그인하거나 Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 API 액세스가 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
+  "marketplace.plugin.postiz.app":
+    "브라우저 로그인 또는 API 키로 Postiz의 MCP 서버를 통해 채널, 초안, 예약 게시물, 미디어를 다룹니다.",
   "marketplace.plugin.postiz.prompt.channels": "Postiz에 연결된 소셜 미디어 채널은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.week": "다음 주에 예약된 게시물은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성해 줘. 단, 예약하지는 마.",

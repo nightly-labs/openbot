@@ -153,26 +153,31 @@ Troubleshooting:
 
 ## Postiz
 
-The listing connects to Postiz's own MCP server at `https://mcp.postiz.com/mcp`
-(<https://docs.postiz.com/mcp/setup>) with streamable HTTP. The user pastes the
-API key from Settings › Developers in Postiz, and OpenBot sends it as
-`Authorization: Bearer <key>`. All Postiz cloud plans include the key; there is
-no free plan.
+The listing connects to Postiz's own MCP server at
+`https://mcp.postiz.com/mcp-oauth-dynamic`. Postiz's documentation
+(<https://docs.postiz.com/mcp/setup>) names only `https://mcp.postiz.com/mcp`,
+which takes an API key and has no sign-in. The `-oauth-dynamic` path is the one
+that Postiz's source names for clients that register themselves
+(`libraries/nestjs-libraries/src/chat/start.mcp.ts` in
+<https://github.com/gitroomhq/postiz-app>). It answers 401 with a `Bearer`
+challenge and has dynamic client registration with S256, so the user signs in
+through the browser. Postiz access tokens do not expire, and the server lists no
+`refresh_token` grant.
 
-The listing has no `link` flow. The server publishes authorization server
-metadata, but no protected-resource metadata, no `Bearer` challenge on its 401,
-no `registration_endpoint` and no client metadata document support (checked
-2026-11-10), so OpenBot cannot register as a sign-in client.
+The same path also takes the API key from Settings › Developers in Postiz as
+`Authorization: Bearer <key>`, so the listing keeps a key flow as a second way
+in. All Postiz cloud plans include API access; there is no free plan.
 
 `schedulePostTool` takes `type` `draft`, `schedule` or `now`; `now` publishes
-immediately. No tool deletes posts or connects channels.
+immediately.
 
 Troubleshooting:
 
 - "Invalid API Key or OAuth token": the key is wrong or was rotated. Copy it
-  again from Settings › Developers.
-- A self-hosted Postiz: add an MCP server with `https://<postiz-host>/mcp` and
-  the same `Authorization` header in the MCP servers settings.
+  again from Settings › Developers, or sign in instead.
+- A self-hosted Postiz: add an MCP server with the backend address of the
+  instance (`NEXT_PUBLIC_BACKEND_URL`) followed by `/mcp`, and the same
+  `Authorization` header, in the MCP servers settings.
 
 ## ElevenLabs
 

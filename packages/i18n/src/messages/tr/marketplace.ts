@@ -394,9 +394,9 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
   "marketplace.plugin.postiz.description":
-    "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları bunu içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin. Kendi sunucunuzdaki Postiz için MCP sunucuları ayarlarında Postiz adresiniz ve sonuna /mcp eklenmiş bir MCP sunucusu ekleyin.",
+    "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz hesabınıza tarayıcıdan giriş yapın veya Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları API erişimi içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin.",
   "marketplace.plugin.postiz.app":
-    "Kanallar, taslaklar, planlanmış gönderiler ve medya; API anahtarıyla Postiz'in MCP sunucusu üzerinden.",
+    "Kanallar, taslaklar, planlanmış gönderiler ve medya; tarayıcıdan giriş veya API anahtarıyla Postiz'in MCP sunucusu üzerinden.",
   "marketplace.plugin.postiz.prompt.channels": "Postiz'e hangi sosyal medya kanalları bağlı?",
   "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
   "marketplace.plugin.postiz.prompt.draft":

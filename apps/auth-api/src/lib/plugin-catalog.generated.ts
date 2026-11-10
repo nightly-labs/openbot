@@ -232,7 +232,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "postiz",
       version: "1.0.0",
       featured: false,
-      detailSha256: "7d8e898d1f33c44d5be32866b881ae2ce6115a8f6aca9b2607f987ad3f633e43",
+      detailSha256: "7a0d7ffb21a2bffd98f2b8e08e7dd9e778ee5054a96cfd69d791d77233aafd12",
     },
     {
       slug: "composio",
@@ -1641,7 +1641,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Postiz",
     tagline: "Social media scheduling",
     description:
-      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include it. Agents can publish a post immediately, so review each post before you approve it. For a self-hosted Postiz, add an MCP server with your Postiz address followed by /mcp in the MCP servers settings.",
+      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
     category: "automation",
     creatorName: "Postiz",
     iconUrl: "https://postiz.com/favicon.ico",
@@ -1655,13 +1655,15 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       {
         id: "app-postiz-mcp",
         name: "Postiz",
-        description: "Channels, drafts, scheduled posts and media, over Postiz's MCP server with an API key.",
+        description:
+          "Channels, drafts, scheduled posts and media, over Postiz's MCP server with browser sign-in or an API key.",
         iconUrl: "https://postiz.com/favicon.ico",
         server: {
           name: "postiz",
           transport: "http",
-          url: "https://mcp.postiz.com/mcp",
+          url: "https://mcp.postiz.com/mcp-oauth-dynamic",
           auth: [
+            { id: "postiz-oauth", kind: "link", label: "Sign in" },
             {
               id: "postiz-key",
               kind: "key",
@@ -1672,7 +1674,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
                   label: "API key",
                   header: "Authorization",
                   prefix: "Bearer ",
-                  hint: "Postiz Settings → Developers → Your API key",
+                  hint: "Postiz Settings › Developers › Your API key",
                 },
               ],
               docsUrl: "https://docs.postiz.com/general/settings/developers",
