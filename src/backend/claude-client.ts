@@ -577,6 +577,13 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
   return settings;
 });
 
+/**
+ * The SDK value of each model that Claude Code reported, by model id. Only the main client reads the
+ * model list, so the clients for one generation and an agent's own process share its last reading:
+ * with no entry, `normalizeClaudeModel` sent the default model instead of a gateway's model (#6330).
+ */
+const CLAUDE_MODEL_SDK_VALUES = new Map<string, string>();
+
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
   readonly turnContext = true;
@@ -621,7 +628,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
-  readonly #modelSdkValues = new Map<string, string>();
   /**
    * The memories and section-mates of each thread. They go with the turns, not in the system
    * prompt, so a memory change keeps the cached prefix and restarts no query.
@@ -943,9 +949,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         };
       });
       this.#modelEffortCapabilities.clear();
-      this.#modelSdkValues.clear();
+      CLAUDE_MODEL_SDK_VALUES.clear();
       for (const [id, capability] of effortCapabilities) this.#modelEffortCapabilities.set(id, capability);
-      for (const [id, value] of sdkValues) this.#modelSdkValues.set(id, value);
+      for (const [id, value] of sdkValues) CLAUDE_MODEL_SDK_VALUES.set(id, value);
       return yield* providerSync(() => result);
     }).pipe(
       Effect.ensuring(
@@ -2559,7 +2565,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #sdkModel(model: string): string {
-    return this.#modelSdkValues.get(model) ?? normalizeClaudeModel(model);
+    return CLAUDE_MODEL_SDK_VALUES.get(model) ?? normalizeClaudeModel(model);
   }
 }
 
