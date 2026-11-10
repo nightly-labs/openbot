@@ -765,8 +765,9 @@ Windows no relative path reaches another drive. OpenBot passes the account's `GE
 `antigravity-acp`, the folder that 1.4 used. On macOS the CLI keeps the Google token in one Keychain
 item (`gemini`/`antigravity`) that every account would share. With `WSL_DISTRO_NAME` set it keeps the
 token in the file `antigravity-oauth-token` in the app data folder, so every Antigravity process gets
-`WSL_DISTRO_NAME=OpenBot` (`ANTIGRAVITY_ENV`). `SSH_CONNECTION` also selects the file, but then the CLI
-refuses a browser sign-in. A confined process also cannot write the Keychain (#2988).
+`WSL_DISTRO_NAME=OpenBot` (`ANTIGRAVITY_ENV`). The CLI gives the variable to its tools and MCP
+servers too. On Linux the CLI still opens the sign-in page with `xdg-open` (checked in Docker with
+1.5.4). `SSH_CONNECTION` also selects the file, but then the CLI refuses a browser sign-in. A confined process also cannot write the Keychain (#2988).
 
 1.4 kept the token in `acp_token.json`, which 1.5 does not read. Before each start,
 `importAntigravityToken` (`src/backend/antigravity-token-import.ts`) copies the old refresh token into

@@ -1771,6 +1771,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             // Antigravity CLI 1.5.4 refreshes its token when a session opens, and answers `authRequired`
             // when Google refuses it. The client reports the sign-out, as at its start.
             if (this.#flavor.authRequiredSignsOut && error instanceof RequestError && error.code === -32000) {
+              const keyRefused = this.options.savedKeyRefusedMessage?.();
+              if (keyRefused) return yield* providerFailure(new ProviderSignInError({ message: keyRefused }));
               this.#signedIn = false;
               this.emit("exit", new Error(this.options.signInMessage));
             }
