@@ -2382,9 +2382,9 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 const WHATSAPP_NO_PLACES =
   "OpenBot posts only to WhatsApp chats that the user allowed, and this number allows none. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
 
-/** Why a WhatsApp number did not post: it is not linked, or its connection is down now. */
+/** A WhatsApp number that is not linked, or whose connection is down now: for a post and for its places. */
 const WHATSAPP_NOT_CONNECTED =
-  "WhatsApp is not connected on this number now, so the message was not delivered. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
+  "WhatsApp is not connected on this number now. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
 
 /** What the user does when OpenBot itself stops a WhatsApp post, by the code of the WhatsApp adapter. */
 const WHATSAPP_LOCAL_REFUSALS = new Map([
