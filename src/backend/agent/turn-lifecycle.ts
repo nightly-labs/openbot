@@ -1898,6 +1898,12 @@ export class TurnLifecycle {
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
   ) {
+    // With no continuation, the next attempt runs with this turn ID and writes its text into this
+    // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
+    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does.
+    if (!resumeAfterUsageLimit)
+      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
+        if (isEmptyAttemptText(snapshot.messages[index], turnId)) snapshot.messages.splice(index, 1);
     for (const context of deliveries) {
       const { delivery } = context;
       const continuation = resumeAfterUsageLimit
@@ -2390,6 +2396,18 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
+}
+
+/** An answer or thinking row of the turn that holds nothing yet: no text, no file and no image. */
+function isEmptyAttemptText(message: ConversationMessage | undefined, turnId: string): boolean {
+  return (
+    message?.author === "assistant" &&
+    message.turnId === turnId &&
+    (message.itemType === "agentMessage" || message.itemType === "commentary") &&
+    !message.text.trim() &&
+    !message.attachments?.length &&
+    !message.imageGeneration
+  );
 }
 
 export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>()("TurnOperationFailed", {
