@@ -16,6 +16,9 @@ interface IndexedTransition extends RoutineRunMarkerTransition {
 /**
  * Reduces the durable transition log to one visible summary for each routine run.
  * The stored messages stay unchanged, so the summary can be rebuilt after refresh or pagination.
+ *
+ * The summary shows the latest state at the place where the run starts. The messages of the run
+ * follow that row, so a later state does not move them below turns that came after them (#6118).
  */
 export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): AgentMessage[] {
   const transitionsByRun = new Map<string, IndexedTransition[]>();
@@ -33,13 +36,18 @@ export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): 
     if (!marker) return [message];
     const transitions = transitionsByRun.get(marker.runId);
     if (!transitions || transitions.length === 1) return [message];
+    const first = transitions[0];
     const latest = transitions.at(-1);
-    if (latest?.index === index) {
+    const latestMessage = latest ? messages[latest.index] : undefined;
+    const latestMarker = latestMessage && routineRunMarker(latestMessage);
+    if (first?.index === index && latestMessage && latestMarker) {
       return [
         {
-          ...message,
+          ...latestMessage,
+          // The day separators read the place of the row, which is the start of the run.
+          ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
           actionMarker: {
-            ...marker,
+            ...latestMarker,
             previousTransitions: transitions.slice(0, -1).map(({ status, timestamp }) => ({ status, timestamp })),
           },
         },
