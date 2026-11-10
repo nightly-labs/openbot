@@ -1613,7 +1613,9 @@ export class OpenBotToolRouter {
     );
     if (sidebarResult) return sidebarResult;
 
-    const routineResult = yield* this.#routines.handleTool(params, senderAgentId);
+    const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
+      this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
+    );
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
