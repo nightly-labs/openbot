@@ -155,10 +155,15 @@ export const messages = {
   "chat.marker.instructionsUndo": "Geri al",
   "chat.marker.instructionsUndone": "Geri alındı",
   "chat.usageLimit.title": "{provider} kullanım sınırına ulaşıldı",
+  "chat.usageLimit.modelTitle": "{model} kullanım sınırına ulaşıldı",
   "chat.usageLimit.onHold": "Mesaj beklemede",
   "chat.usageLimit.bodyReset":
     "Mesajınız başlamadı. Şimdi başka bir modele gönderin veya {reset} zamanına kadar bekleyin.",
   "chat.usageLimit.body": "Mesajınız başlamadı. Şimdi başka bir modele gönderin veya sınır bitene kadar bekleyin.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} bu işe henüz başlamadı. {name} adlı üyeyi şimdi başka bir modele geçirin veya {reset} saatine kadar bekleyin.",
+  "chat.usageLimit.channelBody":
+    "{name} bu işe henüz başlamadı. {name} adlı üyeyi şimdi başka bir modele geçirin veya sınır bitene kadar bekleyin.",
   "chat.usageLimit.sendTo": "Şuraya gönder",
   "chat.usageLimit.remember": "Bir dahaki sefere sormadan değiştir",
   "chat.usageLimit.wait": "Sıfırlanmayı bekle",

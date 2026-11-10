@@ -152,10 +152,15 @@ export const messages = {
   "chat.marker.instructionsUndo": "실행 취소",
   "chat.marker.instructionsUndone": "취소됨",
   "chat.usageLimit.title": "{provider} 사용 한도에 도달했어요",
+  "chat.usageLimit.modelTitle": "{model} 사용 한도에 도달했어요",
   "chat.usageLimit.onHold": "메시지 보류 중",
   "chat.usageLimit.bodyReset": "메시지가 아직 시작되지 않았어요. 지금 다른 모델로 보내거나 {reset}까지 기다려 주세요.",
   "chat.usageLimit.body":
     "메시지가 아직 시작되지 않았어요. 지금 다른 모델로 보내거나 한도가 끝날 때까지 기다려 주세요.",
+  "chat.usageLimit.channelBodyReset":
+    "{name}이(가) 아직 이 작업을 시작하지 않았어요. 지금 {name}을(를) 다른 모델로 옮기거나 {reset}까지 기다려 주세요.",
+  "chat.usageLimit.channelBody":
+    "{name}이(가) 아직 이 작업을 시작하지 않았어요. 지금 {name}을(를) 다른 모델로 옮기거나 한도가 끝날 때까지 기다려 주세요.",
   "chat.usageLimit.sendTo": "보낼 모델",
   "chat.usageLimit.remember": "다음부터는 묻지 않고 전환",
   "chat.usageLimit.wait": "초기화까지 대기",
