@@ -2673,14 +2673,22 @@ export class OpenBotToolRouter {
 type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   outcome?: "steered" | "queued";
   queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
+  note?: string;
 };
+
+/** The one reason that the user can change, named as the agent settings show it. */
+const RECIPIENT_QUEUES_NOTE =
+  "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
 
 /**
  * A `send_message` delivery as its sender reads it. The receipt is from before the steer, so a
- * steered message shows as running. A queued one says why it waits while the recipient works.
+ * steered message shows as running. A queued one says why it waits while the recipient works. The
+ * result explains itself, so the tool description stays in the context budget.
  */
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;
+  if (steer === "recipient-queues")
+    return { ...delivery, outcome: "queued", queuedBecause: steer, note: RECIPIENT_QUEUES_NOTE };
   return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };
 }

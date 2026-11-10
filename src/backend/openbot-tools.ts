@@ -806,7 +806,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "send_message",
     description:
-      "Send an asynchronous message and optional local files to one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId. A new delivery has an outcome: steered, when the message joined the recipient's running turn, or queued, when it waits for the recipient's next turn. A queued delivery to a working recipient gives queuedBecause: recipient-queues (the recipient's While working setting is Queue; the user can set it to Steer), provider-unsupported (its provider cannot take a message during a turn), routine-run, or steer-failed.",
+      "Queue an asynchronous message and optional local files for one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId.",
     shape: {
       recipientAgentIds: z.array(z.string()).min(1).max(32),
       text: z.string().min(1).max(100_000),
