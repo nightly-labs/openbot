@@ -89,6 +89,7 @@ import {
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
+  INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -302,6 +303,7 @@ import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
+import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./team-api/route-live-voice";
 import { routeLocalServers } from "./team-api/route-local-servers";
@@ -1214,6 +1216,7 @@ export class TeamApiServer {
       if ((await this.#routeEvents(context)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if ((await routeInstanceTransfer(context, this.#options.instanceTransfer, newAgentHidden)) === "handled") return;
+      if ((await routeInstanceTransferChunks(context, this.#options.instanceTransfer)) === "handled") return;
       if (
         // The ID, not the member: the registration outlives a role change.
         (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>
@@ -2486,6 +2489,7 @@ export class TeamApiServer {
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
+          if (capability === INSTANCE_TRANSFER_CHUNKS_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;

@@ -247,12 +247,40 @@ removes it. `POST /v1/instance-transfer/stage` takes the raw `.zip` and answers 
 avatars, under a token that only the caller can apply or discard; an upload nobody applies is removed
 after 30 minutes. `POST /v1/instance-transfer/apply` takes `{ token, keys, includeSettings, timezone }`
 and answers the new agents by id and name, which the client reads with the agent list.
-`POST /v1/instance-transfer/discard` releases the token. On desktop, main opens both dialogs and moves
+`POST /v1/instance-transfer/discard` releases the token. `instance-transfer-v1` export has no chat
+history; the desktop export screen offers "Include chat history" only for this computer's server and
+a host with `instance-transfer-chunks-v1`. On desktop, main opens both dialogs and moves
 the file (`instance-transfer:*` is server-scoped). The web client does not show the Transfer section: its
 downloads are limited to 10 MB.
 
+`instance-transfer-chunks-v1` moves the same file in parts of 8 MiB (`INSTANCE_TRANSFER_CHUNK_BYTES`),
+so a file can be up to the 2 GB limit of a computer's own server. It is protocol 9 only, and the
+desktop app uses it when the host has both capabilities; the phone stays on `instance-transfer-v1`.
+The rules for an owner or admin are the same, and each upload or export id is bound to the member
+who started it: another member's id gets the same error as an id that does not exist.
+`POST /v1/instance-transfer-chunks/upload/begin` takes `{ size, sha256 }`, checks the size and the free
+disk space of the host (the size and 256 MiB), creates `<uploadId>.part` with mode 0600 and answers
+`{ uploadId, chunkBytes, received }`. The same member with the same size and SHA-256 gets the same
+upload again with the parts that the host has, so a client that failed sends only the rest. A member
+has one upload: a new file ends the one before. `POST /v1/instance-transfer-chunks/upload/chunk` takes
+`uploadId`, `index` and the part's `sha256` in the query and the raw part as the body, checks its length
+and SHA-256 and writes it at `index * chunkBytes`. `POST /v1/instance-transfer-chunks/upload/finish`
+checks that every part is there and the SHA-256 of the whole file, renames it to `.zip` and stages it
+as `stage` does, with the local limits. It answers the `stage` preview; `apply` and `discard` of
+`instance-transfer-v1` take its token. `POST /v1/instance-transfer-chunks/upload/abort` ends an upload.
+`POST /v1/instance-transfer-chunks/export/begin` takes the `export` input with an optional
+`includeHistory`, which `instance-transfer-v1` export drops, writes the file with the local
+limits and answers `{ exportId, size, sha256, chunkBytes, chunks, warnings }`, where `chunks` is the
+SHA-256 of each part and `warnings` is what a local export would show. `POST /v1/instance-transfer-chunks/export/chunk` takes `{ exportId, index }` and sends that
+byte range as an attachment. `POST /v1/instance-transfer-chunks/export/done` removes the file. An
+upload or export with no request for 30 minutes is removed. The desktop client reads and writes one
+part at a time, checks each part it gets, and sends or reads a part again up to three times when the
+connection fails; it does not send a part again when the host refuses it. A download appears only
+when it is complete.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
-including unfinished `.part` files, before it writes a new file. Concurrent uploads and exports wait
+including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
+new file. Concurrent uploads and exports wait
 for this cleanup. If cleanup fails, the operation fails; the next upload or export retries it.
 Later operations keep the current process's files. Local files selected by the user are kept.
 
@@ -598,6 +626,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-publish-v1` | Preview, publish and unpublish an agent's share link. The host builds the template, checks it for secrets and publishes it with its own account; the client sends only the share card | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `instance-transfer-v1` | Export and import the server's agents and server settings as a transfer file | `instanceTransfer` |
+| `instance-transfer-chunks-v1` | Send and get the transfer file of `instance-transfer-v1` in parts of 8 MiB, up to 2 GB; `apply` and `discard` of `instance-transfer-v1` take the token of an upload | `instanceTransfer` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |

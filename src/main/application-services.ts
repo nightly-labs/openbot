@@ -372,7 +372,7 @@ import {
   configureServerLogoProtocols,
 } from "./session-configuration";
 import { readSetupState, writeSetupState } from "./setup-store";
-import { SidebarPinStore } from "./sidebar-pin-store";
+import { OWNER_PIN_KEY, SidebarPinStore } from "./sidebar-pin-store";
 import { SignInRelayClient } from "./sign-in-relay-client";
 import { agentPrintedLink, SignInRelayHost } from "./sign-in-relay-host";
 import { SignalIngress } from "./signal-ingress";
@@ -2815,6 +2815,26 @@ export async function createApplicationServices({
     agents: service,
     skills: { library: () => skills.requireLocalLibrary(), installLocal: (input) => skills.installLocal(input) },
     sharedRoot: store.sharedRoot,
+    channelActor: () => host.channelActor(),
+    webhookRoutines: {
+      list: (owner) => events.listRoutines({ owner }),
+      save: (input) => events.saveRoutine(input),
+    },
+    preferences: {
+      notificationLevel: (agentId) => agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY).get(agentId) ?? null,
+      setNotificationLevel: (agentId, level) => agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, { agentId, level }),
+      pinned: (agentId) =>
+        sidebarPins.snapshot(OWNER_PIN_KEY).items.some((pin) => pin.kind === "agent" && pin.id === agentId),
+      pin: (agentId) =>
+        sidebarPins.set(OWNER_PIN_KEY, [...sidebarPins.snapshot(OWNER_PIN_KEY).items, { kind: "agent", id: agentId }]),
+      autoApproves: (agentId) => approvalAutomation.autoApproves(agentId),
+      setAutoApprove: (agentId, autoApprove) => approvalAutomation.set({ agentId, autoApprove }),
+      // Only the agent's own keys: Vault keys belong to the computer.
+      apiKeyNames: (agentId) =>
+        agentApiKeys
+          .list(agentId)
+          .pipe(Effect.map((keys) => keys.filter((key) => key.source !== "vault").map((key) => key.name))),
+    },
     appVersion: app.getVersion(),
     uploadDirectory: join(app.getPath("userData"), "instance-transfer-uploads"),
     timezone: () => serverTimezone.effective(),
@@ -2829,6 +2849,16 @@ export async function createApplicationServices({
       mutateSidebar: (action) => sidebarLayout.mutate(action, service.sidebarChatIds()),
       routineFlowLinks: (agentId) => routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.links)),
       connectRoutineFlow: (input) => routineFlowRuntime.connect(input),
+      routineFlowPositions: (agentId) =>
+        routineFlowRuntime.canvas(agentId).pipe(Effect.map((canvas) => canvas.positions)),
+      saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
+      workflows: {
+        workflows: () =>
+          workflowRuntime
+            .listWithGraphs()
+            .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
+        createWorkflow: (input) => workflowRuntime.create(input),
+      },
       signedInProviders: () =>
         (service.getStatus().providers ?? [])
           .filter((provider) => provider.state === "available" && !provider.off)

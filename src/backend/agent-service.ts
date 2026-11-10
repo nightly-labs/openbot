@@ -241,6 +241,13 @@ import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
+import {
+  AgentHistoryTransfer,
+  AgentHistoryTransferFailed,
+  HISTORY_IMPORTED_EVENT,
+  type HistoryThread,
+  type ImportHistoryThreadInput,
+} from "./agent-history-transfer";
 import type { AgentStore } from "./agent-store";
 import { type AgentTaskBranchFailed, AgentTasks } from "./agent-tasks/agent-tasks";
 import { type AgentThreadRecord, AgentThreadStore } from "./agent-threads/agent-thread-store";
@@ -529,6 +536,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #memoryReview: MemoryReview;
   readonly #waits: AgentWaits;
   readonly #tasks: AgentTasks;
+  readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
@@ -658,6 +666,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       (event) => this.#emit(event),
       () => this.listAgents(),
     );
+    this.#history = new AgentHistoryTransfer({
+      database: store.database,
+      threads: new AgentThreadStore(store.database),
+      mailbox,
+      mainThread: (agentId) => store.ensureThreadIdNow(agentId),
+      registerTaskThread: (agentId, threadId) => this.#conversation.registerTaskThread(agentId, threadId),
+    });
     this.#tasks = new AgentTasks({
       store: new AgentThreadStore(store.database),
       mailbox,
@@ -1213,6 +1228,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       sectionTeammates: (agentId) => this.sectionTeammates(agentId),
       channelThread: (threadId) => this.channels.store.channelForThread(threadId) !== null,
       branchThread: (threadId) => this.#tasks.isBranchThread(threadId),
+      importedHistory: (threadId) => store.database.threadHasEvent(threadId, HISTORY_IMPORTED_EVENT),
       routineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
@@ -6042,6 +6058,46 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #emitRuntimeSnapshot(): void {
     this.#emit({ type: "runtime-snapshot", snapshot: this.getRuntimeSnapshot() });
   }
+
+  /** The agent's chats for an instance transfer: its own chat, then each side thread. */
+  readTransferHistory(agentId: string): HistoryThread[] {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return [];
+    return this.#history
+      .readThreads(agentId, agent.threadId)
+      .map((thread) => (thread.main && agent.preview ? { ...thread, preview: agent.preview } : thread));
+  }
+
+  /** The stored file of a message's attachment, or null when it is gone. */
+  resolveTransferFile(attachmentId: string) {
+    return this.#history.resolveFile(attachmentId);
+  }
+
+  /**
+   * Writes one chat of an imported agent, then tells the open views to read the agent again. The
+   * history was read on the other computer, so it does not arrive unread for `readerId`.
+   */
+  readonly importTransferHistory = Effect.fn("AgentService.importTransferHistory")(function* (
+    this: AgentService,
+    input: ImportHistoryThreadInput,
+    readerId: string,
+  ): Effect.fn.Return<void, AgentHistoryTransferFailed> {
+    const { threadId, lastMessageId } = yield* this.#history.importThread(input);
+    if (lastMessageId) this.#reader.markThreadRead(readerId, threadId, lastMessageId);
+    if (!input.thread.main) this.#tasks.changed(input.agentId);
+    else if (input.thread.preview) {
+      // The sidebar shows the last message that the other computer showed.
+      yield* this.#store
+        .updatePreview(input.agentId, input.thread.preview)
+        .pipe(Effect.mapError((failure) => new AgentHistoryTransferFailed({ cause: failure.cause })));
+      this.#emit({ type: "agents-changed", agents: this.listAgents() });
+    }
+    this.#emit({
+      type: "conversation-invalidated",
+      agentId: input.agentId,
+      revision: this.#store.database.readConversationRevision(input.agentId, threadId),
+    });
+  });
 
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);

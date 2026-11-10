@@ -59,6 +59,7 @@ import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
+import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
 import { LIVE_VOICE_CODECS } from "./live-voice-v1";
@@ -222,6 +223,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...VAULT_IMPORT_CODECS,
   ...VAULT_V2_CODECS,
   ...VAULT_V3_CODECS,
+  ...INSTANCE_TRANSFER_CHUNKS_CODECS,
 ]);
 
 export function optionalRouteCodec(path: string): OptionalRouteCodec | undefined {

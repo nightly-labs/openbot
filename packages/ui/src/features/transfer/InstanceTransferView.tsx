@@ -40,6 +40,7 @@ export interface InstanceExportOptions {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  includeHistory?: boolean;
 }
 
 export interface InstanceTransferViewProps {
@@ -53,6 +54,8 @@ export interface InstanceTransferViewProps {
   exportWarnings: string[];
   exportError: string | null;
   onExport: (options: InstanceExportOptions) => void;
+  /** The server can put the chat history in the file. */
+  historyAvailable?: boolean | undefined;
   onShowExport: () => void;
   onExportAgain: () => void;
   importPhase: InstanceImportPhase;
@@ -140,6 +143,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
   const [choosing, setChoosing] = createSignal(false);
   const [files, setFiles] = createSignal(true);
   const [settings, setSettings] = createSignal(true);
+  const [history, setHistory] = createSignal(true);
   const agents = () => props.summary?.agents ?? [];
   const selected = createMemo(() => agents().filter((agent) => !excluded().has(agent.id)));
   const busy = () => props.exportPhase === "exporting";
@@ -188,6 +192,16 @@ function ExportScreen(props: InstanceTransferViewProps) {
             label={t("settings.transfer.export.settings")}
             description={t("settings.transfer.export.settingsDescription")}
           />
+          <Show when={props.historyAvailable}>
+            <SwitchField
+              class="settings-modal-row"
+              checked={history()}
+              disabled={busy()}
+              onChange={setHistory}
+              label={t("settings.transfer.export.history")}
+              description={t("settings.transfer.export.historyDescription")}
+            />
+          </Show>
         </ItemGroup>
         <Button
           type="button"
@@ -232,6 +246,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
                 agentIds: selected().map((agent) => agent.id),
                 includeFiles: files(),
                 includeSettings: settings(),
+                ...(props.historyAvailable && history() ? { includeHistory: true } : {}),
               })
             }
           >
@@ -590,7 +605,7 @@ function NotMoved() {
   return (
     <p class="instance-transfer-not-moved">
       <Lock class="instance-transfer-not-moved-icon" aria-hidden="true" />
-      <span>{t("settings.transfer.notMoved")}</span>
+      <span>{t("settings.transfer.notMovedSecrets")}</span>
     </p>
   );
 }

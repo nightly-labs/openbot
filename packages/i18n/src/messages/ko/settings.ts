@@ -659,8 +659,6 @@ export const messages = {
   "settings.transfer.old.text": "에이전트와 서버 설정을 파일로 저장해요.",
   "settings.transfer.new.title": "이 서버로 가져오기",
   "settings.transfer.new.text": "파일에서 에이전트와 서버 설정을 추가해요.",
-  "settings.transfer.notMoved":
-    "API 키, 로그인 정보, 커넥터, 앱 환경설정, 채팅 기록은 옮겨지지 않아요. 새 서버에서 다시 설정해 주세요.",
   "settings.transfer.back": "뒤로",
   "settings.transfer.loading": "에이전트를 읽는 중…",
   "settings.transfer.summary.label": "파일에 포함된 내용",

@@ -68,7 +68,10 @@ export const InServerSettings: Story = {
 
 export const Home: Story = { name: "Which computer", render: () => <Stage args={viewArgs()} /> };
 
-export const Export: Story = { name: "Export", render: () => <Stage args={viewArgs({ screen: "export" })} /> };
+export const Export: Story = {
+  name: "Export",
+  render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true })} />,
+};
 
 export const ExportLoading: Story = {
   name: "Export: reading agents",

@@ -726,8 +726,6 @@ export const messages = {
   "settings.transfer.old.text": "احفظ وكلاءه وإعدادات الخادم في ملف.",
   "settings.transfer.new.title": "الاستيراد إلى هذا الخادم",
   "settings.transfer.new.text": "أضف الوكلاء وإعدادات الخادم من ملف.",
-  "settings.transfer.notMoved":
-    "لا تُنقل مفاتيح API وبيانات تسجيل الدخول والموصّلات وتفضيلات التطبيق وسجل الدردشة. أعد إعدادها على الخادم الجديد.",
   "settings.transfer.back": "رجوع",
   "settings.transfer.loading": "جارٍ قراءة وكلائك…",
   "settings.transfer.summary.label": "ما يحتويه الملف",

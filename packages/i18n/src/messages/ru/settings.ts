@@ -704,8 +704,6 @@ export const messages = {
   "settings.transfer.old.text": "Сохраните его агентов и настройки сервера в файл.",
   "settings.transfer.new.title": "Импорт на этот сервер",
   "settings.transfer.new.text": "Добавьте агентов и настройки сервера из файла.",
-  "settings.transfer.notMoved":
-    "API-ключи, входы в аккаунты, коннекторы, настройки приложения и история чатов не переносятся. Настройте их заново на новом сервере.",
   "settings.transfer.back": "Назад",
   "settings.transfer.loading": "Чтение агентов…",
   "settings.transfer.summary.label": "Что содержит файл",
