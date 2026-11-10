@@ -137,6 +137,7 @@ export const messages = {
   // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
   // at their default addresses and for known ACP agent commands on the PATH.
   "customProvider.detected.title": "이 컴퓨터에서 찾았어요",
+  "customProvider.detected.titleServer": "서버에서 찾았어요",
   "customProvider.detected.scanning": "로컬 모델과 에이전트를 찾는 중이에요.",
   "customProvider.detected.scanAgain": "다시 검색",
   "customProvider.detected.empty": "OpenBot이 로컬 모델 서버나 ACP 에이전트를 찾지 못했어요.",
@@ -160,6 +161,8 @@ export const messages = {
   "customProvider.detection.enabled": "로컬 모델과 에이전트 찾기",
   "customProvider.detection.enabledDescription":
     "OpenBot이 Ollama와 LM Studio의 기본 주소를 확인하고, PATH에서 알려진 ACP 에이전트를 찾아요.",
+  "customProvider.detection.enabledDescriptionServer":
+    "서버가 Ollama와 LM Studio의 기본 주소를 확인하고, 서버의 PATH에서 알려진 ACP 에이전트를 찾아요.",
   "customProvider.detection.addresses": "기타 모델 서버 주소",
   "customProvider.detection.address.label": "주소 {number}",
   "customProvider.detection.address.remove": "주소 {number} 제거",
@@ -181,6 +184,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "영문 소문자, 숫자, 하이픈. 나중에 변경할 수 없어요.",
   "customProvider.acp.command": "명령",
   "customProvider.acp.commandHint": "시작할 프로그램이에요. OpenBot이 PATH에서 찾아요.",
+  "customProvider.acp.commandHintServer": "시작할 프로그램이에요. 서버가 자체 PATH에서 찾아요.",
   "customProvider.acp.args": "인수",
   "customProvider.acp.argsHint": "인수는 공백으로 구분하세요. 공백이 있는 인수는 따옴표로 묶으세요.",
   "customProvider.acp.env": "환경 변수",
@@ -202,6 +206,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "이 명령은 내 컴퓨터에서 실행돼요",
   "customProvider.acp.trustDescription":
     "OpenBot이 내 사용자 계정으로 이 명령을 시작해요. 에이전트는 파일을 읽고 변경하며 명령을 실행할 수 있어요. 신뢰하는 에이전트만 추가하세요.",
+  "customProvider.acp.hostTrustTitle": "이 명령은 서버에서 실행돼요",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot이 서버의 사용자 계정으로 이 명령을 시작해요. 에이전트는 서버의 파일을 읽고 변경하며 그곳에서 명령을 실행할 수 있어요. 신뢰하는 에이전트만 추가하세요.",
   "customProvider.acp.submit": "에이전트 추가",
   "customProvider.acp.editTitle": "사용자 지정 ACP 에이전트 편집",
   "customProvider.acp.submitEdit": "에이전트 저장",
@@ -219,6 +226,7 @@ export const messages = {
   // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
   "customProvider.agents.title": "사용자 지정 에이전트",
   "customProvider.agents.description": "OpenBot이 이 컴퓨터에서 시작하는 ACP 에이전트예요.",
+  "customProvider.agents.hostDescription": "OpenBot이 서버 컴퓨터에서 시작하는 ACP 에이전트예요.",
   "customProvider.agents.empty": "아직 사용자 지정 에이전트가 없어요.",
   "customProvider.agents.add": "에이전트 추가",
   "customProvider.agents.restart": "에이전트 다시 시작",

@@ -138,6 +138,7 @@ export const messages = {
   },
 
   "customProvider.detected.title": "Найдено на этом компьютере",
+  "customProvider.detected.titleServer": "Найдено на сервере",
   "customProvider.detected.scanning": "Ищем локальные модели и агентов.",
   "customProvider.detected.scanAgain": "Сканировать снова",
   "customProvider.detected.empty": "OpenBot не нашёл ни локального сервера моделей, ни агента ACP.",
@@ -163,6 +164,8 @@ export const messages = {
   "customProvider.detection.enabled": "Искать локальные модели и агентов",
   "customProvider.detection.enabledDescription":
     "OpenBot проверяет адреса Ollama и LM Studio по умолчанию и ищет известных агентов ACP в вашем PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "Сервер проверяет адреса Ollama и LM Studio по умолчанию и ищет известных агентов ACP в своём PATH.",
   "customProvider.detection.addresses": "Другие адреса серверов моделей",
   "customProvider.detection.address.label": "Адрес {number}",
   "customProvider.detection.address.remove": "Удалить адрес {number}",
@@ -183,6 +186,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Строчные буквы, цифры или дефисы. Позже изменить его нельзя.",
   "customProvider.acp.command": "Команда",
   "customProvider.acp.commandHint": "Программа для запуска. OpenBot ищет её в вашем PATH.",
+  "customProvider.acp.commandHintServer": "Программа для запуска. Сервер ищет её в своём PATH.",
   "customProvider.acp.args": "Аргументы",
   "customProvider.acp.argsHint": "Разделяйте аргументы пробелами. Аргумент с пробелами возьмите в кавычки.",
   "customProvider.acp.usagePrompt": "Команда использования",
@@ -210,6 +214,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Эта команда выполняется на вашем компьютере",
   "customProvider.acp.trustDescription":
     "OpenBot запускает её от имени вашей учётной записи. Агент может читать и изменять файлы и выполнять команды. Добавляйте только того агента, которому доверяете.",
+  "customProvider.acp.hostTrustTitle": "Эта команда выполняется на сервере",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot запускает её от имени учётной записи сервера. Агент может читать и изменять файлы на сервере и выполнять там команды. Добавляйте только того агента, которому доверяете.",
   "customProvider.acp.submit": "Добавить агента",
   "customProvider.acp.editTitle": "Изменить своего агента ACP",
   "customProvider.acp.submitEdit": "Сохранить агента",
@@ -227,6 +234,7 @@ export const messages = {
 
   "customProvider.agents.title": "Свои агенты",
   "customProvider.agents.description": "Агенты ACP, которые OpenBot запускает на этом компьютере.",
+  "customProvider.agents.hostDescription": "Агенты ACP, которые OpenBot запускает на компьютере сервера.",
   "customProvider.agents.empty": "Своих агентов пока нет.",
   "customProvider.agents.add": "Добавить агента",
   "customProvider.agents.restart": "Перезапустить агентов",

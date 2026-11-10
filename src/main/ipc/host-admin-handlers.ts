@@ -55,8 +55,17 @@ import {
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_MEMORY_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  CLAUDE_USER_SETUP_CAPABILITY,
+  CLAUDE_USER_SETUP_ROUTES,
+  decodeClaudeUserSetupResponse,
+} from "@openbot/contracts/team-protocol/claude-user-setup-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import {
+  HOST_KEY_ROTATION_CAPABILITY,
+  HOST_KEY_ROTATION_ROUTES,
+} from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import {
   HOST_PERSONALITY_CAPABILITY,
   HOST_PERSONALITY_ROUTES,
@@ -82,6 +91,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
+import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
@@ -112,7 +122,7 @@ interface HostAdminRemoteServers {
 }
 
 interface HostAdminIpcDependencies {
-  host: Pick<HostService, "updateIdentity">;
+  host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
@@ -121,6 +131,7 @@ interface HostAdminIpcDependencies {
   skillLearning: SkillLearningPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  claudeUserSetup: ClaudeUserSetupControl;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
@@ -147,6 +158,7 @@ export function hostAdminIpcHandlers({
   skillLearning,
   machineAlerts,
   promptCacheTtl,
+  claudeUserSetup,
   modelVisibility,
   agentAccess,
   serverAudit,
@@ -201,6 +213,13 @@ export function hostAdminIpcHandlers({
       remoteServers.request(serverId, route, decodePromptCacheTtlSetting, { method: "POST", body }),
     );
   }
+  function remoteClaudeUserSetup(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, CLAUDE_USER_SETUP_CAPABILITY))
+      throw new Error(sourceText("error.team.claudeUserSetupUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
+    );
+  }
   function remoteModelVisibility(
     serverId: string,
     route: string,
@@ -252,6 +271,26 @@ export function hostAdminIpcHandlers({
           );
           // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
+        },
+      }),
+      rotateHostKey: scopedQueryHandler({
+        local: async () => {
+          await runCauseEffect(host.rotateIdentityKey());
+        },
+        // Owner only: the host refuses an admin or a member with 403.
+        remote: async (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_KEY_ROTATION_CAPABILITY))
+            throw new Error(sourceText("error.team.hostKeyRotationUnsupported"));
+          await runCauseEffect(
+            remoteServers.request(serverId, HOST_KEY_ROTATION_ROUTES.rotate, acceptEmpty, {
+              method: "POST",
+              body: {},
+            }),
+          );
+          // The answer does not make the new key trusted. The directory carries the handover that the
+          // previous key signed, and this read follows it. The key is changed, so a failed read is not
+          // a failure of the change: the next read follows it.
+          await runCauseEffect(remoteServers.refreshIdentity(serverId)).catch(() => undefined);
         },
       }),
       getReleaseStatus: scopedQueryHandler({
@@ -375,6 +414,14 @@ export function hostAdminIpcHandlers({
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
       }),
+      getClaudeUserSetup: scopedQueryHandler({
+        local: () => claudeUserSetup.get(),
+        remote: (serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.settings, {}),
+      }),
+      setClaudeUserSetup: scopedHandler(parseClaudeUserSetup, {
+        local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
+        remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
+      }),
       getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
         local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
         remote: (provider, serverId) => remoteModelVisibility(serverId, MODEL_VISIBILITY_ROUTES.settings, { provider }),
@@ -438,6 +485,11 @@ function wireIdentity(input: UpdateHostIdentityInput) {
             : null,
         }),
   };
+}
+
+function parseClaudeUserSetup(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
 }
 
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {

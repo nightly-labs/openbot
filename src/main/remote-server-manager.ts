@@ -55,7 +55,9 @@ import type {
 import {
   type AgentNotificationLevelsSnapshot,
   type BrowserComputerSharing,
+  type Channel,
   decodeBrowserProxyComputer,
+  decodeChannel,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
@@ -63,7 +65,7 @@ import {
   REMOTE_DESKTOP_SETUP_CAPABILITY,
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -76,9 +78,14 @@ import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_PICTURE_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -91,6 +98,14 @@ import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protoco
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  decodeThreadMessageSearchResponse,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+  THREAD_MESSAGE_SEARCH_ROUTES,
+  type ThreadMessageSearchRequest,
+} from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -434,6 +449,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onMemberChatColors: (serverId) => {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
+      hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -1848,7 +1864,22 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     cursor?: string,
     limit = 100,
     serverId = this.#store.activeServerId,
+    includeSideThreads = false,
   ): Effect.Effect<ConversationSearchPage, RemoteWorkflowError> {
+    // Only `thread-message-search-v1` names the side thread of a result. An older host searches the
+    // agents' own chats.
+    if (includeSideThreads && this.supportsCapability(serverId, THREAD_MESSAGE_SEARCH_CAPABILITY)) {
+      const body: ThreadMessageSearchRequest = {
+        query,
+        agentId: agentId ?? null,
+        cursor: cursor ?? null,
+        limit: Math.min(Math.max(limit, 1), THREAD_MESSAGE_SEARCH_PAGE_LIMIT),
+      };
+      return this.request(serverId, THREAD_MESSAGE_SEARCH_ROUTES.search, decodeThreadMessageSearchResponse, {
+        method: "POST",
+        body,
+      });
+    }
     const parameters = new URLSearchParams({ q: query, limit: String(limit) });
     // A query parameter never reaches the JSON adapters, so it keeps the released spelling.
     if (agentId) parameters.set("botId", agentId);
@@ -2421,6 +2452,95 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /**
+   * Sets or removes the image of a channel of a server with `channel-picture-v1`: `PUT
+   * /v1/channels/image` sends the bytes, and `DELETE` removes them. The host answers the channel.
+   */
+  readonly setChannelImage = Effect.fn("RemoteManager.setChannelImage")(
+    function* (
+      this: RemoteServerManager,
+      channelId: string,
+      image: AvatarImageInput | null,
+      serverId: string,
+    ): Effect.fn.Return<Channel, RemoteWorkflowError, RemoteRequest> {
+      if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const url = this.#channelImageUrl(server.apiUrl, channelId);
+      const method = image ? "PUT" : "DELETE";
+      const headers = new Headers();
+      if (image) headers.set("Content-Type", image.mimeType);
+      const response = yield* this.#client.fetch(server, url, {
+        method,
+        headers,
+        ...(image ? { body: Buffer.from(image.bytes) } : {}),
+      });
+      const path = `${url.pathname}${url.search}`;
+      const json = yield* remoteCall(() => response.json());
+      const value = yield* remoteDecode(() =>
+        teamSideRouteCodec(path)?.response(path, response.status, json, {
+          channelIsolation: true,
+          channelPicture: true,
+        }),
+      );
+      if (!response.ok) {
+        const error = isDynamicRecord(value) && isString(value.error) ? value.error : null;
+        const code = isDynamicRecord(value) && isString(value.code) ? value.code : null;
+        return yield* new RemoteWorkflowError({
+          cause: new RemoteRequestError(
+            response.status,
+            error ?? sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            code,
+          ),
+        });
+      }
+      return addRemotePreviewUrls(yield* remoteDecode(() => decodeChannel(value)), server.id);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * The bytes of a channel image of a server with `channel-picture-v1`, by the version in its URL
+   * (`GET /v1/channels/image`). The bytes are checked as an avatar image before the renderer gets them.
+   */
+  readonly downloadChannelImage = Effect.fn("RemoteManager.downloadChannelImage")(
+    function* (
+      this: RemoteServerManager,
+      channelId: string,
+      serverId: string,
+      version: string,
+    ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
+      if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const url = this.#channelImageUrl(server.apiUrl, channelId);
+      url.searchParams.set("v", version);
+      const response = yield* this.#client.fetch(server, url);
+      // The protocol handler answers 404 for any failure, so the host's error text is not read.
+      if (!response.ok)
+        return yield* new RemoteWorkflowError({
+          cause: new RemoteRequestError(
+            response.status,
+            sourceText("error.remote.requestFailedStatus", { status: response.status }),
+          ),
+        });
+      const picture = {
+        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+        mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
+      };
+      if (!isValidAvatarImage(picture.mimeType, picture.bytes))
+        return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
+      return picture;
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  #channelImageUrl(apiUrl: string, channelId: string): URL {
+    const url = new URL(CHANNEL_PICTURE_ROUTES.image, apiUrl);
+    url.searchParams.set("channelId", channelId);
+    return url;
+  }
 
   readonly downloadServerLogo = Effect.fn("RemoteManager.downloadServerLogo")(
     function* (

@@ -1,10 +1,8 @@
-import { type ChatWindowTarget, canAdministerServer } from "@openbot/contracts/ipc";
+import type { ChatWindowTarget } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
-import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
-import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
@@ -34,10 +32,9 @@ import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
 import { createCommunityCardVisibility } from "./community-card";
-import { createMachineCard } from "./machine-card";
+import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
 import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
-import { createStorageCard } from "./storage-card";
 
 /** Dismissing the mobile app card is a choice of this computer, like the sidebar width. The key is
  * new with the Android release, so a computer that dismissed the iPhone-only card sees it once more. */
@@ -140,42 +137,12 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     window.localStorage.getItem(MOBILE_APP_DISMISSED_STORAGE_KEY) === "true",
   );
   const communityCard = createCommunityCardVisibility();
-  const storageCard = createStorageCard(activeServer);
-  const machineCard = createMachineCard(activeServer);
+  const alertCards = createSidebarAlertCards(activeServer);
   // A clear in Server settings frees space and can change an alert level, so both cards read
   // again when settings close.
   createEffect(serverSettingsOpen, (open, wasOpen) => {
-    if (!open && wasOpen) {
-      storageCard.refresh();
-      machineCard.refresh();
-    }
+    if (!open && wasOpen) alertCards.refresh();
   });
-  // One warning card at a time. A disk machine card covers the disk, so it replaces the storage
-  // card. A memory or CPU card gives way to a full disk, unless it is critical itself.
-  const footerCard = createMemo(() => {
-    const machine = machineCard.card();
-    const storage = storageCard.card();
-    if (machine && (machine.metric === "disk" || !storage || (machine.critical && storage.level !== "full")))
-      return { kind: "machine" as const, card: machine };
-    return storage ? { kind: "storage" as const, card: storage } : null;
-  });
-  const shownMachineCard = () => {
-    const shown = footerCard();
-    return shown?.kind === "machine" ? shown.card : null;
-  };
-  const shownStorageCard = () => {
-    const shown = footerCard();
-    return shown?.kind === "storage" ? shown.card : null;
-  };
-  // As the host picks it: the responsible member while an active admin, otherwise the owner.
-  const machineRecipient = (memberId: string | null) => {
-    const members = teamPresence().members;
-    const member =
-      members.find(
-        (candidate) => candidate.id === memberId && !candidate.disabled && canAdministerServer(candidate.role),
-      ) ?? members.find((candidate) => candidate.role === "owner");
-    return member ? member.name?.trim() || member.username : null;
-  };
 
   /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
    * sections beside the agents, so the sidebar has to be able to order and group them. The Routines
@@ -329,34 +296,13 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           <>
             {/* One card at a time. A machine over its alert level comes first, then a disk that is
              * almost full; the community card waits until the mobile app card is dismissed. */}
-            <Show when={shownMachineCard()}>
-              {(card) => (
-                <SidebarMachineCard
-                  serverName={activeServer()?.name ?? ""}
-                  metric={card().metric}
-                  percent={card().percent}
-                  level={card().level}
-                  freeBytes={card().freeBytes}
-                  critical={card().critical}
-                  recipientName={machineRecipient(card().responsibleMemberId)}
-                  onOpenDetails={() => openServerSettings(card().serverId, null, "storage")}
-                  onDismiss={() => machineCard.dismiss(card().serverId, card())}
-                />
-              )}
-            </Show>
-            <Show when={shownStorageCard()}>
-              {(card) => (
-                <SidebarStorageCard
-                  level={card().level}
-                  serverName={activeServer()?.name ?? ""}
-                  freeBytes={card().freeBytes}
-                  totalBytes={card().totalBytes}
-                  onFreeUpSpace={() => openServerSettings(card().serverId, null, "storage")}
-                  onDismiss={() => storageCard.dismiss(card().serverId)}
-                />
-              )}
-            </Show>
-            <Show when={!platform.landingPreview && !footerCard() && !mobileAppDismissed()}>
+            <SidebarAlertCards
+              cards={alertCards}
+              serverName={activeServer()?.name ?? ""}
+              members={teamPresence().members}
+              onOpenStorage={(serverId) => openServerSettings(serverId, null, "storage")}
+            />
+            <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
               <SidebarMobileAppCard
                 onOpenInstall={() => openAppSettings(null, "mobile-connect")}
                 onDismiss={() => {
@@ -366,7 +312,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               />
             </Show>
             <Show
-              when={!platform.landingPreview && !footerCard() && mobileAppDismissed() && !communityCard.dismissed()}
+              when={
+                !platform.landingPreview && !alertCards.shown() && mobileAppDismissed() && !communityCard.dismissed()
+              }
             >
               <SidebarCommunityCard
                 onJoinDiscord={() => void appPort().openExternal("discord")}
@@ -396,7 +344,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       />
       {/* A compact sidebar hides the footer card, so the offer is outside the footer. */}
       <ServerUpgradeOffer
-        card={storageCard.card()}
+        card={alertCards.storageCard.card()}
         server={activeServer()}
         blocked={serverSettingsOpen()}
         onFreeUpSpace={(serverId) => openServerSettings(serverId, null, "storage")}

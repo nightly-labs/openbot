@@ -1,4 +1,6 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { guardedDecoder } from "@openbot/contracts/ipc-decoding";
+import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_BRANCHES_CAPABILITY,
@@ -6,6 +8,12 @@ import {
 } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
+import {
+  AGENT_THREAD_QUEUE_CAPABILITY,
+  AGENT_THREAD_QUEUE_ROUTES,
+  isAgentThreadQueues,
+  withAgentThreadQueues,
+} from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -14,6 +22,7 @@ import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
   branchAgentThread,
+  cancelQueuedMessage,
   deleteAgentThread,
   listAgentTasks,
   listAgentThreadBranches,
@@ -21,8 +30,10 @@ import {
   readAgentTask,
   readAgentThreadPage,
   renameAgentThread,
+  runQueuedMessageAsAgentTask,
   sendAgentTaskMessage,
   startAgentTask,
+  steerQueuedMessage,
   type TeamApiRequest,
   type TeamRequestError,
 } from "@openbot/team-client/team-api-requests";
@@ -45,26 +56,50 @@ export function withoutPreviewUrls(snapshot: ConversationSnapshot): Conversation
   };
 }
 
+const decodeThreadQueues = guardedDecoder(isAgentThreadQueues, "agent thread queue response");
+
 /**
  * The side threads of one host: the `agent-tasks-v1` routes, rename and delete through
- * `agent-threads-v1`, and branches through `agent-thread-branches-v1` when `branchable` is true. The
- * branch links are read after the tasks, so that each listed branch has its link. Each call reads the
- * request again: it fails once the tab leaves the host.
+ * `agent-threads-v1`, branches through `agent-thread-branches-v1` when `branchable` is true, and the
+ * queue of each thread through `agent-thread-queue-v1` when `queued` is true. The branch links and the
+ * queues are read after the tasks, so that each listed task has them. Each call reads the request
+ * again: it fails once the tab leaves the host.
  */
-function webAgentTasksPort(request: () => TeamApiRequest, branchable: () => boolean): AgentTasksPort {
+function webAgentTasksPort(
+  request: () => TeamApiRequest,
+  branchable: () => boolean,
+  queued: () => boolean,
+): AgentTasksPort {
   const run = async <A>(call: (request: TeamApiRequest) => Effect.Effect<A, TeamRequestError>) =>
     runTeamEffect(call(request()).pipe(Effect.mapError((error) => error.cause)));
+  const readQueues = (agentId: string) =>
+    request()("POST", AGENT_THREAD_QUEUE_ROUTES.list, decodeThreadQueues, { agentId });
+  const queue: NonNullable<AgentTasksPort["queue"]> = {
+    cancelQueuedMessage: (input) => run((host) => cancelQueuedMessage(host, input)),
+    steerQueuedMessage: (input) => run((host) => steerQueuedMessage(host, input)),
+    // The panel of a thread orders only its own queue. The response is empty.
+    reorderQueue: async ({ agentId, taskId, deliveryIds }) => {
+      if (taskId === undefined) return;
+      await request()("POST", AGENT_THREAD_QUEUE_ROUTES.reorder, () => undefined, { agentId, taskId, deliveryIds });
+    },
+  };
   return {
-    listTasks: (agentId) =>
-      run((host) =>
-        // An effect callback can ask for the list: the capability is input here, not a dependency.
+    listTasks: async (agentId) => {
+      // An effect callback can ask for the list: the capabilities are input here, not dependencies.
+      const snapshot = await run((host) =>
         untrack(branchable)
           ? Effect.gen(function* () {
-              const snapshot = yield* listAgentTasks(host, agentId);
-              return withAgentThreadBranches(snapshot, yield* listAgentThreadBranches(host, agentId));
+              const tasks = yield* listAgentTasks(host, agentId);
+              return withAgentThreadBranches(tasks, yield* listAgentThreadBranches(host, agentId));
             })
           : listAgentTasks(host, agentId),
-      ),
+      );
+      return untrack(queued) ? withAgentThreadQueues(snapshot, await readQueues(agentId)) : snapshot;
+    },
+    // The panel of a thread shows its queue actions only while the host serves `agent-thread-queue-v1`.
+    get queue() {
+      return queued() ? queue : undefined;
+    },
     readTask: (input) => run((host) => readAgentTask(host, input).pipe(Effect.map(withoutPreviewUrls))),
     readTaskPage: (input) =>
       run((host) =>
@@ -81,6 +116,8 @@ function webAgentTasksPort(request: () => TeamApiRequest, branchable: () => bool
     deleteTask: (input) => run((host) => deleteAgentThread(host, input)),
     markTaskRead: (input) => run((host) => markAgentThreadRead(host, input)),
     branchTask: (input) => run((host) => branchAgentThread(host, input)),
+    // The menu item shows only while the host serves `agent-queue-task-v1`.
+    runQueuedMessageAsTask: (input) => run((host) => runQueuedMessageAsAgentTask(host, input)),
     // The response is empty.
     deleteTaskMessage: async ({ agentId, taskId, messageId }) => {
       await request()("POST", MESSAGE_DELETE_ROUTES.task, () => undefined, { agentId, taskId, messageId });
@@ -100,11 +137,12 @@ export function createWebAgentThreads(options: {
 }) {
   const { workspace, hostId } = options;
   const branchable = () => workspace.state.capabilities.includes(AGENT_THREAD_BRANCHES_CAPABILITY);
-  const port = webAgentTasksPort(options.request, branchable);
+  const queued = () => workspace.state.capabilities.includes(AGENT_THREAD_QUEUE_CAPABILITY);
+  const port = webAgentTasksPort(options.request, branchable, queued);
   const tasks = createAgentTasks({
     port: () => port,
     activeAgentId: () => workspace.state.selectedId ?? undefined,
-    local: () => false,
+    queuedMessageMovable: () => workspace.state.capabilities.includes(AGENT_QUEUE_TASK_CAPABILITY),
     available: () => workspace.state.capabilities.includes(AGENT_TASKS_CAPABILITY),
     editable: () => workspace.state.capabilities.includes(AGENT_THREADS_CAPABILITY),
     readable: () => workspace.state.capabilities.includes(AGENT_THREAD_READS_CAPABILITY),

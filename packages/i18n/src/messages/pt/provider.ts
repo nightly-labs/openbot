@@ -238,6 +238,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Os agentes carregam seu CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Os agentes carregam CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude no servidor. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
   "provider.settings.claudeUserSetupLoadFailed": "Não foi possível carregar a configuração do Claude Code.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {

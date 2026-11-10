@@ -51,6 +51,29 @@ adding a module or moving ownership between workspaces.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
 
+## Joined servers
+
+Many users run OpenBot only on a joined server: a VPS, a hosted server, or another member's computer.
+A feature for agents, chats, channels, routines or server settings must work there as it does on
+this computer. Make it local only when it needs this computer itself: its files and folders, its
+windows, its OS dialogs or its native notifications.
+
+- Ship the remote path in the same change as the local one: the host route in `src/main/team-api/`,
+  a new optional capability in `packages/contracts/src/team-protocol/` (see
+  [packages/contracts/AGENTS.md](packages/contracts/AGENTS.md)), the `remote` branch of the IPC
+  handler, and each client: the desktop with a joined server, the web client
+  (`src/renderer/src/features/web-client/`), and mobile (`apps/mobile`) when the action fits a phone.
+- Do not add a `remote` branch that always throws or returns empty data, or a `kind === "local"`
+  gate, for a feature that can work on a server. When a part must stay local, write the reason at
+  the gate and in the PR.
+- Gate the client on the host capability. Hide the action while the host does not have it; do not
+  show an action that then fails. An older host keeps working without the feature.
+- Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
+  local IPC path.
+- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+  notes say that the server must also be on the new version.
+
 ## Effect
 
 - Use Effect 4.0.0 for migrated server and desktop domain services, schemas, typed errors,
@@ -136,6 +159,8 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - Desktop renderer (`src/renderer`), mobile (`apps/mobile`), public web (`apps/auth-api`; no separate
   landing app), hosted-site routing (`apps/site-router`), the mobile update server
   (`apps/mobile-updates`), and Signal (`remote/api`).
+- Joined servers: the desktop with a joined server, the web client (`openbot.run/app`), and mobile.
+  See [Joined servers](#joined-servers).
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.

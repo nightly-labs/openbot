@@ -123,7 +123,23 @@ export function serverSupportsCapability(
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
       capability === "chat-history-v1" ||
-      capability === "conversation-unread-from-v1") &&
+      capability === "conversation-unread-from-v1" ||
+      capability === "conversation-file-search-v1" ||
+      capability === "custom-agents-v1" ||
+      capability === "host-key-rotation-v1" ||
+      capability === "routine-results-v1" ||
+      capability === "workflows-chats-v1" ||
+      capability === "workflows-channels-v1" ||
+      capability === "vault-import-v1" ||
+      capability === "agent-waits-v1" ||
+      capability === "agent-queue-task-v1" ||
+      capability === "background-processes-v1" ||
+      capability === "routines-once-v1" ||
+      capability === "routine-run-command-v1" ||
+      capability === "claude-user-setup-v1" ||
+      capability === "agent-usage-limit-v1" ||
+      capability === "hermes-import-v1" ||
+      capability === "provider-detection-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -186,6 +202,15 @@ export function relaySignInProviders(server: ServerSummary | undefined): readonl
   return server?.kind === "remote" && serverSupportsCapability(server, "sign-in-relay-v1")
     ? SIGN_IN_RELAY_PROVIDERS
     : [];
+}
+
+/**
+ * Whether Settings can change the server key: this computer's, or a joined server's when the account
+ * owns it and the host serves `host-key-rotation-v1`. The host refuses an admin or a member.
+ */
+export function serverRotatesHostKey(server: ServerSummary | undefined): server is ServerSummary {
+  if (server?.kind === "local") return true;
+  return server?.role === "owner" && serverSupportsCapability(server, "host-key-rotation-v1");
 }
 
 /** An owner or admin of a joined server. This computer is always its own administrator. */

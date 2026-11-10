@@ -48,7 +48,7 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
-import { remoteRoutineRecovery } from "../servers/server-capabilities";
+import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -354,10 +354,25 @@ export function ConversationTimeline() {
   const runtime = conversationRuntime(props);
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
-  const instructionsCalls = agentInstructionsCalls();
-  /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
-  const localInstructionsCalls = () =>
-    props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
+  const localInstructions = agentInstructionsCalls();
+  /**
+   * The server whose instruction file View and Undo read on a change line: a joined server only for an
+   * owner or admin, through `agent-instructions-v1`. The calls follow the server id, so a new summary
+   * of the same server keeps an open view. The web client gets the calls from its runtime, which gives
+   * them only for such a host and user.
+   */
+  const webInstructionsApi = createMemo(() => props.runtime?.agentInstructions);
+  const instructionsServerId = createMemo(() => {
+    if (props.runtime) return webInstructionsApi() ? props.server?.id : undefined;
+    return props.server?.kind === "remote" && serverCanAdminister(props.server, "agent-instructions-v1")
+      ? props.server.id
+      : undefined;
+  });
+  const instructionsCalls = createMemo(() => {
+    if (!props.runtime && props.server?.kind === "local") return localInstructions;
+    const serverId = instructionsServerId();
+    return serverId === undefined ? undefined : agentInstructionsCalls(serverId, webInstructionsApi());
+  });
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
 
@@ -1069,9 +1084,9 @@ export function ConversationTimeline() {
                                                         onToggleRoutineRun={toggleRoutineRun}
                                                         onToggleAgentMessage={toggleAgentMessage}
                                                         agentMessageText={agentMessageText}
-                                                        instructions={localInstructionsCalls()}
+                                                        instructions={instructionsCalls()}
                                                         onOpenInstructions={
-                                                          channel || !localInstructionsCalls()
+                                                          channel || !instructionsCalls()
                                                             ? undefined
                                                             : openInstructionsSettings
                                                         }

@@ -265,6 +265,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Агенты загружают CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude на сервере. Если выключено, каждый ход отправляет более короткий промпт. Файлы рабочей области по-прежнему загружаются.",
   "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {

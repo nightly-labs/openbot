@@ -384,7 +384,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Laatste wijziging",
   "server.settings.hostKeyChangedDescription":
     "{date}. De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
-  "server.settings.hostKeyLocalOnly": "Alleen de server op deze computer kan hier zijn sleutel wijzigen.",
+  "server.settings.hostKeyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "server.settings.removeTitle": "Server verwijderen",
   "server.settings.removeDescription":
     "Verwijder deze server uit de accountservice voor alle leden. Gebruik dit als de computer ervan niet meer beschikbaar is.",

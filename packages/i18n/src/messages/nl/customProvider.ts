@@ -128,6 +128,7 @@ export const messages = {
   "customProvider.probe.checking": "Controleren",
   "customProvider.probe.running": { one: "Actief · {count} model", other: "Actief · {count} modellen" },
   "customProvider.detected.title": "Gevonden op deze computer",
+  "customProvider.detected.titleServer": "Gevonden op de server",
   "customProvider.detected.scanning": "Zoeken naar lokale modellen en agents.",
   "customProvider.detected.scanAgain": "Opnieuw scannen",
   "customProvider.detected.empty": "OpenBot heeft geen lokale modelserver of ACP-agent gevonden.",
@@ -150,6 +151,8 @@ export const messages = {
   "customProvider.detection.enabled": "Zoeken naar lokale modellen en agents",
   "customProvider.detection.enabledDescription":
     "OpenBot controleert de standaardadressen van Ollama en LM Studio, en zoekt naar bekende ACP-agents in je PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "De server controleert de standaardadressen van Ollama en LM Studio, en zoekt naar bekende ACP-agents in zijn PATH.",
   "customProvider.detection.addresses": "Andere adressen van modelservers",
   "customProvider.detection.address.label": "Adres {number}",
   "customProvider.detection.address.remove": "Adres {number} verwijderen",
@@ -169,6 +172,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Kleine letters, cijfers of koppeltekens. Je kunt dit later niet wijzigen.",
   "customProvider.acp.command": "Opdracht",
   "customProvider.acp.commandHint": "Het programma om te starten. OpenBot zoekt het in je PATH.",
+  "customProvider.acp.commandHintServer": "Het programma dat start. De server zoekt het in zijn PATH.",
   "customProvider.acp.args": "Argumenten",
   "customProvider.acp.argsHint": "Scheid argumenten met spaties. Zet aanhalingstekens om een argument met spaties.",
   "customProvider.acp.usagePrompt": "Gebruiksopdracht",
@@ -194,6 +198,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Deze opdracht draait op je computer",
   "customProvider.acp.trustDescription":
     "OpenBot start deze met je gebruikersaccount. De agent kan bestanden lezen en wijzigen en opdrachten uitvoeren. Voeg alleen een agent toe die je vertrouwt.",
+  "customProvider.acp.hostTrustTitle": "Deze opdracht draait op de server",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot start deze met het gebruikersaccount van de server. De agent kan bestanden op de server lezen en wijzigen en daar opdrachten uitvoeren. Voeg alleen een agent toe die je vertrouwt.",
   "customProvider.acp.submit": "Agent toevoegen",
   "customProvider.acp.editTitle": "Eigen ACP-agent bewerken",
   "customProvider.acp.submitEdit": "Agent opslaan",
@@ -210,6 +217,7 @@ export const messages = {
     "Gebruik kleine letters, cijfers of koppeltekens, beginnend met een letter of cijfer. Gebruik hooguit 40 tekens.",
   "customProvider.agents.title": "Eigen agents",
   "customProvider.agents.description": "ACP-agents die OpenBot op deze computer start.",
+  "customProvider.agents.hostDescription": "ACP-agents die OpenBot op de computer van de server start.",
   "customProvider.agents.empty": "Nog geen eigen agents.",
   "customProvider.agents.add": "Agent toevoegen",
   "customProvider.agents.restart": "Agents herstarten",

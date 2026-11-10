@@ -88,7 +88,7 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
  * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
  * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
  * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`).
+ * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`).
  */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();

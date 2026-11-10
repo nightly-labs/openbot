@@ -218,8 +218,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Questo agente non ha una routine con questo id.",
   "error.backend.agentWaitNoRoutine":
     "Solo un'esecuzione di una delle tue routine risveglia un'attesa, e non hai routine. Creane una con openbot.create_routine, poi apri l'attesa.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Le attese aperte sono disponibili solo per gli agenti su questo computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Segnare un messaggio come non letto è disponibile solo per gli agenti su questo computer.",
   "error.backend.messageDeleteUnsupported": "Questo server non supporta l’eliminazione dei messaggi.",

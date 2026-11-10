@@ -10,6 +10,7 @@ import type {
   AgentEvent,
   AgentNotificationLevelsSnapshot,
   AgentStatus,
+  AgentWaitsSnapshot,
   AttachmentSummary,
   AvatarImageInput,
   BrowserLiveViewEvent,
@@ -18,9 +19,11 @@ import type {
   BrowserPreview,
   BrowserTab,
   CancelQueuedMessageInput,
+  Channel,
   ChatColors,
   ClientAgentModelOption,
   ClientAgentSummary,
+  ConversationFileSearchPage,
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -40,6 +43,7 @@ import type {
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
+  SetChannelImageInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -57,11 +61,13 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   canAdministerServer,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
+  isChannel,
   isClientAgentModelOption,
   isClientAgentSummary,
   isConversationMessage,
@@ -84,6 +90,15 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  AGENT_USAGE_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
+  AGENT_WAITS_CAPABILITY,
+  AGENT_WAITS_ROUTES,
+  decodeAgentWaitsResponse,
+} from "@openbot/contracts/team-protocol/agent-waits-v1";
+import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
@@ -98,7 +113,26 @@ import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_PICTURE_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
+import {
+  CONTEXT_COMPACT_CAPABILITY,
+  CONTEXT_COMPACT_ROUTES,
+} from "@openbot/contracts/team-protocol/context-compact-v1";
+import {
+  CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CONVERSATION_FILE_SEARCH_PAGE_LIMIT,
+  CONVERSATION_FILE_SEARCH_ROUTES,
+  decodeConversationFileSearchResponse,
+} from "@openbot/contracts/team-protocol/conversation-file-search-v1";
+import {
+  CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CONVERSATION_UNREAD_FROM_ROUTE,
+} from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
@@ -108,10 +142,17 @@ import {
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
+import {
+  decodeThreadMessageSearchResponse,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+  THREAD_MESSAGE_SEARCH_ROUTES,
+} from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -201,6 +242,8 @@ import {
  */
 export interface WebAdminRuntime {
   request: TeamApiRequest;
+  /** The same requests, with a response of up to one file of the web file limit, such as a transfer file. */
+  download: TeamApiRequest;
   team: ServerAdminPort;
 }
 
@@ -225,6 +268,9 @@ type WebMessageDelete =
   | { kind: "agent"; agentId: string; messageId: string }
   | { kind: "channel"; channelId: string; messageId: string };
 
+/** The chat whose history `chat-history-v1` deletes: the agent's own chat, or a channel. */
+type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   /** The status connections of the hosts that this tab has not opened. */
@@ -244,8 +290,18 @@ export interface WebWorkspaceRuntime {
   respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
-  /** The host's channel routes. A channel page arrives without host file URLs. */
-  channels?: TeamChannelsApi;
+  /**
+   * The host's channel routes. A channel page arrives without host file URLs, and a channel image
+   * arrives as a data URL. `setChannelImage` needs `channel-picture-v1`.
+   */
+  channels?: TeamChannelsApi & {
+    setChannelImage(input: SetChannelImageInput): Promise<Channel>;
+    /**
+     * Calls `listener` after channel images that a list did not wait for have arrived, so that the
+     * caller lists again. Returns the function that removes it. A runtime that gives images at once has none.
+     */
+    onPictures?(listener: () => void): () => void;
+  };
   /** The team member this connection signs in as, which is how the host names this reader's messages. */
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
@@ -269,6 +325,8 @@ export interface WebWorkspaceRuntime {
   conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
+  /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
+  markUnreadFrom(agentId: string, fromMessageId: string): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
   /**
@@ -276,6 +334,24 @@ export interface WebWorkspaceRuntime {
    * without it refuses before a request goes out.
    */
   deleteMessage?: (input: WebMessageDelete) => Promise<void>;
+  /**
+   * "Compact now" for an agent's own chat, or for one side thread with `taskId`, with
+   * `context-compact-v1`. A host without it refuses before a request goes out.
+   */
+  compactContext?: (agentId: string, taskId?: string) => Promise<void>;
+  /**
+   * "Delete history" of an agent's own chat or of a channel, with `chat-history-v1`. A host without
+   * it refuses before a request goes out.
+   */
+  deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
+  /** "New conversation" in a channel, with `chat-history-v1`. */
+  clearChannelContext?: (channelId: string) => Promise<void>;
+  /** "Compact context" of a channel, with `chat-history-v1`. */
+  compactChannelContext?: (channelId: string) => Promise<void>;
+  /** The open waits of an agent, with `agent-waits-v1`. A host without it refuses before a request goes out. */
+  listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
+  /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
+  cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -361,8 +437,19 @@ export interface WebWorkspaceRuntime {
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
-  /** Searches one agent's conversation, or every conversation on the host when `agentId` is not set. */
-  search(agentId: string | undefined, query: string, cursor?: string): Promise<ConversationSearchPage>;
+  /**
+   * Searches one agent's conversation, or every conversation on the host when `agentId` is not set.
+   * `includeSideThreads` also searches the side threads when the host serves `thread-message-search-v1`;
+   * an older host searches the agents' own chats.
+   */
+  search(
+    agentId: string | undefined,
+    query: string,
+    cursor?: string,
+    includeSideThreads?: boolean,
+  ): Promise<ConversationSearchPage>;
+  /** Searches the files of the agent chats by name. Needs `conversation-file-search-v1`. */
+  searchFiles?: (query: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /**
    * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
    * does. The browser then sends no end request, which the revoked cookie would only have refused.
@@ -420,6 +507,16 @@ interface WebConnectionDependencies {
   /** The channel between the tabs of the account. Without one, this tab keeps no status connections. */
   openHostChannel?: (accountId: string) => BroadcastChannel | null;
 }
+
+/** The fields of a move to another model at a usage limit. */
+const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
+  "agentId",
+  "provider",
+  "model",
+  "reasoningEffort",
+  "providerAccountId",
+  "leaveUsageLimit",
+]);
 
 function hostProtocolKey(accountId: string, hostId: string): string {
   return `openbot.web.host-protocol:${accountId}:${hostId}`;
@@ -710,9 +807,39 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     return decode(await request(method, path, body, upload));
   }
+  async function teamApiDownload<T>(
+    method: string,
+    path: string,
+    decode: (value: unknown) => T,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<T> {
+    return decode(await request(method, path, body, upload, WEB_FILE_DOWNLOAD));
+  }
   function requireHost(): RemoteTeamHost {
     if (!connectedHost) throw new Error(currentText().t("webClient.error.hostNotConnected"));
     return connectedHost;
+  }
+  /**
+   * Puts a new agent on the account that the user chose, as on the desktop. The agent exists, so a
+   * failed or unsupported account change does not fail the create: it keeps the provider's own sign-in.
+   */
+  async function withCreatedAgentAccount(
+    agent: ClientAgentSummary,
+    accountId: string | undefined,
+  ): Promise<ClientAgentSummary> {
+    if (
+      accountId === undefined ||
+      accountId === DEFAULT_PROVIDER_ACCOUNT_ID ||
+      !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY)
+    )
+      return agent;
+    return runTeamEffect(
+      setAgentProviderAccount(teamApi, { agentId: agent.id, accountId }).pipe(Effect.mapError((error) => error.cause)),
+    ).then(
+      () => ({ ...agent, providerAccountId: accountId }),
+      () => agent,
+    );
   }
   async function listChatColors(): Promise<ChatColors> {
     if (!capabilities.includes(CHAT_COLORS_CAPABILITY)) return { agents: [], members: [] };
@@ -733,6 +860,7 @@ export function createWebWorkspaceRuntime(
   }
   const admin: WebAdminRuntime = {
     request: teamApi,
+    download: teamApiDownload,
     team: {
       async getPresence() {
         const value = await request("GET", TEAM_API_ROUTES.team.presence);
@@ -780,7 +908,78 @@ export function createWebWorkspaceRuntime(
       revokeInvite: (inviteId) => runTeamEffect(directory.revokeInvite(inviteId)),
     },
   };
-  const channels = teamChannelsApi(teamApi);
+  const routinesOnce = () => capabilities.includes(ROUTINES_ONCE_CAPABILITY);
+  const channels = teamChannelsApi(teamApi, routinesOnce, true);
+  // The host sends an `openbot-avatar:` URL for a channel image, which only the desktop app can open.
+  // The image comes through the host connection, one read for each channel and version, and at most
+  // `CHANNEL_PICTURE_READS` reads at the same time. A failed read shows the channel without its image
+  // until the image gets a new version. A channel list does not wait for the reads: it shows the images
+  // that are already here, and the `onPictures` listeners list again when new ones arrive.
+  const channelPictures = new Map<string, ChannelPicture>();
+  const pictureListeners = new Set<() => void>();
+  let pictureReads = 0;
+  const waitingPictureReads: (() => void)[] = [];
+  async function pictureSlot<T>(read: () => Promise<T>): Promise<T> {
+    if (pictureReads >= CHANNEL_PICTURE_READS) await new Promise<void>((resolve) => waitingPictureReads.push(resolve));
+    pictureReads += 1;
+    try {
+      return await read();
+    } finally {
+      pictureReads -= 1;
+      waitingPictureReads.shift()?.();
+    }
+  }
+  /** The picture of one channel version, and whether this call started its read. Null: no picture to read. */
+  function channelPicture(channelId: string, source: string): { picture: ChannelPicture; started: boolean } | null {
+    const version = capabilities.includes(CHANNEL_PICTURE_CAPABILITY) ? channelPictureVersion(source, channelId) : null;
+    if (!version) return null;
+    const known = channelPictures.get(channelId);
+    if (known?.source === source) return { picture: known, started: false };
+    const path = `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId, v: version })}`;
+    const picture: ChannelPicture = {
+      source,
+      url: undefined,
+      read: pictureSlot(() => request("GET", path)).then(
+        (value) =>
+          isDynamicRecord(value) &&
+          isString(value.mimeType) &&
+          isAvatarMimeType(value.mimeType) &&
+          isString(value.base64)
+            ? `data:${value.mimeType};base64,${value.base64}`
+            : null,
+        () => null,
+      ),
+    };
+    void picture.read.then((url) => {
+      picture.url = url;
+    });
+    channelPictures.set(channelId, picture);
+    return { picture, started: true };
+  }
+  function readChannelPicture(channelId: string, source: string): Promise<string | null> {
+    return channelPicture(channelId, source)?.picture.read ?? Promise.resolve(null);
+  }
+  async function withChannelPicture<T extends Channel>(channel: T): Promise<T> {
+    const source = channel.imageUrl;
+    if (!source?.startsWith("openbot-avatar:")) return channel;
+    return { ...channel, imageUrl: await readChannelPicture(channel.id, source) };
+  }
+  /** The channels with the images that are here now. The reads that this list starts end after it. */
+  function withKnownChannelPictures<T extends Channel>(list: T[]): T[] {
+    const started: Promise<string | null>[] = [];
+    const listed = list.map((channel) => {
+      const source = channel.imageUrl;
+      if (!source?.startsWith("openbot-avatar:")) return channel;
+      const entry = channelPicture(channel.id, source);
+      if (entry?.started) started.push(entry.picture.read);
+      return { ...channel, imageUrl: entry?.picture.url ?? null };
+    });
+    if (started.length)
+      void Promise.all(started).then((urls) => {
+        if (urls.some((url) => url !== null)) for (const listener of pictureListeners) listener();
+      });
+    return listed;
+  }
   /** The routine flow routes, sent only to a host that negotiated them. */
   async function routineFlowsRequest<T>(
     method: string,
@@ -793,7 +992,7 @@ export function createWebWorkspaceRuntime(
     return teamApi(method, path, decode, body);
   }
   const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi);
+  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -1036,11 +1235,21 @@ export function createWebWorkspaceRuntime(
     },
     channels: {
       ...channels,
+      async listChannels() {
+        return withKnownChannelPictures(await channels.listChannels());
+      },
+      onPictures(listener) {
+        pictureListeners.add(listener);
+        return () => {
+          pictureListeners.delete(listener);
+        };
+      },
       async readChannel(input) {
         const page = await channels.readChannel(input);
         // A host file URL must not reach the browser; attachments are downloaded through the host.
         return {
           ...page,
+          channel: await withChannelPicture(page.channel),
           messages: page.messages.map((entry) => {
             const attachments = entry.message.attachments;
             if (!attachments) return entry;
@@ -1057,7 +1266,22 @@ export function createWebWorkspaceRuntime(
       async channelCommand(command) {
         const channel = await channels.channelCommand(command);
         if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
-        return channel;
+        return withChannelPicture(channel);
+      },
+      async setChannelImage({ channelId, image }) {
+        if (!capabilities.includes(CHANNEL_PICTURE_CAPABILITY))
+          throw new Error(currentText().t("error.team.channelPictureUnsupported"));
+        const path = `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId })}`;
+        const value = image
+          ? await request(
+              "PUT",
+              path,
+              {},
+              { name: "channel-image", mimeType: image.mimeType, base64: bytesToBase64(image.bytes) },
+            )
+          : await request("DELETE", path);
+        if (!isChannel(value)) throw new Error(currentText().t("error.remote.invalidData"));
+        return withChannelPicture(value);
       },
     },
     async currentMemberId() {
@@ -1142,6 +1366,13 @@ export function createWebWorkspaceRuntime(
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
+    async markUnreadFrom(agentId, fromMessageId) {
+      if (!capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY))
+        throw new Error(currentText().t("error.backend.markUnreadRemoteUnsupported"));
+      const value = await request("POST", CONVERSATION_UNREAD_FROM_ROUTE, { agentId, fromMessageId });
+      if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
+      return value;
+    },
     async focusUse() {
       await request("POST", FOCUS_USE_ROUTES.ping);
     },
@@ -1155,6 +1386,38 @@ export function createWebWorkspaceRuntime(
           channelId: input.channelId,
           messageId: input.messageId,
         });
+    },
+    async compactContext(agentId, taskId) {
+      if (!capabilities.includes(CONTEXT_COMPACT_CAPABILITY))
+        throw new Error(currentText().t("error.team.contextCompactUnsupported"));
+      if (taskId === undefined) await request("POST", CONTEXT_COMPACT_ROUTES.compact, { agentId });
+      else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId });
+    },
+    async deleteHistory(input) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.historyDeleteUnsupported"));
+      if (input.kind === "agent") await request("POST", CHAT_HISTORY_ROUTES.agentDelete, { agentId: input.agentId });
+      else await request("POST", CHAT_HISTORY_ROUTES.channelDelete, { channelId: input.channelId });
+    },
+    async clearChannelContext(channelId) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.channelContextUnsupported"));
+      await request("POST", CHAT_HISTORY_ROUTES.channelClear, { channelId });
+    },
+    async compactChannelContext(channelId) {
+      if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
+        throw new Error(currentText().t("error.team.channelContextUnsupported"));
+      await request("POST", CHAT_HISTORY_ROUTES.channelCompact, { channelId });
+    },
+    async listWaits(agentId) {
+      if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
+      return decodeAgentWaitsResponse(await request("POST", AGENT_WAITS_ROUTES.list, { agentId }));
+    },
+    async cancelWait(agentId, waitId) {
+      if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
+      await request("POST", AGENT_WAITS_ROUTES.cancel, { agentId, waitId });
     },
     async conversationReads() {
       const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
@@ -1391,10 +1654,12 @@ export function createWebWorkspaceRuntime(
     },
     async createAgent(input) {
       // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-      const { avatarColor, ...profile } = input;
+      // The released route does not carry the account either, so it goes on `provider-accounts-v1`
+      // after it, as on the desktop.
+      const { avatarColor, providerAccountId, ...profile } = input;
       const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...profile });
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      const agent: ClientAgentSummary = value;
+      const agent: ClientAgentSummary = await withCreatedAgentAccount(value, providerAccountId);
       if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
       // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
       const colored = await runTeamEffect(
@@ -1423,9 +1688,31 @@ export function createWebWorkspaceRuntime(
       return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
+      // A move at a usage limit also sends the held message, so it goes on `agent-usage-limit-v1`. The
+      // move carries only the model fields.
+      if (input.leaveUsageLimit !== undefined) {
+        const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+        if (
+          input.leaveUsageLimit !== true ||
+          provider === undefined ||
+          model === undefined ||
+          reasoningEffort === undefined ||
+          !capabilities.includes(AGENT_USAGE_LIMIT_CAPABILITY) ||
+          Object.entries(input).some(([key, value]) => value !== undefined && !USAGE_LIMIT_MOVE_FIELDS.has(key))
+        )
+          throw new Error(currentText().t("error.team.usageLimitUnsupported"));
+        await request("POST", AGENT_USAGE_LIMIT_ROUTES.switch, {
+          agentId,
+          provider,
+          model,
+          reasoningEffort,
+          ...(providerAccountId ? { providerAccountId } : {}),
+        });
+        return;
+      }
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the
       // profile: a provider change there returns the agent to the new provider's own sign-in.
-      // Backup models stay on the host computer: the Team API does not carry them.
+      // Backup models go on `agent-backup-models-v1` before this call: the agent route does not carry them.
       const {
         providerAccountId,
         backupModels: _backupModels,
@@ -1484,7 +1771,15 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.membersCannotDeleteAgents"));
       await Effect.runPromise(deleteAgent(teamApi, agentId).pipe(Effect.mapError((error) => error.cause)));
     },
-    async search(agentId, query, cursor) {
+    async search(agentId, query, cursor, includeSideThreads = false) {
+      // Only `thread-message-search-v1` names the side thread of a result.
+      if (includeSideThreads && capabilities.includes(THREAD_MESSAGE_SEARCH_CAPABILITY))
+        return teamApi("POST", THREAD_MESSAGE_SEARCH_ROUTES.search, decodeThreadMessageSearchResponse, {
+          query,
+          agentId: agentId ?? null,
+          cursor: cursor ?? null,
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+        });
       const params = new URLSearchParams({
         ...(agentId ? { botId: agentId } : {}),
         q: query,
@@ -1505,6 +1800,16 @@ export function createWebWorkspaceRuntime(
         return { agentId: item.agentId, message: item.message };
       });
       return { results, total: value.total, nextCursor: value.nextCursor };
+    },
+    async searchFiles(query, cursor) {
+      // The workspace hides the Files filter while the host does not serve `conversation-file-search-v1`.
+      if (!capabilities.includes(CONVERSATION_FILE_SEARCH_CAPABILITY))
+        throw new Error(currentText().t("error.team.conversationFileSearchUnsupported"));
+      return teamApi("POST", CONVERSATION_FILE_SEARCH_ROUTES.search, decodeConversationFileSearchResponse, {
+        query,
+        cursor: cursor ?? null,
+        limit: CONVERSATION_FILE_SEARCH_PAGE_LIMIT,
+      });
     },
     async dispose(options) {
       if (options?.sessionsEnded) sessionsEnded = true;
@@ -1535,6 +1840,27 @@ export function createWebWorkspaceRuntime(
 const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
 /** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */
 const WEB_FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: WEB_FILE_BYTES };
+
+/** A channel image read through the host. `url` stays undefined until `read` ends; null: no image. */
+interface ChannelPicture {
+  source: string;
+  url: string | null | undefined;
+  read: Promise<string | null>;
+}
+
+/** Channel image reads that run at the same time, so a long channel list does not fill the connection. */
+const CHANNEL_PICTURE_READS = 4;
+
+/** The version of the host's `openbot-avatar://channel/<id>?v=<version>` URL, as mobile reads it. */
+function channelPictureVersion(source: string, channelId: string): string | null {
+  try {
+    const url = new URL(source);
+    if (url.hostname !== "channel" || decodeURIComponent(url.pathname.slice(1)) !== channelId) return null;
+    return url.searchParams.get("v") || null;
+  } catch {
+    return null;
+  }
+}
 
 function decodeWebFile(value: unknown): WebFile {
   if (!isDynamicRecord(value)) throw new Error(currentText().t("error.remote.invalidData"));

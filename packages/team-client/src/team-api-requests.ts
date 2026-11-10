@@ -87,6 +87,7 @@ import {
   AGENT_MEMORY_INCLUSION_ROUTE,
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { AGENT_QUEUE_TASK_ROUTES } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_BRANCHES_ROUTES,
@@ -120,6 +121,17 @@ import {
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
+import {
+  createOnceAgentRoutine,
+  createOnceChannelRoutine,
+  isOnceSchedule,
+  listOnceAgentRoutines,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
+  updateChannelRoutineOnce,
+} from "./routines-once";
 
 export class TeamRequestError extends Schema.TaggedError<TeamRequestError>()("TeamRequestError", {
   cause: Schema.Defect(),
@@ -290,6 +302,14 @@ export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
           ...(clientMessageId === undefined ? {} : { clientMessageId }),
         }),
   );
+});
+
+/** Moves a queued message of the agent's own chat into a new task. Send it only to a host with `agent-queue-task-v1`. */
+export const runQueuedMessageAsAgentTask = Effect.fn("TeamClient.runQueuedMessageAsAgentTask")(function* (
+  request: TeamApiRequest,
+  { agentId, deliveryId }: { agentId: string; deliveryId: string },
+): Effect.fn.Return<AgentTask, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_QUEUE_TASK_ROUTES.run, decodeAgentTask, { agentId, deliveryId }));
 });
 
 /**
@@ -620,25 +640,52 @@ function withoutHostImage<T extends { imageUrl?: string | null }>(channel: T): T
   return channel.imageUrl ? { ...channel, imageUrl: null } : channel;
 }
 
-/** Every channel route is a POST with the channel in the body, except the list. */
-export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
+/**
+ * Every channel route is a POST with the channel in the body, except the list. With `once`, for a host
+ * with `routines-once-v1`, the routine list adds the `once` routines and every routine update goes to
+ * its routes. With `keepHostImage`, a channel keeps the host's image URL, for a caller that reads the
+ * image through the `channel-picture-v1` image route.
+ */
+export function teamChannelsApi(
+  request: TeamApiRequest,
+  once: () => boolean = () => false,
+  keepHostImage = false,
+): TeamChannelsApi {
+  const image = <T extends { imageUrl?: string | null }>(channel: T): T =>
+    keepHostImage ? channel : withoutHostImage(channel);
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
+  const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
   return {
-    listChannels: async () => (await request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries)).map(withoutHostImage),
+    listChannels: async () => (await request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries)).map(image),
     readChannel: async (input) => {
       const page = await post(CHANNEL_ROUTES.read, decodeChannelPage, input);
-      return { ...page, channel: withoutHostImage(page.channel) };
+      return { ...page, channel: image(page.channel) };
     },
-    channelCommand: async (command) => withoutHostImage(await post(CHANNEL_ROUTES.command, decodeChannel, command)),
+    channelCommand: async (command) => image(await post(CHANNEL_ROUTES.command, decodeChannel, command)),
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),
     deleteChannelMemory: (input) => post(CHANNEL_ROUTES.memoryDelete, ignoreResponse, input),
     clearChannelMemories: (channelId) => post(CHANNEL_ROUTES.memoryClear, ignoreResponse, { channelId }),
-    listChannelRoutines: (channelId) => post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }),
-    createChannelRoutine: (input) => post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input),
-    updateChannelRoutine: (input) => post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input),
+    listChannelRoutines: async (channelId) => {
+      const routines = post(CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId });
+      if (!once()) return routines;
+      const [released, onceRoutines] = await Promise.all([routines, listOnceChannelRoutines(send, channelId)]);
+      return [...released, ...onceRoutines];
+    },
+    createChannelRoutine: (input) => {
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, once());
+        return createOnceChannelRoutine(send, input);
+      }
+      return post(CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, input);
+    },
+    updateChannelRoutine: (input) => {
+      if (once()) return updateChannelRoutineOnce(send, input);
+      requireReleasedScheduleOn(input.schedule, false);
+      return post(CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, input);
+    },
     deleteChannelRoutine: (input) => post(CHANNEL_ROUTES.routineDelete, ignoreResponse, input),
     testChannelRoutine: (input) => post(CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, input),
     listChannelRoutineRuns: (input) => post(CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, input),
@@ -670,12 +717,16 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
 
 /**
  * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
- * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes.
+ * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes. They
+ * also leave out the `once` routines, so with `once`, for a host with `routines-once-v1`, the list
+ * adds them and every routine update goes to their routes, which save the place too.
  */
 export function teamAgentRoutinesApi(
   request: TeamApiRequest,
   runPlaces: () => boolean = () => false,
+  once: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
+  const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
   // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
   // and a second save does not make a second routine.
   const withRunPlace = async (
@@ -695,15 +746,24 @@ export function teamAgentRoutinesApi(
   return {
     listRoutines: async (agentId) => {
       const routines = request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-      if (!runPlaces()) return routines;
-      const [list, places] = await Promise.all([
+      const onceRoutines = once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]);
+      if (!runPlaces()) {
+        const [released, extra] = await Promise.all([routines, onceRoutines]);
+        return [...released, ...extra];
+      }
+      const [list, places, extra] = await Promise.all([
         routines,
         request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
+        onceRoutines,
       ]);
-      return withRoutineRunPlaces(list, places);
+      return [...withRoutineRunPlaces(list, places), ...extra];
     },
-    createRoutine: async ({ runIn, ...input }) =>
-      withRunPlace(
+    createRoutine: async ({ runIn, ...input }) => {
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, once());
+        return createOnceAgentRoutine(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+      }
+      return withRunPlace(
         await request(
           "POST",
           TEAM_API_ROUTES.agent.routines(input.agentId),
@@ -712,9 +772,12 @@ export function teamAgentRoutinesApi(
         ),
         runIn,
         true,
-      ),
-    updateRoutine: async ({ runIn, ...input }) =>
-      withRunPlace(
+      );
+    },
+    updateRoutine: async ({ runIn, ...input }) => {
+      if (once()) return updateAgentRoutineOnce(send, { ...input, ...(runIn === undefined ? {} : { runIn }) });
+      requireReleasedScheduleOn(input.schedule, false);
+      return withRunPlace(
         await request(
           "PATCH",
           TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
@@ -722,7 +785,8 @@ export function teamAgentRoutinesApi(
           decodeTeamProtocolV2Json(input),
         ),
         runIn,
-      ),
+      );
+    },
     deleteRoutine: ({ agentId, routineId }) =>
       request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse),
     testRoutine: ({ agentId, routineId }) =>

@@ -634,6 +634,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex 实时语音",
   "settings.voice.speech.codexLive.description":
     "与任何智能体的语音对话都会通过你的 Codex 登录使用 OpenAI 实时语音。你的语音、你的请求和智能体的回复会发送给 OpenAI。",
+  "settings.voice.speech.codexLive.serverDescription":
+    "与任何智能体的语音对话都会通过服务器的 Codex 登录使用 OpenAI 实时语音。你的语音、你的请求和智能体的回复会发送给 OpenAI。",
   "settings.voice.speech.speed.title": "语速",
   "settings.voice.speech.voice.title": "声音",
   "settings.voice.speech.voice.female": "女声 {number}",

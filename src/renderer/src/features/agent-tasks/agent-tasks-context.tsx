@@ -23,7 +23,7 @@ const AgentTasks = createSimpleContext({
     return createAgentTasks({
       port: agentTasksPort,
       activeAgentId,
-      local,
+      queuedMessageMovable: () => local() || activeServerSupportsCapability("agent-queue-task-v1"),
       available: () => local() || activeServerSupportsCapability("agent-tasks-v1"),
       editable: () => local() || activeServerSupportsCapability("agent-threads-v1"),
       readable: () => local() || activeServerSupportsCapability("agent-thread-reads-v1"),

@@ -368,7 +368,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
   "server.settings.hostKeyChanged": "Último cambio",
   "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
-  "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
+  "server.settings.hostKeyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":
     "Elimina este servidor del servicio de cuentas para todos los miembros. Úsalo cuando su equipo ya no esté disponible.",

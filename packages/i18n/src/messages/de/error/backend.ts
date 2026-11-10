@@ -227,8 +227,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Dieser Agent hat keine Routine mit dieser ID.",
   "error.backend.agentWaitNoRoutine":
     "Nur eine Ausführung einer deiner Routinen weckt einen Wartevorgang, und du hast keine Routine. Erstelle eine mit openbot.create_routine und öffne dann den Wartevorgang.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Offene Wartevorgänge sind nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.markUnreadRemoteUnsupported":
     "Eine Nachricht als ungelesen markieren ist nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.messageDeleteUnsupported": "Dieser Server unterstützt das Löschen von Nachrichten nicht.",

@@ -116,6 +116,8 @@ export interface ProviderClaudeUserSetup {
   pending: boolean;
   /** A load or a save that failed. */
   error: string | null;
+  /** The switch of a joined server: the agents load the setup of the host's user, on the host. */
+  remote?: boolean;
   onChange: (enabled: boolean) => void;
 }
 
@@ -1560,16 +1562,17 @@ function PromptCacheSection(props: {
  */
 function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disabled: boolean | undefined }) {
   const { t } = useText();
+  function claudeUserSetupDescription(): string {
+    if (props.setup.remote === true) return t("provider.settings.claudeUserSetupServerDescription");
+    return t("provider.settings.claudeUserSetupDescription");
+  }
   return (
     <SettingsSection title={t("provider.settings.claudeSetup")}>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row">
           <ItemContent>
             <ItemTitle id="provider-settings-claude-setup-label">{t("provider.settings.claudeUserSetup")}</ItemTitle>
-            <Show
-              when={props.setup.error}
-              fallback={<ItemDescription>{t("provider.settings.claudeUserSetupDescription")}</ItemDescription>}
-            >
+            <Show when={props.setup.error} fallback={<ItemDescription>{claudeUserSetupDescription()}</ItemDescription>}>
               {(message) => (
                 <ItemDescription class="provider-settings-error" role="alert">
                   {message()}

@@ -142,6 +142,7 @@ export const messages = {
   // Sağlayıcı adımında ve Ayarlar'da otomatik algılama. OpenBot yerel model sunucularını
   // varsayılan adreslerinde ve PATH'teki bilinen ACP ajanı komutlarını arar.
   "customProvider.detected.title": "Bu bilgisayarda bulundu",
+  "customProvider.detected.titleServer": "Sunucuda bulundu",
   "customProvider.detected.scanning": "Yerel modeller ve ajanlar aranıyor.",
   "customProvider.detected.scanAgain": "Tekrar tara",
   "customProvider.detected.empty": "OpenBot yerel bir model sunucusu veya ACP ajanı bulamadı.",
@@ -166,6 +167,8 @@ export const messages = {
   "customProvider.detection.enabled": "Yerel modelleri ve ajanları ara",
   "customProvider.detection.enabledDescription":
     "OpenBot, Ollama ve LM Studio'nun varsayılan adreslerini kontrol eder ve PATH'inizde bilinen ACP ajanlarını arar.",
+  "customProvider.detection.enabledDescriptionServer":
+    "Sunucu, Ollama ve LM Studio'nun varsayılan adreslerini kontrol eder ve kendi PATH'inde bilinen ACP ajanlarını arar.",
   "customProvider.detection.addresses": "Diğer model sunucusu adresleri",
   "customProvider.detection.address.label": "{number}. adres",
   "customProvider.detection.address.remove": "{number}. adresi kaldır",
@@ -187,6 +190,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Küçük harfler, rakamlar veya kısa çizgiler. Daha sonra değiştiremezsiniz.",
   "customProvider.acp.command": "Komut",
   "customProvider.acp.commandHint": "Başlatılacak program. OpenBot bunu PATH'inizde arar.",
+  "customProvider.acp.commandHintServer": "Başlatılacak program. Sunucu onu kendi PATH'inde arar.",
   "customProvider.acp.args": "Bağımsız değişkenler",
   "customProvider.acp.argsHint":
     "Bağımsız değişkenleri boşluklarla ayırın. Boşluk içeren bir bağımsız değişkenin etrafına tırnak işareti koyun.",
@@ -213,6 +217,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Bu komut bilgisayarınızda çalışır",
   "customProvider.acp.trustDescription":
     "OpenBot bunu kullanıcı hesabınızla başlatır. Ajan dosyaları okuyabilir, değiştirebilir ve komutlar çalıştırabilir. Yalnızca güvendiğiniz bir ajanı ekleyin.",
+  "customProvider.acp.hostTrustTitle": "Bu komut sunucuda çalışır",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot bunu sunucunun kullanıcı hesabıyla başlatır. Ajan sunucudaki dosyaları okuyabilir, değiştirebilir ve orada komutlar çalıştırabilir. Yalnızca güvendiğiniz bir ajanı ekleyin.",
   "customProvider.acp.submit": "Ajan ekle",
   "customProvider.acp.editTitle": "Özel ACP ajanını düzenle",
   "customProvider.acp.submitEdit": "Ajanı kaydet",
@@ -231,6 +238,7 @@ export const messages = {
   // Ayarlar'daki kullanıcının kendi ACP ajanları. Her biri OpenBot'un bu bilgisayarda başlattığı bir komuttur.
   "customProvider.agents.title": "Özel ajanlar",
   "customProvider.agents.description": "OpenBot'un bu bilgisayarda başlattığı ACP ajanları.",
+  "customProvider.agents.hostDescription": "OpenBot'un sunucunun bilgisayarında başlattığı ACP ajanları.",
   "customProvider.agents.empty": "Henüz özel ajan yok.",
   "customProvider.agents.add": "Ajan ekle",
   "customProvider.agents.restart": "Ajanları yeniden başlat",

@@ -16,7 +16,10 @@ export interface VaultCalls {
   remove(id: string): Promise<VaultState>;
   reveal(request: VaultSecretRequest): Promise<string>;
   copy(request: VaultSecretRequest): Promise<void>;
-  /** Absent for a joined server: the CSV file is on this computer, not on the host. */
+  /**
+   * The file dialog opens on this computer. Absent for a joined server without `vault-import-v1`, and
+   * in the web client, which has no file dialog of its own.
+   */
   importCsv?: (() => Promise<VaultImportResult>) | undefined;
   reset(): Promise<VaultState>;
   /** The current two-step code of each login that has a key. Empty for a host without `vault-v3`. */
@@ -47,7 +50,7 @@ export function desktopVaultCalls(): VaultCalls {
  * so it cannot show an item again that the user just deleted.
  */
 export function remoteVaultCalls(
-  calls: Omit<VaultCalls, "onChanged" | "importCsv">,
+  calls: Omit<VaultCalls, "onChanged">,
   changes: (read: () => void) => () => void,
 ): VaultCalls {
   let generation = 0;
@@ -62,6 +65,7 @@ export function remoteVaultCalls(
     save: change(calls.save),
     remove: change(calls.remove),
     reset: change(calls.reset),
+    ...(calls.importCsv ? { importCsv: change(calls.importCsv) } : {}),
     onChanged: (listener) =>
       changes(() => {
         const current = ++generation;
@@ -77,9 +81,10 @@ export function remoteVaultCalls(
 
 /**
  * The desktop calls for a joined server. Main copies a secret, so it does not pass through this
- * window. A change on the host, or a connection that comes back, reads the list again.
+ * window. A change on the host, or a connection that comes back, reads the list again. `importable`
+ * is true while the host serves `vault-import-v1`: main then sends the text of the chosen CSV file.
  */
-export function hostVaultCalls(serverId: string): VaultCalls {
+export function hostVaultCalls(serverId: string, importable: boolean): VaultCalls {
   const vault = () => window.openbot.vault;
   return remoteVaultCalls(
     {
@@ -90,6 +95,7 @@ export function hostVaultCalls(serverId: string): VaultCalls {
       copy: (request) => vault().hostCopy(request, serverId),
       reset: () => vault().hostReset(serverId),
       codes: () => vault().hostCodes(serverId),
+      ...(importable ? { importCsv: () => vault().hostImportCsv(serverId) } : {}),
     },
     (read) => {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {

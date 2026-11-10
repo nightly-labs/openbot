@@ -1,5 +1,14 @@
-import { type ClientAgentSummary, GROK_BOT_EXPORT_URL, resolveRemoteAgentImportResult } from "@openbot/contracts/ipc";
+import {
+  type ClientAgentSummary,
+  decodeRemoteAgentImportResult,
+  GROK_BOT_EXPORT_URL,
+  resolveRemoteAgentImportResult,
+} from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import {
+  decodeHermesImportReadResponse,
+  HERMES_IMPORT_ROUTES,
+} from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
   applyAgentImport,
   discardAgentImport,
@@ -14,7 +23,7 @@ import { openWebLink } from "./web-attachments";
 import { chooseFiles } from "./web-channels-runtime";
 
 /** The file's bytes as Base64, read by the browser rather than byte by byte. */
-function readBase64(file: Blob): Promise<string> {
+export function readBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => {
@@ -31,7 +40,8 @@ function readBase64(file: Blob): Promise<string> {
 /**
  * Server settings > Import in the browser client: the export goes to the connected host in parts
  * with `agent-import-v2`, or with `agent-import-v1`. The export skill ships with the web client,
- * and saving it downloads it.
+ * and saving it downloads it. The host reads its own Hermes folder with `hermes-import-v1`; the
+ * panel offers it only when the host has it.
  */
 export function createWebAgentImportCalls(options: {
   request: (serverId: string) => TeamApiRequest;
@@ -93,6 +103,26 @@ export function createWebAgentImportCalls(options: {
     },
     openExportAgent() {
       void openWebLink(GROK_BOT_EXPORT_URL);
+    },
+    // No folder choice: a browser cannot name a folder of the host.
+    hermes: {
+      readHermes: (serverId) =>
+        options.request(serverId)("POST", HERMES_IMPORT_ROUTES.read, decodeHermesImportReadResponse, {}),
+      async applyHermes(input, serverId) {
+        const result = await options.request(serverId)(
+          "POST",
+          HERMES_IMPORT_ROUTES.apply,
+          decodeRemoteAgentImportResult,
+          {
+            token: input.token,
+            profiles: input.profiles.map((profile) => ({ key: profile.key, allow: profile.allow })),
+          },
+        );
+        return resolveRemoteAgentImportResult(result, await options.listAgents());
+      },
+      async discardHermes(token, serverId) {
+        await options.request(serverId)("POST", HERMES_IMPORT_ROUTES.discard, () => undefined, { token });
+      },
     },
   };
 }

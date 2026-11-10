@@ -681,6 +681,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "صوت Codex المباشر",
   "settings.voice.speech.codexLive.description":
     "تستخدم المحادثات الصوتية مع أي وكيل الصوت المباشر من OpenAI بتسجيل دخولك إلى Codex. يُرسَل صوتك وطلباتك وردود الوكيل إلى OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "تستخدم المحادثات الصوتية مع أي وكيل الصوت المباشر من OpenAI بتسجيل دخول الخادم إلى Codex. يُرسَل صوتك وطلباتك وردود الوكيل إلى OpenAI.",
   "settings.voice.speech.speed.title": "السرعة",
   "settings.voice.speech.voice.title": "الصوت",
   "settings.voice.speech.voice.female": "صوت أنثوي {number}",

@@ -38,6 +38,7 @@ import { webReportsEnabled } from "../../error-reports";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
+import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
 const TABS = ["profile", "preferences"] as const;
@@ -96,6 +97,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const sendShortcutMode = useSendShortcutMode();
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const webLiveVoice = useWebLiveVoice();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
@@ -261,6 +263,17 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   <OwnChatColorTrigger value={props.account.chatColor ?? null} onChange={saveChatColor} />
                 </ItemActions>
               </Item>
+            </ItemGroup>
+          </SettingsSection>
+          {/* The choice is kept in this browser and holds for each server that serves live voice. */}
+          <SettingsSection title={t("settings.voice.live.section")}>
+            <ItemGroup class="settings-modal-card">
+              <SwitchField
+                checked={webLiveVoice()}
+                onChange={(checked) => setWebLiveVoice(checked)}
+                label={t("settings.voice.speech.codexLive.title")}
+                description={t("settings.voice.speech.codexLive.serverDescription")}
+              />
             </ItemGroup>
           </SettingsSection>
           <SettingsSection title={t("settings.analytics.title")}>

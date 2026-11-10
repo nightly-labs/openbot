@@ -695,6 +695,8 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.codexLive.title": "Codex live voice",
   "settings.voice.speech.codexLive.description":
     "Voice conversations with any agent use OpenAI live voice with your Codex sign-in. Your voice, your requests and the agent's replies go to OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Voice conversations with any agent use OpenAI live voice with the Codex sign-in of the server. Your voice, your requests and the agent's replies go to OpenAI.",
   "settings.voice.speech.speed.title": "Speed",
   "settings.voice.speech.voice.title": "Voice",
   "settings.voice.speech.voice.female": "Female voice {number}",

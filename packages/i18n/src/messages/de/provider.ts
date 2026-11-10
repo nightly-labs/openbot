@@ -249,6 +249,8 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Mein Claude-Code-Setup verwenden",
   "provider.settings.claudeUserSetupDescription":
     "Agenten laden deine CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agenten laden CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude auf dem Server. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Die Claude-Code-Einstellung konnte nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {

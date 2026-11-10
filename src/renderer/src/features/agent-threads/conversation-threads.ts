@@ -183,7 +183,9 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     },
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
     // Only this computer moves a queued message to a new thread.
-    onRunQueuedMessage: tasks.local() ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId) : undefined,
+    onRunQueuedMessage: tasks.queuedMessageMovable()
+      ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId)
+      : undefined,
     queueActions: tasks.queueActions()
       ? {
           cancel: (deliveryId) => tasks.cancelQueuedMessage(agentId, deliveryId),

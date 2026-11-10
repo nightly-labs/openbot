@@ -376,7 +376,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Ключ сервера изменён",
   "server.settings.hostKeyChanged": "Последнее изменение",
   "server.settings.hostKeyChangedDescription": "{date}. Предыдущий и новый ключи подписали это изменение.",
-  "server.settings.hostKeyLocalOnly": "Здесь ключ может сменить только сервер на этом компьютере.",
+  "server.settings.hostKeyOwnerOnly": "Сменить ключ сервера может только владелец.",
   "server.settings.removeTitle": "Удалить сервер",
   "server.settings.removeDescription":
     "Удалить этот сервер из сервиса аккаунтов для всех участников. Используйте, когда его компьютер больше недоступен.",

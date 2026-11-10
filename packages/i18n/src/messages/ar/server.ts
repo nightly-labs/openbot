@@ -446,7 +446,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "تم تغيير مفتاح الخادم",
   "server.settings.hostKeyChanged": "آخر تغيير",
   "server.settings.hostKeyChangedDescription": "{date}. وقّع المفتاح السابق والمفتاح الجديد كلاهما على هذا التغيير.",
-  "server.settings.hostKeyLocalOnly": "الخادم الموجود على هذا الحاسوب وحده يمكنه تغيير مفتاحه هنا.",
+  "server.settings.hostKeyOwnerOnly": "يمكن للمالك فقط تغيير مفتاح الخادم.",
   "server.settings.removeTitle": "إزالة الخادم",
   "server.settings.removeDescription":
     "أزل هذا الخادم من خدمة الحساب لكل الأعضاء. استخدم هذا عندما لا يعود حاسوبه متاحًا.",

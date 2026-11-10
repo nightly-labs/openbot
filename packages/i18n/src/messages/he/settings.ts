@@ -640,6 +640,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "קול חי של Codex",
   "settings.voice.speech.codexLive.description":
     "שיחות קוליות עם כל סוכן משתמשות בקול החי של OpenAI עם ההתחברות שלך ל-Codex. הקול שלך, הבקשות שלך והתשובות של הסוכן נשלחים ל-OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "שיחות קוליות עם כל סוכן משתמשות בקול החי של OpenAI עם ההתחברות של השרת ל-Codex. הקול שלך, הבקשות שלך והתשובות של הסוכן נשלחים ל-OpenAI.",
   "settings.voice.speech.speed.title": "מהירות",
   "settings.voice.speech.voice.title": "קול",
   "settings.voice.speech.voice.female": "קול נשי {number}",
