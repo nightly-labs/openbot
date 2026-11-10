@@ -225,6 +225,12 @@ export interface McpSignIn {
    */
   registrationFailed: () => boolean;
   /**
+   * Whether this attempt had to register, and the authorization server has no registration endpoint.
+   * Google's has none and takes no client metadata document either, so the SDK stops before any
+   * request with a bare sentence about dynamic client registration.
+   */
+  registrationUnsupported: () => boolean;
+  /**
    * The HTTP status of this attempt's last registration answer, or `null`. The SDK keeps the status
    * only when the body is not an OAuth error, and turns a code it does not know into a
    * `ServerError`: Dropbox answers 403 `registration_not_supported`, which arrives as a bare
@@ -547,6 +553,7 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon,
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
+      registrationUnsupported: () => provider.registrationUnsupported,
       registrationStatus: () => provider.registrationStatus,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
       cancelled: () => cancelled,
@@ -1028,6 +1035,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   get registrationPending(): boolean {
     return this.#registrationPending;
+  }
+
+  /** No client, and the authorization server's metadata names no registration endpoint. */
+  get registrationUnsupported(): boolean {
+    const metadata = this.#discoveryState?.authorizationServerMetadata;
+    return this.#registrationPending && metadata !== undefined && !metadata.registration_endpoint;
   }
 
   get registrationStatus(): number | null {
