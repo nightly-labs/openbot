@@ -2,7 +2,15 @@ import type { BrowserChallenge } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Option } from "effect";
 import type { WebContents } from "electron";
-import { automationContextId, type SendCommand } from "./browser-cdp-values";
+import {
+  automationContextId,
+  frameIds,
+  isFiniteNumber,
+  numberValue,
+  recordValue,
+  type SendCommand,
+  stringValue,
+} from "./browser-cdp-values";
 
 /** How long a snapshot waits for a check that clears by itself, such as a Cloudflare interstitial. */
 export const CHALLENGE_WAIT_MS = 15_000;
@@ -64,8 +72,7 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
     return rect.width > 100 && rect.height > 100 && getComputedStyle(element).visibility !== "hidden";
   });
   // The checkbox of a Turnstile, reCAPTCHA or hCaptcha widget of the normal size, which is 28 px from
-  // the widget's left edge and in its middle. Turnstile can put its frame in a closed shadow root, so
-  // the parent of its response field gives the widget too. A widget outside the viewport gives none.
+  // the widget's left edge and in its middle. A widget outside the viewport gives none.
   const checkbox = (() => {
     if (puzzle) return null;
     const widgets = [...document.querySelectorAll("iframe")].filter((element) => {
@@ -76,9 +83,6 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
         (!hcaptchaPassed && /hcaptcha\.com.*frame=checkbox/.test(source))
       );
     });
-    if (!turnstilePassed)
-      for (const field of document.querySelectorAll("input[name='cf-turnstile-response']"))
-        if (field.parentElement) widgets.push(field.parentElement);
     for (const widget of widgets) {
       const rect = widget.getBoundingClientRect();
       if (rect.width < 200 || rect.width > 420 || rect.height < 50 || rect.height > 100) continue;
@@ -87,8 +91,14 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
     }
     return null;
   })();
+  // Turnstile puts its frame in a closed shadow root, which this world cannot see. A Turnstile field
+  // without a token asks the main process to find the frame through CDP.
+  const turnstileField = !turnstilePassed && checkbox === null && has("input[name='cf-turnstile-response']");
+  const viewport = { width: innerWidth, height: innerHeight };
   const found = (vendor, kind, signal) =>
-    kind === "block" ? { vendor, kind, signal, checkbox: null, puzzle } : { vendor, kind, signal, checkbox, puzzle };
+    kind === "block"
+      ? { vendor, kind, signal, checkbox: null, puzzle, turnstileField: false, viewport }
+      : { vendor, kind, signal, checkbox, puzzle, turnstileField, viewport };
 
   if ((has("#cf-error-details") || has(".cf-error-code")) && /blocked|error 10(0[0-9]|20)|access denied/i.test(text))
     return found("cloudflare", "block", "cloudflare-error-page");
@@ -115,6 +125,9 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
     return found("aws-waf", "non-interactive", "aws-waf-challenge");
   if (!short) return null;
   if (!turnstilePassed && frame(/challenges\.cloudflare\.com/)) return found("turnstile", "interactive", "turnstile-frame");
+  // The main process keeps this only when it finds a visible Turnstile frame: a widget in invisible
+  // mode has a field too.
+  if (turnstileField) return found("turnstile", "interactive", "turnstile-field");
   if (!hcaptchaPassed && frame(/hcaptcha\.com/)) return found("hcaptcha", "interactive", "hcaptcha-frame");
   if (!recaptchaPassed && frame(/\/recaptcha\/(api2|enterprise)\/|recaptcha\.net/))
     return found("recaptcha", "interactive", "recaptcha-frame");
@@ -152,14 +165,69 @@ function readChallenge(value: unknown): DetectedChallenge | null {
   };
 }
 
+/** The most frames that the Turnstile lookup reads. A page with a check has few. */
+const MAX_WIDGET_FRAMES = 12;
+
+interface FrameBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The box of a visible Turnstile frame in the main document, in viewport CSS pixels. CDP names a
+ * frame's owner also inside a closed shadow root. A frame in another process is a child target.
+ */
+const turnstileFrameBox = Effect.fn("Browser.turnstileFrameBox")(function* (
+  send: SendCommand,
+  childFrameIds: readonly string[],
+) {
+  // The first frame of the tree is the page itself.
+  const local = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
+  for (const frameId of [...new Set([...local, ...childFrameIds])].slice(0, MAX_WIDGET_FRAMES)) {
+    const box = yield* Effect.gen(function* () {
+      const owner = numberValue((yield* send("DOM.getFrameOwner", { frameId })).backendNodeId);
+      if (!owner) return null;
+      const node = recordValue((yield* send("DOM.describeNode", { backendNodeId: owner })).node);
+      const attributes = Array.isArray(node?.attributes) ? node.attributes.map(stringValue) : [];
+      const source = attributes.find((_, index) => index % 2 === 1 && attributes[index - 1] === "src") ?? "";
+      if (!/challenges\.cloudflare\.com/.test(source)) return null;
+      const quad = recordValue((yield* send("DOM.getBoxModel", { backendNodeId: owner })).model)?.border;
+      const corners = Array.isArray(quad) ? quad.filter(isFiniteNumber).slice(0, 8) : [];
+      if (corners.length < 8) return null;
+      const xs = corners.filter((_, index) => index % 2 === 0);
+      const ys = corners.filter((_, index) => index % 2 === 1);
+      const left = Math.min(...xs);
+      const top = Math.min(...ys);
+      return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
+    // A detached frame or a hidden widget has no box.
+    if (box && box.width > 20 && box.height > 20) return box;
+  }
+  return null;
+});
+
+/** The checkbox of a normal-size widget, 28 px from its left edge and in its middle, as the page script finds it. */
+function widgetCheckbox(box: FrameBox, viewport: unknown): DetectedChallenge["checkbox"] {
+  const size = recordValue(viewport);
+  const width = numberValue(size?.width);
+  const height = numberValue(size?.height);
+  if (box.width < 200 || box.width > 420 || box.height < 50 || box.height > 100) return null;
+  if (box.left < 0 || box.top < 0 || box.left + box.width > width || box.top + box.height > height) return null;
+  return { x: Math.round(box.left + 28), y: Math.round(box.top + box.height / 2) };
+}
+
 /**
  * Reads the main frame for a bot check in the isolated automation world, so the page cannot change
  * what it reads. It uses CDP like the snapshot: on Linux, `executeJavaScriptInIsolatedWorld` does not
  * return for a document whose navigation was stopped. A failure or a non-web page gives `null`.
+ * `childFrameIds` names the frames in other processes, where a Turnstile widget usually is.
  */
 export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (
   contents: WebContents,
   send: SendCommand,
+  childFrameIds: readonly string[] = [],
 ) {
   if (contents.isDestroyed()) return null;
   const url = contents.getURL();
@@ -167,9 +235,14 @@ export const detectChallenge = Effect.fn("Browser.detectChallenge")(function* (
   return yield* Effect.gen(function* () {
     const contextId = yield* automationContextId(send);
     const result = yield* send("Runtime.evaluate", { expression: CHALLENGE_SCRIPT, contextId, returnByValue: true });
-    return isDynamicRecord(result.result) ? result.result.value : undefined;
+    const value = isDynamicRecord(result.result) ? result.result.value : undefined;
+    const detected = readChallenge(value);
+    if (!detected || !isDynamicRecord(value) || value.turnstileField !== true || detected.puzzle) return detected;
+    const box = yield* turnstileFrameBox(send, childFrameIds);
+    // A Turnstile field alone is no check: a widget in invisible mode passes by itself.
+    if (!box) return detected.signal === "turnstile-field" ? null : detected;
+    return { ...detected, checkbox: widgetCheckbox(box, value.viewport) };
   }).pipe(
-    Effect.map(readChallenge),
     Effect.timeoutOption(CHECK_TIMEOUT_MS),
     Effect.map((option) => Option.getOrNull(option)),
     Effect.catch(() => Effect.succeed(null)),

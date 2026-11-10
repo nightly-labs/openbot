@@ -181,9 +181,13 @@ report. Each `next` also tells the agent not to solve, reload, or retry the chec
 needs no separate rule.
 
 Many checks of the Turnstile, reCAPTCHA and hCaptcha widgets pass with one click on their checkbox.
-The script finds the widget of the normal size in the viewport (its frame, or for Turnstile, whose
-frame can be in a closed shadow root, the parent of its response field) and gives the checkbox
-point, 28 px from the left edge and in the middle. The first read of a document that needs a person
+The script finds the frame of a widget of the normal size in the viewport and gives the checkbox
+point, 28 px from the left edge and in the middle. Turnstile puts its frame in a closed shadow root,
+which the page script cannot see, and its host element is as wide as the form. When the script
+finds a Turnstile response field without a token, the main process finds the frame through CDP:
+`DOM.getFrameOwner` for each child frame, also for frames in other processes, then the frame's
+`src` and its box from `DOM.getBoxModel`. A field without a visible frame (invisible mode) is not a
+check. The first read of a document that needs a person
 then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
 ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
 that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the

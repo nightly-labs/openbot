@@ -482,6 +482,19 @@ async function main(): Promise<void> {
     );
     measurements.checkboxPassedSnapshotMs = passed.ms;
     recordCases("challenge-offers-one-click", "challenge-click-passes");
+    const shadowOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/shadow-checkbox-captcha` });
+    assert.equal(
+      shadowOffer.page.challenge?.status,
+      "click-once",
+      "A Turnstile frame in a closed shadow root did not offer its click.",
+    );
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(shadowOffer.raw).challenge.target });
+    const shadowPassed = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert(
+      shadowPassed.page.challenge === undefined || shadowPassed.page.challenge.status === "cleared",
+      `The clicked checkbox in a closed shadow root did not pass the check: ${shadowPassed.page.challenge?.status}`,
+    );
+    recordCases("challenge-click-in-closed-shadow-root");
     const stuckOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-checkbox-captcha` });
     assert.equal(stuckOffer.page.challenge?.status, "click-once");
     await call("click", { tabId: settleTab.id, target: offerSchema.parse(stuckOffer.raw).challenge.target });
@@ -676,6 +689,7 @@ const PAGES: Record<string, string> = {
   "/hcaptcha.com/checkbox": `<!doctype html><meta charset="utf-8"><label><input type="checkbox">I am human</label>`,
   "/checkbox-captcha": checkboxCaptchaPage(true),
   "/stuck-checkbox-captcha": checkboxCaptchaPage(false),
+  "/shadow-checkbox-captcha": checkboxCaptchaPage(true, true),
   // A click anywhere in the widget tells the page; the fixture page decides whether the check passes.
   "/challenges.cloudflare.com/turnstile": `<!doctype html><meta charset="utf-8">
     <body style="margin:0"><label style="display:block;height:65px;padding-left:16px">
@@ -689,12 +703,15 @@ const PAGES: Record<string, string> = {
     <script>document.querySelector("dialog").showModal();</script>`,
 };
 
-function checkboxCaptchaPage(passes: boolean): string {
+// Turnstile puts its frame in a closed shadow root, so only CDP finds it.
+function checkboxCaptchaPage(passes: boolean, shadow = false): string {
+  const frame = `<iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>`;
   return `<!doctype html><meta charset="utf-8"><title>Security check</title>
     <p>Verify you are human to continue.</p>
-    <form><div><iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>
+    <form><div><div id="widget">${shadow ? "" : frame}</div>
     <input type="hidden" name="cf-turnstile-response" value=""></div></form>
     <script>
+      if (${shadow}) document.querySelector("#widget").attachShadow({ mode: "closed" }).innerHTML = ${JSON.stringify(frame)};
       addEventListener("message", (event) => {
         if (${passes} && event.data === "turnstile-click")
           document.querySelector("[name=cf-turnstile-response]").value = "fixture-token";
