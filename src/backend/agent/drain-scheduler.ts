@@ -773,7 +773,8 @@ export class DrainScheduler {
         batch = batch.filter((item) => !failedCompanions.has(item.delivery.id));
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
-      const agent = yield* this.#store.getOrCreate(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
+      // Never `getOrCreate`: a message to a deleted agent fails, and does not bring the agent back (#6106).
+      const agent = yield* this.#store.existing(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
       // Once for the turn: its process, its session and its sandbox roots read the result.
       yield* checkAgentFolders(agent);
       requestedModel = agent.model;
@@ -1184,7 +1185,11 @@ export class DrainScheduler {
   /** Sends the agent that asked the note that its request failed. A failed note does not stop the drain. */
   #answerFailedRequest(deliveryId: string, agentId: string): Effect.Effect<void> {
     return this.#mailbox
-      .answerFailedRequest(deliveryId, (taskId) => this.#tasks.threadId(taskId) !== null)
+      .answerFailedRequest(
+        deliveryId,
+        (taskId) => this.#tasks.threadId(taskId) !== null,
+        (id) => this.#store.list().some((agent) => agent.id === id),
+      )
       .pipe(
         Effect.match({
           onFailure: (failure) => this.#hooks.emitError("failed_request_answer_failed", failure.cause, agentId),

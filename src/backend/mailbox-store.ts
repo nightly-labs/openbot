@@ -2099,6 +2099,7 @@ export class MailboxStore {
     this: MailboxStore,
     deliveryId: string,
     taskOpen: (taskId: string) => boolean,
+    agentExists: (agentId: string) => boolean,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
@@ -2108,6 +2109,8 @@ export class MailboxStore {
     const originAgentId = this.chainOriginAgentId(request.id);
     if (
       requesterId === teammateId ||
+      // The user deleted the agent that asked. A note for it would make the agent again (#6106).
+      !agentExists(requesterId) ||
       !originAgentId ||
       originAgentId === teammateId ||
       request.expectsReply === false ||
