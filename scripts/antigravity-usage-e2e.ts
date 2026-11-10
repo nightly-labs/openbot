@@ -21,14 +21,15 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-usage-e2e");
 
-/** The answer of Antigravity 1.4.1's `format_usage_message` for a Google sign-in. */
+/** A Google sign-in answer with the grouped Gemini 5-hour and weekly limits. */
 const GOOGLE_ANSWER = [
   "### Session Usage",
   "- No token usage recorded yet.",
   "### Quota Limits",
   "- **Gemini Models**",
   "  *(Models within this group: Gemini Flash, Gemini Pro)*",
-  "  - **Weekly Limit Remaining:** 96% remaining (resets Oct 29, 2026, 10:12 UTC)",
+  "  - **Weekly Limit Remaining:** 94% remaining (resets Nov 9, 2026, 11:05 UTC)",
+  "  - **Five Hour Limit Remaining:** 87% remaining (resets Nov 2, 2026, 17:49 UTC)",
   "- **Claude and GPT models**",
   "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
   "  - **Weekly Limit Remaining:** 12% remaining (resets Oct 30, 2026, 08:00 UTC)",
@@ -179,16 +180,27 @@ async function readUsage(version: string, answer: string, reads: number, model?:
 }
 
 try {
-  // 1. A Google sign-in on 1.4.1: the Gemini group's weekly window, both reads in one session.
+  // 1. A Google sign-in: the Gemini group's five-hour and weekly windows, both reads in one session.
   const google = await readUsage("1.4.1", GOOGLE_ANSWER, 2, "gemini-3.8-flash-high");
   report.googleSignIn = google;
   assert.deepEqual(google.prompts, ["/usage", "/usage"], "1.4.1 is sent `/usage` for each read");
   assert.equal(google.usageSessions.length, 1, "the second read reuses the first read's session");
+  const googleExpected = {
+    limitId: "antigravity",
+    primary: {
+      usedPercent: 13,
+      windowDurationMins: 300,
+      resetsAt: Date.UTC(2026, 10, 2, 17, 49) / 1_000,
+    },
+    secondary: {
+      usedPercent: 6,
+      windowDurationMins: 10_080,
+      resetsAt: Date.UTC(2026, 10, 9, 11, 5) / 1_000,
+    },
+  };
   for (const reading of google.readings)
     assert.deepEqual(reading.rateLimits, {
-      limitId: "antigravity",
-      primary: null,
-      secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: Date.UTC(2026, 9, 29, 10, 12) / 1_000 },
+      ...googleExpected,
     });
   assert.ok(
     !google.notifications.some((method) => method.startsWith("item/") || method.startsWith("turn/")),
@@ -247,6 +259,14 @@ try {
   assert.equal(usageQuotaForModel(dock, "gemini-4-argon-high")?.secondary?.usedPercent, 100, "Argon's own quota");
   assert.equal(usageQuotaForModel(dock, ""), dock, "no model keeps the reading");
   assert.equal(usageQuotaForModel(dock, "gemini-codename-x"), undefined, "an unlisted model has no quota");
+
+  // Both Gemini windows survive normalization for the rail popover.
+  const googleUsage = normalizeAccountUsage(google.readings[0] ?? null);
+  const googleGemini = googleUsage.limits[0]?.groups?.[0];
+  assert.deepEqual(
+    [googleGemini?.primary, googleGemini?.secondary],
+    [googleExpected.primary, googleExpected.secondary],
+  );
 
   // 4. An API key sign-in has no plan quota.
   const apiKey = await readUsage("1.4.1", API_KEY_ANSWER, 1);
