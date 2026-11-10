@@ -252,6 +252,9 @@ export const messages = {
   "settings.agentDock.edge.left": "左",
   "settings.agentDock.autoHide.title": "使用していないときは隠す",
   "settings.agentDock.autoHide.description": "ドックが端に隠れます。ポインタを端に移動すると表示されます。",
+  "settings.agentDock.edgeStrip.title": "端に細い帯を表示",
+  "settings.agentDock.edgeStrip.description":
+    "ドックが隠れた場所に細い帯が残ります。ポインタを近づけるとドックが表示されます。エージェントから質問があると、帯に色の波が流れます。",
   "settings.agentDock.results.title": "完了した作業を表示",
   "settings.agentDock.results.description": "エージェントの結果がドックの横に短い時間表示されます。",
   "settings.agentDock.agents.title": "ドックのエージェント",

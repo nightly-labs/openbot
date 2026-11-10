@@ -256,6 +256,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",
+  "settings.agentDock.edgeStrip.title": "Een strook aan de rand tonen",
+  "settings.agentDock.edgeStrip.description":
+    "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
   "settings.agentDock.agents.title": "Agents in het dock",

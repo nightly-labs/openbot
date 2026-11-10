@@ -252,6 +252,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Sol",
   "settings.agentDock.autoHide.title": "Kullanılmadığında gizle",
   "settings.agentDock.autoHide.description": "Yuva kenarın içine kayar. Göstermek için işaretçiyi kenara getirin.",
+  "settings.agentDock.edgeStrip.title": "Kenarda bir şerit göster",
+  "settings.agentDock.edgeStrip.description":
+    "Yuvanın gizlendiği yerde ince bir şerit kalır. Yuvayı göstermek için işaretçiyi yaklaştırın. Bir ajan size bir şey sorduğunda şeritten bir renk dalgası geçer.",
   "settings.agentDock.results.title": "Biten işleri göster",
   "settings.agentDock.results.description": "Ajanların bitirdiği sonuçlar kısa bir süre yuvanın yanında görünür.",
   "settings.agentDock.agents.title": "Yuvadaki ajanlar",

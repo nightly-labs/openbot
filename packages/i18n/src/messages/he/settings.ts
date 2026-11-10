@@ -245,6 +245,9 @@ export const messages = {
   "settings.agentDock.edge.left": "שמאל",
   "settings.agentDock.autoHide.title": "הסתרה כשלא בשימוש",
   "settings.agentDock.autoHide.description": "המעגן נכנס לקצה. הזזת המצביע לקצה מציגה אותו.",
+  "settings.agentDock.edgeStrip.title": "הצגת פס בקצה",
+  "settings.agentDock.edgeStrip.description":
+    "פס דק נשאר במקום שבו המעגן נעלם. קירוב המצביע אליו מציג את המעגן. גל צבע עולה בפס כשסוכן שואל אותך משהו.",
   "settings.agentDock.results.title": "הצגת עבודה שהסתיימה",
   "settings.agentDock.results.description": "תוצאות שסוכנים מסיימים מוצגות לצד המעגן לזמן קצר.",
   "settings.agentDock.agents.title": "סוכנים במעגן",

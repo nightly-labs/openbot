@@ -157,6 +157,8 @@ export interface AgentDockPresentation {
   edge: AgentDockEdge;
   /** The dock slides into the screen edge when the pointer is not on it and no chat is open. */
   autoHide: boolean;
+  /** While hidden, a thin strip stays at the edge. It grows as the pointer comes near and shows the dock when the pointer is close. */
+  edgeStrip: boolean;
   /** The saved positions. A display without one has the dock in the centre. */
   offsets: AgentDockOffset[];
   seats: AgentDockSeat[];
@@ -222,6 +224,7 @@ export function isAgentDockPresentation(value: unknown): value is AgentDockPrese
     isAgentDockDisplay(value.display) &&
     (value.edge === "left" || value.edge === "right") &&
     isBoolean(value.autoHide) &&
+    isBoolean(value.edgeStrip) &&
     isList(value.offsets, AGENT_DOCK_LIMITS.displays, isAgentDockOffset) &&
     isList(value.seats, AGENT_DOCK_LIMITS.seats, isSeat) &&
     isList(value.available, INPUT_LIMITS.agents, isAgent) &&

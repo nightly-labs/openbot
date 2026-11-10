@@ -503,6 +503,7 @@ function ScreenAgentDock(props: { serverId: string }) {
       display: { ...preference().display },
       edge: preference().edge,
       autoHide: preference().autoHide,
+      edgeStrip: preference().edgeStrip,
       offsets: preference().offsets.map((item) => ({ ...item })),
       seats: dock
         .seats()

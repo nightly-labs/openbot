@@ -251,6 +251,9 @@ export const messages = {
   "settings.agentDock.edge.left": "왼쪽",
   "settings.agentDock.autoHide.title": "사용하지 않을 때 숨기기",
   "settings.agentDock.autoHide.description": "독이 가장자리 안으로 들어갑니다. 포인터를 가장자리로 옮기면 나타납니다.",
+  "settings.agentDock.edgeStrip.title": "가장자리에 띠 표시",
+  "settings.agentDock.edgeStrip.description":
+    "독이 숨은 자리에 얇은 띠가 남습니다. 포인터를 가까이 가져가면 독이 나타납니다. 에이전트가 질문하면 띠에 색 물결이 올라갑니다.",
   "settings.agentDock.results.title": "완료된 작업 표시",
   "settings.agentDock.results.description": "에이전트가 완료한 결과가 잠시 독 옆에 표시됩니다.",
   "settings.agentDock.agents.title": "독의 에이전트",

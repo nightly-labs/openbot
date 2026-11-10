@@ -62,6 +62,8 @@ export const messages = {
   "agent.dock.writing": "{name} yazıyor",
   "agent.dock.empty": "Henüz mesaj yok. {name} adlı ajana yazın.",
   "agent.dock.settings": "Yuva ayarları",
+  "agent.dock.strip.show": "Ajan yuvasını göster",
+  "agent.dock.strip.asks": "Ajan yuvasını göster. Bir ajan size bir şey soruyor",
   "agent.dock.search": "Ajan ve kanal ara",
   "agent.dock.searchPlaceholder": "Ara",
   "agent.dock.noMatch": "“{query}” adında bir şey yok",

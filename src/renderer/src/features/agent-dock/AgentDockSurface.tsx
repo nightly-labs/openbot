@@ -18,6 +18,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowShape } from "../../window-shape";
+import { AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip, agentDockBody } from "./AgentDockEdgeStrip";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
@@ -38,7 +39,8 @@ const SHAPED_WINDOW = currentDevicePlatform() === "linux";
  *
  * The window lets the pointer through, except over the dock shapes. It takes key input while a chat
  * or a menu is open, and a click in another app closes the chat. When the user wants it hidden, the dock
- * slides into the edge while nobody uses it, and comes back when the pointer touches the edge.
+ * slides into the edge while nobody uses it, and comes back when the pointer touches the edge. With the
+ * edge strip on, only the pointer near the strip brings it back.
  */
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
@@ -61,6 +63,10 @@ export function AgentDockSurface() {
   let shelfShown = false;
   /** A plain copy of the hide setting: the tuck timer and the pointer handlers read it outside a tracking scope. */
   let autoHide = false;
+  /** A plain copy of the edge strip setting. */
+  let edgeStrip = false;
+  /** The pointer is close to the edge strip. */
+  let near = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
   let sent = { interactive: false, keyboard: false };
   /** The dock parts at rest, or null while the dock moves. */
@@ -77,7 +83,7 @@ export function AgentDockSurface() {
   const perform = (action: AgentDockAction) => agentDockPort().agentDock.performAction(action);
 
   const menuOpen = () => document.querySelector(".ui-action-menu") !== null;
-  const inUse = () => pointerIn || chatOpen || dragging || shelfShown || menuOpen();
+  const inUse = () => pointerIn || near || chatOpen || dragging || shelfShown || menuOpen();
   const stopTuckTimer = () => {
     clearTimeout(tuckTimer);
     tuckTimer = undefined;
@@ -103,18 +109,35 @@ export function AgentDockSurface() {
       updateTuck();
     },
   );
+  createEffect(
+    () => presentation()?.edgeStrip ?? false,
+    (value) => {
+      edgeStrip = value;
+      syncShape();
+    },
+  );
+  /** The strip shows only on a dock that hides. */
+  const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
+  const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
   /**
    * Linux: tells main the parts of the window that take the pointer. The whole window while the dock
    * moves or a menu is open, so that nothing is cut off; the strip at the edge while the dock is hidden.
+   * With the edge strip on, that strip is only as tall as the dock: the pointer goes past it elsewhere.
    */
   function syncShape() {
     if (!SHAPED_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
-      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - EDGE_STRIP;
-      parts.push({ x, y: 0, width: EDGE_STRIP, height: window.innerHeight });
+      const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+      const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
+      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
+      parts.push(
+        body
+          ? { x, y: Math.round(body.top), width, height: Math.round(body.height) }
+          : { x, y: 0, width, height: window.innerHeight },
+      );
     }
     const shape = windowShape(parts);
     const key = JSON.stringify(shape);
@@ -149,7 +172,7 @@ export function AgentDockSurface() {
 
     // The dock shapes take the pointer; the empty page, the body and the root let it through.
     const onPointer = (event: MouseEvent) => {
-      if (isTucked && atEdge(event)) {
+      if (isTucked && !edgeStrip && atEdge(event)) {
         stopTuckTimer();
         setTucked(false);
       }
@@ -239,81 +262,98 @@ export function AgentDockSurface() {
   return (
     <Show when={serverId()} keyed>
       {(server) => (
-        <AgentDock
-          seats={seats()}
-          available={presentation()?.available ?? []}
-          availableChannels={availableChannels()}
-          chat={chat}
-          closeRequest={closeRequest()}
-          voice={voice}
-          side={presentation()?.edge ?? "right"}
-          tucked={tucked()}
-          onShapeChange={
-            SHAPED_WINDOW
-              ? (parts) => {
-                  dockShape = parts;
-                  syncShape();
-                }
-              : undefined
-          }
-          onDrag={(phase) => {
-            dragging = phase !== "end";
-            updateTuck();
-            void agentDockPort()
-              .agentDock.drag(phase)
-              .catch(() => undefined);
-          }}
-          onOpenChange={(seat) => {
-            chatOpen = seat !== null;
-            sync();
-            void perform({ type: "open-chat", serverId: server, seat: seat && contractSeat(seat) }).catch(
-              () => undefined,
-            );
-          }}
-          onAdd={(seat) =>
-            void perform({ type: "add", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
-          }
-          onRemove={(seat) =>
-            void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
-          }
-          onSend={async (seat, text) => {
-            const seatKey = agentDockSeatKey(seat);
-            const clientMessageId =
-              failed && failed.seatKey === seatKey && failed.text === text
-                ? failed.clientMessageId
-                : crypto.randomUUID();
-            try {
-              await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
-              failed = null;
-              return { messageId: clientMessageId };
-            } catch (error) {
-              failed = { seatKey, text, clientMessageId };
-              return { error: errorMessage(error, t("chat.errorStatus.send")) };
+        <>
+          <AgentDock
+            seats={seats()}
+            available={presentation()?.available ?? []}
+            availableChannels={availableChannels()}
+            chat={chat}
+            closeRequest={closeRequest()}
+            voice={voice}
+            side={presentation()?.edge ?? "right"}
+            tucked={tucked()}
+            onShapeChange={
+              SHAPED_WINDOW
+                ? (parts) => {
+                    dockShape = parts;
+                    syncShape();
+                  }
+                : undefined
             }
-          }}
-          onOpenInMain={(seat) =>
-            void perform(
-              seat.kind === "channel"
-                ? { type: "open-channel", serverId: server, channelId: seat.id }
-                : { type: "open-agent", serverId: server, agentId: seat.id },
-            ).catch(() => undefined)
-          }
-          onOpenWindow={(agentId) =>
-            void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
-          }
-          agents={agents()}
-          onSelectAgent={(agentId) =>
-            void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
-          }
-          onOpenLink={(url) => void perform({ type: "open-link", url }).catch(() => undefined)}
-          onOpenSettings={() => void perform({ type: "open-settings" }).catch(() => undefined)}
-          results={results()}
-          onShelfChange={(shown) => {
-            // A result that came shows the hidden dock until the shelf is empty.
-            shelfShown = shown;
-            sync();
-          }}
-        />
+            onDrag={(phase) => {
+              dragging = phase !== "end";
+              updateTuck();
+              void agentDockPort()
+                .agentDock.drag(phase)
+                .catch(() => undefined);
+            }}
+            onOpenChange={(seat) => {
+              chatOpen = seat !== null;
+              sync();
+              void perform({ type: "open-chat", serverId: server, seat: seat && contractSeat(seat) }).catch(
+                () => undefined,
+              );
+            }}
+            onAdd={(seat) =>
+              void perform({ type: "add", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
+            }
+            onRemove={(seat) =>
+              void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
+            }
+            onSend={async (seat, text) => {
+              const seatKey = agentDockSeatKey(seat);
+              const clientMessageId =
+                failed && failed.seatKey === seatKey && failed.text === text
+                  ? failed.clientMessageId
+                  : crypto.randomUUID();
+              try {
+                await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
+                failed = null;
+                return { messageId: clientMessageId };
+              } catch (error) {
+                failed = { seatKey, text, clientMessageId };
+                return { error: errorMessage(error, t("chat.errorStatus.send")) };
+              }
+            }}
+            onOpenInMain={(seat) =>
+              void perform(
+                seat.kind === "channel"
+                  ? { type: "open-channel", serverId: server, channelId: seat.id }
+                  : { type: "open-agent", serverId: server, agentId: seat.id },
+              ).catch(() => undefined)
+            }
+            onOpenWindow={(agentId) =>
+              void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
+            }
+            agents={agents()}
+            onSelectAgent={(agentId) =>
+              void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
+            }
+            onOpenLink={(url) => void perform({ type: "open-link", url }).catch(() => undefined)}
+            onOpenSettings={() => void perform({ type: "open-settings" }).catch(() => undefined)}
+            results={results()}
+            onShelfChange={(shown) => {
+              // A result that came shows the hidden dock until the shelf is empty.
+              shelfShown = shown;
+              sync();
+            }}
+          />
+          <Show when={stripOn()}>
+            <AgentDockEdgeStrip
+              side={presentation()?.edge ?? "right"}
+              shown={tucked()}
+              asks={asks()}
+              onNearChange={(value) => {
+                near = value;
+                sync();
+              }}
+              onShow={() => {
+                stopTuckTimer();
+                setTucked(false);
+              }}
+            />
+          </Show>
+        </>
       )}
     </Show>
   );

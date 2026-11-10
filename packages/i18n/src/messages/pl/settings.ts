@@ -257,6 +257,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Lewa",
   "settings.agentDock.autoHide.title": "Ukrywaj, gdy nieużywany",
   "settings.agentDock.autoHide.description": "Dok chowa się w krawędzi. Przesuń wskaźnik do krawędzi, aby go pokazać.",
+  "settings.agentDock.edgeStrip.title": "Pokazuj pasek przy krawędzi",
+  "settings.agentDock.edgeStrip.description":
+    "Cienki pasek zostaje tam, gdzie chowa się dok. Zbliż do niego wskaźnik, aby pokazać dok. Gdy agent o coś pyta, przez pasek przechodzi fala kolorów.",
   "settings.agentDock.results.title": "Pokazuj ukończoną pracę",
   "settings.agentDock.results.description": "Wyniki agentów pojawiają się na chwilę obok doku.",
   "settings.agentDock.agents.title": "Agenci w doku",

@@ -11,8 +11,9 @@ import {
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createStore, onCleanup } from "solid-js";
+import { createSignal, createStore, onCleanup, onSettled, Show } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { AgentDockEdgeStrip } from "../src/features/agent-dock/AgentDockEdgeStrip";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 function storyAgent(id: string): AgentProfile {
@@ -155,11 +156,15 @@ function finishedFixture(now: number): AgentDockShelfResult[] {
   ];
 }
 
+/** The time without use before the story dock slides into the edge, as in the dock window. */
+const STORY_TUCK_DELAY_MS = 900;
+
 /**
  * The dock with fixture agents. A message that you send gets a short answer, which also shows on the
- * finished-work shelf until you open that chat.
+ * finished-work shelf until you open that chat. With `edgeStrip`, the dock hides when not in use and
+ * leaves the edge strip, as "Show a strip at the edge" in Settings does.
  */
-function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockShelfResult[] }) {
+function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockShelfResult[]; edgeStrip?: boolean }) {
   const [state, setState] = createStore({
     seats: props.seats.map(agentDockSeatKey),
     messages: structuredClone(MESSAGES),
@@ -171,6 +176,30 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
     for (const timer of timers) window.clearTimeout(timer);
   });
   let nextId = 0;
+
+  // As in the app, the dock starts full and goes into the edge when it is not in use.
+  const [tucked, setTucked] = createSignal(false);
+  const use = { near: false, onDock: false, chat: false };
+  let tuckTimer: number | undefined;
+  const updateTuck = () => {
+    window.clearTimeout(tuckTimer);
+    if (!props.edgeStrip) return;
+    if (use.near || use.onDock || use.chat) setTucked(false);
+    else tuckTimer = window.setTimeout(() => setTucked(true), STORY_TUCK_DELAY_MS);
+  };
+  onSettled(() => {
+    if (!props.edgeStrip) return;
+    const onPointer = (event: MouseEvent) => {
+      use.onDock = event.target instanceof Element && event.target.closest(".agent-dock, .ui-action-menu") !== null;
+      updateTuck();
+    };
+    document.addEventListener("mouseover", onPointer);
+    updateTuck();
+    return () => {
+      document.removeEventListener("mouseover", onPointer);
+      window.clearTimeout(tuckTimer);
+    };
+  });
 
   const seats = (): AgentDockSeat[] =>
     state.seats.flatMap((key): AgentDockSeat[] => {
@@ -206,13 +235,16 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
         )}
         chat={chat}
         results={state.results}
-        onOpenChange={(seat) =>
+        tucked={tucked()}
+        onOpenChange={(seat) => {
+          use.chat = seat !== null;
+          updateTuck();
           setState((draft) => {
             for (let index = draft.results.length - 1; index >= 0; index -= 1) {
               if (seat?.kind === "agent" && draft.results[index]?.agentId === seat.id) draft.results.splice(index, 1);
             }
-          })
-        }
+          });
+        }}
         onAdd={(seat) =>
           setState((draft) => {
             draft.seats.push(agentDockSeatKey(seat));
@@ -255,6 +287,18 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
         onOpenInMain={() => undefined}
         agents={AGENTS}
       />
+      <Show when={props.edgeStrip}>
+        <AgentDockEdgeStrip
+          side="right"
+          shown={tucked()}
+          asks={seats().some((seat) => seat.state?.kind === "waiting")}
+          onNearChange={(near) => {
+            use.near = near;
+            updateTuck();
+          }}
+          onShow={() => setTucked(false)}
+        />
+      </Show>
     </div>
   );
 }
@@ -319,4 +363,18 @@ export const ManyAgents: Story = {
 /** No agent on the dock yet: only the + button. */
 export const Empty: Story = {
   render: () => <AgentDockStory seats={[]} />,
+};
+
+/**
+ * The dock hides when not in use and leaves a thin strip at the edge. Move the pointer toward the strip:
+ * it grows, and the dock comes out when the pointer is close. Research asks a question, so a wash front
+ * goes up through the strip from time to time.
+ */
+export const EdgeStrip: Story = {
+  render: () => <AgentDockStory seats={agentSeats("chief", "research", "sales")} edgeStrip />,
+};
+
+/** The edge strip while no agent asks anything: the strip stays dark and nothing moves. */
+export const EdgeStripQuiet: Story = {
+  render: () => <AgentDockStory seats={agentSeats("chief", "sales")} edgeStrip />,
 };

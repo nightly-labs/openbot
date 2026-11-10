@@ -257,6 +257,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.edge.left": "Left",
   "settings.agentDock.autoHide.title": "Hide when not in use",
   "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
+  "settings.agentDock.edgeStrip.title": "Show a strip at the edge",
+  "settings.agentDock.edgeStrip.description":
+    "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
   "settings.agentDock.results.title": "Show finished work",
   "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
   "settings.agentDock.agents.title": "Agents on the dock",
