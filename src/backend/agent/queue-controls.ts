@@ -299,6 +299,7 @@ export class QueueControls {
             routineRun:
               context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
             wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+            answeredRoutine: this.#drain.answeredRoutine(context.delivery),
             tags: this.#hooks.tagReferences(agent.id, publicThreadId),
           }),
         },
