@@ -10,6 +10,13 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 /** `format_execution_error` of Antigravity 1.3.0 when the failure is not a Google API error. */
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 /**
+ * Antigravity 1.4.5 `_send_connection_lost_message`: the connection to its harness closed, and a new
+ * harness did not start. It ends the turn as a success and forgets the session, which stays on disk.
+ * The turn fails, and `sessionLost` makes OpenBot open the saved session again for the next prompt
+ * (#6321).
+ */
+const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
+/**
  * Google refuses a request until the user verifies the account (`VALIDATION_REQUIRED`, #2419).
  * Antigravity 1.4.5 `format_execution_error` then sends Google's message, an empty line, and
  * `<link text>: <validation_url>` as the answer, with no `Agent execution error:` prefix. The link
@@ -19,7 +26,7 @@ const GEMINI_VERIFICATION_ANSWER =
   /(?:^|\n)[^\n]*: (https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
 /** The answers that are the server's failure text, not a reply of the model. */
 const GEMINI_FAILURE_ANSWER = new RegExp(
-  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}`,
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}`,
   "u",
 );
 
@@ -90,6 +97,8 @@ function geminiTurnFailure(text: string): string {
   if (geminiAccountLink(text) !== null) return sourceText("error.provider.geminiVerificationRequired");
   // Google's API answer for a refused key. The key is the user's to fix, not the request.
   if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text)) return sourceText("error.provider.geminiKeyRefused");
+  // The server's text names its harness and a WebSocket close code, which the user cannot act on.
+  if (GEMINI_CONNECTION_LOST_ANSWER.test(text)) return sourceText("error.provider.antigravityConnectionLost");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
   return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
 }
@@ -140,6 +149,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
         : null;
     },
     mcpLoadFailure: geminiMcpLoadFailure,
+    sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the
   // harness through session/resume before accepting another prompt.

@@ -221,6 +221,8 @@ interface AcpTurn {
   failureCause: CauseCode | null;
   /** The page where the user fixes the account that failed this turn (`accountLink`), or null. */
   accountLink: string | null;
+  /** The agent removed the session when this turn failed (`AcpFlavor.sdkHarness.sessionLost`). */
+  sessionLost: boolean;
   /**
    * Where the answer text stood when Antigravity logged that its SDK failed this prompt. The
    * server then sends the failure as answer text and ends the turn as a success.
@@ -2251,6 +2253,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       signInLost: false,
       failureCause: null,
       accountLink: null,
+      sessionLost: false,
       sdkFailureAt: null,
       answerOptional,
       messages: [],
@@ -2359,6 +2362,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
             turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
             turn.providerError = sdkHarness.turnFailure(detail);
+            turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
       }
@@ -3224,7 +3228,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (status !== "completed") thread.backgroundSkipUntil = Date.now() + ACP_STOPPED_OUTPUT_MS;
     // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
     // so only new input can reload the session, including input already waiting in the queue.
-    if (status === "failed" && isSessionNotFound(error, thread.id, this.#flavor)) {
+    if (status === "failed" && (turn.sessionLost || isSessionNotFound(error, thread.id, this.#flavor))) {
       this.#forgetMissingSession(thread.id);
     }
     this.#completeThought(thread, turn);
