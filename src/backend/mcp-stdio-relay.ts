@@ -44,6 +44,8 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const expected = Buffer.from(`Bearer ${token}`);
   const transports = new Set<StreamableHTTPServerTransport>();
   const sessions = new Map<string, StreamableHTTPServerTransport>();
+  /** The server processes that have not exited. `close` waits for them, as a provider stop waits for its own. */
+  const children = new Set<ChildProcess>();
 
   const authorized = (request: IncomingMessage) => {
     const header = Buffer.from(request.headers.authorization ?? "");
@@ -60,13 +62,20 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     });
     transports.add(transport);
     transport.onmessage = (message) => {
-      child ??= startServer(launch, transport);
+      if (!child) {
+        const started = startServer(launch, transport);
+        children.add(started);
+        // A command that cannot start has no process id and sends `error`, not always `exit`.
+        started.once("exit", () => children.delete(started));
+        started.once("error", () => children.delete(started));
+        child = started;
+      }
       child.stdin?.write(serializeMessage(message));
     };
     transport.onclose = () => {
       transports.delete(transport);
       if (transport.sessionId) sessions.delete(transport.sessionId);
-      if (child) stopServer(child);
+      if (child) void stopServer(child);
     };
     return transport;
   };
@@ -119,6 +128,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
         const closed = new Promise<void>((resolve) => server.close(() => resolve()));
         server.closeAllConnections();
         await Promise.all([...transports].map((transport) => transport.close().catch(() => undefined)));
+        await Promise.all([...children].map(stopServer));
         await closed;
       }),
   } satisfies StdioMcpRelay;
@@ -160,17 +170,26 @@ function startServer(launch: StdioMcpLaunch, transport: StreamableHTTPServerTran
   return child;
 }
 
-/** Closes stdin and sends SIGTERM, then SIGKILL to the group after the grace. */
-function stopServer(child: ChildProcess): void {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  child.stdin?.end();
-  child.kill("SIGTERM");
-  setTimeout(() => {
-    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return;
-    try {
-      process.kill(PROVIDER_PROCESS_GROUP ? -child.pid : child.pid, "SIGKILL");
-    } catch {
-      /* The process already exited. */
-    }
-  }, STOP_GRACE_MS).unref();
+/**
+ * Closes stdin and sends SIGTERM, then SIGKILL to the group after the grace. Ends when the process
+ * exits. `endProcessGroupOnExit` then stops the rest of its group.
+ */
+function stopServer(child: ChildProcess): Promise<void> {
+  const pid = child.pid;
+  if (pid === undefined || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    const kill = setTimeout(() => {
+      try {
+        process.kill(PROVIDER_PROCESS_GROUP ? -pid : pid, "SIGKILL");
+      } catch {
+        /* The process already exited. */
+      }
+    }, STOP_GRACE_MS);
+    child.once("exit", () => {
+      clearTimeout(kill);
+      resolve();
+    });
+    child.stdin?.end();
+    child.kill("SIGTERM");
+  });
 }

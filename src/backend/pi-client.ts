@@ -655,8 +655,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       );
       this.options.reportMcpDrops?.(this.provider, handoff.dropped);
       // In the Workspace only sandbox, the stdio servers start in OpenBot, with the environment that Pi
-      // would give them (#6191).
-      const relay = this.options.confine ? { environment: this.#environment(), cwd } : undefined;
+      // would give them (#6191). A profile generation runs Pi with no MCP servers.
+      const relay =
+        this.options.confine && !this.options.profileGeneration ? { environment: this.#environment(), cwd } : undefined;
       extension = yield* createPiMcpExtension(handoff.servers, mcp, this.options.providerStateDirectory, relay);
       for (const secret of extension.secrets) this.#secrets.add(secret);
       keyExtension = yield* this.#keyExtension();

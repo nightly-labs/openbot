@@ -81,7 +81,7 @@ interface Report {
 }
 
 const report: Report = { passed: false, requests: [] };
-const root = await mkdtemp(join(tmpdir(), "openbot-pi-deferred-e2e-"));
+const root = await mkdtemp(join(tmpdir(), "openbot-pi-mcp-workspace-only-e2e-"));
 const clients: AgentClient[] = [];
 
 async function body(request: IncomingMessage): Promise<ChatRequest> {
