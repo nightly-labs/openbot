@@ -104,6 +104,8 @@ export const messages = {
   "browser.userControl.status": "Sterujesz tą stroną",
   "browser.dock.messageTo": "Wiadomość do: {name}",
   "browser.dock.hide": "Ukryj pole wiadomości",
+  "browser.dock.show": "Pokaż pole wiadomości",
+  "browser.dock.replied": "Odpowiedź od: {name}",
   "browser.dock.needsYou": "{name} potrzebuje Twojej pomocy na tej stronie",
   "browser.dock.needsAnswer": "{name} czeka na Twoją odpowiedź",
   "browser.dock.needsApproval": "{name} czeka na Twoją zgodę",

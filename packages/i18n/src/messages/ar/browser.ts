@@ -112,6 +112,8 @@ export const messages = {
   "browser.userControl.status": "أنت تتحكم في هذه الصفحة",
   "browser.dock.messageTo": "رسالة إلى {name}",
   "browser.dock.hide": "إخفاء مربع الرسالة",
+  "browser.dock.show": "إظهار مربع الرسالة",
+  "browser.dock.replied": "ردّ {name}",
   "browser.dock.needsYou": "يحتاج {name} إليك في هذه الصفحة",
   "browser.dock.needsAnswer": "يحتاج {name} إلى إجابتك",
   "browser.dock.needsApproval": "يحتاج {name} إلى موافقتك",

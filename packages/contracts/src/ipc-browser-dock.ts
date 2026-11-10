@@ -137,24 +137,24 @@ export interface BrowserDockGlass {
 }
 
 /**
- * The user hid the dock: only a small tab stays, at the bottom corner on `side` of the page. `width` is the
- * space that it needs from that side, in CSS pixels.
+ * The dock is at the bottom corner on `side` of the page: the box, or the tab when the user hid the box.
+ * `width` is the space that it needs from that side, in CSS pixels.
  */
-export interface BrowserDockTuck {
+export interface BrowserDockAnchor {
   side: "left" | "right";
   width: number;
 }
 
 /**
  * The space that the dock needs at the bottom of the page, in CSS pixels, and its glass shapes. `seq`
- * increases with each frame, so main ignores a frame that arrives late. Without `tucked`, the dock is in
- * the middle of the page.
+ * increases with each frame, so main ignores a frame that arrives late. Without `anchor`, the overlay is
+ * at the bottom right of the page with its first width.
  */
 export interface BrowserDockFrame {
   seq: number;
   height: number;
   glass: BrowserDockGlass[];
-  tucked?: BrowserDockTuck;
+  anchor?: BrowserDockAnchor;
 }
 
 export function isBrowserDockPresentation(value: unknown): value is BrowserDockPresentation {
@@ -219,11 +219,11 @@ export function isBrowserDockFrame(value: unknown): value is BrowserDockFrame {
     integerInRange(value.seq, 0, Number.MAX_SAFE_INTEGER) &&
     isSize(value.height) &&
     isList(value.glass, BROWSER_DOCK_LIMITS.glass, isGlass) &&
-    (value.tucked === undefined || isTuck(value.tucked))
+    (value.anchor === undefined || isAnchor(value.anchor))
   );
 }
 
-function isTuck(value: unknown): value is BrowserDockTuck {
+function isAnchor(value: unknown): value is BrowserDockAnchor {
   return isDynamicRecord(value) && (value.side === "left" || value.side === "right") && isSize(value.width);
 }
 

@@ -109,6 +109,8 @@ export const messages = {
   "browser.userControl.status": "Jij bestuurt deze pagina",
   "browser.dock.messageTo": "Bericht aan {name}",
   "browser.dock.hide": "Berichtvak verbergen",
+  "browser.dock.show": "Berichtvak tonen",
+  "browser.dock.replied": "{name} heeft geantwoord",
   "browser.dock.needsYou": "{name} heeft je nodig op deze pagina",
   "browser.dock.needsAnswer": "{name} wacht op je antwoord",
   "browser.dock.needsApproval": "{name} wacht op je goedkeuring",

@@ -109,6 +109,8 @@ export const messages = {
   "browser.userControl.status": "הדף הזה בשליטתך",
   "browser.dock.messageTo": "הודעה אל {name}",
   "browser.dock.hide": "הסתרת תיבת ההודעה",
+  "browser.dock.show": "הצגת תיבת ההודעה",
+  "browser.dock.replied": "התקבלה תשובה מ-{name}",
   "browser.dock.needsYou": "{name} צריך אותך בדף הזה",
   "browser.dock.needsAnswer": "{name} צריך את תשובתך",
   "browser.dock.needsApproval": "{name} צריך את אישורך",

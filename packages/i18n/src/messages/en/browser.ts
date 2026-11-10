@@ -107,6 +107,8 @@ export const messages = defineMessages("browser", {
   "browser.userControl.status": "You control this page",
   "browser.dock.messageTo": "Message to {name}",
   "browser.dock.hide": "Hide the message box",
+  "browser.dock.show": "Show the message box",
+  "browser.dock.replied": "{name} replied",
   "browser.dock.needsYou": "{name} needs you on this page",
   "browser.dock.needsAnswer": "{name} needs your answer",
   "browser.dock.needsApproval": "{name} needs your approval",

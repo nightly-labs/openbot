@@ -102,6 +102,8 @@ export const messages = {
   "browser.userControl.status": "Controlas esta página",
   "browser.dock.messageTo": "Mensaje para {name}",
   "browser.dock.hide": "Ocultar el cuadro de mensaje",
+  "browser.dock.show": "Mostrar el cuadro de mensaje",
+  "browser.dock.replied": "{name} respondió",
   "browser.dock.needsYou": "{name} te necesita en esta página",
   "browser.dock.needsAnswer": "{name} necesita tu respuesta",
   "browser.dock.needsApproval": "{name} necesita tu aprobación",

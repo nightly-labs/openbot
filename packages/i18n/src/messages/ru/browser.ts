@@ -104,6 +104,8 @@ export const messages = {
   "browser.userControl.status": "Вы управляете этой страницей",
   "browser.dock.messageTo": "Сообщение для {name}",
   "browser.dock.hide": "Скрыть поле сообщения",
+  "browser.dock.show": "Показать поле сообщения",
+  "browser.dock.replied": "Ответ от {name}",
   "browser.dock.needsYou": "{name}: нужна ваша помощь на этой странице",
   "browser.dock.needsAnswer": "{name}: нужен ваш ответ",
   "browser.dock.needsApproval": "{name}: нужно ваше одобрение",
