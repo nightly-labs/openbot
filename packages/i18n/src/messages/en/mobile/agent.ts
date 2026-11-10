@@ -305,6 +305,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.runtime.retryModels": "Retry models",
   "mobile.agent.runtime.loadingModels": "Loading models…",
   "mobile.agent.runtime.noModels": "No models available for this provider.",
+  "mobile.agent.runtime.searchModels": "Search models",
+  "mobile.agent.runtime.noMatches": "No models match your search.",
   "mobile.agent.runtime.usageLimit": "Usage limit reached",
   "mobile.agent.runtime.usageLimitWindow": "{window} limit",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Resets {time}",

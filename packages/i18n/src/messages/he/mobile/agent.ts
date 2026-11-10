@@ -305,6 +305,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "ניסיון חוזר לטעינת מודלים",
   "mobile.agent.runtime.loadingModels": "טוען מודלים…",
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
+  "mobile.agent.runtime.searchModels": "חיפוש מודלים",
+  "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",
   "mobile.agent.runtime.usageLimitWindow": "מגבלת {window}",
   "mobile.agent.runtime.usageLimitResets": "{limit} · מתאפס {time}",

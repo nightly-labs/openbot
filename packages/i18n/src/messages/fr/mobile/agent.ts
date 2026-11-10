@@ -321,6 +321,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "Recharger les modèles",
   "mobile.agent.runtime.loadingModels": "Chargement des modèles…",
   "mobile.agent.runtime.noModels": "Aucun modèle disponible pour ce fournisseur.",
+  "mobile.agent.runtime.searchModels": "Rechercher des modèles",
+  "mobile.agent.runtime.noMatches": "Aucun modèle ne correspond à votre recherche.",
   "mobile.agent.runtime.usageLimit": "Limite d’utilisation atteinte",
   "mobile.agent.runtime.usageLimitWindow": "Limite ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Réinitialisation le {time}",

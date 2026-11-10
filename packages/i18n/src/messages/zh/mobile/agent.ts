@@ -300,6 +300,8 @@ export const messages = {
   "mobile.agent.runtime.retryModels": "重试加载模型",
   "mobile.agent.runtime.loadingModels": "正在加载模型…",
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
+  "mobile.agent.runtime.searchModels": "搜索模型",
+  "mobile.agent.runtime.noMatches": "没有匹配的模型。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
   "mobile.agent.runtime.usageLimitWindow": "{window}上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 重置",
