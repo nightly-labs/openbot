@@ -122,6 +122,17 @@ export interface BrowserSnapshot {
   actions: BrowserActionHistoryEntry[];
   image?: { included: boolean; reason: string; width: number; height: number };
   challenge?: BrowserChallenge;
+  /**
+   * The agent's memories about the site of the page, newest first. A snapshot has them once per site
+   * in a tab and a turn.
+   */
+  siteMemories?: BrowserSiteMemory[];
+}
+
+export interface BrowserSiteMemory {
+  id: string;
+  site: string;
+  text: string;
 }
 
 export interface BrowserRecordingArtifact {

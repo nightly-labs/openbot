@@ -15,7 +15,15 @@ export interface MemoryEntry {
   sourceTurnId: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The site the memory is about: a lowercase host name without "www.". The browser shows the memory
+   * when the agent opens a page of that site or of a subdomain. Only agent memories have a site.
+   */
+  site?: string;
 }
+
+/** The longest host name that DNS permits, and the database CHECK on the site column. */
+export const MEMORY_SITE_MAX_LENGTH = 253;
 
 export interface AgentMemory extends MemoryEntry {
   agentId: string;
@@ -36,7 +44,9 @@ export function isMemoryEntry(value: unknown): value is MemoryEntry {
         value.sourceTurnId.length > 0 &&
         value.sourceTurnId.length <= INPUT_LIMITS.identifier)) &&
     isString(value.createdAt) &&
-    isString(value.updatedAt)
+    isString(value.updatedAt) &&
+    (value.site === undefined ||
+      (isString(value.site) && value.site.length > 0 && value.site.length <= MEMORY_SITE_MAX_LENGTH))
   );
 }
 

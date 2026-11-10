@@ -1,4 +1,4 @@
-import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
+import type { BrowserDiagnosticEntry, BrowserSiteMemory, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber, Result } from "effect";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import {
@@ -39,6 +39,14 @@ export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("op
 export const BrowserDialogTurn = Context.Reference<BrowserDialogOwner | undefined>("openbot/BrowserDialogTurn", {
   defaultValue: () => undefined,
 });
+
+/**
+ * The memories of the agent that runs a tool, by page host, and its turn. Only the agent tool paths
+ * provide it, so a snapshot for a person or for the host has no memories.
+ */
+export const BrowserSiteMemories = Context.Reference<
+  { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] } | undefined
+>("openbot/BrowserSiteMemories", { defaultValue: () => undefined });
 
 /** An action that opened a page dialog returns this in place of its result. */
 export interface DialogTabResult {
@@ -184,6 +192,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const heldByUser = yield* BrowserToolHold;
+  const siteMemories = yield* BrowserSiteMemories;
   const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
   const read = (readRevision: number) =>
     Effect.gen(function* () {
@@ -280,10 +289,33 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     );
     if (challenge) result.snapshot.challenge = challenge;
   }
+  const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
+  if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;
   if (release) yield* release(result);
+  // Only a snapshot that reached the agent counts as the recall of its site.
+  if (recalled) tab.siteRecall = recalled.mark;
   tab.diagnostics.delivered(cursor);
   return result;
 });
+
+/**
+ * The memories of the page's site, when this tab has not shown them in this turn. A read of another
+ * page of the same site in the same turn shows none, so the agent does not read them again.
+ */
+function recallSiteMemories(
+  tab: BrowserHostTab,
+  url: string,
+  source: { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] },
+): { memories: BrowserSiteMemory[]; mark: { turnId: string; host: string } } | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  if (!host || (tab.siteRecall?.turnId === source.turnId && tab.siteRecall.host === host)) return null;
+  return { memories: source.recall(host), mark: { turnId: source.turnId, host } };
+}
 
 /** Reads what an action returns once its input reached the page and the page settled. */
 export type ActionResultReader<A> = (

@@ -15,6 +15,7 @@ import type {
   BrowserPreview,
   BrowserProxyFailure,
   BrowserSecretRequest,
+  BrowserSiteMemory,
   BrowserSnapshot,
   BrowserTab,
   BrowserTarget,
@@ -135,6 +136,7 @@ import {
   type ActionResultReader,
   BrowserDialogTurn,
   type BrowserFillFieldsResult,
+  BrowserSiteMemories,
   BrowserToolHold,
   BrowserUserControlHeld,
   boundEngineOperation,
@@ -563,6 +565,7 @@ export class BrowserHost {
    */
   readonly #proxySignInRefused = new WeakSet<BrowserHostTab>();
   readonly #quitShortcut: (input: Input) => boolean;
+  readonly #siteMemories: (agentId: string, hostname: string) => BrowserSiteMemory[];
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -646,6 +649,8 @@ export class BrowserHost {
       pagePreload?: string;
       /** Shorter sleep timing for `scripts/browser-steps-e2e.ts`. */
       tabSleep?: { sweepMs: number; awakeGraceMs: number };
+      /** The memories of an agent about the site of a page host, which its snapshots show. */
+      siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
     } = {},
   ) {
     this.#window = window;
@@ -667,6 +672,7 @@ export class BrowserHost {
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
     this.#quitShortcut = options.quitShortcut ?? (() => false);
+    this.#siteMemories = options.siteMemories ?? (() => []);
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
@@ -2490,6 +2496,12 @@ export class BrowserHost {
     request_link_payment: rejectTakeoverTool,
   };
 
+  #siteRecall(params: DynamicToolCallParams) {
+    const agentId = params.ownerAgentId;
+    if (!agentId) return undefined;
+    return { turnId: params.turnId, recall: (hostname: string) => this.#siteMemories(agentId, hostname) };
+  }
+
   readonly handleDynamicTool = Effect.fn("BrowserHost.handleDynamicTool")(function* (
     this: BrowserHost,
     params: DynamicToolCallParams,
@@ -2503,6 +2515,7 @@ export class BrowserHost {
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
         Effect.provideService(BrowserDialogTurn, { threadId: params.threadId, turnId: params.turnId }),
+        Effect.provideService(BrowserSiteMemories, this.#siteRecall(params)),
         Effect.catch((operationFailure) =>
           Effect.sync((): { result: DynamicToolResult } | { heldTabId: string } => {
             const error = operationFailure.cause;

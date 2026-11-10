@@ -648,6 +648,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
       inclusion: z.enum(["essential", "searchable"]).optional(),
+      site: z
+        .string()
+        .max(2048)
+        .optional()
+        .describe(
+          "A host or URL the memory is about, such as how to work a site. The browser shows it on pages of that site. Omitted on an update: the site stays.",
+        ),
     },
   },
   {

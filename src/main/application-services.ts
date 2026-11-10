@@ -131,6 +131,7 @@ import {
 import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
 import { toMcpGatewayFailed } from "../backend/agent/mcp-gateway";
 import { ProviderAccountStore } from "../backend/agent/provider-account-store";
+import { AgentMemoryStore } from "../backend/agent-memory-store";
 import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -1314,6 +1315,8 @@ export async function createApplicationServices({
   }
   const browserProfileStore = new BrowserProfileStore(store.database);
   const browserProxyStore = new BrowserProxyStore(store.database);
+  // Reads only: the agent service owns memory writes and the memory cap.
+  const siteMemoryStore = new AgentMemoryStore(store.database);
   const browserProxyCipher = safeStorageCipher("error.app.secretStorageUnavailable");
   // The agent service starts after the browser: a proxy failure before it has no open list to update.
   let browserProxyStatusChanged = () => {};
@@ -1329,6 +1332,8 @@ export async function createApplicationServices({
     computerExit: (memberId) => browserEgress.exit(memberId),
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
+    siteMemories: (agentId, hostname) =>
+      siteMemoryStore.forHost(agentId, hostname).flatMap(({ id, site, text }) => (site ? [{ id, site, text }] : [])),
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));

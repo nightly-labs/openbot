@@ -75,15 +75,25 @@ async function main(): Promise<void> {
       focusable: false,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
-    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"));
+    // The site memories that the host reads, by agent and host name, for the site-memories phase.
+    const siteMemoryReads: { agentId: string; hostname: string }[] = [];
+    let siteMemoriesOn = false;
+    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
+      siteMemories: (agentId, hostname) => {
+        if (!siteMemoriesOn) return [];
+        siteMemoryReads.push({ agentId, hostname });
+        return [{ id: "memory-site", site: hostname, text: "Search with the Search button, not Enter." }];
+      },
+    });
     const host = browser;
+    let turnId = "fixture-turn";
     const params = (tool: string, args: DynamicToolCallParams["arguments"]): DynamicToolCallParams => ({
       namespace: "openbot_browser",
       tool,
       arguments: args,
       ownerAgentId: "fixture-agent",
       threadId: "fixture-thread",
-      turnId: "fixture-turn",
+      turnId,
       callId: `steps-${++sequence}`,
     });
     const call = (tool: string, args: DynamicToolCallParams["arguments"]) =>
@@ -494,6 +504,32 @@ async function main(): Promise<void> {
     measurements.modalOutsideButtonInSnapshot = names(modal.page).includes("Outside");
     assert(names(modal.page).includes("Inside"), "The modal button is missing.");
     recordCases("snapshot-reads-modal");
+
+    phase("site-memories");
+    const siteSchema = z.object({
+      siteMemories: z.array(z.object({ id: z.string(), site: z.string(), text: z.string() })).optional(),
+    });
+    const siteMemoriesOf = async (tool: string, args: DynamicToolCallParams["arguments"]) =>
+      siteSchema.parse((await readPage(tool, args)).raw).siteMemories;
+    siteMemoriesOn = true;
+    turnId = "site-turn-1";
+    const recalled = await siteMemoriesOf("navigate", { tabId: settleTab.id, url: `${origin}/form` });
+    assert.deepEqual(
+      recalled,
+      [{ id: "memory-site", site: "127.0.0.1", text: "Search with the Search button, not Enter." }],
+      "The snapshot did not show the memories of its site.",
+    );
+    assert.deepEqual(siteMemoryReads, [{ agentId: "fixture-agent", hostname: "127.0.0.1" }]);
+    recordCases("snapshot-shows-site-memories");
+    const again = await siteMemoriesOf("navigate", { tabId: settleTab.id, url: `${origin}/article` });
+    assert.equal(again, undefined, "A second page of the same site showed its memories again in one turn.");
+    recordCases("site-memories-once-per-turn");
+    turnId = "site-turn-2";
+    const nextTurn = await siteMemoriesOf("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(nextTurn?.length, 1, "A new turn did not show the site memories.");
+    recordCases("site-memories-again-next-turn");
+    siteMemoriesOn = false;
+    turnId = "fixture-turn";
     await close(settleTab.id);
 
     phase("page-crash");

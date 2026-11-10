@@ -201,6 +201,16 @@ after 4 seconds, the agent opens the page with `navigate`. Before, it waited and
 4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
 and 75k tokens.
 
+A memory can name a site (`site`, migration 60): a lowercase host without `www.`. The agent sets it
+with `openbot.remember` (a host or a URL), for example how to work a site. A snapshot of a page then
+has `siteMemories`, up to 5 of the agent's memories for the page's host and its parent domains
+(`app.example.com` also shows `example.com`), newest first. A tab shows them one time per host and
+turn, so the next pages of the same site in that turn do not show them again. A secret tab shows none.
+Only a snapshot that reached the agent counts as shown. The host reads them from SQLite
+(`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
+provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory
+shape stays the same. An instance transfer does not carry the site.
+
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
 go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).

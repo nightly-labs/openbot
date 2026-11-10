@@ -20,7 +20,7 @@ import {
   AgentMemoryStore,
 } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
-import { normalizeMemoryText } from "../memory-store";
+import { normalizeMemorySite, normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MemoryReviewOperation } from "./memory-review-prompt";
@@ -48,6 +48,8 @@ type PendingMemoryMutation =
       expectedSelectionRevision?: number;
       duplicate?: { memoryId: string; expectedRevision: number };
       inclusion: "essential" | "searchable";
+      /** A normalized site. Absent, an update keeps the site that the memory has. */
+      site?: string;
     }
   | {
       callId: string;
@@ -329,6 +331,9 @@ export class AgentMemories {
         return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
       if (args.inclusion !== undefined && args.inclusion !== "essential" && args.inclusion !== "searchable")
         return openBotToolFailure("inclusion must be essential or searchable.");
+      const site = isString(args.site) ? normalizeMemorySite(args.site) : undefined;
+      if ((args.site !== undefined && !isString(args.site)) || site === null)
+        return openBotToolFailure("site must be a host name or a URL.");
       const memoryId = args.memoryId;
       if (
         memoryId !== undefined &&
@@ -369,6 +374,7 @@ export class AgentMemories {
           id: selectedId ?? "00000000-0000-0000-0000-000000000000",
           text,
           origin: duplicate?.origin ?? ("automatic" as const),
+          ...((site ?? current?.site) ? { site: site ?? current?.site } : {}),
         };
         if (essentialMemoryBytes([...others, candidate]) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) {
           if (current && sourceSelection?.inclusion === "essential")
@@ -404,11 +410,13 @@ export class AgentMemories {
           ? { duplicate: { memoryId: duplicate.id, expectedRevision: duplicateSelection.revision } }
           : {}),
         inclusion,
+        ...(site ? { site } : {}),
       });
       return openBotToolResult({
         status: "staged",
         memoryId: memoryId ?? null,
         inclusion,
+        ...(site ? { site } : {}),
         ...(inclusion !== intendedInclusion ? { note: sourceText("error.backend.memoryEssentialBudget") } : {}),
       });
     }
@@ -670,6 +678,7 @@ export class AgentMemories {
         ...(mutation.memoryId ? { memoryId: mutation.memoryId } : {}),
         text: mutation.text,
         sourceTurnId: mutation.sourceTurnId,
+        ...(mutation.site ? { site: mutation.site } : {}),
       });
       if (!memory) return;
       const selection = this.#memories.getSelection(mutation.agentId, memory.id);
