@@ -326,6 +326,7 @@ import { EncryptedRecordStore } from "./password-managers/encrypted-record-store
 import { PasswordManagersService } from "./password-managers/password-managers-service";
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
+import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
@@ -1083,6 +1084,10 @@ export async function createApplicationServices({
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
   const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
+  // Windows: the dock and the island get the pointer moves only near them, not through a hook on each
+  // mouse move of the computer.
+  const pointerForwarding =
+    windowKind === "tool" ? new PointerForwardingGate(() => screen.getCursorScreenPoint()) : null;
   const dynamicIsland = new DynamicIslandWindowController({
     windowKind,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -1098,6 +1103,7 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
+    pointerForwarding,
     performCriticalAction: (action) =>
       Effect.suspend(() => {
         if (!criticalActionTargets) {
@@ -1122,6 +1128,7 @@ export async function createApplicationServices({
     getMainWindow: windows.getMainWindow,
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
+    pointerForwarding,
     // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
     // A channel message is the same send command as in the channel view of the main window.
     sendMessage: (action) =>
