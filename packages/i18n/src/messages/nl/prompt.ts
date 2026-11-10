@@ -44,6 +44,8 @@ export const messages = {
   "prompt.browser.title.cancelled": "Stap geannuleerd op {host}",
   "prompt.browser.title.pending": "Voltooi de stap op {host}",
   "prompt.browser.cancelled": "Geannuleerd",
+  "prompt.browser.reload":
+    "Rond het inloggen af en laad daarna de browserpagina opnieuw voordat je “Ik ben klaar” kiest. De pagina kan pas weer worden geïnspecteerd nadat ze opnieuw is geladen.",
   "prompt.browser.continuing": "{name} gaat verder.",
   "prompt.browser.cancelledBody": "De browserstap is geannuleerd.",
   "prompt.browser.pendingBody":

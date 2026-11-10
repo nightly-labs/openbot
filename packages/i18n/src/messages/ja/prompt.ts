@@ -44,6 +44,8 @@ export const messages = {
   "prompt.browser.title.cancelled": "{host} での手順はキャンセルされました",
   "prompt.browser.title.pending": "{host} で手順を完了してください",
   "prompt.browser.cancelled": "キャンセル済み",
+  "prompt.browser.reload":
+    "サインインを完了し、ブラウザーのページを再読み込みしてから「完了しました」を選んでください。ページが再読み込みされるまで、ページの検査はブロックされます。",
   "prompt.browser.continuing": "{name} が続行しています。",
   "prompt.browser.cancelledBody": "ブラウザーの手順はキャンセルされました。",
   "prompt.browser.pendingBody":

@@ -44,6 +44,8 @@ export const messages = {
   "prompt.browser.title.cancelled": "Шаг отменён на {host}",
   "prompt.browser.title.pending": "Выполните шаг на {host}",
   "prompt.browser.cancelled": "Отменено",
+  "prompt.browser.reload":
+    "Завершите вход, затем перезагрузите страницу в браузере, прежде чем нажимать «Готово». Пока страница не перезагружена, её проверка заблокирована.",
   "prompt.browser.continuing": "{name} продолжает работу.",
   "prompt.browser.cancelledBody": "Шаг в браузере отменён.",
   "prompt.browser.pendingBody":

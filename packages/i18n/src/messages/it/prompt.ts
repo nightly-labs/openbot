@@ -44,6 +44,8 @@ export const messages = {
   "prompt.browser.title.cancelled": "Passaggio annullato su {host}",
   "prompt.browser.title.pending": "Completa il passaggio su {host}",
   "prompt.browser.cancelled": "Annullato",
+  "prompt.browser.reload":
+    "Completa l'accesso, poi ricarica la pagina del browser prima di scegliere «Ho finito». L'ispezione della pagina resta bloccata finché non viene ricaricata.",
   "prompt.browser.continuing": "{name} sta continuando.",
   "prompt.browser.cancelledBody": "Il passaggio nel browser è stato annullato.",
   "prompt.browser.pendingBody":

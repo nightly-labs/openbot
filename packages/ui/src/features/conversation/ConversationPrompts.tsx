@@ -481,6 +481,9 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
         </>
       }
     >
+      <Show when={props.request?.secret?.requiresReload}>
+        <p>{t("prompt.browser.reload")}</p>
+      </Show>
       <figure class="browser-takeover-preview">
         <figcaption class="browser-takeover-preview-bar">
           <Monitor aria-hidden="true" />

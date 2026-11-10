@@ -44,6 +44,8 @@ export const messages = {
   "prompt.browser.title.cancelled": "Krok anulowany: {host}",
   "prompt.browser.title.pending": "Wykonaj krok: {host}",
   "prompt.browser.cancelled": "Anulowano",
+  "prompt.browser.reload":
+    "Dokończ logowanie, a potem przeładuj stronę w przeglądarce, zanim wybierzesz „Gotowe”. Sprawdzanie strony pozostaje zablokowane do jej przeładowania.",
   "prompt.browser.continuing": "{name} kontynuuje.",
   "prompt.browser.cancelledBody": "Krok w przeglądarce został anulowany.",
   "prompt.browser.pendingBody":
