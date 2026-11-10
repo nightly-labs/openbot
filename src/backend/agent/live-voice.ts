@@ -42,13 +42,37 @@ const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
+/**
+ * Codex gives the voice at most about 4,000 bytes of a relay reply: about the first 2,000 bytes while
+ * the relay writes them, and the remainder only when the reply is complete. From a longer reply it
+ * removes the middle. The relay also needs many seconds to copy a long answer. So the relay copies
+ * only a short answer, and gives a long one as a summary that reaches the voice complete and in a
+ * few seconds (#6659).
+ *
+ * The longest answer, in UTF-8 bytes, that the relay copies: about 80 English words. Codex also tells
+ * the relay to be concise, so the relay sometimes shortens an answer that has no mark, and then it
+ * does not name the chat. Thus the limit is small: a marked answer always gets a summary that does.
+ */
+const RELAY_VERBATIM_BYTES = 600;
+/** The longest summary of a longer answer, in words. */
+const RELAY_SUMMARY_WORDS = 150;
+/** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
+const LONG_ANSWER_MARK = "[long answer]";
 const RELAY_INSTRUCTIONS =
   "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
-  "Then reply with the tool result verbatim and nothing else. Never answer on your own.";
+  "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
+  `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
+  `its most important facts in ${RELAY_SUMMARY_WORDS} words or fewer, in the language of the answer. ` +
+  "Use only facts from the answer, and never add or change one. " +
+  "Write plain sentences without links, lists, formatting or code. " +
+  "End with one sentence that says that the full answer is in the chat. " +
+  "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
+  "do not shorten it, and do not change its form.";
 /** The first message in the voice conversation. The voice model reads it as the user's. */
 const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
+  "Say only what the result says, and add no facts of your own. " +
   "Do not reply to this message.";
 
 const logger = createOpenBotLogger("live-voice");
@@ -130,9 +154,9 @@ interface PendingAsk {
  *
  * The voice runs on a relay thread of that process, not on the agent's thread. When the voice model
  * hands a request off, the relay calls `ask_agent`, and OpenBot sends the request to the agent as the
- * user's message. The agent's answer goes back to the voice, which speaks it. So the voice does not
- * depend on the agent's provider or model, and a model change does not end it. The chat shows each
- * request and answer as usual.
+ * user's message. The agent's answer goes back to the voice, which speaks it: a short answer as it
+ * is, a long one as a summary. So the voice does not depend on the agent's provider or model, and a
+ * model change does not end it. The chat shows each request and the full answer as usual.
  *
  * One session runs at a time for each owner: the user of this computer, or one member of the server.
  */
@@ -415,6 +439,12 @@ export class LiveVoice {
   }
 }
 
+/**
+ * A long answer gets the mark that tells the relay to give a summary of it. A failure does not: the
+ * chat can have no answer for it.
+ */
 function toolResult(reply: LiveVoiceReply): DynamicToolResult {
-  return { contentItems: [{ type: "inputText", text: reply.text }], success: reply.success };
+  const long = reply.success && Buffer.byteLength(reply.text) > RELAY_VERBATIM_BYTES;
+  const text = long ? `${LONG_ANSWER_MARK}\n${reply.text}` : reply.text;
+  return { contentItems: [{ type: "inputText", text }], success: reply.success };
 }

@@ -158,11 +158,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "Annulla",
   "chat.marker.instructionsUndone": "Annullato",
   "chat.usageLimit.title": "Limite di utilizzo di {provider} raggiunto",
+  "chat.usageLimit.modelTitle": "Limite di utilizzo di {model} raggiunto",
   "chat.usageLimit.onHold": "Messaggio in attesa",
   "chat.usageLimit.bodyReset":
     "Il tuo messaggio non è partito. Invialo subito a un altro modello oppure attendi fino a {reset}.",
   "chat.usageLimit.body":
     "Il tuo messaggio non è partito. Invialo subito a un altro modello oppure attendi la fine del limite.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} non ha ancora iniziato questo lavoro. Passa {name} a un altro modello ora oppure attendi fino a {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} non ha ancora iniziato questo lavoro. Passa {name} a un altro modello ora oppure attendi la fine del limite.",
   "chat.usageLimit.sendTo": "Invia a",
   "chat.usageLimit.remember": "La prossima volta, cambia senza chiedere",
   "chat.usageLimit.wait": "Attendi il ripristino",
@@ -324,6 +329,9 @@ export const messages = {
   "chat.image.preview": "Anteprima di {name}",
   "chat.image.previewGenerated": "Anteprima dell'immagine generata",
   "chat.image.download": "Scarica {name}",
+  "chat.image.copy": "Copia immagine",
+  "chat.image.copied": "Immagine copiata",
+  "chat.image.copyFailed": "Impossibile copiare l'immagine.",
   "chat.image.downloadGenerated": "Scarica l'immagine generata",
   "chat.image.attachedFallback": "immagine allegata",
   "chat.image.attachment": "Immagine allegata",

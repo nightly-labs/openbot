@@ -89,6 +89,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
   "mobile.settings.animations.title": "Анимации",
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
@@ -128,6 +131,9 @@ export const messages = {
     "Показывает начало ответа, вопрос или действие, которое нужно подтвердить. Apple и служба аккаунтов OpenBot не могут его прочитать.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Показывает начало ответа, вопрос или действие, которое нужно подтвердить. Google и служба аккаунтов OpenBot не могут его прочитать.",
+  "mobile.settings.notifications.threadReplies": "Ответы в ветках",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Ответы в ветках сообщают, когда агент заканчивает работу или останавливается с ошибкой в ветке. Без них ветка всё равно сообщает, когда ждёт вашего ответа или подтверждения.",
   "mobile.settings.notifications.sound": "Звук",
   "mobile.settings.notifications.playSound": "Воспроизводить звук",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

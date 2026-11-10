@@ -1340,6 +1340,57 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "postiz",
+    name: "Postiz",
+    tagline: "Social media scheduling",
+    description:
+      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "Postiz",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-channels", text: "Which social media channels are connected to Postiz?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    ],
+    websiteUrl: "https://postiz.com",
+    privacyPolicyUrl: "https://postiz.com/privacy",
+    termsUrl: "https://postiz.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-postiz-mcp",
+        name: "Postiz",
+        description:
+          "Channels, drafts, scheduled posts and media, over Postiz's MCP server with browser sign-in or an API key.",
+        server: {
+          name: "postiz",
+          transport: "http",
+          url: "https://mcp.postiz.com/mcp-oauth-dynamic",
+          auth: [
+            { id: "postiz-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "postiz-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "Postiz Settings › Developers › Your API key",
+                },
+              ],
+              docsUrl: "https://docs.postiz.com/general/settings/developers",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Gmail, Slack, GitHub and 1,000+ more apps",

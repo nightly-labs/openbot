@@ -85,6 +85,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "明度",
   "mobile.settings.appearance.messageColorFooter":
     "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
+  "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
   "mobile.settings.animations.title": "アニメーション",
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
@@ -124,6 +127,9 @@ export const messages = {
     "返信の冒頭、質問、または承認が必要な操作を表示します。Apple と OpenBot アカウントサービスはこの内容を読めません。",
   "mobile.settings.notifications.previewFooterAndroid":
     "返信の冒頭、質問、または承認が必要な操作を表示します。Google と OpenBot アカウントサービスはこの内容を読めません。",
+  "mobile.settings.notifications.threadReplies": "スレッドの返信",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "スレッドの返信をオンにすると、エージェントがスレッドで作業を終えたとき、またはエラーで止まったときに通知します。オフでも、スレッドで入力または承認が必要なときは通知します。",
   "mobile.settings.notifications.sound": "サウンド",
   "mobile.settings.notifications.playSound": "サウンドを再生",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

@@ -88,6 +88,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidad",
   "mobile.settings.appearance.messageColorFooter":
     "Con Color del agente, tus mensajes en el chat de un agente usan su color. Con Color personalizado, tus mensajes en todos los chats usan el color que elijas. El color del texto cambia para que siga siendo legible.",
+  "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",
   "mobile.settings.animations.title": "Animaciones",
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
@@ -128,6 +131,9 @@ export const messages = {
     "Muestra el inicio de una respuesta, una pregunta o la acción que hay que aprobar. Apple y el servicio de cuentas de OpenBot no pueden leerlo.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Muestra el inicio de una respuesta, una pregunta o la acción que hay que aprobar. Google y el servicio de cuentas de OpenBot no pueden leerlo.",
+  "mobile.settings.notifications.threadReplies": "Respuestas en hilos",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Las respuestas en hilos te avisan cuando un agente termina o se detiene con un error en un hilo. Sin ellas, un hilo te sigue avisando cuando necesita tu respuesta o una aprobación.",
   "mobile.settings.notifications.sound": "Sonido",
   "mobile.settings.notifications.playSound": "Reproducir sonido",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

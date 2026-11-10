@@ -19,6 +19,8 @@ import { createSidebarPendingStore } from "./stores/pending-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
+  /** A chat drags only in the manual orders. "Unread first" sorts each section itself. */
+  const chatsDraggable = () => layoutMutable() && props.chatOrder !== "unread-first";
   const scrollFades = createScrollFades({ stuck: ".sidebar-folder > header" });
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
@@ -47,6 +49,7 @@ export function createSidebarScope(props: SidebarProps) {
     sectionParent,
     sectionPosition,
     sectionUnreadCount,
+    unreadChats,
     userHiddenAgentList,
     userHiddenSince,
     visiblePinnedKeys,
@@ -145,7 +148,14 @@ export function createSidebarScope(props: SidebarProps) {
   });
 
   createEffect(
-    () => [resolvedPinnedItems(), waitingChats(), filteredChats(), orderedPeople(), userHiddenAgentList()],
+    () => [
+      resolvedPinnedItems(),
+      waitingChats(),
+      unreadChats(),
+      filteredChats(),
+      orderedPeople(),
+      userHiddenAgentList(),
+    ],
     () => {
       scrollFades.remeasure();
     },
@@ -173,6 +183,7 @@ export function createSidebarScope(props: SidebarProps) {
     channelDeleteTarget,
     deleting,
     chatPinnedItems,
+    chatsDraggable,
     directThreadByMember,
     dragOffset: dragState.dragOffset,
     dragOverPinnedKey: dragState.dragOverPinnedKey,
@@ -223,6 +234,7 @@ export function createSidebarScope(props: SidebarProps) {
     startRenameSection,
     startSectionDragging,
     stopSidebarDragging,
+    unreadChats,
     updateSectionEditorName,
     updateSidebarNativeDrag,
     userHiddenAgentList,

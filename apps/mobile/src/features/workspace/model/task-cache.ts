@@ -108,6 +108,24 @@ export function taskThreadCheck(
 }
 
 /**
+ * The thread of the side thread of the agent that runs `turnId`, among the tasks that the phone has
+ * read, or null when the turn is of the agent's own chat or of a task that the phone does not know.
+ */
+export function taskTurnThread(
+  queryClient: QueryClient,
+  scope: QueryScope,
+  serverId: string,
+  agentId: string,
+  turnId: string,
+): string | null {
+  return (
+    queryClient
+      .getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, agentId))
+      ?.tasks.find((task) => task.activeTurnId === turnId)?.threadId ?? null
+  );
+}
+
+/**
  * The event as the agent's own chat sees it. A task turn runs on the task's own thread, and the host
  * sends its turn, question, approval and takeover events with that thread, so the chat would show
  * the task's work, or a question it cannot show, as its own. A task that the phone has not read is

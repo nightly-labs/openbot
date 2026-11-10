@@ -51,6 +51,7 @@ import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protoc
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
+import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -207,7 +208,12 @@ import {
   showsOnline,
 } from "@/features/workspace/model/server-status";
 import { moveSidebarChat } from "@/features/workspace/model/sidebar-layout";
-import { taskThreadCheck, taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
+import {
+  taskThreadCheck,
+  taskThreadMessages,
+  taskTurnThread,
+  withoutTaskTurns,
+} from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { reduceThreadWaits } from "@/features/workspace/model/thread-waits";
@@ -562,6 +568,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKeys.serverMembers(queryScope, serverId),
           queryKeys.serverInvites(queryScope, serverId),
           queryKeys.agentAvatar(queryScope, serverId),
+          queryKeys.channelImage(queryScope, serverId),
           queryKeys.serverLogo(queryScope, serverId),
         ])
           queryClient.removeQueries({ queryKey });
@@ -724,6 +731,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string) => hasCapability(serverCapabilities.current, serverId, LIVE_ACTIVITY_PUSH_CAPABILITY),
     [],
   );
+  const sideThreadOfTurn = useCallback(
+    (serverId: string, agentId: string, turnId: string) =>
+      taskTurnThread(queryClient, queryScope, serverId, agentId, turnId),
+    [queryClient, queryScope],
+  );
   const applyLiveActivityEvent = useLiveActivity({
     servers,
     activeServerId,
@@ -733,6 +745,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     post: postLiveActivityAction,
     loadAgentAvatar,
     supportsPush: supportsLiveActivityPush,
+    sideThreadOfTurn,
   });
   // An iPhone and an Android phone register through capabilities of their own.
   const supportsPushNotifications = useCallback(
@@ -744,12 +757,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ),
     [],
   );
+  const supportsThreadNotifications = useCallback(
+    (serverId: string) => hasCapability(serverCapabilities.current, serverId, PUSH_NOTIFICATION_THREADS_CAPABILITY),
+    [],
+  );
   usePushNotifications({
     servers,
     serversReady: serverDirectoryState === "ready",
     foreground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
+    supportsThreads: supportsThreadNotifications,
   });
   /** The shared Team API requests, sent to one server. */
   const teamApi = useCallback(
@@ -2121,7 +2139,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
-      deleteAgent: (agentId) => runTeamRequest(deleteAgent(teamApi(), agentId)),
+      deleteAgent: (agentId, serverId) => runTeamRequest(deleteAgent(teamApi(serverId), agentId)),
       interruptTurn: (agentId, turnId, serverId) =>
         runTeamRequest(interruptAgentTurn(teamApi(serverId), agentId, turnId)),
       loadConversation,

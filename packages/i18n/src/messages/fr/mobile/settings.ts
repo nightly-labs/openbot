@@ -85,6 +85,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosité",
   "mobile.settings.appearance.messageColorFooter":
     "Avec Couleur de l’agent, vos messages dans une discussion avec un agent prennent la couleur de cet agent. Avec Couleur personnalisée, vos messages dans toutes les discussions prennent la couleur choisie. La couleur du texte change pour rester lisible.",
+  "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
@@ -125,6 +128,9 @@ export const messages = {
     "Affiche le début d’une réponse, une question ou l’action à approuver. Apple et le service de compte OpenBot ne peuvent pas le lire.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Affiche le début d’une réponse, une question ou l’action à approuver. Google et le service de compte OpenBot ne peuvent pas le lire.",
+  "mobile.settings.notifications.threadReplies": "Réponses dans les fils",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Les réponses dans les fils vous préviennent quand un agent termine ou s’arrête sur une erreur dans un fil. Sans elles, un fil vous prévient toujours quand il attend votre réponse ou une approbation.",
   "mobile.settings.notifications.sound": "Son",
   "mobile.settings.notifications.playSound": "Jouer un son",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

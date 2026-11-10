@@ -85,6 +85,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",
   "mobile.settings.animations.title": "Animações",
   "mobile.settings.animations.footer":
     "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
@@ -125,6 +128,9 @@ export const messages = {
     "Mostra o início de uma resposta, uma pergunta ou a ação a aprovar. A Apple e o serviço de contas do OpenBot não conseguem ler.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Mostra o início de uma resposta, uma pergunta ou a ação a aprovar. O Google e o serviço de contas do OpenBot não conseguem ler.",
+  "mobile.settings.notifications.threadReplies": "Respostas em tópicos",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "As respostas em tópicos avisam quando um agente termina ou para com um erro em um tópico. Sem elas, um tópico ainda avisa quando precisa da sua resposta ou de uma aprovação.",
   "mobile.settings.notifications.sound": "Som",
   "mobile.settings.notifications.playSound": "Tocar som",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

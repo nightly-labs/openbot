@@ -12,7 +12,8 @@
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // direct-message isolation, agents hidden from an older
-// protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits, and the error
+// protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
+// a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
 import assert from "node:assert/strict";
@@ -80,6 +81,13 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY, AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_IMPORT_CAPABILITY, AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import {
+  AGENT_IMPORT_V2_CAPABILITY,
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
 import {
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_INSTRUCTIONS_ROUTES,
@@ -240,6 +248,7 @@ import { TeamChatStore } from "../src/backend/team-chat-store";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
+import { AgentImportService } from "../src/main/agent-import-service";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
@@ -499,6 +508,8 @@ const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => vo
 // The roles of this host. Empty roles give every member `manage`, as a host without roles does; the
 // message delete checks set "everyone" to a lower level for one agent.
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+/** The free disk space that the import service reads. Null: the disk does not say. */
+let importFreeBytes: number | null = null;
 /** The host's access listener. Only the live voice check sends a change in this run. */
 const accessListeners = new Set<(serverId: string, state: AgentAccessState) => void>();
 const agentAccess: TeamApiAgentAccess = {
@@ -1367,8 +1378,32 @@ try {
     },
   });
 
+  // The real import service. Only the preview runs here, so the agent writer is never reached.
+  const agentImport = new AgentImportService(
+    {
+      listAgents: () => [],
+      createAgentProfile: () => Effect.die("The import is not applied in this run."),
+      createRoutine: unused("agentImport.createRoutine"),
+      createMemory: unused("agentImport.createMemory"),
+      memoryLimit: () => 50,
+      initializeMemorySelection: unused("agentImport.initializeMemorySelection"),
+      setAvatar: () => Effect.die("The export has no avatars."),
+      deleteAgent: () => Effect.die("The import is not applied in this run."),
+      channels: { command: () => Effect.die("The export has no group chats.") },
+      createChannelMemory: unused("agentImport.createChannelMemory"),
+      createChannelRoutine: unused("agentImport.createChannelRoutine"),
+      deleteChannel: () => Effect.die("The export has no group chats."),
+    },
+    { library: unused("agentImport.library"), installLocal: () => Effect.void },
+    () => ({ id: "local", name: "Local" }),
+    () => "UTC",
+    join(root, "agent-import-uploads"),
+    () => Effect.sync(() => importFreeBytes),
+  );
+
   server = new TeamApiServer({
     appVersion: APP_VERSION,
+    agentImport,
     store,
     agents: fakeAgents,
     agentTasks: fakeAgentTasks,
@@ -1717,7 +1752,13 @@ try {
   }
 
   /** One raw request with a declared length, for the body limits that `fetch` cannot reach. */
-  function rawCall(path: string, token: string, contentLength: number, body: Uint8Array | null): Promise<ReplySummary> {
+  function rawCall(
+    path: string,
+    token: string,
+    contentLength: number,
+    body: Uint8Array | null,
+    options: CallOptions = {},
+  ): Promise<ReplySummary> {
     return new Promise((resolveCall, rejectCall) => {
       const request = httpRequest(
         {
@@ -1726,7 +1767,7 @@ try {
           method: "POST",
           path,
           headers: {
-            ...protocolHeaders({ token }),
+            ...protocolHeaders({ ...options, token }),
             "Content-Type": "application/octet-stream",
             "Content-Length": String(contentLength),
           },
@@ -7945,6 +7986,127 @@ try {
         callsOf("resolveLocalWorkspaceFile").length === localReads + 1 &&
         isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
       [summary(memberOutside), summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
+    );
+  }
+
+  // ---- A Grok Bot export sent in parts (agent-import-v2) ----
+  {
+    const importCapabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_IMPORT_CAPABILITY, AGENT_IMPORT_V2_CAPABILITY];
+    const asMember = { token: bobToken, capabilities: importCapabilities, protocol: TEAM_PROTOCOL_V9 };
+    // Two full parts and one short part. Random bytes do not compress, so the stored file needs all of them.
+    const exported = zipSync(
+      {
+        "grok-export/openbot-import.json": strToU8(
+          JSON.stringify({
+            format: "openbot-agent-import",
+            version: 1,
+            source: { app: "grok-bot", exportedAt: "2026-11-09T10:00:00Z" },
+            agents: [
+              {
+                key: "large",
+                name: "Large Export",
+                title: "",
+                description: "You came from a large export.",
+                avatar: null,
+                skills: [],
+                routines: [],
+                memories: ["The export is larger than 16 MB."],
+                files: "agents/large/files",
+              },
+            ],
+          }),
+        ),
+        "grok-export/agents/large/files/data.bin": new Uint8Array(randomBytes(2 * AGENT_IMPORT_V2_CHUNK_BYTES + 4096)),
+      },
+      { level: 0 },
+    );
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-import-v2 to a protocol 9 peer only, beside agent-import-v1",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_IMPORT_V2_CAPABILITY) &&
+        list(field(compatibility.body, "capabilities")).includes(AGENT_IMPORT_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_IMPORT_V2_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_IMPORT_V2_ROUTES.open, {
+      token: bobToken,
+      json: { size: exported.length },
+    });
+    check(
+      "open without the capability gets 400 agentImportUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentImportUnsupported")),
+      summary(unsupported),
+    );
+    importFreeBytes = exported.length - 1;
+    const full = await call("POST", AGENT_IMPORT_V2_ROUTES.open, { ...asMember, json: { size: exported.length } });
+    importFreeBytes = null;
+    check(
+      "open refuses an export that the free disk space cannot hold, with both sizes",
+      // About 16 MB needs 0.1 GB, rounded up, and 1 byte less is 0.0 GB free, rounded down.
+      errorIs(full, 400, sourceText("error.import.uploadDiskSpace", { size: "0.1", free: "0.0" })),
+      summary(full),
+    );
+    const opened = await call("POST", AGENT_IMPORT_V2_ROUTES.open, { ...asMember, json: { size: exported.length } });
+    const uploadId = String(field(opened.body, "uploadId"));
+    check("open answers an upload id", opened.status === 200 && uploadId.length > 0, summary(opened));
+    const send = (offset: number, bytes: Uint8Array<ArrayBuffer>, token = bobToken) =>
+      call("POST", agentImportV2ChunkPath(uploadId, offset), { ...asMember, token, bytes });
+    const early = await call("POST", AGENT_IMPORT_V2_ROUTES.stage, { ...asMember, json: { uploadId } });
+    const skipped = await send(AGENT_IMPORT_V2_CHUNK_BYTES, exported.slice(0, 1024));
+    const otherMember = await send(0, exported.slice(0, 1024), adaToken);
+    check(
+      "stage before the last part, a part at the wrong offset, and a part from another member are refused",
+      early.status === 400 &&
+        skipped.status === 409 &&
+        errorIs(otherMember, 409, sourceText("error.import.exportClosed")),
+      [summary(early), summary(skipped), summary(otherMember)],
+    );
+    const tooLarge = await rawCall(
+      agentImportV2ChunkPath(uploadId, 0),
+      bobToken,
+      AGENT_IMPORT_V2_CHUNK_BYTES + 1,
+      null,
+      asMember,
+    );
+    check("a part over 8 MiB gets 413", tooLarge.status === 413, tooLarge);
+    const received: unknown[] = [];
+    for (let offset = 0; offset < exported.length; offset += AGENT_IMPORT_V2_CHUNK_BYTES) {
+      const part = await send(offset, exported.slice(offset, offset + AGENT_IMPORT_V2_CHUNK_BYTES));
+      received.push(part.status === 200 ? field(part.body, "received") : summary(part));
+    }
+    check(
+      "three parts arrive in order, and each answer counts the bytes the host has",
+      isDeepStrictEqual(received, [AGENT_IMPORT_V2_CHUNK_BYTES, 2 * AGENT_IMPORT_V2_CHUNK_BYTES, exported.length]),
+      received,
+    );
+    const staged = await call("POST", AGENT_IMPORT_V2_ROUTES.stage, { ...asMember, json: { uploadId } });
+    const agents = list(field(staged.body, "agents"));
+    check(
+      "stage answers the v1 preview of the complete export, with the size of its files",
+      staged.status === 200 &&
+        agents.length === 1 &&
+        field(agents[0] ?? null, "name") === "Large Export" &&
+        field(agents[0] ?? null, "fileBytes") === 2 * AGENT_IMPORT_V2_CHUNK_BYTES + 4096 &&
+        field(agents[0] ?? null, "avatarUrl") === undefined,
+      summary(staged),
+    );
+    const again = await call("POST", AGENT_IMPORT_V2_ROUTES.stage, { ...asMember, json: { uploadId } });
+    const discarded = await call("POST", AGENT_IMPORT_ROUTES.discard, {
+      ...asMember,
+      json: { token: field(staged.body, "token") },
+    });
+    const applyClosed = await call("POST", AGENT_IMPORT_ROUTES.apply, {
+      ...asMember,
+      json: { token: field(staged.body, "token"), keys: ["large"], channelKeys: [], timezone: "UTC" },
+    });
+    check(
+      "the upload is spent by stage; the v1 discard releases the token, so apply gets exportClosed",
+      errorIs(again, 400, sourceText("error.import.exportClosed")) &&
+        discarded.status === 200 &&
+        errorIs(applyClosed, 409, sourceText("error.import.exportClosed")),
+      [summary(again), summary(discarded), summary(applyClosed)],
     );
   }
 

@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "밝기",
   "mobile.settings.appearance.messageColorFooter":
     "에이전트 색상을 선택하면 에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 사용자 지정 색상을 선택하면 모든 채팅에서 내 메시지가 선택한 색상을 사용해요. 글자 색은 읽기 쉽도록 바뀌어요.",
+  "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
   "mobile.settings.animations.title": "애니메이션",
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
@@ -123,6 +126,9 @@ export const messages = {
     "답변의 시작 부분, 질문, 승인할 작업을 표시해요. Apple과 OpenBot 계정 서비스는 이 내용을 읽을 수 없어요.",
   "mobile.settings.notifications.previewFooterAndroid":
     "답변의 시작 부분, 질문, 승인할 작업을 표시해요. Google과 OpenBot 계정 서비스는 이 내용을 읽을 수 없어요.",
+  "mobile.settings.notifications.threadReplies": "스레드 답변",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "스레드 답변을 켜면 에이전트가 스레드에서 작업을 마치거나 오류로 멈출 때 알려 줘요. 꺼도 스레드에서 입력이나 승인이 필요할 때는 알려 줘요.",
   "mobile.settings.notifications.sound": "소리",
   "mobile.settings.notifications.playSound": "소리 재생",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

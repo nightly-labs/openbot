@@ -395,6 +395,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.omnisend.prompt.segment":
     "How many contacts are in the VIP segment, and how did it change this month?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
+  "marketplace.plugin.postiz.tagline": "Social media scheduling",
+  "marketplace.plugin.postiz.description":
+    "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.postiz.app":
+    "Channels, drafts, scheduled posts and media, over Postiz's MCP server with browser sign-in or an API key.",
+  "marketplace.plugin.postiz.prompt.channels": "Which social media channels are connected to Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Which posts are scheduled for next week?",
+  "marketplace.plugin.postiz.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",

@@ -1755,6 +1755,12 @@ textarea {
   font-weight: 650;
 }
 
+/* "Unread" uses the "Needs you" heading with a neutral count: the warning colour belongs to waits. */
+.sidebar-unread-group .sidebar-waiting-group-count {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-readable);
+}
+
 .sidebar-hidden-group-count {
   margin-inline-start: var(--openbot-space-1);
   font-variant-numeric: tabular-nums;

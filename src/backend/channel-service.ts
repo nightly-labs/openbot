@@ -80,8 +80,13 @@ export interface ChannelHooks {
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
   busy(agentId: string): boolean;
-  /** Whether a spent provider plan holds this agent, so a routing turn on its model would be refused. */
+  /**
+   * Whether a spent provider plan holds this agent, so a routing turn on its model would be refused.
+   * An agent that may try one turn, after `retry`, is not held.
+   */
   usageLimited?(agentId: string): boolean;
+  /** A person wrote to this agent while a spent plan may hold it, so it may start one turn. */
+  retry?(agentId: string): void;
   /**
    * Whether a task that a spent plan holds is dropped, because its routine has no use for a late
    * result. It settles the routine run before the task is cancelled.
@@ -241,6 +246,12 @@ export class ChannelService {
   /** Turns that the provider started with no delivery. Their rows are no task's reply. */
   readonly #providerTurns = new Set<string>();
   readonly #deletedChannels = new Set<string>();
+  /**
+   * Tasks from a person's message whose owner has not had its one try at a usage limit. The try
+   * goes to the owner once, also to a member that routing picks later: a held task that wakes again
+   * gets no new try.
+   */
+  readonly #tryTasks = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
   /** The active assignments last seen per channel, so turn traffic reports no new hold. */
   readonly #activeAssignments = new Map<string, string>();
@@ -413,8 +424,9 @@ export class ChannelService {
 
   /**
    * Sets or removes the uploaded image of a channel. It is not a channel command: the image is a
-   * file on this computer, and the Team API does not carry it. The old file goes after the commit, so
-   * a failed commit leaves the stored URL on a file that still exists. A shutdown does not stop the
+   * file on this computer. The Team API sets it only through the `channel-picture-v1` image route.
+   * The old file goes after the commit, so a failed commit leaves the stored URL on a file that
+   * still exists. A shutdown does not stop the
    * work between the file and the commit, so no file is left that the channel does not name.
    */
   readonly setImage = Effect.fn("ChannelService.setImage")((channelId: string, image: AvatarImageInput | null) =>
@@ -631,9 +643,11 @@ export class ChannelService {
         const summary = this.#summaries.get(channelId);
         if (summary) yield* Fiber.interrupt(summary);
         yield* Effect.gen({ self: this }, function* () {
+          const tasks = yield* channelSync(() => this.store.tasks(channelId));
+          for (const task of tasks) this.#tryTasks.delete(task.id);
           yield* this.interruptTasks(
             channelId,
-            (yield* channelSync(() => this.store.tasks(channelId))).filter((task) => !terminal(task)),
+            tasks.filter((task) => !terminal(task)),
           );
           if (pump) yield* Fiber.await(pump);
           const agentIds = new Set(
@@ -998,7 +1012,7 @@ export class ChannelService {
             operationId,
           ),
         );
-        return { current, continued, affected, resumed, message, result };
+        return { current, continued, affected, resumed, message, result, tasks: [task, ...others] };
       }).pipe(
         Effect.onExit((exit) =>
           committed
@@ -1009,7 +1023,13 @@ export class ChannelService {
             : Effect.void,
         ),
       );
-      const { current, continued, affected, resumed, message, result } = stored;
+      const { current, continued, affected, resumed, message, result, tasks } = stored;
+      // A person wrote, so the agents that the message reaches may start one turn while a spent plan
+      // holds them, as in their own chat: the person can have bought more usage, and no reading shows
+      // that before the reset. The lead routes a task with no owner, and each owner gets its try when
+      // the task reaches it.
+      for (const item of tasks) this.#tryTasks.add(item.id);
+      if (current.leadAgentId && tasks.some((item) => !item.ownerAgentId)) this.hooks.retry?.(current.leadAgentId);
       this.publish(current.id);
       yield* this.interruptTasks(
         current.id,
@@ -1769,6 +1789,8 @@ export class ChannelService {
               ),
             ),
           );
+          // Each member that a person's message reaches gets its one try at a usage limit.
+          if (this.#tryTasks.has(task.id)) for (const sibling of siblings) this.#tryTasks.add(sibling.id);
           // The owner used to be stamped without a publish, because nothing the renderer shows had
           // changed. The dispatch message has, so the channel has to be republished here.
           this.publish(channelId);
@@ -1793,6 +1815,7 @@ export class ChannelService {
           this.hooks.routingFailed?.({ channelId, taskId: task.id, lead, error });
           if (shown === null) this.hooks.error(error);
           const detail = shown ?? sourceText("error.backend.channelRoutingFailed");
+          this.#tryTasks.delete(task.id);
           yield* channelSync(() =>
             this.store.update(channel, {
               tasks: [{ ...task, state: "paused", error: detail }],
@@ -1811,6 +1834,7 @@ export class ChannelService {
         }
       }
       const owner = task.ownerAgentId;
+      if (owner && this.#tryTasks.delete(task.id)) this.hooks.retry?.(owner);
       if (owner && this.hooks.usageLimited?.(owner)) {
         yield* channelSync(() => this.#heldByLimit(channelId, task, owner));
         continue;

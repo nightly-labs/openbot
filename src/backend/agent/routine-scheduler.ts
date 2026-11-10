@@ -545,13 +545,15 @@ export class RoutineScheduler implements RoutineDueSource {
    *
    * A request the model can correct is a tool failure, not a throw: a throw becomes a provider error
    * toast, although the model's corrected retry then creates the routine. Other errors are faults
-   * and still throw.
+   * and still throw. `requestedByPerson` is the router's check that a person asked for the turn; the
+   * webhook routine tools need it.
    */
   handleTool(
     params: DynamicToolCallParams,
     senderAgentId: string,
+    requestedByPerson: () => boolean,
   ): Effect.Effect<OpenBotToolResponse | null, RoutineOperationFailed> {
-    return this.#handleTool(params, senderAgentId).pipe(
+    return this.#handleTool(params, senderAgentId, requestedByPerson).pipe(
       Effect.catchDefect((cause) => Effect.fail(new RoutineOperationFailed({ cause }))),
       Effect.catch((failure) =>
         failure.cause instanceof RoutineInputError
@@ -588,6 +590,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this: RoutineScheduler,
     params: DynamicToolCallParams,
     senderAgentId: string,
+    requestedByPerson: () => boolean,
   ) {
     if (params.tool === "list_routines") {
       const args = routineToolArguments(params.arguments, ["agentId"]);
@@ -653,7 +656,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (params.tool === CREATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, CREATE_WEBHOOK_ROUTINE_ARGUMENTS);
       const agentId = this.#toolAgentId(args, senderAgentId);
-      const webhooks = this.#webhookTool(senderAgentId, params.threadId, params.turnId);
+      const webhooks = this.#webhookTool(requestedByPerson);
       const active = args.active === undefined ? true : args.active;
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       // The zone has no effect on a webhook trigger. It is the editor's default if the user changes
@@ -686,7 +689,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (params.tool === UPDATE_WEBHOOK_ROUTINE_TOOL) {
       const args = routineToolArguments(params.arguments, UPDATE_WEBHOOK_ROUTINE_ARGUMENTS);
       const agentId = this.#toolAgentId(args, senderAgentId);
-      const webhooks = this.#webhookTool(senderAgentId, params.threadId, params.turnId);
+      const webhooks = this.#webhookTool(requestedByPerson);
       const routineId = routineToolString(
         args.routineId,
         "routineId",
@@ -787,7 +790,7 @@ export class RoutineScheduler implements RoutineDueSource {
         "routineId is required.",
       );
       if (this.#routines.getRecord(agentId, routineId)?.trigger.kind === "webhook") {
-        yield* this.#webhookTool(senderAgentId, params.threadId, params.turnId).delete({ agentId, routineId });
+        yield* this.#webhookTool(requestedByPerson).delete({ agentId, routineId });
       } else {
         yield* this.delete({ agentId, routineId }, agentId === senderAgentId ? { turnId: params.turnId } : {});
       }
@@ -1257,19 +1260,12 @@ export class RoutineScheduler implements RoutineDueSource {
    * The writer of the webhook routine tools. A public route changes only on a person's request: a
    * routine run or an agent message can carry text from outside, such as a webhook body.
    */
-  #webhookTool(senderAgentId: string, threadId: string, turnId: string): WebhookRoutineWriter {
+  #webhookTool(requestedByPerson: () => boolean): WebhookRoutineWriter {
     const webhooks = this.#webhookRoutines?.();
     if (!webhooks) throw new RoutineInputError("This server cannot create webhook routines.");
-    // Every delivery of the turn: a message steered into a routine run shares the run's turn. Only
-    // the agent's own chat: a channel task and a Slack or Telegram message also arrive as `user`.
-    const deliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, turnId);
-    const requested =
-      deliveries.length > 0 &&
-      deliveries.every(({ delivery }) => delivery.sender.kind === "user") &&
-      !this.#conversation.isExecutionThread(this.#conversation.publicThreadId(senderAgentId, threadId));
-    if (!requested) {
+    if (!requestedByPerson()) {
       throw new RoutineInputError(
-        "Only a person's message can create, change or delete a webhook routine. Ask the user to request it in the chat.",
+        "Only a person's message, in your OpenBot chat or a thread they opened, can create, change or delete a webhook routine. Ask the user to request it there.",
       );
     }
     return webhooks;

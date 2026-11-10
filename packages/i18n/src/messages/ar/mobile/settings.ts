@@ -91,6 +91,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
   "mobile.settings.animations.title": "الحركات",
   "mobile.settings.animations.footer":
     "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",
@@ -130,6 +133,9 @@ export const messages = {
     "تعرض بداية الرد، أو السؤال، أو الإجراء المطلوب الموافقة عليه. لا تستطيع Apple ولا خدمة حساب OpenBot قراءتها.",
   "mobile.settings.notifications.previewFooterAndroid":
     "تعرض بداية الرد، أو السؤال، أو الإجراء المطلوب الموافقة عليه. لا تستطيع Google ولا خدمة حساب OpenBot قراءتها.",
+  "mobile.settings.notifications.threadReplies": "ردود السلاسل",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "ردود السلاسل تُعلمك عندما ينتهي وكيل أو يتوقف بسبب خطأ في سلسلة. من دونها، تبقى السلسلة تُعلمك عندما تحتاج إلى إدخالك أو موافقتك.",
   "mobile.settings.notifications.sound": "الصوت",
   "mobile.settings.notifications.playSound": "تشغيل الصوت",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

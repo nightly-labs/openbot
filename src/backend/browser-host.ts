@@ -22,7 +22,7 @@ import type {
   BrowserViewTarget,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -4534,13 +4534,17 @@ function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {
  * The model reads many snapshots in a task, so the model text is compact. Each element is one line,
  * which leaves out the JSON keys and the empty defaults. The history leaves out what the model already
  * knows: network requests that succeeded, and its own actions that succeeded with no detail. The
- * snapshot tool description says so.
+ * snapshot tool description says so. Only the snapshot's own elements become lines: a value that a
+ * script returns keeps its `elements` key as it is.
  */
 function snapshotJson(value: SnapshotToolPayload): string {
-  return JSON.stringify(value, function (this: unknown, key, field: unknown) {
-    if (!Array.isArray(field) || !isDynamicRecord(this) || !Array.isArray(this.elements)) return field;
-    return key === "elements" ? field.map(elementLine) : field;
-  });
+  if ("elements" in value) return JSON.stringify(withElementLines(value));
+  if ("snapshot" in value) return JSON.stringify({ ...value, snapshot: withElementLines(value.snapshot) });
+  return JSON.stringify(value);
+}
+
+function withElementLines(snapshot: BrowserSnapshot | ClosedTabResult | DialogTabResult | null | undefined) {
+  return snapshot && "elements" in snapshot ? { ...snapshot, elements: snapshot.elements.map(elementLine) } : snapshot;
 }
 
 /** Tags that the role already implies. The line names a tag only when it adds to the role. */

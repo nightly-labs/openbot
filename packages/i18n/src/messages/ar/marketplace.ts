@@ -380,6 +380,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
   "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
+  "marketplace.plugin.postiz.tagline": "جدولة منشورات التواصل الاجتماعي",
+  "marketplace.plugin.postiz.description":
+    "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. سجّل الدخول إلى حسابك في Postiz عبر المتصفح، أو الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمن الوصول إلى API. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.postiz.app":
+    "القنوات والمسودات والمنشورات المجدولة والوسائط، عبر خادم MCP من Postiz بتسجيل الدخول في المتصفح أو بمفتاح API.",
+  "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
+  "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
+  "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
   "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
     "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",

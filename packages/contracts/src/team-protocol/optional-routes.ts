@@ -12,6 +12,7 @@ import { AGENT_FOLDERS_CODECS } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CODECS } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CODECS } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CODECS } from "./agent-import-v1";
+import { AGENT_IMPORT_V2_CODECS } from "./agent-import-v2";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CODECS } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
@@ -87,6 +88,7 @@ import { PROVIDERS_SIGN_IN_V3_CODECS } from "./providers-v3";
 import { PROVIDERS_V4_CODECS } from "./providers-v4";
 import { PROVIDERS_V5_CODECS } from "./providers-v5";
 import { PROVIDERS_V8_CODECS } from "./providers-v8";
+import { PUSH_NOTIFICATION_THREADS_CODECS } from "./push-notification-threads-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
@@ -153,11 +155,13 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,
   ...AGENT_IMPORT_CODECS,
+  ...AGENT_IMPORT_V2_CODECS,
   ...INSTANCE_TRANSFER_CODECS,
   ...AGENT_PUBLISH_CODECS,
   ...LIVE_ACTIVITY_PUSH_CODECS,
   ...PUSH_NOTIFICATIONS_CODECS,
   ...ANDROID_PUSH_NOTIFICATIONS_CODECS,
+  ...PUSH_NOTIFICATION_THREADS_CODECS,
   ...HOSTED_SITES_CODECS,
   ...WORKSPACE_DIRECTORY_CODECS,
   ...AGENT_HOST_SETTINGS_CODECS,

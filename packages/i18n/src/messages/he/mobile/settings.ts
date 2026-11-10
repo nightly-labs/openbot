@@ -83,6 +83,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "בהירות",
   "mobile.settings.appearance.messageColorFooter":
     "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
+  "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",
   "mobile.settings.animations.title": "אנימציות",
   "mobile.settings.animations.footer":
     "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",
@@ -122,6 +125,9 @@ export const messages = {
     "מציג את תחילת התשובה, השאלה או הפעולה לאישור. Apple ושירות החשבונות של OpenBot אינם יכולים לקרוא אותה.",
   "mobile.settings.notifications.previewFooterAndroid":
     "מציג את תחילת התשובה, השאלה או הפעולה לאישור. Google ושירות החשבונות של OpenBot אינם יכולים לקרוא אותה.",
+  "mobile.settings.notifications.threadReplies": "תשובות בשרשורים",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "תשובות בשרשורים מודיעות כשסוכן מסיים או נעצר בשגיאה בשרשור. בלעדיהן, שרשור עדיין מודיע כשהוא צריך קלט או אישור.",
   "mobile.settings.notifications.sound": "צליל",
   "mobile.settings.notifications.playSound": "השמעת צליל",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

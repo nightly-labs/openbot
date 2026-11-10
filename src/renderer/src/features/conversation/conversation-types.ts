@@ -408,7 +408,8 @@ export interface ConversationProps {
 }
 
 /** `messageId` is the conversation message the host stored: the delivery id of the receipt. */
-export type SendMessageResult = { messageId: string } | { error: string };
+/** `reference`: the failure's support reference, when it has one. */
+export type SendMessageResult = { messageId: string } | { error: string; reference?: string | null };
 
 export interface ComposerDraft {
   text: string;

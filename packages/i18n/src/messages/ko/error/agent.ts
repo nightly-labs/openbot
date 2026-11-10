@@ -50,6 +50,7 @@ export const messages = {
     "지금 사용할 수 있는 {provider} 모델이 없어요. list_models를 호출해 사용 가능한 모델을 확인하세요.",
   "error.agent.reasoningEffortUnsupported":
     '모델 "{model}"은(는) 추론 강도 "{effort}"을(를) 지원하지 않아요. 지원하는 강도: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable": '모델 "{model}"에는 추론 강도 설정이 없어서 강도를 바꿀 수 없어요.',
   "error.agent.noStartingModelInSettings":
     "{provider}에 사용할 수 있는 모델이 없고, 로그인된 다른 제공자에도 없어요. 제공자에 로그인하거나 서버 설정 → 제공자에서 기본 제공자를 변경하세요.",
   "error.agent.noStartingModel":

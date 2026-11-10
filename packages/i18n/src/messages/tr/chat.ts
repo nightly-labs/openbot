@@ -155,10 +155,15 @@ export const messages = {
   "chat.marker.instructionsUndo": "Geri al",
   "chat.marker.instructionsUndone": "Geri alındı",
   "chat.usageLimit.title": "{provider} kullanım sınırına ulaşıldı",
+  "chat.usageLimit.modelTitle": "{model} kullanım sınırına ulaşıldı",
   "chat.usageLimit.onHold": "Mesaj beklemede",
   "chat.usageLimit.bodyReset":
     "Mesajınız başlamadı. Şimdi başka bir modele gönderin veya {reset} zamanına kadar bekleyin.",
   "chat.usageLimit.body": "Mesajınız başlamadı. Şimdi başka bir modele gönderin veya sınır bitene kadar bekleyin.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} bu işe henüz başlamadı. {name} adlı üyeyi şimdi başka bir modele geçirin veya {reset} saatine kadar bekleyin.",
+  "chat.usageLimit.channelBody":
+    "{name} bu işe henüz başlamadı. {name} adlı üyeyi şimdi başka bir modele geçirin veya sınır bitene kadar bekleyin.",
   "chat.usageLimit.sendTo": "Şuraya gönder",
   "chat.usageLimit.remember": "Bir dahaki sefere sormadan değiştir",
   "chat.usageLimit.wait": "Sıfırlanmayı bekle",
@@ -323,6 +328,9 @@ export const messages = {
   "chat.image.preview": "{name} görselini önizle",
   "chat.image.previewGenerated": "Oluşturulan görseli önizle",
   "chat.image.download": "{name} görselini indir",
+  "chat.image.copy": "Görüntüyü kopyala",
+  "chat.image.copied": "Görüntü kopyalandı",
+  "chat.image.copyFailed": "Görüntü kopyalanamadı.",
   "chat.image.downloadGenerated": "Oluşturulan görseli indir",
   "chat.image.attachedFallback": "ekli görsel",
   "chat.image.attachment": "Görsel eki",

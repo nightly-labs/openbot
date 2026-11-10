@@ -6,6 +6,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type {
   BrowserDockAction,
+  BrowserDockAnchor,
   BrowserDockFrame,
   BrowserDockGlass,
   BrowserDockPresentation,
@@ -21,7 +22,7 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
 
 const logger = createOpenBotLogger("browser-dock-overlay");
 
-/** The dock is at most 640 CSS pixels wide, with 24 on each side, so the overlay is never wider. */
+/** The overlay width, in CSS pixels, until the dock reports the space that it needs. It is wider than the dock. */
 export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
 /** The height of the overlay, in CSS pixels, until it reports the space that the dock needs. */
 const INITIAL_HEIGHT = 160;
@@ -50,28 +51,34 @@ export interface BrowserDockLayout {
 }
 
 /**
- * Where the overlay and its glass go over `page`. The overlay is at the bottom centre of the page, and no
- * part of it or of a glass shape is outside the page.
+ * Where the overlay and its glass go over `page`. The overlay is at the bottom centre of the page, or at
+ * the bottom corner on the side of the dock, and no part of it or of a glass shape is outside the page.
  */
 export function browserDockLayout(
   page: BrowserMainPage,
   height: number,
   glass: readonly BrowserDockGlass[],
+  anchor?: BrowserDockAnchor | null,
 ): BrowserDockLayout {
   const zoom = page.zoomFactor > 0 ? page.zoomFactor : 1;
-  const width = Math.min(Math.round(BROWSER_DOCK_OVERLAY_WIDTH * zoom), page.bounds.width);
+  const wanted = Math.round((anchor?.width ?? BROWSER_DOCK_OVERLAY_WIDTH) * zoom);
+  const width = Math.min(wanted, page.bounds.width);
   const overlayHeight = Math.min(Math.round(height * zoom), page.bounds.height);
+  const space = page.bounds.width - width;
   const overlay = {
-    x: page.bounds.x + Math.round((page.bounds.width - width) / 2),
+    x: page.bounds.x + (anchor?.side === "left" ? 0 : space),
     y: page.bounds.y + page.bounds.height - overlayHeight,
     width,
     height: overlayHeight,
   };
   const bottom = overlay.y + overlay.height;
+  // The glass is measured in an overlay of the width that the frame asks for. A dock at the right edge keeps
+  // its distance from that edge when the page is narrower than that width.
+  const origin = anchor?.side === "left" ? overlay.x : overlay.x + overlay.width - wanted;
   const shapes: BrowserDockLayout["glass"] = [];
   for (const shape of glass) {
-    const left = Math.max(overlay.x, Math.round(overlay.x + shape.left * zoom));
-    const right = Math.min(overlay.x + overlay.width, Math.round(overlay.x + (shape.left + shape.width) * zoom));
+    const left = Math.max(overlay.x, Math.round(origin + shape.left * zoom));
+    const right = Math.min(overlay.x + overlay.width, Math.round(origin + (shape.left + shape.width) * zoom));
     const top = Math.max(overlay.y, Math.round(bottom - (shape.bottom + shape.height) * zoom));
     const end = Math.min(bottom, Math.round(bottom - shape.bottom * zoom));
     if (right <= left || end <= top) continue;
@@ -104,6 +111,8 @@ export class BrowserDockOverlay {
   /** The height that the overlay has, in CSS pixels, and the glass of its last frame. */
   #height = INITIAL_HEIGHT;
   #glass: BrowserDockGlass[] = [];
+  /** The corner and the width of the dock. They change at once, so the page gets its clicks back. */
+  #anchor: BrowserDockAnchor | null = null;
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
   #shown = false;
@@ -158,6 +167,7 @@ export class BrowserDockOverlay {
     if (this.#destroyed || frame.seq <= this.#seq) return;
     this.#seq = frame.seq;
     this.#glass = frame.glass;
+    this.#anchor = frame.anchor ?? null;
     const height = Math.ceil(frame.height / HEIGHT_STEP) * HEIGHT_STEP;
     if (height >= this.#height) {
       this.#cancelShrink();
@@ -239,6 +249,7 @@ export class BrowserDockOverlay {
       this.#seq = -1;
       this.#height = INITIAL_HEIGHT;
       this.#glass = [];
+      this.#anchor = null;
     }
     if (!window.isDestroyed()) window.contentView.removeChildView(view);
     if (!view.webContents.isDestroyed()) view.webContents.close();
@@ -267,7 +278,7 @@ export class BrowserDockOverlay {
       this.#setShown(false);
       return;
     }
-    const layout = browserDockLayout(page, this.#height, this.#glass);
+    const layout = browserDockLayout(page, this.#height, this.#glass, this.#anchor);
     // The page view was raised, so the glass and then the overlay go above it again, in this order.
     layout.glass.forEach((shape, index) => {
       const glass = this.#glassView(index);

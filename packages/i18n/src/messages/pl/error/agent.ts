@@ -51,6 +51,8 @@ export const messages = {
     "Żaden model {provider} nie jest teraz dostępny. Wywołaj list_models, aby zobaczyć dostępne modele.",
   "error.agent.reasoningEffortUnsupported":
     "Model „{model}” nie obsługuje poziomu rozumowania „{effort}”. Obsługiwane poziomy: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model „{model}” nie ma ustawienia poziomu rozumowania, więc nie można go zmienić.",
   "error.agent.noStartingModelInSettings":
     "{provider} nie ma dostępnego modelu i nie ma go też żaden inny zalogowany dostawca. Zaloguj się do dostawcy lub zmień domyślnego dostawcę w sekcji Ustawienia serwera → Dostawcy.",
   "error.agent.noStartingModel":

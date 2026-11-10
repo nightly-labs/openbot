@@ -299,9 +299,11 @@ export function AgentEventBridge() {
           if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
         return;
-      case "routine-thread-turn-completed":
-        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
-        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+      case "thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
+        // routine thread plays the sound, as before: a routine run played it in the agent's chat.
+        if (event.routine && soundLevel() === "all" && !platform.chatWindow)
+          playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));

@@ -1594,6 +1594,7 @@ export function ConversationTimeline() {
                                     state={pendingState()}
                                     updateRequired={Boolean(providerUpdateRequired())}
                                     error={pendingSend()?.error ?? null}
+                                    errorReference={pendingSend()?.errorReference ?? null}
                                     retrySafe={pendingRetrySafe()}
                                     canEdit={!composerHasContent() && !editingDeliveryId()}
                                     onRetry={() => {
@@ -1738,6 +1739,8 @@ export function ConversationTimeline() {
               {(ask) => (
                 <UsageLimitAskCard
                   provider={ask().provider}
+                  model={ask().model}
+                  agentName={ask().agentName}
                   resetsAt={ask().resetsAt}
                   options={ask().options}
                   onSend={ask().onSend}

@@ -56,7 +56,7 @@ import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
 import { usesX11Windows } from "./linux-wayland-output";
-import { hidePanelFromWindowSwitchers, preventPanelActivation } from "./mac-panel-activation";
+import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
   createMainWindowBoundsRecorder,
   presentMainWindow,
@@ -575,13 +575,15 @@ function attachAppInput(
       window.webContents.inspectElement(params.x, params.y);
       return;
     }
-    // A chat message opens its own menu, but leaves selected text and links to this one
-    // (`keepNativeMenu` in `ChatMessageRow`). The native edit menu covers editing, spelling and
-    // link copying; anything else keeps no menu.
+    // A chat message opens its own menu, but leaves selected text, links and images to this one
+    // (`keepNativeMenu` in `ChatMessageRow`). The native menu covers editing, spelling, and link and
+    // image copying; anything else keeps no menu.
     const items = chatContextMenuItems({
       selectionText: params.selectionText,
       isEditable: params.isEditable,
       linkURL: params.linkURL,
+      mediaType: params.mediaType,
+      hasImageContents: params.hasImageContents,
       misspelledWord: params.misspelledWord,
       dictionarySuggestions: params.dictionarySuggestions,
       editFlags: params.editFlags,
@@ -597,6 +599,13 @@ function attachAppInput(
           return {
             label: t("menu.copyLink"),
             click: () => clipboard.writeText(params.linkURL),
+          };
+        if (item.kind === "copy-image")
+          return {
+            label: t("menu.copyImage"),
+            click: () => {
+              if (!window.isDestroyed()) window.webContents.copyImageAt(params.x, params.y);
+            },
           };
         if (item.kind === "spelling")
           return {
@@ -705,6 +714,8 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   preventPanelActivation(window);
   // While its chat composer is focused, the dock is the main window, and AltTab would list it.
   hidePanelFromWindowSwitchers(window);
+  // The dock stays on screen when the user hides OpenBot, as it does when the main window is minimized.
+  keepPanelThroughAppHide(window);
   // Chromium shares zoom per origin. The main window zoom would change the size of the dock.
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

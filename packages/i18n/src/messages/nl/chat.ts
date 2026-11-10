@@ -152,11 +152,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "Ongedaan maken",
   "chat.marker.instructionsUndone": "Ongedaan gemaakt",
   "chat.usageLimit.title": "Gebruikslimiet van {provider} bereikt",
+  "chat.usageLimit.modelTitle": "Gebruikslimiet van {model} bereikt",
   "chat.usageLimit.onHold": "Bericht in de wacht",
   "chat.usageLimit.bodyReset":
     "Je bericht is nog niet gestart. Stuur het nu naar een ander model, of wacht tot {reset}.",
   "chat.usageLimit.body":
     "Je bericht is nog niet gestart. Stuur het nu naar een ander model, of wacht tot de limiet voorbij is.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} is nog niet aan dit werk begonnen. Zet {name} nu op een ander model, of wacht tot {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} is nog niet aan dit werk begonnen. Zet {name} nu op een ander model, of wacht tot de limiet voorbij is.",
   "chat.usageLimit.sendTo": "Sturen naar",
   "chat.usageLimit.remember": "Volgende keer wisselen zonder te vragen",
   "chat.usageLimit.wait": "Wachten op de reset",
@@ -318,6 +323,9 @@ export const messages = {
   "chat.image.preview": "Voorvertoning van {name}",
   "chat.image.previewGenerated": "Voorvertoning van gegenereerde afbeelding",
   "chat.image.download": "{name} downloaden",
+  "chat.image.copy": "Kopieer afbeelding",
+  "chat.image.copied": "Afbeelding gekopieerd",
+  "chat.image.copyFailed": "Kan de afbeelding niet kopiëren.",
   "chat.image.downloadGenerated": "Gegenereerde afbeelding downloaden",
   "chat.image.attachedFallback": "bijgevoegde afbeelding",
   "chat.image.attachment": "Afbeeldingsbijlage",

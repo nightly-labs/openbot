@@ -1899,7 +1899,7 @@ export const messages = {
   "mobile.server.import.reading": "جارٍ قراءة التصدير…",
   "mobile.server.import.sending": "جارٍ إرسال التصدير… {percent}%",
   "mobile.server.import.chooseNote":
-    "ضع الملف على هذا الهاتف أولًا، في تطبيق الملفات مثلًا. يجب أن يكون أقل من 100 MB. سترى وكلاءه قبل أن يتغير أي شيء.",
+    "ضع الملف على هذا الهاتف أولًا، في تطبيق الملفات مثلًا. سترى وكلاءه قبل أن يتغير أي شيء.",
   "mobile.server.import.readFailed": "تعذّرت قراءة التصدير.",
   "mobile.server.import.reviewTitle": "تصدير {source}",
   "mobile.server.import.exported": "صُدّر في {date}",

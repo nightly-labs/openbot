@@ -10,6 +10,7 @@ import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/bro
 import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -722,6 +723,7 @@ export class TeamWebRtcHostPeer {
                   return JSON.stringify(
                     sideRoute.request(input.path, input.body, {
                       channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+                      channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
                     }),
                   );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
@@ -798,6 +800,7 @@ export class TeamWebRtcHostPeer {
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
             channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+            channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),

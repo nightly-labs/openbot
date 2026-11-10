@@ -131,7 +131,7 @@ const RailChannel = memo(function RailChannel({
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >
-        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} />
+        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />
         {unread ? <RailUnreadDot /> : null}
       </ChatLinkPressable>
     </Link>

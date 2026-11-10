@@ -3,7 +3,7 @@ import { zipSync } from "fflate";
 import { parseDocument } from "yaml";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 // Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
-// of a joined client with `agent-import-v1`.
+// of a joined client with `agent-import-v1`, or in parts with `agent-import-v2`.
 //
 // `stage` reads only the manifest and the avatars and measures the other entries without
 // inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
@@ -13,7 +13,7 @@ import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } 
 // after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
 
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -171,9 +171,24 @@ const LOCAL_IMPORT_OWNER = "local";
 const UPLOAD_SLOTS = 4;
 /** An uploaded export nobody applied is released after this. */
 const UPLOAD_TTL_MS = 30 * 60_000;
+/** An `agent-import-v2` upload that gets no part for this long is released. */
+const PART_UPLOAD_IDLE_MS = 10 * 60_000;
+
+/** An export that a member sends in parts with `agent-import-v2`. */
+interface PartUpload {
+  owner: string;
+  path: string;
+  size: number;
+  /** The bytes the file has, so the offset of the next part. */
+  received: number;
+  /** A part is being written. */
+  writing: boolean;
+  expiry: ReturnType<typeof setTimeout> | null;
+}
 
 export class AgentImportService {
   readonly #staged = new Map<string, StagedSlot>();
+  readonly #uploads = new Map<string, PartUpload>();
   /** Uploaded files that are not in `#staged`: being staged, or being applied. */
   #busyUploads = 0;
   /** Files left by an earlier run are removed before the first upload. */
@@ -197,7 +212,7 @@ export class AgentImportService {
     owner = LOCAL_IMPORT_OWNER,
   ) {
     yield* this.#release(owner);
-    return yield* this.#stageFile(path, owner, false);
+    return yield* this.#stageFile(path, owner, false, IMPORT_ARCHIVE);
   }).bind(this);
 
   readonly stageUpload = Effect.fn("AgentImportService.stageUpload")(function* (
@@ -208,26 +223,19 @@ export class AgentImportService {
     const directory = this.uploadDirectory;
     if (!directory) return yield* archiveFailure(new Error("Agent import uploads are not available."));
     yield* this.#release(owner);
-    const held = [...this.#staged.values()].filter((slot) => slot.temporary).length;
-    if (held + this.#busyUploads >= UPLOAD_SLOTS)
+    if (this.#heldUploads() >= UPLOAD_SLOTS)
       return yield* archiveFailure(new Error(sourceText("error.import.hostBusy")));
     this.#busyUploads += 1;
     return yield* Effect.gen({ self: this }, function* () {
       const bytes = yield* archiveCall(() => read());
       yield* this.#prepareUploadDirectory(directory);
       const path = join(directory, `${randomUUID()}.zip`);
-      let retained = false;
-      return yield* Effect.acquireUseRelease(
-        Effect.succeed(path),
-        () =>
-          Effect.gen({ self: this }, function* () {
-            yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(Effect.uninterruptible);
-            const preview = yield* this.#stageFile(path, owner, true);
-            retained = true;
-            return preview;
-          }),
-        () => (retained ? Effect.void : archiveCall(() => rm(path, { force: true }))),
+      yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(
+        Effect.uninterruptible,
+        // A write that fails part of the way, such as on a full disk, leaves part of the file.
+        Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
       );
+      return yield* this.#stageUploadedFile(path, owner, REMOTE_IMPORT_ARCHIVE);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -236,6 +244,192 @@ export class AgentImportService {
       ),
     );
   }).bind(this);
+
+  /**
+   * Starts an `agent-import-v2` upload of `size` bytes and answers its id. A new upload by the same
+   * owner releases the owner's earlier upload and export.
+   */
+  readonly openUpload = Effect.fn("AgentImportService.openUpload")(function* (
+    this: AgentImportService,
+    size: number,
+    owner: string,
+  ): Effect.fn.Return<string, ArchiveOperationError> {
+    const directory = this.uploadDirectory;
+    if (!directory) return yield* archiveFailure(new Error("Agent import uploads are not available."));
+    if (size === 0) return yield* archiveFailure(new Error(sourceText("error.import.chooseZip")));
+    yield* this.#release(owner);
+    if (this.#heldUploads() >= UPLOAD_SLOTS)
+      return yield* archiveFailure(new Error(sourceText("error.import.hostBusy")));
+    this.#busyUploads += 1;
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* this.#prepareUploadDirectory(directory);
+      const disk = yield* this.freeDiskBytes(directory);
+      // From here to the `set`, nothing waits, so a concurrent open sees this upload. Another open by
+      // the same owner can have ended during the reads above: it is released, as an earlier upload is.
+      const earlier = [...this.#uploads].filter(([, other]) => other.owner === owner);
+      // The other uploads still need the bytes they do not have yet.
+      const reserved = [...this.#uploads.values()]
+        .filter((other) => other.owner !== owner)
+        .reduce((total, other) => total + other.size - other.received, 0);
+      const free = disk === null ? null : Math.max(0, disk - reserved);
+      if (free !== null && size > free)
+        return yield* archiveFailure(
+          new Error(
+            sourceText("error.import.uploadDiskSpace", {
+              size: gigabytes(size, Math.ceil),
+              free: gigabytes(free, Math.floor),
+            }),
+          ),
+        );
+      const uploadId = randomUUID();
+      const upload: PartUpload = {
+        owner,
+        path: join(directory, `${randomUUID()}.zip`),
+        size,
+        received: 0,
+        writing: false,
+        expiry: null,
+      };
+      this.#uploads.set(uploadId, upload);
+      yield* Effect.forEach(earlier, ([id, other]) => this.#dropUpload(id, other), { discard: true });
+      yield* archiveCall(() => writeFile(upload.path, new Uint8Array(), { flag: "wx", mode: 0o600 })).pipe(
+        Effect.tapError(() => this.#dropUpload(uploadId, upload)),
+      );
+      this.#keepUpload(uploadId, upload);
+      return uploadId;
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#busyUploads -= 1;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  /** Writes the next part of an `agent-import-v2` upload at `offset`, and answers the bytes the upload has. */
+  readonly writeUpload = Effect.fn("AgentImportService.writeUpload")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    offset: number,
+    read: () => Promise<Uint8Array>,
+    owner: string,
+  ): Effect.fn.Return<number, ArchiveOperationError> {
+    const upload = this.#uploads.get(uploadId);
+    // Another member's upload reads as a closed export, so the answer does not show that it exists.
+    if (!upload || upload.owner !== owner)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    if (upload.writing || offset !== upload.received)
+      return yield* archiveFailure(new Error("The part does not start where the upload ends."));
+    upload.writing = true;
+    return yield* Effect.gen({ self: this }, function* () {
+      this.#keepUpload(uploadId, upload);
+      const bytes = yield* archiveCall(() => read());
+      if (bytes.length === 0 || upload.received + bytes.length > upload.size)
+        return yield* archiveFailure(new Error("The part does not fit the size of the upload."));
+      const closed = () => this.#uploads.get(uploadId) !== upload;
+      yield* archiveCall(async () => {
+        const handle = await open(upload.path, "r+");
+        try {
+          let written = 0;
+          while (written < bytes.length) {
+            const { bytesWritten } = await handle.write(bytes, written, bytes.length - written, offset + written);
+            if (bytesWritten === 0) throw Object.assign(new Error("The part was not written."), { code: "EIO" });
+            written += bytesWritten;
+          }
+        } finally {
+          await handle.close();
+        }
+      }).pipe(
+        Effect.uninterruptible,
+        // A new open or the idle expiry can release the upload, and remove its file, during the write.
+        Effect.catch((error) => (closed() ? Effect.void : Effect.fail(error))),
+      );
+      if (closed()) {
+        yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
+        return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+      }
+      upload.received += bytes.length;
+      this.#keepUpload(uploadId, upload);
+      return upload.received;
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          upload.writing = false;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  /** Reads a complete `agent-import-v2` upload and answers its preview, as `stageUpload` does. */
+  readonly stageParts = Effect.fn("AgentImportService.stageParts")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    owner: string,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
+    const upload = this.#uploads.get(uploadId);
+    if (!upload || upload.owner !== owner)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    if (upload.writing || upload.received !== upload.size)
+      return yield* archiveFailure(new Error("The upload is not complete."));
+    this.#uploads.delete(uploadId);
+    if (upload.expiry) clearTimeout(upload.expiry);
+    this.#busyUploads += 1;
+    // The parts are a complete export, so it has the limits of an export on this computer. The
+    // import checks the free disk space of each agent's files.
+    return yield* this.#stageUploadedFile(upload.path, owner, IMPORT_ARCHIVE).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#busyUploads -= 1;
+        }),
+      ),
+    );
+  }).bind(this);
+
+  /** Uploads that hold a slot: staged, being read, or being sent in parts. */
+  #heldUploads(): number {
+    const staged = [...this.#staged.values()].filter((slot) => slot.temporary).length;
+    return staged + this.#busyUploads + this.#uploads.size;
+  }
+
+  /** Restarts the idle timer of a part upload. */
+  #keepUpload(uploadId: string, upload: PartUpload) {
+    if (upload.expiry) clearTimeout(upload.expiry);
+    upload.expiry = setTimeout(() => {
+      void runCauseEffect(this.#dropUpload(uploadId, upload));
+    }, PART_UPLOAD_IDLE_MS);
+    upload.expiry.unref();
+  }
+
+  readonly #dropUpload = Effect.fn("AgentImportService.dropUpload")(function* (
+    this: AgentImportService,
+    uploadId: string,
+    upload: PartUpload,
+  ) {
+    if (this.#uploads.get(uploadId) !== upload) return;
+    this.#uploads.delete(uploadId);
+    if (upload.expiry) clearTimeout(upload.expiry);
+    yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
+  });
+
+  /** Stages an uploaded file, and removes it when it does not stage. */
+  readonly #stageUploadedFile = Effect.fn("AgentImportService.stageUploadedFile")(function* (
+    this: AgentImportService,
+    path: string,
+    owner: string,
+    limits: ArchiveLimits,
+  ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
+    let retained = false;
+    return yield* Effect.acquireUseRelease(
+      Effect.succeed(path),
+      () =>
+        Effect.gen({ self: this }, function* () {
+          const preview = yield* this.#stageFile(path, owner, true, limits);
+          retained = true;
+          return preview;
+        }),
+      () => (retained ? Effect.void : archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
+    );
+  });
 
   readonly #prepareUploadDirectory = Effect.fn("AgentImportService.prepareUploadDirectory")(function* (
     this: AgentImportService,
@@ -260,8 +454,8 @@ export class AgentImportService {
     path: string,
     owner: string,
     temporary: boolean,
+    limits: ArchiveLimits,
   ): Effect.fn.Return<AgentImportPreview, ArchiveOperationError> {
-    const limits = temporary ? REMOTE_IMPORT_ARCHIVE : IMPORT_ARCHIVE;
     const archive = yield* readArchiveEffect(path, limits);
     const entries = archive.entries;
     const wrapper = wrapperFolder([...entries.keys()]);
@@ -397,6 +591,8 @@ export class AgentImportService {
 
   readonly #release = Effect.fn("AgentImportService.release")(function* (this: AgentImportService, owner: string) {
     for (const [token, slot] of this.#staged) if (slot.owner === owner) yield* this.#drop(token, slot);
+    for (const [uploadId, upload] of this.#uploads)
+      if (upload.owner === owner) yield* this.#dropUpload(uploadId, upload);
   });
 
   readonly #drop = Effect.fn("AgentImportService.drop")(function* (

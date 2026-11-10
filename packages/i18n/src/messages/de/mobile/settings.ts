@@ -88,6 +88,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Helligkeit",
   "mobile.settings.appearance.messageColorFooter":
     "Mit Agentenfarbe verwenden deine Nachrichten in einem Agentenchat die Farbe dieses Agenten. Mit eigener Farbe verwenden deine Nachrichten in allen Chats die gewählte Farbe. Die Textfarbe passt sich an, damit der Text lesbar bleibt.",
+  "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
   "mobile.settings.animations.title": "Animationen",
   "mobile.settings.animations.footer":
     "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
@@ -128,6 +131,9 @@ export const messages = {
     "Zeigt den Anfang einer Antwort, eine Frage oder die zu genehmigende Aktion. Apple und der OpenBot-Kontodienst können sie nicht lesen.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Zeigt den Anfang einer Antwort, eine Frage oder die zu genehmigende Aktion. Google und der OpenBot-Kontodienst können sie nicht lesen.",
+  "mobile.settings.notifications.threadReplies": "Antworten in Threads",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Antworten in Threads melden, wenn ein Agent in einem Thread fertig ist oder mit einem Fehler anhält. Ohne sie meldet sich ein Thread weiter, wenn er deine Eingabe oder eine Genehmigung braucht.",
   "mobile.settings.notifications.sound": "Ton",
   "mobile.settings.notifications.playSound": "Ton abspielen",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

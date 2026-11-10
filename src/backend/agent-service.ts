@@ -1340,19 +1340,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ? { ...model, defaultReasoningEffort: selected.reasoningEffort }
               : model;
           const client = this.#providers.createProfileClient(selected.provider, selected.providerAccountId);
+          // A routing turn uses the one try that a person's message gave the lead, before it starts, so the
+          // other lanes stay held. The member that it picks gets its own. A summary is not that turn.
+          if (!background) this.#usageLimits.tryStarted(selected.id);
           return yield* this.#profileClients
             .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled))
             .pipe(
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
               // does, and the channel keeps the task queued for the reset.
-              Effect.tapError((failure) =>
-                failure instanceof GenerationUsageLimitError
-                  ? this.#usageLimits.reached(selected.id, failure.resetsAt, selected.model)
-                  : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
-                    ? this.#usageLimits.reached(selected.id, null, selected.model)
-                    : Effect.void,
-              ),
+              Effect.tapError((failure) => {
+                const resetsAt =
+                  failure instanceof GenerationUsageLimitError
+                    ? failure.resetsAt
+                    : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
+                      ? null
+                      : undefined;
+                return resetsAt === undefined
+                  ? Effect.void
+                  : this.#usageLimits.reached(selected.id, resetsAt, selected.model);
+              }),
             );
         }).pipe(toChannelOperationError),
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
@@ -1377,14 +1384,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // no turn ID yet, and it makes such an agent busy: otherwise the assignment waits as
       // "starting" for that turn (#4761).
       busy: (agentId) =>
-        !this.#usageLimits.mayDrain(agentId) ||
+        this.#channelHeld(agentId) ||
         this.#mailbox.channelLanes(agentId).length > 0 ||
         this.#conversation.workingChannelSnapshots(agentId).length > 0 ||
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
             this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
-      usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+      usageLimited: (agentId) => this.#channelHeld(agentId),
+      retry: (agentId) => this.#usageLimits.retry(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
       steer: (agentId, threadId, turnId, messageId, text) =>
@@ -3557,6 +3565,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
   }
 
+  /** Whether a spent plan holds this agent's channel work: it is held, and no person's message gave it a try. */
+  #channelHeld(agentId: string): boolean {
+    return !this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId);
+  }
+
   /**
    * The first ready backup model of an agent set to switch without asking, or undefined. With
    * `startedWork`, the work that a limit stopped after it started, an agent set to ask uses its order too.
@@ -5067,7 +5080,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The end of a request that live voice gave to the agent: the answer of the delivery's last turn,
-   * or why it has none. The text goes to the voice model, which says it in the user's language.
+   * or why it has none. The text goes to the relay of the voice, which shortens a long answer, and
+   * then to the voice model, which says it in the user's language.
    */
   #liveVoiceReply(agentId: string, deliveryId: string): LiveVoiceReply | null {
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;

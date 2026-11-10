@@ -42,6 +42,7 @@ import {
   AgentNewChatSection,
   AgentNotificationLevelRow,
 } from "@/features/agents/components/agent-chat-settings";
+import { AgentDeleteSection } from "@/features/agents/components/agent-delete-section";
 import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
 import {
   AgentBusyMessageField,
@@ -671,6 +672,9 @@ function AgentForm({
                 </SettingsRow>
               ) : null}
             </SettingsSection>
+          ) : null}
+          {host && canAdministerServer(host.role) ? (
+            <AgentDeleteSection agent={agent} disabled={!available || saving || dirty} />
           ) : null}
         </>
       ) : null}

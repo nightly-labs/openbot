@@ -1,5 +1,6 @@
 import {
   AGENT_PROVIDERS,
+  type AgentModelOption,
   type AgentSummary,
   agentComputerUseEnabled,
   workspaceAccessEnforced,
@@ -8,7 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { requestedRuntime, requestedToolModel } from "./model-tools";
+import { agentReasoningEffort, requestedRuntime, requestedToolModel } from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -22,12 +23,12 @@ import { ToolOperationFailed, toolStep } from "./tool-operation";
 const logger = createOpenBotLogger("update-agents-tool");
 
 /** The settings of one changed agent. Instructions are left out, so a result for many agents stays small. */
-function agentSettings(agent: AgentSummary) {
+function agentSettings(agent: AgentSummary, models: AgentModelOption[]) {
   return {
     name: agent.name,
     provider: agent.provider,
     model: agent.model,
-    reasoningEffort: agent.reasoningEffort,
+    ...agentReasoningEffort(agent, models),
     // A runtime change during work applies before the next turn.
     ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
     access: workspaceAccessEnforced(agent) ? "workspace" : "full",
@@ -102,7 +103,11 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
           },
           senderAgentId,
         );
-        return { agentId, ok: true, ...agentSettings(updated) } satisfies AgentResult;
+        const updatedModels = hooks.agentModels({
+          provider: updated.provider,
+          providerAccountId: updated.providerAccountId,
+        });
+        return { agentId, ok: true, ...agentSettings(updated, updatedModels) } satisfies AgentResult;
       }).pipe(
         Effect.catch((error) => failure(agentId, error.cause)),
         Effect.catchDefect((defect) => failure(agentId, defect)),

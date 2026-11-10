@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
   "mobile.settings.animations.title": "Animaties",
   "mobile.settings.animations.footer":
     "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
@@ -123,6 +126,9 @@ export const messages = {
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Apple en de accountdienst van OpenBot kunnen dit niet lezen.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Google en de accountdienst van OpenBot kunnen dit niet lezen.",
+  "mobile.settings.notifications.threadReplies": "Antwoorden in threads",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Antwoorden in threads laten je weten wanneer een agent in een thread klaar is of stopt met een fout. Zonder deze meldingen laat een thread je nog steeds weten wanneer je invoer of een goedkeuring nodig is.",
   "mobile.settings.notifications.sound": "Geluid",
   "mobile.settings.notifications.playSound": "Geluid afspelen",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

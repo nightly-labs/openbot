@@ -446,6 +446,12 @@ const CLAUDE_IDLE_THREAD_LIMIT = 1;
  */
 const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
+/**
+ * How long a stopped turn can run on before its query closes. A CLI that does not end the turn after
+ * the stop otherwise holds the agent's queue until OpenBot restarts (#6348).
+ */
+const CLAUDE_STOP_CONFIRM_MS = 10_000;
+
 interface ClaudeStreamMessage {
   type: string;
   parent_tool_use_id?: string | null;
@@ -576,6 +582,13 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
   };
   return settings;
 });
+
+/**
+ * The model ids that a model list of any sign-in reported. A client for one generation or an agent's
+ * own process reads no list, so it sends a listed id as it is, not the default model (#6330). Ids
+ * are never removed: a list of one account must not drop the ids of another.
+ */
+const CLAUDE_LISTED_MODELS = new Set<string>();
 
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
@@ -768,6 +781,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this: ClaudeAgentClient,
     runtime: ThreadRuntime,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const turn = runtime.activeTurn;
     runtime.input.close();
     runtime.query.close();
     yield* removeClaudeQueryFile(runtime.mcpConfigFile);
@@ -778,6 +792,41 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
     // from the map, so there is nothing left to report it against.
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
+    // A turn that the closed query still ran sends no result, so it ends here. After the close, so
+    // the next turn opens a new query. Without the end, its messages stay running and hold the queue.
+    if (turn && runtime.activeTurn === turn) {
+      for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
+      turn.toolCalls.clear();
+      yield* this.#completeTurn(runtime, "interrupted", null);
+    }
+  });
+
+  /**
+   * Closes the query of a stopped turn that still runs after `CLAUDE_STOP_CONFIRM_MS`, which ends
+   * the turn. The next turn resumes the session in a new query.
+   */
+  readonly #closeIfStopIgnored = Effect.fn("ClaudeAgentClient.closeIfStopIgnored")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    turn: ActiveTurn,
+  ) {
+    yield* Effect.forkIn(
+      Effect.sleep(CLAUDE_STOP_CONFIRM_MS).pipe(
+        Effect.andThen(
+          Effect.suspend(() => {
+            if (runtime.activeTurn !== turn || this.#threads.get(runtime.id) !== runtime) return Effect.void;
+            queryLogger.warn("Closed a Claude query that did not end its turn after a stop.", {
+              threadId: runtime.id,
+              waitedMs: CLAUDE_STOP_CONFIRM_MS,
+            });
+            // A session that is not saved cannot open again.
+            return runtime.config.persistSession ? this.#threads.releaseNow(runtime) : this.#threads.close(runtime);
+          }),
+        ),
+        Effect.ignore,
+      ),
+      this.#scope,
+    );
   });
 
   readonly request = Effect.fn("ClaudeAgentClient.request")(function* <T>(
@@ -848,7 +897,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // A released thread has no turn to stop.
         if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
-        yield* providerCall(() => runtime.query.interrupt());
+        const turn = runtime.activeTurn;
+        const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
+        if (stopped) yield* this.#closeIfStopIgnored(runtime, stopped);
+        yield* providerCall(() => runtime.query.interrupt()).pipe(
+          // The close of a CLI that did not answer the stop rejects the stop request, but the close ends the turn.
+          Effect.catch((failure) =>
+            stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)
+              ? Effect.void
+              : Effect.fail(failure),
+          ),
+        );
         return yield* providerSync(() => decoder({}));
       }
       case "thread/compact/start":
@@ -946,6 +1005,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#modelSdkValues.clear();
       for (const [id, capability] of effortCapabilities) this.#modelEffortCapabilities.set(id, capability);
       for (const [id, value] of sdkValues) this.#modelSdkValues.set(id, value);
+      for (const id of sdkValues.keys()) CLAUDE_LISTED_MODELS.add(id);
       return yield* providerSync(() => result);
     }).pipe(
       Effect.ensuring(
@@ -1173,17 +1233,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // OpenBot's own servers spread last: Claude keys this record by name, so a user configuration
     // that reached one of those names would take the agent's own tools away. Profile generation
     // asks one question and must not act, so it gets neither set.
-    const handoff = config.profileGeneration
+    const usable = config.profileGeneration
       ? null
-      : claudeMcpServers(
-          yield* usableMcpServers(
-            agentMcpServers(this.#mcpServers(), config.computerUse),
-            this.#mcpToolRuntimes?.(),
-            this.#mcpEndpoint,
-            config.agentId,
-          ).pipe(toProviderClientOperationError),
-          CLAUDE_MCP_USER_AGENT,
-        );
+      : yield* usableMcpServers(
+          agentMcpServers(this.#mcpServers(), config.computerUse),
+          this.#mcpToolRuntimes?.(),
+          this.#mcpEndpoint,
+          config.agentId,
+        ).pipe(toProviderClientOperationError);
+    const handoff = usable ? claudeMcpServers(usable, CLAUDE_MCP_USER_AGENT) : null;
     const stateDirectory = this.#stateDirectory;
     // Read once, so that the settings and the home skills of one query agree.
     const userSetup = !config.profileGeneration && this.#userSetup();
@@ -1191,6 +1249,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
     const configDirectory =
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    yield* clearClaudeNeedsAuthMarks(
+      configDirectory,
+      usable?.flatMap((server) => (server.proxied ? [server.config.name] : [])) ?? [],
+    );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
     const signInSettings: Settings = userSetup ? {} : yield* claudeSignInSettings(configDirectory);
@@ -2559,7 +2621,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #sdkModel(model: string): string {
-    return this.#modelSdkValues.get(model) ?? normalizeClaudeModel(model);
+    return this.#modelSdkValues.get(model) ?? (CLAUDE_LISTED_MODELS.has(model) ? model : normalizeClaudeModel(model));
   }
 }
 
@@ -2616,6 +2678,31 @@ export function claudeOpenBotTools(call: (name: string, args: unknown) => Promis
       return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
     });
 }
+
+/**
+ * Removes the CLI's "needs sign-in" marks of the servers in `names` before a query starts (#6325).
+ * After a 401, the CLI writes the server name to `mcp-needs-auth-cache.json` in its configuration
+ * folder, and for 15 minutes each new process skips a server of that name without a connection,
+ * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
+ * which never answers 401, so their marks are from before the sign-in, when the row's own URL
+ * refused the CLI. The file is the CLI's own: a missing or unknown file stays as it is.
+ */
+const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
+  function* (configDirectory: string, names: readonly string[]) {
+    if (names.length === 0) return;
+    const file = join(configDirectory, "mcp-needs-auth-cache.json");
+    const marks = yield* providerCall(async (): Promise<unknown> => JSON.parse(await readFile(file, "utf8")));
+    if (!isRecord(marks)) return;
+    const isMark = (name: string) => {
+      const mark = marks[name];
+      return isRecord(mark) && typeof mark.timestamp === "number";
+    };
+    if (!names.some(isMark)) return;
+    const kept = Object.fromEntries(Object.entries(marks).filter(([name]) => !(names.includes(name) && isMark(name))));
+    yield* providerCall(() => writeFile(file, JSON.stringify(kept)));
+  },
+  (effect) => Effect.ignore(effect),
+);
 
 /** A file that cannot be deleted must not stop the close. */
 function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {

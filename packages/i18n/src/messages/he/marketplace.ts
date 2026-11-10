@@ -365,6 +365,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "איך הקמפיינים של השבוע שעבר הצליחו בהשוואה לשבוע שלפניו?",
   "marketplace.plugin.omnisend.prompt.segment": "כמה אנשי קשר יש בפלח VIP, ואיך זה השתנה החודש?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
+  "marketplace.plugin.postiz.tagline": "תזמון פוסטים ברשתות חברתיות",
+  "marketplace.plugin.postiz.description":
+    "Postiz מאפשר לסוכנים להציג את ערוצי הרשתות החברתיות שלך, ולכתוב טיוטות, לתזמן ולפרסם פוסטים ביותר מ-30 רשתות, כמו X,‏ LinkedIn,‏ Instagram ו-TikTok. סוכנים יכולים גם להעלות מדיה וליצור תמונות וסרטונים בבינה מלאכותית. התחבר לחשבון Postiz שלך בדפדפן, או הדבק את מפתח ה-API מ-Settings › Developers ב-Postiz. כל תוכניות הענן של Postiz כוללות גישה ל-API. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שתאשר אותו.",
+  "marketplace.plugin.postiz.app":
+    "ערוצים, טיוטות, פוסטים מתוזמנים ומדיה, דרך שרת ה-MCP של Postiz עם התחברות בדפדפן או מפתח API.",
+  "marketplace.plugin.postiz.prompt.channels": "אילו ערוצי רשתות חברתיות מחוברים ל-Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "אילו פוסטים מתוזמנים לשבוע הבא?",
+  "marketplace.plugin.postiz.prompt.draft": "כתוב טיוטת פוסט ל-LinkedIn על הגרסה החדשה שלנו, אבל אל תתזמן אותו.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
     "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",

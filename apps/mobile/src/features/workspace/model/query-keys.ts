@@ -128,6 +128,11 @@ export const queryKeys = {
     serverId: string | undefined,
     ...avatar: [] | [agentId: string | undefined, avatarUrl: string | null | undefined]
   ) => ["agent-avatar", ...scope, serverId, ...avatar],
+  channelImage: (
+    scope: QueryScope,
+    serverId: string | undefined,
+    ...image: [] | [channelId: string | undefined, imageUrl: string | null | undefined]
+  ) => ["channel-image", ...scope, serverId, ...image],
   agentModels: (scope: QueryScope, serverId: string) => ["agent-models", ...scope, serverId],
 
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
