@@ -59,6 +59,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     ...(stored.allowNewChat === undefined ? {} : { allowNewChat: stored.allowNewChat }),
     ...(stored.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: stored.quickAcknowledgement }),
     ...(stored.fastMode === undefined ? {} : { fastMode: stored.fastMode }),
+    ...(stored.ultrafast === undefined ? {} : { ultrafast: stored.ultrafast }),
     ...(stored.ownBrowserSession === undefined ? {} : { ownBrowserSession: stored.ownBrowserSession }),
     ...(stored.browserProfileId === undefined ? {} : { browserProfileId: stored.browserProfileId }),
     ...(stored.busyMessageMode === undefined ? {} : { busyMessageMode: stored.busyMessageMode }),
@@ -260,6 +261,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.allowNewChat === right.allowNewChat &&
     left.quickAcknowledgement === right.quickAcknowledgement &&
     left.fastMode === right.fastMode &&
+    left.ultrafast === right.ultrafast &&
     left.ownBrowserSession === right.ownBrowserSession &&
     left.browserProfileId === right.browserProfileId &&
     left.busyMessageMode === right.busyMessageMode &&

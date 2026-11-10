@@ -621,7 +621,7 @@ interface ProviderModelCatalog {
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string };
+  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
   /** False drops a model that the stored API key cannot use. Runs only while a key is stored. */
   usableWithStoredKey?(id: string, name: string): boolean;
   /**

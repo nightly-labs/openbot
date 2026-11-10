@@ -1307,7 +1307,7 @@ const { sync: drainStep, rewrap: toDeliveryStartFailed } = causeHelpers(Delivery
  * tier of the thread.
  */
 function serviceTier(
-  agent: Pick<AgentSummary, "fastMode" | "model">,
+  agent: Pick<AgentSummary, "fastMode" | "ultrafast" | "model">,
   provider: "codex" | "claude",
   models: readonly AgentModelOption[],
 ): { serviceTier?: string | null } {
@@ -1315,5 +1315,7 @@ function serviceTier(
   if (!agent.fastMode) return { serviceTier: null };
   const model = models.find((candidate) => candidate.provider === provider && candidate.id === agent.model);
   if (!model) return {};
+  // As Codex does for a tier that the model does not have, Ultrafast on such a model runs at the standard tier.
+  if (agent.ultrafast) return { serviceTier: model.ultrafastServiceTier ?? null };
   return { serviceTier: model.fastServiceTier ?? null };
 }
