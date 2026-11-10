@@ -810,6 +810,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return result;
   }
 
+  /**
+   * A start failure with the agent's explanation in its message, because the provider row, its last
+   * error and the log read only the message. Antigravity 1.4.5 fails `session/new` with "Internal
+   * error" and the reason in `data.details` (#6454). An error with no explanation stays as it is:
+   * OpenCode's start retry knows its failure by the exact message.
+   */
+  #withFailureDetail(error: unknown): unknown {
+    if (!(error instanceof RequestError) || failureDetail(error) === null) return error;
+    return new RequestError(error.code, this.#redact(failureText(error).replace(/^RequestError:\s*/u, "")), error.data);
+  }
+
   get running(): boolean {
     return this.#transport.running;
   }
@@ -1355,7 +1366,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#signedIn = false;
         return;
       }
-      return yield* providerFailure(error);
+      return yield* providerFailure(this.#withFailureDetail(error));
     }
   });
 
