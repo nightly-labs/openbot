@@ -593,6 +593,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-quota-failover
 
+      - name: Run the Gemini Windows zip E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-windows-zip
+
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
