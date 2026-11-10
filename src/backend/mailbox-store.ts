@@ -2169,6 +2169,22 @@ export class MailboxStore {
     );
   }
 
+  /** The routine delivery that started the turn in which this agent sent the request, if any. */
+  routineDeliveryOfRequest(agentId: string, requestMessageId: string): DeliveryContext | null {
+    const request = this.#state.messages.find((message) => message.id === requestMessageId);
+    if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return null;
+    const turnId = this.#sourceTurnIds().get(request.id);
+    if (!turnId) return null;
+    // A run that resumed after a usage limit has a new turn id. Its earlier turns can have sent the request.
+    const delivery = this.#state.deliveries.find(
+      (candidate) =>
+        candidate.recipientAgentId === agentId &&
+        (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true) &&
+        this.#state.messages.find((message) => message.id === candidate.messageId)?.sender.kind === "routine",
+    );
+    return delivery ? this.#context(delivery) : null;
+  }
+
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
     this: MailboxStore,
     deliveryId: string,
