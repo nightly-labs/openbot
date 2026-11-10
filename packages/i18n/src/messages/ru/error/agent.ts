@@ -8,6 +8,8 @@ export const messages = {
     "Неверные аргументы истории: {detail} Исправь аргументы и повтори попытку. openbot.tool_describe возвращает схему.",
   "error.agent.toolRequestInvalid":
     "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Инструмент не запущен. В tool_call параметр arguments должен быть объектом JSON, а не текстом. Отправьте вызов снова, передав arguments как объект.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
   "error.agent.accessLocalOnly": "Доступ агента можно изменить только на компьютере, где он работает.",
   "error.agent.duplicateCleanupFailed": "Не удалось дублировать агента, а неполную копию удалить не получилось.",

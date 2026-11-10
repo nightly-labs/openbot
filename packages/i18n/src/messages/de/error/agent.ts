@@ -8,6 +8,8 @@ export const messages = {
     "Ungültige Verlaufsargumente: {detail} Korrigiere die Argumente und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.toolRequestInvalid":
     "Ungültige Argumente für die Werkzeugsuche. Verwende das deklarierte Schema und einen originalen qualifizierten Werkzeugnamen.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Das Werkzeug wurde nicht ausgeführt. In tool_call muss arguments ein JSON-Objekt sein, kein Text. Sende den Aufruf erneut mit arguments als Objekt.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
   "error.agent.accessLocalOnly":
     "Der Agentenzugriff kann nur auf dem Computer geändert werden, auf dem der Agent läuft.",

@@ -8,6 +8,8 @@ export const messages = {
     "Argumentos de histórico incorretos: {detail} Corrija os argumentos e tente novamente. openbot.tool_describe fornece o esquema.",
   "error.agent.toolRequestInvalid":
     "Argumentos de descoberta de ferramentas inválidos. Use o esquema declarado e um nome de ferramenta qualificado original.",
+  "error.agent.toolCallArgumentsNotObject":
+    "A ferramenta não foi executada. Em tool_call, arguments deve ser um objeto JSON, não texto. Envie a chamada de novo com arguments como objeto.",
   "error.agent.approvalWhileDeleting": "Não é possível conceder aprovação enquanto o agente está sendo excluído.",
   "error.agent.accessLocalOnly": "O acesso do agente só pode ser alterado no computador que executa o agente.",
   "error.agent.duplicateCleanupFailed": "A duplicação do agente falhou e não foi possível remover a cópia incompleta.",
