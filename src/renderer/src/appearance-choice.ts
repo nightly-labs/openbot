@@ -185,8 +185,11 @@ function cachePreference(preference: AppAppearancePreference): void {
  *
  * Only the main window passes `windowGlass`: main gives the macOS blur to that window alone, so in
  * another window a transparent page would show the desktop with no blur.
+ *
+ * A helper window, such as the agent dock or the browser dock, passes `sweep: false` and changes the
+ * theme at once: a wash across its transparent window does not align with the main window.
  */
-export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
+export function syncAppearance(options: { windowGlass?: boolean; sweep?: boolean } = {}): void {
   let preference = cachedPreference();
   const scheme = syncColorScheme(() => selectedThemePalette(preference)?.scheme ?? preference.appearance);
   applyThemePalette(selectedThemePalette(preference));
@@ -219,7 +222,7 @@ export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
   appPort().onAppAppearancePreference((next) => {
     const before = latest;
     latest = next;
-    if (visibleLook(next) === visibleLook(before)) apply(next);
+    if (options.sweep === false || visibleLook(next) === visibleLook(before)) apply(next);
     else sweepTheme(() => apply(latest));
   });
 }

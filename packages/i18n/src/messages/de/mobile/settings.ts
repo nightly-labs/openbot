@@ -131,6 +131,9 @@ export const messages = {
     "Zeigt den Anfang einer Antwort, eine Frage oder die zu genehmigende Aktion. Apple und der OpenBot-Kontodienst können sie nicht lesen.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Zeigt den Anfang einer Antwort, eine Frage oder die zu genehmigende Aktion. Google und der OpenBot-Kontodienst können sie nicht lesen.",
+  "mobile.settings.notifications.threadReplies": "Antworten in Threads",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Antworten in Threads melden, wenn ein Agent in einem Thread fertig ist oder mit einem Fehler anhält. Ohne sie meldet sich ein Thread weiter, wenn er deine Eingabe oder eine Genehmigung braucht.",
   "mobile.settings.notifications.sound": "Ton",
   "mobile.settings.notifications.playSound": "Ton abspielen",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

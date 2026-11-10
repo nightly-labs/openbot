@@ -42,6 +42,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import { PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
+import { PUSH_NOTIFICATION_THREADS_ROUTES } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_ROUTES } from "@openbot/contracts/team-protocol/push-notifications-v1";
 import { ROUTINE_RECOVERY_ROUTES } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -105,6 +106,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PUSH_NOTIFICATIONS_ROUTES.remove,
   ANDROID_PUSH_NOTIFICATIONS_ROUTES.register,
   ANDROID_PUSH_NOTIFICATIONS_ROUTES.remove,
+  PUSH_NOTIFICATION_THREADS_ROUTES.set,
   STORAGE_ROUTES.usage,
   STORAGE_DISK_ROUTES.disk,
   MACHINE_RESOURCES_ROUTES.metrics,

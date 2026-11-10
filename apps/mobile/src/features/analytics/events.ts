@@ -72,7 +72,14 @@ export const MOBILE_EVENTS = {
   },
   onboarding_completed: { skipped: isBoolean },
   notification_settings_action: {
-    action: ["enabled", "disabled", "preview_toggled", "permission_prompted", "live_activities_toggled"],
+    action: [
+      "enabled",
+      "disabled",
+      "preview_toggled",
+      "thread_replies_toggled",
+      "permission_prompted",
+      "live_activities_toggled",
+    ],
     permission: ["granted", "denied", "undetermined"],
     enabled: isBoolean,
   },

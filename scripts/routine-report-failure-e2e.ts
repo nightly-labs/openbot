@@ -597,20 +597,36 @@ try {
   );
   // A run in a routine thread notifies through its own event, and a quiet run does not notify.
   const routineTurns = (turnId: string | null) =>
-    events.filter((event) => event.type === "routine-thread-turn-completed" && event.turn.turnId === turnId);
+    events.filter((event) => event.type === "thread-turn-completed" && event.routine && event.turn.turnId === turnId);
   const routineThread = (routineId: string) =>
     agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
   const failedTurns = routineTurns(quietFailedRun.delivery.turnId);
   const failedThread = routineThread(quietFailed.id);
   pass(
-    "A run in a routine thread sends one routine-thread-turn-completed, and a quiet run sends none",
+    "A run in a routine thread sends one routine thread-turn-completed, and a quiet run sends none",
     failedTurns.length === 1 &&
-      failedTurns[0]?.type === "routine-thread-turn-completed" &&
+      failedTurns[0]?.type === "thread-turn-completed" &&
       failedTurns[0].taskId === failedThread?.id &&
       failedTurns[0].turn.threadId === failedThread?.threadId &&
       routineTurns(quietOkRun.delivery.turnId).length === 0 &&
       !events.some((event) => event.type === "turn-completed" && event.turnId === quietFailedRun.delivery.turnId),
     { failedTurns, failedThread },
+  );
+  // A turn in a side thread that a person started sends the same event, marked as not a routine's:
+  // the phone notifies about it, and the desktop notification and sound leave it out.
+  const sideTask = await runCauseEffect(agents.startTask({ agentId: checker.id, text: "Hello from a side thread." }));
+  const sideTurn = await waitFor("the side thread turn", () =>
+    events.find((event) => event.type === "thread-turn-completed" && event.taskId === sideTask.id),
+  );
+  pass(
+    "A turn in a side thread of a person sends one thread-turn-completed that is not a routine's",
+    sideTurn.type === "thread-turn-completed" &&
+      !sideTurn.routine &&
+      sideTurn.turn.threadId === sideTask.threadId &&
+      sideTurn.turn.status === "completed" &&
+      events.filter((event) => event.type === "thread-turn-completed" && event.taskId === sideTask.id).length === 1 &&
+      !events.some((event) => event.type === "turn-completed" && event.threadId === sideTask.threadId),
+    { sideTurn, sideTask },
   );
   const scriptPrompt = fakeEntries().find(
     (entry) => entry.method === "turn/start" && entry.turnId === quietFailedRun.delivery.turnId,

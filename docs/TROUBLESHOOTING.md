@@ -79,14 +79,17 @@ start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-sta
 `~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. An update with a
 new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
 after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
-CPU. Chromium also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
+CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
+process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
+also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
 
 When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
 avatars do not move. These two effects used the most CPU time.
 
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
-- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
+- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
+  On a server, this value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 

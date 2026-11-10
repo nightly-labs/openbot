@@ -126,6 +126,9 @@ export const messages = {
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Apple en de accountdienst van OpenBot kunnen dit niet lezen.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Toont het begin van een antwoord, een vraag of de actie die je moet goedkeuren. Google en de accountdienst van OpenBot kunnen dit niet lezen.",
+  "mobile.settings.notifications.threadReplies": "Antwoorden in threads",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Antwoorden in threads laten je weten wanneer een agent in een thread klaar is of stopt met een fout. Zonder deze meldingen laat een thread je nog steeds weten wanneer je invoer of een goedkeuring nodig is.",
   "mobile.settings.notifications.sound": "Geluid",
   "mobile.settings.notifications.playSound": "Geluid afspelen",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

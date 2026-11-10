@@ -131,6 +131,9 @@ export const messages = {
     "Pokazuje początek odpowiedzi, pytanie albo działanie do zatwierdzenia. Apple i usługa kont OpenBot nie mogą go odczytać.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Pokazuje początek odpowiedzi, pytanie albo działanie do zatwierdzenia. Google i usługa kont OpenBot nie mogą go odczytać.",
+  "mobile.settings.notifications.threadReplies": "Odpowiedzi w wątkach",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Odpowiedzi w wątkach powiadomią cię, gdy agent skończy albo zatrzyma się z błędem w wątku. Bez nich wątek nadal powiadomi cię, gdy będzie potrzebować twojej odpowiedzi lub zatwierdzenia.",
   "mobile.settings.notifications.sound": "Dźwięk",
   "mobile.settings.notifications.playSound": "Odtwarzaj dźwięk",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

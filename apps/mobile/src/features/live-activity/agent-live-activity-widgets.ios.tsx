@@ -25,6 +25,7 @@ import {
   widgetsDirectory,
 } from "expo-widgets";
 import ExpoWidgetsModule from "expo-widgets/build/ExpoWidgets";
+import type { ReactElement } from "react";
 import { PLUSH_STYLE, renderPlushPicture } from "@/features/agents/model/plush/plush-picture";
 import type { AgentLiveActivityLoader, AgentLiveActivityNative } from "./agent-live-activity.types";
 import { openSealedLiveActivity } from "./model/live-activity-open";
@@ -225,6 +226,14 @@ function agentLiveActivityLayout(
         })}
       </HStack>
     ) : null;
+  // In the expanded island, iOS does not apply the `widgetURL` of a region to a tap: the app opened
+  // on the screen it had, and not on the chat. A link opens its destination, as each row of the
+  // agent list does. The plain style keeps the colors of the content.
+  const tapLink = (key: string, content: ReactElement) => (
+    <Link key={key} destination={props.tapUrl} modifiers={[buttonStyle("plain")]}>
+      {content}
+    </Link>
+  );
   return {
     // Lock Screen: the state heads the view, and below it the photo and text read as a message from
     // the agent. The photo lines up with the name, not with the state line.
@@ -315,24 +324,29 @@ function agentLiveActivityLayout(
     // Expanded island: the state and its count sit beside the camera. Below, the photo and text read
     // as a notification from the agent, and the answers use the full width.
     expandedLeading: (
-      <HStack modifiers={[padding({ leading: 8, top: 6 })]}>{status(waitSymbol ? tint : islandTint)}</HStack>
+      <HStack modifiers={[padding({ leading: 8, top: 6 })]}>
+        {tapLink("state", status(waitSymbol ? tint : islandTint))}
+      </HStack>
     ),
-    expandedTrailing: <HStack modifiers={[padding({ trailing: 8, top: 6 })]}>{footer}</HStack>,
+    expandedTrailing: (
+      <HStack modifiers={[padding({ trailing: 8, top: 6 })]}>{footer ? tapLink("count", footer) : null}</HStack>
+    ),
     expandedBottom: (
       <VStack
         alignment="leading"
         spacing={12}
         modifiers={[padding({ horizontal: 8, top: 6, bottom: 8 }), widgetURL(props.tapUrl)]}
       >
-        {agents.length > 0 ? (
-          agentList(3, 22)
-        ) : (
-          <HStack alignment="top" spacing={12}>
-            {avatar(44)}
-            {text}
-            <Spacer />
-          </HStack>
-        )}
+        {agents.length > 0
+          ? agentList(3, 22)
+          : tapLink(
+              "content",
+              <HStack alignment="top" spacing={12}>
+                {avatar(44)}
+                {text}
+                <Spacer />
+              </HStack>,
+            )}
         {actions(true)}
       </VStack>
     ),

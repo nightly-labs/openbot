@@ -187,12 +187,13 @@ export type AgentEvent =
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
   /**
-   * A non-quiet turn in a routine thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
-   * the state of the agent's chat does not change. The desktop notification, the phone notification and
-   * the completion sound read `turn` from this event, and a click opens the routine thread. Local only:
-   * the released Team API event adapters do not carry it.
+   * A non-quiet turn in a side thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
+   * the state of the agent's chat does not change. `routine` is true for the thread of a routine: the
+   * desktop notification, the phone notification and the completion sound read `turn` from this event,
+   * and a click opens the routine thread. For another side thread, only the phone notification reads
+   * it, and a tap opens the thread. Local only: the released Team API event adapters do not carry it.
    */
-  | { type: "routine-thread-turn-completed"; taskId: string; turn: AgentTurnCompletedEvent }
+  | { type: "thread-turn-completed"; taskId: string; routine: boolean; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
       requestId: string | number;
@@ -378,9 +379,10 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier)) &&
         (value.error === undefined || isBoundedString(value.error, CONVERSATION_TRACE_TEXT_LIMIT))
       );
-    case "routine-thread-turn-completed":
+    case "thread-turn-completed":
       return (
         isIdentifier(value.taskId) &&
+        typeof value.routine === "boolean" &&
         isDynamicRecord(value.turn) &&
         value.turn.type === "turn-completed" &&
         isAgentEvent(value.turn)

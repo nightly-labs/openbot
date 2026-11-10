@@ -133,6 +133,9 @@ export const messages = {
     "تعرض بداية الرد، أو السؤال، أو الإجراء المطلوب الموافقة عليه. لا تستطيع Apple ولا خدمة حساب OpenBot قراءتها.",
   "mobile.settings.notifications.previewFooterAndroid":
     "تعرض بداية الرد، أو السؤال، أو الإجراء المطلوب الموافقة عليه. لا تستطيع Google ولا خدمة حساب OpenBot قراءتها.",
+  "mobile.settings.notifications.threadReplies": "ردود السلاسل",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "ردود السلاسل تُعلمك عندما ينتهي وكيل أو يتوقف بسبب خطأ في سلسلة. من دونها، تبقى السلسلة تُعلمك عندما تحتاج إلى إدخالك أو موافقتك.",
   "mobile.settings.notifications.sound": "الصوت",
   "mobile.settings.notifications.playSound": "تشغيل الصوت",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

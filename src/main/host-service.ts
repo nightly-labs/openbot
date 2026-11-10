@@ -425,6 +425,8 @@ export class HostService extends EventEmitter<HostEvents> {
             const member = options.store.getMember(memberId);
             return member !== null && !member.disabled;
           },
+          sideThreadOfTurn: (agentId, turnId) =>
+            options.agentTasks?.listTasks(agentId).tasks.find((task) => task.activeTurnId === turnId)?.threadId ?? null,
           logger,
         })
       : undefined;

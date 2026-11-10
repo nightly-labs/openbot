@@ -126,6 +126,13 @@ jobs:
           bun run typecheck
           bun run test:desktop -- apps/mobile/src
 
+      # The binary must have this runtime version, and a later over-the-air update of this commit gets
+      # the same value in a clean checkout. Compute it before the build: on the Linux runner, the
+      # native build changes what a fingerprint of this checkout gives.
+      - name: Compute the runtime version of this commit
+        id: runtime
+        run: bun scripts/mobile-ota.ts runtime-version --platform android
+
       - name: Build production Android on this runner
         working-directory: apps/mobile
         env:
@@ -149,7 +156,9 @@ jobs:
       # only the next store build can correct it. So it must not reach Google Play.
       - name: Check the update settings of the binary
         id: updates
-        run: bun scripts/mobile-ota.ts verify-build --platform android --artifact "$AAB_PATH"
+        env:
+          RUNTIME: ${{ steps.runtime.outputs.runtime }}
+        run: bun scripts/mobile-ota.ts verify-build --platform android --artifact "$AAB_PATH" --runtime "$RUNTIME"
 
       - name: Upload to Google Play
         if: inputs.upload

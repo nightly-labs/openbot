@@ -366,8 +366,9 @@ try {
   await step("phone notification: a run in a routine thread shows its answer and opens the thread", async () => {
     const from = sent.length;
     events.emit("event", {
-      type: "routine-thread-turn-completed",
+      type: "thread-turn-completed",
       taskId: ROUTINE_TASK,
+      routine: true,
       turn: {
         type: "turn-completed",
         agentId: AGENT,

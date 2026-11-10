@@ -125,6 +125,9 @@ export const messages = defineMessages("mobile.settings", {
     "Shows the start of a reply, a question, or the action to approve. Apple and the OpenBot account service cannot read it.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Shows the start of a reply, a question, or the action to approve. Google and the OpenBot account service cannot read it.",
+  "mobile.settings.notifications.threadReplies": "Thread replies",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Thread replies tell you when an agent finishes or stops with an error in a thread. Without them, a thread still tells you when it needs your input or an approval.",
   "mobile.settings.notifications.sound": "Sound",
   "mobile.settings.notifications.playSound": "Play sound",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

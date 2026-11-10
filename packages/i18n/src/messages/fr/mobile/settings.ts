@@ -128,6 +128,9 @@ export const messages = {
     "Affiche le début d’une réponse, une question ou l’action à approuver. Apple et le service de compte OpenBot ne peuvent pas le lire.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Affiche le début d’une réponse, une question ou l’action à approuver. Google et le service de compte OpenBot ne peuvent pas le lire.",
+  "mobile.settings.notifications.threadReplies": "Réponses dans les fils",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Les réponses dans les fils vous préviennent quand un agent termine ou s’arrête sur une erreur dans un fil. Sans elles, un fil vous prévient toujours quand il attend votre réponse ou une approbation.",
   "mobile.settings.notifications.sound": "Son",
   "mobile.settings.notifications.playSound": "Jouer un son",
   "mobile.settings.notifications.sound.openbot": "OpenBot",
