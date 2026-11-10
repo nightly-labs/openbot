@@ -1,4 +1,5 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
@@ -20,14 +21,15 @@ export function readableAgentError(message: string): string {
 
 /**
  * The provider's own text, for the "Copy details" button, when the banner shows only the general
- * sentence because the text is empty, long or technical (#6410). The main process has already
- * redacted it. Null when the banner already shows the provider's text or a sentence of its own kind.
+ * sentence (`readable`) because the text is empty, long or technical (#6410). It is redacted again
+ * here, because a host of an older version redacts fewer secret shapes. Null when the banner already
+ * shows the provider's text or a sentence of its own kind.
  */
-export function agentErrorDetails(message: string): string | null {
+export function agentErrorDetails(message: string, readable: string): string | null {
   const { t } = currentText();
   const raw = message.trim();
-  if (!raw || readableAgentError(message) !== t("agent.error.continueFailed")) return null;
-  return raw.slice(0, ERROR_DETAILS_LIMIT);
+  if (!raw || readable !== t("agent.error.continueFailed")) return null;
+  return redactText(raw).slice(0, ERROR_DETAILS_LIMIT);
 }
 
 /**

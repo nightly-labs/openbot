@@ -1522,7 +1522,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         const message = readableAgentError(event.message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         // The general sentence hides the cause, so the user can copy it into a report (#6410).
-        const details = agentErrorDetails(event.message);
+        const details = agentErrorDetails(event.message, message);
         controller.setConversationErrorRuns((current) => {
           if (details) return { ...current, [key]: { message, run: null, details } };
           if (!(key in current)) return current;

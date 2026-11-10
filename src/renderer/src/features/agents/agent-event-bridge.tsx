@@ -403,7 +403,7 @@ export function AgentEventBridge() {
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
           // The general sentence hides the cause, so the user can copy it into a report (#6410).
-          const details = agentErrorDetails(event.message);
+          const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
             if (run || link || details)
               return {
