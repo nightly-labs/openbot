@@ -87,10 +87,7 @@ function withErrorReason(result: unknown): DynamicRecord | null {
   if (!isDynamicRecord(result) || result.isError !== true || !Array.isArray(result.content)) return null;
   const structured = result.structuredContent ?? {};
   if (!isDynamicRecord(structured) || Object.hasOwn(structured, "message")) return null;
-  const message = result.content
-    .flatMap((item) =>
-      isDynamicRecord(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : [],
-    )
+  const message = textItems(result.content)
     .filter((text) => text.length > 0 && !text.startsWith(STRUCTURED_TEXT_LABEL))
     .join("\n");
   if (message.length === 0) return null;
@@ -139,13 +136,17 @@ function withStructuredText(result: unknown): DynamicRecord | null {
   if (!isDynamicRecord(result) || !Array.isArray(result.content)) return null;
   const structured = result.structuredContent;
   if (!isDynamicRecord(structured)) return null;
-  const texts = result.content.flatMap((item) =>
-    isDynamicRecord(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : [],
-  );
+  const texts = textItems(result.content);
   if (texts.some((text) => text.startsWith(STRUCTURED_TEXT_LABEL))) return null;
   const copy = compactCopy(structured, texts);
   if (Object.keys(copy).length === 0) return null;
   return { ...result, content: [...result.content, { type: "text", text: structuredText(copy) }] };
+}
+
+function textItems(content: readonly unknown[]): string[] {
+  return content.flatMap((item) =>
+    isDynamicRecord(item) && item.type === "text" && typeof item.text === "string" ? [item.text] : [],
+  );
 }
 
 /**
