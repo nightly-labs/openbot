@@ -115,12 +115,48 @@ function bindingWindow(current: UsageWindow | null, next: UsageWindow): UsageWin
   return current && current.usedPercent >= next.usedPercent ? current : next;
 }
 
-/** The server writes the reset as "Oct 29, 2026, 10:12 UTC". */
+/**
+ * The server writes the reset as "Oct 29, 2026, 10:12 UTC" or as a duration — "in 2 hours,
+ * 52 minutes" on the usage reading, and "Your limit will reset in 2 days, 18 hours." on a spent
+ * quota (#4368). Days, hours and minutes, joined by commas or "and"; a decimal such as 1.5 is
+ * accepted. Text without a `<number> <unit>` part reads as no reset, so the clock cannot wait for
+ * it and nothing misparses as "now".
+ */
+const RELATIVE_PART = /(\d+(?:\.\d+)?)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m)/giu;
+const RELATIVE_UNIT_SECONDS: Record<string, number> = {
+  d: 86_400,
+  day: 86_400,
+  days: 86_400,
+  h: 3_600,
+  hr: 3_600,
+  hrs: 3_600,
+  hour: 3_600,
+  hours: 3_600,
+  m: 60,
+  min: 60,
+  mins: 60,
+  minute: 60,
+  minutes: 60,
+};
+
 function resetSeconds(text: string | undefined): number | null {
-  const match = text ? RESET.exec(text.trim()) : null;
-  if (!match) return null;
-  const month = MONTHS.indexOf(match[1] ?? "");
-  if (month < 0) return null;
-  const milliseconds = Date.UTC(Number(match[3]), month, Number(match[2]), Number(match[4]), Number(match[5]));
-  return Number.isFinite(milliseconds) ? milliseconds / 1_000 : null;
+  if (!text) return null;
+  const trimmed = text.trim();
+  const match = RESET.exec(trimmed);
+  if (match) {
+    const month = MONTHS.indexOf(match[1] ?? "");
+    if (month >= 0) {
+      const milliseconds = Date.UTC(Number(match[3]), month, Number(match[2]), Number(match[4]), Number(match[5]));
+      return Number.isFinite(milliseconds) ? milliseconds / 1_000 : null;
+    }
+  }
+  const body = /^(?:(?:will\s+)?resets?\s+(?:in|after)\s+)?(?:in\s+)?(.+)$/iu.exec(trimmed)?.[1] ?? "";
+  let seconds = 0;
+  let named = false;
+  for (const part of body.matchAll(RELATIVE_PART)) {
+    named = true;
+    seconds += Number(part[1]) * (RELATIVE_UNIT_SECONDS[(part[2] ?? "").toLowerCase()] ?? 0);
+  }
+  if (named && seconds > 0) return Math.floor(Date.now() / 1000) + seconds;
+  return null;
 }
