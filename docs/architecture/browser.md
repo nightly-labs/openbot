@@ -174,10 +174,28 @@ seconds, and stops at once when the tab closes, a person takes control, or the t
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
 leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
 check that stays after the full wait reads as `needs-user` at once.
-The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `needs-user` or `blocked`), the
-vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
-`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
-the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `click-once`,
+`needs-user` or `blocked`), the vendor, the wait, and `next`, the step that the agent takes. A check
+that needs a person asks for `request_takeover` (in a routine run, a report). A block asks for a
+report. Each `next` also tells the agent not to solve, reload, or retry the check, so the guidance
+needs no separate rule.
+
+Many checks of the Turnstile, reCAPTCHA and hCaptcha widgets pass with one click on their checkbox.
+The script finds the frame of a widget of the normal size in the viewport and gives the checkbox
+point, 28 px from the left edge and in the middle. Turnstile puts its frame in a closed shadow root,
+which the page script cannot see, and its host element is as wide as the form. When the script
+finds a Turnstile response field without a token, the main process finds the frame through CDP:
+`DOM.getFrameOwner` for each child frame, also for frames in other processes, then the frame's
+`src` and its box from `DOM.getBoxModel`. A field without a visible frame (invisible mode) is not a
+check. A Turnstile widget often passes by itself in 1 to 2 seconds, and an early click can look like
+a bot, so the read that would offer its checkbox first waits up to 3 seconds for a token. The first
+read of a document that still needs a person then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
+ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
+that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the
+wait at once, because only a person solves a puzzle. Later reads of the document ask for a person
+and do not offer the click again. A widget whose response field has a token passed: neither its
+frame nor the generic phrases count then, because the page keeps its text. The host never solves a
+puzzle and sends no page data to a solver service. The idea and the vendor
 list come from anomalyco/browse; the code is our own.
 
 `bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
@@ -187,6 +205,40 @@ clicked "I am human" and read the page again: median 7 tool calls, $0.033 for 5 
 after 4 seconds, the agent opens the page with `navigate`. Before, it waited and read again: median
 4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
 and 75k tokens.
+
+A memory can name a site (`site`, migration 60): a lowercase host without `www.`. The agent sets it
+with `openbot.remember` (a host or a URL), for example how to work a site. A snapshot of a page then
+has `siteMemories`, up to 5 of the agent's memories for the page's host and its parent domains
+(`app.example.com` also shows `example.com`), newest first. A tab shows them one time per host and
+turn, so the next pages of the same site in that turn do not show them again. A secret tab shows none.
+An essential memory is already in the agent's instructions with its site, so a snapshot leaves it out.
+Only a snapshot that reached the agent counts as shown. The host reads them from SQLite
+(`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
+provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory
+shape stays the same. An instance transfer does not carry the site.
+The background memory review can add or update a memory with a `site` too. Its prompt asks it to keep
+how one site works, as the agent found it in the chat (where a control is, a step that worked after
+one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
+host and keeps the fact. The browser guidance has no site memory text: the agent context budget
+(`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
+
+"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
+while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
+secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
+a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
+path part that looks like a code, such as a reset token, with `:id`) or a press on a control
+(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
+with a 1 second limit). A press outside a control, on a password field, or on a field whose
+`autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
+never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
+`openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
+agent reads all of them in a `<user_browsing>` block, with secrets redacted, and deletes the steps
+that it read after its result decodes. A step that no review read goes after 30 days (at start and at
+each change). Turning the setting off deletes the file, and deleting an agent deletes its steps. Only
+the review reads the steps; the agent has no tool to search them. Browsing alone does not start a
+review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
+covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
 
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
@@ -627,4 +679,5 @@ opener group until a main-frame navigation, which also clears history. Otherwise
 URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
+passkeys, and payment confirmation use takeover.

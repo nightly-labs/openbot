@@ -32,7 +32,8 @@
 :root {
   color-scheme: dark;
   --openbot-font-sans:
-    "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
+    sans-serif;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;

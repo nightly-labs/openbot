@@ -15,6 +15,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
+import type { UserBrowsingLog, UserBrowsingStep } from "../user-browsing-log";
 import type { AgentMemories } from "./agent-memories";
 import { backgroundModel, withBackgroundEffort } from "./background-model";
 import { memoryChangesMessage } from "./memory-changes-message";
@@ -87,6 +88,11 @@ export interface MemoryReviewOptions {
   interval?(): number;
   /** Keeps the cursors through a restart. Omitted, they live in memory only. */
   cursors?: MemoryReviewCursors;
+  /**
+   * What the user did in the agent's tabs while they held them ("Learn from my browsing"). A review
+   * reads the steps and deletes them once it has an answer. Omitted, a review reads no steps.
+   */
+  browsing?: Pick<UserBrowsingLog, "pending" | "reviewed" | "forgetAgent">;
 }
 
 /** One conversation that a review reads: the agent's own chat (`threadId` null) or one side thread. */
@@ -213,6 +219,7 @@ export class MemoryReview {
     const running = this.#running;
     if (running?.agentId === agentId) yield* Fiber.interrupt(running.fiber);
     yield* this.#options.cursors?.forgetAgent(agentId) ?? Effect.void;
+    yield* this.#options.browsing?.forgetAgent(agentId) ?? Effect.void;
   }).bind(this);
 
   /**
@@ -446,11 +453,13 @@ export class MemoryReview {
           .map((entry) => entry.memory.id),
       );
       const skillInput = yield* this.#skillInput(agentId, messages);
+      const browsing = options.browsing ? yield* options.browsing.pending(agentId) : [];
       const prompt = memoryReviewPrompt(
         agent,
         { ...base, memories: redacted },
         excerpt.map((message) => redactedMessage(message, options.redact)),
         skillInput ?? undefined,
+        browsing.map((step) => redactedStep(step, options.redact)),
       );
       const client = yield* Effect.try(() => options.createProfileClient(agent));
       const answer = yield* options.profileClients.run(client, (cancelled) =>
@@ -464,6 +473,9 @@ export class MemoryReview {
       );
       const json = yield* Effect.try(() => extractJsonObject(answer));
       const result = yield* Schema.decodeUnknownEffect(MemoryReviewResult)(json);
+      // The model read the steps, so they are not kept for the next review.
+      const lastStep = browsing.at(-1);
+      if (lastStep) yield* options.browsing?.reviewed(agentId, lastStep.at) ?? Effect.void;
       const operations = result.operations.filter(
         (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
       );
@@ -638,6 +650,16 @@ export class MemoryReview {
       }
     }
   }
+}
+
+/** The browsing step with its texts redacted, as the review model reads it. */
+function redactedStep(step: UserBrowsingStep, redact: (text: string) => string): UserBrowsingStep {
+  return {
+    ...step,
+    path: redact(step.path),
+    ...(step.title === undefined ? {} : { title: redact(step.title) }),
+    ...(step.name === undefined ? {} : { name: redact(step.name) }),
+  };
 }
 
 /** The message with its text and its work steps redacted, as the review model reads it. */

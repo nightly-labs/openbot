@@ -302,6 +302,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "הסוכנים טוענים את CLAUDE.md, המיומנויות, הסוכנים, ה-hooks והתוספים מ-~/.claude בשרת. כשהמתג כבוי, כל תור שולח הנחיה קצרה יותר. קובצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
+  "provider.settings.context": "הקשר",
+  "provider.settings.compactWindow": "כיווץ צ׳אטים ב־",
+  "provider.settings.compactWindowDescription":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.compactWindowTokens": "{size} טוקנים",
+  "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",

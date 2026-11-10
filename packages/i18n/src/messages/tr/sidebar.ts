@@ -66,6 +66,8 @@ export const messages = {
   "sidebar.agentMenu.edit": "Ajanı düzenle",
   "sidebar.agentMenu.duplicate": "Ajanı çoğalt",
   "sidebar.agentMenu.duplicating": "Çoğaltılıyor…",
+  "sidebar.agentMenu.markRead": "Okundu olarak işaretle",
+  "sidebar.agentMenu.markUnread": "Okunmadı olarak işaretle",
   "sidebar.agentMenu.delete": "Ajanı sil",
   "sidebar.agentMenu.hide": "Ajanı gizle",
   "sidebar.agentMenu.restore": "Geri yükle",

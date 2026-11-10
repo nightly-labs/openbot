@@ -247,6 +247,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "エージェントはサーバー上の ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code の設定を読み込めませんでした。",
+  "provider.settings.context": "コンテキスト",
+  "provider.settings.compactWindow": "チャットを圧縮するサイズ",
+  "provider.settings.compactWindowDescription":
+    "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
+  "provider.settings.compactWindowDefault": "Claude Code の既定",
+  "provider.settings.compactWindowTokens": "{size} トークン",
+  "provider.settings.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },
   "provider.settings.modelsSearch": "モデルを検索",

@@ -65,6 +65,8 @@ export const messages = defineMessages("sidebar", {
   "sidebar.agentMenu.edit": "Edit agent",
   "sidebar.agentMenu.duplicate": "Duplicate agent",
   "sidebar.agentMenu.duplicating": "Duplicating…",
+  "sidebar.agentMenu.markRead": "Mark read",
+  "sidebar.agentMenu.markUnread": "Mark unread",
   "sidebar.agentMenu.delete": "Delete agent",
   "sidebar.agentMenu.hide": "Hide agent",
   "sidebar.agentMenu.restore": "Restore",

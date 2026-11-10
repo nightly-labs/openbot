@@ -1138,6 +1138,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "По умолчанию Claude Code",
   "mobile.server.providers.promptCacheHour": "1 час",
   "mobile.server.providers.promptCacheLoadFailed": "Не удалось загрузить время кеша промптов этого сервера.",
+  "mobile.server.providers.compactWindow": "Сжимать чаты при",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
+  "mobile.server.providers.compactWindowDefault": "По умолчанию Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} токенов",
+  "mobile.server.providers.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
   "mobile.server.providers.disconnect": "Отключить",
   "mobile.server.providers.disconnectTitle": "Отключить {name}?",
   "mobile.server.providers.disconnectBody":

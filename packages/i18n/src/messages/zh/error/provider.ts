@@ -210,9 +210,6 @@ export const messages = {
   "error.provider.noAgentProcess": "{provider} 没有为该助手运行进程。",
   "error.provider.stoppedBeforeAgentProcess": "{provider} 在助手进程启动前就已停止。",
   "error.provider.archiveUnreadable": "运行时压缩包无法读取，或使用了不支持的格式。",
-  "error.provider.antigravityArchivePath": "Gemini 压缩包中包含异常文件。",
-  "error.provider.antigravityChecksum": "Gemini 运行时校验和不匹配。",
-  "error.provider.antigravityReleaseShape": "Gemini 发布包的结构异常。",
   "error.provider.antigravityMissing": "Gemini 尚未下载。请在 OpenBot 中下载后继续。",
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
   "error.provider.antigravityOverrideInvalid":
@@ -226,6 +223,8 @@ export const messages = {
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
   "error.provider.cursorArchivePath": "Cursor 压缩包中包含异常文件。",
   "error.provider.cursorChecksum": "Cursor 运行时校验和不匹配。",
   "error.provider.cursorReleaseShape": "Cursor 发布包的结构异常。",

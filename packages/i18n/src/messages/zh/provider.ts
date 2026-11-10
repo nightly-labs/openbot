@@ -291,6 +291,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "代理会从服务器上的 ~/.claude 加载 CLAUDE.md、技能、代理、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
   "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
+  "provider.settings.context": "上下文",
+  "provider.settings.compactWindow": "压缩聊天的大小",
+  "provider.settings.compactWindowDescription":
+    "当聊天达到此大小时，Claude Code 会总结较早的轮次。较低可使轮次更快、更便宜。较高会保留更多细节。窗口较小的模型会在其自身上限处压缩。",
+  "provider.settings.compactWindowDefault": "Claude Code 默认",
+  "provider.settings.compactWindowTokens": "{size} 个 token",
+  "provider.settings.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",

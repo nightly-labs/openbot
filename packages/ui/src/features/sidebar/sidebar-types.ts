@@ -136,6 +136,15 @@ export interface SidebarProps {
    * one keeps its section and its pin for a restore.
    */
   userHiddenAgents?: HiddenAgent[] | undefined;
+  /**
+   * The agents whose own chat or side threads have unread replies. Their menu offers Mark read; the
+   * menu of the other agents offers Mark unread.
+   */
+  unreadAgentIds?: ReadonlySet<string> | undefined;
+  /** Marks the chat and the side threads of an agent read. Without it, the agent menu shows no read item. */
+  onMarkAgentRead?: ((agentId: string) => void) | undefined;
+  /** Marks the newest reply of an agent unread. Without it, the agent menu shows no unread item. */
+  onMarkAgentUnread?: ((agentId: string) => void) | undefined;
   /** Hides an agent. Without it, the agent menu shows no hide item. */
   onHideAgent?: ((agentId: string) => void) | undefined;
   /** Puts a hidden agent back in its section. Without it, a hidden agent's menu shows no restore item. */

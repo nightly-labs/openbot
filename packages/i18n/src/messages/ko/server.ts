@@ -363,6 +363,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "먼저 묻기",
   "server.settings.skillLearningOff": "끄기",
   "server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
+  "server.settings.browsingMemory": "내 브라우징에서 학습",
+  "server.settings.browsingMemoryDescription":
+    "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
+  "server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
   "server.settings.rolesTitle": "권한",
   "server.settings.rolesDescription":
     "멤버가 사용할 수 있는 에이전트를 선택하세요. 멤버는 모든 사용자와 자신의 역할 중 가장 높은 접근 권한을 받아요. 소유자와 관리자는 모든 에이전트를 사용할 수 있어요.",

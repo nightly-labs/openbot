@@ -19,6 +19,12 @@ export const messages = {
     "Affiche le bureau flouté derrière la fenêtre. Les sites et les menus suivent alors le thème de l’app.",
   "settings.interfaceSize.title": "Taille de l’interface",
   "settings.interfaceSize.description": "La taille du texte et des commandes dans OpenBot.",
+  "settings.interfaceFont.title": "Police de l’interface",
+  "settings.interfaceFont.description": "La police des menus, des discussions et des réglages.",
+  "settings.interfaceFont.default": "Par défaut (Inter)",
+  "settings.codeFont.title": "Police du code",
+  "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
+  "settings.codeFont.default": "Par défaut",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -266,6 +272,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Gauche",
   "settings.agentDock.autoHide.title": "Masquer quand inutilisé",
   "settings.agentDock.autoHide.description": "Le dock glisse dans le bord. Amenez le pointeur au bord pour l’afficher.",
+  "settings.agentDock.edgeStrip.title": "Afficher une bande au bord",
+  "settings.agentDock.edgeStrip.description":
+    "Une fine bande reste là où le dock se cache. Approchez le pointeur pour afficher le dock. Une vague de couleur monte dans la bande quand un agent vous pose une question.",
   "settings.agentDock.results.title": "Afficher le travail terminé",
   "settings.agentDock.results.description": "Les résultats des agents s’affichent un instant à côté du dock.",
   "settings.agentDock.agents.title": "Agents dans le dock",

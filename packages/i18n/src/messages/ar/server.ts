@@ -423,6 +423,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "اسأل أولًا",
   "server.settings.skillLearningOff": "إيقاف",
   "server.settings.skillLearningLoadFailed": "تعذّر تحميل إعداد تعلّم المهارات.",
+  "server.settings.browsingMemory": "التعلّم من تصفّحي",
+  "server.settings.browsingMemoryDescription":
+    "عندما تتحكم في متصفح الوكيل، يتعلّم الوكيل كيف تعمل المواقع من الصفحات والأزرار التي تستخدمها. لا يُحفظ النص الذي تكتبه.",
+  "server.settings.browsingMemoryLoadFailed": "تعذّر تحميل إعداد التصفّح.",
   "server.settings.rolesTitle": "الأذونات",
   "server.settings.rolesDescription":
     "اختر الوكلاء الذين يمكن للأعضاء استخدامهم. يحصل العضو على أعلى وصول من «الجميع» ومن أدواره. يمكن للمالكين والمسؤولين استخدام كل الوكلاء.",

@@ -97,6 +97,8 @@ import {
   getHostAgentAccess,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostBrowsingMemory,
+  getHostClaudeCompactWindow,
   getHostMemoryReview,
   getHostModelVisibility,
   getHostPersonality,
@@ -110,6 +112,8 @@ import {
   listHostedSites,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
+  setHostBrowsingMemory,
+  setHostClaudeCompactWindow,
   setHostMemoryReview,
   setHostModelVisibility,
   setHostPersonality,
@@ -241,6 +245,7 @@ import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOver
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
+import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -266,6 +271,7 @@ import {
   showServerUpdate,
 } from "../servers/server-update-flow";
 import { licenseContactUs, trackLicenseEvent } from "../settings/license-analytics";
+import type { HostClaudeCompactWindowCalls } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupCalls } from "../settings/provider-claude-user-setup";
 import type { HostModelVisibilityCalls } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
@@ -1540,6 +1546,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setSkillLearning: async (mode, serverId) =>
       runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
   };
+  const hostBrowsingMemoryCalls: HostBrowsingMemoryCalls = {
+    getBrowsingMemory: async (serverId) =>
+      runTeamEffect(getHostBrowsingMemory(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setBrowsingMemory: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostBrowsingMemory(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
       runTeamEffect(getHostPromptCacheTtl(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1551,6 +1565,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       hostRequest(serverId)("POST", CLAUDE_USER_SETUP_ROUTES.settings, decodeClaudeUserSetupResponse, {}),
     setClaudeUserSetup: (enabled, serverId) =>
       hostRequest(serverId)("POST", CLAUDE_USER_SETUP_ROUTES.update, decodeClaudeUserSetupResponse, { enabled }),
+  };
+  const hostClaudeCompactWindowCalls: HostClaudeCompactWindowCalls = {
+    getClaudeCompactWindow: async (serverId) =>
+      runTeamEffect(getHostClaudeCompactWindow(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setClaudeCompactWindow: async (tokens, serverId) =>
+      runTeamEffect(
+        setHostClaudeCompactWindow(hostRequest(serverId), tokens).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostModelVisibilityCalls: HostModelVisibilityCalls = {
     getModelVisibility: async (provider, serverId) =>
@@ -2113,28 +2135,54 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
    * again until it opens again, as on the desktop.
    */
   const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
+  /**
+   * Marks a chat unread. The open chat stays unread until it opens again; another chat marks itself
+   * read only when it opens. A failure releases the hold.
+   */
+  async function markAgentUnread(agentId: string, write: () => Promise<void>) {
+    const holds = agentId === workspace.state.selectedId;
+    if (holds) setHeldUnreadAgentId(agentId);
+    try {
+      await write();
+    } catch (error) {
+      if (holds) setHeldUnreadAgentId(null);
+      actionToast.error(t("chat.errorStatus.readState"), {
+        description: text.errorMessage(error, t("webClient.error.requestFailed")),
+        report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
+      });
+    }
+  }
+  const unreadFromSupported = () =>
+    workspace.state.status === "online" && workspace.state.capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY);
   /** With `conversation-unread-from-v1`: marks one message of the open chat and the messages after it unread. */
   const markUnreadFrom = createMemo(() => {
-    if (
-      workspace.state.status !== "online" ||
-      !workspace.state.capabilities.includes(CONVERSATION_UNREAD_FROM_CAPABILITY)
-    )
-      return undefined;
+    if (!unreadFromSupported()) return undefined;
     return async (messageId: string) => {
       const agentId = workspace.state.selectedId;
-      if (!agentId) return;
-      setHeldUnreadAgentId(agentId);
-      try {
-        await workspace.markUnreadFrom(agentId, messageId);
-      } catch (error) {
-        setHeldUnreadAgentId(null);
-        actionToast.error(t("chat.errorStatus.readState"), {
-          description: text.errorMessage(error, t("webClient.error.requestFailed")),
-          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
-        });
-      }
+      if (agentId) await markAgentUnread(agentId, () => workspace.markUnreadFrom(agentId, messageId));
     };
   });
+  /** The agents with an unread badge, for which the sidebar agent menu offers Mark read. */
+  const sidebarUnreadAgentIds = createMemo(
+    () => new Set(Object.entries(workspace.state.reads).flatMap(([id, read]) => (read.unreadCount > 0 ? [id] : []))),
+  );
+  /** An explicit read also ends the unread hold, as on the desktop, so new replies in the open chat read again. */
+  const markSidebarAgentRead = () =>
+    workspace.state.status === "online"
+      ? (agentId: string) => {
+          if (heldUnreadAgentId() === agentId) setHeldUnreadAgentId(null);
+          void workspace.markAgentRead(agentId).catch(() =>
+            actionToast.error(t("chat.unread.markReadFailed"), {
+              report: { operation: "other", source: "action", cause_code: "unknown" },
+            }),
+          );
+        }
+      : undefined;
+  /** With `conversation-unread-from-v1`: marks the newest agent reply of a chat unread from the sidebar. */
+  const markSidebarAgentUnread = () =>
+    unreadFromSupported()
+      ? (agentId: string) => void markAgentUnread(agentId, () => workspace.markLatestReplyUnread(agentId))
+      : undefined;
   /**
    * As on the desktop: for an agent whose provider cannot steer, puts a queued message first and stops
    * the running turn, so the message runs as the next turn.
@@ -2827,6 +2875,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           }
                         : undefined
                     }
+                    unreadAgentIds={sidebarUnreadAgentIds()}
+                    onMarkAgentRead={markSidebarAgentRead()}
+                    onMarkAgentUnread={markSidebarAgentUnread()}
                     hasUnread={
                       workspace.state.agents.some(
                         (agent) =>
@@ -3140,8 +3191,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         skillLearning={{ calls: hostSkillLearningCalls }}
+                        browsingMemory={{ calls: hostBrowsingMemoryCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         claudeUserSetup={{ calls: hostClaudeUserSetupCalls }}
+                        claudeCompactWindow={{ calls: hostClaudeCompactWindowCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}

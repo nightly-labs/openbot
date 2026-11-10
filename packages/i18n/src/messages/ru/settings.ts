@@ -16,6 +16,12 @@ export const messages = {
     "Показывать размытый рабочий стол за окном. Сайты и меню тогда используют тему приложения.",
   "settings.interfaceSize.title": "Размер интерфейса",
   "settings.interfaceSize.description": "Размер текста и элементов управления в OpenBot.",
+  "settings.interfaceFont.title": "Шрифт интерфейса",
+  "settings.interfaceFont.description": "Шрифт меню, чатов и настроек.",
+  "settings.interfaceFont.default": "По умолчанию (Inter)",
+  "settings.codeFont.title": "Шрифт кода",
+  "settings.codeFont.description": "Шрифт кода, терминалов и путей к файлам.",
+  "settings.codeFont.default": "По умолчанию",
   "settings.logoColor.title": "Цвет логотипа",
   "settings.logoColor.description": "Отображается в Dock, на панели задач и в Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -258,6 +264,9 @@ export const messages = {
   "settings.agentDock.edge.left": "Слева",
   "settings.agentDock.autoHide.title": "Скрывать, когда не используется",
   "settings.agentDock.autoHide.description": "Док уходит за край. Подведите указатель к краю, чтобы показать его.",
+  "settings.agentDock.edgeStrip.title": "Показывать полоску у края",
+  "settings.agentDock.edgeStrip.description":
+    "Там, где прячется док, остаётся тонкая полоска. Подведите к ней указатель, чтобы показать док. Когда агент о чём-то спрашивает, по полоске проходит цветная волна.",
   "settings.agentDock.results.title": "Показывать готовую работу",
   "settings.agentDock.results.description": "Результаты агентов ненадолго появляются рядом с доком.",
   "settings.agentDock.agents.title": "Агенты в доке",

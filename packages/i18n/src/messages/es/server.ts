@@ -351,6 +351,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Preguntar antes",
   "server.settings.skillLearningOff": "Desactivado",
   "server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "server.settings.browsingMemory": "Aprender de mi navegación",
+  "server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
   "server.settings.remoteOnline": "El host está en línea. Su propietario controla la publicación.",
   "server.settings.remoteOffline": "El host está sin conexión. Su propietario controla la publicación.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",

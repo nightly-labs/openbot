@@ -1,6 +1,7 @@
 import {
   type AgentProviderId,
   type AgentProviderStatus,
+  claudeCompactWindowSizes,
   isAgentProvider,
   isInstallerProvider,
   isKeyOnlyProvider,
@@ -21,6 +22,7 @@ import KeyRound from "lucide-react-native/icons/key-round";
 import Layers from "lucide-react-native/icons/layers";
 import LogIn from "lucide-react-native/icons/log-in";
 import LogOut from "lucide-react-native/icons/log-out";
+import Minimize2 from "lucide-react-native/icons/minimize-2";
 import Package from "lucide-react-native/icons/package";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
@@ -412,6 +414,9 @@ export function ServerProviderScreen() {
       {provider === "claude" && !off && admin.promptCache ? (
         <PromptCacheSection serverId={serverId} setting={admin.promptCache} />
       ) : null}
+      {provider === "claude" && !off && admin.compactWindow ? (
+        <CompactWindowSection serverId={serverId} setting={admin.compactWindow} />
+      ) : null}
       {row.apiKey ? (
         <SettingsSection
           title={t("mobile.server.providers.apiKey")}
@@ -573,6 +578,88 @@ function PromptCacheSection({
                   .then(async (saved) => {
                     await queryClient.cancelQueries({ queryKey, exact: true });
                     queryClient.setQueryData(queryKey, saved);
+                    void haptics.notification("success");
+                  })
+                  .catch((cause: unknown) => {
+                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
+                    void haptics.notification("error");
+                  })
+                  .finally(() => setSaving(false));
+              }}
+            />
+          ) : null
+        }
+      >
+        <Typography.Paragraph>{label}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** A picker value: `default` for Claude Code's own size, or a number of tokens as text. */
+type CompactWindowChoice = "default" | `${number}`;
+
+function compactWindowChoice(tokens: number | null): CompactWindowChoice {
+  return tokens === null ? "default" : `${tokens}`;
+}
+
+/**
+ * The size at which Claude Code compacts the chats of the host's agents (`claude-compact-window-v1`),
+ * as the Context section of the desktop Claude page. A change applies to the next Claude process on
+ * the host. A size that another client saved and that is not a choice here still shows.
+ */
+function CompactWindowSection({
+  serverId,
+  setting,
+}: {
+  serverId: string;
+  setting: NonNullable<ProviderAdmin["compactWindow"]>;
+}) {
+  const { t, format, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.providerCompactWindow(queryScope, serverId);
+  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = t("mobile.server.providers.compactWindow");
+  const options = claudeCompactWindowSizes(current.data?.tokens ?? null).map((size) => ({
+    value: compactWindowChoice(size),
+    label:
+      size === null
+        ? t("mobile.server.providers.compactWindowDefault")
+        : t("mobile.server.providers.compactWindowTokens", { size: format.compact(size) }),
+  }));
+  return (
+    <SettingsSection
+      footer={
+        error ??
+        (current.isError
+          ? errorMessage(current.error, t("mobile.server.providers.compactWindowLoadFailed"))
+          : t("mobile.server.providers.compactWindowHint"))
+      }
+    >
+      <SettingsRow
+        disclosure={false}
+        leading={<RowIcon icon={Minimize2} />}
+        trailing={
+          current.data ? (
+            <SettingsPicker<CompactWindowChoice>
+              value={compactWindowChoice(current.data.tokens)}
+              options={options}
+              enabled={!saving}
+              dark={theme === "dark"}
+              label={label}
+              onChange={(choice) => {
+                if (choice === compactWindowChoice(current.data?.tokens ?? null)) return;
+                setSaving(true);
+                setError(null);
+                setting
+                  .set(choice === "default" ? null : Number(choice))
+                  .then(async (next) => {
+                    await queryClient.cancelQueries({ queryKey, exact: true });
+                    queryClient.setQueryData(queryKey, next);
                     void haptics.notification("success");
                   })
                   .catch((cause: unknown) => {

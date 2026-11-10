@@ -45,8 +45,6 @@ export interface AcpConnectionOptions {
   label(): string;
   redact(text: string): string;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
-  /** A stderr line that must not become the exit detail, such as a sign-in prompt with OAuth state. */
-  privateDiagnostic?: RegExp | undefined;
   exit(error: Error): void;
   client(): Client;
 }
@@ -131,10 +129,8 @@ export class AcpConnection {
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
-        if (!this.options.privateDiagnostic?.test(message)) {
-          lastDiagnostic = message;
-          if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        }
+        lastDiagnostic = message;
+        if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
         this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
       },
     });

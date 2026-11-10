@@ -658,12 +658,14 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
 | `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
+| `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
@@ -762,6 +764,15 @@ client shows an unknown mode from a later host as its raw value. The agent servi
 at each review. Server settings → General → Agents → Skill learning sets it for this computer
 (`hostAdmin.setSkillLearning`, local handler) and for a joined server.
 
+`browsing-memory-v1` reads and sets "Learn from my browsing" (`openbot-browsing-memory-v1.json`,
+`{ enabled }`, off by default) at `POST /v1/admin/host/browsing-memory` and
+`POST /v1/admin/host/browsing-memory/update` (owner or admin). While it is on, the host records the
+pages and the controls that a person uses in an agent tab that they hold, and the next memory review
+of that agent reads them (see [browser.md](browser.md)). Turning it off deletes the recorded steps.
+A connection without the capability gets `error.team.browsingMemoryUnsupported`. Server settings →
+General → Agents → Learn from my browsing sets it for this computer (`hostAdmin.setBrowsingMemory`,
+local handler) and for a joined server.
+
 The capability also carries the skill question card (see [providers.md](providers.md#skill-suggestions)).
 A skill question message (`itemType` `skill-suggestion:*`) gets `skillSuggestion: { name }` on the
 wire. The frozen protocol 9 projection drops it, so the host adds it after the projection, for a
@@ -827,6 +838,17 @@ in the Claude settings or `CLAUDE_CODE_PROMPT_CACHE_TTL` on the host still wins.
 the next Claude process, not to a running one; an idle thread starts a new process when it resumes.
 The Cache section of the Claude page in Server settings → Providers sets it for this computer and
 for a joined server.
+
+`claude-compact-window-v1` reads and sets the size at which Claude Code compacts the chats of the
+host's agents (`openbot-claude-compact-window-v1.json`; `tokens` is a whole number from 100,000 to
+1,000,000, or `null`, the default). With a size the host starts each Claude process with
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` set to it. Claude Code reads this variable before the
+`autoCompactWindow` of the Claude settings, and lowers it to the context window of a smaller model.
+With `null` it sets nothing, so Claude Code uses its own size for each model, and the Claude settings
+and the environment of the host still apply. An environment value of the agent still wins. Automatic
+compaction stays on. A change applies to the next Claude process, not to a running one. The Context
+section of the Claude page in Server settings → Providers sets it for this computer, for a joined
+server, on the web client and in the mobile app.
 
 `model-visibility-v1` reads every model that one provider of the host lists, and sets which of them
 the model picker shows. The file `openbot-model-visibility-v1.json` keeps, for each provider, only the

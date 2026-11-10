@@ -268,6 +268,13 @@ export const messages = {
   "provider.settings.claudeUserSetupServerDescription":
     "Агенты загружают CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude на сервере. Если выключено, каждый ход отправляет более короткий промпт. Файлы рабочей области по-прежнему загружаются.",
   "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
+  "provider.settings.context": "Контекст",
+  "provider.settings.compactWindow": "Сжимать чаты при",
+  "provider.settings.compactWindowDescription":
+    "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
+  "provider.settings.compactWindowDefault": "По умолчанию Claude Code",
+  "provider.settings.compactWindowTokens": "{size} токенов",
+  "provider.settings.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

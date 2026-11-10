@@ -16,6 +16,12 @@ export const messages = {
     "Toon het vervaagde bureaublad achter het venster. Websites en menu’s gebruiken dan het thema van de app.",
   "settings.interfaceSize.title": "Interfacegrootte",
   "settings.interfaceSize.description": "De grootte van tekst en bedieningselementen in OpenBot.",
+  "settings.interfaceFont.title": "Lettertype van de interface",
+  "settings.interfaceFont.description": "Het lettertype van menu's, chats en instellingen.",
+  "settings.interfaceFont.default": "Standaard (Inter)",
+  "settings.codeFont.title": "Lettertype voor code",
+  "settings.codeFont.description": "Het lettertype van code, terminals en bestandspaden.",
+  "settings.codeFont.default": "Standaard",
   "settings.logoColor.title": "Logokleur",
   "settings.logoColor.description": "Te zien in het Dock, de taakbalk en het Dynamic Island.",
   "settings.logoColor.buildNote": "Deze build houdt een eigen logokleur. De keuze geldt voor de release-app.",
@@ -256,6 +262,9 @@ export const messages = {
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",
+  "settings.agentDock.edgeStrip.title": "Een strook aan de rand tonen",
+  "settings.agentDock.edgeStrip.description":
+    "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
   "settings.agentDock.agents.title": "Agents in het dock",

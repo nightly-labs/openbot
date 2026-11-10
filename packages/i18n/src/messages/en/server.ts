@@ -438,6 +438,10 @@ export const messages = defineMessages("server", {
   "server.settings.skillLearningAsk": "Ask first",
   "server.settings.skillLearningOff": "Off",
   "server.settings.skillLearningLoadFailed": "Could not load the skill learning setting.",
+  "server.settings.browsingMemory": "Learn from my browsing",
+  "server.settings.browsingMemoryDescription":
+    "When you control an agent's browser, the agent learns how sites work from the pages and buttons you use. Typed text is not kept.",
+  "server.settings.browsingMemoryLoadFailed": "Could not load the browsing setting.",
   "server.settings.rolesTitle": "Permissions",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",

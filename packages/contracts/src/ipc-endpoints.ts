@@ -96,6 +96,7 @@ import type {
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   HostAgentMemoryLimit,
+  HostBrowsingMemory,
   HostMemoryReview,
   SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
@@ -276,6 +277,7 @@ import type {
   DeleteChannelMessageInput,
   SetChannelImageInput,
 } from "./ipc-chat-channels";
+import type { ClaudeCompactWindowSetting } from "./ipc-claude-compact-window";
 import type { ClaudeUserSetupSetting } from "./ipc-claude-user-setup";
 import type {
   CancelMessageLinkInput,
@@ -774,6 +776,9 @@ export const IPC_ENDPOINTS = {
     ),
     // Sent to every window, because each window applies the choice to its own page.
     appAppearancePreference: event<AppAppearancePreference>()("app:appearance-preference"),
+    // The font family names of this computer, for the font choices in Settings. Main reads them,
+    // so the renderer needs no font access permission.
+    listInstalledFonts: request<undefined, string[]>()("app:list-installed-fonts"),
     getAppInterfaceSizePreference: request<undefined, AppInterfaceSizePreference>()(
       "app:get-interface-size-preference",
     ),
@@ -1369,6 +1374,10 @@ export const IPC_ENDPOINTS = {
     // the values its host permits.
     getSkillLearning: scopedQuery<HostSkillLearning, "required">()("host-admin:get-skill-learning"),
     setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
+    // Whether the server learns how sites work from what people do in agent tabs they hold
+    // (`browsing-memory-v1`).
+    getBrowsingMemory: scopedQuery<HostBrowsingMemory, "required">()("host-admin:get-browsing-memory"),
+    setBrowsingMemory: scopedRequest<boolean, HostBrowsingMemory, "required">()("host-admin:set-browsing-memory"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(
@@ -1383,6 +1392,14 @@ export const IPC_ENDPOINTS = {
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
       "host-admin:set-claude-user-setup",
+    ),
+    // The size at which Claude Code compacts the chats of the server's agents
+    // (`claude-compact-window-v1`). `null` is Claude Code's own size. An owner or admin sets it.
+    getClaudeCompactWindow: scopedQuery<ClaudeCompactWindowSetting, "required">()(
+      "host-admin:get-claude-compact-window",
+    ),
+    setClaudeCompactWindow: scopedRequest<number | null, ClaudeCompactWindowSetting, "required">()(
+      "host-admin:set-claude-compact-window",
     ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(

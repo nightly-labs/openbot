@@ -1,4 +1,5 @@
 import type { ChatWindowTarget } from "@openbot/contracts/ipc";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
@@ -90,12 +91,16 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { pendingPrompts, approvals } = useTurns();
-  const { agentUnreadReplies, markAllAgentMessagesRead } = useConversation();
+  const { agentUnreadReplies, markAgentChatRead, markAgentChatUnread, markAllAgentMessagesRead } = useConversation();
   const { directPeople, teamPresence } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember, setGlobalSearchVisibility, chatHistory } = useNavigation();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
+  // The agent menu offers Mark read for these. The count also holds the side threads, as the badge does.
+  const unreadAgentIds = createMemo(
+    () => new Set(agentList().flatMap((agent) => ((agentUnreadReplies()[agent.id] ?? 0) > 0 ? [agent.id] : []))),
+  );
   /**
    * Opens the agent's chat with a new thread. A host without threads has no such item, and neither has a
    * chat window: another agent opens in a window of its own, which does not get the new thread.
@@ -280,6 +285,13 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        unreadAgentIds={unreadAgentIds()}
+        onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
+        onMarkAgentUnread={
+          activeServerSupportsCapability(CONVERSATION_UNREAD_FROM_CAPABILITY)
+            ? (agentId) => void markAgentChatUnread(agentId)
+            : undefined
+        }
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}

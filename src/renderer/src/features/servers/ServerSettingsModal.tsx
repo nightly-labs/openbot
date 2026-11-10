@@ -58,6 +58,10 @@ import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from ".
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { hostedPlanStorageGb } from "../files/storage-usage";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type {
+  HostClaudeCompactWindowOptions,
+  ProviderClaudeCompactWindowSource,
+} from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
@@ -65,6 +69,7 @@ import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../se
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
@@ -233,6 +238,12 @@ export interface ServerSettingsModalProps {
    */
   skillLearning?: ServerSkillLearningOptions | undefined;
   /**
+   * General shows whether the agents learn from what people do in agent tabs they hold only when a
+   * caller supplies this, and only for the local server or a remote host with `browsing-memory-v1`
+   * that this member administers.
+   */
+  browsingMemory?: ServerBrowsingMemoryOptions | undefined;
+  /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member
    * administers.
@@ -244,6 +255,12 @@ export interface ServerSettingsModalProps {
    * administers.
    */
   claudeUserSetup?: HostClaudeUserSetupOptions | undefined;
+  /**
+   * The Claude provider page shows the size at which Claude Code compacts chats only when a caller
+   * supplies this, and only for the local server or a remote host with `claude-compact-window-v1`
+   * that this member administers.
+   */
+  claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
   /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
@@ -410,6 +427,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const options = props.claudeUserSetup;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-user-setup-v1")) return undefined;
     return { ...options, serverId: props.server.id, remote: !local() };
+  }
+  function claudeCompactWindowSource(): ProviderClaudeCompactWindowSource | undefined {
+    const options = props.claudeCompactWindow;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-compact-window-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
   }
   function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
     const options = props.hostModelVisibility;
@@ -991,6 +1014,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
                   claudeUserSetup={claudeUserSetupSource()}
+                  claudeCompactWindow={claudeCompactWindowSource()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />

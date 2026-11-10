@@ -126,9 +126,11 @@ export const messages = {
   "error.team.folderUnavailable": "Dieser Ordner ist auf dem Host-Computer nicht verfügbar.",
   "error.team.memoryReviewUnsupported": "Diese Verbindung unterstützt die Erinnerungsprüfung nicht.",
   "error.team.skillLearningUnsupported": "„Fähigkeiten lernen“ wird von dieser Verbindung nicht unterstützt.",
+  "error.team.browsingMemoryUnsupported": "Lernen aus dem Browsen wird von dieser Verbindung nicht unterstützt.",
   "error.team.promptCacheTtlUnsupported": "Diese Verbindung unterstützt die Prompt-Cache-Dauer nicht.",
   "error.team.claudeUserSetupUnsupported":
     "Diese Verbindung unterstützt den Schalter für die Claude-Code-Einrichtung nicht.",
+  "error.team.claudeCompactWindowUnsupported": "Diese Verbindung unterstützt die Claude-Komprimierungsgröße nicht.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",

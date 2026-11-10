@@ -1297,6 +1297,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "الافتراضي في Claude Code",
   "mobile.server.providers.promptCacheHour": "ساعة واحدة",
   "mobile.server.providers.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للمطالبات لهذا الخادم.",
+  "mobile.server.providers.compactWindow": "ضغط المحادثات عند",
+  "mobile.server.providers.compactWindowHint":
+    "يلخّص Claude Code الأدوار الأقدم في المحادثة عندما تصل إلى هذا الحجم. القيمة الأقل تبقي الأدوار سريعة ورخيصة. القيمة الأعلى تحتفظ بتفاصيل أكثر. النموذج ذو النافذة الأصغر يضغط عند حده الخاص.",
+  "mobile.server.providers.compactWindowDefault": "الافتراضي في Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} رمز",
+  "mobile.server.providers.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
   "mobile.server.providers.disconnect": "قطع الاتصال",
   "mobile.server.providers.disconnectTitle": "هل تريد قطع اتصال {name}؟",
   "mobile.server.providers.disconnectBody":

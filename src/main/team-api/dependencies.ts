@@ -11,6 +11,8 @@ import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-s
 import type { AgentTemplateService } from "../agent-template-service";
 import type { listBackgroundProcesses, stopBackgroundProcess } from "../background-processes";
 import type { BrowserProfileService } from "../browser-profile-service";
+import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
@@ -530,10 +532,14 @@ export interface TeamApiAdmin {
   memoryReview?: MemoryReviewPreferenceStore;
   /** `skill-learning-v1`: what this computer's memory reviews do when a chat teaches an agent a skill. */
   skillLearning?: SkillLearningPreferenceStore;
+  /** `browsing-memory-v1`: whether this computer learns from what people do in agent tabs they hold. */
+  browsingMemory?: BrowsingMemoryPreferenceStore;
   /** `prompt-cache-ttl-v1`: how long the provider keeps the prompt cache of this computer's agents. */
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   /** `claude-user-setup-v1`: whether this computer's Claude agents load the Claude Code setup of its user. */
   claudeUserSetup?: ClaudeUserSetupControl;
+  /** `claude-compact-window-v1`: the size at which Claude Code compacts the chats of this computer's agents. */
+  claudeCompactWindow?: ClaudeCompactWindowControl;
   /** `provider-detection-v1`: the local model servers and ACP agent commands that this computer finds. */
   providerDetection?: {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
