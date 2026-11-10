@@ -1173,17 +1173,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // OpenBot's own servers spread last: Claude keys this record by name, so a user configuration
     // that reached one of those names would take the agent's own tools away. Profile generation
     // asks one question and must not act, so it gets neither set.
-    const handoff = config.profileGeneration
+    const usable = config.profileGeneration
       ? null
-      : claudeMcpServers(
-          yield* usableMcpServers(
-            agentMcpServers(this.#mcpServers(), config.computerUse),
-            this.#mcpToolRuntimes?.(),
-            this.#mcpEndpoint,
-            config.agentId,
-          ).pipe(toProviderClientOperationError),
-          CLAUDE_MCP_USER_AGENT,
-        );
+      : yield* usableMcpServers(
+          agentMcpServers(this.#mcpServers(), config.computerUse),
+          this.#mcpToolRuntimes?.(),
+          this.#mcpEndpoint,
+          config.agentId,
+        ).pipe(toProviderClientOperationError);
+    const handoff = usable ? claudeMcpServers(usable, CLAUDE_MCP_USER_AGENT) : null;
     const stateDirectory = this.#stateDirectory;
     // Read once, so that the settings and the home skills of one query agree.
     const userSetup = !config.profileGeneration && this.#userSetup();
@@ -1191,6 +1189,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
     const configDirectory =
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    yield* clearClaudeNeedsAuthMarks(
+      configDirectory,
+      usable?.flatMap((server) => (server.proxied ? [server.config.name] : [])) ?? [],
+    );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
     const signInSettings: Settings = userSetup ? {} : yield* claudeSignInSettings(configDirectory);
@@ -2615,6 +2617,25 @@ export function claudeOpenBotTools(call: (name: string, args: unknown) => Promis
       const shape = advertisedZodShape(z.strictObject(definition.shape));
       return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
     });
+}
+
+/**
+ * Removes the CLI's "needs sign-in" marks of the servers in `names` before a query starts (#6325).
+ * After a 401, the CLI writes the server name to `mcp-needs-auth-cache.json` in its configuration
+ * folder, and for 15 minutes each new process skips a server of that name without a connection,
+ * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
+ * which never answers 401, so their marks are from before the sign-in, when the row's own URL
+ * refused the CLI. The file is the CLI's own: a missing or unknown file stays as it is.
+ */
+function clearClaudeNeedsAuthMarks(configDirectory: string, names: readonly string[]): Effect.Effect<void> {
+  if (names.length === 0) return Effect.void;
+  const file = join(configDirectory, "mcp-needs-auth-cache.json");
+  return Effect.gen(function* () {
+    const marks = yield* providerCall(async (): Promise<unknown> => JSON.parse(await readFile(file, "utf8")));
+    if (!isRecord(marks) || !names.some((name) => Object.hasOwn(marks, name))) return;
+    const kept = Object.fromEntries(Object.entries(marks).filter(([name]) => !names.includes(name)));
+    yield* providerCall(() => writeFile(file, JSON.stringify(kept)));
+  }).pipe(Effect.ignore);
 }
 
 /** A file that cannot be deleted must not stop the close. */
