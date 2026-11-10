@@ -40,6 +40,7 @@ import {
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -329,6 +330,7 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     if (sideRoute) {
       const input = sideRoute.request(path, value, {
         channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+        channelPicture: capabilities.has(CHANNEL_PICTURE_CAPABILITY),
       });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;

@@ -265,7 +265,15 @@ export const ChannelListRow = memo(function ChannelListRow({
     chat: { kind: "channel", id: channel.id },
     pinned,
     name: channel.name,
-    preview: <ChannelAvatar channel={channel} agents={agents} size={DRAG_AVATAR_SIZE} disconnected={disconnected} />,
+    preview: (
+      <ChannelAvatar
+        channel={channel}
+        agents={agents}
+        size={DRAG_AVATAR_SIZE}
+        serverId={serverId}
+        disconnected={disconnected}
+      />
+    ),
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const previewLine = useMemo(
@@ -281,7 +289,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const size = pinned ? 64 : 54;
   const avatar = (
     <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
-      <ChannelAvatar channel={channel} agents={agents} size={size} disconnected={disconnected} />
+      <ChannelAvatar channel={channel} agents={agents} size={size} serverId={serverId} disconnected={disconnected} />
       {pinned && unread ? (
         <View
           className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"

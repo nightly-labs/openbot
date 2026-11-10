@@ -67,7 +67,15 @@ export function HiddenChatsScreen() {
       id: channel.id,
       name: channel.name,
       href: { pathname: "/channel/[channelId]" as const, params: { channelId: channel.id, serverId: activeServer.id } },
-      avatar: <ChannelAvatar channel={channel} agents={members} size={46} disconnected={!showsOnline(activeServer)} />,
+      avatar: (
+        <ChannelAvatar
+          channel={channel}
+          agents={members}
+          size={46}
+          serverId={activeServer.id}
+          disconnected={!showsOnline(activeServer)}
+        />
+      ),
       show: () => {
         if (!unhideChannel(channel.id, activeServer.id)) return;
         void haptics.notification();
