@@ -230,7 +230,11 @@ export class AgentImportService {
       const bytes = yield* archiveCall(() => read());
       yield* this.#prepareUploadDirectory(directory);
       const path = join(directory, `${randomUUID()}.zip`);
-      yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(Effect.uninterruptible);
+      yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(
+        Effect.uninterruptible,
+        // A write that fails part of the way, such as on a full disk, leaves part of the file.
+        Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
+      );
       return yield* this.#stageUploadedFile(path, owner, REMOTE_IMPORT_ARCHIVE);
     }).pipe(
       Effect.ensuring(
