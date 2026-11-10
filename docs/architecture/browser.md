@@ -210,6 +210,7 @@ with `openbot.remember` (a host or a URL), for example how to work a site. A sna
 has `siteMemories`, up to 5 of the agent's memories for the page's host and its parent domains
 (`app.example.com` also shows `example.com`), newest first. A tab shows them one time per host and
 turn, so the next pages of the same site in that turn do not show them again. A secret tab shows none.
+An essential memory is already in the agent's instructions with its site, so a snapshot leaves it out.
 Only a snapshot that reached the agent counts as shown. The host reads them from SQLite
 (`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
 provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory

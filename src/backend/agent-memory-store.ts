@@ -117,16 +117,19 @@ export class AgentMemoryStore extends MemoryStore {
 
   /**
    * The newest memories tied to one of `sites`, for the browser to show on a page of that site.
-   * `agent_memories_site` serves the lookup.
+   * `agent_memories_site` serves the lookup. An essential memory is already in the agent's
+   * instructions with its site, so the browser does not show it again.
    */
   listForSites(agentId: string, sites: readonly string[], limit: number): AgentMemory[] {
     if (sites.length === 0) return [];
     const ids = databaseRows(
       this.database.connection
         .prepare(
-          `SELECT memory_id FROM projection_agent_memories
-       WHERE agent_id = ? AND site IN (${sites.map(() => "?").join(", ")})
-       ORDER BY updated_at DESC, memory_id LIMIT ?`,
+          `SELECT m.memory_id FROM projection_agent_memories m
+       LEFT JOIN agent_memory_selections s ON s.memory_id = m.memory_id
+       WHERE m.agent_id = ? AND m.site IN (${sites.map(() => "?").join(", ")})
+         AND COALESCE(s.inclusion, 'searchable') <> 'essential'
+       ORDER BY m.updated_at DESC, m.memory_id LIMIT ?`,
         )
         .all(agentId, ...sites, limit),
     ).map((row) => requiredStringColumn(row, "memory_id"));
