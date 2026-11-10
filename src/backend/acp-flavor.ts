@@ -146,7 +146,8 @@ export interface AcpFlavor {
   /**
    * The agent can send an answer again after it streamed it, as one chunk with the same `messageId`,
    * and that chunk replaces the streamed text. ACP adds such a chunk to the message. At the end of
-   * the turn, a last chunk that holds all of the text before it in its message replaces that text.
+   * the turn, a last chunk that holds all of the text before it in its message replaces that text,
+   * when two or more chunks of the message came before it.
    */
   resendsAnswer?: true;
   /**

@@ -257,9 +257,11 @@ interface AcpTurn {
   /** The ACP `messageId` of the last text in `text`, and where that message's text starts in it. */
   textMessageId: string | null;
   textMessageStart: number;
+  /** How many text chunks of the message in `textMessageId` are in `text` (`AcpFlavor.resendsAnswer`). */
+  messageChunks: number;
   /**
-   * Where the last chunk starts in `text`, when it has the `messageId` of the text before it and
-   * can be the answer sent again (`AcpFlavor.resendsAnswer`). Null otherwise.
+   * Where the last chunk starts in `text`, when two or more chunks of its message come before it.
+   * Then it can be the answer sent again (`AcpFlavor.resendsAnswer`). Null otherwise.
    */
   lastChunkAt: number | null;
 }
@@ -2277,6 +2279,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       textMessageId: null,
       textMessageStart: 0,
+      messageChunks: 0,
       lastChunkAt: null,
     };
     thread.activeTurn = turn;
@@ -2582,6 +2585,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.receivedOutput = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
+    turn.messageChunks = 0;
     turn.lastChunkAt = null;
     return true;
   });
@@ -2701,8 +2705,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         text = `${turn.text.endsWith("\n\n") ? "" : turn.text.endsWith("\n") ? "\n" : "\n\n"}${text}`;
         turn.textMessageStart = turn.text.length + text.length - update.content.text.length;
       }
-      if (this.#flavor.resendsAnswer && text)
-        turn.lastChunkAt = turn.text && messageId && messageId === turn.textMessageId ? turn.text.length : null;
+      // One chunk after one chunk is not enough: in "ha" and " ha", the second holds the first.
+      if (this.#flavor.resendsAnswer && text) {
+        turn.messageChunks = turn.text && messageId && messageId === turn.textMessageId ? turn.messageChunks + 1 : 1;
+        turn.lastChunkAt = turn.messageChunks > 2 ? turn.text.length : null;
+      }
       if (messageId && (text || !turn.textMessageId)) turn.textMessageId = messageId;
       // An agent can keep session/prompt open while background tasks run (Antigravity). Its text must
       // not wait for that response. A later tool/thought boundary can still classify it as commentary.
@@ -2808,6 +2815,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.text = "";
     turn.textMessageId = null;
     turn.textMessageStart = 0;
+    turn.messageChunks = 0;
     turn.lastChunkAt = null;
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
   }
