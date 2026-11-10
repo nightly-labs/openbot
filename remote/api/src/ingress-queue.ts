@@ -176,7 +176,9 @@ export class IngressQueue {
 
   /**
    * A generic webhook for a route that no socket holds. It keeps nothing. A hosted server that sleeps
-   * starts, at most once in `webhookWakeMilliseconds` for each host. `allowLookup` is asked before a
+   * starts, at most once in `webhookWakeMilliseconds` for each host. A server that is `starting` is asked
+   * to start again in the same interval: a failed resume keeps it `starting`, and a webhook has no queued
+   * event that `#wakeAgain` retries for. `allowLookup` is asked before a
    * request to the account service, so that route IDs that Signal does not know cannot flood it.
    * True when the host starts.
    */
@@ -189,13 +191,15 @@ export class IngressQueue {
     if (!this.#waker) return false;
     if (!this.#fresh(routeKey, this.#now()) && !this.#pending.has(routeKey) && !allowLookup()) return false;
     const known = yield* this.#check(route, routeKey, false);
-    if (known.state !== "sleeping" || !known.hostId) return false;
+    if ((known.state !== "sleeping" && known.state !== "starting") || !known.hostId) return false;
     const now = this.#now();
     const last = this.#webhookWakes.get(known.hostId);
     if (last !== undefined && now - last < this.#limits.webhookWakeMilliseconds) return false;
     this.#webhookWakes.delete(known.hostId);
     dropOldest(this.#webhookWakes, MAXIMUM_ROUTES);
     this.#webhookWakes.set(known.hostId, now);
+    // The cached `starting` answer would stop the wake request.
+    if (known.state === "starting" && !this.#pending.has(routeKey)) this.#routes.delete(routeKey);
     const started = (yield* this.#check(route, routeKey, true)).state === "starting";
     // A wake that failed does not count: the sender's next try asks again.
     if (!started && this.#webhookWakes.get(known.hostId) === now) this.#webhookWakes.delete(known.hostId);

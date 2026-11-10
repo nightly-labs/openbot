@@ -784,7 +784,8 @@ server awake for at most about half of the time (the idle stop is after 15 minut
 Signal has no recent answer for asks the account service at most 60 times a minute from one address
 (1/10 of `REMOTE_MAX_MESSAGES_PER_MINUTE`), and 600 times a minute from all addresses together (the
 full limit), so unknown route IDs cannot flood D1. A start that fails does not count against the 30
-minutes. A route of a host ID that another owner registered again does not start it. A server that
+minutes. A server that stays `starting` (a resume failed and its row stays `running`) is asked to
+start again, also at most once in 30 minutes. A route of a host ID that another owner registered again does not start it. A server that
 went back to sleep less than 30 minutes after a webhook started it waits for the end of the 30
 minutes; senders that retry for hours, such as Shopify and Stripe, still deliver. An account service
 without the `webhook` route answers 400, and Signal then starts nothing, as before.

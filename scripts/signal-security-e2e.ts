@@ -226,6 +226,8 @@ const SLEEPING_WEBHOOK_ROUTES: Record<string, string> = {
   "route-sleeping-b": "host-sleeping-b",
   "route-sleeping-c": "host-sleeping-c",
 };
+// A hosted server whose resume failed: its row stays `running`, so the account service answers `starting`.
+const STARTING_WEBHOOK_ROUTES: Record<string, string> = { "route-starting-d": "host-starting-d" };
 // The first start of this route fails, as when the account service has an error.
 let failNextWebhookWake = "route-sleeping-c";
 const webhookWakes: Array<{ routeId: string; wake: boolean }> = [];
@@ -279,6 +281,8 @@ function startControlPlane(port: number): Promise<Server> {
           return answer(500);
         }
         if (hostId) return answer(200, { hostId, state: payload.wake ? "starting" : "sleeping" });
+        const startingHostId = STARTING_WEBHOOK_ROUTES[payload.route.routeId];
+        if (startingHostId) return answer(200, { hostId: startingHostId, state: "starting" });
       }
       return answer(200, { hostId: null, state: "not_hosted" });
     }
@@ -852,6 +856,10 @@ try {
     await waitUntil(() => calls("route-sleeping-c", true) === 1, "failed wake of route-sleeping-c");
     statuses.push((await post("route-sleeping-c")).status);
     await waitUntil(() => calls("route-sleeping-c", true) === 2, "second wake of route-sleeping-c");
+    // A server that stays `starting` after a failed resume is asked to start again, once in the interval.
+    statuses.push((await post("route-starting-d")).status);
+    await waitUntil(() => calls("route-starting-d", true) === 1, "wake of route-starting-d");
+    statuses.push((await post("route-starting-d")).status);
     // A route that no host has is looked up and starts nothing.
     statuses.push((await post("route-nobody-has")).status);
     await waitUntil(() => calls("route-nobody-has", false) === 1, "lookup of route-nobody-has");
@@ -861,10 +869,11 @@ try {
     );
     expect(calls("route-sleeping-a1", true) === 1, `route-sleeping-a1 wakes: ${calls("route-sleeping-a1", true)}`);
     expect(calls("route-sleeping-a2", true) === 0, "route-sleeping-a2 started its host again in the interval");
+    expect(calls("route-starting-d", true) === 1, `route-starting-d wakes: ${calls("route-starting-d", true)}`);
     expect(calls("route-nobody-has", true) === 0, "a route with no host asked for a wake");
     const delivered = ingress.frames.filter((frame) => frame.includes('"wake-route-'));
     expect(delivered.length === 0, "Signal passed a webhook for a sleeping host to another socket.");
-    return `503 x${statuses.length}; host-sleeping-a woke once for two routes; host-sleeping-b woke; host-sleeping-c woke again after a failed start; unknown route woke nothing`;
+    return `503 x${statuses.length}; host-sleeping-a woke once for two routes; host-sleeping-b woke; host-sleeping-c woke again after a failed start; host-starting-d woke once; unknown route woke nothing`;
   });
 
   // Standard Webhooks (Composio, Svix): Signal relays the `webhook-*` or `svix-*` headers only to a
