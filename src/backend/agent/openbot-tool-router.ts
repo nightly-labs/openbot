@@ -1595,10 +1595,13 @@ export class OpenBotToolRouter {
 
     if (params.tool === ROUTINE_NO_UPDATE_TOOL) {
       const outcome = this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId);
-      if (outcome === null) return openBotToolFailure("Use this tool only in a routine run.");
+      if (outcome === null)
+        return openBotToolFailure(
+          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+        );
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This run ends without a message or a notification. End your turn now." }
+          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
           : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }

@@ -2,7 +2,13 @@ import type { DatabaseSync } from "node:sqlite";
 import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { isImageGenerationItem } from "./agent/image-generation";
-import { isNoUpdateAnswer, isNoUpdateToolCall, isTextAnswer, keptQuietAnswer } from "./agent/routine-quiet-runs";
+import {
+  isNoUpdateAnswer,
+  isNoUpdateToolCall,
+  isTextAnswer,
+  keptQuietAnswer,
+  quietTeammateDelivery,
+} from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
 import type { DeliveryContext } from "./mailbox-store";
@@ -63,6 +69,11 @@ export interface ProviderHistoryImportInput {
    * of a deleted routine, whose record is gone. A Test run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /**
+   * Whether a teammate's update in this thread can have ended quiet: the agent's own chat or a
+   * routine's side thread, as at the turn completion. Left out, it cannot.
+   */
+  quietTeammateThread?: boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -264,7 +275,7 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a quiet routine run started answered: `quiet` when each answer is only the
+ * How a turn that a quiet routine run or a teammate update (`quietTeammateDelivery`) started answered: `quiet` when each answer is only the
  * no-update marker, or the agent called the no-update tool and generated no image, so the turn
  * completion kept only its quiet answers; `image` when the agent called the tool
  * and generated an image, so the completion dropped only the text answers; `answered` for any
@@ -291,12 +302,15 @@ function routineTurnAnswers(
         input.database.stagedProviderHistoryItems({ sessionId: input.sessionId, turnId, afterIndex, limit: 50 }),
       );
       for (const { item } of page) {
-        // Every delivery of the turn must be a scheduled run, as at the turn completion: a message
-        // steered into the turn waits for the answer.
+        // Every delivery of the turn must be a scheduled run or a teammate update, as at the turn
+        // completion: a message steered into the turn waits for the answer.
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string") {
           const delivery = input.findDelivery(item.clientId)?.delivery;
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
-          routine = delivery?.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id);
+          routine =
+            delivery !== undefined &&
+            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
+              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }

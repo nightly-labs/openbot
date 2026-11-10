@@ -175,6 +175,7 @@ export function ConversationTimeline() {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     moveChatSearch,
@@ -448,10 +449,12 @@ export function ConversationTimeline() {
   };
   /*
    * The text of an agent message opens under its marker as the sender's message, with a quote of the
-   * request it answers. Its attachments stay under the marker, so the row draws none.
+   * request it answers. Its attachments stay under the marker, so the row draws none. The quiet
+   * answers of a teammate update follow it, as the agent's own messages.
    */
   const agentMessageText = (messageId: string) => {
     const message = () => agentMessagesByExchangeId().get(messageId);
+    const quietAnswers = () => updateAnswers().get(messageId) ?? [];
     const request = () => exchangeRequest(message()?.exchange?.replyToMessageId);
     const quoted = (): AgentMessage | undefined => {
       const current = request();
@@ -464,44 +467,70 @@ export function ConversationTimeline() {
       return current && requestAuthorName(current);
     };
     return (
-      <Show when={message()}>
-        {(current) => (
-          <ChatMessageRow
-            message={{
-              id: current().id,
-              author: "agent",
-              body: current().body,
-              time: current().time,
-              ...(current().createdAt === undefined ? {} : { createdAt: current().createdAt }),
-              kind: "text",
-            }}
-            author={exchangeAuthor(current())}
-            showAuthor
-            showTime
-            agents={props.agents}
-            referencedMessage={quoted()}
-            referencedAuthorName={quotedAuthorName()}
-            // The sender's name opens the side thread that sent the message, or else the sender's own chat.
-            // Another agent, such as a mention in the text, opens as before.
-            onSelectAgent={(agentId) =>
-              agentId === current().exchange?.senderAgentId
-                ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
-                : props.onSelectAgent(agentId)
-            }
-            onOpenLink={(url) => void openExternalMessageUrl(url)}
-            onPreview={(attachment) => void previewAttachment(attachment)}
-            onAttachmentAction={attachmentAction}
-            onOpenSharedFile={(path) => openSharedFile(path)}
-            // A workspace path is in the workspace of the agent that wrote it, as in a channel.
-            onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
-            onOpenQuote={openQuote}
-            onOpenTag={openTaggedReference}
-            macWindowControls={props.platform === "darwin"}
-          />
-        )}
-      </Show>
+      <>
+        <Show when={message()}>
+          {(current) => (
+            <ChatMessageRow
+              message={{
+                id: current().id,
+                author: "agent",
+                body: current().body,
+                time: current().time,
+                ...(current().createdAt === undefined ? {} : { createdAt: current().createdAt }),
+                kind: "text",
+              }}
+              author={exchangeAuthor(current())}
+              showAuthor
+              showTime
+              agents={props.agents}
+              referencedMessage={quoted()}
+              referencedAuthorName={quotedAuthorName()}
+              // The sender's name opens the side thread that sent the message, or else the sender's own chat.
+              // Another agent, such as a mention in the text, opens as before.
+              onSelectAgent={(agentId) =>
+                agentId === current().exchange?.senderAgentId
+                  ? props.onSelectAgent(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                  : props.onSelectAgent(agentId)
+              }
+              onOpenLink={(url) => void openExternalMessageUrl(url)}
+              onPreview={(attachment) => void previewAttachment(attachment)}
+              onAttachmentAction={attachmentAction}
+              onOpenSharedFile={(path) => openSharedFile(path)}
+              // A workspace path is in the workspace of the agent that wrote it, as in a channel.
+              onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
+              onOpenQuote={openQuote}
+              onOpenTag={openTaggedReference}
+              macWindowControls={props.platform === "darwin"}
+            />
+          )}
+        </Show>
+        <For each={quietAnswers()}>
+          {(answer) => (
+            <ChatMessageRow
+              message={answer}
+              author={ownAgentAuthor()}
+              showTime
+              agents={props.agents}
+              onSelectAgent={props.onSelectAgent}
+              onOpenLink={(url) => void openExternalMessageUrl(url)}
+              onPreview={(attachment) => void previewAttachment(attachment)}
+              onAttachmentAction={attachmentAction}
+              onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, props.agent?.id)}
+              onOpenQuote={openQuote}
+              onOpenTag={openTaggedReference}
+              macWindowControls={props.platform === "darwin"}
+            />
+          )}
+        </For>
+      </>
     );
   };
+  /* The agent of this chat as the author of its own message. */
+  const ownAgentAuthor = (): ChatMessageAuthor => ({
+    kind: "agent",
+    name: props.agent?.name ?? t("chat.message.agentFallback"),
+    agent: props.agent,
+  });
   // A run of one sender breaks where another person starts to write, and in a channel where another
   // agent starts to write.
   const senderRunRow = (message: AgentMessage) => {
