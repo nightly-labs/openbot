@@ -71,6 +71,7 @@ export const messages = {
     "채널에 시작을 확인하지 못한 배정이 있어요. 삭제하기 전에 결과를 확인하세요.",
   "error.backend.channelNotFound": "채널을 찾을 수 없어요.",
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
+  "error.backend.channelInstructionsTooLong": "지침을 2,000자 이내로 줄이세요. 더 긴 지침은 저장되지 않아요.",
   "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
   "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",
   "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",

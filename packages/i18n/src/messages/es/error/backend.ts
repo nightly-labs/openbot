@@ -73,6 +73,8 @@ export const messages = {
     "El canal tiene un inicio de tarea sin confirmar. Comprueba el resultado antes de eliminarlo.",
   "error.backend.channelNotFound": "No se encontró el canal.",
   "error.backend.channelMemberUnavailable": "Un miembro del canal no está disponible.",
+  "error.backend.channelInstructionsTooLong":
+    "Acorta las instrucciones a 2000 caracteres. Las instrucciones más largas no se guardan.",
   "error.backend.channelWaitBeforeNewConversation":
     "Espera a que termine el trabajo en este canal y luego inicia una nueva conversación.",
   "error.backend.channelWaitBeforeCompact": "Espera a que termine el trabajo en este canal y luego compáctalo.",

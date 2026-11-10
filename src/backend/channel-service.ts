@@ -733,6 +733,12 @@ export class ChannelService {
       // carries the whole draft: it would restore the name, the instructions and the members.
       if (!existing && command.update)
         return yield* channelFailure(new Error(sourceText("error.backend.channelNotFound")));
+      // Stored instructions over the limit stay, so the other fields still save; new text must fit.
+      if (
+        command.draft.instructions.length > INPUT_LIMITS.agentDescription &&
+        command.draft.instructions !== existing?.instructions
+      )
+        return yield* channelFailure(new Error(sourceText("error.backend.channelInstructionsTooLong")));
       const members = new Set(existing?.members.map((member) => member.agentId));
       for (const member of command.draft.members)
         if (!members.has(member.agentId) && !known.some((agent) => agent.id === member.agentId))

@@ -74,6 +74,8 @@ export const messages = {
     "Im Kanal gibt es einen unbestätigten Auftragsstart. Prüfe das Ergebnis, bevor du den Kanal löschst.",
   "error.backend.channelNotFound": "Kanal nicht gefunden.",
   "error.backend.channelMemberUnavailable": "Ein Kanalmitglied ist nicht verfügbar.",
+  "error.backend.channelInstructionsTooLong":
+    "Kürze die Anweisungen auf 2.000 Zeichen. Längere Anweisungen werden nicht gespeichert.",
   "error.backend.channelWaitBeforeNewConversation":
     "Warte, bis die Arbeit in diesem Kanal endet, und starte dann eine neue Unterhaltung.",
   "error.backend.channelWaitBeforeCompact": "Warte, bis die Arbeit in diesem Kanal endet, und komprimiere ihn dann.",
