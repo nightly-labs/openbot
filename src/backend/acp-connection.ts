@@ -242,8 +242,12 @@ export class AcpConnection {
   }
 }
 
-/** Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. */
+/**
+ * Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. Its
+ * input stays open there: the end of input can end the wrapper first, and `taskkill /T` then finds
+ * no children (#6470). Node closes the input when the process exits.
+ */
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {
-  child.stdin.end();
+  if (process.platform !== "win32") child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));
 });
