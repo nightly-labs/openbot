@@ -38,13 +38,21 @@ const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 /**
  * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
  * do not use the scan budget before the walk gets to what is visible. Each walk that uses it gives
- * nothing from a hidden element or its descendants, with the same tests as here.
+ * nothing from a hidden element or its descendants, with the same tests as here. A skipped subtree
+ * counts as one node in the `scanned` count of the walk, so the budget still bounds the work.
  */
 const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
-  if (node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true') return NodeFilter.FILTER_REJECT;
-  const style = node.ownerDocument.defaultView?.getComputedStyle(node);
-  if (!style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return NodeFilter.FILTER_REJECT;
+  if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_REJECT;
+  let hidden = node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
+  if (!hidden) {
+    const style = node.ownerDocument.defaultView?.getComputedStyle(node);
+    hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0';
+  }
+  if (hidden) {
+    scanned++;
+    return NodeFilter.FILTER_REJECT;
+  }
   return NodeFilter.FILTER_ACCEPT;
 } }`;
 
@@ -426,7 +434,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
             matches.push(node);
             if (matches.length >= ${MAX_TARGET_CANDIDATES}) break;
           }
-          if (truncated) continue;
+          if (truncated || matches.length >= ${MAX_TARGET_CANDIDATES}) continue;
           // Only the search for shadow roots and frames, which the native query does not enter, is bounded.
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
           let node;
