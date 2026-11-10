@@ -287,6 +287,13 @@ function withClaudeClientLabels(environment: NodeJS.ProcessEnv): NodeJS.ProcessE
   };
 }
 /**
+ * The `User-Agent` of Claude's requests to an http MCP server. Claude puts both labels above in its
+ * own (`claude-code/<v> (openbot, agent-sdk/<v>, client-app/openbot/0.1.0)`), and servers and proxies
+ * that refuse a `User-Agent` with "bot" in it answer an empty 204: the server test passes and the
+ * session reports `Unexpected content type: null` (#6262). A `User-Agent` on the row still wins.
+ */
+const CLAUDE_MCP_USER_AGENT = "claude-code-mcp-client";
+/**
  * The name of a new Claude session. Without one, the CLI sends an extra model request at the first
  * prompt to make a title (about 1.2k input tokens) that OpenBot never shows. Only a new session gets
  * it: the CLI does not name a resumed session, and a title on resume would rename an older session.
@@ -1175,6 +1182,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             this.#mcpEndpoint,
             config.agentId,
           ).pipe(toProviderClientOperationError),
+          CLAUDE_MCP_USER_AGENT,
         );
     const stateDirectory = this.#stateDirectory;
     // Read once, so that the settings and the home skills of one query agree.
