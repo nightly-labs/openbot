@@ -66,6 +66,8 @@ export const messages = {
   "sidebar.agentMenu.edit": "エージェントを編集",
   "sidebar.agentMenu.duplicate": "エージェントを複製",
   "sidebar.agentMenu.duplicating": "複製中…",
+  "sidebar.agentMenu.markRead": "既読にする",
+  "sidebar.agentMenu.markUnread": "未読にする",
   "sidebar.agentMenu.delete": "エージェントを削除",
   "sidebar.agentMenu.hide": "エージェントを非表示",
   "sidebar.agentMenu.restore": "復元",
