@@ -2388,6 +2388,9 @@ function refusal(failure: MessagingAdapterError): string {
   // A new attempt is refused too, and counts against the number at WhatsApp.
   if (cause instanceof WhatsAppRefusedError)
     return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
+  // The driver refuses a chat that the user did not allow before it sends anything.
+  if (cause instanceof Error && cause.message === "place_not_allowed")
+    return "OpenBot posts only to WhatsApp chats that the user allowed, and this chat is not allowed. Nothing was sent. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat.";
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code
