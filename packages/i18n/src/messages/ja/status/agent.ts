@@ -30,6 +30,8 @@ export const messages = {
   "status.agent.reportProblem":
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
+  "status.agent.feedbackSameAs": "issue #{issue} に追加します",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",

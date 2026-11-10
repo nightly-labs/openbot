@@ -1,11 +1,4 @@
-import {
-  FEEDBACK_LIMITS,
-  FEEDBACK_REPOSITORY,
-  feedbackComment,
-  feedbackIssue,
-  feedbackSearchTerms,
-  parseFeedback,
-} from "@openbot/contracts/feedback";
+import { FEEDBACK_REPOSITORY, feedbackComment, feedbackIssue, parseFeedback } from "@openbot/contracts/feedback";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { runApiResponse } from "../../server/effect-runtime";
@@ -29,27 +22,11 @@ const FEEDBACK_BODY_LIMIT = 32 * 1024;
  * With `sameAs`, the report is a comment on that open issue instead. The issue names no account, and the Worker does not store
  * or log the text: GitHub keeps it, in public.
  *
- * GET finds the open issues with similar titles, so that the agent can add to one of them.
+ * `/v1/feedback/similar` finds the open issues with similar titles, so that the agent can add to one of them.
  */
 export const Route = createFileRoute("/v1/feedback")({
   server: {
     handlers: {
-      GET: ({ request }) =>
-        runApiResponse(
-          Effect.gen(function* () {
-            const user = yield* requestUser(request);
-            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-            const title = new URL(request.url).searchParams.get("title") ?? "";
-            if (!title.trim() || title.length > FEEDBACK_LIMITS.title)
-              return apiError(400, "invalid_feedback", "The title is invalid.");
-            const issues = yield* requestGitHubInstallationTokens().searchIssues(
-              FEEDBACK_REPOSITORY,
-              feedbackSearchTerms(title),
-            );
-            return json({ issues });
-          }),
-          githubInstallationTokensErrorResponse,
-        ),
       POST: ({ request }) =>
         runApiResponse(
           Effect.gen(function* () {

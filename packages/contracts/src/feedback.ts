@@ -391,14 +391,18 @@ export interface SimilarFeedbackIssue {
  * The text that the user approves: the title on the first line, then the text of the agent, in plain
  * words. The app version and the system go in the issue too; the approval says so.
  */
-export function feedbackPreview(feedback: Feedback): string {
+export function feedbackPreview(
+  feedback: Feedback,
+  notes: { recentErrors: string; sameAs: (issue: number) => string },
+): string {
   const parts =
     feedback.kind === "bug"
       ? [feedback.title, feedback.description, feedback.reproduction]
       : [feedback.title, feedback.proposal, feedback.problem];
-  // The card shows what else goes out, in the words of the issue: the errors and the issue.
-  if (feedback.recentErrors.trim()) parts.push(`Recent errors in the chat:\n${feedback.recentErrors.trim()}`);
-  if (feedback.sameAs !== null) parts.push(`Adds to issue #${feedback.sameAs}`);
+  // The card shows what else goes out: the errors and the issue. Each note is its own paragraph, a
+  // source text that the card translates.
+  if (feedback.recentErrors.trim()) parts.push(notes.recentErrors, feedback.recentErrors.trim());
+  if (feedback.sameAs !== null) parts.push(notes.sameAs(feedback.sameAs));
   return parts.filter((part) => part.trim()).join("\n\n");
 }
 

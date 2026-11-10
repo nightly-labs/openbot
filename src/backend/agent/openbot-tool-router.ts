@@ -1142,7 +1142,10 @@ export class OpenBotToolRouter {
         threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
         turnId: params.turnId,
         kind: "permissions",
-        command: feedbackPreview(feedback),
+        command: feedbackPreview(feedback, {
+          recentErrors: sourceText("status.agent.feedbackRecentErrors"),
+          sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
+        }),
         cwd: null,
         reason: sourceText(idea ? "status.agent.sendIdea" : "status.agent.reportProblem"),
         grantRoot: null,
@@ -1245,7 +1248,9 @@ export class OpenBotToolRouter {
       ...new Set(
         errors
           .sort((a, b) => a.at - b.at)
-          .map(({ text }) => redactText(text.replace(/\s+/g, " ").trim()).slice(0, FEEDBACK_ERROR_LENGTH)),
+          .map(({ text }) =>
+            this.#hooks.redactMcp(redactText(text.replace(/\s+/g, " ").trim())).slice(0, FEEDBACK_ERROR_LENGTH),
+          ),
       ),
     ];
     return lines.slice(-FEEDBACK_ERRORS).join("\n").slice(0, FEEDBACK_LIMITS.errors);

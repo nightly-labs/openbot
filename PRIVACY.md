@@ -1172,7 +1172,7 @@ Network traffic can also occur when:
   the right token to each call;
 - the user approves a bug report or a feature idea that an agent wrote. Before the card, OpenBot
   sends the title to the central account service (`api.openbot.run`) with the account session, and the
-  service gives the open issues of the OpenBot GitHub App with similar titles, from GitHub search; the
+  service gives the open issues of the OpenBot GitHub App with similar titles, from GitHub search. The service does not store or log the title. The
   agent can then add the report to one of them as a comment. OpenBot shows the title and
   the agent's text first (what happened and the steps, or what the user wants and why). It then sends the text to the central account
   service with the account session: that text, the agent's choice of the form's

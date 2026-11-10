@@ -67,8 +67,8 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
         ? Effect.succeed([])
         : auth
             .requestAuthorized(
-              `/v1/feedback?${new URLSearchParams({ title }).toString()}`,
-              { method: "GET" },
+              "/v1/feedback/similar",
+              { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) },
               similarIssues,
             )
             .pipe(
