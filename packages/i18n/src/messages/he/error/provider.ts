@@ -237,6 +237,8 @@ export const messages = {
     "Gemini לא יכול להשתמש במודל הזה כרגע. יש לבחור מודל אחר ואז לנסות שוב.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח את ההודעה שוב כדי להמשיך.",
   "error.provider.cursorArchivePath": "בארכיון של Cursor יש קובץ לא צפוי.",
   "error.provider.cursorChecksum": "סכום הביקורת של סביבת ההרצה של Cursor אינו תואם.",
   "error.provider.cursorReleaseShape": "לגרסה של Cursor יש מבנה לא צפוי.",

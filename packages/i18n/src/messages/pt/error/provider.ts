@@ -259,6 +259,8 @@ export const messages = {
     "O Gemini não pode usar este modelo agora. Escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "O Gemini perdeu a conexão com seu agente e parou. Envie sua mensagem novamente para continuar.",
   "error.provider.cursorArchivePath": "O arquivo compactado do Cursor contém um arquivo inesperado.",
   "error.provider.cursorChecksum": "A soma de verificação do ambiente de execução do Cursor não corresponde.",
   "error.provider.cursorReleaseShape": "A versão do Cursor tem um formato inesperado.",
