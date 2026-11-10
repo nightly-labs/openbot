@@ -2175,10 +2175,11 @@ export class MailboxStore {
     if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return null;
     const turnId = this.#sourceTurnIds().get(request.id);
     if (!turnId) return null;
+    // A run that resumed after a usage limit has a new turn id. Its earlier turns can have sent the request.
     const delivery = this.#state.deliveries.find(
       (candidate) =>
         candidate.recipientAgentId === agentId &&
-        candidate.turnId === turnId &&
+        (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true) &&
         this.#state.messages.find((message) => message.id === candidate.messageId)?.sender.kind === "routine",
     );
     return delivery ? this.#context(delivery) : null;
