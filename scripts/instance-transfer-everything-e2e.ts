@@ -199,6 +199,7 @@ function profile(name: string) {
       setEnabled: () => {},
       setAccountActive: () => {},
       refresh: () => {},
+      ensureHost: () => Effect.void,
       registerRoute: (routeId) => Effect.succeed(`https://signal.example.test/v1/webhooks/${routeId}`),
       revokeRoute: () => Effect.void,
     },
