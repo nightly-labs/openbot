@@ -44,7 +44,6 @@
   WriteRegStr SHCTX "Software\Classes\openbot\shell\open\command" "" '"$appExe" "%1"'
   !insertmacro openBotRemoveAppFromDataFolder
   !insertmacro openBotRemoveAppAboveInstallDirectory
-  !insertmacro openBotPointLoginItemAtThisCopy
 !macroend
 
 ; OpenBot keeps the agent workspaces in %USERPROFILE%\OpenBot (`src/backend/agent-store.ts`) and its
@@ -150,43 +149,32 @@
   ${endIf}
 !macroend
 
-; An installation whose registry entry is gone, for example after an update that stopped, is
-; installed again in an OpenBot subfolder of its folder (`openBotSafeInstallDirectory`). The earlier
-; copy stays in the folder above, often with files missing, and no update reaches it. Its shortcuts
-; and login item then open a copy that fails at start. Delete its app files.
+; An installation in the default folder whose registry entry is gone, for example after an update
+; that stopped, is installed again in an OpenBot subfolder (`openBotSafeInstallDirectory`). The
+; earlier copy stays in the default folder, often with files missing, and no update reaches it. Its
+; login item and shortcuts then open a copy that fails at start. Delete its app files. Only this
+; user has the default folder, and it holds only OpenBot.
 !macro openBotRemoveAppAboveInstallDirectory
-  Push $0
-  Push $1
-  StrLen $0 "\${APP_FILENAME}"
-  StrCpy $1 $INSTDIR "" -$0
-  ${if} $1 == "\${APP_FILENAME}"
-    StrCpy $1 $INSTDIR -$0
-    ${if} ${FileExists} "$1\${APP_EXECUTABLE_FILENAME}"
-      !insertmacro openBotRemoveAppFiles $1
-    ${endIf}
+  ${if} $INSTDIR == "$LocalAppData\Programs\${APP_FILENAME}\${APP_FILENAME}"
+  ${andIf} ${FileExists} "$LocalAppData\Programs\${APP_FILENAME}\${APP_EXECUTABLE_FILENAME}"
+    !insertmacro openBotRemoveAppFiles "$LocalAppData\Programs\${APP_FILENAME}"
   ${endIf}
-  Pop $1
-  Pop $0
 !macroend
 
-; The login item names the executable (`src/main/login-item.ts`), and Electron calls it by the
-; AppUserModelId. When an installation moves, the item still names the earlier copy. Point an item
-; that exists at this copy; Windows keeps its on or off state under the same name.
-!macro openBotPointLoginItemAtThisCopy
-  Push $0
-  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_ID}"
-  ${if} $0 != ""
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_ID}" '"$appExe"'
-  ${endIf}
-  Pop $0
-!macroend
-
-; Only the files and folders that an OpenBot installation has are deleted, so other files in FOLDER,
-; such as the agent folders, stay. A file that Windows still holds stays too; it does not stop the
-; update.
+; Only the files and folders that an OpenBot installation has are deleted from FOLDER, so the agent
+; folders stay. A file that Windows still holds stays too; it does not stop the update. The login
+; item names the executable (`src/main/login-item.ts`), and Electron calls it by the AppUserModelId:
+; point it at the new copy, or OpenBot no longer opens at sign-in.
 !macro openBotRemoveAppFiles FOLDER
   Push $0
+  Push $1
+  Push $2
   StrCpy $0 ${FOLDER}
+  ReadRegStr $1 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_ID}"
+  ${StrContains} $2 "$0\${APP_EXECUTABLE_FILENAME}" $1
+  ${if} $2 != ""
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APP_ID}" '"$appExe"'
+  ${endIf}
   Delete "$0\${APP_EXECUTABLE_FILENAME}"
   Delete "$0\${UNINSTALL_FILENAME}"
   Delete "$0\uninstallerIcon.ico"
@@ -209,6 +197,8 @@
   Delete "$0\LICENSES.chromium.html"
   RMDir /r "$0\locales"
   RMDir /r "$0\resources"
+  Pop $2
+  Pop $1
   Pop $0
 !macroend
 

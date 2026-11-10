@@ -11,9 +11,9 @@
 //   3. Without such a file, the same uninstaller deletes the workspaces.
 //   4. The new installer updates the installation in %USERPROFILE%\OpenBot: it installs in the
 //      default folder, keeps the workspaces, and removes only the earlier app.
-//   5. An installation that lost its registry entry and was installed again in an OpenBot
-//      subfolder: the new installer removes the earlier app from the folder above, keeps the other
-//      files there, and points the login item at the new copy.
+//   5. An installation in the default folder that lost its registry entry and was installed again
+//      in an OpenBot subfolder: the new installer removes the earlier, incomplete app from the
+//      default folder, keeps the other files there, and points the login item at the new copy.
 // Usage: bun scripts/windows-home-install-update-e2e.ts <earlier installer> <new installer>
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -312,6 +312,8 @@ async function newInstallerRemovesTheCopyAbove(): Promise<void> {
   check((await runInstaller(earlierInstaller, `/S /D=${nestedFolder}`)) === 0, "The earlier installer failed again.");
   check(existsSync(join(defaultFolder, "OpenBot.exe")), "The earlier copy is not in the folder above.");
   check(existsSync(join(nestedFolder, "OpenBot.exe")), "The earlier installer did not use the subfolder.");
+  // The reported copy has files missing.
+  await rm(join(defaultFolder, "ffmpeg.dll"));
   const otherFile = join(defaultFolder, "notes.txt");
   await writeFile(otherFile, "not an app file\n");
   setLoginItem(join(defaultFolder, "OpenBot.exe"));
