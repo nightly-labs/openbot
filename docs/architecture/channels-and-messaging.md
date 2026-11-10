@@ -197,9 +197,9 @@ returns idle gives it to the mentioned members, as a person who is named in a gr
 An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
 visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
-only itself adds none: its reply shows who answers. A routing answer that does not decode pauses the
-task with `channelRoutingUnreadable` and offers Reassign. The log gets the answer length and its
-field names only, not its text.
+only itself adds none: its reply shows who answers. A routing answer that does not decode goes to the
+lead, as an unclear request does. The log gets the answer length and its field names only, not its
+text.
 
 A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
 that can take work, with no routing turn. A quote tag before or between the mentions does not end
@@ -503,6 +503,14 @@ On a host with `channel-isolation-v1`, each channel record and the draft of a `s
 the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
 server or the browser client shows the switch only when the host advertises the capability (#5380).
 A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
+On a host with `channel-picture-v1`, each channel record carries its picture: `icon` and the
+`openbot-avatar://channel/` `imageUrl`, which names only the image version. A `save` draft can carry
+`icon`; absent keeps the stored icon, and null removes it. `/v1/channels/image?channelId=` reads the
+image bytes by version (`GET`), sets them (`PUT`) and removes them (`DELETE`). The phone keeps the
+images beside the agent photos in its cache and edits the picture in Channel info, as the desktop
+channel settings do. The browser client cannot open the host URL, so it drops `imageUrl` and shows
+the icon or the faces. A joined desktop still shows the member faces.
 
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does

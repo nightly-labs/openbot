@@ -9,6 +9,7 @@ export const messages = {
   "menu.zoomIn": "확대",
   "menu.zoomOut": "축소",
   "menu.copyLink": "링크 복사",
+  "menu.copyImage": "이미지 복사",
   "menu.quit": "OpenBot 종료",
   "menu.quitConfirmTitle": "OpenBot을 종료할까요?",
   "menu.quitConfirmBody": "OpenBot을 다시 열 때까지 에이전트와 루틴이 멈춥니다.",

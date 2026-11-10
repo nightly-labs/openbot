@@ -28,12 +28,10 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
  * the JavaScript error class, so the user read the generic text with no provider name (#2850).
  * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
  */
+export const OPENCODE_INTERNAL_FAILURE = "Internal error: Internal service failure";
+
 export function isOpenCodeInternalFailure(error: unknown): boolean {
-  return (
-    error instanceof RequestError &&
-    error.code === -32603 &&
-    error.message === "Internal error: Internal service failure"
-  );
+  return error instanceof RequestError && error.code === -32603 && error.message === OPENCODE_INTERNAL_FAILURE;
 }
 
 /**

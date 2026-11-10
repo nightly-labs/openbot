@@ -77,6 +77,11 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
+import {
   AGENT_MEMORIES_PAGE_ROUTE,
   AGENT_MEMORIES_PAGE_SIZE,
   AGENT_MEMORY_INCLUSION_ROUTE,
@@ -426,6 +431,42 @@ export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(functio
   );
 });
 
+function decodeUploadId(value: unknown): string {
+  if (!isDynamicRecord(value) || !isString(value.uploadId)) throw new Error("The host returned an invalid upload.");
+  return value.uploadId;
+}
+
+/** An export that is read one part at a time. */
+export interface AgentExportParts {
+  name: string;
+  size: number;
+  /** Up to `length` bytes from `offset`, as Base64. */
+  readPart: (offset: number, length: number) => Promise<string>;
+}
+
+/**
+ * Sends a Grok Bot export of any size to the host in parts, and answers its preview. Send it only to
+ * a host that serves `agent-import-v2`; `apply` and `discard` stay the v1 calls.
+ */
+export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInParts")(function* (
+  request: TeamApiRequest,
+  file: AgentExportParts,
+): Effect.fn.Return<AgentImportPreview, TeamRequestError> {
+  const uploadId = yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.open, decodeUploadId, { size: file.size }),
+  );
+  for (let offset = 0; offset < file.size; ) {
+    const length = Math.min(AGENT_IMPORT_V2_CHUNK_BYTES, file.size - offset);
+    const base64 = yield* teamCall(() => file.readPart(offset, length));
+    const upload = { name: file.name, mimeType: "application/zip", base64, maxBytes: AGENT_IMPORT_V2_CHUNK_BYTES };
+    yield* teamCall(() => request("POST", agentImportV2ChunkPath(uploadId, offset), ignoreResponse, undefined, upload));
+    offset += length;
+  }
+  return yield* teamCall(() =>
+    request("POST", AGENT_IMPORT_V2_ROUTES.stage, decodeRemoteAgentImportPreview, { uploadId }),
+  );
+});
+
 export const applyAgentImport = Effect.fn("TeamClient.applyAgentImport")(function* (
   request: TeamApiRequest,
   input: ApplyAgentImportInput,
@@ -571,14 +612,25 @@ export type TeamChannelsApi = Pick<
   | "listChannelRoutineRuns"
 >;
 
+/**
+ * A host with channel-picture-v1 names a channel image by its `openbot-avatar:` URL, which a browser
+ * cannot open. Without it, the channel shows its icon or its member faces.
+ */
+function withoutHostImage<T extends { imageUrl?: string | null }>(channel: T): T {
+  return channel.imageUrl ? { ...channel, imageUrl: null } : channel;
+}
+
 /** Every channel route is a POST with the channel in the body, except the list. */
 export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
   return {
-    listChannels: () => request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries),
-    readChannel: (input) => post(CHANNEL_ROUTES.read, decodeChannelPage, input),
-    channelCommand: (command) => post(CHANNEL_ROUTES.command, decodeChannel, command),
+    listChannels: async () => (await request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries)).map(withoutHostImage),
+    readChannel: async (input) => {
+      const page = await post(CHANNEL_ROUTES.read, decodeChannelPage, input);
+      return { ...page, channel: withoutHostImage(page.channel) };
+    },
+    channelCommand: async (command) => withoutHostImage(await post(CHANNEL_ROUTES.command, decodeChannel, command)),
     listChannelMemories: (channelId) => post(CHANNEL_ROUTES.memories, decodeChannelMemories, { channelId }),
     createChannelMemory: (input) => post(CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, input),
     updateChannelMemory: (input) => post(CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, input),

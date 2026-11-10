@@ -121,6 +121,8 @@ export interface AcpFlavor {
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
+    /** A failure text after which the agent no longer has the session, so the next prompt opens it again. */
+    sessionLost?: RegExp;
   };
   /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;

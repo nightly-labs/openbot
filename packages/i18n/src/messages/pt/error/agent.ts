@@ -53,6 +53,8 @@ export const messages = {
     "Nenhum modelo de {provider} está disponível agora. Chame list_models para ver os modelos disponíveis.",
   "error.agent.reasoningEffortUnsupported":
     'O modelo "{model}" não oferece suporte ao esforço de raciocínio "{effort}". Esforços disponíveis: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    'O modelo "{model}" não tem configuração de esforço de raciocínio, então não é possível alterá-lo.',
   "error.agent.noStartingModelInSettings":
     "{provider} não tem nenhum modelo disponível, e nenhum outro provedor conectado tem um. Entre em um provedor ou altere o provedor padrão em Configurações do servidor → Provedores.",
   "error.agent.noStartingModel":

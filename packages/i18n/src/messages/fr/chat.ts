@@ -152,11 +152,16 @@ export const messages = {
   "chat.marker.instructionsUndo": "Annuler",
   "chat.marker.instructionsUndone": "Annulé",
   "chat.usageLimit.title": "Limite d’utilisation de {provider} atteinte",
+  "chat.usageLimit.modelTitle": "Limite d’utilisation de {model} atteinte",
   "chat.usageLimit.onHold": "Message en attente",
   "chat.usageLimit.bodyReset":
     "Votre message n’a pas démarré. Envoyez-le maintenant à un autre modèle, ou attendez jusqu’à {reset}.",
   "chat.usageLimit.body":
     "Votre message n’a pas démarré. Envoyez-le maintenant à un autre modèle, ou attendez la fin de la limite.",
+  "chat.usageLimit.channelBodyReset":
+    "{name} n’a pas commencé ce travail. Passez {name} à un autre modèle maintenant, ou attendez {reset}.",
+  "chat.usageLimit.channelBody":
+    "{name} n’a pas commencé ce travail. Passez {name} à un autre modèle maintenant, ou attendez la fin de la limite.",
   "chat.usageLimit.sendTo": "Envoyer à",
   "chat.usageLimit.remember": "La prochaine fois, changer sans demander",
   "chat.usageLimit.wait": "Attendre la réinitialisation",
@@ -318,6 +323,9 @@ export const messages = {
   "chat.image.preview": "Aperçu de {name}",
   "chat.image.previewGenerated": "Aperçu de l’image générée",
   "chat.image.download": "Télécharger {name}",
+  "chat.image.copy": "Copier l’image",
+  "chat.image.copied": "Image copiée",
+  "chat.image.copyFailed": "Impossible de copier l’image.",
   "chat.image.downloadGenerated": "Télécharger l’image générée",
   "chat.image.attachedFallback": "image jointe",
   "chat.image.attachment": "Image jointe",

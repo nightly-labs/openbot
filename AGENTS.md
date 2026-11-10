@@ -45,7 +45,8 @@ adding a module or moving ownership between workspaces.
   values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
   on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
-  sessions; it does not hold chats, files, or commands.
+  sessions; it does not hold chats, files, or commands. It also holds the signed JavaScript bundles
+  of mobile over-the-air updates (`apps/mobile-updates`), which are public code and have no user data.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
@@ -133,7 +134,8 @@ and the separate Node and Bun type environments. Read them when changing checks 
 State which surfaces a change touches. Check all affected consumers and reverse actions.
 
 - Desktop renderer (`src/renderer`), mobile (`apps/mobile`), public web (`apps/auth-api`; no separate
-  landing app), hosted-site routing (`apps/site-router`), and Signal (`remote/api`).
+  landing app), hosted-site routing (`apps/site-router`), the mobile update server
+  (`apps/mobile-updates`), and Signal (`remote/api`).
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.

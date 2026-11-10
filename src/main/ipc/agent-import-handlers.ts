@@ -1,6 +1,7 @@
 import { Effect } from "effect";
-// Agent import into the local host, or into a joined server with `agent-import-v1`. The file dialog
-// opens here, so the renderer never names a path. For a joined server, main reads the file and sends it.
+// Agent import into the local host, or into a joined server with `agent-import-v2` (in parts) or
+// `agent-import-v1`. The file dialog opens here, so the renderer never names a path. For a joined
+// server, main reads the file and sends it.
 
 import { copyFile, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -19,6 +20,7 @@ import {
   AGENT_IMPORT_ROUTES,
   AGENT_IMPORT_UPLOAD_BYTES,
 } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
@@ -35,7 +37,10 @@ import { stringPayload } from "./validation";
 export interface AgentImportIpcDependencies {
   agentImport: AgentImportService;
   hermesImport: HermesImportService;
-  remoteServers: Pick<RemoteServerManager, "supportsCapability" | "request" | "stageAgentImport">;
+  remoteServers: Pick<
+    RemoteServerManager,
+    "supportsCapability" | "request" | "stageAgentImport" | "stageAgentImportInParts"
+  >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
   /** The folder of the export skills a user adds to Grok Bot or Hermes by hand: `<source>/SKILL.md`. */
@@ -84,7 +89,9 @@ export function agentImportIpcHandlers({
     if (!path) return null;
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
-    if (info.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(sourceText("error.import.remoteZipTooLarge"));
+    if (remoteServers.supportsCapability(serverId, AGENT_IMPORT_V2_CAPABILITY))
+      return runCauseEffect(remoteServers.stageAgentImportInParts(serverId, path, info.size));
+    if (info.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(sourceText("error.import.remoteZipTooLargeOldHost"));
     return runCauseEffect(remoteServers.stageAgentImport(serverId, new Uint8Array(await readFile(path))));
   };
 

@@ -342,6 +342,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
+  "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.postiz.description":
+    "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
+  "marketplace.plugin.postiz.app":
+    "通过 Postiz 的 MCP 服务器，用浏览器登录或 API 密钥处理频道、草稿、已排程的帖子和媒体。",
+  "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
+  "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
+  "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",

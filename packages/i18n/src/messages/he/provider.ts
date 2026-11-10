@@ -125,6 +125,8 @@ export const messages = {
     "אפשר להוסיף נקודת קצה תואמת OpenAI — שרת מודלים במחשב הזה, או כל שירות עם כתובת בסיס ומפתח.",
   "provider.picker.customPending":
     "המודלים של נקודות הקצה שלך עדיין לא נטענו. הספק קורא אותם אחרי שהמשימה הנוכחית שלו נעצרת.",
+  "provider.picker.customUnlisted": "{name} לא מציג את המודלים של נקודות הקצה שלך.",
+  "provider.picker.editEndpoints": "עריכת נקודות קצה",
   "provider.picker.defaultModelLabel": "{name}, ברירת מחדל",
   "provider.picker.usageLimit": "הגעת למגבלת השימוש",
   "provider.picker.usageLimitWindow": "מגבלת {window}",

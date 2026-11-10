@@ -58,6 +58,8 @@ export const messages = {
     "Derzeit ist kein Modell von {provider} verfügbar. Rufe list_models auf, um die verfügbaren Modelle zu sehen.",
   "error.agent.reasoningEffortUnsupported":
     "Das Modell „{model}“ unterstützt den Denkaufwand „{effort}“ nicht. Unterstützte Stufen: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Das Modell „{model}“ hat keine Einstellung für den Denkaufwand. Du kannst ihn deshalb nicht ändern.",
   "error.agent.noStartingModelInSettings":
     "{provider} hat kein verfügbares Modell, und kein anderer angemeldeter Anbieter hat eines. Melde dich bei einem Anbieter an oder ändere den Standardanbieter unter Servereinstellungen → Anbieter.",
   "error.agent.noStartingModel":

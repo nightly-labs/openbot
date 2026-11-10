@@ -84,6 +84,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "밝기",
   "mobile.settings.appearance.messageColorFooter":
     "에이전트 색상을 선택하면 에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 사용자 지정 색상을 선택하면 모든 채팅에서 내 메시지가 선택한 색상을 사용해요. 글자 색은 읽기 쉽도록 바뀌어요.",
+  "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
+  "mobile.settings.appearance.collapseRoutinesFooter":
+    "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
   "mobile.settings.animations.title": "애니메이션",
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",

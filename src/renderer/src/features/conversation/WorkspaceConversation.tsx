@@ -14,17 +14,11 @@ import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-pro
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { hasVisibleToasts } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
-import {
-  type BackupModelSource,
-  rememberedBackupModels,
-  type UsageLimitAskCardProps,
-  usageLimitAskOptions,
-} from "@openbot/ui/features/conversation/BackupModels";
+import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { sidebarAgentWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
+import { createMemo } from "solid-js";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -70,6 +64,7 @@ import {
   desktopAgentMessageDeleteAccess,
   readerCanDeleteMessage,
 } from "./message-delete-access";
+import { trackUsageLimitShown, useUsageLimitAsk } from "./usage-limit-ask";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -165,8 +160,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     usageLimits,
     usageLimitedModels,
     failedModels,
-    waitedUsageLimits,
-    setWaitedUsageLimits,
     queues,
   } = useTurns();
   const {
@@ -496,79 +489,17 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
    * A usage limit holds the active agent's queued message on this computer. The chat asks where to
    * send it, unless the agent switches by itself to a saved backup model that is ready.
    */
+  const usageLimitAskFor = useUsageLimitAsk();
   const usageLimitAsk = createMemo((): UsageLimitAskCardProps | undefined => {
     const agent = activeAgent();
-    // Only this computer holds a message at a usage limit, and its agents use the providers it knows.
-    if (!agent || activeServer()?.kind !== "local" || !isKnownAgentProvider(agent.provider)) return undefined;
-    const provider = agent.provider;
-    const limits = usageLimits();
-    if (!(agent.id in limits)) return undefined;
-    const resetsAt = limits[agent.id] ?? null;
-    if (waitedUsageLimits()[agent.id] === resetsAt && agent.id in waitedUsageLimits()) return undefined;
-    if (!queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
-    const source: BackupModelSource = {
-      modelOptions: modelOptions(),
-      providers: agentStatus().providers,
-      limited: usageLimited,
-    };
-    const options = usageLimitAskOptions({ ...agent, provider }, agent.backupModels, source);
-    if (options.length === 0) return undefined;
-    const backupModels = agent.backupModels;
-    if (
-      backupModels?.automatic &&
-      backupModels.order.some((choice) => options.some((option) => sameAgentModelChoice(option.choice, choice)))
-    )
-      return undefined;
-    const agentId = agent.id;
-    const reasoningEffort = agent.reasoningEffort;
-    const fromProvider = agent.provider;
-    return {
-      provider,
-      resetsAt,
-      options,
-      onSend: async (option, remember) => {
-        // The agent keeps its reasoning effort where the other model has it.
-        const model = modelOptions().find(
-          (candidate) => candidate.provider === option.choice.provider && candidate.id === option.choice.model,
-        );
-        await updateAgent(agentId, {
-          provider: option.choice.provider,
-          model: option.choice.model,
-          providerAccountId: option.choice.providerAccountId ?? null,
-          reasoningEffort:
-            model && !model.supportedReasoningEfforts.includes(reasoningEffort)
-              ? model.defaultReasoningEffort
-              : reasoningEffort,
-          leaveUsageLimit: true,
-          ...(remember ? { backupModels: rememberedBackupModels(option.choice, backupModels) } : {}),
-        });
-        desktopAnalytics.track("usage_limit_action", {
-          action: "model_switched",
-          from_provider: fromProvider,
-          to_provider: option.choice.provider,
-          to_model: option.choice.model,
-        });
-      },
-      onWait: () => {
-        desktopAnalytics.track("usage_limit_action", { action: "waited", from_provider: fromProvider });
-        setWaitedUsageLimits((current) => ({ ...current, [agentId]: resetsAt }));
-      },
-    };
+    if (!agent || !queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
+    return usageLimitAskFor(agent);
   });
-  // One "shown" for each limit that asks, also when the user opens the agent again; a new reset time is a
-  // new limit.
-  const shownUsageLimits = new Set<string>();
-  createEffect(
-    () => {
-      const ask = usageLimitAsk();
-      return ask ? { key: `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}`, provider: ask.provider } : null;
-    },
-    (shown) => {
-      if (!shown || shownUsageLimits.has(shown.key)) return;
-      shownUsageLimits.add(shown.key);
-      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: shown.provider });
-    },
-  );
+  trackUsageLimitShown(() => {
+    const ask = usageLimitAsk();
+    const agent = activeAgent();
+    return ask && agent ? { agentId: agent.id, ask } : undefined;
+  });
 
   return (
     <>

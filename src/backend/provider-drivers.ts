@@ -963,8 +963,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
     // Grok 1.0.70 starts on its two built-in models when its sign-in has expired, renews the sign-in,
-    // and then fetches its catalogue. A `model/list` in between misses the newer models.
-    catalog: { partialListAtStart: true },
+    // and then fetches its catalogue. A `model/list` in between misses the newer models, so the list
+    // is read once more after each start, also when no agent is on a missing model yet (#6318).
+    catalog: { partialListAtStart: true, relistAfterStart: true },
   },
   {
     id: "opencode",

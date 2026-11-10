@@ -15,6 +15,13 @@ import { databaseRows, requiredNumberColumn, requiredStringColumn } from "./data
 import { MemoryStore, type MemoryTables, type SaveMemoryInput } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
 
+/**
+ * Scripts where a searched word is often part of a longer unicode61 word: no spaces between words,
+ * or, in Korean, particles attached to the word.
+ */
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+
 export class AgentMemorySelectionError extends Schema.TaggedError<AgentMemorySelectionError>()(
   "AgentMemorySelectionError",
   {
@@ -243,7 +250,7 @@ export class AgentMemoryStore extends MemoryStore {
         }),
       ),
     ].join(" OR ");
-    const ids = databaseRows(
+    const indexed = databaseRows(
       this.database.connection
         .prepare(
           `SELECT m.memory_id FROM agent_memory_search JOIN projection_agent_memories m ON m.rowid = agent_memory_search.rowid
@@ -252,6 +259,26 @@ export class AgentMemoryStore extends MemoryStore {
         )
         .all(expression, agentId, limit + 1),
     ).map((row) => requiredStringColumn(row, "memory_id"));
+    // A word inside a run of unspaced text is not an index word, so match it as a substring of this
+    // agent's few memories. Terms hold only letters, numbers and marks: LIKE needs no escape.
+    const unspaced = [...new Set(terms.filter((term) => UNSPACED_SCRIPT.test(term)))];
+    const ids =
+      unspaced.length === 0 || indexed.length > limit
+        ? indexed
+        : [
+            ...new Set([
+              ...indexed,
+              ...databaseRows(
+                this.database.connection
+                  .prepare(
+                    `SELECT memory_id FROM projection_agent_memories
+       WHERE agent_id = ? AND (${unspaced.map(() => "text LIKE ?").join(" OR ")})
+       ORDER BY updated_at DESC, memory_id LIMIT ?`,
+                  )
+                  .all(agentId, ...unspaced.map((term) => `%${term}%`), limit + 1),
+              ).map((row) => requiredStringColumn(row, "memory_id")),
+            ]),
+          ].slice(0, limit + 1);
     const result: AgentMemorySearchResult = { memories: [], hasMore: ids.length > limit };
     for (const id of ids.slice(0, limit)) {
       const memory = this.#retrieved(agentId, id);

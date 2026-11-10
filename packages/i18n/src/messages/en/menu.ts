@@ -11,6 +11,7 @@ export const messages = defineMessages("menu", {
   "menu.zoomIn": "Zoom In",
   "menu.zoomOut": "Zoom Out",
   "menu.copyLink": "Copy Link",
+  "menu.copyImage": "Copy Image",
   "menu.quit": "Quit OpenBot",
   "menu.quitConfirmTitle": "Quit OpenBot?",
   "menu.quitConfirmBody": "Agents and routines stop until you open OpenBot again.",

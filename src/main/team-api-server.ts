@@ -65,6 +65,7 @@ import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
@@ -75,6 +76,7 @@ import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
@@ -2178,6 +2180,7 @@ export class TeamApiServer {
       historyExtent: route.capabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
       channelAttention: route.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
       channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+      channelPicture: route.capabilities.has(CHANNEL_PICTURE_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
@@ -2360,7 +2363,8 @@ export class TeamApiServer {
             capability === "channel-chats-v1" ||
             capability === CHANNEL_DELETE_CAPABILITY ||
             capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
-            capability === CHANNEL_ISOLATION_CAPABILITY
+            capability === CHANNEL_ISOLATION_CAPABILITY ||
+            capability === CHANNEL_PICTURE_CAPABILITY
           )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
@@ -2487,7 +2491,8 @@ export class TeamApiServer {
           if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
-          if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
+          if (capability === AGENT_IMPORT_CAPABILITY || capability === AGENT_IMPORT_V2_CAPABILITY)
+            return this.#options.agentImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === INSTANCE_TRANSFER_CHUNKS_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;

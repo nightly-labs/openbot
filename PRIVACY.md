@@ -570,6 +570,19 @@ does not record message text, files, request bodies or headers, and it masks tok
 addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
 clear it.
 
+The mobile app asks an update server for a newer JavaScript bundle each time it starts, and when
+you come back to it, at most one time in 15 minutes. App versions after 1.4.8 ask OpenBot's server
+`updates.openbot.run`, a Cloudflare Worker; version 1.4.8 and earlier versions ask Expo's server
+`u.expo.dev`. The request has the platform, the runtime version of the build, the build channel, the
+ID of the bundle that runs, a random ID that the update client made for this install, the IDs of
+updates that failed on the phone a short time ago and, after a crash at start, the first 1,024
+characters of the error text. It does not have your account, your servers or your content. OpenBot's
+server uses the random ID only to decide if the install is in a part rollout. It does not store or
+log the request, and Cloudflare sees it in transit as for each request to a Worker. The phone then
+downloads the bundle and its files from the same server. Each update is signed, and the app refuses
+a bundle that the certificate in the app does not accept. A development build and Expo Go ask no
+update server.
+
 Mobile chat, like desktop and web chat, shows the icon of the linked site beside a web link. To get
 it, the phone requests `/favicon.ico` from the site of the link when it shows the message. The request
 contains no conversation text. When the site has no icon, a local symbol shows. Mobile chat does not

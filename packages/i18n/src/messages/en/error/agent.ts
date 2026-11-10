@@ -51,6 +51,8 @@ export const messages = defineMessages("error.agent", {
     "No {provider} model is available now. Call list_models to see the available models.",
   "error.agent.reasoningEffortUnsupported":
     'Model "{model}" does not support reasoning effort "{effort}". Supported efforts: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    'Model "{model}" has no reasoning effort setting, so you cannot change its effort.',
   "error.agent.noStartingModelInSettings":
     "{provider} has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Server settings → Providers.",
   "error.agent.noStartingModel":

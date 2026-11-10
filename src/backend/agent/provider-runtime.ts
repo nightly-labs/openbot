@@ -29,6 +29,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
+  isCustomProviderHarness,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -36,7 +37,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
-import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
+import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -332,6 +333,11 @@ export interface ProviderHooks {
    * so a change made while it starts is not in the process that arrives.
    */
   captureConfigRevision(): number;
+  /**
+   * True while a saved endpoint of `harness` waits for a process that reads it. Without the hook,
+   * the status does not say.
+   */
+  endpointsPending?(harness: CustomProviderHarness): boolean;
 }
 
 /**
@@ -712,7 +718,13 @@ export class ProviderRuntime implements ProviderPort {
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const withAccounts = accounts ? { ...withSource, accounts } : withSource;
-        return this.#restartsWhenIdle.has(row.id) ? { ...withAccounts, restartPending: true } : withAccounts;
+        const endpointsPending =
+          isCustomProviderHarness(row.id) && this.#hooks.endpointsPending
+            ? { endpointsPending: this.#hooks.endpointsPending(row.id) }
+            : {};
+        return this.#restartsWhenIdle.has(row.id)
+          ? { ...withAccounts, ...endpointsPending, restartPending: true }
+          : { ...withAccounts, ...endpointsPending };
       }),
     };
   }
@@ -3298,6 +3310,7 @@ export class ProviderRuntime implements ProviderPort {
         // A new CLI gets new starts: the failures were of the one it replaces.
         this.#startFailures.delete(provider);
         this.#slowStarts.delete(provider);
+        this.#resetRestarts(provider);
       });
       // Other providers can have live turns. Replacement must not run start recovery. The start checks
       // the copy just installed: a CLI the user installed that is as new ran in its place, and its
@@ -3317,6 +3330,9 @@ export class ProviderRuntime implements ProviderPort {
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
       // The system stops each copy in the same way, so the copy stays for the start after the user's fix.
       if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
+      // OpenCode can fail a start in this way, and the start tries again in a few seconds. Removing the
+      // copy left that retry with no CLI, and the row said that OpenCode is not downloaded (#6335).
+      if (status?.message === OPENCODE_INTERNAL_FAILURE && this.#restartTimers.has(provider)) return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         // The update reason keeps catalog text only, so other text would leave only "Try again.".
         // The log keeps the start failure as the cause.

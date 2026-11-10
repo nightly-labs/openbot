@@ -58,7 +58,7 @@ export interface ChannelConversationEnvironment {
 /** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
 export function createChannelConversation(env: ChannelConversationEnvironment) {
   const channels = useChannels();
-  const { t, errorMessage } = useText();
+  const { t, errorDetails } = useText();
   const channelId = env.channelId;
   const page = () => {
     const current = channels.state.page;
@@ -190,7 +190,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       const messageId = sentChannelMessageId(after, sequenceBefore, body, env.isOwnSender);
       return messageId ? { messageId } : { error: t("channel.error.action") };
     } catch (error) {
-      return { error: errorMessage(error, t("channel.error.action")) };
+      // The reason alone can be the generic text, so the reference says which failure it was.
+      const details = errorDetails(error, t("channel.error.action"));
+      return { error: details.message, reference: details.reference };
     }
   }
 

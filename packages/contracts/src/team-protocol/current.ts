@@ -12,6 +12,7 @@ import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
+import { AGENT_IMPORT_V2_CAPABILITY } from "./agent-import-v2";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "./agent-instructions-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
@@ -52,6 +53,7 @@ import {
 } from "./browser-view-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -210,6 +212,7 @@ export {
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_INSTRUCTIONS_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
@@ -242,6 +245,7 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
@@ -504,6 +508,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -686,7 +692,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-    capability !== CHAT_HISTORY_CAPABILITY,
+    capability !== CHAT_HISTORY_CAPABILITY &&
+    capability !== CHANNEL_PICTURE_CAPABILITY &&
+    capability !== AGENT_IMPORT_V2_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -745,6 +753,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
+  AGENT_IMPORT_V2_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -886,6 +896,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-      capability !== CHAT_HISTORY_CAPABILITY,
+      capability !== CHAT_HISTORY_CAPABILITY &&
+      capability !== CHANNEL_PICTURE_CAPABILITY &&
+      capability !== AGENT_IMPORT_V2_CAPABILITY,
   );
 }

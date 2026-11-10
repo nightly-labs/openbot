@@ -54,6 +54,8 @@ export const messages = {
     "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
   "error.agent.reasoningEffortUnsupported":
     "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
+  "error.agent.reasoningEffortNotConfigurable":
+    "モデル「{model}」には推論レベルの設定がないため、推論レベルを変更できません。",
   "error.agent.noStartingModelInSettings":
     "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、サーバー設定 → プロバイダーでデフォルトのプロバイダーを変更してください。",
   "error.agent.noStartingModel":

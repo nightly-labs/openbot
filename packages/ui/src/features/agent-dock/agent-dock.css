@@ -273,6 +273,12 @@
   scrollbar-width: none;
 }
 
+/* A Bloub drawing is larger than its avatar box. Without the clip, the last row overflows the list by a
+ * few pixels, so a short list scrolls and shows the bottom fade. The list already cut that part. */
+.agent-dock-add-list > [role="menuitem"] {
+  overflow-y: clip;
+}
+
 .agent-dock-add-list::-webkit-scrollbar {
   display: none;
 }

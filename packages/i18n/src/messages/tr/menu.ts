@@ -9,6 +9,7 @@ export const messages = {
   "menu.zoomIn": "Yakınlaştır",
   "menu.zoomOut": "Uzaklaştır",
   "menu.copyLink": "Bağlantıyı Kopyala",
+  "menu.copyImage": "Görüntüyü Kopyala",
   "menu.quit": "OpenBot'tan çık",
   "menu.quitConfirmTitle": "OpenBot'tan çıkılsın mı?",
   "menu.quitConfirmBody": "OpenBot'u yeniden açana kadar ajanlar ve rutinler durur.",

@@ -562,6 +562,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKeys.serverMembers(queryScope, serverId),
           queryKeys.serverInvites(queryScope, serverId),
           queryKeys.agentAvatar(queryScope, serverId),
+          queryKeys.channelImage(queryScope, serverId),
           queryKeys.serverLogo(queryScope, serverId),
         ])
           queryClient.removeQueries({ queryKey });
@@ -2121,7 +2122,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
-      deleteAgent: (agentId) => runTeamRequest(deleteAgent(teamApi(), agentId)),
+      deleteAgent: (agentId, serverId) => runTeamRequest(deleteAgent(teamApi(serverId), agentId)),
       interruptTurn: (agentId, turnId, serverId) =>
         runTeamRequest(interruptAgentTurn(teamApi(serverId), agentId, turnId)),
       loadConversation,

@@ -47,6 +47,8 @@ const MODULE_PRAGMAS = new Set(["data_version", "page_size"]);
  */
 const SQLITE_BUSY = 5;
 const SQLITE_FULL = 13;
+/** `SQLITE_READONLY_ROLLBACK`: the file has a hot journal that a read-only connection cannot roll back. */
+const SQLITE_READONLY_ROLLBACK = 776;
 
 /** Functions SQLite can compile in that read, write, or load code from the filesystem. */
 const DENIED_FUNCTIONS = new Set(["load_extension", "readfile", "writefile", "edit", "fts3_tokenizer"]);
@@ -310,6 +312,19 @@ function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): E
   });
 }
 
+/**
+ * A write that a deadline stopped can leave a hot journal. A read-only connection cannot roll it back,
+ * so every read fails, and every new table too, because a schema change reads first (#6353). One read
+ * on the write connection rolls the journal back; the caller then runs its read once more.
+ */
+function rollBackHotJournal(request: AgentDatabaseStatement): Effect.Effect<void, HostFailure> {
+  return databaseCall(request, () => {
+    openDatabase({ ...request, mode: "write" })
+      .prepare("SELECT 1 FROM sqlite_master LIMIT 1")
+      .get();
+  });
+}
+
 class AgentDatabaseHost extends Context.Service<
   AgentDatabaseHost,
   { execute(request: AgentDatabaseRequest): Effect.Effect<AgentDatabaseRows, HostFailure> }
@@ -329,8 +344,8 @@ class AgentDatabaseHost extends Context.Service<
             provisioning = request.provision;
             protectedTables = new Set(request.protectedTables.map((table) => table.toLowerCase()));
           }),
-          () =>
-            Effect.gen(function* () {
+          () => {
+            const run = Effect.gen(function* () {
               const database = yield* databaseCall(request, () => openDatabase(request));
               const statement = yield* databaseCall(request, () => database.prepare(request.sql));
               return yield* databaseCall(request, () =>
@@ -338,7 +353,14 @@ class AgentDatabaseHost extends Context.Service<
                   ? readRows(statement, request.parameters, request.limits)
                   : runStatement(statement, request.parameters),
               );
-            }),
+            });
+            return run.pipe(
+              Effect.catchIf(
+                (failure) => request.mode === "read" && failure.sqliteCode === SQLITE_READONLY_ROLLBACK,
+                () => rollBackHotJournal(request).pipe(Effect.andThen(run)),
+              ),
+            );
+          },
           () =>
             Effect.sync(() => {
               provisioning = false;

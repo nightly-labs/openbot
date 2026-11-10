@@ -21,8 +21,8 @@ import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } fro
 import { useSidebarScope } from "./sidebar-scope";
 
 /**
- * `waiting` is set by the "Needs you" group. The row reads it rather than the agent's state, because
- * the group holds its members still during a drag while the state moves on. `userHidden` is set by
+ * `waiting` is set by the "Needs you" and "Unread" groups. The row reads it rather than the agent's
+ * state, because the group holds its members still during a drag while the state moves on. `userHidden` is set by
  * the "Hidden" group.
  */
 export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boolean; userHidden?: boolean }) {
@@ -30,7 +30,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     dragOffset,
     draggedChatId,
     endChatDragging,
-    layoutMutable,
+    chatsDraggable,
     props,
     sidebarClickIsSuppressed,
     startChatDragging,
@@ -53,7 +53,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   // mood inside an effect, where a memo cannot be created.
   const mood = () => (rowProps.userHidden ? "asleep" : (props.agentMoods[rowProps.agent.id] ?? "idle"));
   const hiddenLabel = () => (rowProps.userHidden ? `${t("sidebar.hidden.title")}. ` : "");
-  const draggable = () => layoutMutable() && !props.compact && !rowProps.waiting && !rowProps.userHidden;
+  const draggable = () => chatsDraggable() && !props.compact && !rowProps.waiting && !rowProps.userHidden;
   const wait = () => {
     const current = state();
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
