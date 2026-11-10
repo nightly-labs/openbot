@@ -95,22 +95,17 @@ export function runScope(
 
 /**
  * The earlier answers that a run from a node can give again. An answer is out of date when its node
- * reads other fields or other inputs than in the run that gave it, or when such a node is before it,
- * so that an edit before the start node takes effect. A trigger gives its event again, whatever its
- * fields. A step that ran alone has no graph of its own, so its answer stays.
+ * reads other fields or other inputs than in the graph that it ran with, or when such a node is
+ * before it, so that an edit before the start node takes effect. A trigger gives its event again,
+ * whatever its fields. When `ranWith` does not know the graph of an answer, the answer stays.
  */
 export function currentAnswers(
   graph: WorkflowGraph,
   answered: ReadonlyMap<string, StoredWorkflowStep>,
-  graphOf: (runId: string) => WorkflowGraph | undefined,
+  ranWith: (step: StoredWorkflowStep) => WorkflowGraph | undefined,
 ): Map<string, StoredWorkflowStep> {
-  // Many answers come from one run: read its graph once.
-  const graphs = new Map<string, WorkflowGraph | undefined>();
   const changed = [...answered.values()].flatMap((step) => {
-    const runId = step.runId;
-    if (runId === null) return [];
-    if (!graphs.has(runId)) graphs.set(runId, graphOf(runId));
-    const earlier = graphs.get(runId);
+    const earlier = ranWith(step);
     return earlier && nodeChanged(step.nodeId, earlier, graph) ? [step.nodeId] : [];
   });
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
