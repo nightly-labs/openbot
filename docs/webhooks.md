@@ -131,7 +131,8 @@ if (response.status !== 200 && response.status !== 202) {
 
 A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event
-is lost.
+is lost. When the host is a hosted server that sleeps, the `503` also starts it, so retry: a hosted
+server is usually online again within a few minutes.
 
 ### Retries and duplicates
 

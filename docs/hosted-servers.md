@@ -740,7 +740,8 @@ comes for a route (a Slack workspace, a Discord guild or a Telegram chat) and no
 holds it:
 
 1. Signal asks the Worker, signed, `POST /v2/remote/route-wake` with the route and `wake`. The Worker
-   finds the host in `slack_workspace_routes`, `discord_guild_routes` or `telegram_chat_routes`, and
+   finds the host in `slack_workspace_routes`, `discord_guild_routes`, `telegram_chat_routes` or
+   `webhook_routes` (a route that is not revoked), and
    answers `not_hosted`, `ended`, `sleeping` or `starting` before it starts anything, because Slack
    waits at most 3 seconds. With `wake`, the server then starts in the background (`waitUntil`) as for
    a client (`last_wake_reason = 'message'`). A plan that ended starts nothing. Signal asks at most
@@ -773,8 +774,21 @@ removes the key that Signal had. A kept delivery that arrives before its connect
 up to 60 seconds for it, only while the connection can still start. When the account service does
 not answer, Signal keeps nothing and does not remember the failure. Signal says `ingress-queue` only
 when the account service had `/v2/remote/route-wake` when Signal started, so deploy the account
-service first. Generic webhooks do not
-start a server: their sender sends again after a 503.
+service first.
+
+A generic webhook for a route that no socket holds also starts a hosted server that sleeps, but
+Signal keeps nothing: only the host can check the webhook's signature, so Signal answers 503 at once
+and the sender sends again (`docs/webhooks.md`). Because Signal cannot check the sender, two limits
+apply. A webhook starts a host at most once in 30 minutes, so requests to a known route URL keep a
+server awake for at most about half of the time (the idle stop is after 15 minutes). And a route that
+Signal has no recent answer for asks the account service at most 60 times a minute from one address
+(1/10 of `REMOTE_MAX_MESSAGES_PER_MINUTE`), and 600 times a minute from all addresses together (the
+full limit), so unknown route IDs cannot flood D1. Each wake request also counts against these lookup limits. A start that fails does not count against the 30
+minutes. A server that stays `starting` (a resume failed and its row stays `running`) is asked to
+start again, also at most once in 30 minutes. A route of a host ID that another owner registered again does not start it. A server that
+went back to sleep less than 30 minutes after a webhook started it waits for the end of the 30
+minutes; senders that retry for hours, such as Shopify and Stripe, still deliver. An account service
+without the `webhook` route answers 400, and Signal then starts nothing, as before.
 
 ## Tested on boat
 
