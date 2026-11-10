@@ -20,9 +20,9 @@ type RecoveryAction = (typeof ACTIONS)[number];
 // In memory only: the page keeps no cookies, cache or storage on the disk.
 const PARTITION = "openbot-start-recovery";
 
-export type RecoveryChoice = "retry" | "quit";
+type RecoveryChoice = "retry" | "quit";
 
-export interface StartRecoveryOptions {
+interface StartRecoveryOptions {
   summary: StartAttemptsSummary;
   locale: TranslatedLocale;
   translate: AppTranslate;
@@ -150,7 +150,7 @@ async function runAction(
 }
 
 /** The release page of the last version that finished a start, or the list of releases. */
-export function previousVersionUrl(summary: StartAttemptsSummary): string {
+function previousVersionUrl(summary: StartAttemptsSummary): string {
   const version = summary.lastGoodVersion;
   if (version && version !== summary.appVersion && isValidSemver(version))
     return `${RELEASES_URL}/tag/v${encodeURIComponent(version)}`;

@@ -25,7 +25,7 @@ export const START_ATTEMPTS_FILE = "openbot-start-attempts-v1.json";
 export const START_FAILURE_LIMIT = 3;
 
 const StartFailure = Schema.Literals(["error", "exception", "crash"]);
-export type StartFailure = typeof StartFailure.Type;
+type StartFailure = typeof StartFailure.Type;
 
 const StartAttemptsRecord = Schema.Struct({
   version: Schema.Literal(1),
@@ -48,7 +48,7 @@ type StartAttemptsRecord = typeof StartAttemptsRecord.Type;
 const decodeStartAttempts = Schema.decodeUnknownOption(StartAttemptsRecord);
 
 /** How the previous attempt ended, for the main log and the diagnostics export. */
-export type PreviousStartOutcome =
+type PreviousStartOutcome =
   | "none"
   | "finished"
   | "failed"
@@ -58,7 +58,7 @@ export type PreviousStartOutcome =
   | "stopped"
   | "other_version";
 
-export interface StartAttemptsOptions {
+interface StartAttemptsOptions {
   userDataPath: string;
   /** `app.getPath("crashDumps")`. Only file names and times are read there, never a dump. */
   crashDumpsPath: string;
@@ -207,7 +207,7 @@ function classify(record: StartAttemptsRecord, options: StartAttemptsOptions): P
 }
 
 /** The start failure that `scripts/start-recovery-e2e.ts` forces. */
-export type ForcedStartFailure = "crash" | "hang";
+type ForcedStartFailure = "crash" | "hang";
 
 /**
  * Reads and removes `OPENBOT_E2E_FORCE_START_FAILURE`, so no child process inherits it. A packaged
