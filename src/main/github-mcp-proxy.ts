@@ -45,11 +45,11 @@ const NOT_FOUND_OR_REFUSED = /\b40[34]\b|Not Found/u;
 /** A rate limit answer is not about access. */
 const RATE_LIMIT = /rate limit/iu;
 /** For the agent, which tells the user. The user token reaches only repositories where the app is installed. */
-const notInstalledHint = (repository: string) =>
-  `The OpenBot GitHub App is not installed on ${repository}. If ${repository} is private, GitHub answers "Not Found" ` +
-  'for it, and git answers "Write access to repository not granted", until the app is installed there. Tell the ' +
-  "user to add the repository in OpenBot: Marketplace > Apps > GitHub > Choose repositories. Do not try another " +
-  "credential.";
+const notVisibleHint = (repository: string) =>
+  `OpenBot cannot see ${repository} on GitHub. It does not exist, or it is a private repository where the OpenBot ` +
+  'GitHub App is not installed: GitHub then answers "Not Found", and git answers "Write access to repository not ' +
+  'granted". Check the owner and the name. When they are correct, tell the user to add the repository in OpenBot: ' +
+  "Marketplace > Apps > GitHub > Choose repositories.";
 
 export interface GitHubMcpProxyOptions {
   /** GitHub's remote MCP server. */
@@ -60,8 +60,8 @@ export interface GitHubMcpProxyOptions {
   userToken: () => Effect.Effect<string | null, GitHubOperationError>;
   /** The bot token of `owner/name`, or null when the user token applies. */
   botToken: (owner: string, name: string) => string | null;
-  /** Whether the app is installed on `owner/name`, or null when that is not known. */
-  installedOn: (owner: string, name: string) => Effect.Effect<boolean | null>;
+  /** Whether the user token can read `owner/name`, or null when that is not known. */
+  canRead: (owner: string, name: string, signal: AbortSignal) => Effect.Effect<boolean | null>;
 }
 
 interface Upstream {
@@ -252,8 +252,14 @@ export class GitHubMcpProxy {
             client.callTool(params, undefined, requestOptions(extra.signal)),
           );
           if (params.name === "create_repository") addRepositoryCreationHint(result);
-          if (owner && name && isNotFoundOrRefused(result) && (yield* this.#options.installedOn(owner, name)) === false)
-            addNotInstalledHint(result, `${owner}/${name}`);
+          // A bot token exists only where the app is installed, so only a user token call can need the hint.
+          const unseen =
+            token === userToken &&
+            owner &&
+            name &&
+            isNotFoundOrRefused(result) &&
+            (yield* this.#options.canRead(owner, name, extra.signal)) === false;
+          if (unseen) addNotVisibleHint(result, `${owner}/${name}`);
           boundTextContent(result);
           return result;
         }),
@@ -354,8 +360,8 @@ function isNotFoundOrRefused(result: Awaited<ReturnType<Client["callTool"]>>): b
   return texts.some((text) => NOT_FOUND_OR_REFUSED.test(text)) && !texts.some((text) => RATE_LIMIT.test(text));
 }
 
-function addNotInstalledHint(result: Awaited<ReturnType<Client["callTool"]>>, repository: string): void {
-  if (Array.isArray(result.content)) result.content.push({ type: "text", text: notInstalledHint(repository) });
+function addNotVisibleHint(result: Awaited<ReturnType<Client["callTool"]>>, repository: string): void {
+  if (Array.isArray(result.content)) result.content.push({ type: "text", text: notVisibleHint(repository) });
 }
 
 /**
