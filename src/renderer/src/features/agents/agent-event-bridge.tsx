@@ -61,7 +61,7 @@ export function AgentEventBridge() {
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
   const { openServerSettings } = useServerSettings();
-  const { applyAccountUsage } = useAuth();
+  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
     useAgents();
@@ -149,6 +149,12 @@ export function AgentEventBridge() {
       case "usage-changed":
         applyAccountUsage(event.usage);
         return;
+      case "usage-credits-changed": {
+        // A joined server's usage event does not say whether an account works on credits: read it again.
+        const target = accountUsageTargetKey();
+        if (target) void refreshAccountUsage(target).catch(() => undefined);
+        return;
+      }
       case "agents-changed":
         applyStoredAgents(event.agents);
         return;

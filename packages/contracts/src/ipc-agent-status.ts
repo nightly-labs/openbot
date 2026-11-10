@@ -308,6 +308,14 @@ export function keepUsageCredits(previous: AccountUsageLimit | undefined, next: 
     : { ...next, creditsAvailable: previous.creditsAvailable };
 }
 
+/**
+ * A limit that an event updated while a read ran, with the credit state of that read. The event is
+ * newer for the windows, but its credit state is only the one that `keepUsageCredits` kept.
+ */
+export function withReadCredits(read: AccountUsageLimit | undefined, limit: AccountUsageLimit): AccountUsageLimit {
+  return read?.creditsAvailable === undefined ? limit : { ...limit, creditsAvailable: read.creditsAvailable };
+}
+
 /** The most groups in one reading, and the most models in one group. */
 export const MAX_USAGE_GROUPS = 16;
 

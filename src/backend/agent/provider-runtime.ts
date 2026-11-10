@@ -473,6 +473,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #resetCredits = new WeakMap<AgentClient, number | null>();
   /** The same count for each provider's own sign-in, kept for a released provider as `#lastUsage` is. */
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
+  /** Whether the last reading of each client's own quota said that the account works on credits. */
+  readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   /**
    * Providers whose last usage read returned no limit, such as custom ACP agents. The dock polls
    * every five minutes, so starting a released one to ask again would keep its process running.
@@ -2729,10 +2731,23 @@ export class ProviderRuntime implements ProviderPort {
     };
     this.#usageUnreported.delete(provider);
     this.#lastUsage.set(provider, limit);
+    this.#noteCredits(source, limit);
     const limits = [...this.#lastUsage]
       .filter(([item]) => !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item)))
       .map(([, item]) => item);
     this.#emit({ type: "usage-changed", usage: structuredClone({ limits }) });
+  }
+
+  /**
+   * A joined server's usage event does not say whether an account works on credits, so a change of it
+   * gets its own event, and `usage-credits-v1` clients read the usage again. A model's own quota, which
+   * has a different id, says nothing about it.
+   */
+  #noteCredits(client: AgentClient, limit: AccountUsage["limits"][number] | undefined): void {
+    const available = limit?.creditsAvailable;
+    if (available === undefined || this.#creditsAvailable.get(client) === available) return;
+    this.#creditsAvailable.set(client, available);
+    this.#emit({ type: "usage-credits-changed" });
   }
 
   /** Refresh the notice once when one provider reports the same exhausted balance several ways. */
@@ -4203,6 +4218,10 @@ export class ProviderRuntime implements ProviderPort {
       if (this.#clients.get(client.provider) === client) this.#ownResetCredits.set(client.provider, available);
     }
     const usage = normalizeAccountUsage(rateLimits, client.provider === "codex" ? model : undefined);
+    this.#noteCredits(
+      client,
+      usage.limits.find((limit) => limit.id === client.provider),
+    );
     // The dock's reading, such as when Codex starts: the gate counts it, so the next poll does not read again.
     if (this.#clients.get(client.provider) === client && model === defaultUsageModel(client.provider)) {
       this.#keepUsage(client.provider, usage);

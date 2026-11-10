@@ -107,6 +107,8 @@ export type AgentEvent =
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
+  /** Whether a provider account of this server works on credits changed. Views read the usage again. */
+  | { type: "usage-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
@@ -291,6 +293,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
     case "vault-changed":
     case "browser-profiles-changed":
+    case "usage-credits-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":

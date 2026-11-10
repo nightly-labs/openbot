@@ -187,6 +187,7 @@ import {
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   withUiBlockVaultRequests,
 } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
+import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -2673,6 +2674,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
+  if (event.type === "usage-credits-changed") return USAGE_CREDITS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

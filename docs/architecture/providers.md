@@ -1423,8 +1423,10 @@ closed while on credits shows again when the credits run out.
 The released usage routes and the `usage-changed` event of the Team API send only `id`, `primary` and
 `secondary`. A joined server reads the flag with the optional `usage-credits-v1` route (see
 [Admin capabilities](servers.md#admin-capabilities)) each time it reads usage, and `withUsageCredits`
-adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last one. A host without
-the capability gives no flag, and the client shows **Usage limit reached** as before.
+adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last one. When the flag of
+a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
+with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
+without the capability gives no flag, and the client shows **Usage limit reached** as before.
 
 ### Disconnect the own sign-in
 

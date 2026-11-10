@@ -108,6 +108,11 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "session-settings",
     });
   }
+  if (event.type === "usage-credits-changed") {
+    // The usage event does not say whether an account works on credits, so the plan limits read again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "browser-profiles-changed") {
     // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
