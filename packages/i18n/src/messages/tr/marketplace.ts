@@ -392,6 +392,15 @@ export const messages = {
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
+  "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.postiz.description":
+    "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları bunu içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin. Kendi sunucunuzdaki Postiz için MCP sunucuları ayarlarında Postiz adresiniz ve sonuna /mcp eklenmiş bir MCP sunucusu ekleyin.",
+  "marketplace.plugin.postiz.app":
+    "Kanallar, taslaklar, planlanmış gönderiler ve medya; API anahtarıyla Postiz'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz'e hangi sosyal medya kanalları bağlı?",
+  "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",

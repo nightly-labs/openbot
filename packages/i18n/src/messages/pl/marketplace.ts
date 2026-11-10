@@ -389,6 +389,15 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "Ile kontaktów jest w segmencie VIP i jak zmienił się w tym miesiącu?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Przygotuj szkic kampanii dla nowej kolekcji, ale jej nie wysyłaj.",
+  "marketplace.plugin.postiz.tagline": "Planowanie postów w mediach społecznościowych",
+  "marketplace.plugin.postiz.description":
+    "Postiz pozwala agentom wyświetlać twoje kanały w mediach społecznościowych oraz tworzyć szkice, planować i publikować posty w ponad 30 serwisach, takich jak X, LinkedIn, Instagram i TikTok. Agenci mogą też przesyłać multimedia i tworzyć obrazy i filmy AI. Wklej klucz API z Settings › Developers w Postiz. Zawierają go wszystkie plany chmurowe Postiz. Agenci mogą opublikować post od razu, więc sprawdź każdy post, zanim go zatwierdzisz. Dla Postiz na własnym serwerze dodaj w ustawieniach serwerów MCP serwer MCP z adresem Postiz zakończonym /mcp.",
+  "marketplace.plugin.postiz.app":
+    "Kanały, szkice, zaplanowane posty i multimedia przez serwer MCP Postiz z kluczem API.",
+  "marketplace.plugin.postiz.prompt.channels": "Które kanały mediów społecznościowych są połączone z Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Jakie posty są zaplanowane na przyszły tydzień?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Przygotuj szkic posta na LinkedIn o naszym nowym wydaniu, ale go nie planuj.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub i ponad 1000 innych aplikacji",
   "marketplace.plugin.composio.description":
     "Composio łączy twoich agentów z Gmailem, Slackiem, GitHubem i ponad 1000 innych aplikacji przez jeden serwer MCP. Zaloguj się kontem Composio. Gdy agent potrzebuje aplikacji, poprosi cię o jej połączenie.",

@@ -395,6 +395,15 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "Сколько контактов в сегменте VIP и как он изменился за этот месяц?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Подготовь черновик кампании для новой коллекции, но не отправляй его.",
+  "marketplace.plugin.postiz.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.postiz.description":
+    "Postiz позволяет агентам показывать ваши каналы в соцсетях, а также готовить черновики, планировать и публиковать посты в более чем 30 сетях, таких как X, LinkedIn, Instagram и TikTok. Агенты также могут загружать медиафайлы и создавать изображения и видео с помощью ИИ. Вставьте API-ключ из Settings › Developers в Postiz. Он есть во всех облачных тарифах Postiz. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением. Для Postiz на своём сервере добавьте в настройках MCP-серверов MCP-сервер с адресом Postiz и /mcp в конце.",
+  "marketplace.plugin.postiz.app":
+    "Каналы, черновики, запланированные посты и медиафайлы через MCP-сервер Postiz с API-ключом.",
+  "marketplace.plugin.postiz.prompt.channels": "Какие каналы соцсетей подключены к Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Какие посты запланированы на следующую неделю?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
     "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",

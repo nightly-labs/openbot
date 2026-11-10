@@ -321,6 +321,18 @@ const PLUGIN_TEXT = {
       "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
     },
   },
+  postiz: {
+    tagline: "marketplace.plugin.postiz.tagline",
+    description: "marketplace.plugin.postiz.description",
+    apps: {
+      "app-postiz-mcp": "marketplace.plugin.postiz.app",
+    },
+    prompts: {
+      "prompt-channels": "marketplace.plugin.postiz.prompt.channels",
+      "prompt-week": "marketplace.plugin.postiz.prompt.week",
+      "prompt-draft": "marketplace.plugin.postiz.prompt.draft",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",

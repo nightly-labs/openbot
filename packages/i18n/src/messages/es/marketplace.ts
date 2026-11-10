@@ -383,6 +383,15 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "¿Cuántos contactos hay en el segmento VIP y cómo cambió este mes?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara un borrador de campaña para la nueva colección, pero no lo envíes.",
+  "marketplace.plugin.postiz.tagline": "Programación de redes sociales",
+  "marketplace.plugin.postiz.description":
+    "Postiz permite a los agentes listar tus canales de redes sociales y redactar, programar y publicar posts en más de 30 redes, como X, LinkedIn, Instagram y TikTok. Los agentes también pueden subir archivos multimedia y crear imágenes y vídeos con IA. Pega la clave de API de Settings › Developers en Postiz. Todos los planes de Postiz en la nube la incluyen. Los agentes pueden publicar un post al instante, así que revisa cada post antes de aprobarlo. Para un Postiz autoalojado, añade un servidor MCP con tu dirección de Postiz seguida de /mcp en los ajustes de servidores MCP.",
+  "marketplace.plugin.postiz.app":
+    "Canales, borradores, posts programados y multimedia, mediante el servidor MCP de Postiz con una clave de API.",
+  "marketplace.plugin.postiz.prompt.channels": "¿Qué canales de redes sociales están conectados a Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "¿Qué posts están programados para la próxima semana?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Redacta un post de LinkedIn sobre nuestra nueva versión, pero no lo programes.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub y más de 1000 aplicaciones",
   "marketplace.plugin.composio.description":
     "Composio conecta tus agentes con Gmail, Slack, GitHub y más de 1000 aplicaciones más mediante un único servidor MCP. Inicia sesión con tu cuenta de Composio. Cuando un agente necesita una aplicación, te pide que la conectes.",

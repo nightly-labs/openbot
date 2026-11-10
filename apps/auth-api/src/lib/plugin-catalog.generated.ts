@@ -229,6 +229,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80",
     },
     {
+      slug: "postiz",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "7d8e898d1f33c44d5be32866b881ae2ce6115a8f6aca9b2607f987ad3f633e43",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -1628,6 +1634,57 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.omnisend.com",
     privacyPolicyUrl: "https://www.omnisend.com/privacy/",
     termsUrl: "https://www.omnisend.com/terms/",
+    skills: [],
+  },
+  postiz: {
+    slug: "postiz",
+    name: "Postiz",
+    tagline: "Social media scheduling",
+    description:
+      "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include it. Agents can publish a post immediately, so review each post before you approve it. For a self-hosted Postiz, add an MCP server with your Postiz address followed by /mcp in the MCP servers settings.",
+    category: "automation",
+    creatorName: "Postiz",
+    iconUrl: "https://postiz.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-channels", text: "Which social media channels are connected to Postiz?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    ],
+    apps: [
+      {
+        id: "app-postiz-mcp",
+        name: "Postiz",
+        description: "Channels, drafts, scheduled posts and media, over Postiz's MCP server with an API key.",
+        iconUrl: "https://postiz.com/favicon.ico",
+        server: {
+          name: "postiz",
+          transport: "http",
+          url: "https://mcp.postiz.com/mcp",
+          auth: [
+            {
+              id: "postiz-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "Postiz Settings → Developers → Your API key",
+                },
+              ],
+              docsUrl: "https://docs.postiz.com/general/settings/developers",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://postiz.com",
+    privacyPolicyUrl: "https://postiz.com/privacy",
+    termsUrl: "https://postiz.com/terms",
     skills: [],
   },
   composio: {

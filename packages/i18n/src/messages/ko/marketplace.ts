@@ -342,6 +342,13 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
+  "marketplace.plugin.postiz.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.postiz.description":
+    "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요. 자체 호스팅 Postiz는 MCP 서버 설정에서 Postiz 주소 뒤에 /mcp를 붙인 MCP 서버를 추가하세요.",
+  "marketplace.plugin.postiz.app": "API 키로 Postiz의 MCP 서버를 통해 채널, 초안, 예약 게시물, 미디어를 다룹니다.",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz에 연결된 소셜 미디어 채널은 무엇인가요?",
+  "marketplace.plugin.postiz.prompt.week": "다음 주에 예약된 게시물은 무엇인가요?",
+  "marketplace.plugin.postiz.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성해 줘. 단, 예약하지는 마.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",

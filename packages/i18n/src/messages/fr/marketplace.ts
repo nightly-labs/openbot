@@ -390,6 +390,15 @@ export const messages = {
     "Combien de contacts compte le segment VIP, et comment a-t-il évolué ce mois-ci ?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prépare un brouillon de campagne pour la nouvelle collection, mais ne l'envoie pas.",
+  "marketplace.plugin.postiz.tagline": "Planification des réseaux sociaux",
+  "marketplace.plugin.postiz.description":
+    "Postiz permet aux agents de lister vos comptes de réseaux sociaux, et de rédiger, planifier et publier des posts sur plus de 30 réseaux, comme X, LinkedIn, Instagram et TikTok. Les agents peuvent aussi importer des médias et créer des images et des vidéos par IA. Collez la clé API de Settings › Developers dans Postiz. Toutes les offres cloud de Postiz l'incluent. Les agents peuvent publier un post tout de suite : vérifiez chaque post avant de l'approuver. Pour un Postiz auto-hébergé, ajoutez un serveur MCP avec votre adresse Postiz suivie de /mcp dans les réglages des serveurs MCP.",
+  "marketplace.plugin.postiz.app":
+    "Comptes, brouillons, posts planifiés et médias, via le serveur MCP de Postiz avec une clé API.",
+  "marketplace.plugin.postiz.prompt.channels": "Quels comptes de réseaux sociaux sont connectés à Postiz ?",
+  "marketplace.plugin.postiz.prompt.week": "Quels posts sont planifiés pour la semaine prochaine ?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Rédige un post LinkedIn sur notre nouvelle version, mais ne le planifie pas.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub et plus de 1 000 autres apps",
   "marketplace.plugin.composio.description":
     "Composio connecte vos agents à Gmail, Slack, GitHub et plus de 1 000 autres apps via un seul serveur MCP. Connectez-vous avec votre compte Composio. Quand un agent a besoin d’une app, il vous demande de la connecter.",

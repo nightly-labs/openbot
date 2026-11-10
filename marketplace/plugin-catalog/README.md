@@ -151,6 +151,29 @@ Troubleshooting:
   Omnisend's guide adds a separate server for each brand with a `?brand=` query
   parameter; add it in the MCP servers settings and select Sign in.
 
+## Postiz
+
+The listing connects to Postiz's own MCP server at `https://mcp.postiz.com/mcp`
+(<https://docs.postiz.com/mcp/setup>) with streamable HTTP. The user pastes the
+API key from Settings › Developers in Postiz, and OpenBot sends it as
+`Authorization: Bearer <key>`. All Postiz cloud plans include the key; there is
+no free plan.
+
+The listing has no `link` flow. The server publishes authorization server
+metadata, but no protected-resource metadata, no `Bearer` challenge on its 401,
+no `registration_endpoint` and no client metadata document support (checked
+2026-11-10), so OpenBot cannot register as a sign-in client.
+
+`schedulePostTool` takes `type` `draft`, `schedule` or `now`; `now` publishes
+immediately. No tool deletes posts or connects channels.
+
+Troubleshooting:
+
+- "Invalid API Key or OAuth token": the key is wrong or was rotated. Copy it
+  again from Settings › Developers.
+- A self-hosted Postiz: add an MCP server with `https://<postiz-host>/mcp` and
+  the same `Authorization` header in the MCP servers settings.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`

@@ -213,6 +213,12 @@
       "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
     },
     {
+      "slug": "postiz",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "7d8e898d1f33c44d5be32866b881ae2ce6115a8f6aca9b2607f987ad3f633e43"
+    },
+    {
       "slug": "composio",
       "version": "1.2.0",
       "featured": false,
