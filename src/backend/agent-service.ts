@@ -949,7 +949,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           Effect.gen({ self: this }, function* () {
             if (isCustomProviderHarness(provider)) {
               this.#endpoints.clearReleased(provider, configRevision);
-              logUnlistedEndpoints(provider, credentials.customProviders(), this.#providers.listModels());
+              logUnlistedEndpoints(
+                provider,
+                credentials.customProviders().filter((endpoint) => !this.#endpoints.waits(provider, endpoint.id)),
+                this.#providers.listModels(),
+              );
             }
             // A CLI that can list part of its models at start is asked once more, outside the lock,
             // before an agent leaves a model. A second list that is not fresh moves nobody, and
@@ -6088,7 +6092,7 @@ function agentModelChoice(agent: AgentSummary): AgentModelChoice {
 }
 
 /**
- * Logs each saved endpoint that a process which read it lists no model of. The provider left it out
+ * Logs each saved endpoint, of those the activated process read, that it lists no model of. The provider left it out
  * itself: OpenCode drops a provider that the user's own `enabled_providers`, `disabled_providers` or
  * policies deny (#6013). The model picker says only that the models are not listed; the cause is here.
  */

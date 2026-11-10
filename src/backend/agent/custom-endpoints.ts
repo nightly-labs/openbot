@@ -143,6 +143,11 @@ export class CustomEndpoints {
     return false;
   }
 
+  /** Whether the endpoint `providerId` of `harness` waits for a process that reads it. */
+  waits(harness: CustomProviderHarness, providerId: string): boolean {
+    return this.#released[harness].has(providerId);
+  }
+
   /** The newest revision a spawning process can read, taken when a provider client starts. */
   committedRevision(): number {
     return this.#committedRevision;
