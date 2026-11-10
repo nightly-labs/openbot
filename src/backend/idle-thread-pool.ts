@@ -223,6 +223,14 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return closed;
   });
 
+  /** Closes the thread now, also during a turn, and keeps its snapshot so that its next turn opens it again. */
+  readonly releaseNow = Effect.fn("IdleThreadPool.releaseNow")(function* (
+    this: IdleThreadPool<Thread, Released>,
+    thread: Thread,
+  ) {
+    if (this.#threads.get(thread.id) === thread) yield* this.#release(thread);
+  });
+
   /** An armed release timer marks a thread that is idle and can be opened again. */
   readonly #releaseIdleOver = Effect.fn("IdleThreadPool.releaseIdleOver")(function* (
     this: IdleThreadPool<Thread, Released>,

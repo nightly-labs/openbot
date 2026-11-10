@@ -446,6 +446,12 @@ const CLAUDE_IDLE_THREAD_LIMIT = 1;
  */
 const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
 
+/**
+ * How long a stopped turn can run on before its query closes. A CLI that does not end the turn after
+ * the stop otherwise holds the agent's queue until OpenBot restarts (#6348).
+ */
+const CLAUDE_STOP_CONFIRM_MS = 10_000;
+
 interface ClaudeStreamMessage {
   type: string;
   parent_tool_use_id?: string | null;
@@ -775,6 +781,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this: ClaudeAgentClient,
     runtime: ThreadRuntime,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const turn = runtime.activeTurn;
     runtime.input.close();
     runtime.query.close();
     yield* removeClaudeQueryFile(runtime.mcpConfigFile);
@@ -785,6 +792,41 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
     // from the map, so there is nothing left to report it against.
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
+    // A turn that the closed query still ran sends no result, so it ends here. After the close, so
+    // the next turn opens a new query. Without the end, its messages stay running and hold the queue.
+    if (turn && runtime.activeTurn === turn) {
+      for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
+      turn.toolCalls.clear();
+      yield* this.#completeTurn(runtime, "interrupted", null);
+    }
+  });
+
+  /**
+   * Closes the query of a stopped turn that still runs after `CLAUDE_STOP_CONFIRM_MS`, which ends
+   * the turn. The next turn resumes the session in a new query.
+   */
+  readonly #closeIfStopIgnored = Effect.fn("ClaudeAgentClient.closeIfStopIgnored")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    turn: ActiveTurn,
+  ) {
+    yield* Effect.forkIn(
+      Effect.sleep(CLAUDE_STOP_CONFIRM_MS).pipe(
+        Effect.andThen(
+          Effect.suspend(() => {
+            if (runtime.activeTurn !== turn || this.#threads.get(runtime.id) !== runtime) return Effect.void;
+            queryLogger.warn("Closed a Claude query that did not end its turn after a stop.", {
+              threadId: runtime.id,
+              waitedMs: CLAUDE_STOP_CONFIRM_MS,
+            });
+            // A session that is not saved cannot open again.
+            return runtime.config.persistSession ? this.#threads.releaseNow(runtime) : this.#threads.close(runtime);
+          }),
+        ),
+        Effect.ignore,
+      ),
+      this.#scope,
+    );
   });
 
   readonly request = Effect.fn("ClaudeAgentClient.request")(function* <T>(
@@ -855,7 +897,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // A released thread has no turn to stop.
         if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
-        yield* providerCall(() => runtime.query.interrupt());
+        const turn = runtime.activeTurn;
+        const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
+        if (stopped) yield* this.#closeIfStopIgnored(runtime, stopped);
+        yield* providerCall(() => runtime.query.interrupt()).pipe(
+          // The close of a CLI that did not answer the stop rejects the stop request, but the close ends the turn.
+          Effect.catch((failure) =>
+            stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)
+              ? Effect.void
+              : Effect.fail(failure),
+          ),
+        );
         return yield* providerSync(() => decoder({}));
       }
       case "thread/compact/start":
