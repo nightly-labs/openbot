@@ -356,6 +356,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Önce sor",
   "server.settings.skillLearningOff": "Kapalı",
   "server.settings.skillLearningLoadFailed": "Beceri öğrenme ayarı yüklenemedi.",
+  "server.settings.browsingMemory": "Gezinmemden öğren",
+  "server.settings.browsingMemoryDescription":
+    "Bir ajanın tarayıcısını kontrol ettiğinizde, ajan kullandığınız sayfalardan ve düğmelerden sitelerin nasıl çalıştığını öğrenir. Yazdığınız metin saklanmaz.",
+  "server.settings.browsingMemoryLoadFailed": "Gezinme ayarı yüklenemedi.",
   "server.settings.remoteOnline": "Ana makine çevrim içi. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.remoteOffline": "Ana makine çevrim dışı. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.reachable": "Çevrim içi erişilebilir. Yalnızca davet edilen kişiler oturum açabilir.",

@@ -18,6 +18,7 @@ import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { COMPUTER_ACTIVITY_ROUTES } from "@openbot/contracts/team-protocol/computer-activity-v1";
@@ -86,6 +87,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_MEMORY_LIMIT_ROUTES.settings,
   MEMORY_REVIEW_ROUTES.settings,
   SKILL_LEARNING_ROUTES.settings,
+  BROWSING_MEMORY_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,

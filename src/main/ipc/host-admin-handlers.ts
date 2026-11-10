@@ -17,6 +17,7 @@ import {
   type AgentProviderRef,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
+  decodeHostBrowsingMemory,
   decodeHostMemoryReview,
   decodeHostPersonality,
   decodeHostSkillLearning,
@@ -30,6 +31,7 @@ import {
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
+  hostBrowsingMemory,
   hostMemoryReview,
   hostSkillLearning,
   isPromptCacheTtl,
@@ -55,6 +57,10 @@ import {
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_MEMORY_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  BROWSING_MEMORY_CAPABILITY,
+  BROWSING_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import {
   CLAUDE_USER_SETUP_CAPABILITY,
   CLAUDE_USER_SETUP_ROUTES,
@@ -91,6 +97,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
+import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
@@ -129,6 +136,7 @@ interface HostAdminIpcDependencies {
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
   skillLearning: SkillLearningPreferenceStore;
+  browsingMemory: BrowsingMemoryPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
@@ -156,6 +164,7 @@ export function hostAdminIpcHandlers({
   agentMemoryLimit,
   memoryReview,
   skillLearning,
+  browsingMemory,
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
@@ -200,6 +209,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY))
       throw new Error(sourceText("error.team.skillLearningUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostSkillLearning, { method: "POST", body }));
+  }
+  function remoteBrowsingMemory(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, BROWSING_MEMORY_CAPABILITY))
+      throw new Error(sourceText("error.team.browsingMemoryUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostBrowsingMemory, { method: "POST", body }));
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))
@@ -393,6 +407,14 @@ export function hostAdminIpcHandlers({
         },
         remote: (mode, serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.update, { mode }),
       }),
+      getBrowsingMemory: scopedQueryHandler({
+        local: () => hostBrowsingMemory(browsingMemory.get()),
+        remote: (serverId) => remoteBrowsingMemory(serverId, BROWSING_MEMORY_ROUTES.settings, {}),
+      }),
+      setBrowsingMemory: scopedHandler(parseBrowsingMemoryEnabled, {
+        local: async (enabled) => hostBrowsingMemory(await runCauseEffect(browsingMemory.set({ enabled }))),
+        remote: (enabled, serverId) => remoteBrowsingMemory(serverId, BROWSING_MEMORY_ROUTES.update, { enabled }),
+      }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
         remote: (serverId) => remoteMachineAlerts(serverId, MACHINE_RESOURCES_ROUTES.alerts, {}),
@@ -505,6 +527,11 @@ function parseMemoryReviewCount(value: unknown): number {
 
 function parseSkillLearningText(value: unknown): string {
   if (typeof value !== "string" || !value || value.length > 32) throw new Error("Skill learning mode is required.");
+  return value;
+}
+
+function parseBrowsingMemoryEnabled(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Browsing memory setting is required.");
   return value;
 }
 

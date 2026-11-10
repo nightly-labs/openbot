@@ -317,7 +317,8 @@ revisions and returns an empty acknowledgement; the client then reads selection 
 Each route requires authentication and a visible agent. Selection writes use the same member
 access as existing memory writes. User choices override automatic selection.
 
-The released full-list GET route, memory shapes, and 2 MiB frame limit stay unchanged. A new
+The released full-list GET route, memory shapes, and 2 MiB frame limit stay unchanged. The
+memory routes leave out the `site` of a memory (see [browser](browser.md)). A new
 client connected to an older host keeps text editing and hides selection controls. An older
 client can edit text on a new host without changing inclusion. Storage choices remain 64, 128,
 256, and 512. Lowering the setting never deletes existing entries.

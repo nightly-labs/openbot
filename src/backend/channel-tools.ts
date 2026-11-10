@@ -4,6 +4,7 @@ import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineScheduleZodSchema,
 } from "./routine-tool-schema";
@@ -123,7 +124,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
       schedule: routineScheduleZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
     },
   },
   {

@@ -136,6 +136,8 @@ export const messages = {
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
   "error.team.skillLearningUnsupported":
     "L’apprentissage des compétences n’est pas pris en charge par cette connexion.",
+  "error.team.browsingMemoryUnsupported":
+    "Cette connexion ne prend pas en charge l'apprentissage à partir de la navigation.",
   "error.team.promptCacheTtlUnsupported": "Cette connexion ne prend pas en charge la durée du cache de prompt.",
   "error.team.claudeUserSetupUnsupported":
     "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",

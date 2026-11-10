@@ -360,6 +360,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Eerst vragen",
   "server.settings.skillLearningOff": "Uit",
   "server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "server.settings.browsingMemory": "Leren van mijn browsen",
+  "server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
   "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",

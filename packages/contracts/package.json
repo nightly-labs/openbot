@@ -86,6 +86,7 @@
     "./team-protocol/mcp-many-servers-v1": "./src/team-protocol/mcp-many-servers-v1.ts",
     "./team-protocol/mcp-sign-in-v1": "./src/team-protocol/mcp-sign-in-v1.ts",
     "./team-protocol/message-delete-v1": "./src/team-protocol/message-delete-v1.ts",
+    "./team-protocol/browsing-memory-v1": "./src/team-protocol/browsing-memory-v1.ts",
     "./team-protocol/chat-history-v1": "./src/team-protocol/chat-history-v1.ts",
     "./team-protocol/provider-account-relay-v1": "./src/team-protocol/provider-account-relay-v1.ts",
     "./team-protocol/provider-account-relay-v2": "./src/team-protocol/provider-account-relay-v2.ts",

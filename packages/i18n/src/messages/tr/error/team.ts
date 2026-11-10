@@ -119,6 +119,7 @@ export const messages = {
   "error.team.folderUnavailable": "Bu klasör ana bilgisayarda kullanılamıyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
   "error.team.skillLearningUnsupported": "Bu bağlantı beceri öğrenmeyi desteklemiyor.",
+  "error.team.browsingMemoryUnsupported": "Bu bağlantı gezinmeden öğrenmeyi desteklemiyor.",
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",

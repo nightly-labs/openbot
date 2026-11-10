@@ -120,6 +120,7 @@ export const messages = {
   "error.team.folderUnavailable": "Эта папка недоступна на компьютере хоста.",
   "error.team.memoryReviewUnsupported": "Это подключение не поддерживает проверку памяти.",
   "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
+  "error.team.browsingMemoryUnsupported": "Это подключение не поддерживает обучение на браузинге.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",

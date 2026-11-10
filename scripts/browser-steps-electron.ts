@@ -75,15 +75,25 @@ async function main(): Promise<void> {
       focusable: false,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
-    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"));
+    // The site memories that the host reads, by agent and host name, for the site-memories phase.
+    const siteMemoryReads: { agentId: string; hostname: string }[] = [];
+    let siteMemoriesOn = false;
+    browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
+      siteMemories: (agentId, hostname) => {
+        if (!siteMemoriesOn) return [];
+        siteMemoryReads.push({ agentId, hostname });
+        return [{ id: "memory-site", site: hostname, text: "Search with the Search button, not Enter." }];
+      },
+    });
     const host = browser;
+    let turnId = "fixture-turn";
     const params = (tool: string, args: DynamicToolCallParams["arguments"]): DynamicToolCallParams => ({
       namespace: "openbot_browser",
       tool,
       arguments: args,
       ownerAgentId: "fixture-agent",
       threadId: "fixture-thread",
-      turnId: "fixture-turn",
+      turnId,
       callId: `steps-${++sequence}`,
     });
     const call = (tool: string, args: DynamicToolCallParams["arguments"]) =>
@@ -458,6 +468,55 @@ async function main(): Promise<void> {
     assert(stuckCheckAgain.ms < 3_000, `A check that stayed waited again: ${stuckCheckAgain.ms} ms.`);
     measurements.stuckChallengeSecondSnapshotMs = stuckCheckAgain.ms;
     recordCases("snapshot-waits-for-check-once-per-document");
+    const offerSchema = z.object({
+      challenge: z.object({ target: z.object({ kind: z.literal("point"), x: z.number(), y: z.number() }) }),
+    });
+    const offer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/checkbox-captcha` });
+    assert.equal(offer.page.challenge?.status, "click-once", "A checkbox check did not offer its click.");
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(offer.raw).challenge.target });
+    const passed = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    // The check passed before or while the read waited.
+    assert(
+      passed.page.challenge === undefined || passed.page.challenge.status === "cleared",
+      `The clicked checkbox did not pass the check: ${passed.page.challenge?.status}`,
+    );
+    measurements.checkboxPassedSnapshotMs = passed.ms;
+    recordCases("challenge-offers-one-click", "challenge-click-passes");
+    const shadowOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/shadow-checkbox-captcha` });
+    assert.equal(
+      shadowOffer.page.challenge?.status,
+      "click-once",
+      "A Turnstile frame in a closed shadow root did not offer its click.",
+    );
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(shadowOffer.raw).challenge.target });
+    const shadowPassed = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert(
+      shadowPassed.page.challenge === undefined || shadowPassed.page.challenge.status === "cleared",
+      `The clicked checkbox in a closed shadow root did not pass the check: ${shadowPassed.page.challenge?.status}`,
+    );
+    recordCases("challenge-click-in-closed-shadow-root");
+    const selfPass = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/self-passing-turnstile` });
+    assert(
+      selfPass.page.challenge === undefined || selfPass.page.challenge.status === "cleared",
+      `A Turnstile that passes by itself offered its click: ${selfPass.page.challenge?.status}`,
+    );
+    measurements.selfPassingTurnstileMs = selfPass.ms;
+    recordCases("turnstile-passes-without-click");
+    const stuckOffer = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/stuck-checkbox-captcha` });
+    assert.equal(stuckOffer.page.challenge?.status, "click-once");
+    await call("click", { tabId: settleTab.id, target: offerSchema.parse(stuckOffer.raw).challenge.target });
+    const stuckClick = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(
+      stuckClick.page.challenge?.status,
+      "needs-user",
+      "A check that stayed after its click did not ask for a person.",
+    );
+    assert(stuckClick.ms < 10_000, `The read after the click waited too long: ${stuckClick.ms} ms.`);
+    const stuckClickAgain = await readPage("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(stuckClickAgain.page.challenge?.status, "needs-user", "A document offered its click twice.");
+    assert(stuckClickAgain.ms < 3_000, `A check that stayed after its click waited again: ${stuckClickAgain.ms} ms.`);
+    measurements.stuckCheckboxSecondSnapshotMs = stuckClickAgain.ms;
+    recordCases("challenge-click-once-per-document");
 
     phase("modal");
     const modal = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/modal` });
@@ -465,6 +524,32 @@ async function main(): Promise<void> {
     measurements.modalOutsideButtonInSnapshot = names(modal.page).includes("Outside");
     assert(names(modal.page).includes("Inside"), "The modal button is missing.");
     recordCases("snapshot-reads-modal");
+
+    phase("site-memories");
+    const siteSchema = z.object({
+      siteMemories: z.array(z.object({ id: z.string(), site: z.string(), text: z.string() })).optional(),
+    });
+    const siteMemoriesOf = async (tool: string, args: DynamicToolCallParams["arguments"]) =>
+      siteSchema.parse((await readPage(tool, args)).raw).siteMemories;
+    siteMemoriesOn = true;
+    turnId = "site-turn-1";
+    const recalled = await siteMemoriesOf("navigate", { tabId: settleTab.id, url: `${origin}/form` });
+    assert.deepEqual(
+      recalled,
+      [{ id: "memory-site", site: "127.0.0.1", text: "Search with the Search button, not Enter." }],
+      "The snapshot did not show the memories of its site.",
+    );
+    assert.deepEqual(siteMemoryReads, [{ agentId: "fixture-agent", hostname: "127.0.0.1" }]);
+    recordCases("snapshot-shows-site-memories");
+    const again = await siteMemoriesOf("navigate", { tabId: settleTab.id, url: `${origin}/article` });
+    assert.equal(again, undefined, "A second page of the same site showed its memories again in one turn.");
+    recordCases("site-memories-once-per-turn");
+    turnId = "site-turn-2";
+    const nextTurn = await siteMemoriesOf("snapshot", { tabId: settleTab.id, image: "never" });
+    assert.equal(nextTurn?.length, 1, "A new turn did not show the site memories.");
+    recordCases("site-memories-again-next-turn");
+    siteMemoriesOn = false;
+    turnId = "fixture-turn";
     await close(settleTab.id);
 
     phase("page-crash");
@@ -609,6 +694,15 @@ const PAGES: Record<string, string> = {
     <p>Please complete the security check to continue.</p>
     <iframe src="/hcaptcha.com/checkbox" style="width:300px;height:80px"></iframe>`,
   "/hcaptcha.com/checkbox": `<!doctype html><meta charset="utf-8"><label><input type="checkbox">I am human</label>`,
+  "/checkbox-captcha": checkboxCaptchaPage(true),
+  "/stuck-checkbox-captcha": checkboxCaptchaPage(false),
+  "/shadow-checkbox-captcha": checkboxCaptchaPage(true, true),
+  "/self-passing-turnstile": checkboxCaptchaPage(false, false, true),
+  // A click anywhere in the widget tells the page; the fixture page decides whether the check passes.
+  "/challenges.cloudflare.com/turnstile": `<!doctype html><meta charset="utf-8">
+    <body style="margin:0"><label style="display:block;height:65px;padding-left:16px">
+    <input type="checkbox" style="margin-top:20px">Verify you are human</label>
+    <script>document.addEventListener("click", () => parent.postMessage("turnstile-click", "*"));</script></body>`,
   "/article": `<!doctype html><meta charset="utf-8"><title>Article</title><h1>Article</h1>
     <p>${"This article explains how a captcha asks you to verify you are human. ".repeat(40)}</p>`,
   "/modal": `<!doctype html><meta charset="utf-8"><title>Modal</title>
@@ -616,6 +710,25 @@ const PAGES: Record<string, string> = {
     <dialog><p>Confirm</p><button type="button">Inside</button></dialog>
     <script>document.querySelector("dialog").showModal();</script>`,
 };
+
+// Turnstile puts its frame in a closed shadow root, so only CDP finds it. A widget that passes by
+// itself gets its token without a click.
+function checkboxCaptchaPage(passes: boolean, shadow = false, selfPass = false): string {
+  const frame = `<iframe src="/challenges.cloudflare.com/turnstile" style="width:300px;height:65px;border:0"></iframe>`;
+  return `<!doctype html><meta charset="utf-8"><title>Security check</title>
+    <p>Verify you are human to continue.</p>
+    <form><div><div id="widget">${shadow ? "" : frame}</div>
+    <input type="hidden" name="cf-turnstile-response" value=""></div></form>
+    <script>
+      if (${shadow}) document.querySelector("#widget").attachShadow({ mode: "closed" }).innerHTML = ${JSON.stringify(frame)};
+      if (${selfPass})
+        setTimeout(() => (document.querySelector("[name=cf-turnstile-response]").value = "fixture-token"), 1500);
+      addEventListener("message", (event) => {
+        if (${passes} && event.data === "turnstile-click")
+          document.querySelector("[name=cf-turnstile-response]").value = "fixture-token";
+      });
+    </script>`;
+}
 
 function formPage(): string {
   return `<!doctype html><meta charset="utf-8"><title>Form</title>

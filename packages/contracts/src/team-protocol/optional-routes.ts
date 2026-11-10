@@ -43,6 +43,7 @@ import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
+import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_USER_SETUP_CODECS } from "./claude-user-setup-v1";
@@ -155,6 +156,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
   ...SKILL_LEARNING_CODECS,
+  ...BROWSING_MEMORY_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
   ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,

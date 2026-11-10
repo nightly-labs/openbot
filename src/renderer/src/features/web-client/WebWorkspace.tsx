@@ -97,6 +97,7 @@ import {
   getHostAgentAccess,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostBrowsingMemory,
   getHostMemoryReview,
   getHostModelVisibility,
   getHostPersonality,
@@ -110,6 +111,7 @@ import {
   listHostedSites,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
+  setHostBrowsingMemory,
   setHostMemoryReview,
   setHostModelVisibility,
   setHostPersonality,
@@ -241,6 +243,7 @@ import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOver
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
+import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -1539,6 +1542,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostSkillLearning(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setSkillLearning: async (mode, serverId) =>
       runTeamEffect(setHostSkillLearning(hostRequest(serverId), mode).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostBrowsingMemoryCalls: HostBrowsingMemoryCalls = {
+    getBrowsingMemory: async (serverId) =>
+      runTeamEffect(getHostBrowsingMemory(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setBrowsingMemory: async (enabled, serverId) =>
+      runTeamEffect(
+        setHostBrowsingMemory(hostRequest(serverId), enabled).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const hostPromptCacheTtlCalls: HostPromptCacheTtlCalls = {
     getPromptCacheTtl: async (serverId) =>
@@ -3169,6 +3180,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
                         skillLearning={{ calls: hostSkillLearningCalls }}
+                        browsingMemory={{ calls: hostBrowsingMemoryCalls }}
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         claudeUserSetup={{ calls: hostClaudeUserSetupCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}

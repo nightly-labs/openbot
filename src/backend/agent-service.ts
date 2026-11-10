@@ -284,6 +284,7 @@ import type { RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
+import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import type { WorkflowRunEnd } from "./workflows/workflows";
@@ -386,6 +387,11 @@ export interface AgentServiceOptions {
    * for them. The main process owns the preference. Omitted, the review asks first.
    */
   skillLearning?: (() => SkillLearningMode) | undefined;
+  /**
+   * What people did in agent tabs they held ("Learn from my browsing"). The memory review reads it to
+   * learn how sites work, and deletes the steps it read.
+   */
+  userBrowsing?: Pick<UserBrowsingLog, "pending" | "reviewed" | "forgetAgent"> | undefined;
   /** Saves a skill that a memory review finds. Built after the service, so read at each use. */
   skillLearner?: (() => SkillLearner) | undefined;
   /** Built after the service, so read when a tool call needs it. */
@@ -756,6 +762,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           : this.#appendSystemMessage(agentId, message, "thread.memory-reviewed"),
       ...(reviewSkills ? { skills: reviewSkills } : {}),
       ...(options.skillLearning ? { skillLearning: options.skillLearning } : {}),
+      ...(options.userBrowsing ? { browsing: options.userBrowsing } : {}),
       ...(skillLearner
         ? {
             skillLearner: {

@@ -1,7 +1,14 @@
-import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
+import type { BrowserDiagnosticEntry, BrowserSiteMemory, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber, Result } from "effect";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
-import { CHALLENGE_POLL_MS, CHALLENGE_WAIT_MS, describeChallenge } from "./browser-challenge";
+import {
+  CHALLENGE_CLICK_WAIT_MS,
+  CHALLENGE_POLL_MS,
+  CHALLENGE_WAIT_MS,
+  type DetectedChallenge,
+  describeChallenge,
+  TURNSTILE_SELF_PASS_MS,
+} from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -33,6 +40,14 @@ export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("op
 export const BrowserDialogTurn = Context.Reference<BrowserDialogOwner | undefined>("openbot/BrowserDialogTurn", {
   defaultValue: () => undefined,
 });
+
+/**
+ * The memories of the agent that runs a tool, by page host, and its turn. Only the agent tool paths
+ * provide it, so a snapshot for a person or for the host has no memories.
+ */
+export const BrowserSiteMemories = Context.Reference<
+  { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] } | undefined
+>("openbot/BrowserSiteMemories", { defaultValue: () => undefined });
 
 /** An action that opened a page dialog returns this in place of its result. */
 export interface DialogTabResult {
@@ -178,6 +193,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const heldByUser = yield* BrowserToolHold;
+  const siteMemories = yield* BrowserSiteMemories;
   const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
   const read = (readRevision: number) =>
     Effect.gen(function* () {
@@ -208,27 +224,44 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   const waitDocument = tab.documents;
   const priorWaitMs = tab.challengeWait?.document === waitDocument ? tab.challengeWait.waitedMs : 0;
   let waitedVendor: string | null = null;
-  let lastReadFailed = false;
-  while (
-    current.result.challenge?.kind === "non-interactive" &&
-    Date.now() - waitStarted < CHALLENGE_WAIT_MS - priorWaitMs &&
-    // A caller with its own timeout gets the check result, not a timeout.
-    (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
-    !tab.secret &&
-    !tab.closing &&
-    !tab.contents.isDestroyed() &&
-    !heldByUser(tab.id)
-  ) {
-    waitedVendor = current.result.challenge.vendor;
-    yield* Effect.sleep(CHALLENGE_POLL_MS);
-    if (tab.closing || tab.contents.isDestroyed()) break;
-    // A passed check reloads the page, and a read during that navigation fails. The next poll reads
-    // the new document.
-    const next = yield* Effect.result(read(tab.revision + 1));
-    lastReadFailed = Result.isFailure(next);
-    if (Result.isSuccess(next)) current = next.success;
+  const waitWhile = (waiting: (challenge: DetectedChallenge) => boolean, budgetMs: number) =>
+    Effect.gen(function* () {
+      const started = Date.now();
+      let lastReadFailed = false;
+      while (
+        current.result.challenge !== null &&
+        waiting(current.result.challenge) &&
+        Date.now() - started < budgetMs &&
+        // A caller with its own timeout gets the check result, not a timeout.
+        (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
+        !tab.secret &&
+        !tab.closing &&
+        !tab.contents.isDestroyed() &&
+        !heldByUser(tab.id)
+      ) {
+        waitedVendor = current.result.challenge.vendor;
+        yield* Effect.sleep(CHALLENGE_POLL_MS);
+        if (tab.closing || tab.contents.isDestroyed()) break;
+        // A passed check reloads the page, and a read during that navigation fails. The next poll reads
+        // the new document.
+        const next = yield* Effect.result(read(tab.revision + 1));
+        lastReadFailed = Result.isFailure(next);
+        if (Result.isSuccess(next)) current = next.success;
+      }
+      if (lastReadFailed) current = yield* read(tab.revision + 1);
+    });
+  yield* waitWhile((challenge) => challenge.kind === "non-interactive", CHALLENGE_WAIT_MS - priorWaitMs);
+  // The read after a checkbox offer waits once for the check to pass, also when the agent did not click:
+  // a later read of the document then asks for a person at once.
+  const clickOffer = tab.challengeClick?.document === tab.documents ? tab.challengeClick : undefined;
+  if (clickOffer && !clickOffer.waited) {
+    clickOffer.waited = true;
+    yield* waitWhile((challenge) => challenge.kind !== "block" && !challenge.puzzle, CHALLENGE_CLICK_WAIT_MS);
   }
-  if (lastReadFailed) current = yield* read(tab.revision + 1);
+  // A Turnstile widget often passes by itself. The read that would offer its checkbox waits for that
+  // first; the offer then makes later reads of the document skip this wait.
+  if (!clickOffer && current.result.challenge?.vendor === "turnstile" && current.result.challenge.checkbox)
+    yield* waitWhile((challenge) => challenge.vendor === "turnstile" && !challenge.puzzle, TURNSTILE_SELF_PASS_MS);
   const { result, cursor } = current;
   if (waitedVendor !== null && result.challenge?.kind === "non-interactive") {
     const waitedMs = Date.now() - waitStarted + (tab.documents === waitDocument ? priorWaitMs : 0);
@@ -241,18 +274,53 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
         : tab.documents === waitDocument
           ? priorWaitMs
           : 0;
+    const checking = CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS;
+    const detected = result.challenge;
+    // The first read of a document that needs a person offers its checkbox for one click.
+    const clickOnce =
+      detected?.checkbox &&
+      detected.kind !== "block" &&
+      !(detected.kind === "non-interactive" && checking) &&
+      tab.challengeClick?.document !== tab.documents
+        ? detected.checkbox
+        : null;
+    if (clickOnce) tab.challengeClick = { document: tab.documents, waited: false };
     const challenge = describeChallenge(
-      result.challenge,
+      detected,
       waitedVendor,
       waitedVendor === null ? 0 : Date.now() - waitStarted,
-      CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS,
+      checking,
+      clickOnce,
     );
     if (challenge) result.snapshot.challenge = challenge;
   }
+  const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
+  if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;
   if (release) yield* release(result);
+  // Only a snapshot that reached the agent counts as the recall of its site.
+  if (recalled) tab.siteRecall = recalled.mark;
   tab.diagnostics.delivered(cursor);
   return result;
 });
+
+/**
+ * The memories of the page's site, when this tab has not shown them in this turn. A read of another
+ * page of the same site in the same turn shows none, so the agent does not read them again.
+ */
+function recallSiteMemories(
+  tab: BrowserHostTab,
+  url: string,
+  source: { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] },
+): { memories: BrowserSiteMemory[]; mark: { turnId: string; host: string } } | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  if (!host || (tab.siteRecall?.turnId === source.turnId && tab.siteRecall.host === host)) return null;
+  return { memories: source.recall(host), mark: { turnId: source.turnId, host } };
+}
 
 /** Reads what an action returns once its input reached the page and the page settled. */
 export type ActionResultReader<A> = (

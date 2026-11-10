@@ -118,6 +118,7 @@ export const messages = {
   "error.team.folderUnavailable": "이 폴더는 호스트 컴퓨터에서 사용할 수 없어요.",
   "error.team.memoryReviewUnsupported": "이 연결에서는 메모리 검토를 지원하지 않아요.",
   "error.team.skillLearningUnsupported": "이 연결은 스킬 학습을 지원하지 않습니다.",
+  "error.team.browsingMemoryUnsupported": "이 연결은 브라우징 학습을 지원하지 않습니다.",
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",

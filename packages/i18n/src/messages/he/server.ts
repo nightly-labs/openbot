@@ -395,6 +395,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "לשאול קודם",
   "server.settings.skillLearningOff": "כבוי",
   "server.settings.skillLearningLoadFailed": "לא ניתן לטעון את הגדרת למידת המיומנויות.",
+  "server.settings.browsingMemory": "ללמוד מהגלישה שלי",
+  "server.settings.browsingMemoryDescription":
+    "כשאתה שולט בדפדפן של סוכן, הסוכן לומד איך אתרים עובדים מהדפים והכפתורים שאתה משתמש בהם. טקסט שהקלדת לא נשמר.",
+  "server.settings.browsingMemoryLoadFailed": "לא ניתן לטעון את הגדרת הגלישה.",
   "server.settings.rolesTitle": "הרשאות",
   "server.settings.rolesDescription":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. חבר מקבל את רמת הגישה הגבוהה ביותר מבין כולם ותפקידיו. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",
