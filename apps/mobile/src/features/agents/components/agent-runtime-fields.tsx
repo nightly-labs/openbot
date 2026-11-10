@@ -1,4 +1,5 @@
 import {
+  type AgentModelOption,
   type AgentProviderId,
   type AgentReasoningEffort,
   agentProviderName,
@@ -155,9 +156,7 @@ export function AgentRuntimeFields({
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
   const openModelPicker = useAgentModelPicker((state) => state.open);
-  const chooseModel = (id: string) => {
-    const next = options.find((option) => option.id === id);
-    if (!next) return;
+  const chooseModel = (next: AgentModelOption) => {
     onChange({
       model: next.id,
       reasoningEffort:

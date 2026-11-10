@@ -117,7 +117,7 @@ export function AgentModelPickerScreen() {
                 trailing={on ? <Check size={18} color={accent} strokeWidth={2} /> : null}
                 onPress={() => {
                   void haptics.selection();
-                  request.choose(option.id);
+                  request.choose(option);
                   router.back();
                 }}
               >

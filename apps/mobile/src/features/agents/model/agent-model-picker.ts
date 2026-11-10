@@ -1,4 +1,4 @@
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import type { AgentModelOption, AgentProviderId } from "@openbot/contracts/ipc";
 import { create } from "zustand";
 
 /**
@@ -9,7 +9,8 @@ export interface AgentModelPickerRequest {
   serverId: string;
   provider: AgentProviderId;
   model: string | undefined;
-  choose: (modelId: string) => void;
+  /** Gets the option from the list on the page, which can be newer than the list of the form. */
+  choose: (option: AgentModelOption) => void;
 }
 
 export const useAgentModelPicker = create<{
