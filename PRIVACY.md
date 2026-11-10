@@ -1180,7 +1180,7 @@ Network traffic can also occur when:
   the agent gives it, the OpenBot version, the operating system and processor architecture, whether
   the agent runs in the desktop app, on a server or on a hosted server, and the agent's provider, CLI
   version, model and reasoning effort. It also sends up to 5 error lines of the chat from the last
-  hour: failed messages, and the errors of failed tools other than shell commands. The card shows the
+  hour: the errors of failed tools other than shell commands, and of OpenBot tools. The card shows the
   errors. OpenBot removes known secrets from the text and the errors before it shows them. The service opens it as a public
   issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
