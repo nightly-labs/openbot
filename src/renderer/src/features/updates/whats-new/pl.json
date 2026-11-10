@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini znów instaluje się i aktualizuje w systemie Windows. W wersji 0.67.0 zatrzymywał się z błędem dotyczącym linku lub pliku specjalnego.",
+          "Agent, który wysyła wiadomość do zajętego członka zespołu, wie teraz, czy wiadomość trafiła do uruchomionego zadania tego członka. Gdy wiadomość czeka, agent może ci powiedzieć dlaczego.",
+          "Podczas Sterowania komputerem agenci nie mówią już, że kursor jest niedostępny. OpenBot rysuje kursor tam, gdzie agent klika, przewija lub przesuwa."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.0",
     "date": "2026-11-10",
     "notices": [
