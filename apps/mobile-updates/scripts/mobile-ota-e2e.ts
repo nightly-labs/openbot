@@ -13,6 +13,8 @@
 // - other runtime versions and channels are not affected, and the answers come from the cache;
 // - a rollout change and a rollback find the binary that has an update from the store builds, also
 //   when only one platform has an update, and stop when two store versions have one;
+// - no `.gitignore` file ignores the update signing certificate by itself, so the project copy of
+//   the EAS build has it;
 // - the publish guard of `scripts/mobile-ota.ts` passes a commit whose runtime version a store build
 //   has, and refuses one that no store build has.
 //
@@ -21,9 +23,9 @@
 // and the keys are in a temporary directory. It uses no network.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, posix, resolve } from "node:path";
 import { promisify } from "node:util";
 import { Effect } from "effect";
 import { getPlatformProxy } from "wrangler";
@@ -476,7 +478,33 @@ try {
     twoPlatforms,
   );
 
-  // 10. The publish guard, with the real runtime version of this checkout and a local tag remote.
+  // 10. The EAS build copies the project with its own ignore logic: it leaves a file out when one
+  // `.gitignore` file ignores it by itself, also when a deeper file includes it again, as git allows.
+  // A build with no certificate stops at `expo prebuild`.
+  const appJson = JSON.parse(await readFile(join(MOBILE, "app.json"), "utf8"));
+  const certificatePath = posix.join("apps/mobile", String(appJson.expo.updates.codeSigningCertificate));
+  const ignoreFiles = (await run("git", ["ls-files", "--", ".gitignore", "**/.gitignore"], { cwd: ROOT })).stdout
+    .split("\n")
+    .filter(Boolean);
+  const leftOutBy: string[] = [];
+  for (const [index, file] of ignoreFiles.entries()) {
+    const folder = file.slice(0, -".gitignore".length);
+    if (!certificatePath.startsWith(folder)) continue;
+    const alone = join(temp, `ignore-${index}`);
+    await mkdir(alone);
+    await run("git", ["init", "--quiet"], { cwd: alone });
+    await copyFile(join(ROOT, file), join(alone, ".gitignore"));
+    const ignored = await run("git", ["check-ignore", "--quiet", "--no-index", certificatePath.slice(folder.length)], {
+      cwd: alone,
+    }).then(
+      () => true,
+      () => false,
+    );
+    if (ignored) leftOutBy.push(file);
+  }
+  check("the EAS project copy keeps the update signing certificate", leftOutBy.length === 0, leftOutBy);
+
+  // 11. The publish guard, with the real runtime version of this checkout and a local tag remote.
   const android = await fingerprint("android", MOBILE);
   const remote = join(temp, "remote");
   await mkdir(remote);
