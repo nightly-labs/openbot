@@ -1703,8 +1703,9 @@ export class MessagingService {
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
+    const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => ({ places })),
+      Effect.map((places) => (whatsApp && !places.length ? { places, note: WHATSAPP_NO_PLACES } : { places })),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -2376,6 +2377,10 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
     })),
   };
 }
+
+/** Why a WhatsApp number has no places: it lists only the chats that the user allowed, not all its chats. */
+const WHATSAPP_NO_PLACES =
+  "OpenBot posts only to WhatsApp chats that the user allowed, and this number allows none. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
 
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
