@@ -36,7 +36,7 @@ export function ServerProviderKeyScreen() {
   const params = useLocalSearchParams<{ serverId: string; provider: string }>();
   const serverId = params.serverId;
   const provider = isAgentProvider(params.provider) ? params.provider : null;
-  const { available, admin, rows, applyStatus, refreshStatus } = useServerProviders(serverId);
+  const { available, admin, rows, applyStatus } = useServerProviders(serverId);
   const row = rows.find((candidate) => candidate.id === provider);
   const keyState = useProviderKeyState(serverId, row?.apiKey ? admin : null, provider);
   const queryScope = useQueryScope();
@@ -64,12 +64,14 @@ export function ServerProviderKeyScreen() {
     try {
       await applyStatus(await operation());
       setDraft("");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.providerKey(queryScope, serverId, target), exact: true }),
-        refreshStatus(),
-        // The host keeps a Claude key as its own account.
-        refreshAccounts(),
-      ]);
+      // `applyStatus` already shows the host's answer. The page closes while the key state and the
+      // accounts load again.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.providerKey(queryScope, serverId, target),
+        exact: true,
+      });
+      // The host keeps a Claude key as its own account.
+      void refreshAccounts();
       void haptics.notification("success");
       router.back();
     } catch (cause) {
@@ -108,9 +110,7 @@ export function ServerProviderKeyScreen() {
           trailing={
             keyState.data ? (
               <Typography.Paragraph className="text-grouped-secondary">
-                {t(
-                  keyState.data === "saved" ? "mobile.server.providers.keySaved" : "mobile.server.providers.keyMissing",
-                )}
+                {t(saved ? "mobile.server.providers.keySaved" : "mobile.server.providers.keyMissing")}
               </Typography.Paragraph>
             ) : null
           }
@@ -146,7 +146,8 @@ export function ServerProviderKeyScreen() {
           }}
         />
       </SettingsSection>
-      {saved ? (
+      {/* `apiKeyClear` does not remove the Codex login (`codex-api-key-v1`); the ChatGPT sign-in replaces it. */}
+      {saved && provider !== "codex" ? (
         <SettingsSection>
           <SettingsRow
             disclosure={false}

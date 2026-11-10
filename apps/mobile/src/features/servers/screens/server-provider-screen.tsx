@@ -213,7 +213,7 @@ export function ServerProviderScreen() {
   const connectOnComputer =
     connectable && !connect && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider));
   const signInShown =
-    !off && !hasAccounts && (Boolean(row.status?.email) || (connectable && Boolean(connect)) || disconnectable);
+    !hasAccounts && (Boolean(row.status?.email) || (connectable && Boolean(connect)) || disconnectable);
 
   const providerName = row.name;
   const signedInAs = row.status?.email ?? row.name;
@@ -339,10 +339,10 @@ export function ServerProviderScreen() {
           ) : null}
         </SettingsSection>
       ) : null}
-      {!off && !hasAccounts && connectOnComputer && !signInShown ? (
+      {!hasAccounts && connectOnComputer && !signInShown ? (
         <SettingsNote>{t("mobile.server.providers.connectOnComputer")}</SettingsNote>
       ) : null}
-      {!off && hasAccounts && providerAccounts ? (
+      {hasAccounts && providerAccounts ? (
         <ProviderAccountsSection
           serverId={serverId}
           provider={provider}
@@ -357,15 +357,17 @@ export function ServerProviderScreen() {
           title={t("mobile.server.providers.sectionUse")}
           footer={
             defaultProvider.error ??
-            (models.list.isError
-              ? errorMessage(models.list.error, t("mobile.server.providers.modelsLoadFailed"))
-              : !admin.defaultProvider
-                ? undefined
-                : isDefault
-                  ? t("mobile.server.providers.startsWith", { name: row.name })
-                  : state !== "available"
-                    ? t("mobile.server.providers.connectFirst", { name: row.name })
-                    : undefined)
+            (defaultProvider.current.isError
+              ? errorMessage(defaultProvider.current.error, t("mobile.server.providers.loadFailed"))
+              : models.list.isError
+                ? errorMessage(models.list.error, t("mobile.server.providers.modelsLoadFailed"))
+                : !admin.defaultProvider
+                  ? undefined
+                  : isDefault
+                    ? t("mobile.server.providers.startsWith", { name: row.name })
+                    : state !== "available"
+                      ? t("mobile.server.providers.connectFirst", { name: row.name })
+                      : undefined)
           }
         >
           {modelsShown ? (
@@ -410,7 +412,7 @@ export function ServerProviderScreen() {
       {provider === "claude" && !off && admin.promptCache ? (
         <PromptCacheSection serverId={serverId} setting={admin.promptCache} />
       ) : null}
-      {!off && row.apiKey ? (
+      {row.apiKey ? (
         <SettingsSection
           title={t("mobile.server.providers.apiKey")}
           footer={
@@ -425,7 +427,7 @@ export function ServerProviderScreen() {
               keyState.data ? (
                 <TrailingValue
                   value={t(
-                    keyState.data === "saved"
+                    keyState.data === "saved" || keyState.data === "unreadable"
                       ? "mobile.server.providers.keySaved"
                       : "mobile.server.providers.keyMissing",
                   )}
@@ -436,7 +438,7 @@ export function ServerProviderScreen() {
           >
             <View className="flex-row items-center gap-2">
               <Typography.Paragraph>{t("mobile.server.providers.apiKey")}</Typography.Paragraph>
-              {row.id === "opencode" && (keyState.data === "missing" || keyState.data === "unreadable") ? (
+              {row.id === "opencode" && keyState.data === "missing" ? (
                 <Chip size="sm" variant="soft" color="success" className="self-center" accessibilityRole="text">
                   <Chip.Label>{t("mobile.server.providers.keyFree")}</Chip.Label>
                 </Chip>
