@@ -420,6 +420,9 @@ export class ThreadLifecycle {
                   Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause)),
                 ),
               );
+          // Codex unloads an unsubscribed thread only 60 s later, with the processes that it started in
+          // the workspace. An archive ends the thread before it answers (#6266).
+          yield* this.#archiveSession(client, externalThreadId);
           this.#conversation.unloadThread(externalThreadId);
         }),
       { concurrency: "unbounded", discard: true },
@@ -884,18 +887,19 @@ export class ThreadLifecycle {
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
     yield* this.#nameSession(client, externalThreadId, agent, null);
-    if (replaced) yield* this.#archiveReplacedSession(client, replaced.externalSessionId);
+    if (replaced) yield* this.#archiveSession(client, replaced.externalSessionId);
     return externalThreadId;
   });
 
   /**
-   * Hides the session that a new one replaced from the provider's own thread list, after the new
-   * session is bound. Each replacement starts a new provider thread with the handoff as its first
-   * message, so without this the user's Codex history fills with rows that start with
-   * `HANDOFF_START`. The history stays readable for the import. A failure is logged, and the new
-   * session goes on: the old thread then only stays in the list.
+   * Hides a session from the provider's own thread list: the session that a new one replaced, after
+   * the new session is bound, and each session of a deleted agent. Each replacement starts a new
+   * provider thread with the handoff as its first message, so without this the user's Codex history
+   * fills with rows that start with `HANDOFF_START`. The history stays readable for the import, and a
+   * resume unarchives it. A failure is logged, and the caller goes on: the thread then only stays in
+   * the list.
    */
-  readonly #archiveReplacedSession = Effect.fn("ThreadLifecycle.archiveReplacedSession")(function* (
+  readonly #archiveSession = Effect.fn("ThreadLifecycle.archiveSession")(function* (
     this: ThreadLifecycle,
     client: AgentClient,
     externalThreadId: string,
