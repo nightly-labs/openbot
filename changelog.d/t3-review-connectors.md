@@ -14,8 +14,8 @@
 - Notion, Figma, Vercel, Coinbase, Obsidian, Render, Brave Search and Apple apps show their full
   square app icon in place of a small or round logo.
 - Slack, Discord, Telegram, WhatsApp, GitHub, 1Password, Bitwarden and Proton Pass show a full square
-  icon in their brand color in the Marketplace and in chat suggestions. Bitwarden shows its shield in
-  place of a lock.
+  icon in their brand color in the Marketplace, on their app page and in chat suggestions. Bitwarden
+  shows its shield in place of a lock.
 
 ### Fixed
 

@@ -4,7 +4,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, ExternalLink, ItemGroup, SettingsSection } from "@openbot/ui";
 import { createEffect, createSignal, For, Match, Switch } from "solid-js";
 import { useText } from "../../text";
-import { TelegramMark } from "./brand-marks";
+import { TelegramTile } from "./brand-marks";
 import {
   type ChannelAgent,
   ChannelConnectChecklist,
@@ -175,7 +175,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
   return (
     <ChannelPage
       text={TELEGRAM_TEXT}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       state={telegramIntegrationState(props.connections, props.agents, props.loadError)}
       connections={props.connections}
       unknown={messagingStateUnknown(props)}
@@ -209,7 +209,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
                 {(connection) => (
                   <ChannelConnectionRow
                     text={TELEGRAM_TEXT}
-                    logo={<TelegramMark />}
+                    logo={<TelegramTile />}
                     connection={connection}
                     note={note(connection)}
                     busy={props.busy}
@@ -247,7 +247,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
       />
       <ChannelDisconnectDialog
         text={TELEGRAM_TEXT}
-        logo={<TelegramMark />}
+        logo={<TelegramTile />}
         connection={disconnecting()}
         title={t("connector.telegram.disconnectTitle", { chat: disconnectingName() })}
         description={t("connector.telegram.leaveDescription", { chat: disconnectingName() })}
@@ -339,7 +339,7 @@ export function TelegramConnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.telegram.close")}
       onClose={props.onClose}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       link={dialogLink()}
       title={copy().title}
       description={copy().description}

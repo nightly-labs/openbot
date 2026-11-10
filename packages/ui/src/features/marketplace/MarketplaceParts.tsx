@@ -129,7 +129,10 @@ export function SkillIcon(props: { url: string | null | undefined; onError?: (ur
   );
 }
 
-/** The mark of an app, without its tile. */
+/**
+ * The icon of an app, without its tile. A connector's icon and a catalog app's icon fill the tile: a
+ * container that shows one needs a rule for `.connector-brand-tile` and for `img`.
+ */
 export function AppMark(props: { app: MarketplaceApp }) {
   const [failed, setFailed] = createSignal<string | null>(null);
   const url = () => {
