@@ -22,7 +22,8 @@ import { developerInstructions } from "../src/backend/agent/developer-instructio
 import { CODEX_FEATURES_CONFIG } from "../src/backend/agent/thread-lifecycle";
 import { discoverTools, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
-import { claudeOpenBotTools } from "../src/backend/claude-client";
+import { OPENBOT_BROWSER_NAMESPACE } from "../src/backend/browser-tools";
+import { claudeBrowserTools, claudeOpenBotTools } from "../src/backend/claude-client";
 import { resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { decodeRecordResponse, getRecord, getString } from "../src/backend/protocol";
@@ -249,29 +250,33 @@ async function codexRequest(root: string) {
   }
 }
 
-/** The tools that the Claude CLI gets from OpenBot's in-process MCP server. */
+/** The tools that the Claude CLI gets from OpenBot's in-process MCP servers. */
 async function claudeTools() {
-  const server = createSdkMcpServer({
-    name: "openbot",
-    version: "0.1.0",
-    tools: claudeOpenBotTools(async () => ({ content: [] })),
-  });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.instance.connect(serverTransport);
-  const client = new Client({ name: "openbot-bench", version: "0.0.0" });
-  await client.connect(clientTransport);
-  try {
-    const { tools } = await client.listTools();
-    await writeFile(join(OUT, "claude-openbot-tools.json"), `${JSON.stringify(tools, null, 2)}${NL}`);
-    const byName = Object.fromEntries(tools.map((tool) => [tool.name, count(tool).tokens ?? count(tool).bytes]));
-    return {
-      tools: count(tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))),
-      byName,
-    };
-  } finally {
-    await client.close();
-    await server.instance.close();
+  const empty = async () => ({ content: [] });
+  const listed = [];
+  for (const [name, tools] of [
+    ["openbot", claudeOpenBotTools(empty)],
+    [OPENBOT_BROWSER_NAMESPACE, claudeBrowserTools(empty)],
+  ] as const) {
+    const server = createSdkMcpServer({ name, version: "0.1.0", tools: [...tools] });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.instance.connect(serverTransport);
+    const client = new Client({ name: "openbot-bench", version: "0.0.0" });
+    await client.connect(clientTransport);
+    try {
+      const { tools: own } = await client.listTools();
+      listed.push(...own.map((tool) => ({ ...tool, name: `mcp__${name}__${tool.name}` })));
+    } finally {
+      await client.close();
+      await server.instance.close();
+    }
   }
+  await writeFile(join(OUT, "claude-openbot-tools.json"), `${JSON.stringify(listed, null, 2)}${NL}`);
+  const byName = Object.fromEntries(listed.map((tool) => [tool.name, count(tool).tokens ?? count(tool).bytes]));
+  return {
+    tools: count(listed.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))),
+    byName,
+  };
 }
 
 /** Searches that an agent often makes. Each result stays in the context for the rest of the task. */

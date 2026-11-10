@@ -2656,10 +2656,16 @@ export class BrowserCdpEngine {
             if (text) {
               matched &&= yield* pageContainsText(send, this.#snapshotTargets(), text, deadline);
             }
-            const target = condition.target;
+            // A wait needs one match, not the only match: a wait for `article.product_pod` on a page of
+            // 20 products timed out, because the ambiguity refusal failed each poll.
+            const target =
+              condition.target &&
+              (condition.target.kind === "css" || condition.target.kind === "role" || condition.target.kind === "text")
+                ? { ...condition.target, nth: condition.target.nth ?? 0 }
+                : condition.target;
             if (target) {
               yield* Effect.gen({ self: this }, function* () {
-                // A poll drops the error, so an ambiguous target needs no candidate list here.
+                // A poll drops the error, so a missing target needs no candidate list here.
                 yield* this.#resolveTargetEffect(send, target, deadline, true, false);
               }).pipe(
                 Effect.catch(() =>
@@ -2913,6 +2919,8 @@ export class BrowserCdpEngine {
         y: 0,
       };
     }
+    // A target with nth chooses one match by its index, so the scan collects matches up to that index.
+    const limit = target.nth === undefined ? MAX_TARGET_CANDIDATES : target.nth + 1;
     if (target.kind === "css") {
       const matches: Array<{ objectId: string; sessionId?: string | undefined; targetId?: string | undefined }> = [];
       const releaseMatches = () =>
@@ -2924,14 +2932,14 @@ export class BrowserCdpEngine {
         );
       yield* Effect.gen({ self: this }, function* () {
         for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId)) {
+          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId, limit)) {
             matches.push({
               objectId,
               ...(capture.sessionId === undefined ? {} : { sessionId: capture.sessionId }),
               ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
             });
           }
-          if (matches.length >= MAX_TARGET_CANDIDATES) break;
+          if (matches.length >= limit) break;
         }
       }).pipe(
         Effect.catch((operationFailure) =>
@@ -2941,6 +2949,18 @@ export class BrowserCdpEngine {
           }),
         ),
       );
+      if (target.nth !== undefined) {
+        const chosen = matches[target.nth];
+        const others = matches.filter((match) => match !== chosen);
+        yield* Effect.all(
+          others.map((match) =>
+            Effect.exit(send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId)),
+          ),
+          { concurrency: "unbounded" },
+        );
+        matches.splice(0, matches.length, ...(chosen ? [chosen] : []));
+        if (!chosen && others.length) return yield* browserFailure(new Error(nthMissing(target, others.length)));
+      }
       if (matches.length > 1) {
         const summary = `CSS selector is ambiguous (at least ${Math.min(matches.length, MAX_TARGET_CANDIDATES)} matches): ${target.selector}`;
         if (!describeAmbiguity) {
@@ -2984,16 +3004,23 @@ export class BrowserCdpEngine {
     const candidates: SemanticMatch[] = [];
     const seen = new Set<string>();
     for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-      for (const candidate of yield* semanticAxMatches(send, capture, target, allowNonActionableRole, deadline)) {
+      for (const candidate of yield* semanticAxMatches(
+        send,
+        capture,
+        target,
+        allowNonActionableRole,
+        deadline,
+        limit,
+      )) {
         const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
         if (seen.has(key)) continue;
         seen.add(key);
         candidates.push(candidate);
-        if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+        if (candidates.length >= limit) break;
       }
-      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+      if (candidates.length >= limit) break;
       if (target.kind === "text") {
-        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline);
+        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline, limit);
         yield* Effect.gen({ self: this }, function* () {
           for (const objectId of objectIds) {
             const candidate = yield* describedMatch(send, objectId, capture, target.text);
@@ -3002,7 +3029,7 @@ export class BrowserCdpEngine {
             if (seen.has(key)) continue;
             seen.add(key);
             candidates.push(candidate);
-            if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+            if (candidates.length >= limit) break;
           }
         }).pipe(
           Effect.ensuring(
@@ -3017,12 +3044,25 @@ export class BrowserCdpEngine {
           ),
         );
       }
-      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+      if (candidates.length >= limit) break;
     }
     if (navigationGeneration !== this.#navigationGeneration) {
       return yield* browserFailure(
         new Error("Page navigated during semantic target collection. Take a fresh snapshot."),
       );
+    }
+    if (target.nth !== undefined) {
+      const chosen = candidates[target.nth];
+      if (!chosen) {
+        return yield* browserFailure(
+          new Error(
+            candidates.length
+              ? nthMissing(target, candidates.length)
+              : `No element matches ${describeBrowserTarget(target)}.`,
+          ),
+        );
+      }
+      candidates.splice(0, candidates.length, chosen);
     }
     const [found] = candidates;
     if (!found) return yield* browserFailure(new Error(`No element matches ${describeBrowserTarget(target)}.`));
@@ -3088,7 +3128,7 @@ export class BrowserCdpEngine {
     const message = [
       `${summary}. No input was sent. Candidates:`,
       ...lines,
-      "Act on the ref of the intended item, or use a target that matches only that item." +
+      "Act on the ref of the intended item, add nth (0 for candidate 1) to the target, or use a target that matches only that item." +
         (missingRef ? " Take a fresh snapshot to get a ref for a candidate that has none." : "") +
         " If the task does not say which item, ask the user.",
     ].join("\n");
@@ -3518,6 +3558,11 @@ export class BrowserCdpEngine {
       viewport: { mode: "custom", width: viewport.width, height: viewport.height, deviceScaleFactor: 0, preset: null },
     };
   }
+}
+
+/** The refusal for a target whose nth is past its last match. */
+function nthMissing(target: BrowserTarget, matches: number): string {
+  return `${describeBrowserTarget(target)} has no match at that index: it matches ${matches} element${matches === 1 ? "" : "s"}, and nth counts from 0.`;
 }
 
 function assertTypingProgressBeforeDeadline(deadline: number | undefined, sent: number, total: number): void {

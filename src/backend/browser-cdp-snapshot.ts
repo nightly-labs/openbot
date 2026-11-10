@@ -391,6 +391,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   send: SendCommand,
   selector: string,
   sessionId?: string,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   const contextId = yield* automationContextId(send, sessionId);
   const collection = yield* send(
@@ -403,16 +404,16 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
         const matches = [];
         let scanned = 0;
         let truncated = false;
-        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
+        while (roots.length && matches.length < ${limit}) {
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
           // The native query finds each match in this root, also on a very large page.
           for (const node of root.querySelectorAll(selector)) {
             matches.push(node);
-            if (matches.length >= ${MAX_TARGET_CANDIDATES}) break;
+            if (matches.length >= ${limit}) break;
           }
-          if (truncated || matches.length >= ${MAX_TARGET_CANDIDATES}) continue;
+          if (truncated || matches.length >= ${limit}) continue;
           // Only the search for shadow roots and frames, which the native query does not enter, is bounded.
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
           let node;
@@ -438,7 +439,7 @@ export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId);
+  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), sessionId, limit);
 });
 
 /** The first elements of a page array, as objects that the caller releases. The array is released. */
@@ -446,6 +447,7 @@ const collectionElements = Effect.fn("Browser.collectionElements")(function* (
   send: SendCommand,
   collectionId: string,
   sessionId: string | undefined,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   if (!collectionId) return [];
   return yield* Effect.gen(function* () {
@@ -455,7 +457,7 @@ const collectionElements = Effect.fn("Browser.collectionElements")(function* (
       .sort((left, right) => Number(left.name) - Number(right.name))
       .map((descriptor) => stringValue(recordValue(descriptor.value)?.objectId))
       .filter(Boolean)
-      .slice(0, MAX_TARGET_CANDIDATES);
+      .slice(0, limit);
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
@@ -471,6 +473,7 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   target: Extract<BrowserTarget, { kind: "role" | "text" }>,
   allowNonActionableRole: boolean,
   deadline?: number,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* send("Accessibility.enable", {}, capture.sessionId);
@@ -503,7 +506,7 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
         role,
         name,
       });
-      if (matches.length >= MAX_TARGET_CANDIDATES) return matches;
+      if (matches.length >= limit) return matches;
     }
   }
   return matches;
@@ -514,6 +517,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   capture: SnapshotTarget,
   target: Extract<BrowserTarget, { kind: "text" }>,
   deadline?: number,
+  limit = MAX_TARGET_CANDIDATES,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   const contextId = yield* automationContextId(send, capture.sessionId);
@@ -538,7 +542,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           if (!semantic && !roles.has(explicitRole)) return false;
           return node.getClientRects().length > 0;
         };
-        while (roots.length && matches.length < ${MAX_TARGET_CANDIDATES}) {
+        while (roots.length && matches.length < ${limit}) {
           if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
             truncated = true;
             break;
@@ -547,7 +551,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
           if (!root || seenRoots.has(root)) continue;
           seenRoots.add(root);
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
-          while (matches.length < ${MAX_TARGET_CANDIDATES}) {
+          while (matches.length < ${limit}) {
             const node = walker.nextNode();
             if (!node) break;
             if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) {
@@ -575,7 +579,12 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   );
   const exception = recordValue(collection.exceptionDetails);
   if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
-  return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), capture.sessionId);
+  return yield* collectionElements(
+    send,
+    stringValue(recordValue(collection.result)?.objectId),
+    capture.sessionId,
+    limit,
+  );
 });
 
 /** What tells the candidates of an ambiguous target apart. */

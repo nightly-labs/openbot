@@ -344,16 +344,86 @@ async function main(): Promise<void> {
         await waitFor({ state: "networkidle" }, 5000);
         await waitFor("item-3-1", 2000);
         await waitFor(() => true, 2000);
+        await waitFor("item-3-1", "page");
+        await waitFor("item-3-1", "load");
+        await waitFor(".absent-spinner", "hidden");
+        await waitFor(() => true, "present");
         let refused = "";
         try { await waitFor("visible", "li"); } catch (error) { refused = error.message; }
-        return [refused, role("button", { name: "Search", exact: true })];
+        return [
+          refused,
+          role("button", { name: "Search", exact: true }),
+          [css("li").nth(2), css("li", 1), css("li").first(), text("Next", { exact: true, nth: 1 }), role("link", "Next", { nth: 0 })],
+        ];
       `,
     });
     assert.equal(guessed.outcome.status, "completed", guessed.outcome.error);
-    const [refused, roleTarget] = z.tuple([z.string(), z.unknown()]).parse(guessed.outcome.value);
+    const [refused, roleTarget, picks] = z.tuple([z.string(), z.unknown(), z.unknown()]).parse(guessed.outcome.value);
     assert.match(refused, /waitFor takes/u);
     assert.deepEqual(roleTarget, { kind: "role", role: "button", name: "Search", exact: true });
-    recordCases("script-accepts-guessed-wait-forms");
+    assert.deepEqual(picks, [
+      { kind: "css", selector: "li", nth: 2 },
+      { kind: "css", selector: "li", nth: 1 },
+      { kind: "css", selector: "li", nth: 0 },
+      { kind: "text", text: "Next", exact: true, nth: 1 },
+      { kind: "role", role: "link", name: "Next", nth: 0 },
+    ]);
+    recordCases("script-accepts-guessed-wait-forms", "script-targets-take-nth");
+
+    // The sandbox has no page globals: the error says where they are.
+    const pageGlobal = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: "return document.title;",
+    });
+    assert.equal(pageGlobal.outcome.status, "failed");
+    assert.match(pageGlobal.outcome.error ?? "", /runs in a sandbox, not in the page/u);
+    const snakeHelper = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: "await wait_for({ text: 'Next' });",
+    });
+    assert.equal(snakeHelper.outcome.status, "failed");
+    assert.match(snakeHelper.outcome.error ?? "", /helpers use camelCase: waitFor/u);
+    recordCases("script-names-the-sandbox-for-page-globals", "script-names-camel-case-helpers");
+
+    // Scripts resolve the links that they read, as in a browser, and can navigate to a URL object.
+    const resolved = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: [
+        "const next = new URL('../b?x=1&x=2#h', 'https://example.com/a/c');",
+        "next.searchParams.set('page', '2');",
+        "const moved = new URL('/list?page=1', location0);",
+        "moved.search = '?page=2';",
+        "await navigate(moved);",
+        "return [next.href, next.pathname, next.searchParams.getAll('x'), next.origin, URL.canParse('no scheme'),",
+        "  String(new URLSearchParams({ q: 'a b&c' })), (await evaluate(() => location.href))];",
+      ]
+        .join("\n")
+        .replace("location0", JSON.stringify(origin)),
+    });
+    assert.equal(resolved.outcome.status, "completed", resolved.outcome.error);
+    assert.deepEqual(resolved.outcome.value, [
+      "https://example.com/b?x=1&x=2&page=2#h",
+      "/b",
+      ["1", "2"],
+      "https://example.com",
+      false,
+      "q=a+b%26c",
+      `${origin}/list?page=2`,
+    ]);
+    recordCases("script-resolves-urls");
+
+    // A wait needs one match: each of these targets matches several elements of the list page.
+    const waitedForMany = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      timeoutMs: 10_000,
+      script: "await waitFor(css('li')); await waitFor(text('Next', { exact: true })); return 'present';",
+    });
+    assert.equal(waitedForMany.outcome.status, "completed", waitedForMany.outcome.error);
+    recordCases("wait-for-target-with-several-matches");
 
     const leftOff = await runScript({
       tabId: list.tab.id,
