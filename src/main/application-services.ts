@@ -547,7 +547,6 @@ const TEARDOWN_ORDER = {
   browserView: 45,
   providerDetection: 48,
   providerRuntimes: 50,
-  cuaDriver: 55,
   /** Before the remote servers: each child detaches from its entry when it stops. */
   localServers: 57,
   remoteServers: 60,
@@ -585,6 +584,9 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  // After the agent service, which stops the provider processes and with them each `cua-driver mcp`
+  // proxy. A turn that starts while the service stops still finds the daemon (#6494).
+  cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
   // After all account consumers have stopped.
@@ -1905,8 +1907,9 @@ export async function createApplicationServices({
     },
     quitting,
   });
-  // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
-  // daemon: stopping it first would leave them reading a socket nothing answers.
+  // After the agent service, whose provider processes hold the `cua-driver mcp` children that talk
+  // to this daemon: stopping it first would leave them reading a socket nothing answers, and a
+  // Hermes turn that starts then fails as a whole.
   teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => runCauseEffect(cuaDriver.stop()));
   /*
    * The rim OpenBot draws over the window an agent works in.
