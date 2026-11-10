@@ -75,6 +75,10 @@ export const MarketplaceModal = lazy(() =>
 export const WorkflowsPage = lazy(() =>
   import("./features/workflows/WorkflowsPage").then((module) => ({ default: module.WorkflowsPage })),
 );
+/** The canvas of the Workflows page without the desktop contexts, for the browser app. */
+export const WorkflowsCanvas = lazy(() =>
+  import("./features/workflows/WorkflowsCanvas").then((module) => ({ default: module.WorkflowsCanvas })),
+);
 export const ScheduleView = lazy(() =>
   import("./features/schedule/SchedulePanel").then((module) => ({ default: module.ScheduleView })),
 );

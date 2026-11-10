@@ -650,6 +650,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex ライブ音声",
   "settings.voice.speech.codexLive.description":
     "どのエージェントとの音声会話も、Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
+  "settings.voice.speech.codexLive.serverDescription":
+    "どのエージェントとの音声会話も、サーバーの Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
   "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",

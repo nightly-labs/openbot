@@ -1,10 +1,4 @@
-import type {
-  AgentEvent,
-  AgentTask,
-  AgentTaskBranch,
-  AgentTasksSnapshot,
-  ConversationSnapshot,
-} from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
@@ -80,8 +74,8 @@ export interface AgentTasksOptions {
   /** Read on each call: tests and stories replace the port per case. */
   port: () => AgentTasksPort;
   activeAgentId: () => string | undefined;
-  /** The server is this computer. Only this computer moves a queued message to a new thread. */
-  local: () => boolean;
+  /** The server moves a queued message to a new thread: this computer, or the `agent-queue-task-v1` route. */
+  queuedMessageMovable: () => boolean;
   /** The server has side threads: the `agent-tasks-v1` routes. */
   available: () => boolean;
   /** The server renames and deletes side threads: the `agent-threads-v1` routes. */
@@ -118,7 +112,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
   const {
     port,
     activeAgentId,
-    local,
+    queuedMessageMovable,
     available,
     editable,
     readable,
@@ -185,21 +179,30 @@ export function createAgentTasks(options: AgentTasksOptions) {
   /**
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
    * without `branch` keeps the link that the stored list has: an `agent-tasks-changed` event of a joined
-   * server does not carry it, and a link does not change.
+   * server does not carry it, and a link does not change. A task without `queue` keeps the stored queue
+   * in the same way, but only the messages that still wait. Returns true when a waiting message changed
+   * and the stored list had a queue: then only a new read of the list gives the full queue.
    */
-  function setSnapshot(snapshot: AgentTasksSnapshot): void {
+  function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
     // An event handler runs this too: the stored list is input here, not a dependency.
-    const links = untrack(() => {
-      const stored = new Map<string, AgentTaskBranch>();
-      for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) {
-        if (task.branch) stored.set(task.id, { ...task.branch });
-      }
-      return stored;
+    const stored = untrack(() => {
+      const byId = new Map<string, AgentTask>();
+      for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) byId.set(task.id, task);
+      return byId;
     });
+    let staleQueue = false;
     const tasks = snapshot.tasks.map((task) => {
-      const branch = task.branch === undefined ? links.get(task.id) : undefined;
-      return branch ? { ...task, branch } : task;
+      const held = stored.get(task.id);
+      if (!held) return task;
+      const next = { ...task };
+      if (task.branch === undefined && held.branch) next.branch = { ...held.branch };
+      if (task.queue === undefined && held.queue) {
+        const waiting = new Set(task.queuedMessages.map((message) => message.deliveryId));
+        next.queue = held.queue.filter((delivery) => waiting.has(delivery.id)).map((delivery) => ({ ...delivery }));
+        if (queuedKey(task) !== queuedKey(held)) staleQueue = true;
+      }
+      return next;
     });
     setState((current) => {
       current.snapshots[snapshot.agentId] = { ...snapshot, tasks };
@@ -211,11 +214,17 @@ export function createAgentTasks(options: AgentTasksOptions) {
         }
       }
     });
+    return staleQueue;
   }
 
-  function applySnapshot(snapshot: AgentTasksSnapshot): void {
+  /** What the waiting messages of a task are, as each list of the task gives them. */
+  function queuedKey(task: AgentTask): string {
+    return JSON.stringify(task.queuedMessages.map((message) => [message.deliveryId, message.text]));
+  }
+
+  function applySnapshot(snapshot: AgentTasksSnapshot): boolean {
     listRequests.set(snapshot.agentId, (listRequests.get(snapshot.agentId) ?? 0) + 1);
-    setSnapshot(snapshot);
+    return setSnapshot(snapshot);
   }
 
   /**
@@ -332,16 +341,17 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
-   * A list from an event of a joined server has no branch links. When it has a task that the stored list
-   * does not have, the list is read again: the new task can be a branch from another device.
+   * A list from an event of a joined server has no branch links and no full queue. When it has a task
+   * that the stored list does not have, the list is read again: the new task can be a branch from
+   * another device. When a waiting message of a thread changed, the list is read again for its queue.
    */
   function applyTasksChanged(snapshot: AgentTasksSnapshot): void {
     const stored = untrack(() => state.snapshots[snapshot.agentId]);
     const known = stored && untrack(branchable) ? new Set(stored.tasks.map((task) => task.id)) : undefined;
     // Each progress line sends a list too. Only a saved message or an end of a turn changes a count.
     const before = stored ? untrack(() => unreadKey(stored)) : undefined;
-    applySnapshot(snapshot);
-    if (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id)))
+    const staleQueue = applySnapshot(snapshot);
+    if (staleQueue || (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id))))
       void loadTasks(snapshot.agentId);
     // The host sends no event when a read mark moves, so a changed list reads the marks again.
     else if (unreadKey(snapshot) !== before) loadUnread(snapshot.agentId);
@@ -742,7 +752,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
   return {
     available,
     editable,
-    local,
+    queuedMessageMovable,
     filesAccepted,
     repliable,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],

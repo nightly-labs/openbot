@@ -24,6 +24,7 @@ import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./conten
 import { filePreviewPages } from "./file-preview-pages";
 import { fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";
+import { parseRemoteAvatarUrl } from "./remote-server-urls";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
 import type { TeamStore } from "./team-store";
 import { isTrustedRendererUrl } from "./trusted-renderer";
@@ -174,13 +175,13 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
   });
   session.defaultSession.protocol.handle("openbot-remote-avatar", async (request) => {
     try {
-      const url = new URL(request.url);
-      const serverId = decodeURIComponent(url.hostname);
-      const agentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
-      if (!serverId || !agentId) return new Response("Not found", { status: 404 });
-      const version = url.searchParams.get("v");
-      if (!version) return new Response("Not found", { status: 404 });
-      const avatar = await runCauseEffect(remoteServers.downloadAgentAvatar(agentId, serverId, version));
+      const target = parseRemoteAvatarUrl(request.url);
+      if (!target) return new Response("Not found", { status: 404 });
+      const avatar = await runCauseEffect(
+        target.kind === "agent"
+          ? remoteServers.downloadAgentAvatar(target.id, target.serverId, target.version)
+          : remoteServers.downloadChannelImage(target.id, target.serverId, target.version),
+      );
       return new Response(Buffer.from(avatar.bytes), {
         headers: {
           "Content-Type": avatar.mimeType,

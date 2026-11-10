@@ -204,8 +204,9 @@ for each version under `userData/avatars/channels/<sha256(channel id)>/`, served
 commits the URL, and then removes the old file. Archiving keeps the file; only the permanent
 delete of the channel records removes the folder. An icon or
 color choice removes the image. A name or hue that this version does not know shows the member
-faces or the default color. Only the local host edits the picture. The channels-v1 Team API codec
-keeps only its released fields, so remote clients, the web client, and mobile show member faces.
+faces or the default color. The channels-v1 Team API codec keeps only its released fields, so a
+client without `channel-picture-v1` shows member faces. A client with it reads and edits the picture
+through the host (see below).
 
 Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
 thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
@@ -549,8 +550,9 @@ On a host with `channel-picture-v1`, each channel record carries its picture: `i
 `icon`; absent keeps the stored icon, and null removes it. `/v1/channels/image?channelId=` reads the
 image bytes by version (`GET`), sets them (`PUT`) and removes them (`DELETE`). The phone keeps the
 images beside the agent photos in its cache and edits the picture in Channel info, as the desktop
-channel settings do. The browser client cannot open the host URL, so it drops `imageUrl` and shows
-the icon or the faces. A joined desktop still shows the member faces.
+channel settings do. The browser client cannot open the host URL, so it reads the bytes of each
+version into a data URL. A joined desktop changes the URL to `openbot-remote-avatar://<server>/channel/<id>`,
+which reads the same route. Both clients set the icon and the image as the phone does.
 
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does

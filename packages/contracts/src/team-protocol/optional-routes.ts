@@ -21,16 +21,21 @@ import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
+import { AGENT_QUEUE_TASK_CODECS } from "./agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CODECS } from "./agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CODECS } from "./agent-task-limit-v1";
 import { AGENT_TASKS_CODECS } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CODECS } from "./agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_CODECS } from "./agent-thread-files-v1";
 import { AGENT_THREAD_PAGES_CODECS } from "./agent-thread-pages-v1";
+import { AGENT_THREAD_QUEUE_CODECS } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CODECS } from "./agent-thread-replies-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
+import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
+import { AGENT_WAITS_CODECS } from "./agent-waits-v1";
+import { BACKGROUND_PROCESSES_CODECS } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
@@ -41,6 +46,7 @@ import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
+import { CLAUDE_USER_SETUP_CODECS } from "./claude-user-setup-v1";
 import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
@@ -53,6 +59,7 @@ import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
+import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
@@ -79,9 +86,11 @@ import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CODECS } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CODECS } from "./provider-default-v1";
+import { PROVIDER_DETECTION_CODECS } from "./provider-detection-v1";
 import { PROVIDER_HOST_SIGN_IN_CODECS } from "./provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_CODECS } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CODECS } from "./provider-usage-reset-v1";
+import { PROVIDER_USE_CODECS } from "./provider-use-v1";
 import { PROVIDERS_ADMIN_CODECS } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CODECS } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CODECS } from "./providers-v3";
@@ -94,7 +103,9 @@ import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
+import { ROUTINE_RUN_COMMAND_CODECS } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CODECS } from "./routine-run-place-v1";
+import { ROUTINES_ONCE_CODECS } from "./routines-once-v1";
 import { SERVER_AUDIT_CODECS } from "./server-audit-v1";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
@@ -104,6 +115,7 @@ import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
+import { THREAD_MESSAGE_SEARCH_CODECS } from "./thread-message-search-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
@@ -180,6 +192,18 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...COMPUTER_ACTIVITY_CODECS,
   ...CONNECTORS_CODECS,
   ...CONVERSATION_FILE_SEARCH_CODECS,
+  ...THREAD_MESSAGE_SEARCH_CODECS,
+  ...BACKGROUND_PROCESSES_CODECS,
+  ...PROVIDER_USE_CODECS,
+  ...ROUTINES_ONCE_CODECS,
+  ...ROUTINE_RUN_COMMAND_CODECS,
+  ...CLAUDE_USER_SETUP_CODECS,
+  ...AGENT_THREAD_QUEUE_CODECS,
+  ...AGENT_USAGE_LIMIT_CODECS,
+  ...HERMES_IMPORT_CODECS,
+  ...PROVIDER_DETECTION_CODECS,
+  ...AGENT_QUEUE_TASK_CODECS,
+  ...AGENT_WAITS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RUN_PLACE_CODECS,

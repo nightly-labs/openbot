@@ -189,7 +189,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "该助手没有这个 id 的自动化任务。",
   "error.backend.agentWaitNoRoutine":
     "只有你自己的自动化任务运行才能唤醒等待，而你还没有自动化任务。请先用 openbot.create_routine 创建一个，再开启等待。",
-  "error.backend.agentWaitRemoteUnsupported": "未关闭的等待仅适用于本电脑上的助手。",
   "error.backend.markUnreadRemoteUnsupported": "仅本电脑上的助手可以将消息标为未读。",
   "error.backend.messageDeleteUnsupported": "此服务器不支持删除消息。",
   "error.backend.messageDeleteNotFound": "这条消息不在聊天中。",

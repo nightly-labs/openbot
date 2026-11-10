@@ -391,7 +391,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "서버 키를 변경했어요",
   "server.settings.hostKeyChanged": "마지막 변경",
   "server.settings.hostKeyChangedDescription": "{date}. 이전 키와 새 키가 모두 이 변경에 서명했어요.",
-  "server.settings.hostKeyLocalOnly": "이 컴퓨터의 서버만 여기서 키를 변경할 수 있어요.",
+  "server.settings.hostKeyOwnerOnly": "서버 키는 소유자만 변경할 수 있어요.",
   "server.settings.removeTitle": "서버 제거",
   "server.settings.removeDescription":
     "모든 멤버에 대해 계정 서비스에서 이 서버를 제거해요. 서버의 컴퓨터를 더 이상 사용할 수 없을 때 사용하세요.",

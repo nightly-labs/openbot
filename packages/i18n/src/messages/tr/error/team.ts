@@ -72,6 +72,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.routineRunPlaceUnsupported": "Bu bağlantı bir rutinin nerede çalıştığını değiştiremez.",
+  "error.team.routinesOnceUnsupported": "Bu bağlantı bir kez çalışan rutinleri kaydedemez.",
+  "error.team.routineRunCommandUnsupported": "Bu bağlantı bir rutinin çalıştırma komutunu veremez.",
+  "error.team.threadQueueUnsupported": "Bu bağlantı bir yan konunun kuyruğunu gösteremez.",
+  "error.team.usageLimitUnsupported": "Bu bağlantı ajanların kullanım sınırlarını gösteremez veya değiştiremez.",
+  "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
+  "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
@@ -85,6 +91,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Bu bağlantı mesaj silmeyi desteklemiyor.",
   "error.team.workspaceDirectoryUnsupported": "Klasörleri gösterme bu bağlantı tarafından desteklenmiyor.",
   "error.team.conversationFileSearchUnsupported": "Dosya arama bu bağlantı tarafından desteklenmiyor.",
+  "error.team.threadMessageSearchUnsupported": "Yan konularda arama bu bağlantı tarafından desteklenmiyor.",
   "error.team.sideQuestionUnsupported": "Yan sorular bu bağlantı tarafından desteklenmiyor.",
   "error.team.liveVoiceUnsupported":
     "Bu sunucu Codex canlı sesi desteklemiyor. Sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
@@ -114,6 +121,7 @@ export const messages = {
   "error.team.skillLearningUnsupported": "Bu bağlantı beceri öğrenmeyi desteklemiyor.",
   "error.team.browsingMemoryUnsupported": "Bu bağlantı gezinmeden öğrenmeyi desteklemiyor.",
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
+  "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
   "error.team.attachmentNameRequired": "Güvenli bir ek adı gereklidir.",
@@ -162,4 +170,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Bu adres bu oturum açmaya ait değil.",
   "error.team.signInRelayLinkUnknown": "Bu sunucudaki hiçbir ajan bu oturum açma bağlantısını göstermedi.",
   "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
+  "error.team.agentWaitsUnsupported": "Bu bağlantı açık beklemeleri desteklemiyor.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Bu bağlantı kuyruktaki bir mesajı yeni bir ileti dizisi olarak çalıştırmayı desteklemiyor.",
+  "error.team.backgroundProcessesUnsupported": "Bu bağlantı arka plan işlemlerini desteklemiyor.",
+  "error.team.providerUseUnsupported": "Bu bağlantı sağlayıcıları açıp kapatmayı desteklemiyor.",
+  "error.team.providerUseInvalid": "Bu sağlayıcının açma/kapatma anahtarı yok.",
 } as const satisfies PartialTranslation<typeof source>;

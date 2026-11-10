@@ -658,6 +658,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex canlı ses",
   "settings.voice.speech.codexLive.description":
     "Herhangi bir ajanla sesli konuşmalar, Codex oturumunla OpenAI canlı sesini kullanır. Sesin, isteklerin ve ajanın yanıtları OpenAI'ye gider.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Herhangi bir ajanla sesli konuşmalar, sunucunun Codex oturumuyla OpenAI canlı sesini kullanır. Sesin, isteklerin ve ajanın yanıtları OpenAI'ye gider.",
   "settings.voice.speech.speed.title": "Hız",
   "settings.voice.speech.voice.title": "Ses",
   "settings.voice.speech.voice.female": "Kadın sesi {number}",

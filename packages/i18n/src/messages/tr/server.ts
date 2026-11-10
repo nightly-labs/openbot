@@ -377,7 +377,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
   "server.settings.hostKeyChanged": "Son değişiklik",
   "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
-  "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
+  "server.settings.hostKeyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":
     "Bu sunucuyu tüm üyeler için hesap hizmetinden kaldırın. Bilgisayarı artık kullanılamadığında bunu kullanın.",

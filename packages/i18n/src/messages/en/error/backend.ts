@@ -206,7 +206,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
-  "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marking a message unread is only available for agents on this computer.",
   "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",

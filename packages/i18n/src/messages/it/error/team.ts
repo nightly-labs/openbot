@@ -78,6 +78,15 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
+  "error.team.routineRunCommandUnsupported":
+    "Questa connessione non può fornire il comando di esecuzione di una routine.",
+  "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.usageLimitUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
+  "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
+  "error.team.providerDetectionUnsupported":
+    "Questa connessione non può trovare i server di modelli e gli agenti del server.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
@@ -93,6 +102,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
+  "error.team.threadMessageSearchUnsupported": "Questa connessione non supporta la ricerca nei thread secondari.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
   "error.team.liveVoiceUnsupported":
     "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
@@ -122,6 +132,8 @@ export const messages = {
   "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
   "error.team.browsingMemoryUnsupported": "Questa connessione non supporta l'apprendimento dalla navigazione.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
+  "error.team.claudeUserSetupUnsupported":
+    "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -173,4 +185,11 @@ export const messages = {
   "error.team.signInRelayMismatch": "Questo indirizzo non appartiene a questo accesso.",
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
+  "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",
+  "error.team.backgroundProcessesUnsupported": "Questa connessione non supporta i processi in background.",
+  "error.team.providerUseUnsupported":
+    "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
+  "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
 } as const satisfies PartialTranslation<typeof source>;

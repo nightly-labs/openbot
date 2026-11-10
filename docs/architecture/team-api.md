@@ -385,6 +385,143 @@ welcome turn starts. The agent answers it, and that answer shows as usual. A cli
 a host that advertises the capability; an older host still gets the released role text, which stays
 a visible user message there.
 
+The optional `agent-waits-v1` capability (protocol 9 only) adds `POST /v1/agent-waits/list`
+(`agentId`) and `POST /v1/agent-waits/cancel` (`agentId`, `waitId`). They show the open waits of an
+agent in the composer of a joined server, with Cancel. `src/main/team-api/route-agent-waits.ts` owns
+the authorization. A hidden or missing agent gets 404; a cancel needs `chat` on the agent (else 403).
+The host cuts each request text to 2,000 characters. A wait that is already closed gets 409 with the
+host's sentence. The host sends no event when a wait changes, so a client reads the list again after a
+cancel and when a turn of the agent starts or ends.
+
+The optional `agent-queue-task-v1` capability (protocol 9 only) adds
+`POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
+new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
+when it has `agent-tasks-v1`, and the answer is the frozen task of an `agent-tasks-v1` start.
+`src/main/team-api/route-agent-queue-task.ts` owns the authorization: a visible agent (else 404) and
+`chat` on it (else 403). A message that left the queue, or a message of a channel, gets 409 with the
+host's sentence. The host then sends `agent-tasks-changed` and the queue change.
+
+The optional `background-processes-v1` capability (protocol 9 only) adds
+`POST /v1/admin/background-processes/list` and `POST /v1/admin/background-processes/stop` (`id`).
+They show, in Server Settings > Storage, the programs that agents left running on the host, such as a
+dev server, with Stop. Only owners and admins can use them (else 403). The host redacts each command
+line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
+200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
+Windows host, which cannot find these programs. Stop signals only a program that is in the list at
+that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+
+The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
+and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's
+built-in providers in Server Settings > Providers. Only owners and admins can use them (else 403). Both
+routes answer `off`, the ids of the providers that are off after the call, at most 64. The released
+status routes leave out `off`, so a client reads it from this list. The host refuses the custom agent
+provider (`acp`) with 400, and a provider that an agent uses or that is busy with 409 and the host's
+message. Without the capability a client hides the switch for that host.
+
+The optional `routines-once-v1` capability (protocol 9 only) adds `POST /v1/routines-once/list`
+(`owner`), `POST /v1/routines-once/create` (`owner` and the routine, with a `once` schedule) and
+`POST /v1/routines-once/update` (`owner`, `id` and the changed fields). `owner` is
+`{ kind: "agent" | "channel", id }`. They carry one-time routines (the `once` schedule), which the
+frozen routine, channel, event and run-place codecs cannot carry. Those routes still hide and refuse
+`once` routines. The list gives only the `once` routines of the owner, so a client adds them to the
+released list. The update changes any schedule routine of the owner, so a client with the capability
+sends each routine update of an agent or a channel there. An agent routine carries `runIn` on these
+routes. Run, test and delete stay on the released routes, which take the id of a `once` routine.
+`src/main/team-api/route-routines-once.ts` owns the authorization, which is that of the released
+routes: a visible agent (else 404), and `manage` on it for a save (else 403); a channel that the member
+sees, on a host with `channel-chats-v1`. An unknown routine or a date that has passed gets 400.
+Without the capability the routes answer 400, and a client hides the `once` option for that host.
+
+The optional `routine-run-command-v1` capability (protocol 9 only) adds
+`POST /v1/admin/routines/run-command` (`agentId`, `routineId`). It answers `command`, the command that
+runs that routine from a script on the host, as Routines > Copy run command gives it on this computer.
+Only owners and admins can use it (else 403): the same people who turn on Local scripts for an agent.
+A member gets no shell access. The command reads the address and the token of the host's automation
+server from their files when it runs, so the token is not in the answer, and the command works only
+in a shell on the host. The host refuses an agent without Local scripts and a routine that is gone
+with 409 and the host's message. `src/main/team-api/route-routine-run-command.ts` owns it. Without the
+capability a client hides Copy run command for that host.
+
+The optional `claude-user-setup-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/claude-user-setup` and `POST /v1/admin/host/claude-user-setup/update`
+(`enabled`). They are "Use my Claude Code setup" of the host on the Claude page of Server Settings >
+Providers. On, the Claude agents of the server load the Claude Code setup of the host's user
+(`~/.claude` and `~/.agents/skills` on the host). Only owners and admins can use them (else 403). The
+routes carry only the switch, never a file of that setup. A change applies to the Claude processes
+that start after it, and the host sends the provider status event, so open settings pages read it
+again. `src/main/team-api/route-claude-user-setup.ts` owns them. Without the capability a client hides
+the switch for that host.
+
+The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
+`POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,
+`taskId`, `deliveryIds`). The list gives, in full, the waiting messages of each open side thread of
+the agent that has one, as the queue panel of a thread shows them on this computer. The released
+`agent-tasks-v1` list gives only the start of each message. The reorder route changes the order of
+the waiting messages of one thread. Cancel and Send now use the released queue routes of the agent,
+by delivery id. A member who can send the agent a message can use them: a visible agent (else 404)
+and `chat` on it (else 403). The host sends no preview URL of a file, because it is an address on the
+host. A stale order and an order with channel work get 409 and the host's message. A change sends the
+released `agent-tasks-changed` event. That event has no full queue, so a client reads the list again
+when the waiting messages of a thread change. `src/main/team-api/route-agent-thread-queue.ts` owns
+them. Without the capability a client shows the waiting messages of a thread without their actions.
+
+The optional `agent-usage-limit-v1` capability (protocol 9 only) adds `POST /v1/agent-usage-limit/list`
+(empty body) and `POST /v1/agent-usage-limit/switch` (`agentId`, `provider`, `model`,
+`reasoningEffort`, optional `providerAccountId`). The released `runtime-snapshot` event does not carry
+the usage limits. The list gives the agents whose queued message a provider usage limit holds, with the
+reset time, and the models and accounts that a usage limit or a provider error holds now. It leaves out
+a hidden agent, an agent that the member cannot see, and a model of a provider that the peer's protocol
+does not know. The switch route moves the agent to another model and sends the held message there, as
+the usage-limit card on the host's computer does. It needs a visible agent (else 404) and `manage` on it
+(else 403). A move to a named provider account that is not the agent's account needs an owner or admin
+(else 403). A change of a hold sends the released `runtime-snapshot` event, and the client then reads
+the list again; the desktop main process adds the list to the snapshot that it forwards.
+`src/main/team-api/route-agent-usage-limit.ts` owns them. Without the capability a client does not show
+the usage-limit card for that host. Only an owner or admin sees "Next time, switch without asking" on
+the card, because the backup models use `agent-backup-models-v1`.
+
+The optional `hermes-import-v1` capability (protocol 9 only) adds `POST /v1/hermes-import/read` (empty
+body), `POST /v1/hermes-import/apply` (`token`, `profiles` with `key` and `allow`) and
+`POST /v1/hermes-import/discard` (`token`). They import the Hermes Agent profiles of the Hermes folder
+of the host, as Import > Hermes does on this computer. The host reads only the folder that Hermes uses
+on the host: the client cannot name a folder (the wire codec drops a folder field). The read answers the
+profiles under a token, or `null` when the host has no Hermes profiles; a new read closes the earlier
+one. The answer shows the home folder of the host as `~` and carries no value from `.env` or
+`auth.json`. Only owners and admins can use the routes (else 403), because an import adds agents,
+skills and MCP servers to the whole server. A stale token gets 409 and the host's message.
+`src/main/team-api/route-hermes-import.ts` owns them. Without the capability a client shows no Hermes
+source for that host. The folder dialog stays on this computer: it shows the files of this computer,
+and the host cannot read them; to import Hermes from this computer to a server, export a `.zip` file.
+
+The optional `provider-detection-v1` capability (protocol 9 only) adds five routes under
+`/v1/admin/provider-detection/`: `settings` (empty body), `settings/update` (`enabled`, `addresses`,
+`folders`, `hiddenIds`), `scan-model-servers` (empty body), `scan-agents` (empty body) and
+`discover-models` (`baseUrl`, `apiKey`, `headers`, optional `savedProviderId`). They find the local
+model servers and the ACP agent commands of the host, as Server Settings > Providers does on this
+computer. The host makes each request from the host. A scan sends no key. A model list request can
+carry a key and headers towards the host; for a saved endpoint, the host uses its stored values only
+for the same origin. No answer carries a key or a header value. Only owners and admins can use the
+routes (else 403), because a model list request makes the host connect to an address that the client
+names, as a custom endpoint does. A refused entry gets 400. The client adds a found row with the
+released custom endpoint and custom agent routes, so it shows the rows only when it also manages
+those on the host. `src/main/team-api/route-provider-detection.ts` owns them. Without the capability a
+client shows no found rows for that host.
+
+The optional `channel-picture-v1` capability (protocol 9 only) adds `icon` and `imageUrl` to the
+channel side routes, `icon` to a `save` draft, and `/v1/channels/image?channelId=<id>`:
+`GET` with `&v=<version>` answers the image bytes of the current version (else 404), `PUT` with a raw
+PNG, JPEG, GIF or WebP body of at most 512 KiB sets the image, and `DELETE` removes it. `PUT` and
+`DELETE` answer the channel. Each request needs `channel-chats-v1` and a channel that the member sees
+(else 404); owners and admins see all channels. `src/main/team-api/route-channels.ts` owns the route.
+The host adds and reads these keys only for a request that advertises the capability, so released
+peers see the same `channels-v1` wire. The host's `imageUrl` is an
+`openbot-avatar://channel/<id>?v=&type=` URL. The desktop changes it to
+`openbot-remote-avatar://<server>/channel/<id>?v=`, the scheme of remote agent avatars, so the CSP does
+not change; the main process reads that URL with `GET /v1/channels/image`. The web client reads the
+bytes into a data URL. Over WebRTC, a `PUT` body and a `GET` answer go as file transfers, as for agent
+avatars. Without the capability a client hides the picture control for that host, and the channel
+shows its member faces.
+
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.

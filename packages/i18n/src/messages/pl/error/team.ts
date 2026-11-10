@@ -72,6 +72,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
   "error.team.chatColorsUnsupported": "To połączenie nie obsługuje kolorów czatu.",
   "error.team.routineRunPlaceUnsupported": "To połączenie nie może zmienić miejsca uruchamiania rutyny.",
+  "error.team.routinesOnceUnsupported": "To połączenie nie może zapisać jednorazowych rutyn.",
+  "error.team.routineRunCommandUnsupported": "To połączenie nie może podać polecenia uruchomienia rutyny.",
+  "error.team.threadQueueUnsupported": "To połączenie nie może pokazać kolejki wątku pobocznego.",
+  "error.team.usageLimitUnsupported": "To połączenie nie może pokazać ani zmienić limitów użycia agentów.",
+  "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
+  "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
@@ -85,6 +91,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "To połączenie nie obsługuje usuwania wiadomości.",
   "error.team.workspaceDirectoryUnsupported": "To połączenie nie obsługuje pokazywania folderów.",
   "error.team.conversationFileSearchUnsupported": "To połączenie nie obsługuje wyszukiwania plików.",
+  "error.team.threadMessageSearchUnsupported": "To połączenie nie obsługuje wyszukiwania w wątkach pobocznych.",
   "error.team.sideQuestionUnsupported": "To połączenie nie obsługuje pytań pobocznych.",
   "error.team.liveVoiceUnsupported":
     "Ten serwer nie obsługuje głosu na żywo Codex. Zaktualizuj OpenBot na komputerze, na którym działa.",
@@ -114,6 +121,7 @@ export const messages = {
   "error.team.skillLearningUnsupported": "To połączenie nie obsługuje uczenia się umiejętności.",
   "error.team.browsingMemoryUnsupported": "To połączenie nie obsługuje nauki z przeglądania.",
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
+  "error.team.claudeUserSetupUnsupported": "To połączenie nie obsługuje przełącznika konfiguracji Claude Code.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
   "error.team.attachmentNameRequired": "Wymagana jest bezpieczna nazwa załącznika.",
@@ -163,4 +171,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Ten adres nie pochodzi z tego logowania.",
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
+  "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
+  "error.team.queuedMessageThreadUnsupported":
+    "To połączenie nie obsługuje uruchamiania wiadomości z kolejki jako nowego wątku.",
+  "error.team.backgroundProcessesUnsupported": "To połączenie nie obsługuje procesów w tle.",
+  "error.team.providerUseUnsupported": "To połączenie nie obsługuje włączania i wyłączania dostawców.",
+  "error.team.providerUseInvalid": "Ten dostawca nie ma przełącznika włączania.",
 } as const satisfies PartialTranslation<typeof source>;

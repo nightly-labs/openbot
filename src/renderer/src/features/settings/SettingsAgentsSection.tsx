@@ -103,7 +103,7 @@ export function createSettingsAgentsSection(options: {
   function loadProcesses(): void {
     const current = ++processGeneration;
     settingsPort()
-      .backgroundProcesses.list()
+      .backgroundProcesses.list(LOCAL_SERVER_ID)
       .then((processes) => {
         if (current !== processGeneration) return;
         setState((draft) => {
@@ -125,7 +125,7 @@ export function createSettingsAgentsSection(options: {
       draft.stopping.push(id);
     });
     settingsPort()
-      .backgroundProcesses.stop(id)
+      .backgroundProcesses.stop(id, LOCAL_SERVER_ID)
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
         actionToast.error(errorMessage(error, t("settings.backgroundProcesses.stopFailed")), {

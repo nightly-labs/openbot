@@ -1563,12 +1563,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       provider,
       status: providerApiKeys.has(provider) ? "saved" : "missing",
     }),
-    getClaudeUserSetup: async () => clone(claudeUserSetup),
-    setClaudeUserSetup: async (enabled) => {
-      if (typeof enabled !== "boolean") throw new Error("Invalid Claude setup setting.");
-      claudeUserSetup = { enabled };
-      return clone(claudeUserSetup);
-    },
     providerRuntimes: mockProviderRuntimes.providerRuntimes,
     openUrl: async () => undefined,
     voice: mockVoice.voice,
@@ -1850,6 +1844,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       saveCustomProvider: (input) => api.customProviders.save(input),
       updateCustomProvider: (input) => api.customProviders.update(input),
       deleteCustomProvider: (input) => api.customProviders.delete(input),
+      // The preview host's switch is the one of this computer.
+      providerUse: async () => (agentStatus.providers ?? []).filter((row) => row.off).map((row) => row.id),
+      setProviderUse: async (input) =>
+        ((await api.setProviderOn(input)).providers ?? []).filter((row) => row.off).map((row) => row.id),
     },
     agentTemplates: {
       // One published template per local agent. The preview shows the agent's own identity with the
@@ -3472,6 +3470,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!server) throw new Error("Server not found");
         return server;
       },
+      rotateHostKey: async () => {
+        await mockTeam.host.rotateIdentityKey();
+      },
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
       ...createMockHostPersonality(),
@@ -3512,6 +3513,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isPromptCacheTtl(ttl)) throw new Error("Prompt cache time is required.");
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
+      },
+      // Preview has one host, so every server shares one switch.
+      getClaudeUserSetup: async () => clone(claudeUserSetup),
+      setClaudeUserSetup: async (enabled) => {
+        if (typeof enabled !== "boolean") throw new Error("Invalid Claude setup setting.");
+        claudeUserSetup = { enabled };
+        return clone(claudeUserSetup);
       },
       // Preview has one host, so every server shares one model list.
       getModelVisibility: async (provider) => modelVisibility(provider),

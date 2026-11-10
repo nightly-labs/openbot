@@ -12,7 +12,11 @@ import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { globalSearchChannels } from "./features/channels/global-search-channels";
-import { activeServerHasProviderSettings, serverCanAdminister } from "./features/servers/server-capabilities";
+import {
+  activeServerHasProviderSettings,
+  serverCanAdminister,
+  serverSupportsCapability,
+} from "./features/servers/server-capabilities";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
@@ -26,7 +30,7 @@ const FILE_SEARCH_LIMIT = 50;
 /**
  * What global search finds besides agents and messages: channels, routines, files, commands and
  * settings pages. Routines load each time the search opens, as no store keeps every agent's list.
- * Files come from this computer's database, so a joined server shows no Files filter.
+ * A joined server shows the Files filter only while its host serves `conversation-file-search-v1`.
  */
 export function useGlobalSearchSources(open: () => boolean) {
   const { t } = useText();
@@ -42,7 +46,10 @@ export function useGlobalSearchSources(open: () => boolean) {
   const [routinesLoading, setRoutinesLoading] = createSignal(false);
   let routineRequest = 0;
 
-  const local = () => activeServer()?.kind === "local";
+  const filesSearchable = () => {
+    const server = activeServer();
+    return server?.kind === "local" || serverSupportsCapability(server, "conversation-file-search-v1");
+  };
 
   // Lazy: the overlay reads these only while the search is open.
   const searchChannels = createMemo(
@@ -237,7 +244,7 @@ export function useGlobalSearchSources(open: () => boolean) {
     routines,
     routinesLoading,
     actions,
-    searchFiles: () => (local() ? searchFiles : undefined),
+    searchFiles: () => (filesSearchable() ? searchFiles : undefined),
     openChannel: (channelId: string) => void channels.open(channelId),
     selectRoutine,
   };

@@ -137,6 +137,7 @@ export const messages = {
     other: "يعمل · {count} نموذج",
   },
   "customProvider.detected.title": "تم العثور عليه على هذا الحاسوب",
+  "customProvider.detected.titleServer": "تم العثور عليه على الخادم",
   "customProvider.detected.scanning": "جارٍ البحث عن نماذج ووكلاء محليين.",
   "customProvider.detected.scanAgain": "الفحص مرة أخرى",
   "customProvider.detected.empty": "لم يعثر OpenBot على أي خادم نماذج محلي أو وكيل ACP.",
@@ -163,6 +164,8 @@ export const messages = {
   "customProvider.detection.enabled": "البحث عن نماذج ووكلاء محليين",
   "customProvider.detection.enabledDescription":
     "يتحقق OpenBot من العناوين الافتراضية لـ Ollama وLM Studio، ويبحث عن وكلاء ACP المعروفين في PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "يتحقق الخادم من العناوين الافتراضية لـ Ollama وLM Studio، ويبحث عن وكلاء ACP المعروفين في PATH الخاص به.",
   "customProvider.detection.addresses": "عناوين خوادم نماذج أخرى",
   "customProvider.detection.address.label": "العنوان {number}",
   "customProvider.detection.address.remove": "إزالة العنوان {number}",
@@ -182,6 +185,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "أحرف لاتينية صغيرة أو أرقام أو شرطات. لا يمكنك تغييره لاحقًا.",
   "customProvider.acp.command": "الأمر",
   "customProvider.acp.commandHint": "البرنامج المراد تشغيله. يبحث عنه OpenBot في PATH.",
+  "customProvider.acp.commandHintServer": "البرنامج الذي يتم تشغيله. يبحث عنه الخادم في PATH الخاص به.",
   "customProvider.acp.args": "الوسائط",
   "customProvider.acp.argsHint": "افصل بين الوسائط بمسافات. ضع علامات اقتباس حول الوسيطة التي تحتوي على مسافات.",
   "customProvider.acp.usagePrompt": "أمر الاستخدام",
@@ -211,6 +215,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "يعمل هذا الأمر على حاسوبك",
   "customProvider.acp.trustDescription":
     "يشغّله OpenBot بحساب المستخدم الخاص بك. يمكن للوكيل قراءة الملفات وتغييرها وتشغيل الأوامر. أضف فقط وكيلًا تثق به.",
+  "customProvider.acp.hostTrustTitle": "يعمل هذا الأمر على الخادم",
+  "customProvider.acp.hostTrustDescription":
+    "يشغّله OpenBot بحساب المستخدم الخاص بالخادم. يمكن للوكيل قراءة الملفات على الخادم وتغييرها وتشغيل الأوامر هناك. أضف فقط وكيلًا تثق به.",
   "customProvider.acp.submit": "إضافة الوكيل",
   "customProvider.acp.editTitle": "تعديل وكيل ACP مخصص",
   "customProvider.acp.submitEdit": "حفظ الوكيل",
@@ -227,6 +234,7 @@ export const messages = {
     "استخدم أحرفًا لاتينية صغيرة أو أرقامًا أو شرطات، على أن يبدأ بحرف أو رقم. استخدم 40 حرفًا كحد أقصى.",
   "customProvider.agents.title": "الوكلاء المخصصون",
   "customProvider.agents.description": "وكلاء ACP التي يشغّلها OpenBot على هذا الحاسوب.",
+  "customProvider.agents.hostDescription": "وكلاء ACP التي يشغّلها OpenBot على حاسوب الخادم.",
   "customProvider.agents.empty": "لا وكلاء مخصصين بعد.",
   "customProvider.agents.add": "إضافة وكيل",
   "customProvider.agents.restart": "إعادة تشغيل الوكلاء",

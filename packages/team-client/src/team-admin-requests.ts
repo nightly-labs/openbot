@@ -11,6 +11,7 @@ import {
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
   type AnswerWhatsAppRequestInput,
+  type BackgroundProcess,
   type BrowseAgentFoldersInput,
   type ChatColors,
   type DiscordAccess,
@@ -62,6 +63,10 @@ import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidd
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import {
+  BACKGROUND_PROCESSES_ROUTES,
+  decodeBackgroundProcessesResponse,
+} from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
@@ -315,6 +320,7 @@ import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provi
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { decodeProviderUseResponse, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
 import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/providers-v3";
@@ -339,6 +345,13 @@ import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/w
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
 import { bytesToBase64 } from "./base64";
+import {
+  isOnceSchedule,
+  listOnceEventRoutines,
+  type RoutinesOncePost,
+  routinesOnceUnsupported,
+  saveOnceEventRoutine,
+} from "./routines-once";
 import { type TeamApiRequest, withRoutineRunPlaces } from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
@@ -509,13 +522,29 @@ export function getEventStatus(request: TeamApiRequest): Effect.Effect<EventStat
 
 /**
  * With `recovery`, for a host with `routine-recovery-v1`, the routines carry `missedPolicy`. With
- * `runPlaces`, for a host with `routine-run-place-v1`, the routines of an agent carry `runIn`.
+ * `runPlaces`, for a host with `routine-run-place-v1`, the routines of an agent carry `runIn`. With
+ * `once`, for a host with `routines-once-v1`, the list adds the `once` routines of the owner.
  */
 export function listEventRoutines(
   request: TeamApiRequest,
   input: ListEventRoutinesInput,
   recovery = false,
   runPlaces = false,
+  once = false,
+): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
+  const routines = listReleasedEventRoutines(request, input, recovery, runPlaces);
+  if (!once) return routines;
+  const onceRoutines = adminCall(() => listOnceEventRoutines(onceSend(request), input.owner));
+  return Effect.all([routines, onceRoutines], { concurrency: "unbounded" }).pipe(
+    Effect.map(([released, extra]) => [...released, ...extra]),
+  );
+}
+
+function listReleasedEventRoutines(
+  request: TeamApiRequest,
+  input: ListEventRoutinesInput,
+  recovery: boolean,
+  runPlaces: boolean,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines;
   const routines = adminCall(() => request("POST", path, decodeEventRoutines, eventBody(input)));
@@ -529,17 +558,40 @@ export function listEventRoutines(
   );
 }
 
+function onceSend(request: TeamApiRequest): RoutinesOncePost {
+  return (path, decode, body) => request("POST", path, decode, body);
+}
+
 /**
  * The result has the new signing secret only when the routine became a webhook routine. With
  * `recovery`, for a host with `routine-recovery-v1`, the host saves `missedPolicy`. With `runPlaces`,
  * for a host with `routine-run-place-v1`, the place of an agent routine goes on its own route after
- * the save.
+ * the save. With `once`, for a host with `routines-once-v1`, a `once` schedule, and a new schedule for
+ * a `once` routine, go to the routes of that capability.
  */
 export function saveEventRoutine(
   request: TeamApiRequest,
   input: SaveEventRoutineInput,
   recovery = false,
   runPlaces = false,
+  once = false,
+): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
+  const released = saveReleasedEventRoutine(request, input, recovery, runPlaces);
+  const schedule = input.trigger.kind === "schedule" ? input.trigger.schedule : undefined;
+  if (!once) {
+    if (isOnceSchedule(schedule)) return Effect.fail(new TeamAdminRequestError({ cause: routinesOnceUnsupported() }));
+    return released;
+  }
+  return adminCall(() => saveOnceEventRoutine(onceSend(request), input)).pipe(
+    Effect.flatMap((saved) => (saved === null ? released : Effect.succeed(saved))),
+  );
+}
+
+function saveReleasedEventRoutine(
+  request: TeamApiRequest,
+  input: SaveEventRoutineInput,
+  recovery: boolean,
+  runPlaces: boolean,
 ): Effect.Effect<SaveEventRoutineResult, TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.saveRoutine : EVENTS_ROUTES.saveRoutine;
   const saved = adminCall(() => request("POST", path, decodeSaveEventRoutineResult, eventBody(input)));
@@ -1146,6 +1198,21 @@ export function clearStorage(
   return adminCall(() => request("POST", STORAGE_ROUTES.clear, ignoreResponse, { ...input }));
 }
 
+/** The programs that agents left running on the host. Send it only to a host with `background-processes-v1`. */
+export function listHostBackgroundProcesses(
+  request: TeamApiRequest,
+): Effect.Effect<BackgroundProcess[] | null, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BACKGROUND_PROCESSES_ROUTES.list, decodeBackgroundProcessesResponse, {}));
+}
+
+/** Stops one program that an agent left running on the host. */
+export function stopHostBackgroundProcess(
+  request: TeamApiRequest,
+  id: string,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BACKGROUND_PROCESSES_ROUTES.stop, ignoreResponse, { id }));
+}
+
 function decodeHostedSiteList(value: unknown): HostedSiteList {
   const list = parseHostedSiteList(value);
   if (!list) throw new Error("The host returned an invalid site list.");
@@ -1324,6 +1391,20 @@ export function signOutProvider(
   provider: AgentProviderId,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_SIGN_OUT_ROUTES.signOut, ignoreResponse, { provider }));
+}
+
+/** The built-in providers that the host has off (`provider-use-v1`). */
+export function getProviderUse(request: TeamApiRequest): Effect.Effect<AgentProviderId[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_USE_ROUTES.list, decodeProviderUseResponse, {}));
+}
+
+/** Turns one built-in provider of the host off or on, and answers the off providers after it. */
+export function setProviderUse(
+  request: TeamApiRequest,
+  provider: AgentProviderId,
+  on: boolean,
+): Effect.Effect<AgentProviderId[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_USE_ROUTES.set, decodeProviderUseResponse, { provider, on }));
 }
 
 /** Moves the agent to an account of its provider; null is the provider's own sign-in. */

@@ -24,7 +24,7 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
       exportError={store.state.exportError}
       onExport={(options) => store.exportFile(options)}
       historyAvailable={props.history}
-      onShowExport={() => store.showExport()}
+      onShowExport={store.showExport}
       onExportAgain={() => store.exportAgain()}
       importPhase={store.state.importPhase}
       preview={store.state.preview}

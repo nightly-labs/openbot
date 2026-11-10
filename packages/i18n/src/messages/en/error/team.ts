@@ -72,6 +72,12 @@ export const messages = defineMessages("error.team", {
   "error.team.agentColorsUnsupported": "Agent colors are not supported by this connection.",
   "error.team.chatColorsUnsupported": "Chat colors are not supported by this connection.",
   "error.team.routineRunPlaceUnsupported": "This connection cannot change where a routine runs.",
+  "error.team.routinesOnceUnsupported": "This connection cannot save routines that run once.",
+  "error.team.routineRunCommandUnsupported": "This connection cannot give the run command of a routine.",
+  "error.team.threadQueueUnsupported": "This connection cannot show the queue of a side thread.",
+  "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
+  "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
+  "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
@@ -85,6 +91,7 @@ export const messages = defineMessages("error.team", {
   "error.team.messageDeleteUnsupported": "Deleting messages is not supported by this connection.",
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
   "error.team.conversationFileSearchUnsupported": "Searching files is not supported by this connection.",
+  "error.team.threadMessageSearchUnsupported": "Searching side threads is not supported by this connection.",
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
   "error.team.liveVoiceUnsupported":
     "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
@@ -114,6 +121,7 @@ export const messages = defineMessages("error.team", {
   "error.team.skillLearningUnsupported": "Skill learning is not supported by this connection.",
   "error.team.browsingMemoryUnsupported": "Learning from browsing is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
+  "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
   "error.team.agentAccessUnsupported": "Roles are not supported by this connection.",
@@ -169,4 +177,10 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayMismatch": "This address is not from this sign-in.",
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
+  "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Running a queued message as a new thread is not supported by this connection.",
+  "error.team.backgroundProcessesUnsupported": "Background processes are not supported by this connection.",
+  "error.team.providerUseUnsupported": "Turning providers on and off is not supported by this connection.",
+  "error.team.providerUseInvalid": "This provider does not have an on/off switch.",
 });

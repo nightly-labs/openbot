@@ -383,7 +383,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Zmieniono klucz serwera",
   "server.settings.hostKeyChanged": "Ostatnia zmiana",
   "server.settings.hostKeyChangedDescription": "{date}. Poprzedni i nowy klucz podpisały tę zmianę.",
-  "server.settings.hostKeyLocalOnly": "Tutaj klucz może zmienić tylko serwer na tym komputerze.",
+  "server.settings.hostKeyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
   "server.settings.removeTitle": "Usuń serwer",
   "server.settings.removeDescription":
     "Usuń ten serwer z usługi kont dla wszystkich członków. Użyj tej opcji, gdy jego komputer nie jest już dostępny.",

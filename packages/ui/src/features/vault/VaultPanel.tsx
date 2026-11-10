@@ -103,7 +103,7 @@ export interface VaultPanelProps {
    * keys: the dialog does not offer them.
    */
   onCodes?: (() => Promise<VaultTwoStepCodes>) | undefined;
-  /** Opens the file dialog. Null when the user closes it. Absent for a joined server: no import. */
+  /** Opens the file dialog. Null when the user closes it. Absent for a host without CSV import. */
   onImportCsv?: (() => Promise<VaultImportResult>) | undefined;
   /** Deletes the Vault file that cannot be read, and starts again with no items. */
   onReset: () => Promise<void>;

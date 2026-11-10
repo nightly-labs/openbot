@@ -29,6 +29,7 @@ import type {
   AgentFolderChange,
   AgentMemory,
   AgentNewChatSettings,
+  AgentProviderId,
   AgentStatus,
   AgentSummary,
   AgentTaskReadState,
@@ -70,6 +71,9 @@ import {
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
@@ -83,6 +87,8 @@ export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
+export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
+export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
@@ -204,6 +210,11 @@ export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
 /** The `provider-accounts-v1` list, as the web client also reads it: an unknown provider is left out. */
 export function decodeHostProviderAccountsFromHost(value: unknown): HostProviderAccounts {
   return decodeHostProviderAccounts(value);
+}
+
+/** The `provider-use-v1` off list, as the web client also reads it: an unknown provider is left out. */
+export function decodeProviderUseFromHost(value: unknown): AgentProviderId[] {
+  return decodeProviderUseResponse(value);
 }
 
 /**

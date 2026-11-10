@@ -1,5 +1,5 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import type { AgentStatus, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
+import type { AccountUsage, AgentStatus, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
 import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   createFirstAgentDraft,
@@ -30,6 +30,13 @@ export function WebAgentSettings(props: {
    */
   liveModels?: ClientAgentModelOption[] | undefined;
   liveStatus?: AgentStatus | undefined;
+  /**
+   * The picker can choose a provider account (`provider-accounts-v1`). The host gives its accounts only
+   * to an owner or admin, so `liveStatus` must carry them.
+   */
+  accountChoice?: boolean | undefined;
+  /** The plan readings that mark the spent models of each account in the picker. */
+  accountUsage?: AccountUsage | null | undefined;
   /** The draft the form starts from. */
   initialDraft?: FirstAgentDraft;
   onDraftChange?: (draft: FirstAgentDraft) => void;
@@ -151,6 +158,9 @@ export function WebAgentSettings(props: {
               provider: selectedModel.provider,
               model: selectedModel.id,
               ...(value.reasoningEffort ? { reasoningEffort: value.reasoningEffort } : {}),
+              ...(props.accountChoice && value.providerAccountId !== undefined
+                ? { providerAccountId: value.providerAccountId }
+                : {}),
             }
           : {}),
       });
@@ -181,6 +191,8 @@ export function WebAgentSettings(props: {
       error={state.error}
       modelOptions={supportsModelSelection() && state.models.length > 0 ? state.models : undefined}
       agentStatus={state.status ?? undefined}
+      accountChoice={props.accountChoice}
+      accountUsage={props.accountUsage}
       customProviders={props.customProviders}
       onManageProviders={props.onManageProviders}
       onChange={(value) => {
@@ -188,7 +200,8 @@ export function WebAgentSettings(props: {
           if (
             value.provider !== draft.draft.provider ||
             value.model !== draft.draft.model ||
-            value.reasoningEffort !== draft.draft.reasoningEffort
+            value.reasoningEffort !== draft.draft.reasoningEffort ||
+            value.providerAccountId !== draft.draft.providerAccountId
           )
             draft.modelTouched = true;
           draft.draft = value;

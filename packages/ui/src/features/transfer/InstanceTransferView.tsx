@@ -56,7 +56,8 @@ export interface InstanceTransferViewProps {
   onExport: (options: InstanceExportOptions) => void;
   /** The server can put the chat history in the file. */
   historyAvailable?: boolean | undefined;
-  onShowExport: () => void;
+  /** Shows the saved file in its folder. Absent in a browser, which saves to its own download folder. */
+  onShowExport?: (() => void) | undefined;
   onExportAgain: () => void;
   importPhase: InstanceImportPhase;
   preview: InstanceTransferPreview | null;
@@ -259,7 +260,12 @@ function ExportScreen(props: InstanceTransferViewProps) {
   );
 }
 
-function ExportSaved(props: { fileName: string | null; warnings: string[]; onShow: () => void; onAgain: () => void }) {
+function ExportSaved(props: {
+  fileName: string | null;
+  warnings: string[];
+  onShow: (() => void) | undefined;
+  onAgain: () => void;
+}) {
   const { t } = useText();
   return (
     <>
@@ -294,10 +300,14 @@ function ExportSaved(props: { fileName: string | null; warnings: string[]; onSho
         </li>
       </ol>
       <div class="agent-import-actions instance-transfer-start">
-        <Button type="button" variant="secondary" onClick={() => props.onShow()}>
-          <FolderOpen class="files-button-icon" aria-hidden="true" />
-          {t("settings.transfer.export.show")}
-        </Button>
+        <Show when={props.onShow}>
+          {(show) => (
+            <Button type="button" variant="secondary" onClick={() => show()()}>
+              <FolderOpen class="files-button-icon" aria-hidden="true" />
+              {t("settings.transfer.export.show")}
+            </Button>
+          )}
+        </Show>
         <Button type="button" variant="ghost" onClick={() => props.onAgain()}>
           {t("settings.transfer.export.again")}
         </Button>

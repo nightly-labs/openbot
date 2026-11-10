@@ -868,12 +868,15 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
-    ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
+    ...backgroundProcessIpcHandlers({
+      platform: process.platform,
+      agents: () => service.listAgents(),
+      remoteServers,
+    }),
     ...providerIpcHandlers({
       service,
       providerRuntimes,
       credentials: providerCredentials,
-      claudeUserSetup,
       openLink,
     }),
     ...voiceIpcHandlers({
@@ -912,9 +915,13 @@ function registerIpcHandlers({
     ...hostedServerIpcHandlers({ hostedServers }),
     ...localServerIpcHandlers({ localServers }),
     ...customProviderIpcHandlers(customProviderChanges),
-    ...customAgentIpcHandlers(customAgentChanges),
+    ...customAgentIpcHandlers({ changes: customAgentChanges, remoteServers }),
     ...acpRegistryIpcHandlers(acpRegistry, remoteServers),
-    ...providerDetectionIpcHandlers({ detection: providerDetection, settings: providerDetectionSettings }),
+    ...providerDetectionIpcHandlers({
+      detection: providerDetection,
+      settings: providerDetectionSettings,
+      remoteServers,
+    }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
@@ -960,7 +967,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
-    ...routineResultIpcHandlers({ routineResults }),
+    ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...agentAdminIpcHandlers({
@@ -983,6 +990,7 @@ function registerIpcHandlers({
       browsingMemory,
       machineAlerts,
       promptCacheTtl,
+      claudeUserSetup,
       modelVisibility,
       agentAccess,
       serverAudit,

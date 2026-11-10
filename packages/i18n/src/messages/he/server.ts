@@ -422,7 +422,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "מפתח השרת הוחלף",
   "server.settings.hostKeyChanged": "השינוי האחרון",
   "server.settings.hostKeyChangedDescription": "{date}. המפתח הקודם והמפתח החדש חתמו שניהם על השינוי הזה.",
-  "server.settings.hostKeyLocalOnly": "רק השרת שבמחשב הזה יכול להחליף כאן את המפתח שלו.",
+  "server.settings.hostKeyOwnerOnly": "רק הבעלים יכול להחליף את מפתח השרת.",
   "server.settings.removeTitle": "הסרת השרת",
   "server.settings.removeDescription": "הסרת השרת הזה משירות החשבונות עבור כל החברים. מתאים כשהמחשב שלו כבר אינו זמין.",
   "server.settings.removeConfirmTitle": "להסיר את {name}?",

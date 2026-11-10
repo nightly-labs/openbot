@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY, type RoutineCalendarOwner } from "@openbot/contracts/ipc";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import { type TeamApiRequest, TeamRequestError, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
@@ -18,7 +19,10 @@ export function webScheduleSource(
     Effect.tryPromise({ try: operation, catch: (cause) => new TeamRequestError({ cause }) });
 
   function source(serverId: string): RoutineCalendarSource<TeamRequestError> {
-    const agentRoutines = teamAgentRoutinesApi(hostRequest(serverId));
+    // A `once` routine is on the calendar too when the host lists it.
+    const agentRoutines = teamAgentRoutinesApi(hostRequest(serverId), undefined, () =>
+      workspace.state.capabilities.includes(ROUTINES_ONCE_CAPABILITY),
+    );
     const channels = workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY)
       ? workspace.runtime.channels
       : undefined;

@@ -73,6 +73,12 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Это подключение не поддерживает цвета агентов.",
   "error.team.chatColorsUnsupported": "Это подключение не поддерживает цвета чата.",
   "error.team.routineRunPlaceUnsupported": "Это подключение не может изменить, где выполняется регулярная задача.",
+  "error.team.routinesOnceUnsupported": "Это подключение не может сохранить однократные регулярные задачи.",
+  "error.team.routineRunCommandUnsupported": "Это подключение не может выдать команду запуска регулярной задачи.",
+  "error.team.threadQueueUnsupported": "Это подключение не может показать очередь побочной ветки.",
+  "error.team.usageLimitUnsupported": "Это подключение не может показать или изменить лимиты использования агентов.",
+  "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
+  "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
@@ -86,6 +92,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Это подключение не поддерживает удаление сообщений.",
   "error.team.workspaceDirectoryUnsupported": "Это подключение не поддерживает показ папок.",
   "error.team.conversationFileSearchUnsupported": "Это подключение не поддерживает поиск файлов.",
+  "error.team.threadMessageSearchUnsupported": "Это подключение не поддерживает поиск в побочных ветках.",
   "error.team.sideQuestionUnsupported": "Это подключение не поддерживает побочные вопросы.",
   "error.team.liveVoiceUnsupported":
     "Этот сервер не поддерживает живой голос Codex. Обновите OpenBot на компьютере, где он работает.",
@@ -115,6 +122,7 @@ export const messages = {
   "error.team.skillLearningUnsupported": "Это подключение не поддерживает обучение навыкам.",
   "error.team.browsingMemoryUnsupported": "Это подключение не поддерживает обучение на браузинге.",
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
+  "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",
@@ -163,4 +171,10 @@ export const messages = {
   "error.team.signInRelayMismatch": "Этот адрес не относится к этому входу.",
   "error.team.signInRelayLinkUnknown": "Ни один агент на этом сервере не показывал эту ссылку для входа.",
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
+  "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Это подключение не поддерживает запуск сообщения из очереди в новой ветке.",
+  "error.team.backgroundProcessesUnsupported": "Это подключение не поддерживает фоновые процессы.",
+  "error.team.providerUseUnsupported": "Это подключение не поддерживает включение и выключение провайдеров.",
+  "error.team.providerUseInvalid": "У этого провайдера нет переключателя включения.",
 } as const satisfies PartialTranslation<typeof source>;

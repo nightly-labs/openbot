@@ -25,6 +25,8 @@ import { useChannels } from "./channels-context";
 export interface ChannelRoutineHost {
   /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
   localHost: () => boolean;
+  /** The host saves the routines that run once: this computer, or a joined host with `routines-once-v1`. */
+  onceSchedule: () => boolean;
   /** The desktop server whose event API this window may manage: owner, admin or this computer. */
   eventsServerId: () => string | undefined;
   /** Whether the `eventsServerId` host has `routine-recovery-v1`. */
@@ -195,7 +197,12 @@ export function ChannelSettingsPane(
   // subscription each time a message arrives.
   const memoriesPort = createMemo(() => channelMemoriesPort(props.channelId, channelName(), runtime().agent));
   const routinesPort = createMemo(() => {
-    const legacy = channelRoutinesPort(props.channelId, runtime().agent, props.routines.localHost());
+    const legacy = channelRoutinesPort(
+      props.channelId,
+      runtime().agent,
+      props.routines.localHost(),
+      props.routines.onceSchedule(),
+    );
     const serverId = props.routines.eventsServerId();
     const eventApi =
       runtime().eventRoutines ??

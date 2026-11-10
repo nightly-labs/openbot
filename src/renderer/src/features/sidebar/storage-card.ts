@@ -5,7 +5,7 @@ import { createMemo, createSignal, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { canManageStorage, hostedPlanStorageGb, planDisk } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
-import { sidebarPort } from "./sidebar-port";
+import { type SidebarCardsPort, sidebarPort } from "./sidebar-port";
 
 const GB = 1024 ** 3;
 
@@ -85,7 +85,7 @@ function clearUpgradeOffered(serverId: string): void {
  * because only they can free up space. A remote host without `storage-disk-v1` shows no card.
  * A hosted server shows its plan storage, not its disk.
  */
-export function createStorageCard(server: () => ServerSummary | undefined) {
+export function createStorageCard(server: () => ServerSummary | undefined, port: () => SidebarCardsPort = sidebarPort) {
   const [disk, setDisk] = createSignal<{ serverId: string; disk: StorageDisk } | null>(null);
   const storageGb = createMemo(() => hostedPlanStorageGb(server()));
   /** Changes on each close, so the card reads the saved choice again. */
@@ -98,7 +98,7 @@ export function createStorageCard(server: () => ServerSummary | undefined) {
   });
 
   function refresh(serverId: string): void {
-    sidebarPort()
+    port()
       .storage.getDisk(serverId)
       .then(
         (answer) => {

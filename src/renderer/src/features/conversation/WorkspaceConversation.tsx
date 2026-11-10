@@ -64,7 +64,7 @@ import {
   desktopAgentMessageDeleteAccess,
   readerCanDeleteMessage,
 } from "./message-delete-access";
-import { trackUsageLimitShown, useUsageLimitAsk } from "./usage-limit-ask";
+import { trackUsageLimitShown, usageLimitAskFrom } from "./usage-limit-ask";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -159,6 +159,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     stopActiveTurn,
     usageLimits,
     usageLimitedModels,
+    waitedUsageLimits,
+    setWaitedUsageLimits,
     failedModels,
     queues,
   } = useTurns();
@@ -486,12 +488,29 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return (messages ?? []).findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;
   });
   /**
-   * A usage limit holds the active agent's queued message on this computer. The chat asks where to
-   * send it, unless the agent switches by itself to a saved backup model that is ready.
+   * A usage limit holds the active agent's queued message. The chat asks where to send it, unless the
+   * agent switches by itself to a saved backup model that is ready. The usage limits of a joined
+   * server's agents come from its host (`agent-usage-limit-v1`).
    */
-  const usageLimitAskFor = useUsageLimitAsk();
+  const usageLimitsShown = () => serverSupportsCapability(activeServer(), "agent-usage-limit-v1");
+  const usageLimitAskFor = usageLimitAskFrom({
+    // On a joined server, the same levels decide Delete of any message: an owner or admin, or a member
+    // with manage access to the agent.
+    available: (agentId) =>
+      usageLimitsShown() && (activeServer()?.kind !== "remote" || deletesAnyAgentMessage(agentId)),
+    // On a joined server, only an owner or admin saves the backup models of an agent.
+    rememberable: () => serverCanAdminister(activeServer(), "agent-backup-models-v1"),
+    usageLimits,
+    waited: waitedUsageLimits,
+    wait: (agentId, resetsAt) => setWaitedUsageLimits((current) => ({ ...current, [agentId]: resetsAt })),
+    modelOptions,
+    providers: () => agentStatus().providers,
+    limited: usageLimited,
+    update: updateConversationAgent,
+  });
   const usageLimitAsk = createMemo((): UsageLimitAskCardProps | undefined => {
-    const agent = activeAgent();
+    // A joined server's agent has its backup models from the host, when the reader can read them.
+    const agent = conversationAgent();
     if (!agent || !queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
     return usageLimitAskFor(agent);
   });
@@ -598,8 +617,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         promptUiBlock={activePromptUiBlock()}
         approval={activeApproval()}
         usageLimitAsk={usageLimitAsk()}
-        usageLimited={activeServer()?.kind === "local" ? usageLimited : undefined}
-        providerFailed={activeServer()?.kind === "local" ? providerFailed : undefined}
+        usageLimited={usageLimitsShown() ? usageLimited : undefined}
+        providerFailed={usageLimitsShown() ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}

@@ -19,6 +19,8 @@ export interface FilesPort {
     >;
   /** The machine alert settings, beside `storage.getMachineMetrics`. */
   hostAdmin?: Pick<OpenBotDesktopApi["hostAdmin"], "getMachineAlerts" | "setMachineAlerts">;
+  /** The programs that agents left running on a joined server. A client without these calls hides them. */
+  backgroundProcesses?: Pick<OpenBotDesktopApi["backgroundProcesses"], "list" | "stop">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

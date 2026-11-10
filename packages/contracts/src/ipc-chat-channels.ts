@@ -83,8 +83,8 @@ export interface ChannelDraft {
    */
   isolated?: boolean;
   /**
-   * Absent keeps the stored icon, and null removes it. The host keeps it. The Team API carries it
-   * only to a client with `channel-picture-v1` (the phone); a joined desktop shows the member faces.
+   * Absent keeps the stored icon, and null removes it. The Team API channel codecs carry it only
+   * between peers with `channel-picture-v1`; other peers show the member faces.
    */
   icon?: ChannelIcon | null;
 }
@@ -94,7 +94,11 @@ export interface Channel extends ChannelDraft {
   archived: boolean;
   revision: number;
   createdAt: string;
-  /** An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. */
+  /**
+   * An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. A
+   * joined server sends the host's URL with `channel-picture-v1`; the desktop changes it to an
+   * `openbot-remote-avatar://<server>/channel/` URL, and the web client to a data URL.
+   */
   imageUrl?: string | null;
 }
 

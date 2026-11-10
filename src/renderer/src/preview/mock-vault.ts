@@ -100,27 +100,28 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
     twoStepKeys.clear();
     return change([]);
   };
+  const importCsv = async () => {
+    const id = `mock-${nextId++}`;
+    const item = summary(
+      {
+        kind: "login",
+        id: null,
+        website: "example.com",
+        username: "user@example.com",
+        notes: "",
+        password: "imported",
+      },
+      id,
+    );
+    return { imported: 1, skipped: 0, state: change([...state.items, item]) };
+  };
   return {
     list: async () => state,
     save,
     delete: remove,
     reveal,
     copy: async () => undefined,
-    importCsv: async () => {
-      const id = `mock-${nextId++}`;
-      const item = summary(
-        {
-          kind: "login",
-          id: null,
-          website: "example.com",
-          username: "user@example.com",
-          notes: "",
-          password: "imported",
-        },
-        id,
-      );
-      return { imported: 1, skipped: 0, state: change([...state.items, item]) };
-    },
+    importCsv,
     reset,
     codes,
     hostList: async () => state,
@@ -130,6 +131,7 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
     hostCopy: async () => undefined,
     hostReset: () => reset(),
     hostCodes: () => codes(),
+    hostImportCsv: () => importCsv(),
     onChanged: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -268,18 +268,26 @@ try {
   );
 
   await page.evaluate(
-    ({ id, command, marker }) =>
-      window.openbot.customAgents.save({
-        id,
-        name: `Agent ${marker}`,
-        command,
-        args: [`--token=${marker}arg`],
-        env: [{ name: "FAKE_TOKEN", value: `${marker}token` }],
-        usagePrompt: null,
-      }),
-    { id: customAgentId, command: fakeAgentPath, marker: MARKER },
+    ({ id, command, marker, server }) =>
+      window.openbot.customAgents.save(
+        {
+          id,
+          name: `Agent ${marker}`,
+          command,
+          args: [`--token=${marker}arg`],
+          env: [{ name: "FAKE_TOKEN", value: `${marker}token` }],
+          usagePrompt: null,
+        },
+        server,
+      ),
+    { id: customAgentId, command: fakeAgentPath, marker: MARKER, server: LOCAL_SERVER_ID },
   );
-  cleanup.push(() => page.evaluate((id) => window.openbot.customAgents.delete({ id }), customAgentId));
+  cleanup.push(() =>
+    page.evaluate(({ id, server }) => window.openbot.customAgents.delete({ id }, server), {
+      id: customAgentId,
+      server: LOCAL_SERVER_ID,
+    }),
+  );
 
   // A saved custom agent restarts the provider. Until the restarted process has listed its models,
   // the host refuses the model with "listed no models"; that refusal is the state to wait out.

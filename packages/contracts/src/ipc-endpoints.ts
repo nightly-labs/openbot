@@ -887,12 +887,6 @@ export const IPC_ENDPOINTS = {
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
-    /**
-     * Whether the Claude agents of this computer load the user's own Claude Code setup. This computer
-     * only: a joined server has no route for it.
-     */
-    getClaudeUserSetup: request<undefined, ClaudeUserSetupSetting>()("app:get-claude-user-setup"),
-    setClaudeUserSetup: request<boolean, ClaudeUserSetupSetting>()("app:set-claude-user-setup"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
@@ -1059,11 +1053,13 @@ export const IPC_ENDPOINTS = {
     /** Sends one harmless Apple Event to each app, so macOS shows its Automation prompts now. */
     request: request<readonly MacAutomationTarget[], MacAutomationResult[]>()("mac-automation:request"),
   },
-  // The programs that agents left running on this computer. `list` answers null where OpenBot cannot
-  // find them (Windows). `stop` takes the id of one, and ends it with its children.
+  // The programs that agents left running on the named server: this computer, or a joined server
+  // with `background-processes-v1`. `list` answers null where OpenBot cannot find them (Windows). `stop`
+  // takes the id of one, and ends it with its children. The server is required, so Settings on this
+  // computer does not follow the selected server.
   backgroundProcesses: {
-    list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
-    stop: request<string, void>()("background-processes:stop"),
+    list: scopedQuery<BackgroundProcess[] | null, "required">()("background-processes:list"),
+    stop: scopedRequest<string, void, "required">()("background-processes:stop"),
   },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),
@@ -1096,13 +1092,20 @@ export const IPC_ENDPOINTS = {
   },
   // Local model servers and ACP agents on this computer. Main makes every request, and a scan sends
   // no key. A joined host is never scanned.
+  // The computer that runs the agents of a server looks: this one, or a joined server's host for an
+  // owner or admin (`provider-detection-v1`). The server is required, so a scan never follows the
+  // selected server by mistake.
   providerDetection: {
-    scanModelServers: request<undefined, DetectedModelServer[]>()("provider-detection:scan-model-servers"),
-    discoverModels: request<DiscoverModelsInput, DiscoverModelsResult>()("provider-detection:discover-models"),
-    getSettings: request<undefined, ProviderDetectionSettings>()("provider-detection:get-settings"),
-    setSettings: request<ProviderDetectionSettings, ProviderDetectionSettings>()("provider-detection:set-settings"),
+    scanModelServers: scopedQuery<DetectedModelServer[], "required">()("provider-detection:scan-model-servers"),
+    discoverModels: scopedRequest<DiscoverModelsInput, DiscoverModelsResult, "required">()(
+      "provider-detection:discover-models",
+    ),
+    getSettings: scopedQuery<ProviderDetectionSettings, "required">()("provider-detection:get-settings"),
+    setSettings: scopedRequest<ProviderDetectionSettings, ProviderDetectionSettings, "required">()(
+      "provider-detection:set-settings",
+    ),
     // Looks for known agent command names only. It starts no file.
-    scanAgents: request<undefined, DetectedAcpAgent[]>()("provider-detection:scan-agents"),
+    scanAgents: scopedQuery<DetectedAcpAgent[], "required">()("provider-detection:scan-agents"),
   },
   // The user's own ACP agents, on this computer only: no Team API route and no `providerAdmin` entry.
   // Environment values travel only towards main.
@@ -1114,10 +1117,13 @@ export const IPC_ENDPOINTS = {
     cancel: scopedRequest<string, void>()("acp-registry:cancel"),
     remove: scopedRequest<string, void>()("acp-registry:remove"),
   },
+  // The server is required: this computer's list must not follow a server switch. A joined server's
+  // owner or admin reaches the host's agents through `custom-agents-v1`. That contract has no trial
+  // start and no usage answers, so `check` and `usage` reach this computer only.
   customAgents: {
-    list: request<undefined, CustomAgentSummary[]>()("custom-agents:list"),
-    save: request<SaveCustomAgentInput, CustomAgentResult>()("custom-agents:save"),
-    delete: request<DeleteCustomAgentInput, CustomAgentResult>()("custom-agents:delete"),
+    list: scopedQuery<CustomAgentSummary[], "required">()("custom-agents:list"),
+    save: scopedRequest<SaveCustomAgentInput, CustomAgentResult, "required">()("custom-agents:save"),
+    delete: scopedRequest<DeleteCustomAgentInput, CustomAgentResult, "required">()("custom-agents:delete"),
     check: request<CheckCustomAgentInput, CustomAgentCheckResult>()("custom-agents:check"),
     // The answers of the agents that have a usage prompt. An agent with no answer is not listed.
     usage: request<undefined, CustomAgentUsage[]>()("custom-agents:usage"),
@@ -1209,6 +1215,12 @@ export const IPC_ENDPOINTS = {
     ),
     deleteCustomProvider: scopedRequest<DeleteCustomProviderInput, CustomProviderResult, "required">()(
       "provider-admin:delete-custom-provider",
+    ),
+    // The built-in providers that a joined server's host has off, and the switch that turns one off or on
+    // (`provider-use-v1`). This computer's own switch is `providers.setProviderOn`; its status carries `off`.
+    providerUse: scopedQuery<AgentProviderId[], "required">()("provider-admin:provider-use"),
+    setProviderUse: scopedRequest<{ provider: AgentProviderId; on: boolean }, AgentProviderId[], "required">()(
+      "provider-admin:set-provider-use",
     ),
   },
   // The Slack workspaces, Discord guilds and Telegram chats where this computer's agents answer. Only
@@ -1326,6 +1338,11 @@ export const IPC_ENDPOINTS = {
   // identity result is the server as the list shows it after the change.
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
+    /**
+     * Changes the server key. On a joined server only the owner can, through `host-key-rotation-v1`.
+     * Paired devices follow the handover that both keys sign.
+     */
+    rotateHostKey: scopedQuery<void, "required">()("host-admin:rotate-host-key"),
     getReleaseStatus: scopedQuery<HostReleaseStatus | null, "required">()("host-admin:get-release-status"),
     checkRelease: scopedQuery<HostReleaseStatus, "required">()("host-admin:check-release"),
     getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),
@@ -1365,6 +1382,12 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    // Whether the Claude agents of the server load the Claude Code setup of the host's user
+    // (`claude-user-setup-v1`). An owner or admin sets it.
+    getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
+    setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
+      "host-admin:set-claude-user-setup",
     ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
@@ -1467,6 +1490,8 @@ export const IPC_ENDPOINTS = {
     hostCopy: scopedRequest<VaultSecretRequest, void, "required">()("vault:host-copy"),
     hostReset: scopedQuery<VaultState, "required">()("vault:host-reset"),
     hostCodes: scopedQuery<VaultTwoStepCodes, "required">()("vault:host-codes"),
+    /** Opens the file dialog on this computer; a joined server adds the logins through `vault-import-v1`. */
+    hostImportCsv: scopedQuery<VaultImportResult, "required">()("vault:host-import-csv"),
   },
   // The 1Password connection of this computer. The token goes from the renderer to main once, in
   // `connectWithToken`; every answer is the status only. The `host*` endpoints do the same for a
@@ -1695,8 +1720,8 @@ export const IPC_ENDPOINTS = {
     // Resolves when the sign-in ended, and rejects with its error.
     pasteMessageLink: scopedRequest<PasteMessageLinkInput, void>()("agent:paste-message-link"),
     cancelMessageLink: scopedRequest<CancelMessageLinkInput, void>()("agent:cancel-message-link"),
-    // Local only: a joined server has no file search route, so the renderer asks only this computer.
-    searchConversationFiles: request<SearchConversationFilesInput, ConversationFileSearchPage>()(
+    // A joined server answers through `conversation-file-search-v1`.
+    searchConversationFiles: scopedRequest<SearchConversationFilesInput, ConversationFileSearchPage>()(
       "agent:search-conversation-files",
     ),
     listConversationReads: scopedQuery<Record<string, ConversationReadState>>()("agent:list-conversation-reads"),
@@ -1855,10 +1880,15 @@ export const IPC_ENDPOINTS = {
    * keeps a destination, so the group has no remote route. The agent event `routines-changed` says
    * when a destination or a delivery changed.
    */
+  // A joined server's owner or admin reads the connections and the destination through
+  // `routine-results-v1`. That contract keeps the deliveries and a second send on the host's own
+  // computer, so `deliveries` and `resend` reach this computer only.
   routineResults: {
-    options: request<undefined, RoutineResultConnectionOption[]>()("routine-results:options"),
-    destination: request<RoutineResultRoutineInput, RoutineResultDestination | null>()("routine-results:destination"),
-    setDestination: request<SetRoutineResultDestinationInput, RoutineResultDestination | null>()(
+    options: scopedQuery<RoutineResultConnectionOption[], "required">()("routine-results:options"),
+    destination: scopedRequest<RoutineResultRoutineInput, RoutineResultDestination | null, "required">()(
+      "routine-results:destination",
+    ),
+    setDestination: scopedRequest<SetRoutineResultDestinationInput, RoutineResultDestination | null, "required">()(
       "routine-results:set-destination",
     ),
     deliveries: request<RoutineResultRoutineInput, RoutineResultDelivery[]>()("routine-results:deliveries"),
@@ -2141,12 +2171,14 @@ export const IPC_ENDPOINTS = {
     // from the app's resources, and `saveSkill` asks where to write it.
     readSkill: request<AgentImportSkillSource, string>()("agent-import:read-skill"),
     saveSkill: request<AgentImportSkillSource, ExportResult>()("agent-import:save-skill"),
-    // Hermes Agent profiles in a folder on this computer, so only the local server imports them.
-    // `readHermes` reads the folder Hermes uses, `chooseHermes` one the user picks; null means none.
-    readHermes: request<undefined, HermesImportPreview | null>()("agent-import:read-hermes"),
+    // Hermes Agent profiles in a folder of the server. `readHermes` reads the folder Hermes uses on the
+    // server: a joined server reads its own with `hermes-import-v1`. `chooseHermes` reads a folder that
+    // the user picks, so only on this computer: the folder dialog shows this computer's files, and the
+    // host cannot read them. Null means no profiles.
+    readHermes: scopedQuery<HermesImportPreview | null, "required">()("agent-import:read-hermes"),
     chooseHermes: request<undefined, HermesImportPreview | null>()("agent-import:choose-hermes"),
-    applyHermes: request<ApplyHermesImportInput, AgentImportResult>()("agent-import:apply-hermes"),
-    discardHermes: request<string, void>()("agent-import:discard-hermes"),
+    applyHermes: scopedRequest<ApplyHermesImportInput, AgentImportResult, "required">()("agent-import:apply-hermes"),
+    discardHermes: scopedRequest<string, void, "required">()("agent-import:discard-hermes"),
   },
   // Bound against the instance transfer service: a server's agents and server settings in one file for
   // another server. A remote server is reached with `instance-transfer-v1`; main opens both file

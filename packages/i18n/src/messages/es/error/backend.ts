@@ -216,8 +216,6 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Este agente no tiene ninguna rutina con este id.",
   "error.backend.agentWaitNoRoutine":
     "Solo una ejecución de una de tus rutinas despierta una espera, y no tienes ninguna rutina. Crea una con openbot.create_routine y luego abre la espera.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Las esperas abiertas solo están disponibles para agentes en este equipo.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marcar un mensaje como no leído solo está disponible para agentes en este equipo.",
   "error.backend.messageDeleteUnsupported": "Este servidor no permite eliminar mensajes.",

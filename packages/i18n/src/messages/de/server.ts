@@ -376,7 +376,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Letzte Änderung",
   "server.settings.hostKeyChangedDescription":
     "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
-  "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
+  "server.settings.hostKeyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":
     "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",

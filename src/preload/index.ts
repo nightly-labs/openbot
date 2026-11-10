@@ -123,6 +123,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeProviderUsageResetOutcomeFromMain,
   decodeProviderUsageResetsFromMain,
+  decodeProviderUseFromMain,
   decodeQuitShortcutHint,
   decodeRoutine,
   decodeRoutineCalendar,
@@ -805,8 +806,6 @@ const openbotApi: OpenBotDesktopApi = {
     signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
-    getClaudeUserSetup: decodeClaudeUserSetupSetting,
-    setClaudeUserSetup: decodeClaudeUserSetupSetting,
   }),
   browserDock: bridgeGroup(IPC_ENDPOINTS.browserDock, {
     publishPresentation: decodeVoid,
@@ -1064,6 +1063,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostCopy: decodeVoid,
     hostReset: decodeVaultState,
     hostCodes: decodeVaultCodes,
+    hostImportCsv: decodeVaultImportResult,
   }),
   onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
     status: decodeOnePasswordConnectorStatus,
@@ -1175,6 +1175,8 @@ const openbotApi: OpenBotDesktopApi = {
     saveCustomProvider: decodeCustomProviderResult,
     updateCustomProvider: decodeCustomProviderResult,
     deleteCustomProvider: decodeCustomProviderResult,
+    providerUse: decodeProviderUseFromMain,
+    setProviderUse: decodeProviderUseFromMain,
   }),
   messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
     getSlackOverview: decodeMessagingOverviewReply,
@@ -1237,6 +1239,7 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
+    rotateHostKey: decodeVoid,
     getUpdateStatus: decodeHostUpdateStatus,
     getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
     checkRelease: decodeHostReleaseStatusFromMain,
@@ -1260,6 +1263,8 @@ const openbotApi: OpenBotDesktopApi = {
     setMachineAlerts: decodeMachineAlertSettings,
     getPromptCacheTtl: decodePromptCacheTtlSetting,
     setPromptCacheTtl: decodePromptCacheTtlSetting,
+    getClaudeUserSetup: decodeClaudeUserSetupSetting,
+    setClaudeUserSetup: decodeClaudeUserSetupSetting,
     getModelVisibility: decodeProviderModelVisibility,
     setModelVisibility: decodeProviderModelVisibility,
     getAgentAccess: decodeAgentAccessSnapshot,
