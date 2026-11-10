@@ -93,6 +93,7 @@
     "./team-protocol/provider-accounts-v1": "./src/team-protocol/provider-accounts-v1.ts",
     "./team-protocol/provider-sign-out-v1": "./src/team-protocol/provider-sign-out-v1.ts",
     "./team-protocol/provider-usage-reset-v1": "./src/team-protocol/provider-usage-reset-v1.ts",
+    "./team-protocol/usage-credits-v1": "./src/team-protocol/usage-credits-v1.ts",
     "./team-protocol/provider-host-sign-in-v1": "./src/team-protocol/provider-host-sign-in-v1.ts",
     "./team-protocol/sign-in-relay-v1": "./src/team-protocol/sign-in-relay-v1.ts",
     "./team-protocol/connectors-v1": "./src/team-protocol/connectors-v1.ts",

@@ -391,7 +391,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       model,
       now(),
     );
-    return spent?.covers ? spent.window : undefined;
+    // An account on credits keeps working, so its model is not stopped.
+    return spent?.covers && !spent.onCredits ? spent.window : undefined;
   };
   /** The spent window of each model of a rail entry, in the order of the models. */
   const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {

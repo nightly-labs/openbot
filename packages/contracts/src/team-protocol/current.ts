@@ -131,6 +131,7 @@ import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
+import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
@@ -326,6 +327,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
@@ -504,6 +506,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -686,7 +689,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MCP_MANY_SERVERS_CAPABILITY &&
     capability !== VAULT_V3_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-    capability !== CHAT_HISTORY_CAPABILITY,
+    capability !== CHAT_HISTORY_CAPABILITY &&
+    capability !== USAGE_CREDITS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -745,6 +749,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   VAULT_V3_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -886,6 +891,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MCP_MANY_SERVERS_CAPABILITY &&
       capability !== VAULT_V3_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_CHUNKS_CAPABILITY &&
-      capability !== CHAT_HISTORY_CAPABILITY,
+      capability !== CHAT_HISTORY_CAPABILITY &&
+      capability !== USAGE_CREDITS_CAPABILITY,
   );
 }

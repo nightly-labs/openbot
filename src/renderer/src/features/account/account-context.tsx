@@ -1,9 +1,10 @@
-import type {
-  AccountUsage,
-  AccountUsageLimit,
-  AvatarColor,
-  AvatarImageInput,
-  CentralAuthState,
+import {
+  type AccountUsage,
+  type AccountUsageLimit,
+  type AvatarColor,
+  type AvatarImageInput,
+  type CentralAuthState,
+  keepUsageCredits,
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
@@ -241,7 +242,11 @@ const Auth = createSimpleContext({
       for (const limit of usage.limits) accountUsageEventIds.add(usageLimitKey(limit));
       setAccountUsageState((state) => {
         const byId = new Map((state.data?.limits ?? []).map((limit) => [usageLimitKey(limit), limit]));
-        for (const limit of usage.limits) byId.set(usageLimitKey(limit), limit);
+        // A joined server's event does not say whether an account works on credits: keep the last reading's.
+        for (const limit of usage.limits) {
+          const key = usageLimitKey(limit);
+          byId.set(key, keepUsageCredits(byId.get(key), limit));
+        }
         state.data = { limits: [...byId.values()] };
       });
     }

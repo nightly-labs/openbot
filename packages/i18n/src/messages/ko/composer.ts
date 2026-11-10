@@ -19,6 +19,10 @@ export const messages = {
   "composer.update.manual": "계속하려면 {provider}이(가) 실행되는 컴퓨터에서 업데이트하세요.",
   "composer.update.pending": "업데이트 중…",
   "composer.update.action": "업데이트",
+  "composer.usageLimit.credits": "{provider} 플랜 한도를 모두 사용했어요. 이제 에이전트가 크레딧을 사용해요.",
+  "composer.usageLimit.creditsResets":
+    "{provider} 플랜 한도를 모두 사용했어요. {reset}에 초기화될 때까지 에이전트가 크레딧을 사용해요.",
+  "composer.usageLimit.creditsTitle": "크레딧 사용 중",
   "composer.usageLimit.resets": "{provider} 한도를 모두 사용했어요. {reset}에 초기화돼요.",
   "composer.usageLimit.selectModel": "{provider} 한도를 모두 사용했어요. 계속하려면 다른 모델을 선택하세요.",
   "composer.usageLimit.title": "사용 한도에 도달했어요",

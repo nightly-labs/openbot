@@ -231,6 +231,12 @@ export interface AccountUsageLimit {
    * rail then shows the ring of that provider alone. The Team API does not send this field.
    */
   sharedQuotaWith?: AgentProviderId;
+  /**
+   * Codex: whether the account can keep working on credits when a plan window is spent. Absent when
+   * the provider sends no credit state. The released usage routes do not send it: a joined server
+   * reads it with `usage-credits-v1`, and a reading without it keeps the last one (`keepUsageCredits`).
+   */
+  creditsAvailable?: boolean;
 }
 
 export interface AccountUsage {
@@ -253,9 +259,53 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
           (Array.isArray(limit.groups) &&
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
-        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)),
+        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
     )
   );
+}
+
+/** One row of a `usage-credits-v1` list: whether a provider account of the host can work on credits. */
+export interface UsageCredits {
+  provider: AgentProviderId;
+  /** `DEFAULT_PROVIDER_ACCOUNT_ID` for the provider's own sign-in. */
+  accountId: string;
+  available: boolean;
+}
+
+/** The `accounts` of a `usage-credits-v1` list. A provider this client does not know is left out. */
+export function decodeUsageCredits(value: unknown): UsageCredits[] {
+  const invalid = () => new Error("Invalid usage credits.");
+  if (!Array.isArray(value)) throw invalid();
+  return value.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row) || !isProviderAccountId(row.accountId) || typeof row.available !== "boolean")
+      throw invalid();
+    return isAgentProvider(row.provider)
+      ? [{ provider: row.provider, accountId: row.accountId, available: row.available }]
+      : [];
+  });
+}
+
+/** A joined server's reading with the credit state that its host gave on `usage-credits-v1`. */
+export function withUsageCredits(usage: AccountUsage, credits: readonly UsageCredits[]): AccountUsage {
+  const byAccount = new Map(credits.map((row) => [JSON.stringify([row.provider, row.accountId]), row.available]));
+  return {
+    limits: usage.limits.map((limit) => {
+      const available = byAccount.get(JSON.stringify([limit.id, limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID]));
+      return available === undefined ? limit : { ...limit, creditsAvailable: available };
+    }),
+  };
+}
+
+/**
+ * The credit state of the last reading, for a limit of a new one that has none. The released usage
+ * routes and the `usage-changed` event of a joined server do not carry it, and a Codex reading on this
+ * computer always does, so a limit without it keeps the last one.
+ */
+export function keepUsageCredits(previous: AccountUsageLimit | undefined, next: AccountUsageLimit): AccountUsageLimit {
+  return next.creditsAvailable !== undefined || previous?.creditsAvailable === undefined
+    ? next
+    : { ...next, creditsAvailable: previous.creditsAvailable };
 }
 
 /** The most groups in one reading, and the most models in one group. */

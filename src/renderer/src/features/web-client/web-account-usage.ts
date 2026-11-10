@@ -1,4 +1,4 @@
-import type { AccountUsage, AgentStatus } from "@openbot/contracts/ipc";
+import { type AccountUsage, type AgentStatus, keepUsageCredits } from "@openbot/contracts/ipc";
 import type { TextValue } from "@openbot/ui/text";
 import { type Accessor, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import type { WebWorkspace } from "./web-client-context";
@@ -75,7 +75,15 @@ export function createWebAccountUsage(options: {
       // As on desktop: the host sends a new reading when a provider reports usage.
       if (event.type === "usage-changed" && untrack(usageTargetKey)) {
         usageGeneration += 1;
-        setAccountUsage(event.usage);
+        // The event does not say whether an account works on credits, so each limit keeps the last reading's.
+        setAccountUsage((current) => ({
+          limits: event.usage.limits.map((limit) =>
+            keepUsageCredits(
+              current?.limits.find((kept) => kept.id === limit.id && kept.accountId === limit.accountId),
+              limit,
+            ),
+          ),
+        }));
       }
     }),
   );

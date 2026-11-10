@@ -19,6 +19,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.usageLimit.credits":
+    "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
+  "composer.usageLimit.creditsResets":
+    "{provider} のプランの上限をすべて使用しました。{reset} にリセットされるまで、エージェントはクレジットを使用します。",
+  "composer.usageLimit.creditsTitle": "クレジットを使用中",
   "composer.usageLimit.resets": "{provider} の上限をすべて使用しました。上限は {reset} にリセットされます。",
   "composer.usageLimit.selectModel":
     "{provider} の上限をすべて使用しました。続行するには別のモデルを選択してください。",
