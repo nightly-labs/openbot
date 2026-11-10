@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Bu güncellemeden sonra Hızlı mod her Claude ajanında kapalıdır. Kullanıyorsanız model seçicide yeniden açın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendi Linux bilgisayarınıza veya VPS'inize tek bir komutla sunucu ekleyin ya da bir ajandan sunucuyu oraya SSH üzerinden kurmasını isteyin.",
+          "Sunucu ayarları → Aktarım artık sohbet geçmişini, kanalları ve iş akışlarını yeni sunucuya taşıyabilir.",
+          "Linux'ta Dynamic Island ve ajan yuvası, Mac'te olduğu gibi diğer pencerelerin üstünde kalır.",
+          "Model seçicide bir Claude ajanı için Hızlı modu açın veya bir Codex ajanı için Ultra hızlı seçeneğini belirleyin.",
+          "Ajanlar bir site hakkında öğrendiklerini o sitenin belleği olarak saklar ve başarısız olan adımları tekrarlamaz.",
+          "Uygulamalar kataloğunda monday.com, Miro, Dropbox ve Zapier gibi 207 yeni uygulama var. Bunları tarayıcıda oturum açarak bağlarsınız."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Okunmamış yanıtları olan sohbetler önce, Okunmamış grubunda gösterilir. Sırayı değiştirmek için sohbet listesinin menüsünde Sohbetleri sırala'yı seçin.",
+          "VPS gibi katılınan bir sunucuda masaüstü uygulaması ve tarayıcı uygulaması artık bu bilgisayarın özelliklerinin çoğuna sahip.",
+          "Ajanlar git commit'lerine OpenBot'u ortak yazar olarak ekler. Yazar siz kalırsınız. Bunu Ayarlarınız → Ajanlar bölümünde kapatın.",
+          "Ajanlar tarayıcı görevlerini daha az adımda ve yaklaşık %18 daha az token ile bitirir.",
+          "Gemini artık Antigravity CLI üzerinde çalışır. Google oturumunuz korunur."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Durdurduğunuz bir Claude ajanı artık yaklaşık 10 saniyede durur ve kuyruktaki mesajları başlar.",
+          "Windows'ta ajanlar, OpenBot penceresi simge durumundayken veya tepsideyken tarayıcıyı kullanabilir.",
+          "macOS'ta Yeniden başlat ve güncelle, OpenBot disk görüntüsünden çalışırken artık OpenBot'u kapatmaz. OpenBot'u Uygulamalar'a taşımanızı söyler.",
+          "Sesli bir konuşmada öksürük veya bir tuşa basma artık ajanın yanıtını durdurmaz."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],
