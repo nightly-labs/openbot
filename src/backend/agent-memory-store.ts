@@ -15,8 +15,12 @@ import { databaseRows, requiredNumberColumn, requiredStringColumn } from "./data
 import { MemoryStore, type MemoryTables, type SaveMemoryInput } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
 
-/** Scripts written without spaces between words, which unicode61 indexes as one word per run. */
-const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+/**
+ * Scripts where a searched word is often part of a longer unicode61 word: no spaces between words,
+ * or, in Korean, particles attached to the word.
+ */
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 
 export class AgentMemorySelectionError extends Schema.TaggedError<AgentMemorySelectionError>()(
   "AgentMemorySelectionError",
@@ -259,7 +263,7 @@ export class AgentMemoryStore extends MemoryStore {
     // agent's few memories. Terms hold only letters, numbers and marks: LIKE needs no escape.
     const unspaced = [...new Set(terms.filter((term) => UNSPACED_SCRIPT.test(term)))];
     const ids =
-      unspaced.length === 0
+      unspaced.length === 0 || indexed.length > limit
         ? indexed
         : [
             ...new Set([
