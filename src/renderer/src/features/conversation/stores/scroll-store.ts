@@ -22,7 +22,7 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
@@ -137,6 +137,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
     (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  const foldedAnswerIds = createMemo(
+    () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
+  );
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
     const channelTurnRows: AgentMessage[][] = [];
@@ -151,7 +156,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         return [];
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
-      return silentAgentAnswer(message) ? [] : [message];
+      return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
     });
     // Members of a channel work at the same time, so each update goes where its time puts it.
     const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
@@ -211,7 +216,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages(), updateAnswers());
     const boundary =
       startedAt === undefined
         ? -1
@@ -430,6 +435,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,

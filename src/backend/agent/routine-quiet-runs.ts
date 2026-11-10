@@ -3,6 +3,7 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
   type ConversationSnapshot,
+  type QueueDelivery,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type RoutineRun,
 } from "@openbot/contracts/ipc";
@@ -51,13 +52,30 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
+/**
+ * Whether a teammate's message may start a quiet turn: it wants no answer and does not reply to a
+ * message of this agent, so it is information only and nobody waits for the turn. A provider such
+ * as Claude Code makes the model write a visible answer, so without the no-update tool each such
+ * update puts filler in the user's chat (#6821). A reply to this agent's message can hold the result
+ * that the user asked for, so it is never quiet.
+ */
+export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+  return (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply === false &&
+    !delivery.replyToMessageId
+  );
+}
+
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
   return text.trim() === ROUTINE_NO_UPDATE_MARKER;
 }
 
 /**
- * Settles the answers of a completed turn that ran only quiet routine runs. Each answer that is only
+ * Settles the answers of a completed turn that ran only quiet routine runs and teammate updates
+ * (`quietTeammateDelivery`). Each answer that is only
  * the marker goes: the user never needs to see it. After a call to the no-update tool, each text answer
  * is a quiet answer. When nothing else in the turn tells the user anything, the turn is quiet: its
  * thinking and plan go, and each quiet answer stays as a `ROUTINE_QUIET_ANSWER_ITEM_TYPE` message that

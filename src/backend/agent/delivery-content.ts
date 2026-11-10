@@ -291,6 +291,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         ? [
             NO_ANSWER_LINE,
             "Use it if it changes your work, and continue. Send no reply, acknowledgement or result: OpenBot sends the sender nothing back.",
+            `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
           ]
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
