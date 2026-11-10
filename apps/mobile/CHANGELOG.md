@@ -7,6 +7,83 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.9] - In review
+
+### Added
+
+- **Photos** in the attachment menu now also shows videos. Select a MOV or MP4 video to attach it to
+  a chat, as on the desktop. A video must be 10 MB or smaller.
+- **Search models** in agent settings and in Create agent. The Model row now opens a list of the
+  provider's models with a search bar. Type a name or a model id to find a model without a scroll
+  through the full list, such as the OpenRouter list (#6503).
+- OpenBot can now get fixes between store versions. When a fix is ready, the home screen shows
+  **A new OpenBot is ready**. Tap **Update** and the app restarts with the fix, with no visit to the
+  App Store or Google Play. This works from this version on.
+- **Settings → About** shows a short update ID after the version when the app runs such a fix.
+- **API key for ChatGPT and Claude** in Server settings > Providers. When the server can read the
+  key, the provider page has an API key row, as on the desktop. The key goes to the server only.
+- **Default for new agents** on each provider page. Turn it on to make new agents of the server
+  start with this provider. The page also shows how many agents use the provider.
+- **Sign in in the browser** on a provider page when the server signs the provider in with a code.
+  Use it when the code sign-in does not work.
+- Give a channel its own picture in Channel info: upload a photo, or choose an icon and a color, as
+  on the desktop. The channel list, the chat header and search show it in place of the member
+  faces. A channel picture that you set on the desktop now shows on the phone too. The server must
+  run this OpenBot version.
+- Connect Postiz from the Apps marketplace with browser sign-in or your Postiz API key, so agents can list your social media channels, and draft, schedule and publish posts.
+- Get a notification when an agent finishes or stops with an error in a thread. Settings >
+  Notifications > Thread replies turns these notifications off on this phone. The server must run
+  the next OpenBot version.
+
+### Changed
+
+- **Open the export agent** in the Grok Bot import guide now opens the new Migrator by OpenBot page
+  in Grok Bot.
+- The app now also looks for a fix when you come back to it, not only when it starts. It asks
+  OpenBot's own update server, and it accepts only updates that OpenBot signed.
+- The provider page has a new layout: a header with the provider logo, its status and its agents,
+  then the Sign-in, Use, API key and Runtime sections. Each action, such as Reconnect, Update and
+  Disconnect, has an icon, as in Settings. The API key opens on its own page.
+- The sign-in page and the custom provider, custom agent and MCP server pages also have an icon
+  on each action, such as Open sign-in page, Cancel, Add and Remove.
+- The Models page of a provider shows the selected models in their own section, above the other
+  models. Select all, Deselect all and Reset to default are in the menu at the top right.
+- The provider page shows if the server runs the CLI that you installed or the one that OpenBot
+  downloaded. The Disconnect question names the agents that stop until you sign in again.
+- Channel info is shorter. The Agents row opens a list of the server's agents with a search and a
+  menu to select or deselect all. The Lead agent row has a menu to choose the lead.
+- An owner or admin can delete an agent from the end of Agent info.
+- Consecutive routine markers in a chat, such as updated, completed or failed routines, now show as
+  one closed row with a count. Tap the row to show or hide each marker. A routine that is running or
+  needs attention keeps a row of its own. To show the markers open, turn off **Collapse routine
+  activity** in Settings > Appearance.
+
+### Fixed
+
+- The number on an agent in the chat list now counts only the unread messages of its chat. Before,
+  it also counted the messages of its threads, such as a routine's thread, so it grew with each
+  routine run and opening the chat did not clear it. Unread messages in threads now show as a badge
+  with no number.
+- A turn that ends without an answer, for example one that you stop or that a restart interrupts,
+  now shows its steps in a row of its own in an agent chat, a thread and a channel. In an agent
+  chat and a thread, tap the row to open the steps. Before, its thinking was not shown after the
+  turn ended, and a chat whose newest messages were only that thinking showed no rows, also after
+  Load older messages.
+- On Android, you can now share an audio file, a video, an email or a file of another type, such as
+  a Garmin `.fit` activity, from another app to an agent. Before, the OpenBot share target showed
+  only for text, images and documents when you shared one file (#6583).
+- With large text, a settings row with a menu value, such as Reasoning on an agent's Model page, no longer flickers after you change its value.
+- You can now import a Grok Bot export of more than 100 MB into a server from your phone. The app
+  sends the export in parts. The server must be on the new OpenBot version.
+- Messages no longer move while you scroll up through older messages of the same day.
+- A tap on a notification of a thread opens that thread, and so does a tap on the Live Activity
+  while it shows the work, a question or an approval of a thread. Before, both opened the main chat
+  of the agent.
+- A tap on the expanded Live Activity in the Dynamic Island that shows one agent opens the chat of
+  that agent. Before, the app opened on the screen that it had.
+- When OpenBot takes a fix back, the Android app now shows **A new OpenBot is ready**, as the iPhone
+  app does. Before, it went back to the earlier version at its next start with no message.
+
 ## [1.4.8] - 2026-11-10 (Android)
 
 ### Added
