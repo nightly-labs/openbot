@@ -787,7 +787,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (runtime.consume) yield* Fiber.join(runtime.consume).pipe(Effect.ignore);
     // A turn that the closed query still ran sends no result, so it ends here. After the close, so
     // the next turn opens a new query. Without the end, its messages stay running and hold the queue.
-    if (turn && runtime.activeTurn === turn) yield* this.#completeTurn(runtime, "interrupted", null);
+    if (turn && runtime.activeTurn === turn) {
+      for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
+      turn.toolCalls.clear();
+      yield* this.#completeTurn(runtime, "interrupted", null);
+    }
   });
 
   /**
@@ -887,8 +891,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
         const turn = runtime.activeTurn;
-        if (turn && turn.id === getString(params, "turnId")) yield* this.#closeIfStopIgnored(runtime, turn);
-        yield* providerCall(() => runtime.query.interrupt());
+        const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
+        if (stopped) yield* this.#closeIfStopIgnored(runtime, stopped);
+        yield* providerCall(() => runtime.query.interrupt()).pipe(
+          // The close of a CLI that did not answer the stop rejects the stop request, but the close ends the turn.
+          Effect.catch((failure) =>
+            stopped && (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn !== stopped)
+              ? Effect.void
+              : Effect.fail(failure),
+          ),
+        );
         return yield* providerSync(() => decoder({}));
       }
       case "thread/compact/start":
