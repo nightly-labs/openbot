@@ -99,7 +99,7 @@ export interface McpOAuthProxyRoute {
  *
  * Bytes go through unchanged, event streams included, because the provider and the server speak
  * MCP to each other. This class changes the credential, and it names OpenBot and the agent as the
- * client: the `clientInfo` of `initialize` and the `User-Agent`. Each route has its own bearer, made
+ * client in the `clientInfo` of `initialize`. Each route has its own bearer, made
  * from the secret, so a bearer that one row's provider holds opens no other route. An agent route
  * adds the agent key to the path and to the bearer; the route without one stays valid for the
  * sessions that hold it.
@@ -282,13 +282,12 @@ export class McpOAuthProxy {
     body: Buffer | null,
     controller: AbortController,
   ): Effect.fn.Return<Response | null, McpOperationError> {
-    const userAgent = this.#options.client ? `OpenBot/${this.#options.client.version}` : null;
-    const first = yield* send(target, target.token, request, method, body, controller, userAgent);
+    const first = yield* send(target, target.token, request, method, body, controller);
     if (first.status !== 401) return first;
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
     if (!renewed) return null;
-    const second = yield* send(target, renewed, request, method, body, controller, userAgent);
+    const second = yield* send(target, renewed, request, method, body, controller);
     if (second.status !== 401) return second;
     yield* discard(second);
     return null;
@@ -412,9 +411,8 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   method: string,
   body: Buffer | null,
   controller: AbortController,
-  userAgent: string | null,
 ): Effect.fn.Return<Response, McpOperationError> {
-  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request, userAgent));
+  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request));
   const origin = new URL(target.url).origin;
   let url = new URL(target.url);
   // The fragment names the account on this machine. It does not go upstream.
@@ -439,18 +437,14 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   }
 });
 
-function upstreamHeaders(
-  target: McpOAuthProxyTarget,
-  token: string,
-  request: IncomingMessage,
-  userAgent: string | null,
-): Headers {
+function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: IncomingMessage): Headers {
   const headers = new Headers();
   for (const { key, value } of target.headers) {
     if (key.trim().toLowerCase() !== "authorization") headers.set(key.trim(), value);
   }
   // A `User-Agent` that the user wrote on the row is kept. The provider's own does not go upstream.
-  if (userAgent && !headers.has("user-agent")) headers.set("user-agent", userAgent);
+  // There is no `OpenBot/<version>` default: n8n answers each `User-Agent` with "bot" in it
+  // with an empty 204 (#6497). `clientInfo` names OpenBot.
   // Node gives the request header names in lowercase.
   for (const [name, value] of Object.entries(request.headers)) {
     if (
