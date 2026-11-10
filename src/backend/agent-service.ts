@@ -1819,6 +1819,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
+      githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       serverClaims: options.serverClaims ?? null,

@@ -330,6 +330,8 @@ export interface OpenBotToolRouterOptions {
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
+  /** Whether the built-in GitHub connection gives agents GitHub now. */
+  githubConnected?: (() => boolean) | undefined;
   /** This build's version and system for `send_feedback`; null where this process does not know them. */
   feedbackFacts?: FeedbackFacts | null | undefined;
   /** Sends approved `send_feedback` text; null where this process has no account service. */
@@ -379,6 +381,7 @@ export class OpenBotToolRouter {
   readonly #videoReader: VideoReaderHost | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
+  readonly #githubConnected: () => boolean;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
   readonly #serverClaims: AgentServerClaims | null;
@@ -423,6 +426,7 @@ export class OpenBotToolRouter {
     this.#videoReader = options.videoReader ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
+    this.#githubConnected = options.githubConnected ?? (() => false);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
     this.#serverClaims = options.serverClaims ?? null;
@@ -1750,6 +1754,13 @@ export class OpenBotToolRouter {
           next: "Marketplace has no app with this name. Call this again only with a listed name for the same service, such as brave-search for Brave. Otherwise say that Marketplace has no app for it, and do not mention a card or an install.",
         });
       }
+      // A card that asks for a connection the user already made is a dead end: they see "Connected".
+      if (args.app === "github" && this.#githubConnected())
+        return openBotToolResult({
+          status: "connected",
+          app: args.app,
+          next: "GitHub is already connected for every agent of this server. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When none of them works, tell the user in one sentence and call openbot.send_feedback.",
+        });
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
