@@ -580,12 +580,13 @@ async function commandVerifyBuild(options: Options) {
       : await androidSettings(artifact, config, channel, certificate);
   // The native build on a Linux runner changes the result of a fingerprint of the same checkout:
   // run 42826070568 gave another value after the build than a clean checkout and the binary have.
-  // So the release workflows compute the value before the build and give it here.
-  const given = options.values.get("runtime");
-  if (given !== undefined && !RUNTIME_VERSION_PATTERN.test(given)) {
-    throw new UsageError("--runtime is empty or not valid. The step before the build must give the runtime version.");
+  // So this command does not compute the value. `runtime-version` gives it before the build.
+  const expected = options.values.get("runtime");
+  if (expected === undefined || !RUNTIME_VERSION_PATTERN.test(expected)) {
+    throw new UsageError(
+      "Give --runtime with the value of `mobile-ota.ts runtime-version`, from a step before the native build.",
+    );
   }
-  const expected = given ?? (await fingerprint(platform, MOBILE));
   const problems = [
     ...(settings.url ? [] : [`The binary does not use the update server ${config.updatesUrl}.`]),
     ...(settings.channel ? [] : [`The binary does not send the channel ${channel}.`]),
