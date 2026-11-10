@@ -386,8 +386,18 @@ const BROWSER_WEB_PREFERENCES = {
   backgroundThrottling: false,
 };
 
-/** macOS and Windows draw no page of a minimized or hidden window, so they use `#backgroundWindow`. */
-const USES_BACKGROUND_WINDOW = process.platform === "darwin" || process.platform === "win32";
+/**
+ * macOS, Windows and Linux draw no page of a minimized or hidden window, so they use `#backgroundWindow`.
+ * On Linux this includes the main window of a local server, which is never shown (#6524).
+ */
+const USES_BACKGROUND_WINDOW =
+  process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
+
+/**
+ * Linux also draws no page of a hidden view, also in a shown window, and it does not apply `setOpacity`.
+ * There the background window is one pixel, and its views stay shown: the window clips them, and they still draw.
+ */
+const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
 
 /** The window of `BrowserHost.#backgroundWindow`. It has no page of its own. */
 function createBackgroundWindow(): BaseWindow {
@@ -598,14 +608,16 @@ export class BrowserHost {
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   /**
-   * macOS and Windows draw no page of a hidden or minimized window. A page that loads there gives
-   * no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991).
-   * While the main window is hidden or minimized, the views of its tabs are in this window: shown,
-   * but transparent, click-through and never focused. `#mountedViews` still names the main window
-   * for them.
+   * macOS, Windows and Linux draw no page of a hidden or minimized window. A page that loads there
+   * gives no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991),
+   * and a live view gets no frame (#6524). While the main window is hidden or minimized, the views of
+   * its tabs are in this window: shown, but transparent (one pixel on Linux), click-through and never
+   * focused. `#mountedViews` still names the main window for them.
    */
   #backgroundWindow: BaseWindow | null = null;
   #mainViewsInBackground = false;
+  /** True while `#syncAttachedView` shows `#attachedView`. On Linux the views in the background window are all shown. */
+  #attachedViewShown = false;
   readonly #takeoverTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
@@ -3877,13 +3889,13 @@ export class BrowserHost {
       !targetWindow ||
       targetWindow.isDestroyed()
     ) {
-      this.#attachedView?.setVisible(false);
+      this.#hideAttachedView();
       this.#mainPageListener?.(null);
       return;
     }
 
     if (this.#attachedView !== tab.view) {
-      this.#attachedView?.setVisible(false);
+      this.#hideAttachedView();
       this.#mountView(tab.view, targetWindow);
       this.#attachedView = tab.view;
     } else {
@@ -3903,6 +3915,7 @@ export class BrowserHost {
     });
     tab.view.setBounds(bounds);
     tab.view.setVisible(true);
+    this.#attachedViewShown = true;
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
@@ -3910,6 +3923,21 @@ export class BrowserHost {
       tab.focusOnVisible = false;
       tab.contents.focus();
     }
+  }
+
+  #hideAttachedView(): void {
+    this.#attachedViewShown = false;
+    if (this.#attachedView) this.#hideView(this.#attachedView);
+  }
+
+  /** Hides a view that the panel does not show. On Linux a view in the background window stays shown, or it would not draw. */
+  #hideView(view: WebContentsView): void {
+    view.setVisible(SHOWS_VIEWS_IN_BACKGROUND && this.#inBackgroundWindow(view));
+  }
+
+  /** True when the panel shows the view. On Linux a view in the background window is shown only to draw. */
+  #viewShown(view: WebContentsView): boolean {
+    return SHOWS_VIEWS_IN_BACKGROUND ? view === this.#attachedView && this.#attachedViewShown : view.getVisible();
   }
 
   #raisePictureInPictureOverlay(): void {
@@ -3924,7 +3952,7 @@ export class BrowserHost {
     if (
       this.#tabs.get(tab.id) !== tab ||
       this.#activeTabId !== tab.id ||
-      !tab.view.getVisible() ||
+      !this.#viewShown(tab.view) ||
       tab.contents.isDestroyed()
     ) {
       return;
@@ -3948,11 +3976,11 @@ export class BrowserHost {
     const currentParent = currentWindow && this.#nativeParent(currentWindow);
     if (currentParent && !currentParent.isDestroyed()) currentParent.contentView.removeChildView(view);
     parent.contentView.addChildView(view);
+    this.#mountedViews.set(view, window);
     // Initialize the native viewport before hiding a tab that has never been shown.
     view.setVisible(true);
     view.setBounds(this.#hiddenViewBounds(window));
-    view.setVisible(false);
-    this.#mountedViews.set(view, window);
+    this.#hideView(view);
   }
 
   /**
@@ -4019,6 +4047,8 @@ export class BrowserHost {
       if (owner !== window) continue;
       if (!from.isDestroyed()) from.contentView.removeChildView(view);
       to.contentView.addChildView(view);
+      if (SHOWS_VIEWS_IN_BACKGROUND)
+        view.setVisible(background || (view === this.#attachedView && this.#attachedViewShown));
     }
     if (!background) this.#backgroundWindow?.hide();
     return true;
@@ -4027,9 +4057,13 @@ export class BrowserHost {
   /**
    * The views keep their bounds, so the background window has the size of the main window's content.
    * A minimized Windows window reports a tiny content size off screen, so there the background window
-   * takes the restored place and covers each view.
+   * takes the restored place and covers each view. On Linux it is one pixel, which clips the shown views.
    */
   #backgroundBounds(window: BrowserWindow): Rectangle {
+    if (SHOWS_VIEWS_IN_BACKGROUND) {
+      const { x, y } = window.getContentBounds();
+      return { x, y, width: 1, height: 1 };
+    }
     if (process.platform !== "win32" || !window.isMinimized()) return window.getContentBounds();
     const { x, y, width, height } = window.getNormalBounds();
     let right = width;
@@ -4058,7 +4092,10 @@ export class BrowserHost {
     const parent = window && this.#nativeParent(window);
     if (parent && !parent.isDestroyed()) parent.contentView.removeChildView(view);
     this.#mountedViews.delete(view);
-    if (this.#attachedView === view) this.#attachedView = null;
+    if (this.#attachedView === view) {
+      this.#attachedView = null;
+      this.#attachedViewShown = false;
+    }
   }
 
   /** Succeeds when the renderer of the tab's page crashes. */
