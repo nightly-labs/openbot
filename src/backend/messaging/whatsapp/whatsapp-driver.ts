@@ -37,6 +37,7 @@ import {
 } from "./whatsapp-events";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
+import { allowsContact } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
@@ -406,7 +407,7 @@ class WhatsAppAdapter implements MessagingAdapter {
       const user = isJidGroup(chatJid) ? null : userPart(chatJid);
       const allowed = isJidGroup(chatJid)
         ? rules.groups.has(chatJid)
-        : user === identity.number || (user !== null && rules.contacts.has(user));
+        : user === identity.number || (user !== null && allowsContact(rules, user));
       return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
     });
   }

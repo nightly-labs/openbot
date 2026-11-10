@@ -239,6 +239,11 @@ class FakeSocket implements WhatsAppSocket {
     return group(jid, jid === GROUP ? "Team" : "Family");
   }
 
+  /** Each number has an account, in the form it was asked for. */
+  async onWhatsApp(...phoneNumbers: string[]) {
+    return phoneNumbers.map((number) => ({ jid: `${number}@s.whatsapp.net`, exists: true }));
+  }
+
   async updateMediaMessage(message: WAMessage): Promise<WAMessage> {
     return message;
   }
