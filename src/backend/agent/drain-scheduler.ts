@@ -773,8 +773,7 @@ export class DrainScheduler {
         batch = batch.filter((item) => !failedCompanions.has(item.delivery.id));
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
-      // Never `getOrCreate`: a message to a deleted agent fails, and does not bring the agent back (#6106).
-      const agent = yield* this.#store.existing(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
+      const agent = yield* this.#store.getOrCreate(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
       // Once for the turn: its process, its session and its sandbox roots read the result.
       yield* checkAgentFolders(agent);
       requestedModel = agent.model;
