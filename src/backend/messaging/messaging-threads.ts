@@ -108,7 +108,7 @@ export type MessagingPostFailure = "gone" | "not-running" | "refused" | "unknown
  * that is safe to show the agent.
  */
 export interface MessagingOutbound {
-  places(connectionId: string): Effect.Effect<{ places: MessagingPlace[] } | { error: string }>;
+  places(connectionId: string): Effect.Effect<{ places: MessagingPlace[]; note?: string } | { error: string }>;
   post(
     connectionId: string,
     target: MessageTarget,
