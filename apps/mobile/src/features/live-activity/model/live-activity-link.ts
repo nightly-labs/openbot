@@ -13,7 +13,7 @@ export interface LiveActivityRequest {
 }
 
 let listener: ((request: LiveActivityRequest) => void) | null = null;
-let navigate: ((target: OutsideTarget | null) => void) | null = null;
+let navigate: ((target: OutsideTarget | null, chatOpened?: boolean) => void) | null = null;
 let pending: LiveActivityRequest | null = null;
 /**
  * The target of a link that came before the navigator and that names a thread. The route of such a
@@ -58,13 +58,16 @@ export function onLiveActivityAction(receive: (request: LiveActivityRequest) => 
 
 /**
  * Opens the conversation of a target, or the chat list for `null`, while the app runs. A thread that
- * a link named before the navigator started opens now.
+ * a link named before the navigator started opens now. For it, `chatOpened` is true: the route of the
+ * link opened the agent's chat already, so the navigator only goes on from that chat.
  */
-export function setLiveActivityNavigator(open: (target: OutsideTarget | null) => void): () => void {
+export function setLiveActivityNavigator(
+  open: (target: OutsideTarget | null, chatOpened?: boolean) => void,
+): () => void {
   navigate = open;
   const waiting = unopened;
   unopened = null;
-  if (waiting) open(waiting);
+  if (waiting) open(waiting, true);
   return () => {
     if (navigate === open) navigate = null;
   };

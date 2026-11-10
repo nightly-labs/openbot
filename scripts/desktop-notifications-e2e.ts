@@ -21,6 +21,7 @@ import {
   type ServerNotificationLevel,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { createFormat, translateFor } from "@openbot/i18n";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -290,7 +291,8 @@ try {
     // The phone of the owner, away from the app.
     phone.register(
       "phone-session",
-      { memberId: OWNER_ID, protocol: 7, capabilities: new Set() },
+      // The phone can open a side thread, so the host sends it the turns of side threads.
+      { memberId: OWNER_ID, protocol: 9, capabilities: new Set([PUSH_NOTIFICATION_THREADS_CAPABILITY]) },
       {
         platform: "android",
         value: {
@@ -346,6 +348,13 @@ try {
     turn: { type: "turn-completed", agentId, threadId: routineThreadId, turnId: "routine-turn-1", status: "completed" },
   };
 
+  const sideThreadFinished: AgentEvent = {
+    type: "thread-turn-completed",
+    taskId: "side-task-1",
+    routine: false,
+    turn: { type: "turn-completed", agentId, threadId: "side-thread-1", turnId: "side-turn-1", status: "completed" },
+  };
+
   await step("A browser step notifies, and its end withdraws the notification", async () => {
     await setLevel("all");
     const from = shown.length;
@@ -376,12 +385,7 @@ try {
   await step("A turn of a side thread that is not a routine thread shows no desktop notification", async () => {
     await setLevel("all");
     const from = shown.length;
-    desktop({
-      type: "thread-turn-completed",
-      taskId: "side-task-1",
-      routine: false,
-      turn: { type: "turn-completed", agentId, threadId: "side-thread-1", turnId: "side-turn-1", status: "completed" },
-    });
+    desktop(sideThreadFinished);
     // The routine thread after it shows, so the forwarder ran for both events.
     desktop(routineFinished);
     assert.deepEqual(shownSince(from), [english("notification.finished")]);
@@ -460,6 +464,14 @@ try {
     await setLevel("needs-me");
     assert.equal(await phoneCount([prompt(8)]), 0);
     return { sent: 0 };
+  });
+
+  await step("The phone tells the owner about a side thread turn, which the desktop does not show", async () => {
+    // The desktop notifies at this level, so the phone stays quiet for a turn of the chat. No desktop
+    // notification names a side thread that is not a routine thread, so that turn goes to the phone.
+    await setLevel("all");
+    assert.equal(await phoneCount([finished, routineFinished, sideThreadFinished]), 1);
+    return { sent: 1 };
   });
 
   await step("The phone tells the owner when the desktop does not", async () => {

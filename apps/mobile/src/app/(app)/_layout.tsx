@@ -195,6 +195,8 @@ function AuthenticatedStack() {
           .fetchQuery({
             queryKey: queryKeys.agentTasks(queryScope.current, serverId, agentId),
             queryFn: () => workspace().loadAgentTasks(agentId, serverId),
+            // The list that the phone has does not have the thread, so only the host can answer.
+            staleTime: 0,
           })
           .then((snapshot) => snapshot.tasks);
       },
@@ -212,9 +214,12 @@ function AuthenticatedStack() {
    * The phone does not know the thread of an agent's own chat. So a thread that it has not read opens
    * the agent's chat at once, and the thread then opens on that chat when the host says that it is a
    * side thread.
+   *
+   * `chatOpened` is true for a link that started the app: its route opened the agent's chat. The
+   * person can leave that chat while the lists load, and nothing then takes them back.
    */
   const openTarget = useCallback(
-    (target: OutsideTarget | null) => {
+    (target: OutsideTarget | null, chatOpened = false) => {
       outsideOpens.current += 1;
       const order = outsideOpens.current;
       if (!target?.serverId || !target.threadId) {
@@ -224,6 +229,7 @@ function AuthenticatedStack() {
       const { agentId } = target;
       void outsideDestination(target, targetSources).then((destination) => {
         if (outsideOpens.current !== order) return;
+        if (chatOpened && !showsChat(agentId)) return;
         if (destination.type === "channel") {
           const { channelId, serverId } = destination;
           whenUnlocked(() => {
@@ -238,11 +244,12 @@ function AuthenticatedStack() {
           whenUnlocked(() => showThread(known));
           return;
         }
-        let chatShown = false;
-        whenUnlocked(() => {
-          chatShown = true;
-          showChat(agentId);
-        });
+        let chatShown = chatOpened;
+        if (!chatOpened)
+          whenUnlocked(() => {
+            chatShown = true;
+            showChat(agentId);
+          });
         void sideThreadDestination(target, targetSources, THREAD_LOOKUP_MS).then((thread) => {
           if (!thread || outsideOpens.current !== order) return;
           // A locked app holds one action only: the thread then opens in place of the chat.

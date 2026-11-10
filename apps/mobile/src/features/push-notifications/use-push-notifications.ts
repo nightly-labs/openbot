@@ -242,8 +242,12 @@ export function usePushNotifications({
           }
           if (replies !== null) await postRef.current(serverId, PUSH_NOTIFICATION_THREADS_ROUTES.set, { replies });
         } catch {
-          if (registered.current.get(serverId)?.key !== key) return;
-          registered.current.delete(serverId);
+          const current = registered.current.get(serverId);
+          if (current?.key === key) registered.current.delete(serverId);
+          // A later request has the registration of this one, but not the choice for side threads that
+          // this one did not deliver. The retry sends the choice again.
+          else if (current && replies !== null) current.threads = null;
+          else return;
           retry.current ??= setTimeout(() => {
             retry.current = null;
             setAttempt((count) => count + 1);

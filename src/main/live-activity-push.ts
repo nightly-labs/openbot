@@ -390,14 +390,15 @@ export class LiveActivityPushService {
 
 /**
  * Whether the island view shows the event that `subject` names, so a notification would repeat it.
- * The view shows the replies of the agent's own chat. A reply in a side thread is not one of them, so
- * its notification goes out, also while the view shows an older reply of the same agent.
+ * The view shows the replies and the failed turn of the agent's own chat. The end of a turn in a side
+ * thread is not one of them, so its notification goes out, also while the view shows an older reply
+ * or failure of the same agent.
  */
 function presentationShows(
   presentation: DynamicIslandPresentation,
   { agentId, kind, sideThread }: PushNotificationSubject,
 ): boolean {
-  if (sideThread && kind === "reply") return false;
+  if (sideThread) return false;
   switch (presentation.mode) {
     case "message":
       return kind === "reply" && presentation.message.agent.id === agentId;

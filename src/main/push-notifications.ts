@@ -102,7 +102,11 @@ interface PushNotificationOptions {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  /** Whether the member is at the computer of this host, where the desktop app shows the event. */
+  /**
+   * Whether the member is at the computer of this host, where the desktop app shows the event. For a
+   * side thread turn that is not a routine's, `event` is the `thread-turn-completed` event, as the
+   * desktop gets it.
+   */
   atHostComputer(memberId: string, event: AgentEvent): boolean;
   /**
    * Whether the session's phone shows a Live Activity of this host that shows this event, in place of
@@ -134,8 +138,8 @@ export interface PushNotificationSubject {
   agentId: string;
   kind: PushNotificationKind;
   /**
-   * `true` for the end of a turn in a side thread. The Live Activity shows the replies of the agent's
-   * own chat only, so it does not show this reply.
+   * `true` for the end of a turn in a side thread. The Live Activity shows the replies and the failed
+   * turn of the agent's own chat only, so it does not show this event.
    */
   sideThread?: boolean;
 }
@@ -339,8 +343,22 @@ export class PushNotificationService {
     const subject = eventSubject(event, thread !== null);
     if (!subject) return;
     const now = this.#now();
+    // The desktop notifies about a routine thread turn as about a turn of the chat. It does not notify
+    // about the turn of another side thread.
+    const desktopNotifies = !thread || thread.routine;
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
       const { value, memberId, protocol, sessionId } = registration.stored;
+      // A routine run notified from the agent's chat before each routine had a thread, so each phone
+      // still gets it. A phone gets the turns of the other side threads only when a tap can open the
+      // thread, and while the member did not turn them off on that phone. Such a turn is not kept
+      // either: it would take the place of an event that the phone can get.
+      if (
+        thread &&
+        !thread.routine &&
+        (!registration.capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY) ||
+          registration.stored.threadReplies === false)
+      )
+        return false;
       // While the app is on screen, it shows the event itself.
       if (!value.away && registration.connected) {
         if (!only) this.#hold(registration, received, now);
@@ -353,9 +371,17 @@ export class PushNotificationService {
       }
       if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
         return false;
-      // A member at a desktop app sees the event there, and the phone would only repeat it.
-      const used = this.#lastUseElsewhere(memberId, sessionId);
-      return !((used !== null && now - used < this.#awayAfterMs) || this.#options.atHostComputer(memberId, event));
+      // A member at a desktop app sees the event there, and the phone would only repeat it. No desktop
+      // notifies about a side thread turn that is not a routine's. So for it, input on the computer in
+      // another app does not count: only the use of OpenBot does, and the host computer gets the
+      // event as its desktop gets it, which shows it only in a window with focus.
+      const used = desktopNotifies
+        ? this.#lastUseElsewhere(memberId, sessionId)
+        : this.#options.lastUseElsewhere(memberId, sessionId);
+      return !(
+        (used !== null && now - used < this.#awayAfterMs) ||
+        this.#options.atHostComputer(memberId, desktopNotifies ? event : received)
+      );
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
@@ -366,15 +392,6 @@ export class PushNotificationService {
     for (const registration of targets) {
       const { stored } = registration;
       const { value, memberId, sessionId } = stored;
-      // A routine run notified from the agent's chat before each routine had a thread, so each phone
-      // still gets it. A phone gets the turns of the other side threads only when a tap can open the
-      // thread, and while the member did not turn them off on that phone.
-      if (
-        thread &&
-        !thread.routine &&
-        (!registration.capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY) || stored.threadReplies === false)
-      )
-        continue;
       const translate = translateFor(resolveLocale("system", value.locale));
       const chosen = this.#options.memberLevels?.(memberId);
       const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);

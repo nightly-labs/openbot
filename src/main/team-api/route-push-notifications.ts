@@ -1,4 +1,3 @@
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import {
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_ROUTES,
@@ -33,12 +32,10 @@ export async function routePushNotifications(
     if (!notifications || !capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY)) {
       throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
     }
-    // `readJson` has already run the body through the push-notification-threads wire codec.
+    // `readJson` has already run the body through the push-notification-threads wire codec, which
+    // takes only a body with a boolean `replies`.
     const choice = await readJson(request);
-    if (!isDynamicRecord(choice) || typeof choice.replies !== "boolean") {
-      throw new HttpError(400, sourceText("error.team.pushNotificationsUnsupported"));
-    }
-    notifications.setThreadReplies(sessionId, choice.replies);
+    notifications.setThreadReplies(sessionId, choice.replies === true);
     return json(200, {});
   }
   const route = pushRoute(url.pathname);

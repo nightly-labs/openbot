@@ -137,9 +137,13 @@ with `replies`; Settings > Notifications > Thread replies). The host keeps the c
 registration of the session in `openbot-push-notifications-v1.json` (`threadReplies`), also when the
 phone registers again. A request for input, an approval or a browser step of a side thread does not
 read the choice. The level, the mute, the preview and the Live Activity check apply as for the
-agent's chat, but the Live Activity shows the replies of the agent's own chat only, so it never
-replaces the notification of a side thread reply. The desktop notification and the completion sound
-still use routine thread turns only.
+agent's chat, but the Live Activity shows the replies and the failed turn of the agent's own chat
+only, so it never replaces the notification of a side thread turn. The desktop notification and the
+completion sound still use routine thread turns only. So for the turn of another side thread, the
+phone stays quiet only while the member uses OpenBot: the window of the host's desktop app has focus,
+or the member sent, answered, or typed from another session in the last 30 seconds. Input in another
+app on a computer does not count for it, because no desktop then tells about that turn. A host does
+not keep such a turn for a phone that does not take it.
 
 The notification data has the thread of the event, not a task id, and the phone does not know the
 thread of an agent's own chat. So the app (`outside-target.ts`, used by `(app)/_layout.tsx`) opens

@@ -100,9 +100,11 @@ const state: {
   unread: number;
   /** The turn of the message that the agent works on, or null when it does no work. */
   workTurn: string | null;
+  /** The failed turn of the agent's own chat, or null. */
+  failedTurn: string | null;
   prompt: AgentRuntimeSnapshot["pendingPrompts"][number] | null;
   approval: AgentRuntimeSnapshot["pendingApprovals"][number] | null;
-} = { unread: 0, workTurn: null, prompt: null, approval: null };
+} = { unread: 0, workTurn: null, failedTurn: null, prompt: null, approval: null };
 const sent: NotificationRelayRequest[] = [];
 const activityPushes: LiveActivityRelayPush[] = [];
 const waiters = new Set<() => void>();
@@ -162,7 +164,7 @@ function snapshot(): AgentRuntimeSnapshot {
     pendingPrompts: state.prompt ? [state.prompt] : [],
     pendingApprovals: state.approval ? [state.approval] : [],
     pendingBrowserTakeovers: [],
-    failedTurns: [],
+    failedTurns: state.failedTurn ? [{ agentId: AGENT, turnId: state.failedTurn }] : [],
   };
 }
 
@@ -267,7 +269,12 @@ const secretOf = (session: string) => {
 const newCapabilities = new Set<string>(teamCapabilitiesForProtocol(9));
 const oldCapabilities = new Set([...newCapabilities].filter((name) => name !== PUSH_NOTIFICATION_THREADS_CAPABILITY));
 
-function registerAndroid(session: string, capabilities: ReadonlySet<string>, level: "all" | "needs-me" = "all") {
+function registerAndroid(
+  session: string,
+  capabilities: ReadonlySet<string>,
+  level: "all" | "needs-me" = "all",
+  away = true,
+) {
   phones.register(
     session,
     { memberId: MEMBER, protocol: 9, capabilities },
@@ -278,7 +285,7 @@ function registerAndroid(session: string, capabilities: ReadonlySet<string>, lev
         token: `${session}-token-`.padEnd(40, "x"),
         secret: encodeLiveActivityBytes(secretOf(session)),
         locale: "en",
-        away: true,
+        away,
         level,
         mutedUntil: null,
         preview: true,
@@ -561,6 +568,27 @@ try {
     return {};
   });
 
+  await step("a side thread turn that a phone does not take does not push out an event that it keeps", async () => {
+    // The phone looks on screen, so the host keeps its events, at most 20. It turned thread replies off.
+    registerAndroid(NEW_PHONE, newCapabilities, "all", false);
+    phones.setThreadReplies(NEW_PHONE, false);
+    const from = sent.length;
+    state.unread = 1;
+    events.emit("event", turn(MAIN_THREAD, "main-turn-kept"));
+    for (let index = 0; index < 25; index += 1) events.emit("event", sideTurn(`side-turn-kept-${index}`));
+    assert.equal(sent.slice(from).filter((request) => request.push.sessionId === NEW_PHONE).length, 0);
+    // The path of the phone fails, as when iOS suspended the app: the kept reply goes out.
+    phones.disconnected(NEW_PHONE);
+    const kept = await waitFor("kept reply", () => {
+      const request = sent.slice(from).find((candidate) => candidate.push.sessionId === NEW_PHONE);
+      return request ? opened(request) : null;
+    });
+    assert.equal(kept.threadId, MAIN_THREAD);
+    state.unread = 0;
+    phones.setThreadReplies(NEW_PHONE, true);
+    return { kept: kept.threadId };
+  });
+
   phones.remove(NEW_PHONE);
   phones.remove(OLD_PHONE);
   phones.register(
@@ -614,6 +642,23 @@ try {
     );
     return { threadId: content.threadId };
   });
+
+  await step(
+    "a Live Activity that shows a failed turn of the chat does not replace a side thread failure",
+    async () => {
+      const shownFrom = activityPushes.length;
+      state.failedTurn = "main-turn-failed";
+      events.emit("event", { type: "queue-invalidated", agentId: AGENT });
+      await activityProps(shownFrom, "failed");
+      const from = sent.length;
+      events.emit("event", sideTurn("side-turn-failed-2", "failed"));
+      const content = opened(await waitFor("side thread failure", () => sent[from] ?? null));
+      assert.equal(content.kind, "failed");
+      assert.equal(content.threadId, SIDE_THREAD);
+      state.failedTurn = null;
+      return { kind: content.kind, threadId: content.threadId };
+    },
+  );
 
   const actionKey = liveActivityKeys(secretOf(IPHONE)).action;
   const keyFor = (serverId: string) => (serverId === SERVER ? actionKey : null);
@@ -670,14 +715,21 @@ try {
   await step("the running app opens the thread of a link, and a link that starts the app opens it later", async () => {
     resetLiveActivityActions();
     const openedTargets: (OutsideTarget | null)[] = [];
+    const chatOpened: boolean[] = [];
     const link = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT, thread: SIDE_THREAD })}`;
     // The link starts the app: its route is the agent's chat, and the thread opens when the app can navigate.
     assert.equal(liveActivityRoute(link, true), `/chat/${AGENT}`);
-    const stop = setLiveActivityNavigator((opened) => openedTargets.push(opened));
+    const stop = setLiveActivityNavigator((opened, routeOpenedChat) => {
+      openedTargets.push(opened);
+      chatOpened.push(routeOpenedChat === true);
+    });
     assert.deepEqual(openedTargets, [target(SIDE_THREAD)]);
+    // The route opened the chat, so the navigator must not open the chat a second time.
+    assert.deepEqual(chatOpened, [true]);
     // The app runs: it opens the thread itself and pushes no route.
     assert.equal(liveActivityRoute(link, false), null);
     assert.deepEqual(openedTargets, [target(SIDE_THREAD), target(SIDE_THREAD)]);
+    assert.deepEqual(chatOpened, [true, false]);
     // A link from an earlier host names no thread, and opens the agent's chat as before.
     const plain = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT })}`;
     assert.equal(liveActivityRoute(plain, true), `/chat/${AGENT}`);
