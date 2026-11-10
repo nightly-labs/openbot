@@ -118,6 +118,14 @@ export type AgentDockSeat =
   | { kind: "agent"; agent: ComposerAgent; mood: AvatarMood; state: SidebarAgentState | undefined }
   | { kind: "channel"; channel: AgentDockChannel; state: SidebarAgentState | undefined };
 
+/**
+ * The dock body in the document: the part between and around the seats that takes the pointer. It has the
+ * height of the dock and is at its place on the screen.
+ */
+export function agentDockBody(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(".agent-dock .agent-dock-hit");
+}
+
 /** The key of a seat in the dock state, unique across the two kinds. */
 export function agentDockSeatKey(seat: AgentDockSeatRef): string {
   return `${seat.kind}:${seat.id}`;

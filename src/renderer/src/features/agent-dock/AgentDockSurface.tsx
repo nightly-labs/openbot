@@ -12,13 +12,14 @@ import {
   type AgentDockSeatRef,
   type AgentDockShapeRect,
   type AgentDockChannel as AgentDockUiChannel,
+  agentDockBody,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowShape } from "../../window-shape";
-import { AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip, agentDockBody } from "./AgentDockEdgeStrip";
+import { AGENT_DOCK_STRIP_REST, AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip } from "./AgentDockEdgeStrip";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
@@ -123,7 +124,7 @@ export function AgentDockSurface() {
   /**
    * Linux: tells main the parts of the window that take the pointer. The whole window while the dock
    * moves or a menu is open, so that nothing is cut off; the strip at the edge while the dock is hidden.
-   * With the edge strip on, that strip is only as tall as the dock: the pointer goes past it elsewhere.
+   * With the edge strip on, only the visible strip at rest takes the pointer: the pointer goes past it elsewhere.
    */
   function syncShape() {
     if (!SHAPED_WINDOW) return;
@@ -135,7 +136,12 @@ export function AgentDockSurface() {
       const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
       parts.push(
         body
-          ? { x, y: Math.round(body.top), width, height: Math.round(body.height) }
+          ? {
+              x,
+              y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2),
+              width,
+              height: Math.round(body.height * AGENT_DOCK_STRIP_REST),
+            }
           : { x, y: 0, width, height: window.innerHeight },
       );
     }
