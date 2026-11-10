@@ -1690,16 +1690,17 @@ export class MailboxStore {
   }
 
   /**
-   * The teammate answers that start in the same turn as this delivery. For an answer, these are the
-   * other answers to the same request. For a message from the person, these are the answers that
-   * wait for a slow teammate: the person writes before all answers are in, so they are read now.
+   * The teammate answers that start in the same turn as this answer: the other answers to the same
+   * request. A message from the person takes none. Answers that wait for a slow teammate stay held,
+   * so a turn that the person starts holds only the person's messages, and the tools that only a
+   * person's request can start still work in it (#6525).
    */
   repliesToStartWith(deliveryId: string): DeliveryContext[] {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next) return [];
     const message = this.#requireMessage(next.messageId);
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
-    if (message.sender.kind !== "user" && !requestId) return [];
+    if (!requestId) return [];
     // One turn runs in one lane: the agent's own chat, or the side thread that sent the request.
     const messages = this.#messagesById();
     const lane = this.#laneOf(next, messages);
@@ -1707,7 +1708,6 @@ export class MailboxStore {
       this.#queuedFor(next.recipientAgentId).filter((candidate) => {
         if (candidate.id === next.id || !this.#mayStart(candidate) || this.#laneOf(candidate, messages) !== lane)
           return false;
-        if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId, messages);
         return isAnswer(reply) && reply.replyToMessageId === requestId;
       }),

@@ -714,14 +714,14 @@ export class DrainScheduler {
     const laneId = this.#mailbox.laneIdForDelivery(delivery.id);
     const drainCallsAtStart = this.#drainCalls.get(delivery.recipientAgentId) ?? 0;
     const ownSession = this.#runsInOwnSession(context);
-    // The teammate answers that start in this turn too. A channel task, an external message and a
-    // routine run in its own session always run alone; a teammate's answer in an external
-    // conversation takes the other answers to the same request. The person's message goes last, so
-    // the turn answers it with the answers already read, and the person's later queued messages
-    // follow it in queue order.
+    // The teammate answers that start in this turn too: only a teammate's answer takes the other
+    // answers to the same request, also in an external conversation. A channel task, an external
+    // message and a routine run in its own session always run alone. The person's message takes no
+    // answers, so the tools that only a person's request can start work in its turn (#6525), and the
+    // person's later queued messages follow it in queue order.
     // A plan continuation runs again the deliveries of the turn it continues, and no others.
     const replies =
-      planNote !== undefined || channelDelivery || ownSession || (messagingDelivery && delivery.sender.kind !== "agent")
+      planNote !== undefined || channelDelivery || ownSession || delivery.sender.kind !== "agent"
         ? []
         : this.#mailbox.repliesToStartWith(delivery.id);
     const laterMessages =
@@ -732,9 +732,7 @@ export class DrainScheduler {
           : this.#mailbox.userMessagesToStartWith(delivery.id);
     const companions = [...replies, ...laterMessages];
     let batch =
-      planNote !== undefined || delivery.sender.kind === "user"
-        ? [...replies, context, ...laterMessages]
-        : [context, ...replies];
+      planNote !== undefined || delivery.sender.kind === "user" ? [context, ...laterMessages] : [context, ...replies];
     let confirmedTurnId: string | null = null;
     // The session of a routine run in its own session. Closed here when no turn starts on it.
     let routineThreadId: string | null = null;
