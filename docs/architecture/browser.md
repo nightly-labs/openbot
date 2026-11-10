@@ -221,6 +221,23 @@ how one site works, as the agent found it in the chat (where a control is, a ste
 one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
 host and keeps the fact. The browser guidance asks the agent to save such a step itself.
 
+"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
+while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
+secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
+a page that loads (host, path and title, without the query or the hash) or a press on a control
+(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
+with a 1 second limit). A press outside a control, on a password field, or on a field whose
+`autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
+never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
+`openbot-browsing-steps-v1.json` (no migration), at most 300 per agent. The next memory review of the
+agent reads the newest 80 in a `<user_browsing>` block, with secrets redacted, and deletes the steps
+that it read after its result decodes. A step that no review read goes after 30 days (at start and at
+each change). Turning the setting off deletes the file, and deleting an agent deletes its steps. Only
+the review reads the steps; the agent has no tool to search them. Browsing alone does not start a
+review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
+covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
+
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
 go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).

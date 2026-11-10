@@ -210,3 +210,30 @@ export function isAgentMemorySelectionState(value: unknown): value is AgentMemor
     value.usedBytes <= value.budgetBytes
   );
 }
+
+/**
+ * "Learn from my browsing": while a person holds a tab of an agent (takeover or Take control), the
+ * host records which pages loaded and which controls they clicked, and the memory review learns how
+ * those sites work. It never records typed text. The default is off.
+ */
+export interface BrowsingMemoryPreference {
+  enabled: boolean;
+}
+
+export const DEFAULT_BROWSING_MEMORY_PREFERENCE: BrowsingMemoryPreference = { enabled: false };
+
+/** The setting of one server's agents (`browsing-memory-v1`). */
+export interface HostBrowsingMemory {
+  enabled: boolean;
+}
+
+export function hostBrowsingMemory({ enabled }: BrowsingMemoryPreference): HostBrowsingMemory {
+  return { enabled };
+}
+
+/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
+export function decodeHostBrowsingMemory(value: unknown): HostBrowsingMemory {
+  if (!isDynamicRecord(value) || typeof value.enabled !== "boolean")
+    throw new Error("Invalid browsing memory setting.");
+  return { enabled: value.enabled };
+}

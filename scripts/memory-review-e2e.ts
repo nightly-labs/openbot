@@ -50,6 +50,10 @@
 //      also revises a local skill. When the writer fails, Save reports false and the yes still works.
 //  26. A review adds a memory with a site, as a host. A site that is not a host is dropped, and the
 //      fact is kept. The review prompt shows the site of a memory.
+//  27. "Learn from my browsing": the review reads the steps that the user did in the agent's tabs,
+//      redacted, and adds a site memory from them. It deletes the steps it read; the next review has
+//      none. A step older than 30 days is deleted, and a review never reads it. The steps stay on
+//      the file across a new log.
 // No provider, account or network is used. `bun run test:memory-review`.
 // Writes .openbot-build/memory-review-e2e/report.json.
 import assert from "node:assert/strict";
@@ -97,6 +101,7 @@ const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
+const { USER_BROWSING_RETENTION_MS, UserBrowsingLog } = await import("../src/backend/user-browsing-log");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 /** A tool call that the fake makes in an agent turn. */
@@ -351,6 +356,11 @@ let reviewInterval = 20;
 let skillLearningMode: SkillLearningMode = "ask";
 const events: AgentEvent[] = [];
 /** The service on the profile. Check 16 starts it again, as an app restart does. */
+/** The steps of "Learn from my browsing", on a file of the profile, as the host keeps them. */
+const browsingFile = join(userData, "openbot-browsing-steps-v1.json");
+let browsingNow = Date.now();
+const userBrowsing = new UserBrowsingLog(browsingFile, () => browsingNow);
+
 function open() {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -366,6 +376,7 @@ function open() {
     localSkillTools: () => LOCAL_SKILL_TOOLS,
     skillLearning: () => skillLearningMode,
     skillLearner: () => SKILL_LEARNER,
+    userBrowsing,
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   });
   service.on("event", (event) => events.push(event));
@@ -1270,6 +1281,62 @@ try {
     assert.ok((reviews().at(-1) ?? "").includes('"site":"docs.example.org"'), "The review shows the site.");
     control({ operations: [] });
     return { memories: memories.length };
+  });
+
+  await check("a review learns from the user's browsing steps, redacted, and deletes them", async () => {
+    const learner = await createAgent("Learner");
+    // A step from 31 days ago, then the steps of today.
+    browsingNow = Date.now() - USER_BROWSING_RETENTION_MS - 24 * 60 * 60 * 1000;
+    await Effect.runPromise(userBrowsing.record(learner.id, { kind: "page", host: "old.example", path: "/gone" }));
+    browsingNow = Date.now();
+    const steps = [
+      { kind: "page", host: "shop.example", path: "/cart", title: "Your cart" },
+      { kind: "click", host: "shop.example", path: "/cart", role: "button", name: "Proceed to checkout" },
+      { kind: "click", host: "shop.example", path: "/checkout", role: "textbox", name: `Code ${SECRET}` },
+    ] as const;
+    for (const step of steps) await Effect.runPromise(userBrowsing.record(learner.id, step));
+    // A new log on the same file reads the saved steps.
+    const reloaded = new UserBrowsingLog(browsingFile);
+    const pendingBefore = await Effect.runPromise(reloaded.pending(learner.id));
+    assert.deepEqual(
+      pendingBefore.map((step) => step.host),
+      ["shop.example", "shop.example", "shop.example"],
+      "The step older than 30 days is deleted.",
+    );
+    assert.ok(!readFileSync(browsingFile, "utf8").includes("old.example"), "The file has no old step.");
+    const count = reviews().length;
+    control({
+      operations: [
+        {
+          type: "add",
+          text: "Shop checkout: Proceed to checkout is on the cart page.",
+          inclusion: "searchable",
+          site: "shop.example",
+        },
+      ],
+    });
+    await chat(learner.id, 3, "Learner");
+    await reviewed(count + 1);
+    const prompt = reviews().at(-1) ?? "";
+    assert.ok(prompt.includes("<user_browsing>"), "The review prompt has the browsing steps.");
+    assert.ok(prompt.includes("Proceed to checkout"), "The prompt has the name of the clicked control.");
+    assert.ok(prompt.includes("/cart"), "The prompt has the path.");
+    assert.ok(!prompt.includes(SECRET), "The secret in a step is redacted.");
+    assert.ok(!prompt.includes("old.example"), "The prompt has no old step.");
+    const memory = await waitFor("the site memory from browsing", () =>
+      service.listMemories(learner.id).find((entry) => entry.site === "shop.example"),
+    );
+    assert.equal(memory.text, "Shop checkout: Proceed to checkout is on the cart page.");
+    // The review deletes the steps it read before it applies the memory changes.
+    const pendingAfter = await Effect.runPromise(userBrowsing.pending(learner.id));
+    assert.equal(pendingAfter.length, 0, "The review deletes the steps it read.");
+    assert.ok(!readFileSync(browsingFile, "utf8").includes("shop.example"), "The file has no read step.");
+    await chat(learner.id, 3, "Learner again");
+    await reviewed(count + 2);
+    assert.ok(!(reviews().at(-1) ?? "").includes("<user_browsing>"), "The next review has no browsing steps.");
+    await Effect.runPromise(userBrowsing.clear());
+    control({ operations: [] });
+    return { steps: pendingBefore.length };
   });
 
   report.passed = true;

@@ -114,6 +114,7 @@ export const messages = {
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
   "error.team.skillLearningUnsupported": "Vaardigheden leren wordt niet ondersteund door deze verbinding.",
+  "error.team.browsingMemoryUnsupported": "Leren van browsen wordt niet ondersteund door deze verbinding.",
   "error.team.promptCacheTtlUnsupported": "Deze verbinding ondersteunt de cachetijd van prompts niet.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",

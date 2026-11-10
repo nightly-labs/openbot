@@ -350,6 +350,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Perguntar antes",
   "server.settings.skillLearningOff": "Desativado",
   "server.settings.skillLearningLoadFailed": "Não foi possível carregar a configuração de aprendizado de habilidades.",
+  "server.settings.browsingMemory": "Aprender com minha navegação",
+  "server.settings.browsingMemoryDescription":
+    "Quando você controla o navegador de um agente, o agente aprende como os sites funcionam pelas páginas e botões que você usa. O texto digitado não é guardado.",
+  "server.settings.browsingMemoryLoadFailed": "Não foi possível carregar a configuração de navegação.",
   "server.settings.remoteOnline": "O computador anfitrião está online. Seu proprietário controla a publicação.",
   "server.settings.remoteOffline": "O computador anfitrião está offline. Seu proprietário controla a publicação.",
   "server.settings.reachable": "Acessível online. Só pessoas convidadas podem entrar.",

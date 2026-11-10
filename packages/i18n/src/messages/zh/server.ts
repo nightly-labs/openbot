@@ -358,6 +358,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "先询问",
   "server.settings.skillLearningOff": "关闭",
   "server.settings.skillLearningLoadFailed": "无法加载技能学习设置。",
+  "server.settings.browsingMemory": "从我的浏览中学习",
+  "server.settings.browsingMemoryDescription":
+    "当你控制智能体的浏览器时，智能体会从你使用的页面和按钮中学习网站的用法。不会保存你输入的文字。",
+  "server.settings.browsingMemoryLoadFailed": "无法加载浏览设置。",
   "server.settings.rolesTitle": "权限",
   "server.settings.rolesDescription":
     "选择成员可以使用的助手。成员拥有“所有人”和自己所属角色中最高的访问权限。所有者和管理员可以使用所有助手。",

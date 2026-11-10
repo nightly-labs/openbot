@@ -115,6 +115,7 @@ export const messages = {
   "error.team.folderUnavailable": "Esta pasta não está disponível no computador host.",
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
   "error.team.skillLearningUnsupported": "Esta conexão não oferece suporte ao aprendizado de habilidades.",
+  "error.team.browsingMemoryUnsupported": "Esta conexão não oferece suporte a aprender com a navegação.",
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",

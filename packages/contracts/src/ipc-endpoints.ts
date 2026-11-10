@@ -96,6 +96,7 @@ import type {
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   HostAgentMemoryLimit,
+  HostBrowsingMemory,
   HostMemoryReview,
   SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
@@ -1352,6 +1353,10 @@ export const IPC_ENDPOINTS = {
     // the values its host permits.
     getSkillLearning: scopedQuery<HostSkillLearning, "required">()("host-admin:get-skill-learning"),
     setSkillLearning: scopedRequest<string, HostSkillLearning, "required">()("host-admin:set-skill-learning"),
+    // Whether the server learns how sites work from what people do in agent tabs they hold
+    // (`browsing-memory-v1`).
+    getBrowsingMemory: scopedQuery<HostBrowsingMemory, "required">()("host-admin:get-browsing-memory"),
+    setBrowsingMemory: scopedRequest<boolean, HostBrowsingMemory, "required">()("host-admin:set-browsing-memory"),
     // The machine alert levels and the member who gets the alert (`machine-resources-v1`).
     getMachineAlerts: scopedQuery<MachineAlertSettings, "required">()("host-admin:get-machine-alerts"),
     setMachineAlerts: scopedRequest<MachineAlertSettings, MachineAlertSettings, "required">()(

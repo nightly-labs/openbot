@@ -107,6 +107,7 @@ export const messages = {
   "error.team.folderUnavailable": "此文件夹在主机电脑上不可用。",
   "error.team.memoryReviewUnsupported": "当前连接不支持记忆整理。",
   "error.team.skillLearningUnsupported": "此连接不支持技能学习。",
+  "error.team.browsingMemoryUnsupported": "此连接不支持从浏览中学习。",
   "error.team.promptCacheTtlUnsupported": "当前连接不支持提示缓存时间。",
   "error.team.modelVisibilityUnsupported": "当前连接不支持模型列表。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",

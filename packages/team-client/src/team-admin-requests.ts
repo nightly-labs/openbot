@@ -62,6 +62,7 @@ import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidd
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
@@ -139,6 +140,7 @@ import {
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
   decodeHostBitwardenConnectorStatus,
+  decodeHostBrowsingMemory,
   decodeHostGitHubConnectorRepositories,
   decodeHostGitHubConnectorStatus,
   decodeHostMemoryReview,
@@ -179,6 +181,7 @@ import {
   type GitHubConnectorRepositories,
   type HostAddMessagingOrchestratorInput,
   type HostAgentMemoryLimit,
+  type HostBrowsingMemory,
   type HostedSiteList,
   type HostGitHubConnectorStatus,
   type HostMemoryReview,
@@ -847,6 +850,20 @@ export function setHostSkillLearning(
   mode: string,
 ): Effect.Effect<HostSkillLearning, TeamAdminRequestError> {
   return adminCall(() => request("POST", SKILL_LEARNING_ROUTES.update, decodeHostSkillLearning, { mode }));
+}
+
+/** Whether the host learns how sites work from what people do in agent tabs they hold (`browsing-memory-v1`). */
+export function getHostBrowsingMemory(
+  request: TeamApiRequest,
+): Effect.Effect<HostBrowsingMemory, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSING_MEMORY_ROUTES.settings, decodeHostBrowsingMemory, {}));
+}
+
+export function setHostBrowsingMemory(
+  request: TeamApiRequest,
+  enabled: boolean,
+): Effect.Effect<HostBrowsingMemory, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSING_MEMORY_ROUTES.update, decodeHostBrowsingMemory, { enabled }));
 }
 
 /** The roles of the host (`agent-access-v1`). A member reads only `mine`. */

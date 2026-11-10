@@ -44,7 +44,7 @@ try {
   const report = z
     .object({
       status: z.literal("passed"),
-      cases: z.array(z.string()).min(19),
+      cases: z.array(z.string()).min(34),
       runId: z.literal(runId),
       sourceSha: z.literal(sourceSha),
     })

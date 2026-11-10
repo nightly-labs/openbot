@@ -359,6 +359,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Сначала спросить",
   "server.settings.skillLearningOff": "Выкл.",
   "server.settings.skillLearningLoadFailed": "Не удалось загрузить настройку обучения навыкам.",
+  "server.settings.browsingMemory": "Учиться на моём браузинге",
+  "server.settings.browsingMemoryDescription":
+    "Когда вы управляете браузером агента, агент узнаёт, как работают сайты, по страницам и кнопкам, которые вы используете. Введённый текст не сохраняется.",
+  "server.settings.browsingMemoryLoadFailed": "Не удалось загрузить настройку браузинга.",
   "server.settings.remoteOnline": "Хост в сети. Публикацией управляет его владелец.",
   "server.settings.remoteOffline": "Хост не в сети. Публикацией управляет его владелец.",
   "server.settings.reachable": "Доступен из интернета. Войти могут только приглашённые.",

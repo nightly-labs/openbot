@@ -174,6 +174,7 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { readClickTarget } from "./browser-user-click";
 import { runCauseEffect } from "./effect-boundary";
 import {
   BROWSER_STRING_MORE,
@@ -185,6 +186,7 @@ import {
 } from "./model-text-limit";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
+import { stepPlace, stepText, type UserBrowsingStep } from "./user-browsing-log";
 import type { VaultCardSecret } from "./vault-items";
 
 interface BrowserHostEvents {
@@ -521,6 +523,13 @@ function rejectTakeoverTool(): Effect.Effect<DynamicToolResult, BrowserOperation
   );
 }
 
+/** Where the browser records what a person does in an agent tab that they hold. */
+export interface BrowserUserBrowsing {
+  /** The setting, read at each step. */
+  enabled(): boolean;
+  record(agentId: string, step: Omit<UserBrowsingStep, "at">): void;
+}
+
 /** Who controls a tab: the person at this computer, or one session of a team member. */
 export type BrowserUserControlHolder = { kind: "local" } | { kind: "member"; memberId: string; sessionId: string };
 /** The holds to release when a window, a session or a member ends. */
@@ -566,6 +575,7 @@ export class BrowserHost {
   readonly #proxySignInRefused = new WeakSet<BrowserHostTab>();
   readonly #quitShortcut: (input: Input) => boolean;
   readonly #siteMemories: (agentId: string, hostname: string) => BrowserSiteMemory[];
+  readonly #userBrowsing: BrowserUserBrowsing | null;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -651,6 +661,11 @@ export class BrowserHost {
       tabSleep?: { sweepMs: number; awakeGraceMs: number };
       /** The memories of an agent about the site of a page host, which its snapshots show. */
       siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
+      /**
+       * Records what a person does in an agent tab that they hold, while "Learn from my browsing" is
+       * on. Omitted, nothing is recorded.
+       */
+      userBrowsing?: BrowserUserBrowsing;
     } = {},
   ) {
     this.#window = window;
@@ -673,6 +688,7 @@ export class BrowserHost {
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
     this.#quitShortcut = options.quitShortcut ?? (() => false);
     this.#siteMemories = options.siteMemories ?? (() => []);
+    this.#userBrowsing = options.userBrowsing ?? null;
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
@@ -3504,6 +3520,7 @@ export class BrowserHost {
         }),
       ).popup({ window });
     });
+    this.#bindUserBrowsing(tab);
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       // Keep page content at the same width when the viewport scrollbar appears or disappears.
@@ -4175,6 +4192,49 @@ export class BrowserHost {
     return focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
       ? focusedContents
       : null;
+  }
+
+  /**
+   * The agent whose memory review may read what a person does in this tab now, or null. Only while a
+   * person holds the tab (takeover or Take control), so no step is the agent's. Never a tab with a
+   * secret entry or a private sign-in.
+   */
+  #userBrowsingAgent(tab: BrowserHostTab): string | null {
+    const agentId = tab.ownerAgentId;
+    if (agentId === null || tab.secret || tab.privateSession || tab.contents.isDestroyed()) return null;
+    if (!this.#takeoverTabIds.has(tab.id) && !this.#userControlTabIds.has(tab.id)) return null;
+    return this.#userBrowsing?.enabled() ? agentId : null;
+  }
+
+  /** Records the pages that load and the controls that a person clicks, as `#userBrowsingAgent` permits. */
+  #bindUserBrowsing(tab: BrowserHostTab): void {
+    const userBrowsing = this.#userBrowsing;
+    if (!userBrowsing) return;
+    const contents = tab.contents;
+    const recordPage = () => {
+      const agentId = this.#userBrowsingAgent(tab);
+      const place = agentId === null ? null : stepPlace(contents.getURL());
+      if (agentId === null || !place) return;
+      const title = stepText(contents.getTitle());
+      userBrowsing.record(agentId, { kind: "page", ...place, ...(title ? { title } : {}) });
+    };
+    contents.on("did-finish-load", recordPage);
+    contents.on("page-title-updated", recordPage);
+    contents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
+      if (isMainFrame) recordPage();
+    });
+    contents.on("input-event", (_event, input) => {
+      if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
+      const { x, y } = input;
+      if (typeof x !== "number" || typeof y !== "number" || this.#userBrowsingAgent(tab) === null) return;
+      const place = stepPlace(contents.getURL());
+      if (!place) return;
+      void readClickTarget(contents, x, y).then((target) => {
+        // The tab can change hands while the page answers.
+        const agentId = this.#userBrowsingAgent(tab);
+        if (target && agentId !== null) userBrowsing.record(agentId, { kind: "click", ...place, ...target });
+      });
+    });
   }
 
   #noteSiteVisit(tab: BrowserHostTab, url: string): void {

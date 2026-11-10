@@ -112,6 +112,7 @@ export const messages = {
   "error.team.folderUnavailable": "このフォルダーはホストのコンピューターで使用できません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.skillLearningUnsupported": "この接続はスキル学習に対応していません。",
+  "error.team.browsingMemoryUnsupported": "この接続は閲覧からの学習に対応していません。",
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",

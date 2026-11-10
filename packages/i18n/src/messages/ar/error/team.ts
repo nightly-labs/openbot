@@ -110,6 +110,7 @@ export const messages = {
   "error.team.folderUnavailable": "هذا المجلد غير متاح على حاسوب المضيف.",
   "error.team.memoryReviewUnsupported": "مراجعة الذاكرة غير مدعومة في هذا الاتصال.",
   "error.team.skillLearningUnsupported": "تعلّم المهارات غير مدعوم في هذا الاتصال.",
+  "error.team.browsingMemoryUnsupported": "هذا الاتصال لا يدعم التعلّم من التصفّح.",
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",

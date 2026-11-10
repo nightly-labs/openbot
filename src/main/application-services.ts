@@ -152,6 +152,7 @@ import { sweepProviderTemp } from "../backend/provider-temp";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
+import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
 import {
   type AgentDefaultsPreferenceStore,
@@ -188,6 +189,7 @@ import { BrowserEgressClient } from "./browser-egress-client";
 import { BrowserEgressHost } from "./browser-egress-host";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
+import { BrowsingMemoryPreferenceStore } from "./browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import {
   CentralAuthManager,
@@ -445,6 +447,8 @@ const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
 const SKILL_LEARNING_PREFERENCE_FILE = "openbot-skill-learning-v1.json";
+const BROWSING_MEMORY_PREFERENCE_FILE = "openbot-browsing-memory-v1.json";
+const USER_BROWSING_FILE = "openbot-browsing-steps-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
@@ -695,6 +699,7 @@ export interface ApplicationServices {
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
   skillLearning: SkillLearningPreferenceStore;
+  browsingMemory: BrowsingMemoryPreferenceStore;
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
@@ -1318,6 +1323,17 @@ export async function createApplicationServices({
   // Reads only: the agent service owns memory writes and the memory cap.
   const siteMemoryStore = new AgentMemoryStore(store.database);
   const browserProxyCipher = safeStorageCipher("error.app.secretStorageUnavailable");
+  // "Learn from my browsing": off by default. Turning it off deletes every recorded step.
+  const browsingMemory = new BrowsingMemoryPreferenceStore(
+    join(app.getPath("userData"), BROWSING_MEMORY_PREFERENCE_FILE),
+  );
+  await runCauseEffect(browsingMemory.load());
+  const userBrowsing = new UserBrowsingLog(join(app.getPath("userData"), USER_BROWSING_FILE));
+  // The load also deletes the steps older than 30 days.
+  await Effect.runPromise(userBrowsing.load());
+  browsingMemory.onChange(({ enabled }) => {
+    if (!enabled) Effect.runFork(userBrowsing.clear());
+  });
   // The agent service starts after the browser: a proxy failure before it has no open list to update.
   let browserProxyStatusChanged = () => {};
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
@@ -1334,6 +1350,12 @@ export async function createApplicationServices({
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
     siteMemories: (agentId, hostname) =>
       siteMemoryStore.forHost(agentId, hostname).flatMap(({ id, site, text }) => (site ? [{ id, site, text }] : [])),
+    userBrowsing: {
+      enabled: () => browsingMemory.get().enabled,
+      record: (agentId, step) => {
+        Effect.runFork(userBrowsing.record(agentId, step));
+      },
+    },
   });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
   await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
@@ -2129,6 +2151,7 @@ export async function createApplicationServices({
     agentMemoryLimit: () => agentMemoryLimit.get().limit,
     memoryReviewInterval: () => memoryReview.get().interval,
     skillLearning: () => skillLearning.get().mode,
+    userBrowsing,
     skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
@@ -3045,6 +3068,7 @@ export async function createApplicationServices({
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
       skillLearning,
+      browsingMemory,
       promptCacheTtl,
       modelVisibility,
       // The local Settings save does the same two steps (`saveSetup`).
@@ -4088,6 +4112,7 @@ export async function createApplicationServices({
     agentMemoryLimit: agentMemoryLimitSetting,
     memoryReview,
     skillLearning,
+    browsingMemory,
     agentNotificationLevels,
     sidebarPins,
     agentAccess,
