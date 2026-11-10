@@ -40,6 +40,8 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
@@ -176,11 +178,27 @@ function runtimeProviders(capabilities: readonly string[]): readonly Downloadabl
 }
 
 /**
- * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`, and
- * Inception, DeepSeek and OpenRouter from `providers-v8`.
+ * The other way in that the provider page offers, as the desktop ⋯ menu of a joined server does: the
+ * relayed page, when Connect is the host's code route.
+ */
+function providerSignInAlternative(provider: AgentProviderId, capabilities: readonly string[]): "relay" | null {
+  return providerSignInMethod(provider, capabilities) === "code" &&
+    capabilities.includes(SIGN_IN_RELAY_CAPABILITY) &&
+    isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)
+    ? "relay"
+    : null;
+}
+
+/**
+ * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`,
+ * Inception, DeepSeek and OpenRouter from `providers-v8`, and Claude and ChatGPT when the host reads
+ * their key (`claude-api-key-v1`, `codex-api-key-v1`). An older host stores such a key and never
+ * reads it.
  */
 function providerHasApiKey(provider: AgentProviderId, capabilities: readonly string[]): boolean {
   if (provider === "opencode") return true;
+  if (provider === "claude") return capabilities.includes(CLAUDE_API_KEY_CAPABILITY);
+  if (provider === "codex") return capabilities.includes(CODEX_API_KEY_CAPABILITY);
   if (isKeyOnlyProvider(provider)) return capabilities.includes(PROVIDERS_V8_CAPABILITY);
   return capabilities.includes(PROVIDERS_V5_CAPABILITY) && (provider === "muse" || provider === "antigravity");
 }
@@ -219,6 +237,8 @@ export interface ProviderRow {
   /** Installed, idle, and the host has a different version. */
   updatable: boolean;
   signIn: ProviderSignInMethod | null;
+  /** A second sign-in that differs from `signIn`, or null. */
+  alternativeSignIn: "relay" | null;
   apiKey: boolean;
 }
 
@@ -264,6 +284,7 @@ export function providerRows(
             availableVersion !== runtime.version,
         ),
         signIn: providerSignInMethod(provider, capabilities),
+        alternativeSignIn: providerSignInAlternative(provider, capabilities),
         apiKey: providerHasApiKey(provider, capabilities),
       };
     });

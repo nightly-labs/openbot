@@ -1,13 +1,13 @@
 import { isAgentProvider, providerDisplayName } from "@openbot/contracts/ipc";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Server from "lucide-react-native/icons/server";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
-import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import {
@@ -17,6 +17,7 @@ import {
   providerStatusText,
 } from "@/features/servers/model/provider-admin";
 import {
+  useHostProviderDefault,
   useServerCustomAgents,
   useServerCustomProviders,
   useServerProviders,
@@ -28,7 +29,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { queryKeys } from "@/features/workspace/model/query-keys";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, type MobileText, useText } from "@/shared/lib/text";
 
@@ -112,6 +113,7 @@ export function ServerProvidersScreen() {
           <SettingsRow
             disclosure={false}
             disabled={checking}
+            leading={<RowIcon icon={RefreshCw} tone="accent" />}
             onPress={() => {
               setChecking(true);
               setCheckResult(null);
@@ -193,7 +195,12 @@ function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: 
         </SettingsRow>
       ))}
       {list.isError ? (
-        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+        <SettingsRow
+          disclosure={false}
+          disabled={list.isFetching}
+          leading={<RowIcon icon={RotateCcw} tone="accent" />}
+          onPress={() => void list.refetch()}
+        >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
         </SettingsRow>
       ) : (
@@ -242,7 +249,12 @@ function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderA
         </SettingsRow>
       ) : null}
       {list.isError ? (
-        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+        <SettingsRow
+          disclosure={false}
+          disabled={list.isFetching}
+          leading={<RowIcon icon={RotateCcw} tone="accent" />}
+          onPress={() => void list.refetch()}
+        >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
@@ -299,12 +311,7 @@ function DefaultProviderSection({
 }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerDefault(queryScope, serverId);
-  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { current, saving, error, choose } = useHostProviderDefault(serverId, setting);
   const value = current.data?.provider ?? null;
   const options: { value: string; label: string }[] = rows
     .filter((row) => (row.status?.state === "available" && !row.status.off) || row.id === value)
@@ -333,21 +340,7 @@ function DefaultProviderSection({
             dark={theme === "dark"}
             label={label}
             onChange={(next) => {
-              if (!isAgentProvider(next) || next === value) return;
-              setSaving(true);
-              setError(null);
-              setting
-                .set(next)
-                .then(async (saved) => {
-                  await queryClient.cancelQueries({ queryKey, exact: true });
-                  queryClient.setQueryData(queryKey, saved);
-                  void haptics.notification("success");
-                })
-                .catch((cause: unknown) => {
-                  setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
-                  void haptics.notification("error");
-                })
-                .finally(() => setSaving(false));
+              if (isAgentProvider(next)) choose(next);
             }}
           />
         }
