@@ -406,8 +406,9 @@ export class McpGateway {
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
     if (this.#testedTools.get(key) === tools) return;
-    this.#testedTools.set(key, tools);
+    // Recorded after the refresh, so a refresh that fails is tried again at the next test.
     yield* this.#hooks.refreshAllAgentRuntimes();
+    this.#testedTools.set(key, tools);
   });
 
   /**
