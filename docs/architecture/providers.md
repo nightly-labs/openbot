@@ -367,14 +367,13 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, Pi, Kimi, GitHub Copilot and Mistral, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+`releases/latest` for Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini (`google-antigravity/antigravity-cli`), the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entry `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi, Kimi, GitHub Copilot and Mistral, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
-so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
-`dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
+Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+so a Grok or Cursor release is trusted on TLS alone. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
 registry date, and keep the pinned command. An upstream install writes `openbot-install.json` with the SHA-256 of each
 file it installed, and every start verifies that record and the binary's `--version` before the
@@ -747,36 +746,55 @@ accept only `AGENT_PROVIDERS` and reject other values before they write an event
 
 ### Gemini
 
-The Gemini provider (id `antigravity`) starts Google's Antigravity ACP server
-(`agy_acp_server`). Google's license does not allow redistribution, so the runtime manager
-downloads the zip on the user's computer. `extractZipFiles` in `src/main/provider-runtime-archive.ts`
-accepts only the server and `localharness_external`, which the server starts from its own folder.
-The server has no `--version`, so staging writes `antigravity-package.json` and
-`verifyInstalledRuntime` reads the version from that file (`versionFile`). OpenBot never searches
-`PATH`, because the Antigravity editor installs an `antigravity` command that is not this server.
+The Gemini provider (id `antigravity`) starts the `acp` command of Google's Antigravity CLI
+(`antigravity`, from GitHub `google-antigravity/antigravity-cli`). Google's license does not allow
+redistribution, so the runtime manager downloads the archive on the user's computer. Each archive
+holds only the program, which `nativeProviderRuntime` stages as `bin/antigravity`. The CLI prints its
+version with `--version`. OpenBot never searches `PATH`, because the Antigravity editor installs an
+`antigravity` command that is not this CLI. Up to 1.4.5 the provider ran the ACP server
+`agy_acp_server` from the ACP registry; an install of it is not used (`legacyExecutableNames`), and
+`antigravityTakesStateFolders` (1.5.3 and later) gates the accounts after the first.
 
-The server offers its Claude and GPT models only to a client whose `initialize` `clientInfo.name` is
-`zed`, `xcode`, `jetbrains.*` or `android studio*` (`supports_third_party_models` in 1.4.3). Other
-clients get only the Gemini models. So `ANTIGRAVITY_ACP_FLAVOR.clientInfo` sends the name `zed` and
-the title `OpenBot`. The server also sends the name and version to Google in its User-Agent
-(`_surface`), so Google sees OpenBot's requests as `zed/0.1.0`.
+The 1.5 CLI offers its Claude and GPT models to every client, so the flavor sends OpenBot's own
+`clientInfo`. (1.4 offered them only to a client named `zed`.)
+
+The CLI ignores `GEMINI_HOME`. It takes its folders as flags: `--gemini-dir` as an absolute path
+and `--app-data-dir` relative to the Gemini home (`antigravityArgv`). A relative `--gemini-dir` logs
+`Failed to resolve GeminiDir ... must be an absolute path ... falling back to default`, and on
+Windows no relative path reaches another drive. OpenBot passes the account's `GEMINI_HOME` (default `~/.gemini`) and
+`antigravity-acp`, the folder that 1.4 used. On macOS the CLI keeps the Google token in one Keychain
+item (`gemini`/`antigravity`) that every account would share. With `WSL_DISTRO_NAME` set it keeps the
+token in the file `antigravity-oauth-token` in the app data folder, so every Antigravity process gets
+`WSL_DISTRO_NAME=OpenBot` (`ANTIGRAVITY_ENV`). `SSH_CONNECTION` also selects the file, but then the CLI
+refuses a browser sign-in. A confined process also cannot write the Keychain (#2988).
+
+1.4 kept the token in `acp_token.json`, which 1.5 does not read. Before each start,
+`importAntigravityToken` (`src/backend/antigravity-token-import.ts`) copies the old refresh token into
+a new `antigravity-oauth-token` once, with an expired access token that the CLI refreshes, and writes
+the marker `openbot-token-imported`. An account whose `settings.json` names another sign-in method gets
+no copy. The old file stays, and after a sign-out the marker stops a second copy.
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
-(`src/backend/acp-sign-in.ts`). On Linux, OpenBot reads the Google sign-in link from the
-server and opens it with the desktop browser. The server browser launch is disabled for this
-process so the page opens once. A failed browser launch gives an actionable error; the OAuth
-link and browser error details are not logged. Other platforms let the server open the browser.
-A valid saved Google token answers `authenticate` with no browser page. So a Reconnect of a
-connected Google sign-in, with no saved key, first calls ACP `logout` when `initialize` advertises
-`agentCapabilities.auth.logout` (runtime 1.4.1 and later). The Google page then opens. The token is
-shared by every OpenBot profile on the computer, so they all sign out. A Reconnect is refused while
-a Gemini turn runs. When the sign-in stops after the logout answered, OpenBot stops the old client
-and reports Gemini signed out; a failure keeps its own reason. A status probe must never call `authenticate`. The serving client does not call it.
-OpenBot checks authentication through model discovery (`session/new`), not the auth methods
-advertised by `initialize`. The runtime can answer "Authentication required", which OpenBot
-reports as sign-in required. In runtime 1.3.0, a saved OAuth method with no valid token can also
-start interactive authentication during `session/new`; this can leave the probe waiting until
-its existing deadline. Runtime installation alone does not confirm authentication.
+(`src/backend/acp-sign-in.ts`). The CLI writes no sign-in link; it runs `open` (macOS) or `xdg-open`
+(Linux) from `PATH`. So the sign-in process gets a private folder first on `PATH` with an `open` and an
+`xdg-open` script that write the link to a file. OpenBot accepts only an `accounts.google.com` OAuth
+page, registers it as a secret, and opens it in the desktop browser or in the host's private tab. A
+failed browser launch gives an actionable error; the OAuth link and browser error details are not
+logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FileProtocolHandler` by its
+absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
+(`googleSignInByOpenBot`): the page opens from the CLI itself, and a remote host cannot relay it, as
+with 1.4.5 (#4521). The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
+`initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
+and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old
+refresh token still gets new access tokens. The Google page then opens. A Reconnect is
+refused while a Gemini turn runs. When the sign-in stops after the logout answered, OpenBot stops the
+old client and reports Gemini signed out; a failure keeps its own reason. A status probe must never
+call `authenticate`. The serving client does not call it. OpenBot checks authentication through model
+discovery (`session/new`), not the auth methods advertised by `initialize`. A session process
+refreshes the token when its session opens. When Google refuses it, 1.5.4 answers `session/new` with
+ACP's `authRequired` error and opens no browser; the flavor's `authRequiredSignsOut` then reports the
+sign-out. Runtime installation alone does not confirm authentication.
 On Ubuntu 24.04, install a desktop browser and `xdg-utils` before sign-in. The Google
 callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session on that same
 VM. A browser on another computer cannot complete this loopback callback. A server with no
@@ -794,55 +812,26 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 available; "Connected" requires a successful provider check. A known authentication or launch
 error takes priority over runtime readiness.
 
-#### Download and external runtime recovery
+#### External runtime
 
-Issue #1776 reports an HTTP 404 for the official 1.3.0 Linux archive from an OVH IPv6 pool,
-and HTTP 200 over IPv4. This cause is not confirmed: checks from another host on 2026-10-10
-returned HTTP 200 over both families. An HTTP failure occurs before archive extraction or
-ACP startup; it is separate from browser sign-in and missing runtime files. OpenBot keeps
-the download error and Retry action and does not change the host's network settings.
+Set `OPENBOT_ANTIGRAVITY_PATH` to an Antigravity CLI executable, 1.5.3 or later, that the OpenBot host
+user can run, and restart OpenBot. The variable names the executable, not the directory. OpenBot reads
+the version with `--version`. An invalid override remains an error: OpenBot does not replace it with
+the managed runtime. Managed updates do not change the explicit override.
 
-For an affected host, an operator can compare bounded requests to the exact failing URL
-with `curl --ipv4 --head --connect-timeout 10 --max-time 30 <url>` and the corresponding
-`--ipv6` command. If IPv4 works, download that same official archive with
-`curl --ipv4 --fail --connect-timeout 10 --max-time 300 --output <new-archive-path> <url>`.
-Verify the archive against a trusted release checksum before extraction. This affects only
-that request. Do not disable IPv6. The report's claimed `::1` kernel requirement was not
-confirmed in the ACP Python source; a native harness requirement remains unverified.
+The CLI runs confined; `antigravityStatePaths` gives it the app data folder, `artifacts` and
+`config/projects` in the Gemini home, and protects its settings files. Migration 22 adds `antigravity`
+to `projection_provider_sessions`.
 
-An external installation must preserve this layout (1.3.0 is an example):
-
-```text
-/var/lib/openbot/antigravity-acp-1.3.0/
-  antigravity-package.json    {"version":"1.3.0"}
-  bin/
-    agy_acp_server.par
-    localharness_external
-```
-
-Both programs must be executable by the OpenBot host user. Set
-`OPENBOT_ANTIGRAVITY_PATH=/var/lib/openbot/antigravity-acp-1.3.0/bin/agy_acp_server.par`
-in that process's environment and restart OpenBot. The variable names the executable, not
-the directory. OpenBot requires the version manifest two levels above it; extraction alone
-does not create that manifest. An invalid override remains an error: OpenBot does not replace
-it with the managed runtime. Managed updates do not change the explicit override.
-
-The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravity-acp` and
-`~/.gemini/artifacts` and protects its settings files. On macOS, runtime 1.4.0 and later keep the
-Google sign-in in the login Keychain only when a test item can be written there at start, and a
-confined process cannot write the Keychain (#2988). So every Antigravity process, the sign-in
-included, gets `AGY_ACP_FORCE_FILE_STORAGE=1` and keeps the token in
-`~/.gemini/antigravity-acp/acp_token.json`, as on Linux and Windows. A token that an earlier
-version saved in the Keychain is not read, so the user signs in again once. Migration 22 adds `antigravity` to
-`projection_provider_sessions`.
-
-From 1.4.0 the server keeps the token, `settings.json` (which names the sign-in method) and its
-conversations in `$GEMINI_HOME/antigravity-acp`, with `~/.gemini` when the variable is not set. So
-Gemini can hold more than one account: each account after the first gets `GEMINI_HOME` set to its
-own folder (`antigravityReadsGeminiHome` gates the rows, the sign-in, the checks, the usage reads and
-the agent start), and `antigravityStatePaths` confines its process to that folder. Each new session
-leaves a conversation database in that folder, so a usage read of an account with no agent process
-starts no process: the account shows its reading from the sign-in check. The sandbox cannot create folders in a new account's home, so OpenBot makes them.
+The CLI keeps the token, `settings.json` (which names the sign-in method) and its conversations in the
+app data folder. Its own log there (`log/`) contains the Google account email (`applyAuthResult`).
+OpenBot does not read that folder into its log or a diagnostics export. In the 1.5.4 tests the CLI wrote
+nothing to stderr. So Gemini can hold more than one account: each account after the first gets
+`GEMINI_HOME` set to its own folder, which `antigravityArgv` passes as `--gemini-dir`, and
+`antigravityStatePaths` confines its process to that folder. A usage read needs an access token that
+has not expired, and only a running CLI refreshes it, so a usage read of an account with no agent
+process starts no process: the account shows its reading from the sign-in check. The sandbox cannot
+create folders in a new account's home, so OpenBot makes them.
 A plan can serve models that the first account's does not, so the account check also reads the account's own
 `model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
 `models` only the ones that the provider's catalogue does not list: the picker shows the catalogue on the
@@ -857,23 +846,23 @@ that two accounts are the same Google account. A joined server relays the accoun
 client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
 names Codex and Claude only, signs the account in through the live view.
 
-From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
-reads the Google account's quota summary and sends one Markdown answer. The driver's
-`readRateLimits` sends it in a session that no thread owns (`privatePrompt` in
-`src/backend/acp-client.ts`). Each process keeps that one session for every read, because each new
-Antigravity session leaves a conversation database in `~/.gemini/antigravity-acp/conversations`,
-also after it closes. `src/backend/antigravity-usage.ts` reads one group of the answer's
-"Quota Limits" section into the windows. Google can give a model a group of its own, such as Gemini 4
+Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
+(`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
+Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
+`retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
+unless the User-Agent is `antigravity/<version> <os>/<arch>`. OpenBot does not refresh the token: it
+does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
+reading. `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
+(`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
+Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
 and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
 send `groups`, so a remote client shows the one reading. The Claude and GPT models that Antigravity
-also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold. An
-older runtime, an
-API key sign-in ("Not applicable for current authentication method") and an answer that does not
-parse give no reading. A saved Gemini API key comes before the Google sign-in, so the provider
+also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold.
+A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
 not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
 
@@ -882,16 +871,16 @@ many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
 `src/backend/acp-flavor-antigravity.ts` names a rate limit or quota, an unavailable model, and a
 service failure from Google's status text. Antigravity does not document these texts.
 
-Antigravity 1.3.0 reports a spent per-user quota as answer text, `Usage Limit Reached` and Google's
-reset time. The flavor shows it with `error.provider.antigravityQuotaReached`, not the rate-limit
+Antigravity reports a spent per-user quota as answer text, `Usage Limit Reached` and Google's
+reset time; 1.5 puts `⚠ ` before it. A failed MCP server gets the same prefix. The flavor shows it with `error.provider.antigravityQuotaReached`, not the rate-limit
 text, because the quota resets in days. The server names no bucket, so the message says that the
 limit can be for one model and that the plan's usage page can still show room.
 
-Antigravity 1.3.0 and later send ACP `usage_update` after each model step: `used` is the size of
+Antigravity 1.3.0 to 1.4.5 send ACP `usage_update` after each model step: `used` is the size of
 the last model call, and `size` is the model's context window. The adapter turns it into
-`thread/tokenUsage/updated`, also after a turn that OpenBot already ended. 1.2.1, the pinned
-first-install version, sends none, so the ring stays hidden until the runtime updates. The update
-has no category breakdown.
+`thread/tokenUsage/updated`, also after a turn that OpenBot already ended. The update has no
+category breakdown. The 1.5.4 CLI sends no `usage_update` (checked on macOS and Windows), so a
+Gemini agent shows no context reading until the CLI sends it again.
 
 Antigravity 1.4.3 also returns `usage` from `session/prompt`: the tokens of that prompt only, measured
 from the session's total at the turn's start. A restored session starts from its saved total.

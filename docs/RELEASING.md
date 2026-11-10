@@ -261,13 +261,15 @@ licence, because Ubuntu 26.04 has only `libminiupnpc21`. Sunshine finds it throu
 Ubuntu 26.04.
 Linux arm64 builds only for local development and has no release artifact.
 
-## Pin the Gemini server
+## Pin the Gemini CLI
 
-`native-runtime.lock.json` pins Google's Antigravity ACP server for the Gemini provider by hand:
-the version from the ACP registry entry `antigravity-acp`, and for each target the zip name, its
-SHA-256 and size, and the SHA-256 of `agy_acp_server` and `localharness_external` in it. Download
-each zip from the registry `archive` URL, hash the zip and the two files, and set `installedBytes`
-above the extracted size. Do not commit the zip: Google's license does not allow redistribution.
+`native-runtime.lock.json` pins Google's Antigravity CLI for the Gemini provider by hand. Read the
+tag of `https://api.github.com/repos/google-antigravity/antigravity-cli/releases/latest` and set
+`version` to it (the tags have no `v`). For each target, download `agy_cli_<target>.tar.gz`
+(`agy_cli_windows_x64.zip` on Windows) from that release, and check its SHA-256 against the asset
+`digest`. Set `url`, `assetSha256`, `downloadBytes`, `installedBytes` (the size of the extracted
+`antigravity` or `antigravity.exe`) and the SHA-256 of `bin/antigravity` (`bin/antigravity.exe` on
+Windows). Do not commit an archive: Google's license does not allow redistribution.
 
 ## Pin the Cursor CLI
 

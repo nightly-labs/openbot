@@ -241,9 +241,6 @@ export const messages = {
   "error.provider.noAgentProcess": "{provider} bu ajan için çalışan bir işleme sahip değil.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} ajanın işlemi başlamadan önce durdu.",
   "error.provider.archiveUnreadable": "Çalışma zamanı arşivi okunamıyor veya desteklenmeyen bir biçim kullanıyor.",
-  "error.provider.antigravityArchivePath": "Gemini arşivi beklenmeyen bir dosya içeriyor.",
-  "error.provider.antigravityChecksum": "Gemini çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
-  "error.provider.antigravityReleaseShape": "Gemini sürümü beklenmeyen bir yapıya sahip.",
   "error.provider.antigravityMissing": "Gemini indirilmedi. Devam etmek için OpenBot içinde indirin.",
   "error.provider.antigravityNotStarted": "Gemini sunucusu bulundu ancak sürümü okunamıyor.",
   "error.provider.antigravityOverrideInvalid":

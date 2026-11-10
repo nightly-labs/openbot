@@ -27,6 +27,12 @@ export interface AcpFlavor {
    */
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   /**
+   * Whether ACP's `authRequired` error (`-32000`) to a new session means that the saved sign-in
+   * stopped working. The client then reports the sign-out, as at its start. Absent: the error is the
+   * session's failure only.
+   */
+  authRequiredSignsOut?: boolean;
+  /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null.

@@ -1022,7 +1022,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  /** The newest version older than `version` whose executable is still there. */
+  /**
+   * The newest version older than `version` whose executable is still there. An install with a
+   * legacy executable name counts, so the update after an app upgrade replaces it, but it cannot run:
+   * `executablePath` names the current program in it, which is missing.
+   */
 
   #workingBackupEffect(
     targetRoot: string,
@@ -1035,11 +1039,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .filter((entry) => entry.isDirectory() && olderVersion(entry.name, version))
         .map((entry) => entry.name)
         .sort((a, b) => compareReleases(b, a));
+      const names = [spec.executableName, ...(providerRuntimeDescriptor(spec.runtime).legacyExecutableNames ?? [])];
       for (const candidate of versions) {
-        const executable = yield* runtimeIO(
-          async () => await stat(join(targetRoot, candidate, "bin", spec.executableName)).catch(() => null),
-        );
-        if (executable?.isFile()) return candidate;
+        for (const name of names) {
+          const executable = yield* runtimeIO(
+            async () => await stat(join(targetRoot, candidate, "bin", name)).catch(() => null),
+          );
+          if (executable?.isFile()) return candidate;
+        }
       }
       return null;
     });

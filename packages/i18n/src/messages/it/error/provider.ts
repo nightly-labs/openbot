@@ -240,9 +240,6 @@ export const messages = {
   "error.provider.noAgentProcess": "{provider} non ha nessun processo in esecuzione per questo agente.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} si è fermato prima che partisse il processo dell'agente.",
   "error.provider.archiveUnreadable": "L'archivio del runtime non è leggibile o usa un formato non supportato.",
-  "error.provider.antigravityArchivePath": "L'archivio di Gemini contiene un file inatteso.",
-  "error.provider.antigravityChecksum": "Checksum del runtime di Gemini non corrispondente.",
-  "error.provider.antigravityReleaseShape": "La release di Gemini ha una struttura inattesa.",
   "error.provider.antigravityMissing": "Gemini non è scaricato. Scaricalo in OpenBot per continuare.",
   "error.provider.antigravityNotStarted":
     "Il server di Gemini è stato trovato, ma non è possibile leggerne la versione.",

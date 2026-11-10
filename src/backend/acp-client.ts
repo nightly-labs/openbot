@@ -1766,6 +1766,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             retained = true;
             return { thread: { id } };
           } catch (error) {
+            // Antigravity CLI 1.5.4 refreshes its token when a session opens, and answers `authRequired`
+            // when Google refuses it. The client reports the sign-out, as at its start.
+            if (this.#flavor.authRequiredSignsOut && error instanceof RequestError && error.code === -32000) {
+              this.#signedIn = false;
+              this.emit("exit", new Error(this.options.signInMessage));
+            }
             // The server asked for a browser sign-in while the session opened, and the stop ended it.
             if (!this.#signedIn) return yield* providerFailure(new Error(this.options.signInMessage));
             return yield* transport ? yield* this.#explainSessionEnd(transport, error) : providerFailure(error);

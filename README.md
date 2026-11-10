@@ -210,14 +210,13 @@ keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select
 outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
 show these agents.
 
-Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity ACP server on
-this computer when you select Download on the Gemini row, because Google's license does not let
-OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
+Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity CLI on this
+computer when you select Download on the Gemini row, because Google's license does not let OpenBot
+include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
 `antigravity` command on your search path, because the Antigravity editor installs a command with
-that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
-`bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
-`bin/`. Keep `localharness_external` beside the server. When that path is set, OpenBot uses
-only it. Connect remains available in the host's local Server settings > Providers screen. Remote
+that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select an Antigravity CLI 1.5.3 or later executable
+yourself. OpenBot reads its version with `--version`. When that path is set, OpenBot uses only
+it. Connect remains available in the host's local Server settings > Providers screen. Remote
 settings cannot perform Google sign-in; use a browser on the host. See
 [Gemini setup and download recovery](docs/architecture/providers.md#gemini) for the required
 layout, the reported IPv6 download failure, and checks that do not change host networking.

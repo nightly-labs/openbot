@@ -250,9 +250,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} wurde gestoppt, bevor der Agentenprozess gestartet wurde.",
   "error.provider.archiveUnreadable":
     "Das Laufzeitarchiv kann nicht gelesen werden oder verwendet ein nicht unterstütztes Format.",
-  "error.provider.antigravityArchivePath": "Das Gemini-Archiv enthält eine unerwartete Datei.",
-  "error.provider.antigravityChecksum": "Die Prüfsumme der Gemini-Laufzeit stimmt nicht überein.",
-  "error.provider.antigravityReleaseShape": "Die Gemini-Version hat eine unerwartete Struktur.",
   "error.provider.antigravityMissing":
     "Gemini wurde nicht heruntergeladen. Lade es in OpenBot herunter, um fortzufahren.",
   "error.provider.antigravityNotStarted":

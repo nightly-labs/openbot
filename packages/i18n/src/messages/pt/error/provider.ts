@@ -242,9 +242,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} parou antes de o processo do agente iniciar.",
   "error.provider.archiveUnreadable":
     "O arquivo compactado do ambiente de execução não pode ser lido ou usa um formato incompatível.",
-  "error.provider.antigravityArchivePath": "O arquivo compactado do Gemini contém um arquivo inesperado.",
-  "error.provider.antigravityChecksum": "A soma de verificação do ambiente de execução do Gemini não corresponde.",
-  "error.provider.antigravityReleaseShape": "A versão do Gemini tem um formato inesperado.",
   "error.provider.antigravityMissing": "O Gemini não foi baixado. Baixe-o no OpenBot para continuar.",
   "error.provider.antigravityNotStarted": "O servidor do Gemini foi encontrado, mas não é possível ler sua versão.",
   "error.provider.antigravityOverrideInvalid":

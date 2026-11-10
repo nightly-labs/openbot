@@ -239,9 +239,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} is gestopt voordat het proces van de agent startte.",
   "error.provider.archiveUnreadable":
     "Het runtime-archief kan niet worden gelezen of gebruikt een niet-ondersteunde indeling.",
-  "error.provider.antigravityArchivePath": "Het Gemini-archief bevat een onverwacht bestand.",
-  "error.provider.antigravityChecksum": "Checksum van de Gemini-runtime komt niet overeen.",
-  "error.provider.antigravityReleaseShape": "De Gemini-release heeft een onverwachte vorm.",
   "error.provider.antigravityMissing": "Gemini is niet gedownload. Download het in OpenBot om door te gaan.",
   "error.provider.antigravityNotStarted": "De Gemini-server is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.antigravityOverrideInvalid":

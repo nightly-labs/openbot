@@ -3,8 +3,11 @@ import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import { isRecord } from "./protocol";
 
-/** Antigravity 1.3.0's `quota_exhausted_message`: a fixed header, then the reset time. */
-const GEMINI_QUOTA_CHUNK = /^\s*Usage Limit Reached\n\n([\s\S]*)$/u;
+/**
+ * Antigravity 1.3.0's `quota_exhausted_message`: a fixed header, then the reset time. The 1.5 CLI
+ * can put its warning sign first (`GEMINI_WARNING_ANSWER`).
+ */
+const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
 /** The stderr record that Antigravity 1.3.0 writes before it sends an SDK failure as answer text. */
 const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for session (\S+)/u;
 /** `format_execution_error` of Antigravity 1.3.0 when the failure is not a Google API error. */
@@ -17,9 +20,15 @@ const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
  */
 const GEMINI_VERIFICATION_ANSWER =
   /(?:^|\n)[^\n]*: (https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+/**
+ * The Antigravity CLI 1.5 sends a failed request as an answer that starts with a line break, a
+ * warning sign and a space, such as "\n⚠ Agent Platform API has not been used in project ...", and
+ * ends the turn as a success. A model's warning sign comes with the emoji selector (U+FE0F).
+ */
+const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
 /** The answers that are the server's failure text, not a reply of the model. */
 const GEMINI_FAILURE_ANSWER = new RegExp(
-  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}`,
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}`,
   "u",
 );
 
@@ -41,7 +50,7 @@ const GEMINI_EMPTY_OUTPUT_FAILURE =
  * characters.
  */
 const GEMINI_MCP_LOAD_FAILURES = [
-  /^\s*The MCP server '([A-Za-z0-9_-]+)' failed to initialize(?:: ([\s\S]*?))?\.? Fix the MCP server\b/u,
+  /^\s*(?:\u26A0 )?The MCP server '([A-Za-z0-9_-]+)' failed to initialize(?:: ([\s\S]*?))?\.? Fix the MCP server\b/u,
   /\bMCP load failed for ([A-Za-z0-9_-]+): ([\s\S]*)$/u,
 ] as const;
 
@@ -85,7 +94,8 @@ const GEMINI_REQUEST_FAILURES = [
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */
-function geminiTurnFailure(text: string): string {
+function geminiTurnFailure(answer: string): string {
+  const text = answer.replace(GEMINI_WARNING_ANSWER, "");
   // The account, not the request, is the problem: no key or model change helps.
   if (geminiAccountLink(text) !== null) return sourceText("error.provider.geminiVerificationRequired");
   // Google's API answer for a refused key. The key is the user's to fix, not the request.
@@ -103,11 +113,8 @@ function geminiRequestFailure(error: unknown, detail: string): string {
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
-  // Antigravity 1.4.3 offers its Claude and GPT models only to a client named `zed`, `xcode`,
-  // `jetbrains.*` or `android studio*` (`supports_third_party_models`). Any other client gets the
-  // Gemini models only, also when the plan includes the others. The server also sends the name and
-  // version to Google in its User-Agent (`_surface`), so Google sees these requests as `zed/0.1.0`.
-  clientInfo: { name: "zed", title: "OpenBot", version: "0.1.0" },
+  // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
+  // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
   // routines, and a workflow runs agents that OpenBot does not show. Antigravity keeps the filter with
   // the session; a load or resume sends it again, so a session from an earlier release gets it too.
@@ -121,6 +128,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
   },
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
+  // The 1.5.4 CLI refreshes the Google token when a session opens. When Google refuses it, the CLI
+  // answers `authRequired` and opens no browser.
+  authRequiredSignsOut: true,
   // Antigravity 1.4.5 ends a turn whose quota is spent with the stop reason `refusal`
   // (`_to_acp_stop_reason` of QUOTA_EXHAUSTED).
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),

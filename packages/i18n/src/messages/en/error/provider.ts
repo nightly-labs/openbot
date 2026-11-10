@@ -230,9 +230,6 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAgentProcess": "{provider} has no process running for this agent.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} stopped before the agent's process started.",
   "error.provider.archiveUnreadable": "The runtime archive cannot be read or uses an unsupported format.",
-  "error.provider.antigravityArchivePath": "The Gemini archive has an unexpected file.",
-  "error.provider.antigravityChecksum": "Gemini runtime checksum mismatch.",
-  "error.provider.antigravityReleaseShape": "The Gemini release has an unexpected shape.",
   "error.provider.antigravityMissing": "Gemini is not downloaded. Download it in OpenBot to continue.",
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityOverrideInvalid":
