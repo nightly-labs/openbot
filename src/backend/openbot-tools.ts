@@ -52,6 +52,7 @@ import {
   ROUTINE_INSTRUCTION_RULE,
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineRunPlaceZodSchema,
   routineScheduleZodSchema,
@@ -582,7 +583,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
       runIn: routineRunPlaceZodSchema.optional(),
     },
   },
@@ -643,18 +644,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "remember",
     description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or consolidate an existing memory. New entries are searchable unless inclusion is essential. Essential requests that do not fit stay searchable. The change commits only if the current turn completes.",
+      "Stage one short, durable memory for this agent. Use memoryId to correct or merge a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. It commits only if the current turn completes.",
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
       inclusion: z.enum(["essential", "searchable"]).optional(),
-      site: z
-        .string()
-        .max(2048)
-        .optional()
-        .describe(
-          "A host or URL the memory is about, such as how to work a site. The browser shows it on pages of that site. Omitted on an update: the site stays.",
-        ),
+      site: z.string().max(2048).optional(),
     },
   },
   {

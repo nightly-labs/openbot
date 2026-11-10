@@ -219,7 +219,8 @@ shape stays the same. An instance transfer does not carry the site.
 The background memory review can add or update a memory with a `site` too. Its prompt asks it to keep
 how one site works, as the agent found it in the chat (where a control is, a step that worked after
 one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
-host and keeps the fact. The browser guidance asks the agent to save such a step itself.
+host and keeps the fact. The browser guidance has no site memory text: the agent context budget
+(`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
 
 "Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
 lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
