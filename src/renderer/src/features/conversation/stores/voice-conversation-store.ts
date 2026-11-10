@@ -592,6 +592,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     }
     if (held) interruptByVoice();
     setStep("waiting");
+    waitingSend = own;
     sentHeard = text;
     setState((draft) => {
       draft.heard = text;
@@ -602,7 +603,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       discardRecording(recordingId);
       return;
     }
-    waitingSend = own;
     noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
