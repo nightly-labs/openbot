@@ -41,6 +41,8 @@ export const messages = {
   "error.import.remoteZipTooLarge": "כדי לייבא לשרת שהצטרפת אליו, הייצוא חייב להיות קובץ .zip קטן מ-100 MB.",
   "error.import.hostBusy": "השרת קורא ייצואים אחרים. יש לנסות שוב בעוד כמה דקות.",
   "error.import.skillKept": '{name}: בשרת כבר יש את המיומנות "{skill}", ולכן הסוכן משתמש בה. יש לבקש ממנהל לעדכן אותה.',
+  "error.import.skillRenamed":
+    '{name}: השם של המיומנות "{skill}" דומה מדי לשם של מיומנות אחרת, ולכן היא נשמרת בשם "{renamed}".',
   "error.import.hermesNoProfiles":
     "בתיקייה הזו אין פרופילי Hermes. יש לבחור את תיקיית Hermes, שמכילה את config.yaml או את SOUL.md.",
   "error.import.hermesClosed": "פרופילי Hermes אינם פתוחים עוד. יש לקרוא אותם שוב.",

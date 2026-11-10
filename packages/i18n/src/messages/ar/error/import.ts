@@ -42,6 +42,7 @@ export const messages = {
   "error.import.hostBusy": "يقرأ الخادم عمليات تصدير أخرى. حاول مرة أخرى بعد بضع دقائق.",
   "error.import.skillKept":
     "{name}: لدى الخادم المهارة «{skill}» بالفعل، لذا يستخدم الوكيل تلك المهارة. اطلب من مسؤول تحديثها.",
+  "error.import.skillRenamed": "{name}: اسم المهارة «{skill}» قريب جدًا من اسم مهارة أخرى، لذا حُفظت باسم «{renamed}».",
   "error.import.hermesNoProfiles":
     "لا يحتوي هذا المجلد على ملفات تعريف Hermes. اختر مجلد Hermes الذي يحتوي على config.yaml أو SOUL.md.",
   "error.import.hermesClosed": "لم تعد ملفات تعريف Hermes مفتوحة. اقرأها مرة أخرى.",
