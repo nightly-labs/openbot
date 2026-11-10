@@ -3310,6 +3310,7 @@ export class ProviderRuntime implements ProviderPort {
         // A new CLI gets new starts: the failures were of the one it replaces.
         this.#startFailures.delete(provider);
         this.#slowStarts.delete(provider);
+        this.#resetRestarts(provider);
       });
       // Other providers can have live turns. Replacement must not run start recovery. The start checks
       // the copy just installed: a CLI the user installed that is as new ran in its place, and its
