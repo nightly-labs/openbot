@@ -510,9 +510,12 @@ async function quit(app: RunningApp): Promise<QuitResult> {
   const outcome = await Promise.race([app.exited, limit]);
   current.app = null;
   if (outcome !== "limit") {
-    // Chromium deletes `SingletonLock` when it ends, after the database host has stopped.
+    // Chromium deletes its profile lock when it ends, after the database host has stopped. On
+    // Windows the lock is `lockfile`, which Chromium opens with delete-on-close; it has no
+    // `SingletonLock` there.
+    const lockName = process.platform === "win32" ? "lockfile" : "SingletonLock";
     await waitFor("the profile lock to be released", QUIT_LIMIT_MS, async () =>
-      (await lstat(join(userDataPath, "SingletonLock")).then(
+      (await lstat(join(userDataPath, lockName)).then(
         () => false,
         () => true,
       ))
