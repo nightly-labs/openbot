@@ -282,8 +282,12 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
         index = end;
         continue;
       }
-      result += value.slice(index, start + 1);
-      index = start + 1;
+      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
+      // so `{{name}}` costs one scan against the bound and not two.
+      let next = start + 1;
+      while (value[next] === "{" || value[next] === "[") next += 1;
+      result += value.slice(index, next);
+      index = next;
       continue;
     }
     result += value.slice(index, start) + parsed;
@@ -306,12 +310,16 @@ function parseRedacted(candidate: string, emails: boolean): string | null {
  * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
  * dropping when it does not close, because prose loses nothing by staying and a record can hold a
  * credential under a header name no rule can predict.
+ *
+ * Only an object key names what is under it, and a serializer opens an object with a quoted key, so
+ * the first character after the opening brackets must be a quote. A template placeholder such as
+ * `{{name}}` or a link such as `[[Page]]` has none, and an agent's text keeps it as written (#6437).
  */
 function startsLikeJson(value: string, start: number): boolean {
   for (let index = start + 1; index < value.length; index += 1) {
     const char = value[index];
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
-    return char === '"' || char === "{" || char === "[";
+    if (char === " " || char === "\t" || char === "\n" || char === "\r" || char === "{" || char === "[") continue;
+    return char === '"';
   }
   return false;
 }
