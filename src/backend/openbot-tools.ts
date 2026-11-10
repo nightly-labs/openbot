@@ -434,7 +434,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "delete_section",
-    description: "Delete a custom sidebar section without deleting its agents; its agents become ungrouped.",
+    description: "Delete a custom sidebar section, not its agents; they and its folders move up one level.",
     shape: deleteSectionToolSchema.shape,
   },
   {
