@@ -266,6 +266,12 @@ export class RoutineScheduler implements RoutineDueSource {
     return run !== null && quietRoutineRun(run);
   }
 
+  /** Records that the run of this delivery ended with nothing to report, so its chat row can say so. */
+  markQuietRunForDelivery(deliveryId: string): void {
+    const run = this.#routines.runForDelivery(deliveryId);
+    if (run && !run.quiet) this.#routines.markRunQuiet(run.id);
+  }
+
   /**
    * The preview before the routine run of this delivery, and the one the run showed, once: the
    * entry goes with the call. Null after a restart, or for a run that saved none.

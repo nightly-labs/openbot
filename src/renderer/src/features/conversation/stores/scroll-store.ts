@@ -29,7 +29,9 @@ import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
+  markQuietRoutineRuns,
   placeRoutineRunTurns,
+  quietRunCandidates,
   type RoutineRunOpenState,
   routineRunToggleKey,
   routineRunTurnMessages,
@@ -162,9 +164,41 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
+  const routineRunRows = createMemo(() => summarizeRoutineRunMessages(shownMessages()));
+  /*
+   * The runs that ended with nothing to report. Only the host's run record says so, so the chat reads
+   * the runs of a routine when a completed run row shows no answer. Each run is read once; a failed read
+   * leaves its row as it is until the rows change.
+   */
+  const [quietRunIds, setQuietRunIds] = createSignal<ReadonlySet<string>>(new Set());
+  const readRunIds = new Set<string>();
+  createEffect(
+    () => quietRunCandidates(routineRunRows(), routineRunTurns()),
+    (candidates) => {
+      const listRuns = deps.props.listRoutineRuns;
+      if (!listRuns) return;
+      for (const [routineId, runIds] of candidates) {
+        const unread = runIds.filter((runId) => !readRunIds.has(runId));
+        if (unread.length === 0) continue;
+        for (const runId of unread) readRunIds.add(runId);
+        void listRuns(routineId)
+          .then((runs) => {
+            const quiet = runs.flatMap((run) => (run.quiet ? [run.id] : []));
+            if (quiet.length > 0) setQuietRunIds((current) => new Set([...current, ...quiet]));
+          })
+          .catch(() => {
+            for (const runId of unread) readRunIds.delete(runId);
+          });
+      }
+    },
+  );
   /* The messages of a routine run follow its row and open and close with it. */
   const drawnMessages = createMemo(() => [
-    ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
+    ...placeRoutineRunTurns(
+      markQuietRoutineRuns(routineRunRows(), quietRunIds()),
+      routineRunTurns(),
+      openRoutineRuns(),
+    ),
     ...deps.pendingMessages(),
   ]);
   function toggleRoutineRun(marker: RoutineRunToggleMarkerModel): void {

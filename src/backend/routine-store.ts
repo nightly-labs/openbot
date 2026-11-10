@@ -66,6 +66,8 @@ export interface RoutineTables {
   limitMessage: string;
   /** Only agent routines have the `run_in` column. A channel routine runs in its channel. */
   runInColumn: boolean;
+  /** Only agent routine runs have the `quiet` column. */
+  quietRunColumn: boolean;
 }
 
 /** A routine read back with the owner column it was stored under. */
@@ -186,8 +188,8 @@ export class RoutineStore {
 
   protected get runColumns(): string {
     return `run_id, routine_id, ${this.tables.ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name,
-            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source, created_at,
-            updated_at`;
+            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source,
+            ${this.tables.quietRunColumn ? "quiet, " : ""}created_at, updated_at`;
   }
 
   protected listRoutines(ownerId: string): OwnedRoutine[] {
@@ -1023,6 +1025,15 @@ export class RoutineStore {
     });
   }
 
+  /** Records that the run ended with nothing to report. Only for a table with `quietRunColumn`. */
+  protected markRunQuietRow(runId: string): OwnedRoutineRun {
+    return this.#mutateRun(runId, `${this.tables.eventPrefix}.run-quiet`, (db, sequence, now) => {
+      db.prepare(
+        `UPDATE ${this.tables.runTable} SET quiet = 1, updated_at = ?, last_event_sequence = ? WHERE run_id = ?`,
+      ).run(now, sequence, runId);
+    });
+  }
+
   protected runForHandleRow(handleId: string): OwnedRoutineRun | null {
     const row = this.database.connection
       .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE ${this.tables.handleColumn} = ?`)
@@ -1154,6 +1165,7 @@ export class RoutineStore {
       handleId: optionalStringColumn(row, this.tables.handleColumn),
       status,
       error: optionalStringColumn(row, "error"),
+      ...(row.quiet === 1 ? { quiet: true as const } : {}),
       ...(missedCount === null
         ? {}
         : {

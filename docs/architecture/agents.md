@@ -62,6 +62,10 @@ answer is the marker, or the agent called the tool and the turn gave no file, im
 turn drops its markers, thinking and plan from the conversation. Each other text answer stays with the
 item type `routine_quiet_answer`. A quiet answer does not count as unread, does not change the agent
 preview, and no Team API client gets it; the desktop chat shows it under its run, which starts closed.
+Before such a turn ends its deliveries, it sets `quiet` on each run (migration 60, agent routine runs
+only), and the run reads back with `quiet: true`. A desktop chat on this computer reads the runs of a
+routine when a completed run row shows no answer, and that row says "Nothing to report". The Team API
+run projection leaves `quiet` out, so a joined server's chat shows the row as before.
 The turn puts back the agent preview from
 before the run (the run start shows the task there; memory only, so after a restart the task stays),
 and its `turn-completed`

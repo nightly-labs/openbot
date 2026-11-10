@@ -207,6 +207,7 @@ export const messages = defineMessages("chat", {
   "chat.marker.run.failed": "Routine failed",
   "chat.marker.run.interrupted": "Routine interrupted",
   "chat.marker.run.cancelled": "Cancelled routine",
+  "chat.marker.run.nothingToReport": "Nothing to report",
   "chat.marker.runGroup.count": { one: "{count} run", other: "{count} runs" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": { one: "Show {count} run of {name}", other: "Show {count} runs of {name}" },

@@ -321,6 +321,7 @@ export const messages = {
   "chat.marker.run.failed": "فشلت المهمة الدورية",
   "chat.marker.run.interrupted": "انقطعت المهمة الدورية",
   "chat.marker.run.cancelled": "أُلغيت المهمة الدورية",
+  "chat.marker.run.nothingToReport": "لا جديد للإبلاغ عنه",
   "chat.marker.runGroup.count": {
     zero: "لا تشغيلات",
     one: "تشغيل واحد",

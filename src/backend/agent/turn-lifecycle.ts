@@ -210,6 +210,8 @@ export interface TurnHooks {
    * agent answers only the no-update marker or calls the no-update tool.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /** Records that the routine run of this delivery ended with nothing to report. */
+  markQuietRoutineRun(deliveryId: string): void;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
   /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
@@ -1603,6 +1605,15 @@ export class TurnLifecycle {
               : terminal === "completed" && reportedFailure !== undefined && delivery.delivery.sender.kind === "routine"
                 ? this.#hooks.redactMcp(reportedFailure)
                 : null;
+          // Before the run ends, so its chat row says that the run had nothing to report. A failed save
+          // loses only that line.
+          if (quiet && delivery.delivery.sender.kind === "routine") {
+            try {
+              this.#hooks.markQuietRoutineRun(delivery.delivery.id);
+            } catch (error) {
+              this.#hooks.emitError("routine_quiet_record_failed", error, agentId);
+            }
+          }
           yield* this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason).pipe(toTurnOperationFailed);
           this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
         }

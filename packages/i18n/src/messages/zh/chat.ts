@@ -208,6 +208,7 @@ export const messages = {
   "chat.marker.run.failed": "自动化任务失败",
   "chat.marker.run.interrupted": "自动化任务已中断",
   "chat.marker.run.cancelled": "已取消自动化任务",
+  "chat.marker.run.nothingToReport": "没有需要报告的内容",
   "chat.marker.runGroup.count": { one: "{count} 次运行", other: "{count} 次运行" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": { one: "显示 {name} 的 {count} 次运行", other: "显示 {name} 的 {count} 次运行" },

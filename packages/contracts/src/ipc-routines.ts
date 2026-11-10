@@ -252,6 +252,11 @@ export interface RoutineRunFields {
   error: string | null;
   /** Set only on a run that records missed occurrences. A host that does not store it leaves it out. */
   missed?: RoutineMissedRuns;
+  /**
+   * Set only on an agent routine run that ended with nothing to report. A channel routine run, a run from
+   * before this was stored, and a run of a remote host leave it out.
+   */
+  quiet?: true;
   createdAt: string;
   updatedAt: string;
 }
@@ -278,6 +283,7 @@ export function isRoutineRunFields(value: unknown): value is RoutineRunFields {
     ) &&
     (value.error === null || isString(value.error)) &&
     (value.missed === undefined || isRoutineMissedRuns(value.missed)) &&
+    (value.quiet === undefined || value.quiet === true) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );

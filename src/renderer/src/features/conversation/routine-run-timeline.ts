@@ -217,6 +217,34 @@ export function placeRoutineRunTurns(
   });
 }
 
+/**
+ * The completed runs whose row shows no answer, by routine id: a run with no message in the chat, or with
+ * only quiet answers. Only these can have ended with nothing to report, so the chat reads their runs.
+ */
+export function quietRunCandidates(
+  rows: readonly AgentMessage[],
+  turns: ReadonlyMap<string, readonly AgentMessage[]>,
+): Map<string, string[]> {
+  const candidates = new Map<string, string[]>();
+  for (const row of rows) {
+    const marker = routineRunMarker(row);
+    if (marker?.status !== "succeeded") continue;
+    const messages = turns.get(marker.runId) ?? [];
+    if (messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE)) continue;
+    candidates.set(marker.routineId, [...(candidates.get(marker.routineId) ?? []), marker.runId]);
+  }
+  return candidates;
+}
+
+/** Marks the row of each run in `quietRunIds` as a run that ended with nothing to report. */
+export function markQuietRoutineRuns(rows: readonly AgentMessage[], quietRunIds: ReadonlySet<string>): AgentMessage[] {
+  if (quietRunIds.size === 0) return [...rows];
+  return rows.map((row) => {
+    const marker = routineRunMarker(row);
+    return marker && quietRunIds.has(marker.runId) ? { ...row, actionMarker: { ...marker, quiet: true } } : row;
+  });
+}
+
 function routineRunOpenByDefault(marker: RoutineRunMarker, messages: readonly AgentMessage[]): boolean {
   if (marker.status === "queued" || marker.status === "running" || marker.status === "needs-attention") return true;
   return messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);

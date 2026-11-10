@@ -120,6 +120,10 @@ export class AgentRoutineStore extends RoutineStore {
     return toRun(this.updateRunRow(runId, status, error));
   }
 
+  markRunQuiet(runId: string): RoutineRun {
+    return toRun(this.markRunQuietRow(runId));
+  }
+
   runForDelivery(deliveryId: string): RoutineRun | null {
     const run = this.runForHandleRow(deliveryId);
     return run ? toRun(run) : null;

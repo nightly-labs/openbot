@@ -278,6 +278,7 @@ export const messages = {
   "chat.marker.run.failed": "Регулярная задача завершилась ошибкой",
   "chat.marker.run.interrupted": "Регулярная задача прервана",
   "chat.marker.run.cancelled": "Регулярная задача отменена",
+  "chat.marker.run.nothingToReport": "Нечего сообщить",
   "chat.marker.runGroup.count": {
     one: "{count} запуск",
     few: "{count} запуска",
