@@ -716,9 +716,9 @@ export class DrainScheduler {
     const ownSession = this.#runsInOwnSession(context);
     // The teammate answers that start in this turn too. A channel task, an external message and a
     // routine run in its own session always run alone; a teammate's answer in an external
-    // conversation takes the other answers to the same request. The person's message goes last, so
-    // the turn answers it with the answers already read, and the person's later queued messages
-    // follow it in queue order.
+    // conversation takes the other answers to the same request. The person's message takes no
+    // answers, so the tools that only a person's request can start work in its turn, and the
+    // person's later queued messages follow it in queue order.
     // A plan continuation runs again the deliveries of the turn it continues, and no others.
     const replies =
       planNote !== undefined || channelDelivery || ownSession || (messagingDelivery && delivery.sender.kind !== "agent")
