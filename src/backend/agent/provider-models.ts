@@ -62,9 +62,13 @@ export const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentMode
   ["opencode", opencodeModelRank],
 ]);
 
-/** The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`. */
+/**
+ * The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`.
+ * A parameter count is not a version: `GPT-OSS 120B` has none, and `Llama 3.3 70B` is `[3, 3]`.
+ * Before, 120B read as version 120 and put GPT-OSS ahead of every GPT-5 model.
+ */
 function modelVersion(name: string): number[] | null {
-  const match = /\d+(?:\.\d+)*/u.exec(name);
+  const match = /(?<![\d.])\d+(?:\.\d+)*(?![\d.]|[bkmt]\b)/iu.exec(name);
   return match ? match[0].split(".").map(Number) : null;
 }
 
@@ -118,7 +122,30 @@ export function modelFamily(id: string): string | null {
 export function newestOfFamily(models: readonly AgentModelOption[], modelId: string): AgentModelOption | null {
   const family = modelFamily(modelId);
   if (!family) return null;
-  return [...models].filter((model) => modelFamily(model.id) === family).sort(compareModelVersions)[0] ?? null;
+  const variant = modelVariant(modelId);
+  const sameVariant = (model: AgentModelOption) => Number(modelVariant(model.id) !== variant);
+  return (
+    models
+      .filter((model) => modelFamily(model.id) === family)
+      .map((model) => ({ model, version: { ...model, name: model.name.slice(model.name.lastIndexOf("/") + 1) } }))
+      // Between two models of one version, the one with the same variant wins, so an agent on
+      // `claude-opus-4-6-thinking` keeps thinking on `claude-opus-5-5-thinking`. Only the name after
+      // its last `/` gives the version: OpenCode puts the provider name first, such as `Lab 2/Llama 3.3`.
+      .sort(
+        (left, right) =>
+          compareModelVersions(left.version, right.version) || sameVariant(left.model) - sameVariant(right.model),
+      )[0]?.model ?? null
+  );
+}
+
+/** The variant parts of a model id, such as `high-thinking` for `claude-opus-4-6-thinking-high`. */
+function modelVariant(id: string): string {
+  return id
+    .toLowerCase()
+    .split(/[-_/]/u)
+    .filter((part) => MODEL_VARIANT_PARTS.has(part))
+    .sort()
+    .join("-");
 }
 
 /**

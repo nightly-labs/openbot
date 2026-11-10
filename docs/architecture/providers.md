@@ -693,8 +693,10 @@ one version.
 When a fresh catalog no longer lists an agent's model, `moveAgentsOffUnlistedModels`
 (`src/backend/agent/custom-endpoints.ts`) moves the agent on the same provider: to the listed model
 whose effort the saved id names (`effortVariant`), else to the newest listed model of the same family
-(`newestOfFamily`: the id without versions, dates and effort words, so `claude-opus-4-6-thinking` goes to
-`claude-opus-5-5` with its effort when that model has it), else to the default or the first model.
+(`newestOfFamily`: the id without versions, dates and effort words, so `claude-opus-4-6` goes to
+`claude-opus-5-5`), else to the default or the first model. Between two models of one version, the one
+with the same variant wins, so `claude-opus-4-6-thinking` goes to `claude-opus-5-5-thinking`. The effort
+that the saved id names, such as `high` in `gemini-3.1-pro-high`, comes before the stored effort.
 
 Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
@@ -767,7 +769,8 @@ The 1.5 CLI offers its Claude and GPT models to every client, so the flavor send
 The CLI lists the plan's models best first, and the catalog keeps that order (`ownOrder`): an Ultra
 plan on 1.5.5 lists Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS
 120B, a free plan Gemini 3.8 Flash first. The provider has no `defaultProviderModel`, so a new agent
-runs the first one. Sorted by version, "GPT-OSS 120B" read as version 120 and came first. Gemini 4
+runs the first one. A version sort puts Claude Opus 5.5 ahead of Gemini 4 Argon, and before
+`modelVersion` skipped parameter counts, "GPT-OSS 120B" read as version 120 and came first. Gemini 4
 Carbon is offered only with an Application Default Credentials sign-in (`AGY_ADC_AUTH`), which
 OpenBot does not use.
 

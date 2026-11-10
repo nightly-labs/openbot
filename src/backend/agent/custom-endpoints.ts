@@ -7,6 +7,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   defaultProviderModel,
   isCustomProviderHarness,
+  isReasoningEffort,
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -668,10 +669,13 @@ export class CustomEndpoints {
           ? models.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
           : providerFallback);
       if (!fallback) continue;
+      // The effort that the saved id names comes first: an id such as `gemini-3.1-pro-high` is from
+      // the time when OpenBot saved each effort as a model, and its stored effort can be another one.
       const keptEffort =
-        family?.reasoningEffortConfigurable !== false &&
-        family?.supportedReasoningEfforts.includes(agent.reasoningEffort)
-          ? agent.reasoningEffort
+        family && family.reasoningEffortConfigurable !== false
+          ? ([effortInModelId(agent.model), agent.reasoningEffort].find(
+              (effort) => effort !== null && family.supportedReasoningEfforts.includes(effort),
+            ) ?? null)
           : null;
       yield* this.#hooks
         .applyAgentUpdate({
@@ -735,6 +739,17 @@ function effortVariant(
     if (effort) return { model, effort };
   }
   return null;
+}
+
+/** The last part of a model id that names an effort, such as `high` for `gemini-3.1-pro-high`. */
+function effortInModelId(modelId: string): AgentReasoningEffort | null {
+  return (
+    modelId
+      .toLowerCase()
+      .split(/[-_]/u)
+      .reverse()
+      .find((part) => isReasoningEffort(part)) ?? null
+  );
 }
 
 export class EndpointChangeFailed extends Schema.TaggedError<EndpointChangeFailed>()("EndpointChangeFailed", {
