@@ -392,6 +392,8 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
+  /** Quiet routine turns whose provider failed with no answer after the no-update call. The completion takes the entry. */
+  readonly #quietEmptyAnswers = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -525,6 +527,7 @@ export class TurnLifecycle {
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
     this.#noUpdateTurns.clear();
+    this.#quietEmptyAnswers.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -966,13 +969,16 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        // The compaction deadline stopped this turn, not the user: it failed.
+        // The compaction deadline stopped this turn, not the user: it failed. A quiet routine turn that
+        // failed only because it gave no answer after the no-update call completed.
         const status =
-          reported === "interrupted" &&
-          this.#compactionFailures.get(turnId)?.stalled &&
-          !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)
-            ? "failed"
-            : reported;
+          reported === "failed" && this.#quietEmptyAnswers.has(turnId) && !this.#turnErrors.has(turnId)
+            ? "completed"
+            : reported === "interrupted" &&
+                this.#compactionFailures.get(turnId)?.stalled &&
+                !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)
+              ? "failed"
+              : reported;
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -1084,6 +1090,28 @@ export class TurnLifecycle {
         }
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
+        // The no-update tool tells the model to end its turn, and a model that then sends only its
+        // reasoning makes Grok fail the prompt with no answer. The run had nothing to report, so it
+        // ends quiet and shows no error (#6247).
+        if (
+          notification.method === "error" &&
+          causeCode === "empty_answer" &&
+          agentId &&
+          threadId &&
+          errorTurnId &&
+          this.#runningTurns.has(errorTurnId) &&
+          this.#noUpdateTurns.has(errorTurnId) &&
+          !this.#reportedFailures.has(errorTurnId) &&
+          this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))
+        ) {
+          this.#quietEmptyAnswers.add(errorTurnId);
+          logger.info("A quiet routine run ended with no answer after its no-update call.", {
+            agentId,
+            turnId: errorTurnId,
+            provider: source.provider,
+          });
+          return;
+        }
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
           // The turn's completion runs it again or reports it in words the user can act on.
@@ -1290,6 +1318,7 @@ export class TurnLifecycle {
       // A turn that runs again below starts a new trace, so each path takes this one.
       const trace = this.#traces.take(turnId, new Date().toISOString());
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
+      this.#quietEmptyAnswers.delete(turnId);
       const reportedFailure = this.#reportedFailures.get(turnId);
       this.#reportedFailures.delete(turnId);
       if (running) {
@@ -1744,6 +1773,7 @@ export class TurnLifecycle {
     if (running) this.#keepTurnTiming(turnId, running);
     this.#runningTurns.delete(turnId);
     this.#reportedFailures.delete(turnId);
+    this.#quietEmptyAnswers.delete(turnId);
     this.#markEnded(turnId);
     this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
