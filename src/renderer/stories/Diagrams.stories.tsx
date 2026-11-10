@@ -714,6 +714,7 @@ function InteractiveDiagram(props: {
           });
         },
         onRegenerateSecret: async () => `whsec_story_${nextId("secret")}`,
+        onUseSenderSecret: async () => undefined,
       }}
     />
   );
