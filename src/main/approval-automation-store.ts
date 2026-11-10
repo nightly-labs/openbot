@@ -7,11 +7,14 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
 const DENY_ALL: ApprovalAutomationPreference = { defaultAutoApprove: false, autoApproveOverrides: {} };
+
+const logger = createOpenBotLogger("approval-automation");
 
 /** Turbo mode gave every agent Full access, so a file that had it on keeps that for each agent. */
 const TURBO_ON: ApprovalAutomationPreference = { defaultAutoApprove: true, autoApproveOverrides: {} };
@@ -41,7 +44,12 @@ export const readApprovalAutomation = Effect.fn("ApprovalAutomation.read")(funct
   if (Result.isFailure(loaded)) {
     const error = loaded.failure.cause;
     if (isMissingFileError(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
-    if (error instanceof SyntaxError) return DENY_ALL;
+    if (error instanceof SyntaxError) {
+      // A half-written or hand-edited file is a typo, not a decision: keep the product default so
+      // the whole fleet does not fall back to asking for every step over one brace.
+      logger.warn("approval automation settings are not valid JSON; using the default", error);
+      return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
+    }
     return yield* loaded.failure;
   }
   const parsed = loaded.success;
