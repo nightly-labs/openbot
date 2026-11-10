@@ -132,11 +132,13 @@ routine result destinations and local scripts read the answer of a run with
 `readTurnAssistantMessages(agentId, turnId)`: the `projection_turns` row names the thread that ran the
 turn, so the answer of a run in a routine thread is found. A turn in a routine thread sends no
 `turn-completed` event outside `AgentTasks`, as for other side threads, so the chat keeps its turn
-state. When the run is not quiet, `AgentTasks` sends the local-only `routine-thread-turn-completed`
-event (`taskId` and the inner `turn`). The desktop notification, the phone push and the completion
-sound use it as a `turn-completed`, read the answer from the routine thread (`readTask`), and a click
-opens the routine thread. The Team API adapters drop this event, so a remote client gets no
-notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
+state. When the turn of a side thread is not quiet, `AgentTasks` sends the local-only
+`thread-turn-completed` event (`taskId`, `routine` and the inner `turn`). For a routine thread
+(`routine: true`), the desktop notification, the phone push and the completion sound use it as a
+`turn-completed`, read the answer from the routine thread (`readTask`), and a click opens the routine
+thread. For another side thread, only the phone push uses it (see
+[side thread notifications](channels-and-messaging.md#side-thread-notifications)). The Team API
+adapters drop this event, so a remote client gets no notification for a turn in a side thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
 A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a

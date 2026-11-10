@@ -126,6 +126,9 @@ export const messages = {
     "Bir yanıtın başını, bir soruyu veya onaylanacak işlemi gösterir. Apple ve OpenBot hesap hizmeti bunu okuyamaz.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Bir yanıtın başını, bir soruyu veya onaylanacak işlemi gösterir. Google ve OpenBot hesap hizmeti bunu okuyamaz.",
+  "mobile.settings.notifications.threadReplies": "Dizi yanıtları",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Dizi yanıtları, bir ajan bir mesaj dizisinde işi bitirdiğinde veya bir hatayla durduğunda size haber verir. Kapalıyken de bir dizi, girdinize veya bir onaya ihtiyaç duyduğunda haber verir.",
   "mobile.settings.notifications.sound": "Ses",
   "mobile.settings.notifications.playSound": "Ses çal",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

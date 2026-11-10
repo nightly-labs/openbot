@@ -127,6 +127,9 @@ export const messages = {
     "Mostra l'inizio di una risposta, una domanda o l'azione da approvare. Apple e il servizio account di OpenBot non possono leggerla.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Mostra l'inizio di una risposta, una domanda o l'azione da approvare. Google e il servizio account di OpenBot non possono leggerla.",
+  "mobile.settings.notifications.threadReplies": "Risposte nei thread",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "Le risposte nei thread ti avvisano quando un agente finisce o si ferma per un errore in un thread. Senza, un thread ti avvisa comunque quando ha bisogno di una tua risposta o di un'approvazione.",
   "mobile.settings.notifications.sound": "Suono",
   "mobile.settings.notifications.playSound": "Riproduci suono",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

@@ -128,6 +128,9 @@ export const messages = {
     "Mostra o início de uma resposta, uma pergunta ou a ação a aprovar. A Apple e o serviço de contas do OpenBot não conseguem ler.",
   "mobile.settings.notifications.previewFooterAndroid":
     "Mostra o início de uma resposta, uma pergunta ou a ação a aprovar. O Google e o serviço de contas do OpenBot não conseguem ler.",
+  "mobile.settings.notifications.threadReplies": "Respostas em tópicos",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "As respostas em tópicos avisam quando um agente termina ou para com um erro em um tópico. Sem elas, um tópico ainda avisa quando precisa da sua resposta ou de uma aprovação.",
   "mobile.settings.notifications.sound": "Som",
   "mobile.settings.notifications.playSound": "Tocar som",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

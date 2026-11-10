@@ -127,6 +127,9 @@ export const messages = {
     "返信の冒頭、質問、または承認が必要な操作を表示します。Apple と OpenBot アカウントサービスはこの内容を読めません。",
   "mobile.settings.notifications.previewFooterAndroid":
     "返信の冒頭、質問、または承認が必要な操作を表示します。Google と OpenBot アカウントサービスはこの内容を読めません。",
+  "mobile.settings.notifications.threadReplies": "スレッドの返信",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "スレッドの返信をオンにすると、エージェントがスレッドで作業を終えたとき、またはエラーで止まったときに通知します。オフでも、スレッドで入力または承認が必要なときは通知します。",
   "mobile.settings.notifications.sound": "サウンド",
   "mobile.settings.notifications.playSound": "サウンドを再生",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

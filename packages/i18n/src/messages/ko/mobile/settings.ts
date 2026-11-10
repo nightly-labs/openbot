@@ -126,6 +126,9 @@ export const messages = {
     "답변의 시작 부분, 질문, 승인할 작업을 표시해요. Apple과 OpenBot 계정 서비스는 이 내용을 읽을 수 없어요.",
   "mobile.settings.notifications.previewFooterAndroid":
     "답변의 시작 부분, 질문, 승인할 작업을 표시해요. Google과 OpenBot 계정 서비스는 이 내용을 읽을 수 없어요.",
+  "mobile.settings.notifications.threadReplies": "스레드 답변",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "스레드 답변을 켜면 에이전트가 스레드에서 작업을 마치거나 오류로 멈출 때 알려 줘요. 꺼도 스레드에서 입력이나 승인이 필요할 때는 알려 줘요.",
   "mobile.settings.notifications.sound": "소리",
   "mobile.settings.notifications.playSound": "소리 재생",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

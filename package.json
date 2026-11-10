@@ -382,6 +382,7 @@
     "test:push-notification-away": "bun scripts/push-notification-away-e2e.ts",
     "test:computer-activity": "bun scripts/computer-activity-e2e.ts",
     "test:notification-summary": "bun scripts/notification-summary-e2e.ts",
+    "test:thread-notifications": "bun scripts/thread-notifications-e2e.ts",
     "test:browser-sign-in": "bun scripts/browser-sign-in-e2e.ts",
     "test:routine-pause-resume": "bun scripts/routine-pause-resume-e2e.ts",
     "test:routine-timezone-move": "bun scripts/routine-timezone-move-e2e.ts",

@@ -125,6 +125,9 @@ export const messages = {
     "מציג את תחילת התשובה, השאלה או הפעולה לאישור. Apple ושירות החשבונות של OpenBot אינם יכולים לקרוא אותה.",
   "mobile.settings.notifications.previewFooterAndroid":
     "מציג את תחילת התשובה, השאלה או הפעולה לאישור. Google ושירות החשבונות של OpenBot אינם יכולים לקרוא אותה.",
+  "mobile.settings.notifications.threadReplies": "תשובות בשרשורים",
+  "mobile.settings.notifications.threadRepliesFooter":
+    "תשובות בשרשורים מודיעות כשסוכן מסיים או נעצר בשגיאה בשרשור. בלעדיהן, שרשור עדיין מודיע כשהוא צריך קלט או אישור.",
   "mobile.settings.notifications.sound": "צליל",
   "mobile.settings.notifications.playSound": "השמעת צליל",
   "mobile.settings.notifications.sound.openbot": "OpenBot",

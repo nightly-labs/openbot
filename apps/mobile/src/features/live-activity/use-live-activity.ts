@@ -81,6 +81,8 @@ interface LiveActivityInput {
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
   /** Whether the host can update the activity while iOS suspends the app. */
   supportsPush: (serverId: string) => boolean;
+  /** The thread of the side thread that runs a turn, or null for a turn of the agent's own chat. */
+  sideThreadOfTurn: (serverId: string, agentId: string, turnId: string) => string | null;
 }
 
 /**
@@ -99,6 +101,7 @@ export function useLiveActivity({
   post,
   loadAgentAvatar,
   supportsPush,
+  sideThreadOfTurn,
 }: LiveActivityInput): (serverId: string, event: AgentEvent | TeamRealtimeEvent) => void {
   const live = useMemo(() => {
     const native = agentLiveActivity();
@@ -151,6 +154,8 @@ export function useLiveActivity({
   const loadPhotoRef = useRef<(serverId: string, agentId: string, avatarUrl: string) => void>(() => undefined);
   const postRef = useRef(post);
   postRef.current = post;
+  const sideThreadOfTurnRef = useRef(sideThreadOfTurn);
+  sideThreadOfTurnRef.current = sideThreadOfTurn;
   const [request, setRequest] = useState<LiveActivityRequest | null>(null);
   /**
    * Set after sign-out. An avatar load or an answer can finish later, and must not start the
@@ -280,6 +285,8 @@ export function useLiveActivity({
           })),
         // Only the host that the buttons answer can sign them too.
         actionKey: liveActivityHostKeys(phoneSecret, presentation.serverId).keys.action,
+        // A question, an approval or the work of a side thread opens that thread.
+        threadId: live.coordinator.requestThreadId(presentation) ?? workingThread(),
         redact: redactText,
       });
       if (avatars.current.size !== keptAvatars.current) keepAvatars();
@@ -295,6 +302,11 @@ export function useLiveActivity({
         props && fitLiveActivityProps(props),
         foregroundRef.current ? undefined : staleDate.current,
       );
+
+      function workingThread(): string | null {
+        const working = live?.coordinator.workingTurn(presentation);
+        return working ? sideThreadOfTurnRef.current(presentation.serverId, working.agentId, working.turnId) : null;
+      }
 
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
