@@ -104,8 +104,13 @@ export function currentAnswers(
   answered: ReadonlyMap<string, StoredWorkflowStep>,
   graphOf: (runId: string) => WorkflowGraph | undefined,
 ): Map<string, StoredWorkflowStep> {
+  // Many answers come from one run: read its graph once.
+  const graphs = new Map<string, WorkflowGraph | undefined>();
   const changed = [...answered.values()].flatMap((step) => {
-    const earlier = step.runId === null ? undefined : graphOf(step.runId);
+    const runId = step.runId;
+    if (runId === null) return [];
+    if (!graphs.has(runId)) graphs.set(runId, graphOf(runId));
+    const earlier = graphs.get(runId);
     return earlier && nodeChanged(step.nodeId, earlier, graph) ? [step.nodeId] : [];
   });
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
