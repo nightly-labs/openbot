@@ -72,6 +72,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       let committed = false;
       let successorStarted = false;
       let documentPending = false;
+      let previousDocumentAborted = false;
       let timer: NodeJS.Timeout | undefined;
       const cleanup = () => {
         clearTimeout(timer);
@@ -80,7 +81,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         contents.off("did-stop-loading", didStopLoading);
         contents.off("did-navigate-in-page", didNavigateInPage);
         contents.off("did-fail-load", didFailLoad);
-        contents.off("did-fail-provisional-load", didFailProvisionalLoad);
         contents.off("destroyed", destroyed);
       };
       const finish = (error?: unknown) => {
@@ -119,28 +119,18 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const didNavigateInPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
         if (started && inPlace && isMainFrame) complete();
       };
-      const fail = (code: number, description: string) => {
+      const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
+        if (!started || !isMainFrame) return;
+        // Electron reports no `did-fail-load` for a navigation that is cancelled before it commits. An
+        // `ERR_ABORTED` while the next document is pending is the load of the document that it replaces,
+        // such as a streaming page that still loads. Wait for the next document.
+        if (documentPending && code === ERR_ABORTED) {
+          previousDocumentAborted = true;
+          supersededBy(code);
+          return;
+        }
         if (supersededBy(code)) return;
         finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
-      };
-      // A new document that does not commit reports `did-fail-provisional-load` first. A document that
-      // still loads, such as a streaming page, aborts its load with `ERR_ABORTED` when the next page
-      // starts, and reports only `did-fail-load`. That failure belongs to the old document: wait for
-      // the next page.
-      const didFailProvisionalLoad = (
-        _event: unknown,
-        code: number,
-        description: string,
-        _url: string,
-        isMainFrame: boolean,
-      ) => {
-        if (!isMainFrame) return;
-        documentPending = false;
-        if (started) fail(code, description);
-      };
-      const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-        if (!started || !isMainFrame || documentPending) return;
-        fail(code, description);
       };
       const destroyed = () => {
         finish(new Error(TAB_CLOSED));
@@ -150,7 +140,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       contents.on("did-stop-loading", didStopLoading);
       contents.on("did-navigate-in-page", didNavigateInPage);
       contents.on("did-fail-load", didFailLoad);
-      contents.on("did-fail-provisional-load", didFailProvisionalLoad);
       contents.once("destroyed", destroyed);
       const startDeadline = (ms: number) => {
         timer = setTimeout(() => {
@@ -187,8 +176,14 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
             (error) =>
               setImmediate(() => {
                 initiationPending = false;
-                if (settled || supersededBy(error instanceof Error && "errno" in error ? error.errno : undefined))
+                const errno = error instanceof Error && "errno" in error ? error.errno : undefined;
+                if (settled || supersededBy(errno)) return;
+                // `loadURL` rejects with the abort of the replaced document, also when the next document
+                // commits. That document's load ends the wait.
+                if (errno === ERR_ABORTED && previousDocumentAborted && committed) {
+                  if (!contents.isLoading()) complete();
                   return;
+                }
                 finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
               }),
           );
