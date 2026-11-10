@@ -1125,7 +1125,7 @@ export class OpenBotToolRouter {
     // A routine, a channel task, an external chat or another agent must not wait on the owner's card.
     if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead.",
+        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead. Do not open an OpenBot issue with GitHub tools, gh, or a browser: the repository closes issues that do not use its forms. A person can report it at https://github.com/nightly-labs/openbot/issues/new/choose.",
       );
     // The card offers a send, so a user who is not signed in gets the form link at once.
     if (!sender.signedIn()) return form(FEEDBACK_SIGNED_OUT_NEXT);
