@@ -298,6 +298,11 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Hermes Agent sürümü okunamıyor.",
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
+  "error.provider.zcodeMissing":
+    "ZCode yüklü değil. ZCode Desktop ve zcode-acp bağdaştırıcısını yükleyin, sonra yeniden deneyin.",
+  "error.provider.zcodeNotStarted": "ZCode başlatılamadı. Bir terminalde `zcode-acp --version` komutunu çalıştırın.",
+  "error.provider.zcodeVersionUnreadable": "ZCode sürümü okunamadı.",
+  "error.provider.zcodeSignIn": "ZCode oturumu açın (`zcode login`), sonra yeniden deneyin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.claudeContextFull":
     "Bu sohbet Claude için çok uzun hale geldi. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",

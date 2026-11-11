@@ -283,6 +283,11 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
+  "error.provider.zcodeMissing":
+    "ZCode is not installed. Install ZCode Desktop and the zcode-acp adapter, then try again.",
+  "error.provider.zcodeNotStarted": "ZCode could not start. Run `zcode-acp --version` in a terminal.",
+  "error.provider.zcodeVersionUnreadable": "Unable to read the ZCode version.",
+  "error.provider.zcodeSignIn": "Sign in with ZCode (`zcode login`), then try again.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.claudeContextFull":
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",

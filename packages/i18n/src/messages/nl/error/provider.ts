@@ -293,6 +293,11 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
+  "error.provider.zcodeMissing":
+    "ZCode is niet geïnstalleerd. Installeer ZCode Desktop en de zcode-acp-adapter en probeer het opnieuw.",
+  "error.provider.zcodeNotStarted": "ZCode kon niet starten. Voer `zcode-acp --version` uit in een terminal.",
+  "error.provider.zcodeVersionUnreadable": "Kan de ZCode-versie niet lezen.",
+  "error.provider.zcodeSignIn": "Meld je aan bij ZCode (`zcode login`) en probeer het opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
   "error.provider.claudeContextFull":
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",

@@ -259,6 +259,10 @@ export const messages = {
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
+  "error.provider.zcodeMissing": "未安装 ZCode。请先安装 ZCode Desktop 和 zcode-acp 适配器，然后重试。",
+  "error.provider.zcodeNotStarted": "无法启动 ZCode。请在终端中运行 `zcode-acp --version`。",
+  "error.provider.zcodeVersionUnreadable": "无法读取 ZCode 版本。",
+  "error.provider.zcodeSignIn": "请先登录 ZCode（`zcode login`），然后重试。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",

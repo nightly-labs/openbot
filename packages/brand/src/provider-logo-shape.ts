@@ -66,6 +66,9 @@ const ACP_CURSOR_PATH = "M12 17a1 1 0 0 1 1-1h7a1 1 0 1 1 0 2h-7a1 1 0 0 1-1-1Z"
 // A neutral ring for a provider that this build does not know. It is no provider's mark.
 const UNKNOWN_PATH = "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z";
 
+// The ZCode mark: a blocky Z on a 24 by 24 grid.
+const ZCODE_PATH = "M4 4H20V7.6L10.6 16.4H20V20H4V16.4L13.4 7.6H4Z";
+
 // The Grok mark in one colour, on a 24 by 24 grid.
 const GROK_PATHS = [
   "M9.26905 15.284 17.2479 9.36086c.3912-.29039.9502-.17712 1.1366.27392.981 2.37872.5427 5.23732-1.409 7.20012-1.9517 1.9627-4.6673 2.3931-7.1494 1.4128L7.1146 19.5102c3.8891 2.6732 8.6117 2.0121 11.5628-.9577 2.3408-2.354 3.0658-5.5628 2.3879-8.4564l.0061.0062c-.983-4.25087.2417-5.94997 2.7504-9.424387L24 .428711l-3.3013 3.319949v-.0103L9.267 15.2861",
@@ -91,6 +94,7 @@ export type ProviderLogoVariant =
   | "deepseek"
   | "openrouter"
   | "hermes"
+  | "zcode"
   | "unknown";
 
 export interface ProviderLogoPath {
@@ -141,6 +145,8 @@ export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoSh
       return { viewBox: GRID_24, paths: [{ d: OPENROUTER_PATH }] };
     case "hermes":
       return { viewBox: GRID_24, paths: HERMES_PATHS.map((d) => ({ d, evenOdd: true })) };
+    case "zcode":
+      return { viewBox: GRID_24, paths: [{ d: ZCODE_PATH }] };
     // Native CLI providers use the neutral terminal mark.
     case "acp":
     case "pi":
