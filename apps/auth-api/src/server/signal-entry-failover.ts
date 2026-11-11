@@ -16,7 +16,11 @@ const API_TIMEOUT_MS = 10_000;
 
 export type SignalEntryBindings = Pick<
   WorkerBindings,
-  "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "SIGNAL_ENTRY_ZONE_ID" | "SIGNAL_ENTRY_DNS_TOKEN"
+  | "REMOTE_SIGNAL_URL"
+  | "REMOTE_SIGNAL_HOMES"
+  | "REMOTE_SIGNAL_HOME_LOCATIONS"
+  | "SIGNAL_ENTRY_ZONE_ID"
+  | "SIGNAL_ENTRY_DNS_TOKEN"
 >;
 
 export type SignalEntryFetch = (input: string, init: RequestInit) => Promise<Response>;
