@@ -2,8 +2,10 @@
 //
 // What it grants, recorded here because freezing it makes it permanent: each agent has folders for
 // its files in the Library, five levels in all, and a file is in one folder of its agent or in none.
-// Each signed-in member reads the folders and changes them. The folders are a layout over the stored
-// files: a folder change moves, copies and deletes no file, and it changes no chat. A member gets no
+// Each signed-in member reads the folders of each agent that they can see. A member changes the
+// folders of an agent only with `chat` access to it, and gets 403 without it; an owner or an admin
+// changes all folders. The folders are a layout over the stored files: a folder change moves, copies
+// and deletes no file, and it changes no chat. A member gets no
 // folder of an agent that they cannot see and no file that is in one, and the host answers 404 to an
 // action that names such an agent or folder. The actions are `create` (the client makes the id, and
 // `fileIds` puts files into the new folder), `rename`, `delete` (the folder and the folders in it;
