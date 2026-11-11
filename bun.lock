@@ -191,6 +191,7 @@
         "katex": "catalog:",
         "lucide-react-native": "^1.61.0",
         "marked": "catalog:",
+        "marked-cjk-friendly": "catalog:",
         "mermaid": "catalog:",
         "pdfjs-dist": "catalog:",
         "react": "19.3.0",
@@ -359,6 +360,7 @@
         "katex": "catalog:",
         "lucide-solid": "catalog:",
         "marked": "catalog:",
+        "marked-cjk-friendly": "catalog:",
         "mermaid": "catalog:",
         "qrcode": "catalog:",
         "solid-recharts": "catalog:",
@@ -482,6 +484,7 @@
     "lru-cache": "11.5.3",
     "lucide-solid": "1.33.0",
     "marked": "18.1.1",
+    "marked-cjk-friendly": "0.1.3",
     "mermaid": "12.2.0",
     "music-metadata": "11.16.1",
     "p-queue": "9.3.5",
@@ -2724,6 +2727,8 @@
     "makeerror": ["makeerror@1.0.12", "", { "dependencies": { "tmpl": "1.0.5" } }, "sha512-JmqCvUhmt43madlpFzG4BQzG2Z3m6tvQDNKdClZnO3VbIudJYmxsT0FNJMeiB2+JTSlTQTSbU8QdesVmwJcmLg=="],
 
     "marked": ["marked@18.1.1", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-zEGgrtUG8crk+TrMacJSVABU4DYDDkS8uqgU3ohrn/2fW9C2AEfUrO3m6IhpIpQpl7YcVpiXXC9cSMWDANT3dg=="],
+
+    "marked-cjk-friendly": ["marked-cjk-friendly@0.1.3", "", { "peerDependencies": { "marked": ">=15.0.0" } }, "sha512-9X5zELpCKopA6rLlNWk/f1swkRUvuuO4DedM48V0OBABaEEy520WEBYY5bdLd7GDEaqzZuTofBxgzr32/4rWFw=="],
 
     "matcher": ["matcher@3.0.0", "", { "dependencies": { "escape-string-regexp": "^4.0.0" } }, "sha512-OkeDaAZ/bQCxeFAozM55PKcKU0yJMPGifLwV4Qgjitu+5MoAfSQN4lsLJeXZ1b8w0x+/Emda6MZgXS1jvsapng=="],
 

@@ -6,6 +6,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
 import { createMemo, For, Show } from "solid-js";
 import { textDirection } from "../../content-direction";
 import { useText } from "../../text";
@@ -120,6 +121,8 @@ const markdown = new Marked({
     },
   ],
 });
+// Bold and struck text also close next to Chinese, Japanese or Korean punctuation, as in `**待办：**说明`.
+markdown.use(markedCjkFriendly());
 
 const VOID_HTML_ELEMENTS = new Set([
   "area",
