@@ -5,8 +5,10 @@ import {
   type CodexLiveVoice,
   cloudSpeechModel,
   type DictationKeyProvider,
+  EDGE_TTS_VOICES,
   ELEVENLABS_SPEECH_VOICES,
   ELEVENLABS_VOICE_MODEL_ID,
+  isEdgeTtsSpeechVoice,
   isElevenLabsSpeechVoice,
   isSpeechVoice,
   isVoiceModelId,
@@ -75,6 +77,7 @@ const MODEL_DESCRIPTION = {
 
 const SPEECH_MODEL_DESCRIPTION = {
   [SPEECH_MODEL_ID]: "settings.voice.speech.model.description",
+  "edge-tts": "settings.voice.speech.model.edgeTts.description",
   "elevenlabs-flash-v2.5": "settings.voice.speech.model.flash.description",
   "elevenlabs-multilingual-v2": "settings.voice.speech.model.multilingual.description",
   "elevenlabs-v3": "settings.voice.speech.model.v3.description",
@@ -93,10 +96,11 @@ const SPEECH_CHOICES: readonly ModelChoice<SpeechModelId>[] = [
  * The voices of each speech model place. The arrays stay the same objects: a new array makes the
  * Select send its value again, and that write starts the same change again.
  */
-const VOICE_OPTIONS: Record<"local" | SpeechKeyProvider, string[]> = {
+const VOICE_OPTIONS: Record<"local" | SpeechKeyProvider | "edge-tts", string[]> = {
   local: [...SPEECH_VOICES],
   elevenlabs: [...ELEVENLABS_SPEECH_VOICES],
   xai: [...XAI_SPEECH_VOICES],
+  "edge-tts": [...EDGE_TTS_VOICES],
 };
 
 /** The language that the model uses, and why it cannot be set, for each model that takes no language. */
@@ -353,6 +357,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     const provider = speechCloud()?.provider;
     if (provider === "elevenlabs") return saved.elevenLabsVoice;
     if (provider === "xai") return saved.xaiVoice;
+    if (provider === "edge-tts") return saved.edgeTtsVoice;
     return saved.voice;
   };
   /** A provider voice shows its own name, which stays the same in each language. */
@@ -363,6 +368,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     if (isSpeechVoice(voice)) props.store.setSpeechVoice(voice);
     else if (isElevenLabsSpeechVoice(voice)) props.store.setElevenLabsVoice(voice);
     else if (isXaiSpeechVoice(voice)) props.store.setXaiVoice(voice);
+    else if (isEdgeTtsSpeechVoice(voice)) props.store.setEdgeTtsVoice(voice);
   };
 
   /** Each model file that downloads, for the download toasts. */
@@ -494,16 +500,20 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             disabled={!speech().settings}
             mount={props.selectMount}
           />
-          {/* Keyed: a new provider gets an empty key field, so a draft key is not saved for the other provider. */}
+          {/* Keyed: a new provider gets an empty key field, so a draft key is not saved for the other provider. Edge TTS needs no key. */}
           <Show when={speechCloud()?.provider} keyed>
-            {(provider) => (
-              <VoiceKeyRow
-                provider={provider}
-                saved={speechKeySaved(provider)}
-                onSave={(key) => props.store.saveSpeechApiKey(provider, key)}
-                onRemove={() => void props.store.removeSpeechApiKey(provider)}
-              />
-            )}
+            {(provider) =>
+              provider === "edge-tts" ? (
+                <></>
+              ) : (
+                <VoiceKeyRow
+                  provider={provider}
+                  saved={speechKeySaved(provider)}
+                  onSave={(key) => props.store.saveSpeechApiKey(provider, key)}
+                  onRemove={() => void props.store.removeSpeechApiKey(provider)}
+                />
+              )
+            }
           </Show>
           <SwitchField
             data-settings-row="settings.voice.speech.readReplies.title"

@@ -638,6 +638,8 @@ export const messages = {
   "settings.voice.apiKey.removeFailed": "无法移除 API 密钥，请重试。",
   "settings.voice.speech.section": "语音回复",
   "settings.voice.speech.model.description": "在这台电脑上朗读回复，支持 31 种语言。",
+  "settings.voice.speech.model.edgeTts.description":
+    "使用微软 Edge 免费的文本转语音服务朗读回复，无需 API 密钥。支持中文、英语、日语、韩语等多种语言。",
   "settings.voice.speech.readReplies.title": "朗读回复",
   "settings.voice.speech.readReplies.description": "你用听写发送消息时，会朗读回复。再次听写即可停止朗读。",
   "settings.voice.speech.codexLive.title": "Codex 实时语音",

@@ -1,6 +1,7 @@
 import {
   DEFAULT_SPEECH_SETTINGS,
   isCodexLiveVoice,
+  isEdgeTtsSpeechVoice,
   isElevenLabsSpeechVoice,
   isSpeechModelId,
   isSpeechSpeed,
@@ -48,6 +49,9 @@ export class SpeechPreferenceStore {
                   ? parsed.elevenLabsVoice
                   : DEFAULT_SPEECH_SETTINGS.elevenLabsVoice,
                 xaiVoice: isXaiSpeechVoice(parsed.xaiVoice) ? parsed.xaiVoice : DEFAULT_SPEECH_SETTINGS.xaiVoice,
+                edgeTtsVoice: isEdgeTtsSpeechVoice(parsed.edgeTtsVoice)
+                  ? parsed.edgeTtsVoice
+                  : DEFAULT_SPEECH_SETTINGS.edgeTtsVoice,
                 speed: isSpeechSpeed(parsed.speed) ? parsed.speed : DEFAULT_SPEECH_SETTINGS.speed,
                 codexLive: parsed.codexLive === true,
                 codexLiveVoice: isCodexLiveVoice(parsed.codexLiveVoice) ? parsed.codexLiveVoice : null,
@@ -73,6 +77,7 @@ export class SpeechPreferenceStore {
       voice: input.voice,
       elevenLabsVoice: input.elevenLabsVoice,
       xaiVoice: input.xaiVoice,
+      edgeTtsVoice: input.edgeTtsVoice,
       speed: input.speed,
       codexLive: input.codexLive,
       codexLiveVoice: input.codexLiveVoice,

@@ -367,9 +367,13 @@ export function modelLanguage(model: VoiceModelInfo, language: VoiceLanguage): V
 export const SPEECH_MODEL_ID = "supertonic-3";
 export type LocalSpeechModelId = typeof SPEECH_MODEL_ID;
 
-/** The providers that read replies aloud with the user's own API key. */
+/** The providers that read replies aloud with the user's own API key. Edge TTS needs no key. */
 export const SPEECH_KEY_PROVIDERS = ["elevenlabs", "xai"] as const;
 export type SpeechKeyProvider = (typeof SPEECH_KEY_PROVIDERS)[number];
+
+/** Edge TTS is a free cloud provider that needs no API key. It is not in SPEECH_KEY_PROVIDERS. */
+export const EDGE_TTS_PROVIDER = "edge-tts" as const;
+export type EdgeTtsProvider = typeof EDGE_TTS_PROVIDER;
 
 /** The providers that transcribe dictation with the user's own API key. ElevenLabs has one key for both routes. */
 export const DICTATION_KEY_PROVIDERS = ["elevenlabs", "groq"] as const;
@@ -387,9 +391,11 @@ export const VOICE_KEY_PROVIDER_NAMES: Record<VoiceKeyProvider, string> = {
 
 /**
  * The models that read replies aloud at a provider. The reply text goes to the provider with the
- * user's own API key, so none is the default. Saved in `speech-preference.json`; never rename one.
+ * user's own API key, so none is the default, except Edge TTS which is free and needs no key.
+ * Saved in `speech-preference.json`; never rename one.
  */
 export const CLOUD_SPEECH_MODEL_IDS = [
+  "edge-tts",
   "elevenlabs-flash-v2.5",
   "elevenlabs-multilingual-v2",
   "elevenlabs-v4-turbo",
@@ -405,12 +411,14 @@ export type SpeechModelId = (typeof SPEECH_MODEL_IDS)[number];
 
 export interface CloudSpeechModelInfo {
   id: CloudSpeechModelId;
-  provider: SpeechKeyProvider;
+  /** The provider. Edge TTS needs no API key; others are in SPEECH_KEY_PROVIDERS. */
+  provider: SpeechKeyProvider | EdgeTtsProvider;
   /** The product name. It is not translated. */
   name: string;
 }
 
 export const CLOUD_SPEECH_MODELS: readonly CloudSpeechModelInfo[] = [
+  { id: "edge-tts", provider: EDGE_TTS_PROVIDER, name: "Edge TTS" },
   { id: "elevenlabs-flash-v2.5", provider: "elevenlabs", name: "Flash v2.5" },
   { id: "elevenlabs-multilingual-v2", provider: "elevenlabs", name: "Multilingual v2" },
   { id: "elevenlabs-v4-turbo", provider: "elevenlabs", name: "Eleven v4 Turbo" },
@@ -431,6 +439,26 @@ export type ElevenLabsSpeechVoice = (typeof ELEVENLABS_SPEECH_VOICES)[number];
 /** xAI voices. Each name is also the voice ID. Saved in `speech-preference.json`. */
 export const XAI_SPEECH_VOICES = ["eve", "ara", "leo", "rex", "sal"] as const;
 export type XaiSpeechVoice = (typeof XAI_SPEECH_VOICES)[number];
+
+/**
+ * Edge TTS voices, one per common language. Each name is the voice identifier Edge TTS accepts.
+ * Saved in `speech-preference.json`.
+ */
+export const EDGE_TTS_VOICES = [
+  "zh-CN-XiaoxiaoNeural",
+  "zh-CN-YunxiNeural",
+  "en-US-AriaNeural",
+  "en-US-GuyNeural",
+  "ja-JP-NanamiNeural",
+  "ko-KR-SunHiNeural",
+  "fr-FR-DeniseNeural",
+  "de-DE-KatjaNeural",
+  "es-ES-ElviraNeural",
+  "pt-BR-FranciscaNeural",
+  "ru-RU-SvetlanaNeural",
+  "it-IT-ElsaNeural",
+] as const;
+export type EdgeTtsVoice = (typeof EDGE_TTS_VOICES)[number];
 
 export const SPEECH_MODEL = {
   id: SPEECH_MODEL_ID,
@@ -477,6 +505,7 @@ export const SPEECH_LANGUAGES = [
   "tr",
   "uk",
   "vi",
+  "zh",
 ] as const;
 export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 
@@ -505,6 +534,8 @@ export interface SpeechSettings {
   voice: SpeechVoice;
   elevenLabsVoice: ElevenLabsSpeechVoice;
   xaiVoice: XaiSpeechVoice;
+  /** The Edge TTS voice. */
+  edgeTtsVoice: EdgeTtsVoice;
   /** The speed of each reply that is read aloud. The pitch stays the same. */
   speed: SpeechSpeed;
   /**
@@ -523,6 +554,7 @@ export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   voice: "F1",
   elevenLabsVoice: "alice",
   xaiVoice: "eve",
+  edgeTtsVoice: "zh-CN-XiaoxiaoNeural",
   speed: 1,
   codexLive: false,
   codexLiveVoice: null,
@@ -639,6 +671,10 @@ export function isElevenLabsSpeechVoice(value: unknown): value is ElevenLabsSpee
 
 export function isXaiSpeechVoice(value: unknown): value is XaiSpeechVoice {
   return isOneOf(XAI_SPEECH_VOICES, value);
+}
+
+export function isEdgeTtsSpeechVoice(value: unknown): value is EdgeTtsVoice {
+  return isOneOf(EDGE_TTS_VOICES, value);
 }
 
 export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {

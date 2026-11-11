@@ -695,6 +695,8 @@ export const messages = defineMessages("settings", {
     "The best quality, in more than 90 languages, and slow. Sends the reply text to ElevenLabs. Uses your own API key, and ElevenLabs bills each use.",
   "settings.voice.speech.model.xai.description":
     "Sends the reply text to xAI. Uses your own API key, and xAI bills each use.",
+  "settings.voice.speech.model.edgeTts.description":
+    "Reads replies aloud with Microsoft Edge's free text-to-speech service. No API key needed. Supports Chinese, English, Japanese, Korean and more.",
   "settings.voice.speech.serverSpeaks": "Your voice server reads replies aloud now.",
   "settings.voice.speech.section": "Spoken replies",
   "settings.voice.speech.model.description": "Reads replies aloud on this computer, in 31 languages.",

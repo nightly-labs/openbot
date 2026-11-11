@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   cloudSpeechModel,
+  EDGE_TTS_PROVIDER,
   SPEECH_MODEL_ID,
   SPEECH_VOICES,
   type SpeechAudio,
@@ -160,11 +161,32 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     const settings = this.#preferences.get();
     const cloud = cloudSpeechModel(settings.modelId);
     if (cloud) {
-      const key = this.#apiKeys[cloud.provider].get();
+      // Edge TTS needs no API key.
+      if (cloud.provider === EDGE_TTS_PROVIDER) {
+        const startedAt = Date.now();
+        return yield* speakInCloud(this.#fetch, {
+          model: cloud,
+          key: "",
+          text: input.text,
+          language: input.language,
+          elevenLabsVoice: settings.elevenLabsVoice,
+          xaiVoice: settings.xaiVoice,
+          edgeTtsVoice: settings.edgeTtsVoice,
+        }).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() =>
+              logger.warn(
+                `edge-tts speech of ${input.text.length} characters failed after ${Date.now() - startedAt}ms.`,
+              ),
+            ),
+          ),
+        );
+      }
+      const key = this.#apiKeys[cloud.provider as "elevenlabs" | "xai"].get();
       if (!key)
         return yield* new VoiceOperationError({
           cause: new Error(
-            sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider] }),
+            sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider as "elevenlabs" | "xai"] }),
           ),
         });
       const startedAt = Date.now();
@@ -176,6 +198,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         language: input.language,
         elevenLabsVoice: settings.elevenLabsVoice,
         xaiVoice: settings.xaiVoice,
+        edgeTtsVoice: settings.edgeTtsVoice,
       }).pipe(
         Effect.tapError(() =>
           Effect.sync(() =>
@@ -251,7 +274,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     const { modelId } = this.#preferences.get();
     const cloud = cloudSpeechModel(modelId);
     if (!cloud) return null;
-    return this.#apiKeys[cloud.provider].get()
+    // Edge TTS needs no API key: it is always ready.
+    if (cloud.provider === EDGE_TTS_PROVIDER)
+      return { modelId, phase: "ready", progress: 100, message: null };
+    const provider = cloud.provider as "elevenlabs" | "xai";
+    return this.#apiKeys[provider].get()
       ? { modelId, phase: "ready", progress: 100, message: null }
       : {
           modelId,
@@ -259,7 +286,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
           progress: null,
           // A voice conversation shows this when it cannot start.
           message: sourceText("error.voice.cloud.keyRequired", {
-            provider: VOICE_KEY_PROVIDER_NAMES[cloud.provider],
+            provider: VOICE_KEY_PROVIDER_NAMES[provider],
           }),
         };
   }
