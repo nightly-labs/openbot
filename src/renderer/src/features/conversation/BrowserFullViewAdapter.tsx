@@ -55,7 +55,7 @@ export default function BrowserFullViewAdapter() {
     startBrowserTeach,
     stopBrowserTeach,
     sendCardFile,
-    updateCurrentDraft,
+    addPageText,
   } = useConversationViewScope();
   const { t } = useText();
   const serverId = () => props.server?.id ?? "";
@@ -131,14 +131,14 @@ export default function BrowserFullViewAdapter() {
 
   /**
    * Save sends one short message of the user with the steps in a file, so the chat stays easy to read.
-   * When the chat cannot send now, the steps go to the draft as text.
+   * When the chat cannot send now, the steps go to the end of the draft as text.
    */
   async function saveTeach() {
     const steps = await stopBrowserTeach(true);
     if (!steps) return;
     const message = t("browser.teach.message");
     if (await sendCardFile(message, browserTeachFile(t, steps))) return;
-    updateCurrentDraft({ text: `${message}\n\n${browserTeachSteps(t, steps)}` });
+    addPageText(`${message}\n\n${browserTeachSteps(t, steps)}`);
   }
   const teach = createMemo(() => {
     const current = browserTeach();
