@@ -9,6 +9,8 @@ export const messages = {
   "startup.archiveChangedBody":
     "Başka bir program OpenBot’un app.asar dosyasını değiştirdi. OpenBot şu an çalışıyor, ancak kapattıktan sonra açılmayacak.\n\nOnarmak için OpenBot’u yeniden yükleyin. Yerel verileriniz korunur.",
   "startup.archiveChangedDownload": "OpenBot’u indir",
+  "startup.filesDamagedBody":
+    "Bazı OpenBot dosyaları hasarlı veya eksik.\n\nOnarmak için OpenBot’u yeniden yükleyin. Yerel verileriniz korunur.",
   "startup.newerDataUpdatingTitle": "OpenBot güncelleniyor",
   "startup.newerDataUpdatingBody":
     "OpenBot’un daha yeni bir sürümü verilerinizi kaydetti. OpenBot en son sürümü yüklüyor ve ardından yeniden açılacak.\n\nYerel verileriniz sıfırlanmadı veya üzerine yazılmadı.",

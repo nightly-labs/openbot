@@ -84,7 +84,7 @@
       "protobufjs": "7.6.6"
     }
   },
-  "main": "./out/main/index.js",
+  "main": "./out/main/start.js",
   "packageManager": "bun@1.4.2",
   "engines": {
     "node": ">=24.0.0"
