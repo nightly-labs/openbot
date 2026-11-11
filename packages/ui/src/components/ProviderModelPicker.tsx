@@ -234,19 +234,24 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           : summary,
     };
   };
-  /** The accounts that get rail entries: only a provider's with more than one, only on request, and not a pool's. */
+  /**
+   * The accounts that get rail entries: only a provider's with more than one, and only on request. A
+   * pool has one entry for its accounts, and an entry for each API key, which is not in the pool.
+   */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
-    if (!props.accountChoice || rail === CUSTOM_RAIL || railPool(rail)) return [];
+    if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
+    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id));
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
     visibleProviders().flatMap((rail): RailKey[] => {
       const accounts = railAccounts(rail);
       if (!accounts.length || rail === CUSTOM_RAIL) return [rail];
-      return accounts.map((account) =>
+      const keys = accounts.map((account) =>
         account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? rail : (`${rail}:${account.id}` as const),
       );
+      return railPool(rail) ? [rail, ...keys] : keys;
     }),
   );
   /** The account for `onChange`: only a provider with account entries sends one. */
@@ -404,13 +409,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
-  /** The pool's line, in the place of the account's email, while the provider is available. */
-  const poolSummary = (rail: RailId, status: AgentProviderStatus): string | undefined =>
-    status.state === "available" ? railPool(rail)?.summary : undefined;
-  const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : (poolSummary(rail, status) ?? providerSummary(rail, status, text));
-  const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
-    if (rail !== CUSTOM_RAIL) return poolSummary(rail, status) ?? providerHeadingSummary(rail, status, text);
+  /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
+  const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
+    status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
+  const railSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    return rail === CUSTOM_RAIL ? customSummary() : (poolSummary(key, status) ?? providerSummary(rail, status, text));
+  };
+  const railHeadingSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    if (rail !== CUSTOM_RAIL) return poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
@@ -605,7 +613,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerAccount = () => {
     if (props.foreignProvider !== undefined) return null;
     const accounts = railAccounts(props.provider);
-    return accounts.length ? providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID) : null;
+    if (!accounts.length || (railPool(props.provider) && currentAccount() === null)) return null;
+    return providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID);
   };
   /** The saved speed. It can name a tier that the model does not have. */
   const savedSpeed = (): Speed =>
@@ -640,8 +649,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const prefix = `${railName(activeProvider(), t)} `;
     return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
   };
-  /** True while the agent's provider pools its accounts. */
-  const triggerPool = () => props.foreignProvider === undefined && railPool(props.provider) !== null;
+  /** True while the agent's provider pools its accounts and the agent is not on an API key. */
+  const triggerPool = () =>
+    props.foreignProvider === undefined && railPool(props.provider) !== null && currentAccount() === null;
   const triggerSummary = () =>
     [
       triggerModelName(),
@@ -783,7 +793,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             ]}
                             data-state={status().state}
                             aria-label={spentLabel(
-                              `${name()}: ${railSummary(provider, status())}`,
+                              `${name()}: ${railSummary(key, status())}`,
                               status().state === "available" ? entrySpentWindow(key) : undefined,
                             )}
                             onClick={(event) => {
@@ -817,7 +827,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 </span>
                               )}
                             </Show>
-                            <Show when={railPool(provider)}>
+                            <Show when={key === provider && railPool(provider)}>
                               <span class="provider-model-rail-account" aria-hidden="true">
                                 <Layers />
                               </span>
@@ -827,7 +837,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <Tooltip.Portal>
                           <Tooltip.Content class="provider-model-rail-tooltip">
                             <strong>{name()}</strong>
-                            <small>{railSummary(provider, status())}</small>
+                            <small>{railSummary(key, status())}</small>
                           </Tooltip.Content>
                         </Tooltip.Portal>
                       </Tooltip.Root>
@@ -1115,8 +1125,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                         <span>
                           {account() && status().state === "available"
-                            ? (account()?.account.email ?? railHeadingSummary(provider, status()))
-                            : railHeadingSummary(provider, status())}
+                            ? (account()?.account.email ?? railHeadingSummary(key, status()))
+                            : railHeadingSummary(key, status())}
                         </span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && !props.onManageProviders && props.onAddCustomProvider}>

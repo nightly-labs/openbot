@@ -3584,7 +3584,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #poolMove(agent: AgentSummary): AgentModelChoice | null {
     const choice = agentModelChoice(agent);
-    if (!this.#providers.accountPool(choice.provider)) return null;
+    if (!this.#pooled(choice)) return null;
     this.#readPoolWhenStale(choice.provider);
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
@@ -3602,10 +3602,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return false;
     const choice = agentModelChoice(agent);
-    if (!this.#providers.accountPool(choice.provider)) return false;
+    if (!this.#pooled(choice)) return false;
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
     return pick !== null && pick !== current;
+  }
+
+  /**
+   * Whether the pool chooses the account of the agent. An agent that the user put on the Claude API
+   * key stays on it: the key is not in the pool.
+   */
+  #pooled(choice: AgentModelChoice): boolean {
+    if (choice.provider === "claude" && choice.providerAccountId === CLAUDE_API_KEY_ACCOUNT_ID) return false;
+    return this.#providers.accountPool(choice.provider) !== null;
   }
 
   /**

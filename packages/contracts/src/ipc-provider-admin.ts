@@ -143,14 +143,6 @@ export function decodeHostProviderAccountPools(value: unknown): NonNullable<Host
   });
 }
 
-/** The accounts with the pools that are on. */
-export function withHostProviderAccountPools(
-  accounts: HostProviderAccounts,
-  pools: NonNullable<HostProviderAccounts["pools"]>,
-): HostProviderAccounts {
-  return { ...accounts, pools };
-}
-
 /** The accounts with the models that `models` gives for each. An account it does not name keeps its own. */
 export function withHostProviderAccountModels(
   accounts: HostProviderAccounts,

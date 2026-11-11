@@ -817,7 +817,7 @@ function AccountsSection(props: SectionProps) {
             <ItemActions>
               <Switch
                 checked={Boolean(pool())}
-                disabled={props.disabled}
+                disabled={props.disabled === true}
                 aria-labelledby={poolLabelId}
                 onChange={(enabled: boolean) => setPool(enabled, pool()?.leftOut ?? [])}
               />

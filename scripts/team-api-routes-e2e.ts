@@ -81,7 +81,6 @@ import {
   type WhatsAppLinkState,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
-  withHostProviderAccountPools,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -3529,10 +3528,7 @@ try {
     );
     // The client decodes the list and puts the pool on the accounts, as the web client, a joined
     // desktop and mobile do before the settings and the model picker read it.
-    const decoded = withHostProviderAccountPools(
-      { providers: [], agents: [] },
-      decodeHostProviderAccountPools(pooled.body),
-    );
+    const decoded = { providers: [], agents: [], pools: decodeHostProviderAccountPools(pooled.body) };
     check(
       "the client decodes the pool",
       isDeepStrictEqual(decoded.pools, [{ provider: "antigravity", pool: expected }]),

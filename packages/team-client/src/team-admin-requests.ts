@@ -278,7 +278,6 @@ import {
   type VaultSaveInput,
   type VaultState,
   withHostProviderAccountModels,
-  withHostProviderAccountPools,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -1386,7 +1385,7 @@ export function listProviderAccountsWithModels(
   ).pipe(
     Effect.map(([accounts, models, pools]) => {
       const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
-      return pools ? withHostProviderAccountPools(withAccountModels, pools) : withAccountModels;
+      return pools ? { ...withAccountModels, pools } : withAccountModels;
     }),
   );
 }

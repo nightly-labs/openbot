@@ -27,7 +27,6 @@ import {
   type ProviderRelaySignInStatus,
   type SubmitProviderCodeLoginInput,
   withHostProviderAccountModels,
-  withHostProviderAccountPools,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -429,7 +428,7 @@ export function providerAdminIpcHandlers({
             Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
               Effect.map(([accounts, extra, pooled]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? withHostProviderAccountPools(withModels, pooled) : withModels;
+                return pooled ? { ...withModels, pools: pooled } : withModels;
               }),
             ),
           );
