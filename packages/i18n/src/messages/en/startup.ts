@@ -10,6 +10,9 @@ export const messages = defineMessages("startup", {
   "startup.archiveChangedBody":
     "Another program changed the OpenBot file app.asar. OpenBot runs now, but it will not open after you quit it.\n\nTo repair OpenBot, install it again. Your local data stays.",
   "startup.archiveChangedDownload": "Download OpenBot",
+  // The entry of the main process shows this when a program file cannot load, so no OpenBot code can run.
+  "startup.filesDamagedBody":
+    "Some OpenBot files are damaged or missing.\n\nTo repair OpenBot, install it again. Your local data stays.",
   // An older OpenBot started over data that a newer one migrated: it installs the latest release.
   "startup.newerDataUpdatingTitle": "Updating OpenBot",
   "startup.newerDataUpdatingBody":

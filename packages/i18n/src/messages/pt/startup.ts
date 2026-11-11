@@ -9,6 +9,8 @@ export const messages = {
   "startup.archiveChangedBody":
     "Outro programa alterou o arquivo app.asar do OpenBot. O OpenBot funciona agora, mas não vai abrir depois que você fechá-lo.\n\nPara reparar, instale o OpenBot novamente. Seus dados locais são mantidos.",
   "startup.archiveChangedDownload": "Baixar OpenBot",
+  "startup.filesDamagedBody":
+    "Alguns arquivos do OpenBot estão danificados ou faltando.\n\nPara reparar, instale o OpenBot novamente. Seus dados locais são mantidos.",
   "startup.newerDataUpdatingTitle": "Atualizando o OpenBot",
   "startup.newerDataUpdatingBody":
     "Uma versão mais recente do OpenBot salvou seus dados. O OpenBot instala a versão mais recente e depois abre de novo.\n\nSeus dados locais não foram redefinidos nem substituídos.",
