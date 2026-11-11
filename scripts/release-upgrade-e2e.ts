@@ -43,7 +43,7 @@
 // a modified install. electron-updater installs on Windows with the same `--updated /S` arguments
 // that this test uses, and on Linux it replaces the AppImage file, as this test does; macOS
 // replaces the bundle. `bun run verify:update-artifacts` checks the feed files of the new build.
-import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import {
@@ -518,21 +518,20 @@ async function rendererCalledMain(): Promise<boolean> {
 }
 
 /**
- * Asks the app to quit as a user's quit, a log-out or `kill` does, and waits for the exit. POSIX
- * sends SIGTERM, which main handles as a quit (`quitFor("signal")`). Windows sends WM_CLOSE with
- * `taskkill` without `/F`, which closes the main window and so quits the app.
+ * Asks the app to quit as a user does, and waits for the exit. POSIX sends SIGTERM, which main
+ * handles as a quit (`quitFor("signal")`), as a log-out or `kill` does. Windows closes the main
+ * window, as the window's close button does: on Windows the app quits when its main window closes.
+ * WM_CLOSE from `taskkill` without `/F` did not quit the app on the CI runner.
  */
 async function quit(app: RunningApp): Promise<QuitResult> {
-  await app.browser.close().catch(() => undefined);
-  const pid = app.child.pid;
-  check(pid, "OpenBot has no process id.");
   if (process.platform === "win32") {
-    // The app can exit before taskkill finds its windows, so a failure only goes to the log.
-    const result = spawnSync("taskkill.exe", ["/pid", String(pid)], { encoding: "utf8", windowsHide: true });
-    if (result.status !== 0) {
-      logger.warn(`taskkill exited with code ${result.status}: ${`${result.stdout}${result.stderr}`.trim()}`);
-    }
-  } else app.child.kill("SIGTERM");
+    // The timer lets the call return before the page closes.
+    await app.page.evaluate(() => {
+      setTimeout(() => window.close(), 0);
+    });
+  }
+  await app.browser.close().catch(() => undefined);
+  if (process.platform !== "win32") app.child.kill("SIGTERM");
   const limit = sleep(QUIT_LIMIT_MS).then(() => "limit" as const);
   const outcome = await Promise.race([app.exited, limit]);
   current.app = null;
