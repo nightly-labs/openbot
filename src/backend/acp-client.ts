@@ -3428,8 +3428,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         result.decision === "approved" ||
         (isRecord(result.permissions) && Object.keys(result.permissions).length > 0));
     const option = bestPermissionOption(params.options, accepted);
-    if (turn && accepted && option && kind === "file-change" && this.#flavor.approvedEditSweep) {
-      const { toolCallId } = params.toolCall;
+    const { toolCallId } = params.toolCall;
+    // Only an edit is claimed by a call that runs it, so only an edit is noted. The request can omit
+    // the kind that the pending call had.
+    const approvedKind = params.toolCall.kind ?? turn?.toolKinds.get(toolCallId);
+    if (turn && accepted && option && approvedKind === "edit" && this.#flavor.approvedEditSweep) {
       turn.approvedEdits.push({
         id: toolCallId,
         paths: toolCallPaths(params.toolCall, turn.toolItems.get(toolCallId)?.arguments),
