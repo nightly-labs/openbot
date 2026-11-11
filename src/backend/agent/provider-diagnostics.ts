@@ -359,3 +359,19 @@ export function isImageTooSmallDiagnostic(message: string): boolean {
 export function isImageTooLargeDiagnostic(message: string): boolean {
   return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
 }
+
+/**
+ * Whether a model endpoint refused the request because it holds more images than the endpoint
+ * accepts in one request. The provider session sends each image of the chat again on each turn, so
+ * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
+ * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
+ * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50".
+ */
+export function isImageCountDiagnostic(message: string): boolean {
+  return (
+    /\bat most \d+ image(?:s|\(s\))? may be provided\b/iu.test(message) ||
+    /\btoo many images\b/iu.test(message) ||
+    /\bmaximum of \d+ images\b/iu.test(message) ||
+    /\b\d+ images\b[^.\n]{0,40}\bexceed/iu.test(message)
+  );
+}

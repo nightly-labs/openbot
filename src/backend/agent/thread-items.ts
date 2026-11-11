@@ -28,7 +28,7 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
-import { isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
+import { isImageCountDiagnostic, isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
@@ -123,10 +123,15 @@ function isForeignReasoningError(message: string): boolean {
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
- * (#2351). Only a new session, given the OpenBot transcript, recovers.
+ * (#2351). Venice answers "Invalid request parameters", and OpenCode keeps only that text of its
+ * reply, also when the session holds more images than Venice accepts (#6702). Only a new session,
+ * given the OpenBot transcript, recovers.
  */
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
-  return provider === "opencode" && /\bthe request contains invalid parameters\b/i.test(message);
+  return (
+    provider === "opencode" &&
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b/i.test(message)
+  );
 }
 
 /**
@@ -166,6 +171,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
+  if (isImageCountDiagnostic(message))
+    return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
