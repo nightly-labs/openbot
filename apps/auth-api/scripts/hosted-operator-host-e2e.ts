@@ -9,7 +9,8 @@
 // account service cannot restart a moved server, so the client hides the action. A moved server has the
 // larger storage of its plan in the server list, the hosting list and the billing state, also after a
 // plan change. Servers that boat runs show that the same service still sets up, starts, stops and
-// resizes them, and that they keep the storage of the plan table.
+// resizes them, and that they keep the storage of the plan table. A move that the operator writes while
+// the Worker reads the sandbox at boat wins over the state that boat then gives.
 //
 // Run: bun run test:hosted-operator-host
 // It writes .openbot-build/hosted-operator-host-e2e/report.json and exits non-zero on a failure.
@@ -116,6 +117,8 @@ async function run() {
 
   const calls: string[] = [];
   const running = new Set<string>();
+  /** Runs one time while boat answers a read of this sandbox: the operator moves the server at that moment. */
+  const duringRead = new Map<string, () => void>();
   const boatFetch = async (input: string, init: RequestInit) => {
     const path = new URL(input).pathname.replace("/api/v1", "");
     const method = init.method ?? "GET";
@@ -140,6 +143,8 @@ async function run() {
       return Response.json({ ok: false, code: "sandbox_not_found" }, { status: 404 });
     }
     if (method === "GET") {
+      duringRead.get(sandboxId)?.();
+      duringRead.delete(sandboxId);
       return Response.json({
         ok: true,
         sandbox: { id: sandboxId, state: running.has(sandboxId) ? "running" : "archived" },
@@ -365,6 +370,41 @@ async function run() {
     row("moved")?.observed_state === "running" && foreign().length === 0,
     row("moved"),
   );
+
+  // The operator moves a server while the Worker reads its sandbox at boat. The Worker read the row before
+  // the move, and boat then says that the sandbox is stopped.
+  server("control-race", { sandboxId: "bx_control_race", template: "tpl_1", observed: "stopping" });
+  duringRead.set("bx_control_race", () => {
+    database
+      .prepare(
+        `UPDATE hosted_servers SET operator_host = 'leaseweb:12728113', retired_sandbox_id = provider_sandbox_id,
+           provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
+           updated_at = ?
+         WHERE server_id = 'control-race' AND provider_sandbox_id IS NOT NULL AND operator_host IS NULL
+           AND desired_state IN ('running', 'idle')`,
+      )
+      .run(at);
+  });
+  const raceFrom = calls.length;
+  const ready = JSON.stringify({
+    type: "sandbox.ready",
+    createdAt: new Date(at).toISOString(),
+    data: { state: "running", sandbox: { id: "bx_control_race" } },
+  });
+  await Effect.runPromise(service.handleWebhook(await signedWebhook("delivery-race", at, ready)));
+  await Promise.all(work.splice(0));
+  const raced = row("control-race");
+  check(
+    "a move during a read of the sandbox wins: the old state of the sandbox does not change the moved server",
+    raced?.operator_host === "leaseweb:12728113" &&
+      raced.desired_state === "running" &&
+      raced.observed_state === "running" &&
+      calls.slice(raceFrom).join() === "GET /sandboxes/bx_control_race",
+    { row: raced, calls: calls.slice(raceFrom) },
+  );
+  // The other checks do not use this server.
+  database.prepare("DELETE FROM billing_subscriptions WHERE server_id = 'control-race'").run();
+  database.prepare("DELETE FROM hosted_servers WHERE server_id = 'control-race'").run();
 
   // The states in which the Worker makes or starts a sandbox for a server that boat runs.
   operatorSets("moved", "error", "provider_error", at - 20 * MINUTE);

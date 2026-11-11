@@ -195,8 +195,12 @@ export_data() {
   chmod 0600 "$MANIFEST"
 
   # The manifest is the first member, so `import` reads it before it restores a file.
-  tar --create --file "$archive" --numeric-owner --acls --xattrs --one-file-system --anchored --directory / \
-    "${EXCLUDED[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}"
+  # tar also fails when a process outside openbot.service changes a file while tar reads it.
+  if ! tar --create --file "$archive" --numeric-owner --acls --xattrs --one-file-system --anchored --directory / \
+    "${EXCLUDED[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}"; then
+    rm -f "$MANIFEST"
+    fail "The archive is not complete. OpenBot stays stopped. Delete $archive and run the export again."
+  fi
   rm -f "$MANIFEST"
   if openbot_runs; then fail "OpenBot started during the archive. Delete $archive and run the export again."; fi
   echo "Archived OpenBot $version to $archive ($(du -h "$archive" | cut -f1))."
@@ -245,7 +249,7 @@ import_data() {
   missing=""
   while read -r line; do
     [ -n "$line" ] || continue
-    runuser -u "$SERVICE_USER" -- bash -lc "command -v -- '${line%% *}'" >/dev/null 2>&1 ||
+    runuser -u "$SERVICE_USER" -- bash -lc "command -v -- '${line%% *}'" </dev/null >/dev/null 2>&1 ||
       missing+="  ${line%% *} (${line#* })"$'\n'
   done <<<"$clis"
   if [ -n "$missing" ]; then

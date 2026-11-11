@@ -1599,7 +1599,7 @@ export class HostedServerService {
         .prepare(
           `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
          WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
-           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ?`,
+           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ? AND operator_host IS NULL`,
         )
         .bind(now, row.server_id, now - RESIZE_AFTER_NO_USE_MS)
         .run(),
@@ -2026,7 +2026,7 @@ export class HostedServerService {
         .prepare(
           `UPDATE hosted_servers SET desired_state = 'idle', updated_at = ?
          WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
-           AND COALESCE(last_active_at, 0) <= ?`,
+           AND COALESCE(last_active_at, 0) <= ? AND operator_host IS NULL`,
         )
         .bind(dependencies.now(), row.server_id, now - IDLE_STOP_AFTER_MS)
         .run(),
@@ -2448,7 +2448,8 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET observed_state = ?, observed_error = ?, provider_event_at = ?, updated_at = ?
-         WHERE server_id = ? AND desired_state != 'deleted' AND (provider_event_at IS NULL OR provider_event_at <= ?)`,
+         WHERE server_id = ? AND desired_state != 'deleted' AND (provider_event_at IS NULL OR provider_event_at <= ?)
+           AND operator_host IS NULL`,
         )
         .bind(observed, error, eventAt, dependencies.now(), row.server_id, eventAt)
         .run(),

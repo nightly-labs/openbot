@@ -965,17 +965,19 @@ private key.
 The second way in is the Leaseweb API, which works below the operating system: `reboot`, `console`,
 `resetPassword`, and `attachIso` with the `GRML` image. So the Leaseweb API key gives full access
 to each server and its disk. Keep it only where the operator runs. The key of the account that
-has the customer servers is `LEASEWEB_API_KEY` in the encrypted `apps/auth-api/.env.production`.
-The deploy script does not send it to the Worker. Send it in the `X-LSW-Auth` header:
+has the customer servers (Netherlands) is `LEASEWEB_API_KEY_NL` in the encrypted
+`apps/auth-api/.env.production`. The deploy script does not send it to the Worker. Send it in the
+`X-LSW-Auth` header:
 
 ```sh
 bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
-  sh -c 'curl -sS -H "X-LSW-Auth: $LEASEWEB_API_KEY" "https://api.leaseweb.com/publicCloud/v1/vps?limit=50"'
+  sh -c 'curl -sS -H "X-LSW-Auth: $LEASEWEB_API_KEY_NL" "https://api.leaseweb.com/publicCloud/v1/vps?limit=50"'
 ```
 
 One Leaseweb account is for one sales organization, and an API key sees only the servers of its
 account: the key of the German account does not list a server in Amsterdam. The key of the German
-account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file.
+account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
+the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEWEB_API_KEY_AU`.
 
 ### Move a server from boat
 
@@ -1044,8 +1046,11 @@ the parts of a move that run on the two machines, as root. The steps:
      provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
      updated_at = <now in ms>
    WHERE server_id = '<server ID>' AND provider_sandbox_id IS NOT NULL AND operator_host IS NULL
-     AND plan IN ('standard', 'pro');
+     AND plan IN ('standard', 'pro') AND desired_state IN ('running', 'idle');
    ```
+
+   The statement changes no row of a server whose plan ended (`stopped`) or whose delete is in
+   progress (`deleted`): do not move such a server.
 
    From this statement, the Worker sends no call to boat for the server, and the customer still uses
    the sandbox. The order is necessary: while the row has the sandbox and `desired_state = 'running'`,
@@ -1053,6 +1058,13 @@ the parts of a move that run on the two machines, as root. The steps:
    Worker can also stop the sandbox for no use during the export, and the next client request then
    starts it. In each case the sandbox gets data that the archive does not have. When the sandbox is
    stopped at this step, start it at boat.
+
+   From this statement, the Worker also does not extend the boat lease of the sandbox, and boat stops
+   the sandbox at the end of the lease. Read `lease_until` of the row before the statement. A server
+   in use has 1 to 2 hours. When less time is left than steps 5 to 7 need, extend the lease at boat
+   first (`PATCH /sandboxes/<sandbox ID>` with `ttlSeconds`). When boat stops the sandbox during the
+   export or the copy, start it at boat, delete the archive, and do step 5 again. Not confirmed: the
+   lease that a start at boat by hand gives.
 5. On the sandbox: `move-from-boat.sh export <archive>`. The downtime of the customer starts here.
    The command sets `/run/openbot-pre-stop`, stops `openbot.service`, and archives, with numeric
    owners, the home of `user` and `/srv/openbot-hosted`. The archive has the SHA-256 of `openbot.db`,
@@ -1124,9 +1136,17 @@ there. The work that the server did on the VPS is not in the sandbox.
 
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
-  operator_host = NULL, desired_state = 'idle', observed_state = 'stopped', updated_at = <now in ms>
-WHERE server_id = '<server ID>' AND operator_host IS NOT NULL AND retired_sandbox_id IS NOT NULL;
+  operator_host = NULL, desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
+  observed_state = 'stopped', updated_at = <now in ms>
+WHERE server_id = '<server ID>' AND operator_host IS NOT NULL AND retired_sandbox_id IS NOT NULL
+  AND desired_state != 'deleted';
 ```
+
+A server whose plan ended on the VPS keeps `stopped`, so the rollback does not start it. When the
+plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan and
+the row has the `size` of the new plan. In that case also write `pending_size = size` in the
+statement, so that the resume changes the machine, as it does after a plan change on boat. Not
+tested: a rollback after a plan change.
 
 A moved server that lost its session cannot get a new claim from a client request. The operator
 makes a claim of 16 to 128 characters from `A-Z a-z 0-9 _ -`, writes its SHA-256 as base64url with no
