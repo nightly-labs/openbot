@@ -23,9 +23,10 @@ import { TeamWebRtcFileTransfer } from "../src/main/team-webrtc-file-transfer";
 
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
 
-const CHUNK_BYTES = 60 * 1024;
 const FILE_BYTES = 3 * 1024 * 1024;
-const FAILED_CHUNK_OFFSET = 30 * CHUNK_BYTES;
+// The chunks before this one hold more than one ack interval (1 MiB), so the receiver sends a periodic
+// ack for them.
+const FAILED_CHUNK_INDEX = 30;
 
 /** Delivers frames to `target` in order. `hold` keeps frames back until `release`. */
 class LinkedBridge extends EventEmitter<BridgeEvents> {
@@ -66,10 +67,10 @@ class LinkedBridge extends EventEmitter<BridgeEvents> {
 interface ResumeReport {
   status: "failed" | "passed";
   fileBytes: number;
-  failedChunkOffset: number;
+  failedChunkOffset: number | null;
   staleAcknowledgement: number | null;
   resentFrom: number | null;
-  hostHadThrough: number | null;
+  deliveredBeforeResume: number | null;
   receivedEqualsSent: boolean;
   error?: string;
 }
@@ -77,10 +78,10 @@ interface ResumeReport {
 const report: ResumeReport = {
   status: "failed",
   fileBytes: FILE_BYTES,
-  failedChunkOffset: FAILED_CHUNK_OFFSET,
+  failedChunkOffset: null,
   staleAcknowledgement: null,
   resentFrom: null,
-  hostHadThrough: null,
+  deliveredBeforeResume: null,
   receivedEqualsSent: false,
 };
 
@@ -97,7 +98,7 @@ host.setPeerAuthenticated("client", true);
 // The first `file-open` goes through. The chunks after it wait in the channel, one chunk send fails,
 // and the next `file-open` lets the waiting frames arrive, in order, before it.
 let opens = 0;
-let failed = false;
+let chunks = 0;
 let highestSent = 0;
 clientBridge.setPolicy((data) => {
   if (typeof data === "string") {
@@ -105,14 +106,16 @@ clientBridge.setPolicy((data) => {
     opens += 1;
     if (opens === 1) return "send";
     if (opens === 2) {
-      report.hostHadThrough = highestSent;
+      // The held frames arrive before this `file-open`, so the receiver has these bytes when it answers.
+      report.deliveredBeforeResume = highestSent;
       return "release";
     }
     return "send";
   }
   const chunk = decodeTeamProtocolV2FileChunk(data);
-  if (!failed && chunk.offset === FAILED_CHUNK_OFFSET) {
-    failed = true;
+  chunks += 1;
+  if (chunks === FAILED_CHUNK_INDEX + 1) {
+    report.failedChunkOffset = chunk.offset;
     return "fail";
   }
   if (opens === 2 && report.resentFrom === null) report.resentFrom = chunk.offset;
@@ -135,12 +138,12 @@ try {
   if (Result.isFailure(sent)) throw sent.failure.cause;
   const received = await Effect.runPromise(host.consume("client", sent.success));
   report.receivedEqualsSent = Buffer.from(received.bytes).equals(Buffer.from(bytes));
-  assert.ok(failed, "One chunk send must fail, so the sender resumes.");
-  assert.ok(report.hostHadThrough !== null && report.resentFrom !== null, "The sender must resume.");
-  assert.ok(
-    report.resentFrom < report.hostHadThrough,
-    "The resumed sender must send again bytes that the receiver already has.",
-  );
+  const { failedChunkOffset, staleAcknowledgement, resentFrom, deliveredBeforeResume } = report;
+  assert.ok(failedChunkOffset !== null, "One chunk send must fail, so the sender resumes.");
+  assert.ok(deliveredBeforeResume !== null && resentFrom !== null, "The sender must resume.");
+  assert.ok(staleAcknowledgement !== null, "A periodic ack must reach the sender after its new file-open.");
+  assert.ok(staleAcknowledgement < deliveredBeforeResume, "That ack must be older than the bytes that arrived.");
+  assert.equal(resentFrom, staleAcknowledgement, "The resumed sender must start at that ack.");
   assert.ok(report.receivedEqualsSent, "The host must get the same bytes.");
   report.status = "passed";
 } catch (error) {
