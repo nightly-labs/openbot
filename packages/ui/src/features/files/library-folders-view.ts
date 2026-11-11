@@ -1,4 +1,9 @@
-import { LIBRARY_FOLDER_LIMITS, type LibraryFolder, libraryFolderPath } from "@openbot/contracts/ipc";
+import {
+  LIBRARY_FOLDER_LIMITS,
+  type LibraryFolder,
+  libraryFolderHeight,
+  libraryFolderPath,
+} from "@openbot/contracts/ipc";
 
 /** The place in the Library that the page shows. `removed`: the files of agents that the server no longer has. */
 export type LibraryLocation =
@@ -36,17 +41,6 @@ export function childFolders(
   return folders.filter((folder) => folder.agentId === agentId && folder.parentId === parentId);
 }
 
-/** How many levels of folders a folder holds under it: 0 for a folder with no folders in it. */
-function folderHeight(folders: readonly LibraryFolder[], folderId: string, seen = new Set<string>()): number {
-  if (seen.has(folderId)) return 0;
-  seen.add(folderId);
-  let height = 0;
-  for (const folder of folders) {
-    if (folder.parentId === folderId) height = Math.max(height, 1 + folderHeight(folders, folder.id, seen));
-  }
-  return height;
-}
-
 /**
  * A folder can hold one more level of folders: a new folder, or the folder `movedId` with the folders
  * in it. `parentId` undefined is the top level of an agent. The host has the same limit.
@@ -57,7 +51,7 @@ export function canHoldFolder(
   movedId?: string,
 ): boolean {
   const level = libraryFolderPath(folders, parentId).length;
-  const height = movedId === undefined ? 0 : folderHeight(folders, movedId);
+  const height = movedId === undefined ? 0 : libraryFolderHeight(folders, movedId);
   return level + 1 + height <= LIBRARY_FOLDER_LIMITS.levels;
 }
 

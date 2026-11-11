@@ -139,9 +139,12 @@ export class LibraryFoldersService {
     return this.#sources.store.removeAgent(agentId);
   }
 
-  /** Removes the entries of deleted files. */
+  /**
+   * Removes the entries of deleted files. The files are already gone, so a failed write does not fail
+   * the delete: the next start removes the entries.
+   */
   removeFiles(fileIds: readonly string[]) {
-    return this.#sources.store.removeFiles(fileIds);
+    return this.#sources.store.removeFiles(fileIds).pipe(Effect.catch(() => Effect.void));
   }
 
   /**

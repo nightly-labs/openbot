@@ -237,10 +237,23 @@ export class LibraryFoldersStore extends EventEmitter<LibraryFoldersStoreEvents>
   /** Removes the entries of deleted files. */
   removeFiles(fileIds: Iterable<string>): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
     const deleted = new Set(fileIds);
+    return this.#keepFiles((fileId) => !deleted.has(fileId));
+  }
+
+  /**
+   * Removes the entries of files that the host no longer has, at the start of the app. A file can go
+   * on a path that does not call `removeFiles`, such as the delete of a message or a chat, and each
+   * entry counts toward the file limit of the folders.
+   */
+  reconcileFiles(fileIds: Pick<ReadonlySet<string>, "has">): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
+    return this.#keepFiles((fileId) => fileIds.has(fileId));
+  }
+
+  #keepFiles(keep: (fileId: string) => boolean): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
     return this.#enqueue(
       Effect.gen({ self: this }, function* () {
         const entries = Object.entries(this.#snapshot.placement);
-        const kept = entries.filter(([fileId]) => !deleted.has(fileId));
+        const kept = entries.filter(([fileId]) => keep(fileId));
         if (kept.length === entries.length) return this.getSnapshot();
         yield* this.#commit({
           ...this.#snapshot,

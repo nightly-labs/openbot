@@ -665,6 +665,30 @@ try {
     existing.text,
   );
 
+  // 10b. The start of the app removes the entry of a file that went on a path that does not tell the
+  // folders, such as the delete of a chat. The entries of the files that the host has stay.
+  const reportsFolder = storedFolder(maker.id, "Reports");
+  if (!reportsFolder) throw new Error("The agent has no Reports folder.");
+  const goneFileId = randomUUID();
+  await runCauseEffect(
+    store.mutate(
+      { type: "place", fileIds: [goneFileId], folderId: reportsFolder.id },
+      { agentIds: new Set([maker.id]), fileAgent: (fileId) => (fileId === goneFileId ? maker.id : undefined) },
+    ),
+  );
+  const keptBefore = Object.keys(host.stored().placement).filter((fileId) => fileId !== goneFileId);
+  await runCauseEffect(
+    store.reconcileFiles(new Set(host.mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
+  );
+  const placementAfter = host.stored().placement;
+  pass(
+    "The start removes the entry of a file that the host no longer has, and keeps the others",
+    keptBefore.length > 0 &&
+      !(goneFileId in placementAfter) &&
+      keptBefore.every((fileId) => placementAfter[fileId] !== undefined),
+    JSON.stringify({ keptBefore: keptBefore.length, after: Object.keys(placementAfter).length }),
+  );
+
   // 11. A host with no Library folders store: the file is attached, and the result says so.
   const bare = await startHost(join(root, "user-data-bare"), false);
   hosts.push(bare);

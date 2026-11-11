@@ -152,12 +152,16 @@ export function libraryFolderTree(
 }
 
 /** How many levels of folders a folder holds under it: 0 for a folder with no folders in it. */
-function branchHeight(folders: readonly LibraryFolder[], folderId: string, seen = new Set<string>()): number {
+export function libraryFolderHeight(
+  folders: readonly LibraryFolder[],
+  folderId: string,
+  seen = new Set<string>(),
+): number {
   if (seen.has(folderId)) return 0;
   seen.add(folderId);
   let height = 0;
   for (const folder of folders) {
-    if (folder.parentId === folderId) height = Math.max(height, 1 + branchHeight(folders, folder.id, seen));
+    if (folder.parentId === folderId) height = Math.max(height, 1 + libraryFolderHeight(folders, folder.id, seen));
   }
   return height;
 }
@@ -293,7 +297,7 @@ export function applyLibraryFolderAction(
       if (action.parentId !== null) {
         if (branch.has(action.parentId)) refuse("into-itself");
         if (requireFolder(current, action.parentId).agentId !== moved.agentId) refuse("other-agent");
-        const levels = folderLevel(current, action.parentId) + 1 + branchHeight(current.folders, moved.id);
+        const levels = folderLevel(current, action.parentId) + 1 + libraryFolderHeight(current.folders, moved.id);
         if (levels > LIBRARY_FOLDER_LIMITS.levels) refuse("too-deep");
       }
       if (action.beforeFolderId !== null && action.beforeFolderId !== moved.id) {

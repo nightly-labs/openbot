@@ -82,7 +82,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
     () => ({ agentIds: agentIds(), fileAgent: (fileId) => fileAgents().get(fileId) }),
     props.calls,
   );
-  // A scan can find that files went, and the host then drops their folders.
+  // A new scan follows a change of the files on the host. The folders load again with it, so they match the files.
   createEffect(
     () => storage.state.loading,
     (loading, was) => {
