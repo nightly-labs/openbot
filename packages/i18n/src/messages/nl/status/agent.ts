@@ -50,6 +50,7 @@ export const messages = {
   "status.agent.browserTyping": "Typt op de webpagina…",
   "status.agent.browserActing": "Gebruikt de webpagina…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
+  "status.agent.browserDeciding": "Bepaalt de volgende stap op de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",

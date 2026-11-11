@@ -47,6 +47,7 @@ export const messages = {
   "status.agent.browserTyping": "جارٍ الكتابة في صفحة الويب…",
   "status.agent.browserActing": "جارٍ استخدام صفحة الويب…",
   "status.agent.browserReviewing": "جارٍ مراجعة صفحة الويب…",
+  "status.agent.browserDeciding": "جارٍ تحديد الخطوة التالية في صفحة الويب…",
   "status.agent.memoriesSearching": "جارٍ البحث في ذكرياته…",
   "status.agent.memoriesSearched": {
     zero: "بحث في ذكرياته: لم يُعثر على شيء",

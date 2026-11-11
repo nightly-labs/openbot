@@ -47,6 +47,7 @@ export const messages = {
   "status.agent.browserTyping": "Web ページに入力しています…",
   "status.agent.browserActing": "Web ページを操作しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
+  "status.agent.browserDeciding": "Web ページでの次の操作を決めています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",

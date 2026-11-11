@@ -43,6 +43,7 @@ export const messages = {
   "status.agent.browserTyping": "正在网页中输入…",
   "status.agent.browserActing": "正在使用网页…",
   "status.agent.browserReviewing": "正在查看网页…",
+  "status.agent.browserDeciding": "正在决定网页上的下一步…",
   "status.agent.memoriesSearching": "正在搜索记忆…",
   "status.agent.memoriesSearched": { other: "已搜索记忆：找到 {count} 条" },
   "status.agent.memoriesUpdating": "正在更新记忆…",

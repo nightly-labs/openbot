@@ -45,6 +45,7 @@ export const messages = {
   "status.agent.browserTyping": "Ввод на веб-странице…",
   "status.agent.browserActing": "Работа с веб-страницей…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
+  "status.agent.browserDeciding": "Выбираю следующий шаг на веб-странице…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
   "status.agent.memoriesSearched": {
     one: "Поиск в памяти: найдено {count}",

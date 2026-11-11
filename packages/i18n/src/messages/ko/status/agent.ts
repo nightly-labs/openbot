@@ -45,6 +45,7 @@ export const messages = {
   "status.agent.browserTyping": "웹 페이지에 입력하는 중…",
   "status.agent.browserActing": "웹 페이지를 사용하는 중…",
   "status.agent.browserReviewing": "웹 페이지를 확인하는 중…",
+  "status.agent.browserDeciding": "웹 페이지에서 다음 단계를 결정하는 중…",
   "status.agent.memoriesSearching": "메모리를 검색하는 중…",
   "status.agent.memoriesSearched": {
     other: "메모리를 검색했어요: {count}개 찾음",
