@@ -233,11 +233,16 @@ try {
       turnStarts: turnStarts(threadId),
       finalStatus: delivery.status,
       finalError: mailbox.getDelivery(delivery.id)?.delivery.error ?? null,
-      errorEvents: errorEvents.slice(firstErrorEvent).map(({ code, message }) => ({ code, message })),
+      // A warning reaches the banner or a toast as `agent_warning`. Other events are not this check.
+      errorEvents: errorEvents
+        .slice(firstErrorEvent)
+        .filter((event) => event.code === "agent_warning")
+        .map(({ code, message }) => ({ code, message })),
       noTextLogLines: logLines
         .slice(firstLogLine)
-        .filter((line) => line.includes("A provider warning has no text to show.") && line.includes("rollout.jsonl"))
-        .length,
+        .filter(
+          (line) => line.includes("A provider warning has no text to show.") && line.includes('"provider":"codex"'),
+        ).length,
       passed: false,
     };
     report.cases.push(result);

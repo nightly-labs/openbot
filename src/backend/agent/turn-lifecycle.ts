@@ -1163,23 +1163,6 @@ export class TurnLifecycle {
           });
           return;
         }
-        // A warning does not end the turn. When its text is a path, a stack or too long, the banner
-        // showed "The agent could not continue" in its place while the turn went on. Codex warnings
-        // on Windows quote `C:\` paths. The log keeps the text and the failure count keeps the report.
-        if (notification.method === "warning" && userErrorMessage(message, "") === "") {
-          logger.info("A provider warning has no text to show.", {
-            provider: source.provider,
-            message: this.#hooks.redactMcp(message),
-          });
-          this.#hooks.emitFailure?.({
-            code: "agent_warning",
-            ...(agentId ? { agentId } : {}),
-            causeCode,
-            provider: source.provider,
-            severity: "warning",
-          });
-          return;
-        }
         // Codex retries on its own and reports the final failure again without `willRetry`.
         if (isRecord(params) && params.willRetry === true) {
           this.#providerRetried(agentId, threadId, getString(params, "turnId"), source.provider);
@@ -1315,6 +1298,18 @@ export class TurnLifecycle {
             this.#mayHoldError(agentId, errorTurnId, context.causeCode))
         ) {
           this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
+          return;
+        }
+        // A warning does not end the turn. When its text is empty, a path, a stack or too long, the
+        // banner showed "The agent could not continue" in its place while the turn went on. Codex
+        // warnings on Windows quote `C:\` paths. The log keeps the text and the failure count keeps
+        // the report.
+        if (notification.method === "warning" && userErrorMessage(message, "") === "") {
+          logger.info("A provider warning has no text to show.", {
+            provider: source.provider,
+            message: this.#hooks.redactMcp(message),
+          });
+          this.#hooks.emitFailure?.({ code: "agent_warning", ...(agentId ? { agentId } : {}), ...context });
           return;
         }
         const taskId =
