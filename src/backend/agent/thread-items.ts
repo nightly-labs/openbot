@@ -41,7 +41,11 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // Codex sends this on each thread start when the user turned on a feature such as
     // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
     // the text has the config path, so the banner replaced it with "could not continue".
-    message.startsWith("Under-development features enabled:")
+    message.startsWith("Under-development features enabled:") ||
+    // Codex sends this on each session start when its config asks for a tier, such as `priority`,
+    // that the model does not list (`codex-rs/core/src/session/mod.rs`). Codex leaves the tier out
+    // and the turn continues at the standard speed, so the banner showed a false error (#6827).
+    message.startsWith("Configured service tier ")
   );
 }
 
