@@ -17,6 +17,7 @@ export interface SkillsPort {
     | "addMarketplaceAgent"
     | "cancelMcpSignIn"
     | "completeMcpSignInRelay"
+    | "getMcpAccess"
     | "installAgentSkill"
     | "listAgentSkills"
     | "listInstalledSkills"
@@ -28,10 +29,12 @@ export interface SkillsPort {
     | "removeMcpServer"
     | "saveMcpServer"
     | "setAgentSkillEnabled"
+    | "setMcpAccess"
     | "signInMcpServer"
     | "testMcpServer"
     | "uninstallAgentSkill"
   >;
+  hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "getAgentAccess">;
   marketplaceAgents: Pick<OpenBotDesktopApi["marketplaceAgents"], "get" | "getListing" | "install" | "list">;
   macAutomation: Pick<OpenBotDesktopApi["macAutomation"], "request">;
   skills: Pick<

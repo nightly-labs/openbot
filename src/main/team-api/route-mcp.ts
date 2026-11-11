@@ -15,7 +15,7 @@ import {
 import { type McpToolRuntimePreparation, prepareToolRuntimeForTest } from "../ipc/mcp-server-handlers";
 import type { TeamApiMcpServerOwners, TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
-import { requireMcpAccess, requireOwnMcpServer } from "./mcp-member-access";
+import { requireMcpAccess, requireOwnMcpServer, visibleMcpServers } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
@@ -63,7 +63,7 @@ export async function routeMcpServers(
   if (list) {
     const servers = mcpServers.listMcpServers();
     requireMcpListFits(capabilities, servers.length);
-    return json(200, servers);
+    return json(200, visibleMcpServers(access, servers));
   }
   // `readJson` has already run the body through the MCP wire codec, so every field below is decoded
   // and bounded before the IPC parsers see it.
@@ -82,7 +82,7 @@ export async function routeMcpServers(
     const name = input.config.name.trim();
     const added = saved.find((server) => !before.has(server.id) && server.name === name);
     if (added && owners) await runCauseEffect(owners.add(added.id, member.id));
-    return json(200, saved);
+    return json(200, visibleMcpServers(access, saved));
   }
   if (remove) {
     const input = parseRemoveMcpServer(body);
@@ -92,7 +92,7 @@ export async function routeMcpServers(
     requireMcpListFits(capabilities, rows.length - (rows.some((server) => server.id === input.mcpServerId) ? 1 : 0));
     const servers = await runCauseEffect(mcpServers.removeMcpServer(input));
     if (owners) await runCauseEffect(owners.remove(input.mcpServerId));
-    return json(200, servers);
+    return json(200, visibleMcpServers(access, servers));
   }
   if (test) {
     const parsed = parseTestMcpServer(body);
@@ -109,5 +109,5 @@ export async function routeMcpServers(
   requireOwnMcpServer(access, toggled.mcpServerId);
   requireMcpListFits(capabilities, mcpServers.listMcpServers().length);
   if (toggled.enabled) toolRuntimes?.startToolRuntimes();
-  return json(200, await runCauseEffect(mcpServers.setMcpServerEnabled(toggled)));
+  return json(200, visibleMcpServers(access, await runCauseEffect(mcpServers.setMcpServerEnabled(toggled))));
 }

@@ -39,6 +39,7 @@ import { type ConnectorDetail, ConnectorDetailPanel, connectorDescription } from
 import type { ConnectorId } from "../connectors/connectors";
 import { DangerZone, IntegrationPage, StatusPill, WizardDialog } from "../settings/IntegrationLayout";
 import type { MarketplacePluginApp } from "../settings/marketplace-plugins";
+import { AppAccessSections } from "./MarketplaceAppAccess";
 import { AppAction } from "./MarketplaceCards";
 import { AppMark, TryCard } from "./MarketplaceParts";
 import { CATEGORY_LABELS } from "./marketplace-listing";
@@ -85,6 +86,12 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
     model().canConnectApps() && plugin().apps.some((app) => app.macAutomation?.length)
       ? model().macAutomation
       : undefined;
+  /** Each MCP row that the host holds for the plugin. */
+  const accessRows = () => plugin().apps.flatMap((entry) => props.app.connections[entry.id]?.accounts ?? []);
+  const access = () => {
+    if (accessRows().length === 0) return undefined;
+    return model().mcpAccess;
+  };
   const runPrompt = () => {
     const run = model().runPrompt;
     if (!run) return undefined;
@@ -222,6 +229,11 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
             </Show>
           </ItemGroup>
         </SettingsSection>
+      </Show>
+      <Show when={access()}>
+        {(held) => (
+          <AppAccessSections access={held()} agents={model().agents()} rows={accessRows()} name={props.app.name} />
+        )}
       </Show>
       <Show when={plugin().skills.length > 0}>
         <SettingsSection title={t("plugin.section.skills")}>
@@ -693,6 +705,16 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
           </Item>
         </ItemGroup>
       </SettingsSection>
+      <Show when={model().mcpAccess}>
+        {(access) => (
+          <AppAccessSections
+            access={access()}
+            agents={model().agents()}
+            rows={[{ id: props.app.server.id, name: props.app.name }]}
+            name={props.app.name}
+          />
+        )}
+      </Show>
       <WizardDialog
         open={confirm()}
         closeLabel={t("common.close")}

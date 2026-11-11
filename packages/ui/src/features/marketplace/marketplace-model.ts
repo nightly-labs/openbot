@@ -5,7 +5,9 @@ import type {
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillSummary,
+  McpServerAccess,
   McpServerConfig,
+  SetMcpAccessInput,
   SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
@@ -176,6 +178,16 @@ export interface MarketplaceMacAutomation {
  * What the Marketplace view reads and asks for. The renderer builds it from its IPC calls, and a
  * story builds it from fixtures. Each action reports its own failure through `error`.
  */
+/** The agents and the role levels of the MCP rows of the server. */
+export interface MarketplaceMcpAccess {
+  /** The access of one MCP row. A row with no stored entry has the default. */
+  entry: (mcpServerId: string) => McpServerAccess;
+  roles: () => readonly { id: string; name: string }[];
+  busy: () => boolean;
+  /** A full replace for each row. False when the host refused one; the error shows in the window. */
+  set: (changes: readonly SetMcpAccessInput[]) => Promise<boolean>;
+}
+
 export interface MarketplaceModel {
   listAgents: CatalogList<MarketplaceAgentSummary>;
   agentHomeCache?: MarketplaceHomeCache<MarketplaceAgentSummary> | undefined;
@@ -263,6 +275,11 @@ export interface MarketplaceModel {
   disconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => void;
   /** Removes a custom MCP server. */
   removeServer: (id: string) => Promise<boolean>;
+  /**
+   * Who gets the MCP servers of an app (`mcp-access-v1`). Absent while the host does not have it, the
+   * user is not an owner or admin, or the answer did not arrive.
+   */
+  mcpAccess?: MarketplaceMcpAccess | undefined;
   /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
   addServer?: (() => void) | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;

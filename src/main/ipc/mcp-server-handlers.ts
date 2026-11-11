@@ -7,6 +7,7 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // why nothing routes through the selected server.
 
 import {
+  decodeMcpAccessSnapshot,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
   decodeMcpSignInStates,
@@ -14,10 +15,13 @@ import {
   decodeMcpTestResult,
   decodeSignInRelayFlow,
   MCP_SERVERS_CAPABILITY,
+  type McpAccessSnapshot,
   type McpServerConfig,
+  parseSetMcpAccessInput,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import {
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_APP_ROUTES,
@@ -30,6 +34,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { MCP_STDIO_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
+import { type McpAccessControl, mcpAccessSnapshot } from "../mcp-access-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -103,8 +108,13 @@ export const prepareToolRuntimeForTest = Effect.fn("Mcp.prepareToolRuntimeForTes
   }
 });
 
+/** The user of this computer, who manages each of its MCP servers. */
+const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
+
 interface McpServerIpcDependencies {
   service: McpServerService;
+  /** Which agents get each MCP server of this computer, and the level of each role (`mcp-access-v1`). */
+  mcpAccess: McpAccessControl;
   remoteServers: McpRemoteServers;
   /**
    * Fetches the tool runtimes an MCP server is started with, if this machine does not hold them
@@ -138,6 +148,7 @@ const REMOTE_TEST_TIMEOUT_MS = TOOL_RUNTIME_TEST_WAIT_MS + MCP_STDIO_PROBE_TIMEO
 
 export function mcpServerIpcHandlers({
   service,
+  mcpAccess,
   remoteServers,
   startToolRuntimes,
   ensureToolRuntimesReady,
@@ -155,6 +166,24 @@ export function mcpServerIpcHandlers({
   function remoteList(serverId: string, path: string, body: unknown): Promise<McpServerConfig[]> {
     requireRemoteSupport(serverId);
     return runCauseEffect(remoteServers.request(serverId, path, decodeMcpServerConfigs, { method: "POST", body }));
+  }
+
+  /** A host that predates `mcp-access-v1` has no access entries: each agent gets each server. */
+  function remoteAccess(serverId: string, path: string, body: unknown): Promise<McpAccessSnapshot> {
+    requireRemoteSupport(serverId);
+    if (!remoteServers.supportsCapability(serverId, MCP_ACCESS_CAPABILITY))
+      throw new Error(sourceText("error.mcp.unsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeMcpAccessSnapshot, { method: "POST", body }));
+  }
+
+  function localAccess(): McpAccessSnapshot {
+    return mcpAccessSnapshot(
+      mcpAccess,
+      service.listMcpServers().map((server) => server.id),
+      LOCAL_OWNER,
+      [],
+      () => true,
+    );
   }
 
   /** A host without `mcp-sign-in-v1` cannot open a sign-in page for a client. */
@@ -233,8 +262,22 @@ export function mcpServerIpcHandlers({
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
       }),
       removeMcpServer: scopedHandler(parseRemoveMcpServer, {
-        local: (parsed) => runCauseEffect(service.removeMcpServer(parsed)),
+        local: (parsed) =>
+          runCauseEffect(service.removeMcpServer(parsed).pipe(Effect.tap(() => mcpAccess.remove(parsed.mcpServerId)))),
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
+      }),
+      getMcpAccess: scopedQueryHandler({
+        local: () => localAccess(),
+        remote: (serverId) => remoteAccess(serverId, MCP_ACCESS_ROUTES.read, {}),
+      }),
+      setMcpAccess: scopedHandler(parseSetMcpAccessInput, {
+        local: async (parsed) => {
+          const existing = new Set(service.listMcpServers().map((server) => server.id));
+          if (!existing.has(parsed.mcpServerId)) throw new Error("Invalid MCP access change.");
+          await runCauseEffect(mcpAccess.set(parsed.mcpServerId, parsed.access, existing));
+          return localAccess();
+        },
+        remote: (parsed, serverId) => remoteAccess(serverId, MCP_ACCESS_ROUTES.set, parsed),
       }),
       setMcpServerEnabled: scopedHandler(parseSetMcpServerEnabled, {
         local: (parsed) => {

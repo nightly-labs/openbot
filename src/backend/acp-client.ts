@@ -1677,7 +1677,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               providerResult(
                 yield* Effect.result(
                   usableMcpServers(
-                    agentMcpServers(this.options.mcpServers?.() ?? [], computerUse),
+                    agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse),
                     this.options.mcpToolRuntimes?.(),
                     this.options.mcpEndpoint,
                     agentId,

@@ -7,6 +7,11 @@
 // server, and changes, signs in, signs out and removes it. The host refuses the member each change and
 // each sign-in of a server that the owner added, also through a row of the member on the owner's
 // address. Provider sign-ins stay with owners and admins. Who added each server stays after a restart.
+//
+// Then the host starts with the access entries (`mcp-access-v1`). An owner reads and replaces the entry
+// of a server; a member reads only their own levels. `none` hides a server from a member and refuses
+// it, a role at `manage` gives the member the rights of the person who added it, and a list of agents
+// keeps the server from each other agent. The entries stay after a restart and go with the server.
 // Run: `bun run test:mcp-member-access`.
 // Writes .openbot-build/mcp-member-access-e2e/report.json.
 
@@ -15,7 +20,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { McpServerConfig, McpSignInState, TestMcpServerInput } from "@openbot/contracts/ipc";
+import {
+  decodeMcpAccessSnapshot,
+  type McpAccessSnapshot,
+  type McpServerAccess,
+  type McpServerConfig,
+  type McpSignInState,
+  type TestMcpServerInput,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -23,6 +35,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { MCP_MEMBER_ACCESS_CAPABILITY, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
@@ -80,6 +93,8 @@ plugin({
 const { TeamApiServer } = await import("../src/main/team-api-server");
 const { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } = await import("../src/main/mcp-server-owners-store");
 const { TeamStore } = await import("../src/main/team-store");
+const { MCP_ACCESS_FILE, McpAccessStore } = await import("../src/main/mcp-access-store");
+const { AGENT_ACCESS_FILE, AgentAccessStore } = await import("../src/main/agent-access-store");
 
 interface Step {
   name: string;
@@ -210,27 +225,41 @@ interface Host {
   agents: AgentService;
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
+  roles: InstanceType<typeof AgentAccessStore>;
   port: number;
 }
 
 let host: Host | null = null;
 
-/** Starts the host on the profile, as the app does at each launch. The stores keep their files. */
-async function startHost(): Promise<Host> {
+/**
+ * Starts the host on the profile, as the app does at each launch. The stores keep their files.
+ * `withAccess` gives it the access entries, as a host with `mcp-access-v1` has.
+ */
+async function startHost(withAccess = false): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
   const mailbox = new MailboxStore(userData, agentStore.sharedRoot, agentStore.database);
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const owners = new McpServerOwnersStore(join(userData, MCP_SERVER_OWNERS_FILE));
+  const access = new McpAccessStore(join(userData, MCP_ACCESS_FILE));
+  const roles = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
   await runCauseEffect(owners.load());
+  assert.equal(await runCauseEffect(access.load()), true, "The MCP access file did not load.");
+  assert.equal(await runCauseEffect(roles.load()), true, "The roles file did not load.");
   await runCauseEffect(sidebar.initialize());
   // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
-  const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
+  const agents = new AgentService({
+    store: agentStore,
+    mailbox,
+    browser: agentBrowser,
+    sidebarLayout: sidebar,
+    ...(withAccess ? { mcpAgentAccess: (mcpServerId, agentId) => access.allowsAgent(mcpServerId, agentId) } : {}),
+  });
   const server = new TeamApiServer({
     store: team,
     agents,
@@ -240,11 +269,12 @@ async function startHost(): Promise<Host> {
     appVersion: HOST_VERSION,
     mcpServers: agents,
     mcpServerOwners: owners,
+    ...(withAccess ? { mcpAccess: access, agentAccess: roles } : {}),
     mcpSignIns: signIns,
     signInRelay: relay,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, port };
+  return { database, agents, server, team, roles, port };
 }
 
 async function stopHost(): Promise<void> {
@@ -262,8 +292,10 @@ function current(): Host {
 }
 
 const CURRENT = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
-/** A released client: the current list without `mcp-member-access-v1`. */
-const RELEASED = CURRENT.filter((capability) => capability !== MCP_MEMBER_ACCESS_CAPABILITY);
+/** A released client: the current list without `mcp-member-access-v1` and `mcp-access-v1`. */
+const RELEASED = CURRENT.filter(
+  (capability) => capability !== MCP_MEMBER_ACCESS_CAPABILITY && capability !== MCP_ACCESS_CAPABILITY,
+);
 
 /** One protocol 9 request. A current client sends `mcp-member-access-v1`. */
 async function call(
@@ -323,6 +355,22 @@ async function save(token: string, config: McpServerConfig): Promise<McpServerCo
   const saved = servers(response.body).find((server) => server.name === config.name);
   assert.ok(saved, `${config.name} is not in the list.`);
   return saved;
+}
+
+async function readAccess(token: string): Promise<McpAccessSnapshot> {
+  const response = await call("POST", MCP_ACCESS_ROUTES.read, { token, body: {} });
+  assert.equal(response.status, 200, `Reading the access returned ${response.status}.`);
+  return decodeMcpAccessSnapshot(response.body);
+}
+
+function setAccess(token: string, mcpServerId: string, access: McpServerAccess) {
+  return call("POST", MCP_ACCESS_ROUTES.set, { token, body: { mcpServerId, access } });
+}
+
+async function listedNames(token: string): Promise<string[]> {
+  const list = await call("GET", MCP_ROUTES.list, { token });
+  assert.equal(list.status, 200, `List returned ${list.status}.`);
+  return servers(list.body).map((server) => server.name);
 }
 
 const NOT_YOURS = sourceText("error.team.mcpServerNotYours");
@@ -488,6 +536,150 @@ try {
         .find((m) => m.role === "owner")?.id,
     );
     return { owners: Object.keys(file.owners).length };
+  });
+
+  // The host of the steps above has no access entries: `mcp-access-v1` is absent there.
+  await step("a host without the access entries does not serve the access routes", async () => {
+    const response = await call("POST", MCP_ACCESS_ROUTES.read, { token: await login(OWNER), body: {} });
+    assert.equal(response.status, 400, `Expected 400, got ${response.status}.`);
+    return { status: response.status };
+  });
+
+  await stopHost();
+  host = await startHost(true);
+  const owner = await login(OWNER);
+  const member = await login(MEMBER);
+  const OPEN: McpServerAccess = { agents: null, everyone: "use", roles: {} };
+
+  await step("access: an owner reads each entry, a member reads only their own levels", async () => {
+    const forOwner = await readAccess(owner);
+    assert.deepEqual(forOwner.servers?.[ownerRow.id], OPEN, "A server with no entry is not open.");
+    assert.equal(forOwner.mine[ownerRow.id], "manage");
+    const forMember = await readAccess(member);
+    assert.deepEqual(forMember, { mine: { [ownerRow.id]: "use" } });
+    refused(await setAccess(member, ownerRow.id, { ...OPEN, everyone: "manage" }), ADMIN_REQUIRED, "member set");
+    const released = await call("POST", MCP_ACCESS_ROUTES.read, { token: owner, body: {}, capabilities: RELEASED });
+    assert.equal(released.status, 400, `A client without the capability got ${released.status}.`);
+    const unknown = await setAccess(owner, "no-such-server", OPEN);
+    assert.equal(unknown.status, 400, `An unknown server returned ${unknown.status}.`);
+    return { owner: forOwner, member: forMember };
+  });
+
+  await step("access: `none` hides the server from the member and refuses it", async () => {
+    const saved = await setAccess(owner, ownerRow.id, { ...OPEN, everyone: "none" });
+    assert.equal(saved.status, 200, `Set returned ${saved.status}: ${JSON.stringify(saved.body)}`);
+    assert.deepEqual(await listedNames(member), []);
+    assert.deepEqual(await listedNames(owner), ["trello"]);
+    assert.deepEqual((await readAccess(member)).mine, {});
+    refused(
+      await call("POST", MCP_ROUTES.toggle, { token: member, body: { mcpServerId: ownerRow.id, enabled: true } }),
+      NOT_YOURS,
+      "toggle",
+    );
+    // A released client of the member gets the same answer: the host holds the level.
+    const released = await call("GET", MCP_ROUTES.list, {
+      token: member,
+      capabilities: CURRENT.filter((capability) => capability !== MCP_ACCESS_CAPABILITY),
+    });
+    assert.deepEqual(
+      servers(released.body).map((server) => server.name),
+      [],
+    );
+    return { memberList: [] };
+  });
+
+  const roleId = "role-ops";
+  await step("access: a role at `manage` lets its member change the server", async () => {
+    const { roles, team } = current();
+    const serverId = team.getIdentity()?.serverId;
+    assert.ok(serverId, "The host has no identity.");
+    await Effect.runPromise(
+      roles.set(
+        serverId,
+        {
+          revision: roles.get(serverId).revision,
+          everyone: {},
+          roles: [{ id: roleId, name: "Ops", agents: {}, memberIds: [memberId] }],
+        },
+        new Set(),
+        new Set(),
+        null,
+      ),
+    );
+    const saved = await setAccess(owner, ownerRow.id, {
+      agents: null,
+      everyone: "none",
+      roles: { [roleId]: "manage" },
+    });
+    assert.equal(saved.status, 200, `Set returned ${saved.status}: ${JSON.stringify(saved.body)}`);
+    assert.equal((await readAccess(member)).mine[ownerRow.id], "manage");
+    assert.deepEqual(await listedNames(member), ["trello"]);
+    const toggled = await call("POST", MCP_ROUTES.toggle, {
+      token: member,
+      body: { mcpServerId: ownerRow.id, enabled: true },
+    });
+    assert.equal(toggled.status, 200, `The member's toggle returned ${toggled.status}.`);
+    return { level: "manage", toggle: toggled.status };
+  });
+
+  await step("access: the role at `use` reads the server and cannot change it", async () => {
+    const saved = await setAccess(owner, ownerRow.id, { agents: null, everyone: "none", roles: { [roleId]: "use" } });
+    assert.equal(saved.status, 200, `Set returned ${saved.status}.`);
+    assert.deepEqual(await listedNames(member), ["trello"]);
+    refused(
+      await call("POST", MCP_ROUTES.toggle, { token: member, body: { mcpServerId: ownerRow.id, enabled: false } }),
+      NOT_YOURS,
+      "toggle",
+    );
+    return { level: (await readAccess(member)).mine[ownerRow.id] };
+  });
+
+  await step("access: a list of agents keeps the server from each other agent", async () => {
+    const { agents } = current();
+    const names = (agentId: string | null) => agents.enabledMcpServers(agentId).map((server) => server.name);
+    assert.deepEqual(names("agent-a"), ["trello"], "The server is not on before the change.");
+    const saved = await setAccess(owner, ownerRow.id, { ...OPEN, agents: ["agent-a"] });
+    assert.equal(saved.status, 200, `Set returned ${saved.status}.`);
+    assert.deepEqual(names("agent-a"), ["trello"]);
+    assert.deepEqual(names("agent-b"), []);
+    assert.deepEqual(names(null), [], "A session with no agent got a server that has a list of agents.");
+    return { "agent-a": names("agent-a"), "agent-b": names("agent-b") };
+  });
+
+  await step("access: the entry stays after a restart, and all agents get the server again", async () => {
+    await stopHost();
+    host = await startHost(true);
+    const ownerAgain = await login(OWNER);
+    assert.deepEqual((await readAccess(ownerAgain)).servers?.[ownerRow.id], { ...OPEN, agents: ["agent-a"] });
+    assert.deepEqual(
+      current()
+        .agents.enabledMcpServers("agent-b")
+        .map((server) => server.name),
+      [],
+    );
+    const saved = await setAccess(ownerAgain, ownerRow.id, OPEN);
+    assert.equal(saved.status, 200, `Set returned ${saved.status}.`);
+    assert.deepEqual(
+      current()
+        .agents.enabledMcpServers("agent-b")
+        .map((server) => server.name),
+      ["trello"],
+    );
+    assert.equal((await readAccess(await login(MEMBER))).mine[ownerRow.id], "use");
+    return { restored: true };
+  });
+
+  await step("access: a removed server loses its entry", async () => {
+    const ownerAgain = await login(OWNER);
+    assert.equal((await setAccess(ownerAgain, ownerRow.id, { ...OPEN, everyone: "none" })).status, 200);
+    const before = JSON.parse(await readFile(join(userData, MCP_ACCESS_FILE), "utf8"));
+    assert.equal(before.version, 1);
+    assert.equal(before.servers[ownerRow.id]?.everyone, "none");
+    const removed = await call("POST", MCP_ROUTES.remove, { token: ownerAgain, body: { mcpServerId: ownerRow.id } });
+    assert.equal(removed.status, 200, `Remove returned ${removed.status}.`);
+    const after = JSON.parse(await readFile(join(userData, MCP_ACCESS_FILE), "utf8"));
+    assert.equal(after.servers[ownerRow.id], undefined, "A removed server keeps its entry.");
+    return { entries: Object.keys(after.servers).length };
   });
 
   report.passed = true;

@@ -194,6 +194,7 @@
     "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
     "./team-protocol/acp-registry-v1": "./src/team-protocol/acp-registry-v1.ts",
     "./team-protocol/agent-access-v1": "./src/team-protocol/agent-access-v1.ts",
+    "./team-protocol/mcp-access-v1": "./src/team-protocol/mcp-access-v1.ts",
     "./team-protocol/agent-colors-v1": "./src/team-protocol/agent-colors-v1.ts",
     "./team-protocol/chat-colors-v1": "./src/team-protocol/chat-colors-v1.ts",
     "./team-protocol/whatsapp-connector-v1": "./src/team-protocol/whatsapp-connector-v1.ts",

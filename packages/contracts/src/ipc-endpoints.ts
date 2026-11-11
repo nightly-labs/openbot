@@ -381,6 +381,7 @@ import type {
   MarketplaceAgentQuery,
   SubmitMarketplaceAgentInput,
 } from "./ipc-marketplace-agents";
+import type { McpAccessSnapshot, SetMcpAccessInput } from "./ipc-mcp-access";
 import type {
   CancelMcpSignInInput,
   CompleteMcpSignInRelayInput,
@@ -2162,6 +2163,10 @@ export const IPC_ENDPOINTS = {
     removeMcpSignInApp: scopedRequest<McpSignInAppInput, McpSignInAppState, "required">()(
       "servers:mcp:remove-sign-in-app",
     ),
+    // Which agents get an MCP server, and the level of each role for it (`mcp-access-v1`). A set
+    // replaces the entry of one MCP server and answers with the whole snapshot.
+    getMcpAccess: scopedQuery<McpAccessSnapshot, "required">()("servers:mcp:get-access"),
+    setMcpAccess: scopedRequest<SetMcpAccessInput, McpAccessSnapshot, "required">()("servers:mcp:set-access"),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {

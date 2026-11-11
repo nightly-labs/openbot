@@ -127,6 +127,8 @@ import {
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type MacPermissionId,
+  type McpAccessSnapshot,
+  type McpServerAccess,
   type MemoryReviewPreference,
   nextBrowserProfileHue,
   normalizeMcpConfig,
@@ -142,6 +144,7 @@ import {
   parseAgentAccessChange,
   parseBrowserProxyAddress,
   parseProviderModelVisibilityChange,
+  parseSetMcpAccessInput,
   type QueueDelivery,
   type QueuedMessageReceipt,
   type QueueSnapshot,
@@ -655,6 +658,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return value;
   }
   let mcpServers = clone(STORY_MCP_SERVERS);
+  let mcpAccess: Record<string, McpServerAccess> = {};
+  const mcpAccessSnapshot = (): McpAccessSnapshot => ({
+    mine: Object.fromEntries(mcpServers.map((server) => [server.id, "manage" as const])),
+    servers: clone(mcpAccess),
+  });
   let mcpSignedIn = new Set<string>();
   // Figma refused its saved sign-in, so the preview shows a row that asks for a new one.
   let mcpLost = new Set<string>(["mcp-figma"]);
@@ -2416,7 +2424,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       removeMcpServer: async ({ mcpServerId }) => {
         mcpServers = mcpServers.filter((server) => server.id !== mcpServerId);
+        mcpAccess = Object.fromEntries(Object.entries(mcpAccess).filter(([id]) => id !== mcpServerId));
         return clone(mcpServers);
+      },
+      // Preview has one host, and its user owns it, so `mine` gives every server.
+      getMcpAccess: async () => mcpAccessSnapshot(),
+      setMcpAccess: async (input) => {
+        const change = parseSetMcpAccessInput(input);
+        if (!mcpServers.some((server) => server.id === change.mcpServerId))
+          throw new Error("Invalid MCP access change.");
+        mcpAccess = { ...mcpAccess, [change.mcpServerId]: change.access };
+        return mcpAccessSnapshot();
       },
       setMcpServerEnabled: async ({ mcpServerId, enabled }) => {
         mcpServers = mcpServers.map((server) => (server.id === mcpServerId ? { ...server, enabled } : server));

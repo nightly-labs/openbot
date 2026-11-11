@@ -12,11 +12,18 @@ import type {
   MarketplaceSkillDetail,
   MarketplaceSkillQuery,
   MarketplaceSkillSummary,
+  McpServerAccess,
   McpServerConfig,
   McpSignInRelayPage,
   McpSignInState,
 } from "@openbot/contracts/ipc";
-import { assignedSkillCount, isRemovableSkill, isSkillEnabled, mcpConfigErrors } from "@openbot/contracts/ipc";
+import {
+  assignedSkillCount,
+  DEFAULT_MCP_SERVER_ACCESS,
+  isRemovableSkill,
+  isSkillEnabled,
+  mcpConfigErrors,
+} from "@openbot/contracts/ipc";
 import { createMarketplaceShareUrl, type MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
 import { type McpConnectFlow, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
@@ -33,6 +40,7 @@ import type {
   MarketplaceAppStatus,
   MarketplaceAppsBlock,
   MarketplaceMacAutomation,
+  MarketplaceMcpAccess,
   MarketplaceModel,
   MarketplaceSkillChange,
   MarketplaceSkillRef,
@@ -107,6 +115,8 @@ export interface MarketplaceControllerProps {
   pluginSignInRelay?: boolean | undefined;
   /** The server in `pluginServerId` keeps a separate sign-in for each account of an app (`mcp-accounts-v1`). */
   pluginAccounts?: boolean | undefined;
+  /** This account sets who gets each MCP server of `pluginServerId` (`mcp-access-v1`, owner or admin). */
+  pluginAccess?: boolean | undefined;
   /** The joined server whose agents `agents` lists, when this account manages it. Absent: this computer. */
   hostServerId?: string | undefined;
   /** The joined server that a marketplace agent is added to. Absent: this computer. */
@@ -981,6 +991,55 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     },
   );
 
+  /* Who gets each MCP row. Null: the host has no `mcp-access-v1`, the user cannot change it, or no answer yet. */
+  const [accessServers, setAccessServers] = createSignal<Record<string, McpServerAccess> | null>(null);
+  const [accessRoles, setAccessRoles] = createSignal<readonly { id: string; name: string }[]>([]);
+  const [accessBusy, setAccessBusy] = createSignal(false);
+  let accessRead = 0;
+  /** A failed read shows no access sections: the rest of the app page does not depend on them. */
+  async function readAccess(serverId: string) {
+    const access = calls().mcpAccess;
+    const request = ++accessRead;
+    setAccessServers(null);
+    if (!access) return;
+    const answer = await Promise.all([access.get(serverId), access.roles(serverId)]).catch(() => undefined);
+    if (!answer || request !== accessRead) return;
+    setAccessRoles(answer[1]);
+    setAccessServers(answer[0].servers ?? null);
+  }
+  createEffect(
+    () => (props.open && props.pluginAccess ? props.pluginServerId : undefined),
+    (serverId) => {
+      if (serverId) void readAccess(serverId);
+      else {
+        accessRead += 1;
+        setAccessServers(null);
+      }
+    },
+  );
+  const mcpAccess: MarketplaceMcpAccess = {
+    entry: (mcpServerId) => accessServers()?.[mcpServerId] ?? DEFAULT_MCP_SERVER_ACCESS,
+    roles: accessRoles,
+    busy: accessBusy,
+    set: async (changes) => {
+      const serverId = props.pluginServerId;
+      const access = calls().mcpAccess;
+      if (!serverId || !access) return false;
+      setAccessBusy(true);
+      let saved = true;
+      for (const change of changes) {
+        const answer = await run(() => access.set(change, serverId));
+        if (!answer) {
+          saved = false;
+          break;
+        }
+        if (props.pluginServerId === serverId) setAccessServers(answer.servers ?? null);
+      }
+      setAccessBusy(false);
+      return saved;
+    },
+  };
+
   const [connecting, setConnecting] = createSignal<PendingConnect | null>(null);
   /** The listing the user asked to disconnect, held while the confirmation is on screen. */
   const [uninstalling, setUninstalling] = createSignal<MarketplacePluginDetail | null>(null);
@@ -1595,6 +1654,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     },
     disconnectApp: (app) => setUninstalling(app.plugin),
     removeServer,
+    get mcpAccess() {
+      return accessServers() ? mcpAccess : undefined;
+    },
     get addServer() {
       return props.onAddServer;
     },

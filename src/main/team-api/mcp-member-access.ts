@@ -5,8 +5,17 @@
 // reads the list, tests, and adds a server. A member changes, signs in, signs out, or removes only a
 // server that the member added. A sign-in belongs to an address, not to a row, so each row on the
 // same address must be the member's.
+//
+// With `mcp-access-v1` on the host, the level of the member decides instead: `none` hides the server
+// and refuses it, `use` gives the rights on a server of another person, and `manage` gives the rights
+// on a server that the member added.
 
-import { canAdministerServer, type McpServerConfig, type TeamMemberSummary } from "@openbot/contracts/ipc";
+import {
+  canAdministerServer,
+  type McpAccessLevel,
+  type McpServerConfig,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
 import { MCP_MEMBER_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import { mcpOAuthAccountKey } from "../../backend/mcp-oauth-provider";
@@ -28,9 +37,19 @@ export function requireMcpAccess(
   return owners ? { memberId: member.id, owners } : null;
 }
 
-/** Refuses a member a row that another person added. */
+function memberLevel(access: NonNullable<McpMemberAccess>, mcpServerId: string): McpAccessLevel {
+  if (access.owners.level) return access.owners.level(mcpServerId, access.memberId);
+  return access.owners.addedBy(mcpServerId, access.memberId) ? "manage" : "use";
+}
+
+/** Refuses a member a row that the member does not manage: one that another person added, without a level of `manage`. */
 export function requireOwnMcpServer(access: McpMemberAccess, mcpServerId: string): void {
-  if (access && !access.owners.addedBy(mcpServerId, access.memberId)) throw notYours();
+  if (access && memberLevel(access, mcpServerId) !== "manage") throw notYours();
+}
+
+/** The rows that the caller can see: all of them, or for a member the rows that are not at `none`. */
+export function visibleMcpServers(access: McpMemberAccess, servers: McpServerConfig[]): McpServerConfig[] {
+  return access ? servers.filter((server) => memberLevel(access, server.id) !== "none") : servers;
 }
 
 /** Refuses a member the sign-in of an address that a row of another person also uses. */

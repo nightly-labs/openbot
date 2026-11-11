@@ -98,6 +98,22 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 
 Run `bun run test:mcp-member-access` to check these rules on a real host.
 
+### Who gets each MCP server
+
+A host with `mcp-access-v1` keeps one entry for each MCP server in
+[`mcp-access-store.ts`](../../src/main/mcp-access-store.ts), a preference file with no migration.
+
+| Part | Rule |
+| --- | --- |
+| Agents | `agents: null` gives the server to each agent, also to a new one. A list gives it only to those agents. `AgentService` applies the list when it gives the enabled servers to a provider session. |
+| Members | `everyone` and each role have a level: `none` hides the server and refuses it, `use` gives the rights on a server of another person, `manage` gives the rights of the person who added it. A member gets the highest level. An owner, an admin and the person who added the server always manage. |
+| Routes | `POST /v1/mcp-access` reads and `POST /v1/mcp-access/set` replaces one entry ([`route-mcp-access.ts`](../../src/main/team-api/route-mcp-access.ts)). Only an owner or admin reads the entries and sets them; a member reads `mine`. |
+| Client | The Marketplace page of a connected app or custom server shows the Agents and Roles sections when `serverCanAdminister(server, "mcp-access-v1")` is true. |
+| Damaged file | Each server is closed to agents and members until an owner or admin saves its access. |
+| Not covered | Access for each tool, and the built-in entries (Computer Use, the GitHub connector), which have no MCP row. |
+
+Run `bun run test:mcp-member-access` to check the routes and the levels through the Team API.
+
 ### How many MCP servers a host keeps
 
 A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The

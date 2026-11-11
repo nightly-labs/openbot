@@ -121,6 +121,7 @@ interface HostServiceOptions {
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
+  mcpAccess?: ForwardedApiOptions["mcpAccess"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
   signInRelay?: ForwardedApiOptions["signInRelay"];
   connectors?: ForwardedApiOptions["connectors"];
@@ -483,6 +484,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.channels === undefined ? {} : { channels: options.channels }),
       ...(options.mcpServers === undefined ? {} : { mcpServers: options.mcpServers }),
       ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
+      ...(options.mcpAccess === undefined ? {} : { mcpAccess: options.mcpAccess }),
       ...(options.mcpSignIns === undefined ? {} : { mcpSignIns: options.mcpSignIns }),
       ...(options.signInRelay === undefined ? {} : { signInRelay: options.signInRelay }),
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
