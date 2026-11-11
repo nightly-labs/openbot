@@ -21,6 +21,8 @@ export const messages = {
   "island.badge.takeover": "接管",
   "island.badge.failed": "失败",
   "island.status.replied": "已回复",
+  "island.status.repliedIn": "已在 {channel} 中回复",
+  "island.channel.agentIn": "{channel} 中的 {name}",
   "island.status.failed": "失败",
   "island.status.needsYou": "需要你",
   "island.status.needsApproval": "待批准",

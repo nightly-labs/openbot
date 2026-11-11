@@ -955,3 +955,14 @@ div.dynamic-island-surface-context-line span {
     transform: translateY(0) scale(1);
   }
 }
+
+/* A channel's picture beside the agent, on an item in a channel. */
+.dynamic-island-surface-channel-tile {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  vertical-align: -3px;
+}
+.dynamic-island-surface-row-copy strong .dynamic-island-surface-channel-tile {
+  margin-inline-end: var(--openbot-space-1, 4px);
+}

@@ -21,6 +21,8 @@ export const messages = {
   "island.badge.takeover": "引き継ぐ",
   "island.badge.failed": "失敗",
   "island.status.replied": "返信しました",
+  "island.status.repliedIn": "{channel} で返信しました",
+  "island.channel.agentIn": "{channel} の {name}",
   "island.status.failed": "失敗しました",
   "island.status.needsYou": "対応が必要です",
   "island.status.needsApproval": "承認が必要です",

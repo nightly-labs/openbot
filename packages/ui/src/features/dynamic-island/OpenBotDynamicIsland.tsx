@@ -5,6 +5,7 @@ import type {
   DynamicIslandAction,
   DynamicIslandAgentIdentity,
   DynamicIslandApprovalItem,
+  DynamicIslandChannelIdentity,
   DynamicIslandFailureItem,
   DynamicIslandPresentation,
   DynamicIslandPromptItem,
@@ -57,6 +58,7 @@ import {
 } from "solid-js";
 import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
 import {
@@ -306,7 +308,7 @@ function compactStatusGeometry(
   const badge = OPENBOT_ISLAND_MODE_CONFIG[mode].badge;
   if (!badge) return undefined;
   const badgeWidth = Math.ceil(measureCompactText(t(badge.label), 600) + STATUS_COMPACT_BADGE_CHROME_WIDTH);
-  const measuredNameWidth = agent ? measureCompactText(agent.name, 600) : 0;
+  const measuredNameWidth = agent ? measureCompactText(compactLabel(t, presentation, agent), 600) : 0;
   const notchNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.notch, Math.ceil(measuredNameWidth));
   const islandNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.island, Math.ceil(measuredNameWidth));
   const workingAvatarStackWidth =
@@ -769,6 +771,7 @@ function CompactLeading(props: {
   displayMode?: "notch" | "island" | undefined;
   variant?: AppVariant | undefined;
 }): JSX.Element {
+  const { t } = useText();
   const statusAgent = () => compactStatusAgent(props.presentation);
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
   // The logo blinks only while the pointer is on the island: each blink draws frames all day.
@@ -806,12 +809,23 @@ function CompactLeading(props: {
               </For>
             </span>
             <Show when={working().length === 1 ? working()[0] : undefined}>
-              {(item) => <CompactAgentName name={item().agent.name} displayMode={props.displayMode} />}
+              {(item) => (
+                <CompactAgentName
+                  name={compactLabel(t, props.presentation, item().agent)}
+                  displayMode={props.displayMode}
+                />
+              )}
             </Show>
           </span>
         </Match>
         <Match when={statusAgent()}>
-          {(agent) => <CompactAgentIdentity agent={agent()} displayMode={props.displayMode} />}
+          {(agent) => (
+            <CompactAgentIdentity
+              agent={agent()}
+              label={compactLabel(t, props.presentation, agent())}
+              displayMode={props.displayMode}
+            />
+          )}
         </Match>
       </Switch>
     </span>
@@ -833,6 +847,8 @@ function CompactTrailing(props: { presentation: DynamicIslandPresentation; hover
 
 function CompactAgentIdentity(props: {
   agent: DynamicIslandAgentIdentity;
+  /** The name, with the channel where there is one. */
+  label?: string | undefined;
   displayMode?: "notch" | "island" | undefined;
   working?: boolean;
 }): JSX.Element {
@@ -842,8 +858,40 @@ function CompactAgentIdentity(props: {
       data-island-spatial-anchor="center"
     >
       <IslandAvatar agent={props.agent} working={props.working} />
-      <CompactAgentName name={props.agent.name} displayMode={props.displayMode} />
+      <CompactAgentName name={props.label ?? props.agent.name} displayMode={props.displayMode} />
     </span>
+  );
+}
+
+/** The name on the compact island: "Nyx in Design" for an item in a channel. */
+function compactLabel(
+  t: AppTranslate,
+  presentation: DynamicIslandPresentation,
+  agent: DynamicIslandAgentIdentity,
+): string {
+  const channel =
+    presentation.mode === "working"
+      ? presentation.working.length === 1
+        ? presentation.working[0]?.channel
+        : undefined
+      : presentation.mode === "message"
+        ? presentation.message.channel
+        : undefined;
+  return channel ? t("island.channel.agentIn", { name: agent.name, channel: channel.name }) : agent.name;
+}
+
+/** A channel's own picture (its icon or image), the size of an island avatar. A channel without one shows none. */
+function IslandChannelTile(props: { channel: DynamicIslandChannelIdentity; size: number }): JSX.Element {
+  return (
+    <Show when={props.channel.icon || props.channel.imageUrl}>
+      <span
+        class="dynamic-island-surface-channel-tile"
+        style={{ "--channel-avatar-size": `${props.size}px` }}
+        aria-hidden="true"
+      >
+        <ChannelAvatar members={[]} agents={[]} icon={props.channel.icon} imageUrl={props.channel.imageUrl} />
+      </span>
+    </Show>
   );
 }
 
@@ -1034,18 +1082,28 @@ function ExpandedContent(props: {
                       <Button
                         variant="ghost"
                         class="dynamic-island-surface-row dynamic-island-surface-animated-row"
-                        onClick={() =>
-                          props.onAction({
-                            type: "open-agent",
-                            serverId: props.presentation.serverId,
-                            agentId: item().agent.id,
-                          })
-                        }
+                        onClick={() => {
+                          const channel = item().channel;
+                          void props.onAction(
+                            channel
+                              ? { type: "open-channel", serverId: props.presentation.serverId, channelId: channel.id }
+                              : { type: "open-agent", serverId: props.presentation.serverId, agentId: item().agent.id },
+                          );
+                        }}
                       >
                         <span class="dynamic-island-surface-working-avatar-slot" aria-hidden="true" />
-                        <IslandContentSwap contentKey={`${item().agent.id}:${item().task}`}>
+                        <IslandContentSwap contentKey={`${item().agent.id}:${item().channel?.id ?? ""}:${item().task}`}>
                           <span class="dynamic-island-surface-row-copy" data-island-motion-content>
-                            <strong>{item().agent.name}</strong>
+                            <strong>
+                              <Show when={item().channel} fallback={item().agent.name}>
+                                {(channel) => (
+                                  <>
+                                    <IslandChannelTile channel={channel()} size={14} />
+                                    {t("island.channel.agentIn", { name: item().agent.name, channel: channel().name })}
+                                  </>
+                                )}
+                              </Show>
+                            </strong>
                             <small>{item().task}</small>
                           </span>
                         </IslandContentSwap>
@@ -1086,12 +1144,17 @@ function ExpandedContent(props: {
             <IslandContentSwap contentKey={message().messageId} block>
               <DynamicIslandIdentity
                 name={message().agent.name}
-                status={t("island.status.replied")}
+                status={
+                  message().channel
+                    ? t("island.status.repliedIn", { channel: message().channel?.name ?? "" })
+                    : t("island.status.replied")
+                }
                 description={message().text}
                 trailing={<time datetime={message().createdAt}>{t("chat.day.now")}</time>}
               />
             </IslandContentSwap>
-            <Show when={props.inlineReply}>
+            {/* A reply in a channel goes to the channel, so the island opens it instead of a direct reply. */}
+            <Show when={props.inlineReply && !message().channel}>
               {/* Each recipient gets a new field, so a draft for one agent is not sent to another. */}
               <Show keyed when={`${props.presentation.serverId}:${message().agent.id}`}>
                 {(_recipient) => (
@@ -1117,14 +1180,19 @@ function ExpandedContent(props: {
               </span>
               <Button
                 size="sm"
-                onClick={() =>
-                  props.onAction({
-                    type: "open-message",
-                    serverId: props.presentation.serverId,
-                    agentId: message().agent.id,
-                    messageId: message().messageId,
-                  })
-                }
+                onClick={() => {
+                  const channel = message().channel;
+                  void props.onAction(
+                    channel
+                      ? { type: "open-channel", serverId: props.presentation.serverId, channelId: channel.id }
+                      : {
+                          type: "open-message",
+                          serverId: props.presentation.serverId,
+                          agentId: message().agent.id,
+                          messageId: message().messageId,
+                        },
+                  );
+                }}
               >
                 <MessageCircle aria-hidden="true" /> {t("island.action.openChat")}
               </Button>
