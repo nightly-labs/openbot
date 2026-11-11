@@ -2442,7 +2442,6 @@ export class OpenBotToolRouter {
         ...(workspaceAccessEnforced(caller) ? { access: "workspace" } : {}),
         ...(agentComputerUseEnabled(caller) ? {} : { computerUse: false }),
       };
-      const asksFirst = !this.#approvalAutomation.autoApproves(caller.id);
       const create = (assign?: (agentId: string) => Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure>) =>
         this.#hooks.createAgent(
           {
@@ -2463,7 +2462,7 @@ export class OpenBotToolRouter {
             Effect.gen({ self: this }, function* () {
               if (assign) yield* assign(agent.id).pipe(toToolOperationFailed);
               // Saved before the first message starts a turn. A failed write removes the new agent.
-              if (asksFirst && this.#approvalAutomation.autoApproves(agent.id))
+              if (!this.#approvalAutomation.autoApproves(caller.id) && this.#approvalAutomation.autoApproves(agent.id))
                 yield* this.#approvalAutomation
                   .set({ agentId: agent.id, autoApprove: false })
                   .pipe(toToolOperationFailed);
