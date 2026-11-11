@@ -714,13 +714,14 @@ An install gets the release only when its ID is in the first `stagingPercentage`
 do not change, so the same installs are first in each release, and an install that is in a 10% stage
 is also in the 50% stage. A manifest with no `stagingPercentage` goes to all installs.
 
-At an automatic check, an install outside the stage gets the same result as an install with no new
-release: the sidebar shows nothing, and Settings > Updates shows that OpenBot is up to date, with no
-error. A check that a person asks for skips the stage and gets the release. These checks are
-**Check for updates** in Settings > Updates or in the app menu, an update that a member of a joined
-server asks for, and the recovery when an older app opens newer data. After such a check, the other
-checks and download retries of that session also skip the stage. No check gets a paused release
-(0%). `UpdateService` does this through the `isUserWithinRollout` test of electron-updater.
+At an automatic check, an install outside the stage does not get the release. The sidebar shows
+nothing, and Settings > Updates says that the new version is rolling out to some computers and that
+**Check for updates** gets it now (`UpdateStatus.stagedVersion`). It shows no error. At 0%, the tab
+shows that OpenBot is up to date. A check that a person asks for skips the stage and gets the
+release. These checks are **Check for updates** in Settings > Updates or in the app menu, an update
+that a member of a joined server asks for, and the recovery when an older app opens newer data.
+After such a check, the other checks and download retries of that session also skip the stage. No
+check gets a paused release (0%). `UpdateService` does this through the `isUserWithinRollout` test of electron-updater.
 
 The publish job writes the percentage into the four manifests before it uploads them, with
 `scripts/update-rollout.ts`. The default is 10. To use a different first percentage, set the

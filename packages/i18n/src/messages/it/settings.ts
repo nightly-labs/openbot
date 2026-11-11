@@ -518,6 +518,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} è pronto. Riavvia per applicarlo.",
   "settings.updates.status.installing": "Riavvio per applicare {target}…",
   "settings.updates.status.upToDate": "OpenBot è aggiornato nel canale Stabile.",
+  "settings.updates.status.staged": "{target} è in distribuzione graduale. Cerca aggiornamenti per ottenerlo ora.",
   "settings.updates.status.checkFailed": "OpenBot non è riuscito a cercare aggiornamenti. Riprova.",
   "settings.updates.status.unsupported": "Gli aggiornamenti non sono disponibili in questa versione.",
   "settings.updates.actionFailed": "Impossibile aggiornare OpenBot.",

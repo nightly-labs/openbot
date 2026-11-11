@@ -277,7 +277,10 @@ const feeds: Array<{ name: ManifestName; platform: NodeJS.Platform; arch: string
 ];
 const installsRoot = join(OUT, "installs");
 const updaterResults: Record<string, { installs: number; offered: Record<string, number> }> = {};
-const serviceResults: Record<string, { automatic: UpdateStatus["phase"]; requested: UpdateStatus["phase"] }> = {};
+const serviceResults: Record<
+  string,
+  { automatic: UpdateStatus["phase"]; staged: string | null; requested: UpdateStatus["phase"] }
+> = {};
 try {
   for (const feed of feeds) {
     process.env.TEST_UPDATER_ARCH = feed.arch;
@@ -349,11 +352,12 @@ try {
   serviceResults.outsideAt0 = await serviceChecks(outside, "0.66.0", feedUrl("0"));
   serviceResults.insideAt0 = await serviceChecks(inside, "0.66.0", feedUrl("0"));
   serviceResults.currentAt10 = await serviceChecks(outside, VERSION, feedUrl("10"));
-  assert.deepEqual(serviceResults.outsideAt10, { automatic: "up-to-date", requested: "available" });
-  assert.deepEqual(serviceResults.insideAt10, { automatic: "available", requested: "available" });
-  assert.deepEqual(serviceResults.outsideAt0, { automatic: "up-to-date", requested: "up-to-date" });
-  assert.deepEqual(serviceResults.insideAt0, { automatic: "up-to-date", requested: "up-to-date" });
-  assert.deepEqual(serviceResults.currentAt10, { automatic: "up-to-date", requested: "up-to-date" });
+  // `staged` is the release that Settings > Updates names after the automatic check.
+  assert.deepEqual(serviceResults.outsideAt10, { automatic: "up-to-date", staged: VERSION, requested: "available" });
+  assert.deepEqual(serviceResults.insideAt10, { automatic: "available", staged: null, requested: "available" });
+  assert.deepEqual(serviceResults.outsideAt0, { automatic: "up-to-date", staged: null, requested: "up-to-date" });
+  assert.deepEqual(serviceResults.insideAt0, { automatic: "up-to-date", staged: null, requested: "up-to-date" });
+  assert.deepEqual(serviceResults.currentAt10, { automatic: "up-to-date", staged: null, requested: "up-to-date" });
 } finally {
   server.stop(true);
   delete process.env.TEST_UPDATER_ARCH;
@@ -404,7 +408,8 @@ async function serviceChecks(userData: string, version: string, feedUrl: string)
     assert.equal(first.errorCode, null, `the automatic check has no error: ${first.message}`);
     const requested = await Effect.runPromise(service.checkForUpdates());
     assert.equal(requested.errorCode, null, `the requested check has no error: ${requested.message}`);
-    return { automatic: first.phase, requested: requested.phase };
+    assert.equal(requested.stagedVersion, undefined, "the requested check names no waiting release");
+    return { automatic: first.phase, staged: first.stagedVersion ?? null, requested: requested.phase };
   } finally {
     await Effect.runPromise(service.stop());
   }

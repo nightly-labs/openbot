@@ -529,6 +529,8 @@ export const messages = {
   "settings.updates.status.ready": "Gotowe: {target}. Uruchom ponownie, aby zastosować.",
   "settings.updates.status.installing": "Ponowne uruchamianie, aby zastosować: {target}…",
   "settings.updates.status.upToDate": "OpenBot jest aktualny w kanale Stabilny.",
+  "settings.updates.status.staged":
+    "{target} trafia najpierw do części komputerów. Sprawdź aktualizacje, aby pobrać tę wersję teraz.",
   "settings.updates.status.checkFailed": "OpenBot nie mógł sprawdzić aktualizacji. Spróbuj ponownie.",
   "settings.updates.status.unsupported": "Aktualizacje są niedostępne w tej kompilacji.",
   "settings.updates.actionFailed": "Nie udało się zaktualizować OpenBot.",

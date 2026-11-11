@@ -495,6 +495,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} 已就绪，重启后生效。",
   "settings.updates.status.installing": "正在重启以应用 {target}…",
   "settings.updates.status.upToDate": "OpenBot 在稳定版通道上已是最新。",
+  "settings.updates.status.staged": "{target} 正在分批推送。检查更新即可立即获取。",
   "settings.updates.status.checkFailed": "OpenBot 无法检查更新，请重试。",
   "settings.updates.status.unsupported": "当前版本不支持更新。",
   "settings.updates.actionFailed": "无法更新 OpenBot。",

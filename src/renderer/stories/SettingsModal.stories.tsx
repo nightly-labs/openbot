@@ -48,6 +48,27 @@ const storyUpdateStatus: UpdateStatus = {
   errorCode: null,
 };
 
+function storyInitialUpdateStatus(props: {
+  scheduledRestart?: UpdateStatus["scheduledRestart"];
+  stagedVersion?: string;
+}): UpdateStatus {
+  if (props.scheduledRestart)
+    return {
+      ...storyUpdateStatus,
+      phase: "ready",
+      availableVersion: "0.3.0",
+      scheduledRestart: props.scheduledRestart,
+    };
+  if (props.stagedVersion)
+    return {
+      ...storyUpdateStatus,
+      phase: "up-to-date",
+      checkedAt: new Date().toISOString(),
+      stagedVersion: props.stagedVersion,
+    };
+  return storyUpdateStatus;
+}
+
 const storyAgentDock = {
   server: { id: STORY_SERVERS[0].id, name: STORY_SERVERS[0].name },
   agents: STORY_AGENTS,
@@ -64,6 +85,8 @@ function SettingsModalStory(props: {
   openTab?: SettingsTab;
   /** A restart that a server admin asked for. */
   scheduledRestart?: UpdateStatus["scheduledRestart"];
+  /** A release in its staged rollout that the automatic check did not offer. Check for updates gets it. */
+  stagedVersion?: string;
   /** The downloaded dictation models and the saved voice setting. */
   voice?: MockVoiceOptions;
   /** Whether Codex can open live voice. */
@@ -90,11 +113,7 @@ function SettingsModalStory(props: {
   };
   const [open, setOpen] = createSignal(props.initialOpen);
   const [value, setValue] = createSignal({ ...storyGeneralSettings });
-  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(
-    props.scheduledRestart
-      ? { ...storyUpdateStatus, phase: "ready", availableVersion: "0.3.0", scheduledRestart: props.scheduledRestart }
-      : storyUpdateStatus,
-  );
+  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyInitialUpdateStatus(props));
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
   // The notification level and the mute of each server, as the server list of the app keeps them.
   const [servers, setServers] = createSignal<readonly ServerSummary[]>(STORY_SERVERS);
@@ -132,7 +151,13 @@ function SettingsModalStory(props: {
   }
 
   async function runUpdateAction(): Promise<void> {
-    setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
+    const checkedAt = new Date().toISOString();
+    // Check for updates gets a release that is in its staged rollout.
+    setUpdateStatus(
+      props.stagedVersion
+        ? { ...storyUpdateStatus, phase: "available", availableVersion: props.stagedVersion, checkedAt }
+        : { ...storyUpdateStatus, phase: "up-to-date", checkedAt },
+    );
   }
 
   /** A phone scans the code and signs in a few seconds after the code shows. */
@@ -396,6 +421,10 @@ export const ScheduledRemoteUpdate: Story = {
       scheduledRestart={{ requestedBy: "Ada Lovelace", mode: "when-idle", waitingFor: ["agent-turn"] }}
     />
   ),
+};
+
+export const StagedRollout: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="updates" stagedVersion="0.3.0" />,
 };
 
 export const Interactive: Story = {

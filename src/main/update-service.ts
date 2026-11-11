@@ -30,7 +30,7 @@ export type UpdateCancellationToken = {
 /** Only the part of a check result this service depends on. */
 export type UpdateCheckOutcome = {
   readonly isUpdateAvailable: boolean;
-  readonly updateInfo: { readonly version: string };
+  readonly updateInfo: { readonly version: string; readonly stagingPercentage?: number };
   readonly cancellationToken?: UpdateCancellationToken;
 };
 
@@ -259,6 +259,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #teardownCommitted = false;
   /** True after a person asked for a check in this session. Then the staged rollout does not apply. */
   #skipStagedRollout = false;
+  /** A newer release in its staged rollout that the last check did not offer to this install. */
+  #stagedVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -372,6 +374,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#scheduledRestart)
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
+    if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
     return status;
   }
 
@@ -498,6 +501,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         ),
       );
       if (this.#checkGeneration !== generation) return this.getStatus();
+      this.#stagedVersion = null;
       if (Result.isFailure(checked)) this.#setError("check_failed", describeCheckFailure(checked.failure.cause));
       else {
         const result = checked.success;
@@ -507,6 +511,17 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           this.#markAvailable(result.updateInfo.version);
         } else {
           this.#downloadedVersion = null;
+          // electron-updater returns the release also when the staged rollout leaves this install
+          // out. Settings > Updates then says that a check that a person asks for gets it. A paused
+          // release (0%) is not offered to any check, so it is not shown.
+          const staging = result?.updateInfo.stagingPercentage;
+          if (
+            result &&
+            typeof staging === "number" &&
+            staging > 0 &&
+            isNewerRelease(result.updateInfo.version, this.#status.currentVersion)
+          )
+            this.#stagedVersion = result.updateInfo.version;
           this.#setStatus({
             phase: "up-to-date",
             availableVersion: null,

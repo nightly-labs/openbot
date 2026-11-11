@@ -529,6 +529,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} готово. Перезапустите, чтобы применить.",
   "settings.updates.status.installing": "Перезапуск для применения {target}…",
   "settings.updates.status.upToDate": "OpenBot обновлён до последней версии канала Stable.",
+  "settings.updates.status.staged": "{target} выпускается поэтапно. Проверьте обновления, чтобы получить его сейчас.",
   "settings.updates.status.checkFailed": "OpenBot не удалось проверить обновления. Повторите попытку.",
   "settings.updates.status.unsupported": "В этой сборке обновления недоступны.",
   "settings.updates.actionFailed": "Не удалось обновить OpenBot.",

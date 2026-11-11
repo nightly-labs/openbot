@@ -511,6 +511,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} の準備ができました。再起動して適用してください。",
   "settings.updates.status.installing": "{target} を適用するため再起動しています…",
   "settings.updates.status.upToDate": "OpenBot は Stable チャンネルで最新です。",
+  "settings.updates.status.staged":
+    "{target} は一部のコンピューターから順に配信中です。アップデートを確認すると今すぐ入手できます。",
   "settings.updates.status.checkFailed": "OpenBot はアップデートを確認できませんでした。もう一度お試しください。",
   "settings.updates.status.unsupported": "このビルドではアップデートを利用できません。",
   "settings.updates.actionFailed": "OpenBot をアップデートできませんでした。",
