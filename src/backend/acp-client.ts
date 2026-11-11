@@ -248,6 +248,8 @@ interface AcpTurn {
   lastActivityAt: number;
   /** The agent sent an update, a question or a tool call for the prompt that it has now. */
   answered: boolean;
+  /** The chat shows a retry of a failed model request (`AcpFlavor.retryNotice`), and no output came after it. */
+  retrying?: true;
   /** Questions and approvals that wait for the user. The turn is not stalled while one is open. */
   waitingOnUser: number;
   /** OpenBot ended the turn because the agent did not. Its open tool calls get no more updates. */
@@ -2629,7 +2631,29 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
+    // The first output after a retry replaces the retry in the chat.
+    if (turn.retrying && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      delete turn.retrying;
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText("status.provider.retryRecovered", { provider: this.#providerName(thread) }),
+      );
+    }
     this.#applyTurnUpdate(thread, turn, update);
+  }
+
+  /** A provider's own status for a running turn, such as a retry of a failed model request. */
+  #emitTurnProgress(thread: AcpThread, turn: AcpTurn, detail: string): void {
+    this.emit("notification", {
+      method: "openbot/turn-progress",
+      params: { threadId: thread.id, turnId: turn.id, detail },
+    });
+  }
+
+  /** The name of the provider or custom endpoint that serves the thread's model, as the user knows it. */
+  #providerName(thread: AcpThread): string {
+    return this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label;
   }
 
   /** Applies one output update of the agent to a turn: a live one, or one that a background replay found. */
@@ -3185,8 +3209,26 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  /** ACP extension notifications. OpenBot reads only OpenCode's updates of its subagents' sessions. */
+  /** ACP extension notifications: an agent's notice that it retries a request, and OpenCode's subagent updates. */
   #extNotification(method: string, params: DynamicRecord): void {
+    const retry = this.#flavor.retryNotice?.(method, params);
+    if (retry) {
+      const thread = this.#threads.get(retry.sessionId);
+      const turn = thread?.activeTurn;
+      if (!thread || !turn || turn.completing) return;
+      turn.lastActivityAt = Date.now();
+      turn.retrying = true;
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText(retry.unreachable ? "status.provider.retryUnreachable" : "status.provider.retryServerError", {
+          provider: this.#providerName(thread),
+          attempt: retry.attempt,
+          maxAttempts: retry.maxAttempts,
+        }),
+      );
+      return;
+    }
     if (method.replace(/^_/, "") !== OPENCODE_CHILD_UPDATE_METHOD || !this.#flavor.childSessionUpdates) return;
     const thread = isString(params.rootSessionId) ? this.#threads.get(params.rootSessionId) : undefined;
     const turn = thread?.activeTurn ?? null;

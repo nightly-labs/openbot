@@ -248,6 +248,10 @@ export const messages = defineMessages("error.provider", {
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
+  "error.provider.grokServiceFailure":
+    "The Grok service is busy or has an error. Try again in a few minutes, or choose another model.",
+  "error.provider.grokConnectionFailed":
+    "Grok cannot connect to its service. Check your internet connection, then send the message again.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "On a Windows host, Gemini opens the Google page on the host itself. Connect Gemini on the host computer.",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",

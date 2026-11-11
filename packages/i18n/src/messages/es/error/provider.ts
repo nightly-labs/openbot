@@ -265,6 +265,10 @@ export const messages = {
     "El servicio Gemini de Google no completó la solicitud. Vuelve a intentarlo en unos minutos.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini perdió la conexión con su agente y se detuvo. Envía un mensaje para continuar.",
+  "error.provider.grokServiceFailure":
+    "El servicio de Grok está ocupado o tiene un error. Vuelve a intentarlo en unos minutos o elige otro modelo.",
+  "error.provider.grokConnectionFailed":
+    "Grok no puede conectarse a su servicio. Comprueba tu conexión a internet y vuelve a enviar el mensaje.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "En un host con Windows, Gemini abre la página de Google en el propio host. Conecta Gemini en el equipo host.",
   "error.provider.cursorArchivePath": "El archivo de Cursor contiene un archivo inesperado.",
