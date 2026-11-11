@@ -71,6 +71,10 @@ export interface DynamicIslandWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
+  /** Called when the presentation changes, with the one before. A renderer outside these windows follows it. */
+  onPresentation?: (previous: DynamicIslandPresentation, next: DynamicIslandPresentation) => void;
+  /** Called with each shape that an island page reports, before the window takes it. */
+  onInputRegion?: (rendererId: number, rects: AgentDockInputRect[]) => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
   /** Shows the menu of a right-click on the island, outside a text field. */
   showContextMenu?: (window: BrowserWindow) => void;
@@ -176,7 +180,9 @@ export class DynamicIslandWindowController {
 
   publish(presentation: DynamicIslandPresentation): void {
     if (isDeepStrictEqual(this.#presentation, presentation)) return;
+    const previous = this.#presentation;
     this.#presentation = presentation;
+    this.#options.onPresentation?.(previous, presentation);
     for (const window of this.#windows.values()) {
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, presentation);
     }
@@ -224,6 +230,7 @@ export class DynamicIslandWindowController {
    * or animates shut, all of the window does: the expanded island changes its size at each frame.
    */
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
+    this.#options.onInputRegion?.(rendererId, rects);
     if (this.#options.windowKind !== "x11") return;
     const entry = [...this.#windows].find(
       ([, candidate]) => !candidate.isDestroyed() && candidate.webContents.id === rendererId,

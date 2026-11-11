@@ -58,6 +58,9 @@ extraResources:
   # `cpu-limit.cjs` makes os.cpus() follow the CPU limit for the Node programs of agents on a server.
   - from: resources/agent-runtime
     to: agent-runtime
+  # `shell.qml` shows the Dynamic Island and the agent dock as Wayland layers on Hyprland; see linux-layer-overlay.ts.
+  - from: resources/linux-layer-overlay
+    to: linux-layer-overlay
   - from: build/icon-production.png
     to: icons/icon-production.png
   - from: build/icon-dev.png

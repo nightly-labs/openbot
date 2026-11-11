@@ -274,6 +274,7 @@ import { LanguageService } from "./language-service";
 import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
+import { LinuxLayerOverlay, layerOverlayLocation } from "./linux-layer-overlay";
 import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -1100,7 +1101,14 @@ export async function createApplicationServices({
   // two lazy getters, so the gap is visible and bounded.
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
-  const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
+  const serverProcess = Boolean(hostedServer || serverModeEnvironment || localServerChild);
+  // Hyprland with Quickshell: the island and the dock render offscreen and show as Wayland layers
+  // (linux-layer-overlay.ts). The window controllers then work as on X11.
+  const layerLocation = layerOverlayLocation(process.env, process.resourcesPath, serverProcess);
+  const layerOverlay = layerLocation
+    ? new LinuxLayerOverlay(layerLocation, process.env.XDG_RUNTIME_DIR || app.getPath("userData"))
+    : null;
+  const windowKind = layerOverlay ? "x11" : aboveAppsWindowKind(serverProcess);
   // Made here so the island menu can read it; it loads the saved language below, before the first window.
   const language = new LanguageService({
     path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
@@ -1117,7 +1125,7 @@ export async function createApplicationServices({
     ...(process.env.ELECTRON_RENDERER_URL
       ? { defaultPreference: { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE, enabled: false } }
       : {}),
-    createWindow: createDynamicIslandWindow,
+    createWindow: layerOverlay ? layerOverlay.createIslandWindow : createDynamicIslandWindow,
     loadWindow: (window, display) => loadDynamicIslandRenderer(window, display, appVariant),
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
@@ -1125,6 +1133,8 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
+    onPresentation: (previous, next) => layerOverlay?.islandPresentationChanged(previous, next),
+    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged("island", rendererId, rects),
     showContextMenu: (window) =>
       Menu.buildFromTemplate([
         {
@@ -1161,9 +1171,12 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
   const agentDock = new AgentDockWindowController({
     windowKind,
-    createWindow: createAgentDockWindow,
+    createWindow: layerOverlay ? layerOverlay.createDockWindow : createAgentDockWindow,
+    onPresentation: (presentation) => layerOverlay?.dockPresentationChanged(presentation),
+    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged("dock", rendererId, rects),
     loadWindow: loadAgentDockRenderer,
     screen,
+    dragPointer: layerOverlay ? () => layerOverlay.dragPointer() : undefined,
     getMainWindow: windows.getMainWindow,
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
@@ -1211,6 +1224,10 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.agentDock, "the agent dock", () => agentDock.destroy());
+  if (layerOverlay) {
+    layerOverlay.start();
+    teardown.push(TEARDOWN_ORDER.agentDock, "the layer overlay", () => layerOverlay.stop());
+  }
   const centralAuthApiUrl = readCentralAuthApiUrl(
     process.env.OPENBOT_AUTH_API_URL,
     app.isPackaged ? "https://api.openbot.run" : "http://127.0.0.1:3100",
