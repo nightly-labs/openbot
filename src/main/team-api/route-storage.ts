@@ -4,6 +4,7 @@ import {
   parseDeleteStoredFileInput,
   parseGetStorageUsageInput,
   STORAGE_CAPABILITY,
+  type StorageUsage,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import {
@@ -19,16 +20,17 @@ import { StorageNotFoundError } from "../../backend/storage-usage";
 import type { TeamApiStorage } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin } from "./request-helpers";
+import { readJson, requireAdmin, requireVisibleBodyAgent } from "./request-helpers";
 import { hiddenAuthor, requireVisibleChannel } from "./route-channels";
 
 /**
  * The disk use of the machine that runs this host, read from a joined server.
  *
  * Every member can read it: the answer carries sizes, chat titles and the names of files sent in
- * chats, never a path. Deleting a file and clearing caches or logs change the host, so only an
- * owner or an admin can. Both were decided deliberately and are frozen by `storage-v1`; changing
- * either needs a second capability string.
+ * chats, never a path. A member reads the chats and files only of the agents that they can see
+ * (`visibleStorage`); the category sizes count the whole host. Deleting a file and clearing caches or
+ * logs change the host, so only an owner or an admin can. Both were decided deliberately and are
+ * frozen by `storage-v1`; changing either needs a second capability string.
  */
 export async function routeStorage(
   context: TeamApiRequestContext,
@@ -87,7 +89,11 @@ export async function routeStorage(
   // `readJson` has already run the body through the storage wire codec.
   const body = await readJson(request);
   try {
-    if (usage) return json(200, await runCauseEffect(storage.usage(parseGetStorageUsageInput(body))));
+    if (usage) {
+      const input = parseGetStorageUsageInput(body);
+      requireVisibleBodyAgent(body, hiddenAgentIds);
+      return json(200, visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds));
+    }
     if (deleteFile) await runCauseEffect(storage.deleteFile(parseDeleteStoredFileInput(body).fileId));
     else await runCauseEffect(storage.clear(parseClearStorageInput(body).category));
   } catch (error) {
@@ -95,4 +101,20 @@ export async function routeStorage(
     throw error;
   }
   return json(200, {});
+}
+
+/**
+ * The storage that a peer with hidden agents reads: no chat and no file of a hidden agent. A file id
+ * is enough to download the file, so a file that the host cannot place with an agent is left out too:
+ * it can be a file of a hidden agent. The chat of a hidden agent answers as a chat with no files.
+ */
+function visibleStorage(usage: StorageUsage, hiddenAgentIds: ReadonlySet<string>): StorageUsage {
+  if (hiddenAgentIds.size === 0) return usage;
+  const visible = (agentId: string | null) => agentId !== null && !hiddenAgentIds.has(agentId);
+  return {
+    ...usage,
+    agents: usage.agents.filter((row) => visible(row.agentId)),
+    conversations: usage.conversations.filter((row) => visible(row.agentId)),
+    files: usage.files.filter((file) => visible(file.agentId)),
+  };
 }
