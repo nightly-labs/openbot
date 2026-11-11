@@ -34,6 +34,7 @@ import {
   modelsAfterOpenCodeDiscoveryFailure,
   serviceTierFields,
 } from "./agent/provider-models";
+import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
 import { readAntigravityQuota } from "./antigravity-usage";
@@ -572,6 +573,12 @@ export interface ProviderClientContext {
    * leave Claude Code's own size for each model.
    */
   readonly claudeCompactWindow?: () => number | null;
+  /**
+   * What each Codex thread was sent with its turns, shared by every Codex client of this process. A
+   * client that replaces an idle one resumes threads that hold those blocks already (#6963). Optional
+   * for the same reason as `reportMcpDrops`: without it each client keeps its own.
+   */
+  readonly codexTurnContext?: TurnContext;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -873,11 +880,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     catalog: { paged: true, modelFields: serviceTierFields },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
-      new CodexAppServerClient(cli.executable, requestTimeoutMs, {
-        ...cliPathEnvironment(cli),
-        ...context.serverEnvironment,
-        ...context.accountEnvironment,
-      }),
+      new CodexAppServerClient(
+        cli.executable,
+        requestTimeoutMs,
+        {
+          ...cliPathEnvironment(cli),
+          ...context.serverEnvironment,
+          ...context.accountEnvironment,
+        },
+        context.codexTurnContext,
+      ),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
     // An API-key login has no plan usage to read.
     validateAccount: (account) => {
