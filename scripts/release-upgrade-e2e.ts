@@ -168,6 +168,11 @@ const userDataPath = join(root, "user-data");
 const homePath = join(root, "home");
 await mkdir(userDataPath);
 await mkdir(homePath);
+// The app puts agent workspaces in `homedir()`/OpenBot/Agents. On Windows `homedir()` reads
+// USERPROFILE, which stays the real one (see `launchEnvironment`), and an earlier step of the job
+// can have made workspaces there. So the check counts only the folders that are new.
+const agentsFolder = join(target === "windows" ? (process.env.USERPROFILE ?? homePath) : homePath, "OpenBot", "Agents");
+const earlierWorkspaces = new Set(await listWorkspaces());
 // The process and the app that run now, so that a failure can stop them. `process` is set at the
 // spawn and `app` when the window is connected.
 const current: { process: LaunchedProcess | null; app: RunningApp | null } = { process: null, app: null };
@@ -383,7 +388,8 @@ function launchEnvironment(): NodeJS.ProcessEnv {
     ...process.env,
     // Agent workspaces go to ~/OpenBot, so the home folder is the test's own. Windows keeps the real
     // USERPROFILE: with an empty one, Windows cannot find the AppData known folder and the start
-    // fails ("Failed to get 'appData' path"). The runner is discarded after the job.
+    // fails ("Failed to get 'appData' path"). So on Windows the workspaces go to the real profile
+    // (see `agentsFolder`). The runner is discarded after the job.
     HOME: homePath,
     ...(target === "windows" ? {} : { USERPROFILE: homePath }),
     CODEX_HOME: join(userDataPath, "codex-home"),
@@ -782,8 +788,7 @@ async function readSeed(page: Page, seeded: Seed): Promise<Counts> {
     channelMessages = seeded.channelMessageIds.filter((id) => messageIds.has(id)).length;
   }
   const customAgents = await page.evaluate((server) => window.openbot.customAgents.list(server), LOCAL_SERVER_ID);
-  const agentsFolder = join(homePath, "OpenBot", "Agents");
-  const workspaceFolders = existsSync(agentsFolder) ? (await readdir(agentsFolder)).length : 0;
+  const workspaceFolders = (await listWorkspaces()).filter((name) => !earlierWorkspaces.has(name)).length;
   return {
     agents: seeded.agentIds.filter((id) => agentIds.has(id)).length,
     agentMessages,
@@ -793,6 +798,10 @@ async function readSeed(page: Page, seeded: Seed): Promise<Counts> {
     customAgents: customAgents.filter((agent) => agent.id === CUSTOM_AGENT_ID).length,
     workspaceFolders,
   };
+}
+
+async function listWorkspaces(): Promise<string[]> {
+  return existsSync(agentsFolder) ? await readdir(agentsFolder) : [];
 }
 
 async function readAppVersion(page: Page): Promise<string> {
@@ -954,6 +963,7 @@ try {
     `The new build lost seeded data: before ${JSON.stringify(report.seeded)}, after ${JSON.stringify(afterUpgrade)}.`,
   );
   check(report.seeded.agents === 2 && report.seeded.customAgents === 1, "The seed step did not make its agents.");
+  check(report.seeded.workspaceFolders === 2, "The seed step did not make the agents' workspace folders.");
   check(database.integrity === "ok", `PRAGMA integrity_check failed: ${database.integrity}.`);
   check(
     database.foreignKeyViolations === 0,
