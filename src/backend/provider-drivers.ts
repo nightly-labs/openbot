@@ -1598,11 +1598,14 @@ function customAgentChild(
       ? {}
       : {
           // A variable the user saved on this agent wins over the GitHub connection's. The
-          // `GIT_CONFIG_*` entries count on from the user's own, so they always apply.
+          // `GIT_CONFIG_*` entries count on from the user's own, so they always apply. A certificate
+          // folder saved here also keeps out OpenBot's `SSL_CERT_FILE`: `httpx` reads the file first.
           extraEnv: () =>
             Object.fromEntries(
               Object.entries(context.agentEnvironment?.({ ...process.env, ...env }) ?? {}).filter(
-                ([name]) => name.startsWith("GIT_CONFIG_") || !(name in env),
+                ([name]) =>
+                  name.startsWith("GIT_CONFIG_") ||
+                  !(name in env || (name === "SSL_CERT_FILE" && "SSL_CERT_DIR" in env)),
               ),
             ),
           mcpServers: context.mcpServers,

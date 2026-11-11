@@ -1,5 +1,5 @@
 import { X509Certificate } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { getCACertificates, setDefaultCACertificates } from "node:tls";
 import { Effect, Schema } from "effect";
 
@@ -52,11 +52,19 @@ export const agentCertificateEnvironment = Effect.fn("SystemCertificates.agentEn
     catch: (cause) => new AgentCertificatesFailed({ cause }),
   });
   if (roots === null) return {};
-  // Rewritten only when the roots change, so a process that reads the file never sees half of it.
+  // Rewritten only when the roots change. An agent process from an earlier run can still read the
+  // file, so the new roots replace it whole: a reader never sees half of them.
   const current = yield* Effect.promise(() => readFile(file, "utf8").catch(() => null));
   if (current !== roots)
     yield* Effect.tryPromise({
-      try: () => writeFile(file, roots),
+      try: async () => {
+        const temporary = `${file}.${process.pid}.tmp`;
+        await writeFile(temporary, roots);
+        await rename(temporary, file).catch(async (error: unknown) => {
+          await rm(temporary, { force: true });
+          throw error;
+        });
+      },
       catch: (cause) => new AgentCertificatesFailed({ cause }),
     });
   return { SSL_CERT_FILE: file };
