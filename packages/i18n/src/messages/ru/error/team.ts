@@ -173,6 +173,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ни один агент на этом сервере не показывал эту ссылку для входа.",
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
+  "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":
     "Это подключение не поддерживает запуск сообщения из очереди в новой ветке.",
   "error.team.backgroundProcessesUnsupported": "Это подключение не поддерживает фоновые процессы.",

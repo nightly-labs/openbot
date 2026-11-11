@@ -231,6 +231,8 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Questo messaggio fa parte di un turno in corso. Eliminalo quando il turno finisce.",
   "error.backend.messageDeleteForbidden": "Puoi eliminare solo i messaggi che hai inviato.",
+  "error.backend.messagePinNotFound": "Questo messaggio non è nella chat.",
+  "error.backend.messagePinLimit": "Questa chat ha 50 messaggi fissati. Rimuovine uno prima di fissarne un altro.",
   "error.backend.routineFlowHandoffFailed": "La routine non è riuscita a passare il lavoro a questo agente.",
   "error.backend.mcpServerLimit": "OpenBot conserva fino a {limit} server MCP.",
   "error.backend.mcpServerNameTaken": "Esiste già un server MCP chiamato {name}.",

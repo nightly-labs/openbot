@@ -218,6 +218,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.messageDeleteNotFound": "This message is not in the chat.",
   "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
   "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
+  "error.backend.messagePinNotFound": "The message to pin is not in this chat.",
+  "error.backend.messagePinLimit": "This chat has 50 pinned messages. Unpin one before you pin another.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",

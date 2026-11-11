@@ -200,6 +200,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "这条消息不在聊天中。",
   "error.backend.messageDeleteBusy": "这条消息属于正在运行的回合。请在回合结束后删除。",
   "error.backend.messageDeleteForbidden": "你只能删除自己发送的消息。",
+  "error.backend.messagePinNotFound": "此消息不在聊天中。",
+  "error.backend.messagePinLimit": "此聊天已有 50 条置顶消息。请先取消置顶一条，再置顶其他消息。",
   "error.backend.routineFlowHandoffFailed": "自动化任务无法把工作交给该助手。",
   "error.backend.mcpServerLimit": "OpenBot 最多保留 {limit} 个 MCP 服务器。",
   "error.backend.mcpServerNameTaken": "名为 {name} 的 MCP 服务器已存在。",

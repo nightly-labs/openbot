@@ -179,6 +179,7 @@ import {
   type MachineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
@@ -340,6 +341,7 @@ import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
 import { routeMessageDelete } from "./team-api/route-message-delete";
+import { routeMessagePins } from "./team-api/route-message-pins";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
@@ -1231,6 +1233,8 @@ export class TeamApiServer {
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
+        return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
@@ -2727,6 +2731,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   )
     return "channel-chats-v1";
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
+  if (event.type === "message-pins-changed") return MESSAGE_PINS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
   if (event.type === "agent-colors-changed") return AGENT_COLORS_CAPABILITY;
   if (event.type === "chat-colors-changed") return CHAT_COLORS_CAPABILITY;

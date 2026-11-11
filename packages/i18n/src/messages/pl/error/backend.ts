@@ -224,6 +224,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
   "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
   "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
+  "error.backend.messagePinNotFound": "Tej wiadomości nie ma na czacie.",
+  "error.backend.messagePinLimit": "Ten czat ma 50 przypiętych wiadomości. Odepnij jedną, zanim przypniesz kolejną.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",

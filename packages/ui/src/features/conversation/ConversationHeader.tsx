@@ -4,6 +4,7 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { agentAccessLockLabel } from "@openbot/ui/features/agents/agent-access";
 import { RemoteDesktopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { PinnedMessages, type PinnedMessagesProps } from "@openbot/ui/features/conversation/PinnedMessages";
 import { SidePanelToggle, type SidePanelToggleProps } from "@openbot/ui/features/conversation/SidePanel";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps, JSX } from "@solidjs/web";
@@ -22,6 +23,8 @@ export interface ConversationHeaderProps {
   onOpenChat?: (() => void) | undefined;
   remoteControl?: ConversationHeaderRemoteControl | undefined;
   /** Missing when the chat has no side panel, such as a deleted channel. */
+  /** The pinned messages of the chat in view. Without it, the header has no pin button. */
+  pinnedMessages?: PinnedMessagesProps | undefined;
   sidePanel?: SidePanelToggleProps | undefined;
   /** The thread tabs of the agent, after its name. */
   threads?: JSX.Element | undefined;
@@ -116,6 +119,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
             </Button>
           )}
         </Show>
+        <Show when={props.pinnedMessages}>{(pins) => <PinnedMessages {...pins()} />}</Show>
         <Show when={props.sidePanel}>{(sidePanel) => <SidePanelToggle {...sidePanel()} />}</Show>
       </div>
     </header>

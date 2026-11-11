@@ -130,6 +130,7 @@ import {
   marketplaceAppStatus,
   searchSignIns,
 } from "./mcp-tools";
+import type { AgentPinRefusal, MessagePins } from "./message-pins";
 import {
   agentAccountSetup,
   agentReasoningEffort,
@@ -212,6 +213,14 @@ function requestAborted(signal: AbortSignal | undefined) {
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
+
+/** What `pin_message` tells the agent when the host refuses its pin. */
+const PIN_REFUSALS: Record<AgentPinRefusal, string> = {
+  "not-found": "That message cannot be pinned: it is still streaming, it is a status line, or it was deleted.",
+  limit: "This chat has 50 pins, the most it keeps. Ask the user which pin to remove, or unpin one of yours.",
+  "pinned-by-person": "A person pinned that message. Only a person can unpin it; tell the user.",
+  "not-pinnable-chat": "This chat keeps no pins. Pins are only in your own chat and its side threads.",
+};
 /** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
 const FEEDBACK_URL_LIMIT = 8000;
 
@@ -382,6 +391,7 @@ export interface OpenBotToolRouterOptions {
   memories: AgentMemories;
   waits: AgentWaits;
   tasks: AgentTasks;
+  messagePins: MessagePins;
   drain: DrainScheduler;
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
@@ -438,6 +448,7 @@ export class OpenBotToolRouter {
   readonly #memories: AgentMemories;
   readonly #waits: AgentWaits;
   readonly #tasks: AgentTasks;
+  readonly #messagePins: MessagePins;
   readonly #drain: DrainScheduler;
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
@@ -487,6 +498,7 @@ export class OpenBotToolRouter {
     this.#memories = options.memories;
     this.#waits = options.waits;
     this.#tasks = options.tasks;
+    this.#messagePins = options.messagePins;
     this.#drain = options.drain;
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
@@ -2022,6 +2034,8 @@ export class OpenBotToolRouter {
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 
+    if (params.tool === "pin_message") return yield* this.#pin(params, senderAgentId);
+
     return yield* this.#sendMessage(params, senderAgentId);
   });
 
@@ -2770,6 +2784,52 @@ export class OpenBotToolRouter {
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
       return openBotToolResult({ status: "reacted", messageId: delivery.delivery.id, emoji: args.emoji });
+    },
+    Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
+    Effect.uninterruptible,
+  );
+
+  /**
+   * `pin_message`: pins or unpins one message of the chat that the call runs in. The agent does not see
+   * message ids, so a quote names the message; without one, the current user message is the target.
+   */
+  readonly #pin = Effect.fn("OpenBotToolRouter.pin")(
+    function* (
+      this: OpenBotToolRouter,
+      params: DynamicToolCallParams,
+      senderAgentId: string,
+    ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+      const args = isRecord(params.arguments) ? params.arguments : {};
+      const quote = typeof args.quote === "string" ? args.quote.trim() : "";
+      const pinned = args.pinned !== false;
+      const threadId = params.threadId;
+      const target = quote
+        ? this.#messagePins.findByQuote(senderAgentId, threadId, quote)?.id
+        : this.#mailbox
+            .findDeliveriesByTurn(senderAgentId, params.turnId)
+            .findLast((candidate) => candidate.delivery.sender.kind === "user")?.delivery.id;
+      if (!target)
+        return openBotToolFailure(
+          quote
+            ? "No finished message of this chat contains that quote. Copy a short exact part of the message text and call this again."
+            : "This turn has no user message. Pass quote with a short exact part of the message to pin.",
+        );
+      const result = yield* this.#messagePins
+        .setByAgent({ agentId: senderAgentId, threadId, messageId: target, pinned })
+        .pipe(toToolOperationFailed);
+      if (result.refused) return openBotToolFailure(PIN_REFUSALS[result.refused]);
+      // The thread was pinnable, so it is the agent's own chat (no task) or one of its side threads.
+      const taskId = this.#tasks.taskForThread(threadId);
+      const pins = result.snapshot.pins.filter((pin) => pin.taskId === taskId);
+      return openBotToolResult({
+        status: pinned ? "pinned" : "unpinned",
+        messageId: target,
+        pinsInThisChat: pins.map((pin) => ({
+          text: pin.text.slice(0, 160),
+          pinnedBy:
+            pin.pinnedBy.kind === "agent" ? (pin.pinnedBy.agentId === senderAgentId ? "you" : "agent") : "person",
+        })),
+      });
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,

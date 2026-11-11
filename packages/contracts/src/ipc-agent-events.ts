@@ -108,6 +108,8 @@ export type AgentEvent =
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
+  /** A pin of a chat of the agent changed. Views read the list of pins again. */
+  | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
@@ -285,6 +287,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "agent-session-settings-changed":
+    case "message-pins-changed":
     case "skills-changed":
     case "routine-flows-changed":
       return isIdentifier(value.agentId);

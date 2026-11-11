@@ -70,6 +70,7 @@ import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -1636,6 +1637,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const deleteOpenAgentMessage = (messageId: string) => {
     const agentId = workspace.state.selectedId;
     return agentId ? workspace.deleteMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** Pin and Unpin on the host. A host without `message-pins-v1` has none. */
+  const agentMessagePins = () => {
+    const { listPinnedMessages: list, setMessagePinned: set } = workspace.runtime;
+    if (!list || !set || !workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY)) return undefined;
+    return {
+      list,
+      set,
+      subscribe: (agentId: string, changed: () => void) =>
+        workspace.onHostEvent((event) => {
+          if (event.type === "message-pins-changed" && event.agentId === agentId) changed();
+        }),
+    };
   };
   /** The Delete action of the open agent's chat. A host without `message-delete-v1` has none. */
   const agentDeleteMessageAction = () => (messageDeleteSupported() ? deleteOpenAgentMessage : undefined);
@@ -3720,6 +3734,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   sendToChannel={sendToChannel()}
                   onDeleteMessage={agentDeleteMessageAction()}
                   canDeleteMessage={canDeleteAgentMessage}
+                  messagePins={agentMessagePins()}
                   onLoadOlder={() => void workspace.older()}
                   onLoadLatest={workspace.refresh}
                   onSearchMessages={async (query) => {

@@ -206,6 +206,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "هذه الرسالة ليست في المحادثة.",
   "error.backend.messageDeleteBusy": "هذه الرسالة جزء من دور قيد التشغيل. احذفها عند انتهاء الدور.",
   "error.backend.messageDeleteForbidden": "يمكنك حذف الرسائل التي أرسلتها فقط.",
+  "error.backend.messagePinNotFound": "هذه الرسالة ليست في المحادثة.",
+  "error.backend.messagePinLimit": "في هذه المحادثة 50 رسالة مثبتة. ألغِ تثبيت واحدة قبل تثبيت أخرى.",
   "error.backend.routineFlowHandoffFailed": "تعذّر على المهمة الدورية تمرير العمل إلى هذا الوكيل.",
   "error.backend.mcpServerLimit": "يحتفظ OpenBot بـ {limit} خوادم MCP كحد أقصى.",
   "error.backend.mcpServerNameTaken": "يوجد بالفعل خادم MCP باسم {name}.",

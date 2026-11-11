@@ -135,8 +135,10 @@ import type {
   AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  AgentTaskWindow,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
@@ -397,6 +399,7 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
   AddMessagingOrchestratorResult,
@@ -1755,11 +1758,16 @@ export const IPC_ENDPOINTS = {
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
+    // The pins of all chats of an agent. A joined server takes both through `message-pins-v1`.
+    listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
+    setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     // A joined server takes this through `agent-thread-pages-v1`.
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
+    // A joined server takes this through `message-pins-v1`: it opens a pin of a side thread at its message.
+    readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.

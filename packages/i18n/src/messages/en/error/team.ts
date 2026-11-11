@@ -179,6 +179,7 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
   "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
+  "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
   "error.team.queuedMessageThreadUnsupported":
     "Running a queued message as a new thread is not supported by this connection.",
   "error.team.backgroundProcessesUnsupported": "Background processes are not supported by this connection.",

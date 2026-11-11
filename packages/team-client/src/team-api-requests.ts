@@ -14,6 +14,7 @@ import {
   type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
+  type AgentTaskWindow,
   type ApplyAgentImportInput,
   type ApplyInstanceTransferInput,
   type AttachmentSummary,
@@ -46,6 +47,7 @@ import {
   isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAttachmentSummary,
   isConversationSnapshot,
   isQueuedMessageReceipt,
@@ -57,6 +59,7 @@ import {
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
   type QueuedMessageReceipt,
+  type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
   type RemoteAgentImportResult,
   type RemoteInstanceTransferResult,
@@ -112,6 +115,7 @@ import {
   type LiveVoiceSessionResponse,
   type LiveVoiceStartRequest,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutineRunPlace,
@@ -250,6 +254,7 @@ const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks respo
 const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
 const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
 const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
+const decodeTaskWindow = guardedDecoder(isAgentTaskWindow, "thread part response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
 
 /**
@@ -277,6 +282,16 @@ export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(f
 ): Effect.fn.Return<AgentTaskPage, TeamRequestError> {
   return yield* teamCall(() =>
     request("POST", AGENT_THREAD_PAGES_ROUTES.readOlder, decodeTaskPage, { agentId, taskId, beforeMessageId, limit }),
+  );
+});
+
+/** The messages of a task around one of its messages. Send it only to a host with `message-pins-v1`. */
+export const readAgentThreadAround = Effect.fn("TeamClient.readAgentThreadAround")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, limit }: ReadAgentTaskAroundInput,
+): Effect.fn.Return<AgentTaskWindow, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", MESSAGE_PINS_ROUTES.readThread, decodeTaskWindow, { agentId, taskId, messageId, limit }),
   );
 });
 

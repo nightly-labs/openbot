@@ -223,6 +223,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Этого сообщения нет в чате.",
   "error.backend.messageDeleteBusy": "Это сообщение входит в выполняемый ход. Удалите его, когда ход закончится.",
   "error.backend.messageDeleteForbidden": "Вы можете удалять только отправленные вами сообщения.",
+  "error.backend.messagePinNotFound": "Этого сообщения нет в чате.",
+  "error.backend.messagePinLimit":
+    "В этом чате 50 закреплённых сообщений. Открепите одно, прежде чем закрепить другое.",
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",

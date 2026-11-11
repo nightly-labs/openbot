@@ -63,6 +63,7 @@ import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
+import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -972,6 +973,7 @@ export function createConversationViewScope(props: ConversationProps) {
     draftLocked: threadQueue.draftLocked,
     keepsAttachment: threadQueue.keepsAttachment,
   });
+  const messagePins = createMessagePinsStore({ props });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
   const voice = createVoiceStore({
@@ -2484,6 +2486,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
+    messagePins,
     voiceConversationAvailable,
     startVoiceConversation,
     sideQuestionAvailable,

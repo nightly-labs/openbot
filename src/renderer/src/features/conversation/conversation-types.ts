@@ -338,6 +338,11 @@ export interface ConversationProps {
   /** Whether the reader can delete a message. Without it, every finished message can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /**
+   * The pinned messages of the agent's chats on the host. Absent where the host cannot pin: the header
+   * then has no pin button, and the message menu has no Pin item.
+   */
+  messagePins?: ConversationMessagePins | undefined;
+  /**
    * The open channels that a message of this agent chat can go to. Each one opens with the text in its
    * composer. Without it, the message menu has no such item.
    */
@@ -469,6 +474,19 @@ export type RightPanelMode =
 export type { SidePanelPane };
 
 /**
+ * Reads and changes the pins of an agent: the pins of all its chats in one list. Each call resolves
+ * with the new list. `subscribe` calls `changed` when a pin of the agent changes on the host, also a
+ * pin of the agent itself, and returns the stop.
+ */
+export interface ConversationMessagePins {
+  list: (agentId: string) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  set: (
+    input: import("@openbot/contracts/ipc").SetMessagePinnedInput,
+  ) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  subscribe: (agentId: string, changed: () => void) => () => void;
+}
+
+/**
  * The threads of the active agent. A side thread is a task of the host; the agent's own chat is the
  * main thread. Each action applies to the open thread.
  */
@@ -488,6 +506,8 @@ export interface ConversationThreads {
   conversation: ConversationSnapshot | undefined;
   /** The open side thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The open side thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
   /** The approval that the open side thread's turn waits for. */
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
@@ -539,6 +559,14 @@ export interface ConversationThreads {
   onOpenRoutineRun: (routineId: string, messageId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+  /**
+   * Opens a chat of the agent at a message and marks it: the agent's own chat when `taskId` is null,
+   * else a side thread, also an archived one. A side thread that does not hold the message reads the
+   * part of the thread around it in one read, before its tab opens. A thread in the side panel stays
+   * there. Resolves false, with no tab change, when the chat does not have the message, the thread is
+   * deleted, or its delete waits for the end of the Undo time.
+   */
+  onOpenMessage: (taskId: string | null, messageId: string) => Promise<boolean>;
 }
 
 /** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
@@ -580,6 +608,10 @@ export interface SideThread {
   conversation: ConversationSnapshot | undefined;
   /** The thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
+  /** The message that the thread scrolls to once, after a pin opened it. */
+  focusMessage: { messageId: string; nonce: number } | undefined;
   approval: AgentApproval | undefined;
   onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;

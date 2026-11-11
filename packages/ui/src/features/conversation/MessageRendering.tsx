@@ -16,6 +16,8 @@ import {
   Hash,
   Info,
   LoaderCircle,
+  Pin,
+  PinOff,
   Trash2,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
@@ -1149,6 +1151,8 @@ export interface MessageMenuItemsProps {
   branchDisabled?: boolean | undefined;
   /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
   sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
+  /** Pins this message to its chat, or unpins it. Without it, the menu has no such item. */
+  pin?: { pinned: boolean; onToggle: () => void } | undefined;
   /** Asks to delete this message. Without it, the menu has no such item. */
   onDelete?: (() => void) | undefined;
 }
@@ -1243,8 +1247,16 @@ export function MessageMenuItems(props: MessageMenuItemsProps) {
           </ContextMenu.Sub>
         )}
       </Show>
-      <Show when={props.onBranch || props.onMarkUnread}>
+      <Show when={props.onBranch || props.onMarkUnread || props.pin}>
         <ContextMenu.Separator />
+      </Show>
+      <Show when={props.pin}>
+        {(pin) => (
+          <ContextMenu.Item onSelect={() => pin().onToggle()}>
+            {pin().pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+            <span>{pin().pinned ? t("chat.menu.unpin") : t("chat.menu.pin")}</span>
+          </ContextMenu.Item>
+        )}
       </Show>
       <Show when={props.onBranch}>
         {(onBranch) => (
