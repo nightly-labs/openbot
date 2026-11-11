@@ -143,6 +143,22 @@
     "zh"
   ],
   "error.backend.browserTypingSubmitSkipped": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.mcpOAuthRequestRefused": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.backend.replyReferenceRequests": [
     "ar",
     "de",
