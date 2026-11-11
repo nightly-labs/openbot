@@ -751,6 +751,16 @@ When the last copy ends, the waiting answers start in one turn, and the prompt n
 whose copy ended with no answer. A message from the person does not wait: it starts at once and
 takes the answers that are already in. Each end of a copy schedules a drain for the requester.
 
+Nothing else wakes the requester, so a turn of teammate results that ends with no answer and no
+step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
+with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
+(a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
+by the user. The error waits for the end
+of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
+error. With no backup, a turn that only teammate results started runs once more on the same model;
+the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
+shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+
 A message from another agent follows the recipient's busy-message mode, as a message from the
 person does. When the mode is "steer", the provider steers natively and the recipient runs a chat
 turn, `send_message` and the result relay take the message into that turn

@@ -348,6 +348,7 @@
     "smoke:codex-agent": "bun scripts/codex-agent-smoke.ts",
     "test:token-usage": "bun scripts/token-usage-e2e.ts",
     "test:backup-model-failover": "bun scripts/backup-model-failover-e2e.ts",
+    "test:codex-empty-lead-turn": "bun scripts/codex-empty-lead-turn-e2e.ts",
     "test:zip-attachments": "bun scripts/zip-attachment-e2e.ts",
     "test:mp4-attachments": "bun scripts/mp4-attachment-e2e.ts",
     "test:svg-attachments": "bun scripts/svg-attachment-e2e.ts",
