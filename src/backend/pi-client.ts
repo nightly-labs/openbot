@@ -269,12 +269,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     }
     const refused = message === null ? null : /^403\b:?\s*([\s\S]*)$/u.exec(message);
     if (refused) {
-      const reason = piRefusalReason(refused[1] ?? "");
-      return this.#redact(
-        reason
-          ? sourceText("error.provider.modelServiceRefusedReason", { reason })
-          : sourceText("error.provider.modelServiceRefused"),
-      );
+      // Redact before the reason is cut: a cut through a secret leaves a part that no longer matches.
+      const reason = piRefusalReason(this.#redact(refused[1] ?? ""));
+      return reason
+        ? sourceText("error.provider.modelServiceRefusedReason", { reason })
+        : sourceText("error.provider.modelServiceRefused");
     }
     return this.#redact(message ?? "Pi model request failed.");
   }
@@ -1351,11 +1350,15 @@ function isToolResult(value: unknown): value is DynamicToolResult {
 const PI_PROVIDER_STOP =
   /^(?:Provider finish_reason: error\b|Stream ended without finish_reason\b|Provider returned (?:an? )?error\b)/u;
 
-/** The JSON body of an API error: OpenAI's and Anthropic's `{ error: { message } }`, or a flat `{ message }`. */
+/**
+ * The JSON body of an API error: OpenAI's and Anthropic's `{ error: { message } }`, a proxy's
+ * `{ error }` or `{ detail }`, or a flat `{ message }`.
+ */
 const PiErrorBody = Schema.fromJsonString(
   Schema.Union([
-    Schema.Struct({ error: Schema.Struct({ message: Schema.String }) }),
+    Schema.Struct({ error: Schema.Union([Schema.String, Schema.Struct({ message: Schema.String })]) }),
     Schema.Struct({ message: Schema.String }),
+    Schema.Struct({ detail: Schema.String }),
   ]),
 );
 
@@ -1370,8 +1373,12 @@ function piRefusalReason(body: string): string | null {
   const decoded = Schema.decodeUnknownOption(PiErrorBody)(body.trim());
   const text = Option.isSome(decoded)
     ? "error" in decoded.value
-      ? decoded.value.error.message
-      : decoded.value.message
+      ? typeof decoded.value.error === "string"
+        ? decoded.value.error
+        : decoded.value.error.message
+      : "message" in decoded.value
+        ? decoded.value.message
+        : decoded.value.detail
     : /^\s*[{[]/u.test(body)
       ? ""
       : body;
