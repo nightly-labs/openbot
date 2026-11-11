@@ -35,6 +35,6 @@ export const messages = {
   "error.voice.live.unavailable":
     "OpenAI no pudo iniciar la voz en directo. El problema es de OpenAI. Inténtalo de nuevo más tarde.",
   "error.voice.live.refused":
-    "OpenAI rechazó iniciar la voz en directo. Para hablar por voz, desactiva la voz en directo de Codex en Ajustes → Voz.",
+    "OpenAI rechazó iniciar la voz en directo. Inténtalo de nuevo más tarde o desactiva la voz en directo en Ajustes para hablar por voz.",
   "error.voice.live.off": "La voz en directo de Codex está desactivada. Actívala en Ajustes → Voz.",
 } as const satisfies PartialTranslation<typeof source>;

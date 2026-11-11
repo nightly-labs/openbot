@@ -35,6 +35,6 @@ export const messages = {
   "error.voice.live.unavailable":
     "OpenAI non è riuscita ad avviare la voce dal vivo. Il problema è di OpenAI. Riprova più tardi.",
   "error.voice.live.refused":
-    "OpenAI ha rifiutato di avviare la voce dal vivo. Per parlare a voce, disattiva la voce dal vivo di Codex in Impostazioni → Voce.",
+    "OpenAI ha rifiutato di avviare la voce dal vivo. Riprova più tardi, oppure disattiva la voce dal vivo in Impostazioni per parlare a voce.",
   "error.voice.live.off": "La voce dal vivo di Codex è disattivata. Attivala in Impostazioni → Voce.",
 } as const satisfies PartialTranslation<typeof source>;

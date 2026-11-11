@@ -41,10 +41,11 @@ const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
  */
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 /**
- * How Codex reports that OpenAI refused the live voice connection:
- * `unexpected status 403 Forbidden: realtime websocket handshake failed`. Codex drops the reason.
+ * How Codex reports that OpenAI refused the live voice connection. Codex drops OpenAI's reason.
+ * Current Codex: `unexpected status 403 Forbidden: realtime websocket handshake failed`.
+ * Older Codex: `failed to connect realtime websocket: HTTP error: 403 Forbidden`.
  */
-const FORBIDDEN = /\bstatus 403\b[\s\S]*\brealtime\b/;
+const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
 /**
@@ -395,25 +396,36 @@ export class LiveVoice {
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    if (UNAUTHORIZED.test(message)) return liveFailure(sourceText("error.voice.live.signIn"));
-    if (CALL_NOT_FOUND.test(message)) return liveFailure(this.#refused(message, "error.voice.live.unavailable"));
-    if (FORBIDDEN.test(message)) return liveFailure(this.#refused(message, "error.voice.live.refused"));
-    return failure;
+    const text = this.#plainText(message);
+    return text ? liveFailure(text) : failure;
   }
 
   #reason(message: string | null): string {
     if (!message) return sourceText("error.voice.live.disconnected");
-    // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
-    if (CALL_NOT_FOUND.test(message)) return this.#refused(message, "error.voice.live.unavailable");
-    if (FORBIDDEN.test(message)) return this.#refused(message, "error.voice.live.refused");
-    return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
+    return (
+      this.#plainText(message) ??
+      sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
+    );
   }
 
-  /** The screen gets plain text for an OpenAI refusal, and the log keeps OpenAI's request details. */
-  #refused(message: string, text: "error.voice.live.unavailable" | "error.voice.live.refused"): string {
-    logger.warn("OpenAI refused the live voice call.", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
-    return sourceText(text);
+  /**
+   * Plain text for an OpenAI refusal that Codex reports, or null for another error. The log keeps
+   * OpenAI's request details.
+   */
+  #plainText(message: string): string | null {
+    // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
+    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+    const key = CALL_NOT_FOUND.test(message)
+      ? "error.voice.live.unavailable"
+      : FORBIDDEN.test(message)
+        ? "error.voice.live.refused"
+        : null;
+    if (!key) return null;
+    logger.warn("OpenAI refused the live voice call.", {
+      text: key,
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText(key);
   }
 
   readonly #stopSession = Effect.fn("LiveVoice.stopSession")(function* (this: LiveVoice, session: LiveSession) {
