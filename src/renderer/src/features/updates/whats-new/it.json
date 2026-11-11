@@ -26,7 +26,7 @@
         "items": [
           "Una chat che hai letto non resta più nel gruppo Non lette. I thread secondari non letti, come quello di una routine, non tengono più lì un agente.",
           "Su Windows, il dock degli agenti e la Dynamic Island non rallentano più il puntatore in tutte le app mentre molti agenti lavorano.",
-          "Un team non si ferma più quando il responsabile del canale termina il turno senza risposta, dopo che i membri del team hanno riportato i risultati.",
+          "Un team non si ferma più quando il responsabile del team termina il turno senza risposta, dopo che i membri del team hanno riportato i risultati.",
           "Una chat di Claude diventata troppo lunga ora avvia una nuova sessione con la cronologia della chat. Prima, ogni messaggio falliva con \"Prompt is too long\".",
           "Quando un account Claude raggiunge il limite di 5 ore, l'agente passa al modello di backup o attende il ripristino.",
           "Un agente può salvare uno screenshot del browser come file e allegarlo alla sua risposta."

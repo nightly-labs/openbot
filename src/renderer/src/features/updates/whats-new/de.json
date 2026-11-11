@@ -26,7 +26,7 @@
         "items": [
           "Ein Chat, den du gelesen hast, bleibt nicht mehr in der Gruppe Ungelesen. Ungelesene Nebenthreads, etwa der Thread einer Routine, halten keinen Agenten mehr dort.",
           "Unter Windows machen das Agenten-Dock und Dynamic Island den Zeiger nicht mehr in allen Apps langsam, während viele Agenten arbeiten.",
-          "Ein Team bleibt nicht mehr stehen, wenn die Kanalleitung ihren Zug ohne Antwort beendet, nachdem die Teammitglieder berichtet haben.",
+          "Ein Team bleibt nicht mehr stehen, wenn die Teamleitung ihren Zug ohne Antwort beendet, nachdem die Teammitglieder berichtet haben.",
           "Ein Claude-Chat, der zu lang geworden ist, startet jetzt eine neue Sitzung mit dem Chatverlauf. Vorher schlug jede Nachricht mit „Prompt is too long“ fehl.",
           "Wenn ein Claude-Konto sein 5-Stunden-Limit erreicht, wechselt der Agent zu seinem Ersatzmodell oder wartet auf das Zurücksetzen.",
           "Ein Agent kann einen Browser-Screenshot als Datei speichern und an seine Antwort anhängen."

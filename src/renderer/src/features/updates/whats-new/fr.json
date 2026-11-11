@@ -26,7 +26,7 @@
         "items": [
           "Une discussion que vous avez lue ne reste plus dans le groupe Non lues. Les fils secondaires non lus, comme le fil d’une routine, ne gardent plus un agent dans ce groupe.",
           "Sous Windows, le dock des agents et l’îlot dynamique ne ralentissent plus le pointeur dans toutes les apps quand beaucoup d’agents travaillent.",
-          "Une équipe ne s’arrête plus quand le responsable du canal termine son tour sans réponse, après que ses coéquipiers ont fait leur rapport.",
+          "Une équipe ne s’arrête plus quand le responsable de l’équipe termine son tour sans réponse, après que ses coéquipiers ont fait leur rapport.",
           "Une discussion Claude devenue trop longue démarre maintenant une nouvelle session avec l’historique de la discussion. Avant, chaque message échouait avec « Prompt is too long ».",
           "Quand un compte Claude atteint sa limite de 5 heures, l’agent passe à son modèle de secours ou attend la réinitialisation.",
           "Un agent peut enregistrer une capture d’écran du navigateur sous forme de fichier et la joindre à sa réponse."

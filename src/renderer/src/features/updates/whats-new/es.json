@@ -26,7 +26,7 @@
         "items": [
           "Un chat que has leído ya no se queda en el grupo No leídos. Los hilos secundarios sin leer, como el hilo de una rutina, ya no mantienen a un agente en ese grupo.",
           "En Windows, el dock de agentes y la Dynamic Island ya no hacen lento el puntero en todas las apps mientras trabajan muchos agentes.",
-          "Un equipo ya no se detiene cuando el responsable del canal termina su turno sin respuesta, después de que sus compañeros informan.",
+          "Un equipo ya no se detiene cuando el líder del equipo termina su turno sin respuesta, después de que sus compañeros informan.",
           "Un chat de Claude que se hizo demasiado largo ahora empieza una sesión nueva con el historial del chat. Antes, cada mensaje fallaba con «Prompt is too long».",
           "Cuando una cuenta de Claude llega a su límite de 5 horas, el agente pasa a su modelo de respaldo o espera al reinicio del límite.",
           "Un agente puede guardar una captura de pantalla del navegador como archivo y adjuntarla a su respuesta."
