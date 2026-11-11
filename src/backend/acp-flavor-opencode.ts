@@ -3,6 +3,7 @@ import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
+  isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
   isUsageLimitDiagnostic,
@@ -116,7 +117,8 @@ function openCodeRequestFailure(
   // A spent usage limit shows in OpenCode's own words, which the turn also reads for a plan window.
   if (isUsageLimitDiagnostic(reason)) return redact(reason);
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
-  if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason)) return redact(reason);
+  if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
+    return redact(reason);
   // The part stays in the session, so each turn on this model fails until the user picks another.
   // The provider's text says nothing more to the user; it goes to the log.
   if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
