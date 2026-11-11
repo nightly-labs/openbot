@@ -33,7 +33,9 @@ export interface AwaitingReplyListProps {
   /** The header text. The default is "Waiting for replies". */
   title?: string | undefined;
   /** The list starts collapsed when this is false. */
-  defaultOpen?: boolean;
+  defaultOpen?: boolean | undefined;
+  /** Gets the user's choice each time the user opens or collapses the list. */
+  onOpenChange?: ((open: boolean) => void) | undefined;
   /** Hides the block. It has a close button only when this is set and no agent still works. */
   onDismiss?: () => void;
   /** Opens the chat of an agent that waits for the user, where the user can answer it. */
@@ -131,7 +133,11 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
       <div class="awaiting-replies-bar">
         <TaskListHeader
           open={open()}
-          onToggle={() => setOpen((value) => !value)}
+          onToggle={() => {
+            const next = !open();
+            setOpen(next);
+            props.onOpenChange?.(next);
+          }}
           panelId={panelId}
           done={done()}
           total={total()}
