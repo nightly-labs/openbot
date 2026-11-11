@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ustawienia kanału mają ustawienie Przeglądarka. Wybierz, czy każdy członek, jeden członek czy nikt może używać przeglądarki w kanale.",
+          "Panel boczny kanału ma panel Przeglądarka i panel Pliki. Pokazują karty członków kanału oraz pliki wysłane w kanale.",
+          "Kliknij prawym przyciskiem Dynamic Island lub dok agentów, aby je ukryć. Możesz też przeciągnąć agenta na nowe miejsce w doku i zmienić rozmiar doku w Ustawieniach.",
+          "Możesz wyłączyć grupę Nieprzeczytane na pasku bocznym. Kliknij prawym przyciskiem nagłówek Nieprzeczytane albo ustaw Sortuj czaty na Ręcznie.",
+          "Gdy nowa wersja nie może się uruchomić 3 razy z rzędu, otwiera się okno odzyskiwania. Możesz spróbować ponownie, pobrać poprzednią wersję albo wyeksportować diagnostykę."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Nowa wersja trafia najpierw na około 1 na 10 komputerów, a na wszystkie komputery około dzień później. Aby ją dostać od razu, wybierz Sprawdź aktualizacje.",
+          "Agenci zadają pytania z opcjami w oknie pytań. Karty z przyciskami służą tylko do zatwierdzeń."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Przeczytany czat nie zostaje już w grupie Nieprzeczytane. Nieprzeczytane wątki poboczne, na przykład wątek rutyny, nie trzymają już tam agenta.",
+          "W systemie Windows dok agentów i Dynamic Island nie spowalniają już kursora we wszystkich aplikacjach, gdy pracuje wielu agentów.",
+          "Zespół nie zatrzymuje się już, gdy lider kończy turę bez odpowiedzi, po tym jak członkowie zespołu zgłoszą wyniki.",
+          "Czat z Claude, który stał się zbyt długi, rozpoczyna teraz nową sesję z historią czatu. Wcześniej każda wiadomość kończyła się błędem „Prompt is too long”.",
+          "Gdy konto Claude osiągnie limit 5-godzinny, agent przechodzi na model zapasowy albo czeka na reset limitu.",
+          "Agent może zapisać zrzut ekranu przeglądarki jako plik i dołączyć go do odpowiedzi."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Die Kanaleinstellungen haben eine Option Browser. Wähle, ob alle Mitglieder, ein Mitglied oder niemand den Browser im Kanal nutzen darf.",
+          "Die Seitenleiste des Kanals hat einen Bereich Browser und einen Bereich Dateien. Sie zeigen die Tabs der Kanalmitglieder und die im Kanal gesendeten Dateien.",
+          "Rechtsklicke auf Dynamic Island oder das Agenten-Dock, um es auszublenden. Du kannst außerdem einen Agenten an eine neue Stelle im Dock ziehen und die Größe des Docks in den Einstellungen ändern.",
+          "Du kannst die Gruppe Ungelesen in der Seitenleiste ausschalten. Rechtsklicke auf die Überschrift Ungelesen oder stelle Chats sortieren auf Manuell.",
+          "Wenn eine neue Version 3-mal hintereinander nicht starten kann, öffnet sich ein Wiederherstellungsfenster. Du kannst es wiederholen, die vorherige Version laden oder die Diagnose exportieren."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Eine neue Version geht jetzt zuerst an etwa einen von zehn Computern und etwa einen Tag später an alle Computer. Um sie sofort zu erhalten, wähle Nach Updates suchen.",
+          "Agenten stellen Fragen mit Auswahlmöglichkeiten im Fragefenster. Karten mit Schaltflächen gibt es nur für Freigaben."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Chat, den du gelesen hast, bleibt nicht mehr in der Gruppe Ungelesen. Ungelesene Nebenthreads, etwa der Thread einer Routine, halten keinen Agenten mehr dort.",
+          "Unter Windows machen das Agenten-Dock und Dynamic Island den Zeiger nicht mehr in allen Apps langsam, während viele Agenten arbeiten.",
+          "Ein Team bleibt nicht mehr stehen, wenn die Teamleitung ihren Zug ohne Antwort beendet, nachdem die Teammitglieder berichtet haben.",
+          "Ein Claude-Chat, der zu lang geworden ist, startet jetzt eine neue Sitzung mit dem Chatverlauf. Vorher schlug jede Nachricht mit „Prompt is too long“ fehl.",
+          "Wenn ein Claude-Konto sein 5-Stunden-Limit erreicht, wechselt der Agent zu seinem Ersatzmodell oder wartet auf das Zurücksetzen.",
+          "Ein Agent kann einen Browser-Screenshot als Datei speichern und an seine Antwort anhängen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],
