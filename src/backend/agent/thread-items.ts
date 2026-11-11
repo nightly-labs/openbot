@@ -98,6 +98,18 @@ export function isCodexCompactionRefusal(error: unknown): boolean {
 }
 
 /**
+ * Another Codex app that uses the same Codex folder, such as the Codex desktop app, has this thread
+ * open and holds its writer lock. Codex refuses `thread/resume` with this error then, and the lock
+ * stays until that app closes the thread (#6666). A new session would split the chat from the one
+ * that app shows, so the session stays.
+ */
+export function isCodexThreadInUse(error: unknown): boolean {
+  return (
+    error instanceof AppServerError && error.code === -32600 && error.message.includes("already has an active writer")
+  );
+}
+
+/**
  * The provider refused the session's own history. Grok keeps the `encrypted_content` of each
  * reasoning item in its session and sends it back on every request, and xAI accepts it only from
  * the caller it was issued to. After a sign-in to another account or a new API key, each turn of

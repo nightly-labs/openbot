@@ -38,6 +38,7 @@ import type { RoutineScheduler } from "./routine-scheduler";
 import { sessionSettingsOverrides } from "./session-settings";
 import {
   isCodexCompactionRefusal,
+  isCodexThreadInUse,
   isMissingProviderSessionError,
   isRequestTimeout,
   providerForAgent,
@@ -1112,7 +1113,10 @@ export class DrainScheduler {
             );
             return;
           }
-          const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+          const detail = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+          // Another Codex app holds the thread. The user reads what to do, and the log keeps the detail.
+          const threadInUse = isCodexThreadInUse(error);
+          const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : detail;
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.
           if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
@@ -1160,9 +1164,9 @@ export class DrainScheduler {
           logger.warn("A message did not start.", {
             agentId: delivery.recipientAgentId,
             model: requestedModel,
-            reason,
+            reason: detail,
           });
-          this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
+          this.#hooks.emitError("delivery_start_failed", threadInUse ? reason : error, delivery.recipientAgentId);
           this.scheduleDrain(delivery.recipientAgentId);
           // The requester may hold the other answers until this request ends.
           if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);
