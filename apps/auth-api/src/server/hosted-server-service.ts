@@ -7,6 +7,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  planStorageGb,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
@@ -202,6 +203,14 @@ interface HostedServerRow {
   name: string;
   provider_sandbox_id: string | null;
   provider_template: string | null;
+  /**
+   * The machine of a server that an operator moved out of boat, such as `leaseweb:12728110`. NULL when
+   * boat runs the server. Such a row has no sandbox: the Worker sends no boat call for it and writes
+   * only `desired_state`, and the operator writes `observed_state` (docs/hosted-servers.md).
+   */
+  operator_host: string | null;
+  /** The boat sandbox from before the move. A delete of the server deletes it. */
+  retired_sandbox_id: string | null;
   size: HostedServerSize;
   pending_size: HostedServerSize | null;
   plan: BillingPlanId;
@@ -226,7 +235,7 @@ interface HostedServerRow {
   deletion_subscription_id: string | null;
 }
 
-const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
+const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, operator_host, retired_sandbox_id, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, last_wake_reason, start_requested_at, created_at, updated_at, deletion_scheduled_at,
   deletion_subscription_id`;
@@ -876,6 +885,14 @@ export class HostedServerService {
       if (row.desired_state === "stopped") {
         return yield* new HostedServerServiceError(402, "plan_required", sourceText("error.billing.planRequired"));
       }
+      // Only the operator can restart a machine outside boat. A silent success would hide that.
+      if (row.operator_host) {
+        return yield* new HostedServerServiceError(
+          409,
+          "hosted_server_restart_unavailable",
+          sourceText("error.billing.restartUnavailable"),
+        );
+      }
       const sandboxId = row.provider_sandbox_id;
       const boat = dependencies.boat;
       if (row.observed_state !== "running" || !sandboxId) {
@@ -1252,7 +1269,7 @@ export class HostedServerService {
             .prepare(
               `SELECT ${ROW_COLUMNS} FROM hosted_servers
            WHERE desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL
-             AND updated_at <= ? LIMIT ?`,
+             AND operator_host IS NULL AND updated_at <= ? LIMIT ?`,
             )
             .bind(now - SETUP_RETRY_AFTER_MS, TICK_BATCH_SIZE)
             .all<HostedServerRow>(),
@@ -1330,12 +1347,14 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       result.stopped += yield* run(unstopped.results, (row) => this.#stop(row));
-      // The webhook starts a stopped server at once. This catches a start that did not happen.
+      // The webhook starts a stopped server at once. This catches a start that did not happen. Only the
+      // operator starts a machine outside boat.
       const stopped = yield* hostedCall(() =>
         dependencies.database
           .prepare(
             `SELECT ${ROW_COLUMNS} FROM hosted_servers
-         WHERE desired_state = 'running' AND observed_state = 'stopped' AND updated_at <= ? LIMIT ?`,
+         WHERE desired_state = 'running' AND observed_state = 'stopped' AND operator_host IS NULL
+           AND updated_at <= ? LIMIT ?`,
           )
           .bind(now - STUCK_AFTER_MS, TICK_BATCH_SIZE)
           .all<HostedServerRow>(),
@@ -1533,6 +1552,7 @@ export class HostedServerService {
   /**
    * Stores a plan change from the Customer Portal, so the list and a renewal use the plan that the
    * owner pays for. A server with a sandbox gets the new machine at its next resume (`pending_size`).
+   * A machine outside boat has no resume, so its row takes the size at once.
    */
   readonly #followPlan = Effect.fn("HostedServerService.followPlan")(function* (
     this: HostedServerService,
@@ -1546,8 +1566,9 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET plan = ?, billing_interval = ?, currency = ?,
-           size = CASE WHEN provider_template IS NULL THEN ? ELSE size END,
-           pending_size = CASE WHEN provider_template IS NULL OR size = ? THEN NULL ELSE ? END, updated_at = ?
+           size = CASE WHEN provider_template IS NULL OR operator_host IS NOT NULL THEN ? ELSE size END,
+           pending_size = CASE WHEN provider_template IS NULL OR operator_host IS NOT NULL OR size = ? THEN NULL
+             ELSE ? END, updated_at = ?
          WHERE server_id = ? AND desired_state != 'deleted'`,
         )
         .bind(sync.plan, sync.interval, sync.currency, size, size, size, dependencies.now(), row.server_id)
@@ -1643,6 +1664,8 @@ export class HostedServerService {
     row: HostedServerRow,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
+    // A server on a machine outside boat never gets a sandbox: a new one would be empty.
+    if (row.operator_host) return;
     const boat = dependencies.boat;
     const template = this.#template;
     const secret = yield* this.#claimKey();
@@ -1666,7 +1689,8 @@ export class HostedServerService {
            claim_redeemed_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN NULL ELSE claim_redeemed_at END,
            provider_template = COALESCE(provider_template, ?), checkout_session_id = NULL, provider_event_at = ?,
            last_active_at = ?, lease_until = ?, updated_at = ?
-         WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'`,
+         WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+           AND operator_host IS NULL`,
         )
         .bind(now, claimHash, now + CLAIM_TTL_MS, from, now, now, now + LEASE_TTL_SECONDS * 1000, now, row.server_id)
         .run(),
@@ -1860,6 +1884,8 @@ export class HostedServerService {
   ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     if (row.desired_state !== "running" || row.observed_state !== "error" || row.provider_sandbox_id) return false;
+    // A machine outside boat has the data of the server. A new sandbox would be an empty second server.
+    if (row.operator_host) return false;
     if (
       !(yield* getServerEntitlement(dependencies.database, row.server_id, dependencies.now()).pipe(
         Effect.mapError(hostedFailure),
@@ -1870,7 +1896,8 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET observed_state = 'awaiting_payment', observed_error = NULL, updated_at = ?
-         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL`,
+         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL
+           AND operator_host IS NULL`,
         )
         .bind(dependencies.now(), row.server_id)
         .run(),
@@ -1889,13 +1916,15 @@ export class HostedServerService {
     row: HostedServerRow,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
-    if (!row.provider_sandbox_id) {
+    // A machine outside boat keeps the data, so its row only takes the new plan: the operator starts it.
+    if (!row.provider_sandbox_id && !row.operator_host) {
       const reset = yield* hostedCall(() =>
         dependencies.database
           .prepare(
             `UPDATE hosted_servers SET desired_state = 'running', observed_state = 'awaiting_payment',
              observed_error = NULL, updated_at = ?
-           WHERE server_id = ? AND desired_state = 'stopped' AND provider_sandbox_id IS NULL`,
+           WHERE server_id = ? AND desired_state = 'stopped' AND provider_sandbox_id IS NULL
+             AND operator_host IS NULL`,
           )
           .bind(dependencies.now(), row.server_id)
           .run(),
@@ -2234,6 +2263,8 @@ export class HostedServerService {
     reason: WakeReason,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
+    // Only the operator starts a machine outside boat. `waking` would wait for a boat event that never comes.
+    if (row.operator_host) return;
     const now = dependencies.now();
     const rateLimited = isRateLimitedStart(row);
     if (rateLimited && now < rateLimitRetryAt(row)) return;
@@ -2444,7 +2475,10 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     // A create call runs and can still return a sandbox. The cron deletes it after the call ends.
     if (row.observed_state === "creating" && !row.provider_sandbox_id) return;
-    const sandboxId = row.provider_sandbox_id ?? (yield* this.#findLostSandbox(row));
+    // The sandbox from before a move still has the data of the server, so it goes too. The operator
+    // erases the machine outside boat (docs/hosted-servers.md).
+    const sandboxId =
+      row.provider_sandbox_id ?? (row.operator_host ? row.retired_sandbox_id : yield* this.#findLostSandbox(row));
     if (sandboxId) {
       const boat = dependencies.boat;
       if (!boat)
@@ -2645,6 +2679,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+    storageGb: planStorageGb(row.plan, row.operator_host !== null),
   };
 }
 

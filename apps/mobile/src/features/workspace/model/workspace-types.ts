@@ -242,6 +242,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
+  restartAvailable?: boolean;
   /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
   keyChangedAt?: number;
 }
