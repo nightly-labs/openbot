@@ -60,7 +60,7 @@ const MCP_APPROVAL =
 export const MCP_SERVER_TOOL_DEFINITIONS = [
   {
     name: "list_mcp_servers",
-    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in. Values are never shown. A server with builtIn is part of OpenBot: github while the GitHub connection is on, and computer_use while Computer Use is on for you and ready. The user controls it in OpenBot on the computer that runs this server (Marketplace, Apps, GitHub; Settings, Computer Use). The other MCP tools do not test, turn on or off, or remove it. ${MCP_SCOPE} Read-only.`,
+    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in. Values are never shown. ${MCP_SCOPE} Read-only.`,
     shape: {},
   },
   {

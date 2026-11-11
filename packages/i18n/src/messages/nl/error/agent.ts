@@ -164,7 +164,7 @@ export const messages = {
   "error.agent.mcpServerKeysMove":
     "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Serverinstellingen, MCP.",
   "error.agent.mcpServerBuiltIn":
-    "{name} is een ingebouwde server van OpenBot. Je kunt deze niet testen, wijzigen of verwijderen met de MCP-tools. De gebruiker beheert deze in OpenBot; list_mcp_servers zegt waar.",
+    "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",
   "error.agent.screenCaptureWindowMissing":
     "Dat venster is nu niet open. Roep list_capture_sources aan voor de huidige venster-id’s.",
