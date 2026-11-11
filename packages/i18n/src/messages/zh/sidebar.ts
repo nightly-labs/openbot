@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "本地",
   "sidebar.resizer.compactWidth": "紧凑（{width}px）",
   "sidebar.topbar.expand": "展开侧边栏",
+  "sidebar.topbar.collapse": "收起侧边栏",
   "sidebar.topbar.openMarketplace": "打开市场",
   "sidebar.topbar.marketplace": "市场",
   "sidebar.topbar.back": "后退",

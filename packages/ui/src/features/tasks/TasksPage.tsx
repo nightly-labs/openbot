@@ -9,17 +9,14 @@ import {
 } from "@openbot/team-client/agent-tasks";
 import {
   ActiveCurrentRow,
-  ArrowLeft,
   ArrowUp,
   Button,
   buttonVariants,
   Check,
   ChevronDown,
   Combobox,
-  IconButton,
   LoaderCircle,
   Mic,
-  PanelLeft,
   Popover,
   Search,
   X,
@@ -47,6 +44,7 @@ import {
   VoiceRecordingMorph,
   voiceButtonLabel,
 } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
+import { PageHeader, type PageHeaderFrame } from "@openbot/ui/features/window/PageHeader";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
@@ -92,10 +90,8 @@ interface TasksTook {
 interface TasksPageProps {
   hostName: string;
   onBack?: (() => void) | undefined;
-  /** Whether the agent list shows beside the page. */
-  agentsOpen?: boolean | undefined;
-  /** Shows or hides the agent list. Without it, the header has no button for the list. */
-  onToggleAgents?: (() => void) | undefined;
+  /** In the app window, the header has no Back button and no server name. */
+  frame?: PageHeaderFrame | undefined;
   agents: AgentProfile[];
   /** The tasks of all agents, also a start that waits. */
   tasks: readonly AgentTask[];
@@ -856,58 +852,20 @@ function TasksSidePanel(props: {
 export function TasksPage(props: TasksPageProps) {
   const { t } = useText();
   const headingId = createUniqueId();
-  let heading: HTMLHeadingElement | undefined;
-  const agentsLabel = () =>
-    t(props.agentsOpen ? "conversation.tasks.page.hideAgents" : "conversation.tasks.page.showAgents");
   // The first start adds a task that waits, so the page shows the list as soon as the user sends.
   const empty = () => props.loaded === true && props.tasks.length === 0;
-  onSettled(() => {
-    if (untrack(() => props.onBack)) heading?.focus();
-  });
   return (
     <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>
       <div class="tasks-page-scroll">
         <div class="tasks-page-column">
-          <header class="tasks-page-header">
-            <Show when={props.onBack}>
-              {(back) => (
-                <IconButton
-                  variant="ghost"
-                  label={t("common.back")}
-                  data-cuelume-tap="navigate"
-                  onClick={() => back()()}
-                >
-                  <ArrowLeft />
-                </IconButton>
-              )}
-            </Show>
-            <Show when={props.onToggleAgents}>
-              {(toggle) => (
-                <Button
-                  variant="ghost"
-                  type="button"
-                  class="header-panel-toggle side-panel-toggle"
-                  aria-label={agentsLabel()}
-                  title={agentsLabel()}
-                  aria-expanded={props.agentsOpen ? "true" : "false"}
-                  onClick={() => toggle()()}
-                >
-                  <PanelLeft aria-hidden="true" class="size-[14px]" />
-                </Button>
-              )}
-            </Show>
-            <h2 id={headingId} ref={heading} tabindex={-1}>
-              {t("conversation.tasks.title")}
-              <Show when={props.hostName}>
-                {(host) => (
-                  <>
-                    {" "}
-                    <span aria-hidden="true">/</span> <span>{host()}</span>
-                  </>
-                )}
-              </Show>
-            </h2>
-          </header>
+          <PageHeader
+            class="tasks-page-header"
+            title={t("conversation.tasks.title")}
+            hostName={props.hostName}
+            headingId={headingId}
+            onBack={props.onBack}
+            frame={props.frame}
+          />
           <Show when={empty()}>
             <TasksEmptyPitch />
           </Show>

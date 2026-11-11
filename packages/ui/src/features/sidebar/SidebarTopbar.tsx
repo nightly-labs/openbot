@@ -1,29 +1,22 @@
 /**
- * The server name, Back and Forward, its update, the marketplace or expand toggle, and new agent - plus
- * the window drag region.
+ * The server name, Back and Forward, the sidebar toggle, the server update, and the marketplace
+ * button - plus the window drag region. A window with the page rail shows the server in the rail, and
+ * its styles hide the name here. The styles also hide Back, Forward and the update in a compact
+ * sidebar that has no room for them.
  */
 
-import {
-  ArrowLeft,
-  ArrowRight,
-  Bot,
-  Button,
-  CircleFadingArrowUp,
-  DropdownMenu,
-  FolderPlus,
-  Hash,
-  IconButton,
-  Puzzle,
-} from "@openbot/ui";
+import { ArrowLeft, ArrowRight, Button, CircleFadingArrowUp, IconButton, Puzzle } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
 import { ServerMenu } from "../servers/ServerMenu";
-import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
+import { SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarTopbar() {
-  const { layoutMutable, props, startCreateSection } = useSidebarScope();
+  const { props } = useSidebarScope();
   const { t } = useText();
+  const toggleLabel = () => (props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.collapse"));
+  const toggleSidebar = () => (props.compact ? props.onExpand() : props.onCollapse?.());
   return (
     <div class="window-drag sidebar-topbar">
       <Show
@@ -50,7 +43,7 @@ export function SidebarTopbar() {
         {(serverMenu) => <ServerMenu {...serverMenu()} serverName={props.serverName} compact={props.compact} />}
       </Show>
       <div class="sidebar-topbar-actions">
-        <Show when={!props.compact && props.chatHistory}>
+        <Show when={props.chatHistory}>
           {(history) => {
             const backLabel = () => {
               const back = history().back;
@@ -90,7 +83,22 @@ export function SidebarTopbar() {
             );
           }}
         </Show>
-        <Show when={!props.compact && props.serverUpdate}>
+        <Show when={props.compact || props.onCollapse}>
+          <Button
+            variant="ghost"
+            type="button"
+            class="sidebar-icon-button sidebar-toggle-button no-drag"
+            onClick={toggleSidebar}
+            data-cuelume-tap={props.compact ? "open" : "close"}
+            aria-label={toggleLabel()}
+            aria-controls="agent-sidebar"
+            aria-expanded={props.compact ? "false" : "true"}
+            title={toggleLabel()}
+          >
+            <SidebarToggleIcon />
+          </Button>
+        </Show>
+        <Show when={props.serverUpdate}>
           {(update) => {
             const label = () =>
               update().running
@@ -112,59 +120,18 @@ export function SidebarTopbar() {
           }}
         </Show>
         {/* The menu view needs the room for the server name. The page rail also opens the marketplace. */}
-        <Show when={props.compact || (props.marketplaceSupported !== false && props.serverMenu?.view !== "menu")}>
+        <Show when={!props.compact && props.marketplaceSupported !== false && props.serverMenu?.view !== "menu"}>
           <Button
             variant="ghost"
             type="button"
-            class={[
-              "sidebar-icon-button no-drag",
-              props.compact ? "sidebar-toggle-button" : "sidebar-marketplace-button",
-            ]}
-            onClick={() => (props.compact ? props.onExpand() : props.onOpenMarketplace())}
-            data-cuelume-tap={props.compact ? "open" : "navigate"}
-            aria-label={props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.openMarketplace")}
-            aria-controls={props.compact ? "agent-sidebar" : undefined}
-            aria-expanded={props.compact ? "false" : undefined}
-            title={props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.marketplace")}
+            class="sidebar-icon-button sidebar-marketplace-button no-drag"
+            onClick={() => props.onOpenMarketplace()}
+            data-cuelume-tap="navigate"
+            aria-label={t("sidebar.topbar.openMarketplace")}
+            title={t("sidebar.topbar.marketplace")}
           >
-            <Show when={props.compact} fallback={<Puzzle aria-hidden="true" />}>
-              <SidebarToggleIcon />
-            </Show>
+            <Puzzle aria-hidden="true" />
           </Button>
-        </Show>
-        <Show when={props.createSupported !== false || props.onCreateChannel || layoutMutable()}>
-          <DropdownMenu.Root placement="bottom-end" gutter={4}>
-            <DropdownMenu.Trigger
-              class="sidebar-icon-button sidebar-new-button no-drag"
-              aria-label={props.onCreateChannel ? t("sidebar.new.menuWithChannel") : t("sidebar.new.menu")}
-              aria-hidden={props.compact ? "true" : undefined}
-              tabindex={props.compact ? -1 : 0}
-            >
-              <PlusIcon />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content>
-                <Show when={props.createSupported !== false}>
-                  <DropdownMenu.Item onSelectAfterClose={props.onCreateAgent}>
-                    <Bot aria-hidden="true" />
-                    {t("sidebar.new.agent")}
-                  </DropdownMenu.Item>
-                </Show>
-                <Show when={props.onCreateChannel}>
-                  <DropdownMenu.Item onSelectAfterClose={() => props.onCreateChannel?.()}>
-                    <Hash aria-hidden="true" />
-                    {t("sidebar.new.channel")}
-                  </DropdownMenu.Item>
-                </Show>
-                <Show when={layoutMutable()}>
-                  <DropdownMenu.Item onSelectAfterClose={() => startCreateSection()}>
-                    <FolderPlus aria-hidden="true" />
-                    {t("sidebar.new.section")}
-                  </DropdownMenu.Item>
-                </Show>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
         </Show>
       </div>
     </div>

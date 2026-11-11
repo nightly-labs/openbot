@@ -17,7 +17,6 @@ import {
   AlertActions,
   AlertContent,
   AlertDescription,
-  ArrowLeft,
   Button,
   Check,
   ChevronLeft,
@@ -28,7 +27,8 @@ import {
   SlidingTabs,
   X,
 } from "@openbot/ui";
-import { createMemo, createStore, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
+import { PageHeader, type PageHeaderFrame } from "@openbot/ui/features/window/PageHeader";
+import { createMemo, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -81,6 +81,8 @@ export interface RoutineCalendarProps {
   onBack?: () => void;
   /** The host whose routines show, after the title. */
   hostName?: string;
+  /** In the app window, the header has no Back button and no server name. */
+  frame?: PageHeaderFrame | undefined;
 }
 
 interface CalendarEntry {
@@ -245,45 +247,26 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     </Show>
   );
 
-  onSettled(() => {
-    if (untrack(() => props.onBack)) heading?.focus();
-  });
-
   /** With no routine, there is nothing to move through: the calendar shows its pitch on a faint month. */
   const empty = () => (props.state ?? "ready") === "ready" && props.routines.length === 0;
   const emptyMonth = createMemo(() => daysFor(today(), "month"));
 
   return (
     <section class="routine-planner" aria-labelledby="routine-planner-heading" data-view={state.view}>
-      <header class="routine-planner-header">
-        <div class="routine-planner-title">
-          <div class="routine-planner-identity">
-            <Show when={props.onBack}>
-              {(back) => (
-                <IconButton
-                  variant="ghost"
-                  label={t("common.back")}
-                  data-cuelume-tap="navigate"
-                  onClick={() => back()()}
-                >
-                  <ArrowLeft />
-                </IconButton>
-              )}
-            </Show>
-            <h2 id="routine-planner-heading" ref={heading} tabindex={-1}>
-              {t("routine.calendar.title")}
-              <Show when={props.hostName}>
-                {(host) => (
-                  <>
-                    {" "}
-                    <span aria-hidden="true">/</span> <span>{host()}</span>
-                  </>
-                )}
-              </Show>
-            </h2>
-          </div>
+      <div class="routine-planner-header">
+        <PageHeader
+          class="routine-planner-title"
+          title={t("routine.calendar.title")}
+          hostName={props.hostName}
+          headingId="routine-planner-heading"
+          onBack={props.onBack}
+          frame={props.frame}
+          headingRef={(element) => {
+            heading = element;
+          }}
+        >
           <p>{t("routine.calendar.timeZone", { zone: props.timeZone.replaceAll("_", " ") })}</p>
-        </div>
+        </PageHeader>
         <Show when={!empty()}>
           <div class="routine-planner-toolbar">
             <div class="routine-planner-nav">
@@ -333,7 +316,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
             <p class="routine-planner-clock-change">{t("routine.calendar.clockChange", { day: longDay(day()) })}</p>
           )}
         </Show>
-      </header>
+      </div>
 
       <Switch>
         <Match when={(props.state ?? "ready") === "loading"}>

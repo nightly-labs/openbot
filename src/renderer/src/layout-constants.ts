@@ -6,6 +6,8 @@
 
 export const LEFT_PANEL_STORAGE_KEY = "openbot:left-panel-width";
 export const LEFT_PANEL_COLLAPSED_STORAGE_KEY = "openbot:left-panel-collapsed";
+/** The user closed the agent list with the sidebar button of the top row. */
+export const LEFT_PANEL_CLOSED_STORAGE_KEY = "openbot:left-panel-closed";
 export const SERVER_VIEW_STORAGE_KEY = "openbot:server-view";
 /** Whether the middle shows the open agent's chat or its routines. */
 export const SIDEBAR_VIEW_STORAGE_KEY = "openbot:sidebar-view";
