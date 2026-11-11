@@ -2689,7 +2689,14 @@ export class OpenBotToolRouter {
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        if (!agent) throw new Error(unknownAgentMessage(recipient, agents));
+        // Suggest only an agent that this tool takes: not the sender, and not a hidden agent.
+        if (!agent)
+          throw new Error(
+            unknownAgentMessage(
+              recipient,
+              agents.filter((candidate) => candidate.hiddenAt === undefined && candidate.id !== senderAgentId),
+            ),
+          );
         // A hidden agent receives no new messages until the user restores it.
         if (agent.hiddenAt !== undefined)
           throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);

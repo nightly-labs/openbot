@@ -76,7 +76,9 @@ export class AgentInterruptTool {
     if (agentId === callerAgentId) return openBotToolFailure(sourceText("error.backend.interruptSelf"));
     const agents = this.#hooks.listAgents();
     if (!agents.some((agent) => agent.id === agentId)) {
-      return yield* new ToolOperationFailed({ cause: new Error(unknownAgentMessage(agentId, agents)) });
+      // A hidden agent can still run a turn to stop, so only the caller is left out.
+      const candidates = agents.filter((agent) => agent.id !== callerAgentId);
+      return yield* new ToolOperationFailed({ cause: new Error(unknownAgentMessage(agentId, candidates)) });
     }
 
     // A delivery on its way to a turn has no turn id yet. Wait for the drain that starts it, as
