@@ -43,6 +43,7 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
+  COMPUTER_USE_MCP_SERVER_ID,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -1374,6 +1375,7 @@ export class OpenBotToolRouter {
   readonly #readAgent = Effect.fn("OpenBotToolRouter.readAgent")(function* (this: OpenBotToolRouter, agentId: string) {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
+    const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(), computerUse);
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
@@ -1414,6 +1416,10 @@ export class OpenBotToolRouter {
       ...agentAccountSetup(agent),
       access: workspaceAccessEnforced(agent) ? "workspace" : "full",
       computerUse,
+      // The setting can be on while the driver is not ready, and then the agent has no driver tools (#6612).
+      ...(computerUse
+        ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
+        : {}),
       notifications: agent.notifications,
       autoApprove: this.#approvalAutomation.autoApproves(agent.id),
       ...(skills ? { skills } : { skillsError }),
@@ -1424,7 +1430,7 @@ export class OpenBotToolRouter {
         schedule: routine.trigger.schedule,
         nextRunAt: routine.trigger.nextRunAt,
       })),
-      mcpServers: agentMcpServers(this.#hooks.enabledMcpServers(), computerUse).map((server) => ({
+      mcpServers: mcpServers.map((server) => ({
         name: server.name,
         transport: server.transport,
       })),

@@ -1380,6 +1380,10 @@ export class ThreadLifecycle {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
       computerUseInOwnChat,
+      // The driver entry is in this set only while the driver is ready. A change to the entry replaces
+      // the session, so this text always agrees with the tools that the session has.
+      computerUseNotReady:
+        agentComputerUseEnabled(agent) && !mcpServers.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID),
       sideThread,
       passwordVault: this.#passwordVaultConnected(),
       vaultItems: this.#vaultItems(),
