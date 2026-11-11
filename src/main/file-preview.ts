@@ -1,5 +1,5 @@
 import { readFile, realpath, stat } from "node:fs/promises";
-import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { attachmentFileExtension, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
@@ -20,21 +20,22 @@ export function filePreviewFromBytes(name: string, bytes: Uint8Array): FilePrevi
   return { name, size: bytes.byteLength, mimeType, previewKind: kind, bytes: kind === "none" ? null : bytes };
 }
 
-const IMAGE_MIME_TYPES: Readonly<Record<string, string>> = {
-  ".apng": "image/apng",
-  ".avif": "image/avif",
-  ".bmp": "image/bmp",
-  ".gif": "image/gif",
-  ".ico": "image/x-icon",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".webp": "image/webp",
-};
+/** At most this many different image addresses of one page are looked up. */
+const IMAGE_ADDRESS_LIMIT = 256;
 
-/** A quoted `src` attribute or a CSS `url()`. Group 3 or 6 is its address. */
-const IMAGE_REFERENCE = /(\bsrc\s*=\s*)(["'])([^"'<>]*)\2|(\burl\(\s*)(["']?)([^"'()<>]*?)\5(\s*\))/giu;
+/**
+ * A `src` attribute, in double quotes, single quotes or none, or a CSS `url()`. Group 1, 2, 3 or 5
+ * is its address.
+ */
+const IMAGE_REFERENCE =
+  /\bsrc\s*=\s*(?:"([^"<>]*)"|'([^'<>]*)'|([^\s"'<>`=]+))|\burl\(\s*(["']?)([^"'()<>]*?)\4\s*\)/dgiu;
+
+interface FolderImage {
+  path: string;
+  mimeType: string;
+  /** The place in the image, such as `#icon` of an SVG sprite, which its new address keeps. */
+  fragment: string;
+}
 
 function insideFolder(folder: string, path: string): boolean {
   const rest = relative(folder, path);
@@ -42,60 +43,84 @@ function insideFolder(folder: string, path: string): boolean {
 }
 
 /** The image file that a relative address names in the page's folder or below it. */
-function folderImagePath(folder: string, address: string): string | undefined {
+function folderImage(folder: string, address: string): FolderImage | undefined {
   // An address with a scheme, a root or a network path, or a place in the page, is not a file here.
   if (/^(?:[a-z][a-z\d+.-]*:|[\\/]|#)/iu.test(address)) return undefined;
+  const hash = address.indexOf("#");
   let name: string;
   try {
-    name = decodeURIComponent(address.split(/[?#]/u, 1)[0] ?? "");
+    name = decodeURIComponent((address.replaceAll("&amp;", "&").split(/[?#]/u, 1)[0] ?? "").trim());
   } catch {
     return undefined;
   }
-  if (!IMAGE_MIME_TYPES[extname(name).toLowerCase()]) return undefined;
+  const mimeType = attachmentMimeTypeForName(name);
+  if (!mimeType.startsWith("image/")) return undefined;
   const path = resolve(folder, name);
-  return insideFolder(folder, path) ? path : undefined;
+  return insideFolder(folder, path) ? { path, mimeType, fragment: hash < 0 ? "" : address.slice(hash) } : undefined;
 }
 
+/** The real path of the image, when it is a file and no link leads it out of the folder. */
+const realFolderImage = (realFolder: string, image: FolderImage) =>
+  attachmentCall(async () => {
+    const path = await realpath(image.path);
+    return insideFolder(realFolder, path) && (await stat(path)).isFile() ? { ...image, path } : undefined;
+  }).pipe(Effect.orElseSucceed(() => undefined));
+
 /**
- * The page of a local HTML file, with the images that it names by a relative address in its own
- * folder put in as `data:` addresses. The page has an opaque address, so it cannot load them itself,
- * and it never names a path to main. An image outside the folder, through a link too, or one that
- * does not fit in the page limit stays as it is.
+ * The page of a local HTML file, with each image that it names by a relative address in its own
+ * folder at an address that main gives it. The page has an opaque address, so it cannot load them
+ * itself, and it never names a path to main. An image outside the folder, through a link too,
+ * stays as it is. The addresses go with the page, so `add` or `release` drops them.
  */
-const inlineFolderImages = Effect.fn("FilePreview.inlineFolderImages")(function* (path: string, bytes: Uint8Array) {
+const linkFolderImages = Effect.fn("FilePreview.linkFolderImages")(function* (
+  path: string,
+  bytes: Uint8Array,
+  generation: number,
+) {
   const html = new TextDecoder().decode(bytes);
-  const uses = new Map<string, number>();
+  const spans: { start: number; end: number; address: string }[] = [];
   for (const match of html.matchAll(IMAGE_REFERENCE)) {
-    const address = match[3] ?? match[6];
-    if (address) uses.set(address, (uses.get(address) ?? 0) + 1);
+    const group = [1, 2, 3, 5].find((index) => match[index]);
+    const span = group === undefined ? undefined : match.indices?.[group];
+    const address = group === undefined ? undefined : match[group];
+    if (!span || !address) continue;
+    // A `src` in the text of the page, such as in a code sample, is not an attribute.
+    if (group !== 5 && html.lastIndexOf("<", match.index) <= html.lastIndexOf(">", match.index)) continue;
+    spans.push({ start: span[0], end: span[1], address });
   }
   const folder = dirname(path);
-  const images = new Map<string, string>();
-  let size = bytes.byteLength;
-  for (const [address, count] of uses) {
-    const image = folderImagePath(folder, address);
-    if (!image) continue;
-    const prefix = `data:${IMAGE_MIME_TYPES[extname(image).toLowerCase()]};base64,`;
-    const growth = (length: number) => (prefix.length + Math.ceil(length / 3) * 4 - Buffer.byteLength(address)) * count;
-    const content = yield* attachmentCall(async () => {
-      const [realFolder, realImage] = await Promise.all([realpath(folder), realpath(image)]);
-      const file = await stat(realImage);
-      if (!insideFolder(realFolder, realImage) || !file.isFile() || size + growth(file.size) > CHAT_VISUAL_PAGE_LIMIT)
-        return undefined;
-      return readFile(realImage);
-    }).pipe(Effect.orElseSucceed(() => undefined));
-    if (!content || size + growth(content.byteLength) > CHAT_VISUAL_PAGE_LIMIT) continue;
-    size += growth(content.byteLength);
-    images.set(address, prefix + content.toString("base64"));
-  }
-  if (images.size === 0) return bytes;
-  const page = html.replace(IMAGE_REFERENCE, (match, src, quote, srcAddress, url, urlQuote, urlAddress, end) => {
-    const address = srcAddress ?? urlAddress;
-    const image = address === undefined ? undefined : images.get(address);
-    if (!image) return match;
-    return srcAddress === undefined ? `${url}${urlQuote}${image}${urlQuote}${end}` : `${src}${quote}${image}${quote}`;
+  const candidates = [...new Set(spans.map((span) => span.address))]
+    .slice(0, IMAGE_ADDRESS_LIMIT)
+    .flatMap((address) => {
+      const image = folderImage(folder, address);
+      return image ? [{ address, image }] : [];
+    });
+  if (candidates.length === 0) return { bytes, images: [] };
+  const realFolder = yield* attachmentCall(() => realpath(folder));
+  const found = yield* Effect.forEach(candidates, ({ image }) => realFolderImage(realFolder, image), {
+    concurrency: 8,
   });
-  return new TextEncoder().encode(page);
+  const links = new Map<string, string>();
+  for (const [index, image] of found.entries()) {
+    const candidate = candidates[index];
+    const link = image && candidate ? filePreviewPages.addImage(image.path, image.mimeType, generation) : undefined;
+    if (link && candidate && image) links.set(candidate.address, `${link}${image.fragment}`);
+  }
+  const images = [...new Set([...links.values()].map((link) => link.split("#", 1)[0] ?? link))];
+  let page = "";
+  let last = 0;
+  for (const span of spans) {
+    const link = links.get(span.address);
+    if (!link) continue;
+    page += html.slice(last, span.start) + link;
+    last = span.end;
+  }
+  const linked = new TextEncoder().encode(page + html.slice(last));
+  if (images.length === 0 || linked.byteLength > CHAT_VISUAL_PAGE_LIMIT) {
+    for (const image of images) filePreviewPages.release(image);
+    return { bytes, images: [] };
+  }
+  return { bytes: linked, images };
 });
 
 export const localFilePreview = Effect.fn("FilePreview.local")(function* (
@@ -112,9 +137,9 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
   const page =
     bytes && isChatVisualMimeType(mimeType) && bytes.byteLength <= CHAT_VISUAL_PAGE_LIMIT
-      ? yield* inlineFolderImages(path, bytes)
-      : bytes;
-  const pageUrl = page ? filePreviewPages.add(mimeType, page, generation) : undefined;
+      ? yield* linkFolderImages(path, bytes, generation).pipe(Effect.orElseSucceed(() => ({ bytes, images: [] })))
+      : { bytes, images: [] };
+  const pageUrl = page.bytes ? filePreviewPages.add(mimeType, page.bytes, generation, page.images) : undefined;
   return {
     name,
     size,
