@@ -326,6 +326,10 @@ export const messages = {
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":
     "Het {provider}-account van de opgeslagen API-sleutel heeft geen saldo. Voeg tegoed toe aan het account en probeer het opnieuw.",
+  "error.provider.modelServiceRefused":
+    "De modeldienst heeft het verzoek geweigerd. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
+  "error.provider.modelServiceRefusedReason":
+    "De modeldienst heeft het verzoek geweigerd: {reason}. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
   "error.provider.messageTooLarge":
     "OpenBot heeft {provider} gestopt, omdat het een bericht groter dan {limit} MB stuurde.",
   "error.provider.customAgentIdInvalid":

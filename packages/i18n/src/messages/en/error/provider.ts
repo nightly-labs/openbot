@@ -316,6 +316,10 @@ export const messages = defineMessages("error.provider", {
     "{provider} refused the saved API key. Replace or remove the key in Settings, then try again.",
   "error.provider.keyProviderNoBalance":
     "The {provider} account of the saved API key has no balance. Add credit to the account, then try again.",
+  "error.provider.modelServiceRefused":
+    "The model service refused the request. Select a different model, or check your access to this model at the service.",
+  "error.provider.modelServiceRefusedReason":
+    "The model service refused the request: {reason}. Select a different model, or check your access to this model at the service.",
   "error.provider.messageTooLarge": "OpenBot stopped {provider} because it sent a message larger than {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "An agent ID must be lowercase letters, digits or `-`, and cannot be the ID of a built-in provider.",
