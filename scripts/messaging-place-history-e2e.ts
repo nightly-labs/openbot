@@ -33,7 +33,6 @@ import { MailboxStore } from "../src/backend/mailbox-store";
 import { discordDriver } from "../src/backend/messaging/discord/discord-driver";
 import { type MessagingCredentials, MessagingService } from "../src/backend/messaging/messaging-service";
 import { MessagingThreads } from "../src/backend/messaging/messaging-threads";
-import { isMessagingOutboundCall } from "../src/backend/messaging/messaging-tools";
 import {
   DiscordApiError,
   MessagingAdapterError,
@@ -265,11 +264,11 @@ function record(value: unknown): DynamicRecord {
 }
 
 /** One outbound tool call, as the tool router makes it. Returns the result and the new traffic. */
-async function call(threads: MessagingThreads, tool: string, args: DynamicRecord) {
+const AGENT = "agent-place-history-e2e";
+
+async function call(threads: MessagingThreads, tool: string, args: DynamicRecord, threadId = "thread-routine-e2e") {
   const before = { requests: hostRequests.length, reads: reads.length };
-  const response = await runCauseEffect(
-    threads.outboundTool("agent-place-history-e2e", tool, args, () => Effect.succeed([])),
-  );
+  const response = await runCauseEffect(threads.outboundTool(AGENT, threadId, tool, args, () => Effect.succeed([])));
   return {
     success: response.success,
     result: record(JSON.parse(response.contentItems[0]?.text ?? "{}")),
@@ -358,14 +357,30 @@ try {
       return { refused: cases.length, errors };
     });
 
-    await step("only a call that names a connection or a place leaves the turn's conversation", async () => {
-      assert.equal(isMessagingOutboundCall("messaging_history", { connection, place: CHANNEL }), true);
-      assert.equal(isMessagingOutboundCall("messaging_history", { place: CHANNEL }), true);
-      assert.equal(isMessagingOutboundCall("messaging_history", {}), false);
-      assert.equal(isMessagingOutboundCall("messaging_history", { scope: "conversation", limit: 5 }), false);
-      assert.equal(isMessagingOutboundCall("messaging_history", undefined), false);
-      assert.equal(isMessagingOutboundCall("messaging_remember", { connection, place: CHANNEL }), false);
-      return { checked: 6 };
+    await step("a turn that answers an external chat cannot read a named place", async () => {
+      const link = threads.store.ensureLink({
+        connectionId: connection,
+        agentId: AGENT,
+        platformChannelId: CHANNEL,
+        threadKey: "external-conversation",
+        isDirect: false,
+        title: "general",
+      });
+      const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, link.threadId);
+      assert.equal(read.success, false, "An external chat turn read a named place.");
+      assert.match(String(read.result.error), /reads only that chat/u);
+      assert.deepEqual(read.reads, [], "Discord was read for an external chat turn.");
+      assert.equal(read.requests.length, 0, "The refused call reached Signal.");
+      // The same thread still posts and lists: only the read of another place is closed.
+      const places = await call(threads, "messaging_list_places", { connection }, link.threadId);
+      assert.equal(places.success, true);
+      return read.result;
+    });
+
+    await step("a named place accepts the channel scope", async () => {
+      const read = await call(threads, "messaging_history", { connection, place: CHANNEL, scope: "channel" });
+      assert.equal(read.success, true, JSON.stringify(read.result));
+      return { scope: read.result.scope };
     });
 
     await step("a connection that is off is not read", async () => {

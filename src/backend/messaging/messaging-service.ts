@@ -1733,7 +1733,11 @@ export class MessagingService {
         };
       const messages = yield* live.adapter.recent(placeId, null, limit);
       return { history: { platform, place: place.name, messages } };
-    }).pipe(Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })));
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.succeed({ error: `${refusal(failure)} When the platform limits reads, try again in a minute.` }),
+      ),
+    );
   });
 
   /** A post that an agent sends on its own initiative, for the agent's `messaging_post` tool. */
