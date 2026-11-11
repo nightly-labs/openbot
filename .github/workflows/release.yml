@@ -984,23 +984,29 @@ jobs:
         env:
           SUFFIX: ${{ matrix.suffix }}
 
-      - name: Diagnose DNS (temporary)
+      - name: Build the image
         shell: bash
         run: |
-          set +e
-          cat /etc/resolv.conf; resolvectl status | head -30
-          for h in archive.ubuntu.com security.ubuntu.com ports.ubuntu.com azure.archive.ubuntu.com github.com; do echo "== $h"; getent hosts "$h"; done
-          for s in 168.63.129.16 8.8.8.8 1.1.1.1; do echo "== @$s"; dig +time=3 +tries=1 +short @"$s" archive.ubuntu.com; echo "rc=$?"; done
-          echo "== bridge"; docker run --rm ubuntu:24.04 sh -c 'cat /etc/resolv.conf; getent hosts archive.ubuntu.com; echo rc=$?; getent hosts github.com'
-          echo "== host"; docker run --rm --network=host ubuntu:24.04 sh -c 'cat /etc/resolv.conf; getent hosts archive.ubuntu.com; echo rc=$?; getent hosts github.com'
-          true
-
-      - name: Build the image
-        run: |
-          # `--network=host` gives the build steps the DNS resolver of the runner. On the default
-          # bridge network, `apt-get update` could not resolve the Ubuntu mirrors on hosted runners
-          # (v0.68.0), while the runner itself resolved them.
-          docker build --network=host --file docker/Dockerfile --platform "$PLATFORM" \
+          set -euo pipefail
+          # The Azure resolver of a hosted runner sometimes does not answer for the Ubuntu
+          # mirrors (v0.68.0: `apt-get update` could not resolve them for hours). When the
+          # runner cannot resolve a mirror, ask a public resolver and give the address to the build.
+          add_hosts=()
+          for host in archive.ubuntu.com security.ubuntu.com ports.ubuntu.com; do
+            if timeout 10 getent ahostsv4 "$host" >/dev/null; then continue; fi
+            address=
+            for resolver in 1.1.1.1 9.9.9.9 8.8.8.8; do
+              address=$(dig +time=3 +tries=2 +short A "$host" @"$resolver" | grep -Em1 '^[0-9.]+$' || true)
+              if [ -n "$address" ]; then break; fi
+            done
+            if [ -z "$address" ]; then
+              echo "::error::No resolver answers for $host."
+              exit 1
+            fi
+            echo "The runner cannot resolve $host. The build uses $address."
+            add_hosts+=(--add-host "$host:$address")
+          done
+          docker build "${add_hosts[@]}" --file docker/Dockerfile --platform "$PLATFORM" \
             --build-arg "VERSION=$RELEASE_VERSION" --build-arg "REVISION=$GITHUB_SHA" \
             --tag openbot:release image
         env:
