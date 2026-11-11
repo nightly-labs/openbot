@@ -197,6 +197,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
+/** A CLI built for a processor feature that this computer does not have, such as AES (#7111). */
+const UNSUPPORTED_PROCESSOR = /\(signal SIGILL\)/u;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -3028,6 +3030,8 @@ export class ProviderRuntime implements ProviderPort {
     // counts: the stderr line can quote another process.
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
+    if (UNSUPPORTED_PROCESSOR.test(error.message))
+      return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
     return detailed;
   }
 
@@ -4073,6 +4077,8 @@ export class ProviderRuntime implements ProviderPort {
     // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     if (reason === realtimeLimitZero) return realtimeLimitZero;
+    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
+    if (reason === cpuUnsupported) return cpuUnsupported;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
