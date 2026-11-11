@@ -354,4 +354,6 @@ export const messages = {
     two: "{url} · שני מודלים",
     other: "{url} · {count} מודלים",
   },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
 } as const satisfies PartialTranslation<typeof source>;

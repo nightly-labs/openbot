@@ -285,4 +285,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot'un {name} için indirdiği CLI silinir ({size}). Hesaplar, oturumlar ve ajanlar kalır.",
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalindeki {provider} CLI kendi oturumunu korur.",
 } as const satisfies PartialTranslation<typeof source>;

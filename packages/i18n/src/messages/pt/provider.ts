@@ -279,4 +279,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
+  "provider.settings.disconnectLocalOnly":
+    "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
 } as const satisfies PartialTranslation<typeof source>;

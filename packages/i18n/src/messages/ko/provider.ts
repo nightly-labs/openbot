@@ -329,4 +329,6 @@ export const messages = {
   "provider.settings.endpoints": "엔드포인트",
   "provider.settings.noEndpoints": "엔드포인트가 없어요.",
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
 } as const satisfies PartialTranslation<typeof source>;

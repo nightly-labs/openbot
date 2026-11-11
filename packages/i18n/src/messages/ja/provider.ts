@@ -283,4 +283,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot が {name} 用にダウンロードした CLI（{size}）を削除します。アカウント、サインイン、エージェントは残ります。",
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
 } as const satisfies PartialTranslation<typeof source>;

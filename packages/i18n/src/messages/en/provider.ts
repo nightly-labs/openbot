@@ -363,4 +363,6 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
 });

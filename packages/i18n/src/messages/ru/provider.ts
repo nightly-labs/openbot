@@ -308,4 +308,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
 } as const satisfies PartialTranslation<typeof source>;

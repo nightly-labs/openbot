@@ -682,17 +682,31 @@ const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "antigravity",
 ]);
 
+/**
+ * OpenBot keeps the Gemini sign-in in a token file of its own (`ANTIGRAVITY_ENV`), not in the macOS
+ * keychain item of a terminal CLI, so a Disconnect does not sign that CLI out.
+ */
+const SIGN_OUT_KEEPS_TERMINAL: ReadonlySet<AgentProviderId> = new Set(["antigravity"]);
+
 /** The confirmation text of a Disconnect of the provider's own sign-in. */
 function disconnectDescription(
   t: AppTranslate,
   format: AppFormat,
-  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+  options: {
+    id: AgentProviderId;
+    provider: string;
+    local: boolean;
+    usedBy: readonly string[];
+    otherAccounts: boolean;
+  },
 ): string {
   const { provider, usedBy } = options;
   return [
-    options.local
-      ? t("provider.settings.disconnectLocal", { provider })
-      : t("provider.settings.disconnectHost", { provider }),
+    !options.local
+      ? t("provider.settings.disconnectHost", { provider })
+      : SIGN_OUT_KEEPS_TERMINAL.has(options.id)
+        ? t("provider.settings.disconnectLocalOnly", { provider })
+        : t("provider.settings.disconnectLocal", { provider }),
     usedBy.length > 0
       ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
       : t("provider.settings.removeUnused"),
@@ -903,6 +917,7 @@ function AccountsSection(props: SectionProps) {
         description={
           disconnecting()
             ? disconnectDescription(t, format, {
+                id: props.option.id,
                 provider: props.option.name,
                 local: Boolean(props.accountActions?.local),
                 usedBy: disconnecting()?.usedBy ?? [],
@@ -1447,6 +1462,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
         tone="destructive"
         title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
         description={disconnectDescription(t, format, {
+          id: props.option.id,
           provider: props.option.name,
           local: Boolean(props.accountActions?.local),
           usedBy: props.option.usedBy ?? [],

@@ -1447,7 +1447,8 @@ sign-out: **Remove account** deletes its folder. Muse offers it only on this com
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
-the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+the confirmation says so. Gemini is the exception: OpenBot keeps its sign-in in a token file of
+its own (`ANTIGRAVITY_ENV`), so a terminal Gemini CLI keeps its sign-in, and the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
 Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
 sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
 need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`

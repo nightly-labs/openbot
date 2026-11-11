@@ -336,4 +336,6 @@ export const messages = {
   "provider.settings.endpoints": "端点",
   "provider.settings.noEndpoints": "没有端点。",
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
 } as const satisfies PartialTranslation<typeof source>;

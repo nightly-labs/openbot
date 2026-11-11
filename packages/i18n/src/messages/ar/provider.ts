@@ -397,4 +397,6 @@ export const messages = {
     many: "{url} · {count} نموذجًا",
     other: "{url} · {count} نموذج",
   },
+  "provider.settings.disconnectLocalOnly":
+    "يسجّل OpenBot خروج {provider} على هذا الكمبيوتر. تحتفظ واجهة {provider} CLI في الطرفية بتسجيل دخولها.",
 } as const satisfies PartialTranslation<typeof source>;
