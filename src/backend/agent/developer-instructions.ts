@@ -4,7 +4,7 @@ import {
   essentialMemoryBytes,
   serializeEssentialMemories,
 } from "@openbot/contracts/agent-memory-context";
-import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import { HOSTED_SERVER_BASE_IMAGE_GB } from "@openbot/contracts/hosted-servers";
 import {
   type AgentDefaults,
@@ -31,6 +31,22 @@ import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sand
 const ROUTINE_SIGN_IN_RULE =
   "In a routine run, first check saved logins with openbot_browser.list_logins. Use a matching login's username and submit_secret with its loginId for a password or authenticator code. With several logins, use only the account that the task names. When no login fits, the account is unclear, a fill fails, or the page needs a person (email or SMS code, CAPTCHA, passkey, or payment confirmation), report the sign-in requirement; do not call request_takeover or submit_secret without loginId.";
 const ROUTINE_NO_TAKEOVER_RULE = "In a routine run, report a required sign-in instead of a takeover.";
+
+/**
+ * The access sentence for a provider whose own file tools reach only the folders of the session in
+ * every access level (`foldersInFullAccess`, Antigravity #3843). Full access does not open other
+ * folders there, so an agent told it had full filesystem access said that no setting could add a
+ * folder (#6817). It names the folders and the setting that adds one.
+ */
+function folderToolsInstruction(workspaceOnly: boolean, addedFolders: boolean): string {
+  const reach = addedFolders
+    ? "your working directory, the shared directory, and the folders the user gave you"
+    : "your working directory and the shared directory";
+  const access = workspaceOnly
+    ? `The user limited you to Workspace only. You can run local commands and use the network, but your file tools reach only ${reach}, and a sandbox lets you write only there and in the temporary directories. Do not try to get around the sandbox.`
+    : `You have full local computer, command, and network access as requested by the user, but your file tools reach only ${reach}.`;
+  return `${access} When a task needs files in another folder, name that folder and say that it can be added in your settings, under Folders; you can use it from the next message.`;
+}
 
 /**
  * The disk limit of a hosted server. The disk is larger than the plan, so `df` alone does not show
@@ -535,15 +551,17 @@ export function developerInstructions(
           `The user also gave you these folders to work in: ${folders.join(", ")}. You can change files and run commands in them. They belong to the user: keep your own files in your working directory.`,
         ]
       : []),
-    workspaceAccessEnforced(agent)
-      ? `The user limited you to Workspace only. You can read files anywhere, run local commands, and use the network, but a sandbox lets you write only in your working directory, the shared directory, ${folders.length ? "the folders the user gave you, " : ""}and the temporary directories. Do not try to get around the sandbox. When a task truly needs a write outside these directories, ${
-          agent.provider === "claude"
-            ? "make that one change with a file edit tool, which asks the user, and say why; commands cannot write there; the user decides"
-            : agent.provider === "codex"
-              ? "request approval for that one command and say why; the user decides"
-              : "say so and why; no approval lets you write there, and the user can give you Full access"
-        }.`
-      : "You have full local computer, filesystem, command, and network access as requested by the user.",
+    agentProviderDescriptor(agent.provider).foldersInFullAccess
+      ? folderToolsInstruction(workspaceAccessEnforced(agent), folders.length > 0)
+      : workspaceAccessEnforced(agent)
+        ? `The user limited you to Workspace only. You can read files anywhere, run local commands, and use the network, but a sandbox lets you write only in your working directory, the shared directory, ${folders.length ? "the folders the user gave you, " : ""}and the temporary directories. Do not try to get around the sandbox. When a task truly needs a write outside these directories, ${
+            agent.provider === "claude"
+              ? "make that one change with a file edit tool, which asks the user, and say why; commands cannot write there; the user decides"
+              : agent.provider === "codex"
+                ? "request approval for that one command and say why; the user decides"
+                : "say so and why; no approval lets you write there, and the user can give you Full access"
+          }.`
+        : "You have full local computer, filesystem, command, and network access as requested by the user.",
     ...(excluded.length
       ? [
           `The user excluded these folders: ${excluded.join(", ")}. Do not create, change, move, or delete files in them, also when a request asks for it; say that the user excluded the folder. You can read them.`,
