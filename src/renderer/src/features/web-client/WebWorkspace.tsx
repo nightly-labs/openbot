@@ -364,6 +364,8 @@ const PHONE_QUERY = "(max-width: 720px)";
 const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 /** Global search reads one routine list per agent; this many requests go to the host at the same time. */
 const SEARCH_ROUTINE_REQUESTS = 4;
+/** After the host answers, the first page load waits at most this long for the sidebar before its cover goes. */
+const SIDEBAR_WAIT_MS = 5000;
 
 function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue" | "avatarColor"> {
   const { avatarSeed, avatarHue } = createFirstAgentDraft();
@@ -677,16 +679,27 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       loading: workspace.state.status === "connecting",
       hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
+  /**
+   * The first load of the page. Its cover stays over a saved frame too, and stays after the host answers
+   * until the sidebar is ready, so the user does not see the agents and channels load. It ends when the
+   * cover first goes.
+   */
+  const [pageLoad, setPageLoad] = createSignal(true);
   // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
   // shows its screen in the pane only.
   const fullWindowLoading = () =>
-    connectionShown() &&
-    // A saved frame stays on screen: the chat shows its history loader until the host answers.
-    !workspace.state.workspaceLoaded &&
-    !workspace.state.hostOffline &&
-    // The status is "offline" before the first attempt too; only a reported failure ends the cover.
-    !(workspace.state.status === "offline" && workspace.state.connectionError) &&
-    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+    (connectionShown() &&
+      // After the page load, a saved frame stays on screen: the chat shows its history loader until the host answers.
+      (!workspace.state.workspaceLoaded || pageLoad()) &&
+      !workspace.state.hostOffline &&
+      // The status is "offline" before the first attempt too; only a reported failure ends the cover.
+      !(workspace.state.status === "offline" && workspace.state.connectionError) &&
+      (connectionPhase() === "loading" || connectionPhase() === "connecting")) ||
+    // The status check comes first: the sidebar state is defined after this point.
+    (pageLoad() && workspace.state.status === "online" && sidebarLoading());
+  createEffect(fullWindowLoading, (loading) => {
+    if (!loading) setPageLoad(false);
+  });
   // The full-window screen stays after the load ends, so its crew hop out before it goes. It mounts in
   // the first render, so the account screen in WebApp hands the pile to it and does not hop alone.
   const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
@@ -1798,6 +1811,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       : channelsListed()
         ? channels.state.channels
         : [];
+  // A host that does not answer a sidebar read does not keep the page load's cover.
+  const [sidebarWaitOver, setSidebarWaitOver] = createSignal(false);
+  createEffect(
+    () => pageLoad() && workspace.state.status === "online",
+    (waiting) => {
+      if (!waiting) return;
+      const timer = setTimeout(() => setSidebarWaitOver(true), SIDEBAR_WAIT_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /** The host answered, and the sidebar still reads its order, hidden agents, unread counts or channels. */
+  function sidebarLoading(): boolean {
+    return (
+      !sidebarWaitOver() &&
+      (workspace.state.panelsLoading || (channelsSupported() && !routinesView() && !channels.state.listed))
+    );
+  }
   const savedChannelId = () => {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
@@ -2686,6 +2716,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   /** The chat shows the loader of its history from the start, so the connect and the history load are one screen. */
   const frameConnecting = () =>
     connectionShown() &&
+    !fullWindowLoading() &&
     frameFirstLoad() &&
     agentChatOpen() &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting");
