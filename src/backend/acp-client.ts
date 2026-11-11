@@ -3449,20 +3449,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: DynamicRecord,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
     const sessionId = getString(params, "sessionId") ?? [...this.#threads.ids()][0];
-    if (sessionId && this.#historyReplays.has(sessionId)) return {};
-    const thread = sessionId ? this.#threads.get(sessionId) : undefined;
     // The agent's own question method has questions without ids, and needs its own reply shape.
     const own = this.#flavor.userQuestions;
-    const asked =
-      own?.method === method.replace(/^_/u, "")
-        ? getArray(params, "questions")
-            .filter(isRecord)
-            .map((question, index) => ({
-              ...question,
-              id: `question-${index}`,
-              question: getString(question, "question") ?? "",
-            }))
-        : null;
+    const isOwn = own?.method === method.replace(/^_/u, "");
+    if (sessionId && this.#historyReplays.has(sessionId)) return own && isOwn ? own.reply([], {}) : {};
+    const thread = sessionId ? this.#threads.get(sessionId) : undefined;
+    const asked = isOwn
+      ? getArray(params, "questions")
+          .filter(isRecord)
+          .map((question, index) => ({
+            ...question,
+            id: `question-${index}`,
+            question: getString(question, "question") ?? "",
+          }))
+      : null;
     const result = yield* this.#waitForUser(
       thread?.activeTurn,
       this.#serverRequests.call("item/tool/requestUserInput", {
