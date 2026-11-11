@@ -2671,6 +2671,38 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * A steer that came after the running turn's last request, which the provider answers in a turn of
+   * its own named by the delivery. The message moves to that turn, so the chat shows it above its own
+   * answer and not above the answer of the turn it was sent to (#6673). Its state stays: a delivery
+   * that the earlier turn already ended is not started again.
+   */
+  moveSteerToTurn = Effect.fn("MailboxStore.moveSteerToTurn")(function* (
+    this: MailboxStore,
+    agentId: string,
+    turnId: string,
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === turnId);
+      if (
+        !delivery ||
+        delivery.recipientAgentId !== agentId ||
+        delivery.steeredAt === undefined ||
+        delivery.turnId === null ||
+        delivery.turnId === turnId ||
+        delivery.status === "queued" ||
+        delivery.status === "cancelled"
+      )
+        return false;
+      delivery.turnId = turnId;
+      this.#changes.deliveryIds.add(delivery.id);
+      this.#persist("delivery.updated");
+      return true;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
   /** Says why a message sent to steer waits in the queue. A message that has left the queue keeps its state. */
   markSteerFallback = Effect.fn("MailboxStore.markSteerFallback")(function* (
     this: MailboxStore,

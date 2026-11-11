@@ -829,6 +829,21 @@ export class TurnLifecycle {
             yield* Deferred.done(association, exit);
             if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
           }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
+        } else {
+          // Claude answers a steer that came after the turn's last request in a turn of its own, named by
+          // the steered delivery. The message goes with that answer, not above the earlier one (#6673).
+          const moved = yield* this.#mailbox.moveSteerToTurn(agentId, turnId).pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId);
+                return false;
+              }),
+            ),
+          );
+          if (moved) {
+            this.#mailboxSync.syncDeliveryMessage(snapshot, turnId);
+            this.#mailboxSync.syncMailboxMessages(snapshot);
+          }
         }
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
