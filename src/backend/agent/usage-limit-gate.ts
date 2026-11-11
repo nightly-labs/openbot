@@ -273,6 +273,8 @@ export class UsageLimitGate {
     const readReleased = this.#readReleased.get(key);
     this.#readReleased.delete(key);
     if (named !== null && readReleased !== undefined && readReleased * 1_000 > Date.now()) limit.readBlind = true;
+    // With no reset known, only a reading can end the limit.
+    else if (limit.resetsAt === null) limit.readBlind = false;
     this.#limits.set(key, limit);
     this.#arm(key, limit);
     yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
@@ -317,6 +319,8 @@ export class UsageLimitGate {
     provider: AgentProvider,
     accountId: string | null,
   ) {
+    const account = limitKey(provider, accountId, "");
+    for (const key of [...this.#readReleased.keys()]) if (key.startsWith(account)) this.#readReleased.delete(key);
     for (const [key, limit] of [...this.#limits])
       if (limit.provider === provider && limit.accountId === accountId) yield* this.#release(key, true);
   }).bind(this);
