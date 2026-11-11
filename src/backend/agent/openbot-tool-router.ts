@@ -1753,7 +1753,10 @@ export class OpenBotToolRouter {
       // A channel routine runs as a request in the channel. The owner of its main task ends the run;
       // a member that works on a part of it reports to that owner (#6667).
       const channelRun = channelId
-        ? yield* this.#channels.routineRunPart(channelId, senderAgentId, params.turnId)
+        ? // A turn with no active assignment, such as one that the provider started itself, has no run.
+          yield* this.#channels
+            .routineRunPart(channelId, senderAgentId, params.turnId)
+            .pipe(Effect.catch(() => Effect.succeed(null)))
         : null;
       if (channelRun === "member")
         return openBotToolFailure(
