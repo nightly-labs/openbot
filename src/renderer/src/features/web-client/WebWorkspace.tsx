@@ -25,6 +25,7 @@ import {
   type RoutineFields,
   type ServerConnectionState,
   type ServerSummary,
+  STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
 import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
@@ -71,6 +72,7 @@ import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -198,6 +200,7 @@ import {
   AgentUsagePanel,
   RoutineFlowsCanvas,
   ScheduleView,
+  ServerLibrary,
   ServerOnboarding,
   ServerSettingsModal,
   TasksView,
@@ -241,7 +244,11 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
-import { createAgentMessageDeleteAccess, readerCanDeleteMessage } from "../conversation/message-delete-access";
+import {
+  type AgentLevelsSource,
+  createAgentMessageDeleteAccess,
+  readerCanDeleteMessage,
+} from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import type { FilesPort } from "../files/files-port";
@@ -379,7 +386,7 @@ async function reportedFailure(send: () => Promise<unknown>, options: PromptAnsw
 }
 
 /** The pages of the connected host that cover the conversation. */
-type HostPageView = "usage" | "schedule" | "tasks" | "workflows";
+type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library";
 
 type WebWorkspaceProps = {
   accountId: string;
@@ -631,6 +638,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         remoteDesktopAvailable: false,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+        ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
         compatibility: {
           localAppVersion: "web",
@@ -909,9 +917,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     await workspace.run(async () => {
       await select(agentId);
       if (workspace.state.selectedId !== agentId) return;
-      await workspace.openSearchMessage(messageId);
-      setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
+      await openSelectedMessage(agentId, messageId);
     });
+  }
+  /** Loads a message in the open agent's chat and scrolls to it. Resolves false when the chat does not have it. */
+  async function openSelectedMessage(agentId: string, messageId: string): Promise<boolean> {
+    if (workspace.state.selectedId !== agentId) return false;
+    const found = await workspace.openSearchMessage(messageId);
+    if (found) setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
+    return found;
   }
   /** The admin requests of the connected host. A call for another server is refused, not redirected. */
   function hostAdmin(serverId?: string): WebAdminRuntime {
@@ -1266,6 +1280,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     githubConnector: githubPort,
   });
+  const librarySupported = () => workspace.state.capabilities.includes(STORAGE_CAPABILITY);
+  // As the Tasks page: an older host has no storage routes and no Library button.
+  createEffect(
+    () => page() === "library" && workspace.state.status === "online" && !librarySupported(),
+    (unsupported) => {
+      if (unsupported) setHostPage(null);
+    },
+  );
+  /** The Library button of the page rail, only on a host with `storage-v1`. A named function, not a ternary prop. */
+  function libraryRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!librarySupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (id) void openHostPage(id, "library", button);
+    };
+  }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
   function workflowsRailAction(): (() => void) | undefined {
     if (!workflowsSupported()) return undefined;
@@ -1433,6 +1463,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     hostAdmin: machineCalls.hostAdmin,
     storage: {
       getMachineMetrics: machineCalls.storage.getMachineMetrics,
+      getLibraryFolders: machineCalls.storage.getLibraryFolders,
+      changeLibraryFolders: machineCalls.storage.changeLibraryFolders,
       // The host names previews with the desktop `openbot-attachment:` scheme, as it does in chat.
       getUsage: async (input, serverId) => {
         if (input.scope === "channel" && !workspace.state.capabilities.includes(STORAGE_CHANNEL_CAPABILITY))
@@ -1624,6 +1656,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       accountUserId: props.accountId,
       onOwnComputer: false,
     });
+  /** The levels of a member on the connected host, for the messages and the Library folders that the member can change. */
+  const hostAgentLevels: Pick<AgentLevelsSource, "readLevels" | "onLevelsChanged"> = {
+    readLevels: (serverId) => hostAgentAccessCalls.getAgentAccess(serverId),
+    onLevelsChanged: (_serverId, listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "agent-access-changed") listener();
+      }),
+  };
   const messageDeleteSupported = () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY);
   const deletesAnyAgentMessage = createAgentMessageDeleteAccess({
     deletesAny: () => canAdministerServer(workspace.state.host?.role),
@@ -1633,11 +1673,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return null;
       return messageDeleteSupported() && workspace.state.capabilities.includes(AGENT_ACCESS_CAPABILITY) ? hostId : null;
     },
-    readLevels: (serverId) => hostAgentAccessCalls.getAgentAccess(serverId),
-    onLevelsChanged: (_serverId, listener) =>
-      workspace.onHostEvent((event) => {
-        if (event.type === "agent-access-changed") listener();
-      }),
+    ...hostAgentLevels,
   });
   /** Whether the reader may delete `message` in the open agent's chat or side threads. */
   const canDeleteAgentMessage = (message: AgentMessage) =>
@@ -1648,6 +1684,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const deleteOpenAgentMessage = (messageId: string) => {
     const agentId = workspace.state.selectedId;
     return agentId ? workspace.deleteMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** Pin and Unpin on the host. A host without `message-pins-v1` has none. */
+  const agentMessagePins = () => {
+    const { listPinnedMessages: list, setMessagePinned: set } = workspace.runtime;
+    if (!list || !set || !workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY)) return undefined;
+    return {
+      list,
+      set,
+      subscribe: (agentId: string, changed: () => void) =>
+        workspace.onHostEvent((event) => {
+          if (event.type === "message-pins-changed" && event.agentId === agentId) changed();
+        }),
+    };
   };
   /** The Delete action of the open agent's chat. A host without `message-delete-v1` has none. */
   const agentDeleteMessageAction = () => (messageDeleteSupported() ? deleteOpenAgentMessage : undefined);
@@ -1980,17 +2029,48 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (channelOpenInRoutines) layout.setSidebarView("agents");
     },
   );
+  /**
+   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
+   * again until it opens again, as on the desktop.
+   */
+  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   const readState = () => workspace.conversation()?.page?.readState;
+  const readsOpenChat = () =>
+    workspace.state.status === "online" &&
+    !agentFormOpen() &&
+    !channelOpen() &&
+    canMarkRead() &&
+    heldUnreadAgentId() !== workspace.state.selectedId;
+  /*
+   * The read state that the chat shows. The host counts a reply as unread until this tab marks it
+   * read, so each reply would move the unread line to it and the chat would jump. A reply that comes
+   * while the reader can read the loaded chat is read at once, as on the desktop: the chat keeps the
+   * line of its opening. The messages of the opening, of a time away and of Mark unread keep theirs.
+   */
+  const shownReadState = createMemo<{ visit: string; seen: boolean; unreadCount: number; firstUnread: string | null }>(
+    (previous) => {
+      const conversation = workspace.conversation();
+      const page = conversation?.page;
+      const visit = `${workspace.state.host?.hostId ?? ""}:${workspace.state.selectedId ?? ""}:${page?.threadId ?? ""}`;
+      const readable = readsOpenChat();
+      const seenBefore = previous?.visit === visit && previous.seen;
+      // A time away ends the visit's read: what comes next keeps its unread line.
+      const seen = readable && (seenBefore || (Boolean(page) && conversation?.loading === false));
+      if (seenBefore && readable) return { visit, seen, unreadCount: 0, firstUnread: null };
+      return {
+        visit,
+        seen,
+        unreadCount: page?.readState?.unreadCount ?? 0,
+        firstUnread: page?.readState?.firstUnreadMessageId ?? null,
+      };
+    },
+  );
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
   // coming back reads the page again.
   createEffect(
     () =>
-      (readState()?.unreadCount ?? 0) > 0 &&
-      !agentFormOpen() &&
-      !channelOpen() &&
-      canMarkRead() &&
-      heldUnreadAgentId() !== workspace.state.selectedId
+      (readState()?.unreadCount ?? 0) > 0 && readsOpenChat()
         ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
         : null,
     (unread) => {
@@ -2161,11 +2241,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     };
   };
-  /**
-   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
-   * again until it opens again, as on the desktop.
-   */
-  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   /**
    * Marks a chat unread. The open chat stays unread until it opens again; another chat marks itself
    * read only when it opens. A failure releases the hold.
@@ -2368,6 +2443,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         reportedFailure(() => workspace.approve({ requestId: item.requestId, decision }), options),
       contextStates: () => workspace.state.threadContextStates,
       onCompactContext: compactSelectedTaskContext(),
+      onOpenMainMessage: (messageId) => openSelectedMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
@@ -2692,6 +2768,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 if (id) void openHostPage(id, "schedule", button);
               }}
               onWorkflows={workflowsRailAction()}
+              onLibrary={libraryRailAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
@@ -2761,7 +2838,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               windowPage={page()}
               page={
                 <Show
-                  when={page() === "usage" || page() === "schedule" || page() === "workflows" ? server() : undefined}
+                  when={
+                    page() === "usage" || page() === "schedule" || page() === "workflows" || page() === "library"
+                      ? server()
+                      : undefined
+                  }
                   fallback={
                     <Show
                       when={settingsKind()}
@@ -2885,6 +2966,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               self={account().name ?? undefined}
                             />
                           </Loading>
+                        </Show>
+                      </Match>
+                      <Match when={page() === "library"}>
+                        {/* Keyed: the page reads the files and folders of one server, as on desktop. */}
+                        <Show when={target().id} keyed>
+                          {(serverId) => (
+                            <Loading>
+                              <ServerLibrary
+                                serverId={serverId}
+                                server={server()}
+                                calls={() => storageCalls}
+                                levels={hostAgentLevels}
+                                onShowInChat={(agentId, messageId) => void openMessage(agentId, messageId)}
+                                onOpenUrl={(url) => void openWebLink(url)}
+                                mediaSource={runtime.attachmentMedia}
+                                opensFiles={false}
+                              />
+                            </Loading>
+                          )}
                         </Show>
                       </Match>
                       <Match when={page() === "schedule"}>
@@ -3656,8 +3756,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   messages={view.messages}
                   messageReferences={view.messageReferences()}
                   missingMessageReferences={view.missingMessageReferences()}
-                  unreadCount={readState()?.unreadCount ?? 0}
-                  firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
+                  unreadCount={shownReadState().unreadCount}
+                  firstUnreadMessageId={shownReadState().firstUnread}
                   loaded={Boolean(workspace.conversation()?.page)}
                   hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
                   unloadedHistory={unloadedHistory(workspace.conversation()?.page?.pageInfo)}
@@ -3734,15 +3834,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   sendToChannel={sendToChannel()}
                   onDeleteMessage={agentDeleteMessageAction()}
                   canDeleteMessage={canDeleteAgentMessage}
+                  messagePins={agentMessagePins()}
                   onLoadOlder={() => void workspace.older()}
-                  onLoadLatest={workspace.refresh}
+                  discontinuous={workspace.conversation()?.around === true}
+                  onLoadLatest={workspace.loadLatest}
                   onSearchMessages={async (query) => {
                     const id = workspace.state.selectedId;
                     if (!id) return { messageIds: [], total: 0 };
                     const result = await workspace.runtime.search(id, query);
                     return { messageIds: result.results.map((item) => item.message.id), total: result.total };
                   }}
-                  onOpenSearchMessage={workspace.openSearchMessage}
+                  onOpenSearchMessage={async (messageId) => {
+                    await workspace.openSearchMessage(messageId);
+                  }}
                   onTypingChange={setTyping}
                   onAnswerPrompt={view.answerPrompt}
                   onPromptResolutionPresented={(_agentId, turnId, requestId) =>

@@ -49,6 +49,8 @@ export const messages = {
   "error.skill.managedSlug": "OpenBot даёт каждому агенту свой навык {slug}. Дайте этому навыку другое имя.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md больше 64 КБ. Сократите его, прежде чем публиковать.",
   "error.skill.localNoRevisions": "У локального навыка нет опубликованных ревизий.",
+  "error.skill.localNotFound": "Этого локального навыка нет. Проверьте его ID в списке локальных навыков.",
+  "error.skill.localRevisionNotFound": "У этого локального навыка нет ревизии {revision}. Последняя ревизия: {latest}.",
   "error.skill.localNameTaken": "Локальный навык с таким именем уже существует. Измените его вместо этого.",
   "error.skill.localKeepName": "При изменении навыка оставьте его имя прежним.",
   "error.skill.localRelativeFolder": "Укажите относительную папку навыка внутри рабочего пространства текущего агента.",

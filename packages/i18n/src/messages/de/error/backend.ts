@@ -242,6 +242,9 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Diese Nachricht gehört zu einem laufenden Durchlauf. Lösche sie, wenn der Durchlauf endet.",
   "error.backend.messageDeleteForbidden": "Du kannst nur die Nachrichten löschen, die du gesendet hast.",
+  "error.backend.messagePinNotFound": "Diese Nachricht ist nicht im Chat.",
+  "error.backend.messagePinLimit":
+    "Dieser Chat hat 50 angeheftete Nachrichten. Löse eine, bevor du eine weitere anheftest.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
@@ -306,6 +309,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
   "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
   "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.libraryFolderName": "Ein Ordnername muss 1 bis {limit} Zeichen haben.",
+  "error.backend.libraryFolderLimit": "Ein Server kann bis zu {limit} Bibliotheksordner haben.",
+  "error.backend.libraryFolderFileLimit": "In den Bibliotheksordnern sind zu viele Dateien.",
+  "error.backend.libraryFolderTooDeep": "Bibliotheksordner können nur {limit} Ebenen tief sein.",
+  "error.backend.libraryFolderGone": "Der Ordner existiert nicht oder wurde bereits gelöscht.",
+  "error.backend.libraryFolderOtherAgent": "Eine Datei kann nur in einen Ordner ihres Agenten verschoben werden.",
+  "error.backend.libraryFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",

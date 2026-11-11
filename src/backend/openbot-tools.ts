@@ -22,6 +22,7 @@ import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
+import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
@@ -307,8 +308,17 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "attach_files_to_response",
     description:
-      "Attach existing local files, such as screenshots, charts, reports or ZIP archives, to the current response for the user. OpenBot copies each file and shows image previews in the conversation.",
-    shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
+      'Attach existing local files, such as screenshots, charts, reports or ZIP archives, to the current response for the user. OpenBot copies each file and shows image previews in the conversation. Pass folder, such as "Reports/2026", only when the user or your instructions name a Library folder; a missing folder is made.',
+    shape: {
+      paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),
+      folder: libraryFolderArgument.optional(),
+    },
+  },
+  {
+    name: "list_library_folders",
+    description:
+      "List your Library folders by path, with the id, name and stored path of each file in them, and the count of your files in no folder. Pass folder to list one folder and the folders in it. To put a file in a folder, pass folder to attach_files_to_response.",
+    shape: listLibraryFoldersToolSchema.shape,
   },
   {
     name: "html_preview",
@@ -751,6 +761,22 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Add one emoji reaction to the current user message for a clear emotional moment, such as a win, affection, gratitude, humor, sadness, disappointment or frustration. An emoji in the written answer is not a reaction.",
     shape: { emoji: z.string().min(1).max(64).describe("Exactly one complete Unicode emoji.") },
+  },
+  {
+    name: "pin_message",
+    description:
+      "Pin or unpin one finished message of this chat in the pin list of the chat header. You cannot unpin a person's pin.",
+    shape: {
+      quote: z
+        .string()
+        .min(1)
+        .max(500)
+        .describe(
+          "Exact part of the message text; the newest message that contains it is the target. Omit for the current user message.",
+        )
+        .optional(),
+      pinned: z.boolean().describe("False to unpin. Default true.").optional(),
+    },
   },
   {
     name: "send_message",

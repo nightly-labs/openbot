@@ -282,6 +282,7 @@ function server(summary: DynamicRecord): ServerSummary {
     hostedStart,
     memberLimit,
     hosted,
+    restartAvailable,
     storageGb,
     keyChangedAt,
     thisComputer,
@@ -294,6 +295,7 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid memberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
+  if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
   if (storageGb !== undefined && !(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1)) {
     throw new Error("Invalid storageGb.");
   }
@@ -331,6 +333,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),

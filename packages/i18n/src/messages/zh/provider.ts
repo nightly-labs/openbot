@@ -230,6 +230,15 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} 没有剩余的用量重置次数。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} 的这次重置机会已被使用。",
   "provider.account.resetUsageFailed": "无法重置 {name} 的用量。",
+  "provider.account.pool": "账号池",
+  "provider.account.poolDescription": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "provider.account.inUse": "使用中",
+  "provider.account.notInPool": "不在池中",
+  "provider.account.leaveOutOfPool": "移出账号池",
+  "provider.account.putBackInPool": "放回账号池",
+  "provider.account.poolChip": "账号池",
+  "provider.account.poolCount": "{accounts}的账号池",
+  "provider.account.poolInUse": "{pool} · 正在使用 {name}",
 
   // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "已连接",
@@ -250,6 +259,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "新助手的默认选项 · {use}",
   "provider.settings.accounts": "账号",
   "provider.settings.accountsDescription": "{count} / {max}。每个助手使用一个账号。",
+  "provider.settings.accountsPooledDescription": "{count} / {max}。助手共享这些账号。",
   "provider.settings.accountBlocked": "重新登录之前，{agents} 无法运行。",
   "provider.settings.removeTitle": "移除 {name}？",
   "provider.settings.removeMoves": "{agents} 将改用 {name}。",

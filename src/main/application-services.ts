@@ -139,6 +139,7 @@ import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } from "../backend/library-folders-store";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { discordDriver, downloadDiscordAttachment } from "../backend/messaging/discord/discord-driver";
@@ -270,6 +271,7 @@ import { InstanceTransferService } from "./instance-transfer-service";
 import { InterfaceSizeService } from "./interface-size-service";
 import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
+import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
@@ -676,6 +678,7 @@ export interface ApplicationServices {
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
+  libraryFoldersService: LibraryFoldersService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
   localSignIn: LocalSignInWindows;
@@ -1329,6 +1332,8 @@ export async function createApplicationServices({
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await runCauseEffect(sidebarLayout.initialize());
+  const libraryFolders = new LibraryFoldersStore(join(app.getPath("userData"), LIBRARY_FOLDERS_FILE));
+  await runCauseEffect(libraryFolders.initialize());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();
@@ -1696,11 +1701,13 @@ export async function createApplicationServices({
   );
   performance.mark("openbot:services.preferences");
   await runCauseEffect(providerDetectionSettings.load());
+  const modelReleaseCatalog = new ModelReleaseCatalog();
   const providerDetection = await Effect.runPromise(
     createProviderDetection({
       settings: providerDetectionSettings,
       customProviders,
       customAgents,
+      catalog: modelReleaseCatalog,
     }),
   );
   teardown.push(TEARDOWN_ORDER.providerDetection, "model server discovery", () =>
@@ -2174,6 +2181,7 @@ export async function createApplicationServices({
       delete: (siteId) => hostedSites.delete(siteId).pipe(toHostedSiteOperationFailed),
     },
     sidebarLayout,
+    libraryFolders,
     preferredModel: setupState.preferredModel,
     // Only a dev build leads with the OpenCode development model; a packaged app keeps the
     // built-in default.
@@ -2292,7 +2300,7 @@ export async function createApplicationServices({
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
-    catalog: new ModelReleaseCatalog(),
+    catalog: modelReleaseCatalog,
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
     modelsChanged: () => service.notifyProviderSettingsChanged(),
@@ -2574,6 +2582,10 @@ export async function createApplicationServices({
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
+  await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
+  await runCauseEffect(
+    libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
+  );
 
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
@@ -2671,6 +2683,12 @@ export async function createApplicationServices({
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
+  // The Library shows the files of the host scan, so a folder change reads the agent of a file there.
+  const libraryFoldersService = new LibraryFoldersService({
+    store: libraryFolders,
+    storage: storageUsage,
+    agents: () => service.listAgents(),
+  });
   // A deleted or renamed agent changes every scope, so no surface keeps its old answer.
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
@@ -3100,6 +3118,8 @@ export async function createApplicationServices({
     providerSignOut: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
+    // Present, so the host advertises `library-folders-v1`. Each member reads and changes the folders.
+    libraryFolders: libraryFoldersService,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
     // Present, so the host advertises `background-processes-v1`. The routes are admin-only. A Windows
@@ -4213,6 +4233,7 @@ export async function createApplicationServices({
     vault,
     mailbox,
     storageUsage,
+    libraryFoldersService,
     browser,
     browserPictureInPicture,
     localSignIn,

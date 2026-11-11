@@ -9,18 +9,24 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   assertStorageUsageScope,
   decodeChannelStorageUsage,
+  decodeLibraryFoldersSnapshot,
   decodeMachineMetrics,
   decodeStorageDisk,
   decodeStorageUsage,
   parseClearStorageInput,
   parseDeleteStoredFileInput,
   parseGetStorageUsageInput,
+  parseLibraryFolderAction,
   parseOpenStorageLocationInput,
   parseOpenStoredFileInput,
   STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/library-folders-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
@@ -34,6 +40,7 @@ import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
+import type { LibraryFoldersService } from "../library-folders-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
@@ -57,6 +64,7 @@ interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteSe
 
 export interface StorageIpcDependencies extends Omit<OpenAttachmentDependencies, "remoteServers"> {
   storage: Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+  libraryFolders: Pick<LibraryFoldersService, "snapshot" | "change" | "removeFiles">;
   machine: Pick<MachineAlertMonitor, "metrics">;
   providerRuntimes: Pick<ProviderRuntimeManager, "removableRuntimes" | "removeRemovableRuntimes">;
   remoteServers: StorageRemoteServers;
@@ -73,6 +81,7 @@ function decodeStorageChange(value: unknown): undefined {
 
 export function storageIpcHandlers({
   storage,
+  libraryFolders,
   machine,
   providerRuntimes,
   mailbox,
@@ -140,7 +149,11 @@ export function storageIpcHandlers({
         },
       }),
       deleteFile: scopedHandler(parseDeleteStoredFileInput, {
-        local: (parsed) => runCauseEffect(storage.deleteFile(parsed.fileId)),
+        local: async (parsed) => {
+          await runCauseEffect(storage.deleteFile(parsed.fileId));
+          // A deleted file leaves its Library folder. A joined server does this in its route.
+          await runCauseEffect(libraryFolders.removeFiles([parsed.fileId]));
+        },
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
       }),
       clear: scopedHandler(parseClearStorageInput, {
@@ -154,6 +167,33 @@ export function storageIpcHandlers({
           attachmentId: parsed.fileId,
           action: parsed.action,
         });
+      }),
+      // The folders of the Library. A host before `library-folders-v1` has none, so the read answers
+      // null and the Library shows no folders.
+      getLibraryFolders: scopedQueryHandler({
+        local: () => libraryFolders.snapshot(),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIBRARY_FOLDERS_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, LIBRARY_FOLDERS_ROUTES.read, decodeLibraryFoldersSnapshot, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      changeLibraryFolders: scopedHandler(parseLibraryFolderAction, {
+        local: (action) => runCauseEffect(libraryFolders.change(action)),
+        remote: (action, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIBRARY_FOLDERS_CAPABILITY))
+            throw new Error(sourceText("error.team.libraryFoldersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, LIBRARY_FOLDERS_ROUTES.actions, decodeLibraryFoldersSnapshot, {
+              method: "POST",
+              body: action,
+            }),
+          );
+        },
       }),
       // Local only: a remote host's workspace is a path on another computer.
       openLocation: payloadHandler(parseOpenStorageLocationInput, async ({ agentId }) => {

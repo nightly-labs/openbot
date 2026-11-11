@@ -6,6 +6,7 @@ import {
   type BillingInterval,
   type BillingPlanId,
   isBillingAmount,
+  isStorageGb,
   isStripeCheckoutUrl,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
@@ -115,6 +116,8 @@ export interface HostedServerSummary {
   error: HostedServerError | null;
   createdAt: string;
   updatedAt: string;
+  /** The storage of the server in GB. An account server from before this field sends none: see `serverStorageGb`. */
+  storageGb?: number;
 }
 
 /**
@@ -193,6 +196,8 @@ export function parseHostedServerSummary(value: unknown): HostedServerSummary | 
     error,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    // A value that this app cannot read is left out, so the server still shows with the storage of its plan.
+    ...(isStorageGb(value.storageGb) ? { storageGb: value.storageGb } : {}),
   };
 }
 

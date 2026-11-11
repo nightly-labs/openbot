@@ -60,14 +60,16 @@ export function canManageStorage(server: ServerSummary): boolean {
 
 /**
  * The agents of one server, to name the rows of its storage. They are read for that server, because a
- * storage view can be open for a server that is not the selected one.
+ * storage view can be open for a server that is not the selected one. Undefined until the list of
+ * that server arrives, so a file is not taken as a file of a deleted agent before it.
  */
 export function createServerAgents(
   serverId: () => string,
   calls: () => FilesPort = filesPort,
-): Accessor<AgentProfile[]> {
-  const [agents, setAgents] = createSignal<AgentProfile[]>([]);
+): Accessor<AgentProfile[] | undefined> {
+  const [agents, setAgents] = createSignal<AgentProfile[] | undefined>(undefined);
   createEffect(serverId, (id) => {
+    setAgents(undefined);
     let current = true;
     untrack(calls)
       .agent.listAgents(id)

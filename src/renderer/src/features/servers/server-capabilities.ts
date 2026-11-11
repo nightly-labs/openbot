@@ -95,6 +95,7 @@ export function serverSupportsCapability(
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
+      capability === "library-folders-v1" ||
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
       capability === "whatsapp-working-message-v1" ||
@@ -127,6 +128,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||
       capability === "conversation-file-search-v1" ||

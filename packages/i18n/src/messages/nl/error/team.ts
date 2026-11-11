@@ -81,6 +81,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
+  "error.team.libraryFoldersUnsupported": "Deze verbinding ondersteunt geen bibliotheekmappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.sidebarPinsUnsupported":
@@ -184,6 +185,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Geen enkele agent op deze server heeft deze inloglink getoond.",
   "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
   "error.team.agentWaitsUnsupported": "Deze verbinding ondersteunt geen open wachtpunten.",
+  "error.team.messagePinsUnsupported": "Deze verbinding ondersteunt geen vastgemaakte berichten.",
   "error.team.queuedMessageThreadUnsupported":
     "Deze verbinding ondersteunt het uitvoeren van een bericht in de wachtrij als nieuwe thread niet.",
   "error.team.backgroundProcessesUnsupported": "Deze verbinding ondersteunt geen achtergrondprocessen.",

@@ -4,6 +4,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   isAgentProvider,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
+  type ProviderAccountPool,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,8 @@ import LogOut from "lucide-react-native/icons/log-out";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Trash2 from "lucide-react-native/icons/trash";
+import UserMinus from "lucide-react-native/icons/user-minus";
+import UserPlus from "lucide-react-native/icons/user-plus";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
@@ -47,8 +50,9 @@ const RESET_OUTCOME_KEYS = {
 } as const satisfies Record<ProviderUsageResetOutcome, string>;
 
 /**
- * Server settings > Providers > a provider > one of its accounts on the host: its name, its sign-in
- * and its removal. A sign-in runs on the provider page, which has the relayed sign-in.
+ * Server settings > Providers > a provider > one of its accounts on the host: its name, its sign-in,
+ * its place in the pool and its removal. A sign-in runs on the provider page, which has the relayed
+ * sign-in.
  */
 export function ServerProviderAccountScreen() {
   const { t, errorMessage } = useText();
@@ -59,6 +63,10 @@ export function ServerProviderAccountScreen() {
   const list = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
   const index = list.findIndex((account) => account.id === params.accountId);
   const account = list[index];
+  // The host lists a pool only while it is on, and an older host has no pool.
+  const pool = admin?.accounts?.setPool
+    ? accounts.list.data?.pools?.find((entry) => entry.provider === provider)?.pool
+    : undefined;
   if (!available || !admin?.accounts || !provider || !account)
     return (
       <SettingsContent>
@@ -81,6 +89,7 @@ export function ServerProviderAccountScreen() {
       account={account}
       index={index}
       accounts={admin.accounts}
+      pool={pool}
       usageResets={admin.usageResets}
       // The provider's own sign-in signs out on the host, as the desktop account menu offers it.
       signOut={
@@ -103,6 +112,7 @@ function AccountPage({
   account,
   index,
   accounts,
+  pool,
   usageResets,
   signOut,
   onChanged,
@@ -113,6 +123,8 @@ function AccountPage({
   account: ProviderAccountStatus;
   index: number;
   accounts: NonNullable<ProviderAdmin["accounts"]>;
+  /** The pool of the provider's accounts, while it is on. */
+  pool: ProviderAccountPool | undefined;
   usageResets: ProviderAdmin["usageResets"];
   signOut: ProviderAdmin["signOut"];
   onChanged: () => Promise<void>;
@@ -122,7 +134,7 @@ function AccountPage({
   const accountName = useProviderAccountName();
   const name = accountName(account, index);
   const [label, setLabel] = useState(account.label ?? "");
-  const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | null>(null);
+  const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | "pool" | null>(null);
   /** How the last usage reset ended, when it did not fail. */
   const [notice, setNotice] = useState<string | null>(null);
   const queryScope = useQueryScope();
@@ -147,7 +159,7 @@ function AccountPage({
     void onChanged();
   }, [leaving, onChanged]);
 
-  async function run(kind: "rename" | "remove" | "reset" | "sign-out", operation: () => Promise<void>) {
+  async function run(kind: "rename" | "remove" | "reset" | "sign-out" | "pool", operation: () => Promise<void>) {
     if (locked.current) return;
     locked.current = true;
     setPending(kind);
@@ -176,8 +188,11 @@ function AccountPage({
   const trimmed = label.trim();
   const dirty = trimmed !== (account.label ?? "");
   // The host keeps the provider's own sign-in, and only the key page removes the Claude API key account.
-  const removable =
-    account.id !== DEFAULT_PROVIDER_ACCOUNT_ID && !(provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID);
+  const setPool = accounts.setPool;
+  const apiKeyAccount = provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID;
+  // A saved key has no plan limit, so it is not a pool member.
+  const inPool = pool !== undefined && !apiKeyAccount && !pool.leftOut.includes(account.id);
+  const removable = account.id !== DEFAULT_PROVIDER_ACCOUNT_ID && !apiKeyAccount;
   const value = (text: string) => (
     <Typography.Paragraph numberOfLines={1} className="shrink text-grouped-secondary">
       {text}
@@ -271,6 +286,28 @@ function AccountPage({
         </SettingsSection>
       ) : notice ? (
         <SettingsNote>{notice}</SettingsNote>
+      ) : null}
+      {pool && !apiKeyAccount && setPool ? (
+        <SettingsSection>
+          <SettingsRow
+            disclosure={false}
+            disabled={pending !== null}
+            leading={<RowIcon icon={inPool ? UserMinus : UserPlus} tone="accent" />}
+            onPress={() =>
+              void run("pool", () =>
+                setPool(
+                  provider,
+                  true,
+                  inPool ? [...pool.leftOut, account.id] : pool.leftOut.filter((id) => id !== account.id),
+                ),
+              )
+            }
+          >
+            <Typography.Paragraph className="text-accent">
+              {t(inPool ? "mobile.server.providers.leaveOutOfPool" : "mobile.server.providers.putBackInPool")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
       {signOut ? (
         <SettingsSection>

@@ -224,6 +224,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.7 sends `usage_update` and has no ACP method that compacts. It compacts by itself
   // only when the context is full, so a long chat sent an almost full context with each request (#7171).
   contextCompaction: "handoff",
+  // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
+  // added one more copy of the instructions to a long chat (#7171).
+  reopenKeepsPrompts: true,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A

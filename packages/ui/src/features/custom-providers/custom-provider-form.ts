@@ -91,7 +91,10 @@ export function savedHeaderDrafts(names: readonly string[] | undefined): CustomH
  * The form for a saved endpoint. The key and the header values stay in main, so their fields open
  * blank, and blank fields keep them (`customProviderUpdate`).
  */
-export function savedCustomProviderDraft(provider: CustomProviderSummary): CustomProviderDraft {
+export function savedCustomProviderDraft(
+  provider: CustomProviderSummary,
+  format: Pick<AppFormat, "number">,
+): CustomProviderDraft {
   return {
     providerId: provider.id,
     displayName: provider.name,
@@ -102,8 +105,8 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
         ? provider.models.map((model) => ({
             id: model.id,
             name: model.name,
-            contextWindow: model.contextWindow?.toString() ?? "",
-            maxOutput: model.maxOutput?.toString() ?? "",
+            contextWindow: model.contextWindow === undefined ? "" : tokenCountText(model.contextWindow, format),
+            maxOutput: model.maxOutput === undefined ? "" : tokenCountText(model.maxOutput, format),
             ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
             ...(model.inputs ? { inputs: [...model.inputs] } : {}),
           }))
@@ -135,6 +138,30 @@ function tokenCount(text: string | undefined, inRange: (value: number) => boolea
   if (!/^(?:\d+|\d{1,3}(?:([\s,._'’])\d{3})(?:\1\d{3})*)$/u.test(typed)) return null;
   const value = Number(typed.replace(/\D/gu, ""));
   return inRange(value) ? value : null;
+}
+
+/**
+ * A token count as the form shows it: in groups of three digits, as `1,048,576`, so a long number is
+ * easy to read. Plain digits when the form cannot read the grouped text of the language back.
+ */
+export function tokenCountText(value: number, format: Pick<AppFormat, "number">): string {
+  const text = format.number(value);
+  return tokenCount(text, () => true) === value ? text : value.toString();
+}
+
+/**
+ * A token count while the user edits it: plain digits, so the change of one digit is always a valid
+ * count. Text that is not a count stays as typed.
+ */
+export function tokenCountEditText(text: string): string {
+  const value = tokenCount(text, () => true);
+  return typeof value === "number" ? value.toString() : text;
+}
+
+/** A token count when the user leaves its field: in groups again. Other text stays as typed. */
+export function tokenCountRestText(text: string, format: Pick<AppFormat, "number">): string {
+  const value = tokenCount(text, () => true);
+  return typeof value === "number" ? tokenCountText(value, format) : text;
 }
 
 function contextWindowValue(model: CustomModelDraft): number | null | undefined {
@@ -407,9 +434,13 @@ export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel):
  * Puts what a model list says about a model into the empty fields of its row (#3946). A typed or
  * saved value stays.
  */
-export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): void {
+export function fillFoundValues(
+  row: CustomModelDraft,
+  found: DiscoveredModel,
+  format: Pick<AppFormat, "number">,
+): void {
   if (!row.contextWindow?.trim() && found.contextWindow !== undefined) {
-    row.contextWindow = found.contextWindow.toString();
+    row.contextWindow = tokenCountText(found.contextWindow, format);
   }
   // A max output needs a window, as `validateCustomProvider` says, and must leave room for the prompt.
   const window = contextWindowValue(row);
@@ -419,7 +450,7 @@ export function fillFoundValues(row: CustomModelDraft, found: DiscoveredModel): 
     found.maxOutput !== undefined &&
     found.maxOutput < window
   ) {
-    row.maxOutput = found.maxOutput.toString();
+    row.maxOutput = tokenCountText(found.maxOutput, format);
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
   // No checked effort is an empty field: the model keeps the efforts of the harness that runs it.

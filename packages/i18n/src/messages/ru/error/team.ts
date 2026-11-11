@@ -80,6 +80,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
   "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
+  "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.sidebarPinsUnsupported":
@@ -173,6 +174,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ни один агент на этом сервере не показывал эту ссылку для входа.",
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
+  "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":
     "Это подключение не поддерживает запуск сообщения из очереди в новой ветке.",
   "error.team.backgroundProcessesUnsupported": "Это подключение не поддерживает фоновые процессы.",

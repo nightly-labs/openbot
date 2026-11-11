@@ -121,6 +121,7 @@ import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
+import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
@@ -130,6 +131,7 @@ import {
   marketplaceAppStatus,
   searchSignIns,
 } from "./mcp-tools";
+import type { AgentPinRefusal, MessagePins } from "./message-pins";
 import {
   agentAccountSetup,
   agentReasoningEffort,
@@ -212,6 +214,14 @@ function requestAborted(signal: AbortSignal | undefined) {
 
 /** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
 const LISTED_DESCRIPTION_LENGTH = 300;
+
+/** What `pin_message` tells the agent when the host refuses its pin. */
+const PIN_REFUSALS: Record<AgentPinRefusal, string> = {
+  "not-found": "That message cannot be pinned: it is still streaming, it is a status line, or it was deleted.",
+  limit: "This chat has 50 pins, the most it keeps. Ask the user which pin to remove, or unpin one of yours.",
+  "pinned-by-person": "A person pinned that message. Only a person can unpin it; tell the user.",
+  "not-pinnable-chat": "This chat keeps no pins. Pins are only in your own chat and its side threads.",
+};
 /** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
 const FEEDBACK_URL_LIMIT = 8000;
 
@@ -345,8 +355,11 @@ export interface OpenBotToolRouterHooks {
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
-  /** Records a no-update tool call for the turn; null when no routine run started the turn. */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
+  /**
+   * Records a no-update tool call for the turn; null when no routine run started the turn.
+   * `channelRun` is a turn that owns a main task of a channel routine's request.
+   */
+  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -382,9 +395,12 @@ export interface OpenBotToolRouterOptions {
   memories: AgentMemories;
   waits: AgentWaits;
   tasks: AgentTasks;
+  messagePins: MessagePins;
   drain: DrainScheduler;
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
+  /** The Library folders of this host; null where the host keeps none. */
+  libraryFolders: AgentLibraryFolders | null;
   localSkillTools?: (() => LocalSkillTools) | undefined;
   routineFlowTools?: (() => RoutineFlowTools) | undefined;
   workflowTools?: (() => WorkflowTools) | undefined;
@@ -438,9 +454,11 @@ export class OpenBotToolRouter {
   readonly #memories: AgentMemories;
   readonly #waits: AgentWaits;
   readonly #tasks: AgentTasks;
+  readonly #messagePins: MessagePins;
   readonly #drain: DrainScheduler;
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
@@ -487,9 +505,11 @@ export class OpenBotToolRouter {
     this.#memories = options.memories;
     this.#waits = options.waits;
     this.#tasks = options.tasks;
+    this.#messagePins = options.messagePins;
     this.#drain = options.drain;
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
+    this.#libraryFolders = options.libraryFolders;
     this.#localSkillTools = options.localSkillTools;
     this.#routineFlowTools = options.routineFlowTools;
     this.#workflowTools = options.workflowTools;
@@ -845,6 +865,7 @@ export class OpenBotToolRouter {
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
+              tool === "list_library_folders" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
@@ -1724,9 +1745,21 @@ export class OpenBotToolRouter {
       ) {
         throw new Error(`paths must contain between 1 and ${INPUT_LIMITS.attachments} valid local file paths.`);
       }
+      // Only a folder that is not text fails the call. For a path that cannot be used, the gateway
+      // attaches the files and the result says why they are in no folder.
+      if (args.folder !== undefined && !isString(args.folder)) throw new Error("folder must be a string.");
 
       const messageId = responseAttachmentMessageId(params.threadId, params.turnId, params.callId);
-      return yield* this.#attachments.attachFiles(senderAgentId, params, args.paths, messageId);
+      return yield* this.#attachments.attachFiles(senderAgentId, params, args.paths, messageId, args.folder);
+    }
+
+    if (params.tool === "list_library_folders") {
+      const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const store = this.#libraryFolders;
+      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+      );
     }
 
     if (params.tool === "list_agents") {
@@ -1815,7 +1848,22 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === ROUTINE_NO_UPDATE_TOOL) {
-      const outcome = this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId);
+      // As for the failure tool below: the owner of a channel routine's request ends the run quiet, and
+      // a member reports to that owner (#7166).
+      const channelRun = channelId
+        ? yield* this.#channels
+            .routineRunPart(channelId, senderAgentId, params.turnId)
+            .pipe(Effect.catch(() => Effect.succeed(null)))
+        : null;
+      if (channelRun?.part === "member")
+        return openBotToolFailure(
+          "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
+        );
+      // A person who started a Test run waits for its answer, as in an agent's own routine.
+      const outcome =
+        channelRun?.part === "owner" && !channelRun.quiet
+          ? "shown"
+          : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
           "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
@@ -1837,11 +1885,11 @@ export class OpenBotToolRouter {
             .routineRunPart(channelId, senderAgentId, params.turnId)
             .pipe(Effect.catch(() => Effect.succeed(null)))
         : null;
-      if (channelRun === "member")
+      if (channelRun?.part === "member")
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run as failed. Say in your result that the task could not be done, and why.",
         );
-      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun === "owner"))
+      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
     }
@@ -1984,11 +2032,12 @@ export class OpenBotToolRouter {
         });
       }
       // A card that asks for a connection the user already made is a dead end: they see "Connected".
+      // A refusal while connected is the app's installation, which only the user can change (#7182).
       if (args.app === "github" && this.#githubConnected())
         return openBotToolResult({
           status: "connected",
           app: args.app,
-          next: "GitHub is already connected for every agent of this server. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When none of them works, tell the user in one sentence and call openbot.send_feedback.",
+          next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
@@ -2017,6 +2066,8 @@ export class OpenBotToolRouter {
       return yield* this.#serverInstallCommand(client, request, params, senderAgentId);
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
+
+    if (params.tool === "pin_message") return yield* this.#pin(params, senderAgentId);
 
     return yield* this.#sendMessage(params, senderAgentId);
   });
@@ -2766,6 +2817,57 @@ export class OpenBotToolRouter {
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#conversation.emitConversation(snapshot);
       return openBotToolResult({ status: "reacted", messageId: delivery.delivery.id, emoji: args.emoji });
+    },
+    Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
+    Effect.uninterruptible,
+  );
+
+  /**
+   * `pin_message`: pins or unpins one message of the chat that the call runs in. The agent does not see
+   * message ids, so a quote names the message; without one, the current user message is the target.
+   */
+  readonly #pin = Effect.fn("OpenBotToolRouter.pin")(
+    function* (
+      this: OpenBotToolRouter,
+      params: DynamicToolCallParams,
+      senderAgentId: string,
+    ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+      const args = isRecord(params.arguments) ? params.arguments : {};
+      const quote = typeof args.quote === "string" ? args.quote.trim() : "";
+      const pinned = args.pinned !== false;
+      const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+      const turnMessages = this.#mailbox
+        .findDeliveriesByTurn(senderAgentId, params.turnId)
+        .filter((candidate) => candidate.delivery.sender.kind === "user")
+        .map((candidate) => candidate.delivery.id);
+      const target = quote
+        ? this.#messagePins.findByQuote(senderAgentId, threadId, quote, {
+            exclude: new Set(turnMessages),
+            pinned,
+          })?.id
+        : turnMessages.at(-1);
+      if (!target)
+        return openBotToolFailure(
+          quote
+            ? `No ${pinned ? "finished" : "pinned"} message of this chat contains that quote. Copy a short exact part of the message text and call this again.`
+            : "This turn has no user message. Pass quote with a short exact part of the message to pin.",
+        );
+      const result = yield* this.#messagePins
+        .setByAgent({ agentId: senderAgentId, threadId, messageId: target, pinned })
+        .pipe(toToolOperationFailed);
+      if (result.refused) return openBotToolFailure(PIN_REFUSALS[result.refused]);
+      // The thread was pinnable, so it is the agent's own chat (no task) or one of its side threads.
+      const taskId = this.#tasks.taskForThread(threadId);
+      const pins = result.snapshot.pins.filter((pin) => pin.taskId === taskId);
+      return openBotToolResult({
+        status: pinned ? "pinned" : "unpinned",
+        messageId: target,
+        pinsInThisChat: pins.map((pin) => ({
+          text: pin.text.slice(0, 160),
+          pinnedBy:
+            pin.pinnedBy.kind === "agent" ? (pin.pinnedBy.agentId === senderAgentId ? "you" : "agent") : "person",
+        })),
+      });
     },
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
