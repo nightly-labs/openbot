@@ -289,7 +289,7 @@ export class QueueControls {
     }
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
-    const note = steerNoteFor(providerForAgent(agent), context.delivery.sender);
+    const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
     yield* client
       .request(
         "turn/steer",
@@ -357,10 +357,12 @@ const PROVIDERS_THAT_FRAME_STEERS: ReadonlySet<AgentProvider> = new Set(["claude
 /**
  * The note that goes in front of a steered message, or null when the provider writes its own or the
  * message is not from a person or a teammate. A routine run's prompt already gives its own task.
+ * A slash command from the user gets none, as at the start of a turn: the agent reads a command
+ * only at the start of the input.
  */
-export function steerNoteFor(provider: AgentProvider, sender: QueueDelivery["sender"]): string | null {
+export function steerNoteFor(provider: AgentProvider, sender: QueueDelivery["sender"], text: string): string | null {
   if (PROVIDERS_THAT_FRAME_STEERS.has(provider)) return null;
-  if (sender.kind === "user") return steerNote("user");
+  if (sender.kind === "user") return text.startsWith("/") ? null : steerNote("user");
   return sender.kind === "agent" ? steerNote("teammate") : null;
 }
 

@@ -777,7 +777,9 @@ correction applies from this point, and the unfinished work continues unless the
 The block is a text item of its own, as the turn context blocks are, so the history readers remove
 it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
 with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
-block of a steer. A routine run gets no block. `scripts/pi-steer-e2e.ts` checks the block.
+block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
+block.
 
 A message from another agent that only gives information follows the recipient's busy-message mode,
 as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).

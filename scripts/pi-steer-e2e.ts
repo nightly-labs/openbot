@@ -183,11 +183,16 @@ try {
 
   // A steer from the queue has OpenBot's note in front of it. Pi gets the note with the message. The
   // saved turn shows the two messages that the user wrote, and no note.
-  const note = steerNoteFor("deepseek", { kind: "user" });
+  const note = steerNoteFor("deepseek", { kind: "user" }, "keep the tests");
   assert.ok(note, "A provider with no steer note of its own must get OpenBot's.");
-  assert.ok(steerNoteFor("pi", { kind: "agent", agentId: "teammate" }), "A teammate's steer must get a note.");
+  assert.ok(
+    steerNoteFor("pi", { kind: "agent", agentId: "teammate" }, "keep the tests"),
+    "A teammate's steer must get a note.",
+  );
+  // The agent reads a command only at the start of the input, so no note goes in front of it.
+  assert.equal(steerNoteFor("pi", { kind: "user" }, "/skill:review"), null, "A slash command must get no note.");
   const providersWithOwnNote = (["claude", "grok"] as const).filter(
-    (provider) => steerNoteFor(provider, { kind: "user" }) === null,
+    (provider) => steerNoteFor(provider, { kind: "user" }, "keep the tests") === null,
   );
   assert.deepEqual(providersWithOwnNote, ["claude", "grok"]);
   const noted = await startWork(client, thread, log);
