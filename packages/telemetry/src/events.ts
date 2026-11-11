@@ -185,6 +185,7 @@ export function safeReport(input: unknown): Report | null {
 const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   invalid_upload_request: "invalid_upload_request",
   usageLimitExceeded: "usage_limit",
+  misalignmentPolicyViolation: "content_blocked",
   contextWindowExceeded: "context_too_long",
   context_length_exceeded: "context_too_long",
   invalid_request_error: "invalid_request",

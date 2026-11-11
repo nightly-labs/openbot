@@ -1240,7 +1240,17 @@ export class TurnLifecycle {
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+        } else {
+          // Keep the structured Codex stop distinct from other content blocks. Clients can offer
+          // the existing confirmed New chat action without matching provider prose.
+          const code =
+            source.provider === "codex" &&
+            notification.method === "error" &&
+            error?.codexErrorInfo === "misalignmentPolicyViolation"
+              ? "codex_safety_stop"
+              : `agent_${notification.method}`;
+          this.#hooks.emitError(code, message, agentId, context, link);
+        }
       }
     }
   }).bind(this);

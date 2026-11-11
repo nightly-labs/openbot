@@ -128,6 +128,8 @@ export interface ChatViewProps {
   branchPoints?: ReadonlySet<string>;
   /** Copies the chat through a host message into a new thread. Absent for a chat that cannot branch. */
   onBranch?: (messageId: string) => Promise<void>;
+  /** Opens the same New chat confirmation as agent settings. Only the main chat can reset. */
+  onNewChat?: (onStarted: () => void) => void;
   /** Deletes a host message for everyone. Absent where the host cannot delete messages. */
   deleteMessage?: (messageId: string) => Promise<void>;
   /** The reader can delete the messages of others too, not only the ones that they sent. */
@@ -258,6 +260,7 @@ export function ChatView({
   stopTurn,
   branchPoints,
   onBranch,
+  onNewChat,
   deleteMessage,
   deletesAnyMessage = false,
   markUnread,
@@ -833,6 +836,22 @@ export function ChatView({
     const body = value.trim();
     const files = attachments.items;
     if (!body && files.length === 0) return;
+    if (
+      body === "/new" &&
+      files.length === 0 &&
+      !replyTarget &&
+      !selection &&
+      !answersQuestion &&
+      editedMessages.current.size === 0 &&
+      onNewChat
+    ) {
+      const previousError = sendError;
+      onNewChat(() => {
+        setSharedDraft((current) => (current === value ? "" : current));
+        setSendError((current) => (current === previousError ? null : current));
+      });
+      return;
+    }
     // Files given back by Edit can add up to more than one message takes.
     if (files.length > INPUT_LIMITS.attachments) {
       const message = t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments });

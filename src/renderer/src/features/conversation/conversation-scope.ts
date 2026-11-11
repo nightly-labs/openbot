@@ -171,6 +171,7 @@ export function createConversationViewScope(props: ConversationProps) {
     conversationErrors,
     setConversationErrors,
     conversationErrorRuns,
+    setConversationErrorRuns,
     voicePhase,
     setVoicePhase,
     voiceModelProgress,
@@ -429,6 +430,47 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   /** The page that fixes the account behind the shown error (#2419). */
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
+  const currentChatSafetyStop = () => currentChatErrorEntry()?.code === "codex_safety_stop";
+  /** All New chat entry points clear the old banner only after the host accepts the reset. */
+  const startNewChat = createMemo(() => {
+    const start = props.onClearAgentContext;
+    const target = currentTarget();
+    if (!start || !target) return undefined;
+    const key = composerDraftKey(target);
+    return async () => {
+      const error = conversationErrorRuns()[key];
+      await start();
+      if (!error || conversationErrorRuns()[key] !== error || conversationErrors()[key] !== error.message) return;
+      clearConversationError(target);
+      setConversationErrorRuns((current) => {
+        const { [key]: _cleared, ...next } = current;
+        return next;
+      });
+    };
+  });
+  const [newChatRequest, setNewChatRequest] = createSignal<{
+    agent: NonNullable<ConversationProps["agent"]>;
+    start: () => Promise<void>;
+  } | null>(null);
+  function requestNewChat(command = false): boolean {
+    const agent = props.agent;
+    const start = startNewChat();
+    const target = currentTarget();
+    if (!agent || !start || !target || props.channel) return false;
+    const key = composerDraftKey(target);
+    const draft = currentDraft();
+    setNewChatRequest({
+      agent,
+      start: async () => {
+        await start();
+        // Cancel and a failed reset keep the command. A later edit belongs to the user.
+        if (command)
+          setDrafts((current) => (current[key] === draft ? { ...current, [key]: { ...draft, text: "" } } : current));
+      },
+    });
+    return true;
+  }
+  const closeNewChat = () => setNewChatRequest(null);
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
@@ -1179,7 +1221,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editQueuedMessage,
     cancelQueuedMessageEdit,
     reorderPresentedQueue,
-    submitComposer,
+    submitComposer: submitDraft,
     steerComposer,
     composerAnswersPrompt,
     sendSelectionInstruction,
@@ -1188,6 +1230,22 @@ export function createConversationViewScope(props: ConversationProps) {
     editPendingSend,
     dismissPendingSend,
   } = actions;
+  function submitComposer(): void {
+    const draft = currentDraft();
+    if (
+      draft.text.trim() === "/new" &&
+      draft.attachments.length === 0 &&
+      !draft.replyToMessageId &&
+      !currentEditingDeliveryId() &&
+      !composerAnswersPrompt() &&
+      voicePhase() === "idle" &&
+      !attachmentBusy() &&
+      !submitting() &&
+      requestNewChat(true)
+    )
+      return;
+    submitDraft();
+  }
   createEffect(
     () => {
       const deliveryId = currentEditingDeliveryId();
@@ -2545,6 +2603,11 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatError,
     currentChatErrorReference,
     currentChatErrorRun,
+    currentChatSafetyStop,
+    startNewChat,
+    newChatRequest,
+    requestNewChat,
+    closeNewChat,
     currentChatErrorLink,
     currentChatConversationKey,
     dismissCurrentChatErrors,
