@@ -109,10 +109,10 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "questo",
       "come",
       "ma",
-      "la",
     ]),
-    // A word that ends in an accented vowel, such as città, più or così; not là, déjà, voilà or où.
-    letters: /(?:^|\P{L})(?!(?:l|o|déj|voil)[àù](?!\p{L}))\p{L}+[àèìòù](?!\p{L})/gu,
+    // The word è, and a word that ends in an accented vowel, such as città, più or così; not là, déjà,
+    // voilà or où.
+    letters: /(?:^|\P{L})(?:è|(?!(?:l|o|déj|voil)[àù](?!\p{L}))\p{L}+[àèìòù])(?!\p{L})/gu,
   },
   {
     language: "pt",
