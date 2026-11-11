@@ -662,8 +662,9 @@ export class DrainScheduler {
         // A routine run in its own session leaves the chat session as it is.
         const ownSession = this.#runsInOwnSession(context);
         if (agent && publicThreadId === agent.threadId) {
-          // When only such runs wait, the new chat that the agent asked for starts before them, so their
-          // answers are in the new chat (#7129). Another message ends the request.
+          // When only such runs wait, the new chat that the agent asked for starts before them, so they do
+          // not cancel it (#7129). Their queued messages keep them above the new chat's marker: like each
+          // message above it, the agent does not see their answers. Another message ends the request.
           const queued = this.#mailbox.laneQueuedIds(agentId, null);
           if (
             ownSession &&
