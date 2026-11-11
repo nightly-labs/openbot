@@ -26,6 +26,28 @@
   animation-delay: var(--openbot-duration-overlay);
 }
 
+/* A main window that the user does not look at keeps the loops of a working agent still, on their
+   current frame. See `AmbientMotion`. The task list pauses through `--task-list-play-state`. */
+:root[data-openbot-ambient-motion-paused]
+:is(
+  .ui-spinner,
+  .agent-row-thinking-dots i,
+  .agent-activity-label,
+  .subagents-status-icon,
+  .chat-action-target-status-in-progress .ui-marker-icon svg,
+  .context-meter-ring .ui-radial-progress-chart,
+  .image-generation-glow,
+  .image-generation-label
+) {
+  animation-play-state: paused;
+}
+
+/* A new plain label still rises into place, so its text stays readable. The values follow the order of
+   the plain label's animations in messages.css: the rise, then the light. */
+:root[data-openbot-ambient-motion-paused] .agent-activity-entry[data-plain="true"] .agent-activity-label {
+  animation-play-state: running, paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .agent-row-thinking-dots i,
   .team-typing-dots i,

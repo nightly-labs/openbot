@@ -782,16 +782,6 @@
   animation: agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
 }
 
-/* A main window that the user does not look at keeps the light still. See `AmbientMotion`. A new
-   plain label still rises into place, so the step text stays readable. */
-:root[data-openbot-ambient-motion-paused] .agent-activity-label {
-  animation-play-state: paused;
-}
-
-:root[data-openbot-ambient-motion-paused] .agent-activity-entry[data-plain="true"] .agent-activity-label {
-  animation-play-state: running, paused;
-}
-
 @keyframes agent-activity-label-enter {
   from {
     opacity: 0;

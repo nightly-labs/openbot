@@ -2113,11 +2113,6 @@ html.ui-textarea-resizing {
   animation: ui-spin 720ms linear infinite;
 }
 
-/* A main window that the user does not look at keeps its spinners still. See `AmbientMotion`. */
-:root[data-openbot-ambient-motion-paused] .ui-spinner {
-  animation-play-state: paused;
-}
-
 .ui-spinner[data-size="sm"] {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);

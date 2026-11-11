@@ -11,6 +11,8 @@ import { usePlatform } from "./platform";
  */
 export function WindowAmbientMotion(props: { children: JSX.Element }): JSX.Element {
   const platform = usePlatform();
+  // The landing preview is a demo on a web page, not a window open beside another app.
+  if (platform.landingPreview) return props.children;
   const [pointerOn, setPointerOn] = createSignal(false);
   const allowed = createMemo(() => platform.appFocused() || pointerOn());
 
@@ -21,14 +23,19 @@ export function WindowAmbientMotion(props: { children: JSX.Element }): JSX.Eleme
       if (event.relatedTarget === null) setPointerOn(false);
     };
     // Another app can come over the pointer without a pointer event, so the pointer must move again.
-    const blur = () => setPointerOn(false);
+    const forget = () => setPointerOn(false);
+    const hide = () => {
+      if (document.hidden) forget();
+    };
     document.addEventListener("pointermove", move, { passive: true });
     document.addEventListener("pointerout", leave);
-    window.addEventListener("blur", blur);
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("blur", forget);
     return () => {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerout", leave);
-      window.removeEventListener("blur", blur);
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("blur", forget);
     };
   });
 

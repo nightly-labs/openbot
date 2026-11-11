@@ -33,7 +33,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { ComposerAgent } from "../../data";
@@ -348,7 +348,9 @@ export function AgentDock(props: AgentDockProps) {
   /** The pointer is on a part of the dock that takes it. The stage itself lets the pointer through. */
   const [pointerOn, setPointerOn] = createSignal(false);
   // The dock stays above the other apps. A working agent moves on it only while the user uses the dock.
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  // A dock in the main window also follows that window, which pauses while the user is in another app.
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && (pointerOn() || dragging() || state.open !== null);
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
