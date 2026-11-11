@@ -49,6 +49,8 @@ export const messages = {
     "Deze externe host ondersteunt geen navigatie via de adresbalk in een bestaand tabblad.",
   "error.backend.browserUserControlBusy":
     "Dit browsertabblad wacht op een geheim. Beantwoord eerst het verzoek om het geheim.",
+  "error.backend.browserTeachBusy":
+    "Iemand anders bestuurt dit browsertabblad. Probeer het opnieuw wanneer die persoon klaar is.",
   "error.backend.browserTeachUnavailable": "Dit browsertabblad heeft geen agent die een taak kan leren.",
   "error.backend.browserTeachUnsupported": "Deze externe host ondersteunt de opname van een taak niet.",
   "error.backend.browserUserControlUnsupported":

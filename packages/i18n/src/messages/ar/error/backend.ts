@@ -46,6 +46,7 @@ export const messages = {
   "error.backend.browserNavigateUnsupported":
     "لا يدعم هذا المضيف البعيد التنقل عبر شريط العنوان في علامة تبويب موجودة.",
   "error.backend.browserUserControlBusy": "علامة تبويب المتصفح هذه تنتظر سرًا. أجب عن طلب السر أولًا.",
+  "error.backend.browserTeachBusy": "يتحكم شخص آخر في علامة تبويب المتصفح هذه. حاول مرة أخرى عندما ينتهي.",
   "error.backend.browserTeachUnavailable": "لا يوجد لعلامة تبويب المتصفح هذه وكيل يمكنه تعلّم مهمة.",
   "error.backend.browserTeachUnsupported": "لا يدعم هذا المضيف البعيد تسجيل مهمة.",
   "error.backend.browserUserControlUnsupported": "لا يدعم هذا المضيف البعيد التحكم في علامة تبويب المتصفح.",

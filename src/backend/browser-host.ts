@@ -1471,7 +1471,7 @@ export class BrowserHost {
       return yield* browserFailure(new Error(sourceText("error.backend.browserTeachUnavailable")));
     const held = this.#userControlTabIds.get(tabId);
     if (held && !sameUserControlHolder(held, holder))
-      return yield* browserFailure(new Error(sourceText("error.backend.browserUserControlBusy")));
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTeachBusy")));
     yield* this.takeUserControl(tabId, holder);
     // The tab can close or change hands while the take waits for its place in the tab queue.
     const current = this.#userControlTabIds.get(tabId);

@@ -48,6 +48,8 @@ export const messages = {
     "Cet hôte distant ne prend pas en charge la navigation par la barre d’adresse dans un onglet existant.",
   "error.backend.browserUserControlBusy":
     "Cet onglet du navigateur attend un secret. Répondez d’abord à la demande de secret.",
+  "error.backend.browserTeachBusy":
+    "Une autre personne contrôle cet onglet du navigateur. Réessayez quand elle aura terminé.",
   "error.backend.browserTeachUnavailable": "Cet onglet du navigateur n’a aucun agent qui peut apprendre une tâche.",
   "error.backend.browserTeachUnsupported": "Cet hôte distant ne prend pas en charge l’enregistrement d’une tâche.",
   "error.backend.browserUserControlUnsupported":

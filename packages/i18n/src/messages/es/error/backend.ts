@@ -48,6 +48,8 @@ export const messages = {
     "Este host remoto no admite navegar con la barra de direcciones en una pestaña existente.",
   "error.backend.browserUserControlBusy":
     "Esta pestaña del navegador espera un secreto. Responde primero a la solicitud del secreto.",
+  "error.backend.browserTeachBusy":
+    "Otra persona controla esta pestaña del navegador. Inténtalo de nuevo cuando termine.",
   "error.backend.browserTeachUnavailable":
     "Esta pestaña del navegador no tiene un agente que pueda aprender una tarea.",
   "error.backend.browserTeachUnsupported": "Este host remoto no admite la grabación de una tarea.",
