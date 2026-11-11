@@ -828,6 +828,7 @@ function registerIpcHandlers({
   cuaDriver,
   computerUsePermissionHelp,
   storageUsage,
+  libraryFoldersService,
   machineAlerts,
   trace,
   resourceMonitor,
@@ -1070,6 +1071,7 @@ function registerIpcHandlers({
     }),
     ...storageIpcHandlers({
       storage: storageUsage,
+      libraryFolders: libraryFoldersService,
       machine: machineAlerts,
       providerRuntimes,
       mailbox,
@@ -1082,6 +1084,7 @@ function registerIpcHandlers({
     ...agentIpcHandlers({
       service,
       sidebarLayout,
+      libraryFolders: libraryFoldersService,
       sidebarPins,
       host,
       remoteServers,

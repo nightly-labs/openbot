@@ -14,7 +14,12 @@ export interface FilesPort {
     Partial<
       Pick<
         OpenBotDesktopApi["storage"],
-        "getRemovableRuntimes" | "removeRemovableRuntimes" | "getMachineMetrics" | "getDisk"
+        | "getRemovableRuntimes"
+        | "removeRemovableRuntimes"
+        | "getMachineMetrics"
+        | "getDisk"
+        | "getLibraryFolders"
+        | "changeLibraryFolders"
       >
     >;
   /** The machine alert settings, beside `storage.getMachineMetrics`. */

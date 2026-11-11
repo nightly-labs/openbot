@@ -15,6 +15,7 @@ import {
 import type { GeneratedAttachmentSource, MailboxStore } from "../mailbox-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "../workspace-paths";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { type AgentLibraryFolders, placeInLibraryFolder } from "./library-folder-tools";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 
 export interface AttachmentGatewayHooks {
@@ -53,6 +54,8 @@ export interface AttachmentGatewayOptions {
   mailbox: MailboxStore;
   /** `AgentStore.sharedRoot`, passed as a string so this class never opens the store. */
   sharedRoot: string;
+  /** The Library folders of this host. With none, the `folder` of an attach call places no file. */
+  libraryFolders?: AgentLibraryFolders | null;
   hooks: AttachmentGatewayHooks;
 }
 
@@ -72,6 +75,7 @@ export class AttachmentGateway {
   readonly #conversation: ConversationRuntime;
   readonly #mailbox: MailboxStore;
   readonly #sharedRoot: string;
+  readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #hooks: AttachmentGatewayHooks;
   readonly #inFlight = new Map<string, Deferred.Deferred<OpenBotToolResponse, AttachmentOperationError>>();
 
@@ -79,6 +83,7 @@ export class AttachmentGateway {
     this.#conversation = options.conversation;
     this.#mailbox = options.mailbox;
     this.#sharedRoot = options.sharedRoot;
+    this.#libraryFolders = options.libraryFolders ?? null;
     this.#hooks = options.hooks;
   }
 
@@ -88,12 +93,13 @@ export class AttachmentGateway {
     params: { threadId: string; turnId: string; callId: string },
     paths: string[],
     messageId: string,
+    folder?: string,
   ) {
     const inFlight = this.#inFlight.get(messageId);
     if (inFlight) return yield* Deferred.await(inFlight);
     const completion = Deferred.makeUnsafe<OpenBotToolResponse, AttachmentOperationError>();
     this.#inFlight.set(messageId, completion);
-    const exit = yield* Effect.exit(this.#attachFilesToResponse(senderAgentId, params, paths, messageId));
+    const exit = yield* Effect.exit(this.#attachFilesToResponse(senderAgentId, params, paths, messageId, folder));
     yield* Deferred.done(completion, exit);
     if (this.#inFlight.get(messageId) === completion) this.#inFlight.delete(messageId);
     return yield* exit;
@@ -192,22 +198,14 @@ export class AttachmentGateway {
     params: { threadId: string; turnId: string; callId: string },
     paths: string[],
     messageId: string,
+    folder: string | undefined,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const publicThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     const snapshot = this.#conversation.ensureSnapshot(senderAgentId, publicThreadId);
     const existing = snapshot.messages.find((message) => message.id === messageId);
-    if (existing) {
-      return yield* attachmentCall(() =>
-        openBotToolResult({
-          status: "attached",
-          messageId,
-          attachments: (existing.attachments ?? []).map((attachment) => ({
-            id: attachment.id,
-            name: attachment.name,
-          })),
-        }),
-      );
-    }
+    // A repeated call finds its message. It puts the files into the folder again, which changes
+    // nothing when the first attempt did it, and completes an attempt that stopped before it.
+    if (existing) return yield* this.#attachedResult(senderAgentId, messageId, existing.attachments ?? [], folder);
 
     return yield* Effect.acquireUseRelease(
       this.#openSources(senderAgentId, paths, WORKSPACE_OR_SHARED),
@@ -263,16 +261,40 @@ export class AttachmentGateway {
               // A committed attachment remains successful even if event listeners fail.
             }
           }
-          return yield* attachmentCall(() =>
-            openBotToolResult({
-              status: "attached",
-              messageId,
-              attachments: attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })),
-            }),
-          );
+          return yield* this.#attachedResult(senderAgentId, messageId, attachments, folder);
         }),
       (sources) =>
         attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close()))).pipe(Effect.orDie),
+    );
+  });
+
+  /**
+   * The tool result for files that the conversation holds. The folder step runs after the files are
+   * saved and cannot fail the call: the result names the folder, or says why the files are in none.
+   */
+  readonly #attachedResult = Effect.fn("AttachmentGateway.attachedResult")(function* (
+    this: AttachmentGateway,
+    senderAgentId: string,
+    messageId: string,
+    attachments: readonly { id: string; name: string }[],
+    folder: string | undefined,
+  ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
+    const placed =
+      folder === undefined
+        ? null
+        : yield* placeInLibraryFolder(
+            this.#libraryFolders,
+            senderAgentId,
+            folder,
+            attachments.map((attachment) => attachment.id),
+          );
+    return yield* attachmentCall(() =>
+      openBotToolResult({
+        status: "attached",
+        messageId,
+        attachments: attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })),
+        ...(placed === null ? {} : { folder: placed }),
+      }),
     );
   });
 

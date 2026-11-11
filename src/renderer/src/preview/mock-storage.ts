@@ -1,4 +1,10 @@
-import type { GetStorageUsageInput, StorageDesktopApi, StorageUsage } from "@openbot/contracts/ipc";
+import {
+  applyLibraryFolderAction,
+  EMPTY_LIBRARY_FOLDERS,
+  type GetStorageUsageInput,
+  type StorageDesktopApi,
+  type StorageUsage,
+} from "@openbot/contracts/ipc";
 import {
   FILES_AGENT_USAGE,
   FILES_BREAKDOWN,
@@ -16,6 +22,7 @@ export function createMockStorage(): StorageDesktopApi {
   let files = structuredClone(FILES_ROWS);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
+  let libraryFolders = structuredClone(EMPTY_LIBRARY_FOLDERS);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
     // The fixtures hold no channel messages, so a channel has no files here.
@@ -57,12 +64,23 @@ export function createMockStorage(): StorageDesktopApi {
     deleteFile: async ({ fileId }) => {
       if (!files.some((file) => file.id === fileId)) throw new Error("The file does not exist or is already deleted.");
       files = files.filter((file) => file.id !== fileId);
+      const { [fileId]: _folder, ...placement } = libraryFolders.placement;
+      libraryFolders = { ...libraryFolders, placement };
     },
     clear: async ({ category }) => {
       breakdown = breakdown.map((row) => (row.category === category ? { ...row, bytes: 0 } : row));
     },
     openFile: async () => undefined,
     openLocation: async () => undefined,
+    getLibraryFolders: async () => structuredClone(libraryFolders),
+    changeLibraryFolders: async (action) => {
+      libraryFolders = applyLibraryFolderAction(libraryFolders, action, {
+        // The preview has no fixed list of agents: each agent can have folders.
+        agentIds: { has: () => true },
+        fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
+      });
+      return structuredClone(libraryFolders);
+    },
     getRemovableRuntimes: async () => structuredClone(removableRuntimes),
     removeRemovableRuntimes: async () => {
       const { bytes } = removableRuntimes;
