@@ -754,7 +754,8 @@ takes the answers that are already in. Each end of a copy schedules a drain for 
 Nothing else wakes the requester, so a turn of teammate results that ends with no answer and no
 step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
 with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
-(a quiet teammate update or routine run), compacted, or showed a plan. The error waits for the end
+(a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
+by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model;
 the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
