@@ -9,6 +9,7 @@ import { app, BrowserWindow, nativeTheme, session, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { exportStartDiagnostics } from "./maintenance-service";
 import type { StartAttemptsSummary } from "./start-attempts";
+import { recoveryPlushSvg } from "./start-recovery-plush";
 import { isValidSemver } from "./update-service";
 
 const logger = createOpenBotLogger("start-recovery");
@@ -45,9 +46,10 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
     callback({ cancel: !details.url.startsWith("data:") }),
   );
   const window = new BrowserWindow({
-    // The content size: five buttons, the texts of a long language and the notice after an export.
+    // The content size: the plush, five buttons, the texts of a long language and the notice after an
+    // export.
     width: 520,
-    height: 560,
+    height: 640,
     useContentSize: true,
     minWidth: 420,
     minHeight: 420,
@@ -81,8 +83,10 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
     settled = true;
     resolveChoice(next);
   };
+  const plush = recoveryPlushSvg();
   const render = (notice: Notice | null) => {
-    void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(recoveryPage(options, notice))}`);
+    const page = recoveryPage(options, plush, notice);
+    void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
   };
 
   const contents = window.webContents;
@@ -175,7 +179,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function recoveryPage(options: StartRecoveryOptions, notice: Notice | null): string {
+function recoveryPage(options: StartRecoveryOptions, plush: string | null, notice: Notice | null): string {
   const t = options.translate;
   const text = (value: string) => escapeHtml(value).replaceAll("\n", "<br>");
   const link = (action: RecoveryAction, label: string, primary = false) =>
@@ -190,15 +194,25 @@ function recoveryPage(options: StartRecoveryOptions, notice: Notice | null): str
 <html lang="${escapeHtml(options.locale)}" dir="${localeDirection(options.locale)}">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
 <title>${text(t("startup.recoveryWindowTitle"))}</title>
 <style>
 :root { color-scheme: light dark; --text: #1d1d1f; --muted: #6e6e73; --surface: #ffffff; --line: #d2d2d7; --button: #f2f2f4; --primary: #1d1d1f; --primary-text: #ffffff; }
 @media (prefers-color-scheme: dark) { :root { --text: #f5f5f7; --muted: #a1a1a6; --surface: #1c1c1e; --line: #3a3a3c; --button: #2c2c2e; --primary: #f5f5f7; --primary-text: #1c1c1e; } }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--surface); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; flex-direction: column; padding: 32px; gap: 16px; }
+body { background: var(--surface); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; flex-direction: column; padding: 24px 32px 32px; gap: 16px; text-align: center; }
 h1 { font-size: 20px; line-height: 1.3; margin: 0; font-weight: 600; }
+.plush { display: block; width: 132px; height: 120px; margin: 0 auto -4px; overflow: visible; transform-origin: 50% 88%; }
+.plush-eyes { transform-box: view-box; transform-origin: 0 0; }
+.intro .plush { animation: plush-land 700ms cubic-bezier(0.3, 0, 0.3, 1) both, plush-shake 900ms ease-in-out 900ms, plush-breathe 3600ms ease-in-out 2000ms infinite; }
+.intro .plush-eyes { animation: plush-look 900ms ease-in-out 900ms; }
+body:not(.intro) .plush { animation: plush-breathe 3600ms ease-in-out infinite; }
+@keyframes plush-land { 0% { opacity: 0; transform: translateY(-48px); } 55% { opacity: 1; transform: translateY(0) scale(1.08, 0.88); } 75% { transform: translateY(-4px) scale(0.97, 1.04); } 100% { transform: none; } }
+@keyframes plush-shake { 0%, 100% { transform: none; } 20% { transform: rotate(-4deg); } 45% { transform: rotate(3.5deg); } 70% { transform: rotate(-2deg); } 88% { transform: rotate(1deg); } }
+@keyframes plush-look { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 45% { transform: translateX(8px); } 70% { transform: translateX(-4px); } 88% { transform: translateX(2px); } }
+@keyframes plush-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.015, 0.985); } }
+@media (prefers-reduced-motion: reduce) { .plush, .plush-eyes { animation: none !important; } }
 p { margin: 0; }
 .muted { color: var(--muted); }
 .notice { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
@@ -208,7 +222,8 @@ p { margin: 0; }
 .button:focus-visible { outline: 1px solid var(--muted); outline-offset: 2px; }
 </style>
 </head>
-<body>
+<body${notice ? "" : ' class="intro"'}>
+${plush ?? ""}
 <h1>${text(t("startup.recoveryTitle"))}</h1>
 <p>${text(t("startup.recoveryBody", { version: options.summary.appVersion, count: options.summary.consecutiveFailures }))}</p>
 <p class="muted">${text(t("startup.recoveryHint"))}</p>
