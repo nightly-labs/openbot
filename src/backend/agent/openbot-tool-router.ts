@@ -1059,7 +1059,20 @@ export class OpenBotToolRouter {
     }
     const keys = yield* apiKeys.list(agentId).pipe(Effect.catch(() => Effect.succeed<SavedApiKey[]>([])));
     const path = keys.find((entry) => entry.name === name)?.path ?? null;
-    return openBotToolResult({ status: saved.success.created ? "added" : "updated", name, path });
+    const status = saved.success.created ? "added" : "updated";
+    // An installed local MCP app keeps the key that the user typed for it and never reads the Vault, so
+    // without this the agent reports a fix while the app still sends its old key.
+    const apps = (this.#mcpServers?.list() ?? [])
+      .filter((config) => config.transport === "stdio" && config.env.some((pair) => pair.key === name))
+      .map((config) => config.name);
+    if (apps.length === 0) return openBotToolResult({ status, name, path });
+    return openBotToolResult({
+      status,
+      name,
+      path,
+      apps,
+      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to open Marketplace, open the app, and click Change key.`,
+    });
   });
 
   /**
