@@ -193,6 +193,9 @@ export const readPlanLimits = Effect.fn("TeamClient.readPlanLimits")(function* (
   return { usage: withSignInUsage(extra?.[0], signInUsage), accounts: extra?.[1].providers ?? null };
 });
 
+/** Cursor's own models, which a split Cursor plan counts in `primary`. An agent with no model runs Cursor's default. */
+const CURSOR_OWN_MODEL = /^(?:auto|default|composer|grok)/iu;
+
 /** A plan window that is spent and has not ended yet, as the composer notice and the model picker read it. */
 export interface SpentUsageWindow {
   slot: "primary" | "secondary";
@@ -220,19 +223,28 @@ export function spentUsageWindow(
     // and a model that no group lists has no spent window.
     const quota = usageQuotaForModel(limit, model);
     if (!quota) continue;
+    // A split Cursor plan holds Cursor's own models in `primary` and every other model in `secondary`.
+    // Cursor's own models go on in the other window when theirs is spent, so only both stop them (#6707).
+    const cursorSplit = provider === "cursor" && Boolean(quota.primary && quota.secondary);
+    const ownCursorModel = cursorSplit && CURSOR_OWN_MODEL.test(model || "default");
+    const slots = cursorSplit && !ownCursorModel ? (["secondary"] as const) : (["primary", "secondary"] as const);
     // When two windows are spent, the model can run only after both reset: keep the one that resets
     // last. A window with no reset time never gives the quota back.
     let spent: SpentUsageWindow | null = null;
-    for (const slot of ["primary", "secondary"] as const) {
+    let open = false;
+    for (const slot of slots) {
       const window = quota[slot];
-      if (!window || window.usedPercent < 100) continue;
-      if (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs) continue;
+      if (!window) continue;
+      if (window.usedPercent < 100 || (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs)) {
+        open = true;
+        continue;
+      }
       if (spent && (window.resetsAt ?? Number.POSITIVE_INFINITY) <= (spent.window.resetsAt ?? Number.POSITIVE_INFINITY))
         continue;
       // A named group is the model's own quota.
       spent = { slot, window, covers: quota !== limit || accountUsageCoversModel(provider, model) };
     }
-    if (spent) return spent;
+    if (spent && !(ownCursorModel && open)) return spent;
   }
   return null;
 }
