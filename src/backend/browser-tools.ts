@@ -49,7 +49,8 @@ const nth = z
   .exactOptional();
 
 const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+  // The advertised schema merges the target kinds and keeps only `kind` as required, so name this rule.
+  z.object({ kind: z.literal("ref"), ref: identifier, revision: revision.describe("Required for kind=ref.") }),
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
