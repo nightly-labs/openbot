@@ -196,6 +196,13 @@ export interface AcpFlavor {
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
    */
   planUsedUpChunk?: RegExp;
+  /**
+   * The agent runs an approved edit under a second tool call id. At the end of the turn it reports
+   * the approved id as failed with this text, although the edit ran. OpenBot shows the approved call
+   * as completed when an edit of the same file, or the only approved edit, completed under another
+   * id in the turn. Without such an edit, the failure stays.
+   */
+  approvedEditSweep?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
   /**
