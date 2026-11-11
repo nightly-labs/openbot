@@ -53,7 +53,7 @@ export interface McpToolRuntimes {
   readonly catalogCommand?: (config: McpServerConfig) => McpCatalogCommand | "pending" | null;
 }
 
-export interface McpCatalogCommand {
+interface McpCatalogCommand {
   command: string;
   args: readonly string[];
 }
