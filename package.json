@@ -543,7 +543,7 @@
     "axe-core": "4.14.0",
     "class-variance-authority": "catalog:",
     "cuelume": "0.2.8",
-    "electron": "44.9.3",
+    "electron": "45.3.0",
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
     "jsdom": "catalog:",

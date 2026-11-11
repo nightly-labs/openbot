@@ -91,6 +91,9 @@ import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } fr
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
+/** The failure of a snapshot of a page that navigated during the read. */
+export const SNAPSHOT_NAVIGATED_MESSAGE = "Page navigated during the browser snapshot. Take a fresh snapshot.";
+
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
 const MAX_RESULT_BYTES = 64 * 1024;
@@ -843,7 +846,7 @@ export class BrowserCdpEngine {
           if (navigationGeneration === this.#navigationGeneration) [parsed, focus] = yield* collect();
         }
         if (navigationGeneration !== this.#navigationGeneration) {
-          return yield* browserFailure(new Error("Page navigated during the browser snapshot. Take a fresh snapshot."));
+          return yield* browserFailure(new Error(SNAPSHOT_NAVIGATED_MESSAGE));
         }
         const viewport = readViewport(metrics, context.environment);
         const snapshot: BrowserSnapshot = {
