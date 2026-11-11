@@ -135,7 +135,8 @@ Two deferred tools recover omitted text without model calls for search or summar
 
 - `history_search` searches the calling conversation, with five results by default and ten maximum.
   Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
-- `history_read` returns recent messages, a named message, or a page before a returned cursor.
+- `history_read` returns recent messages, a named message, or a page before a returned cursor or
+  a returned `messageId` of the same conversation.
   It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
   `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
   as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work
