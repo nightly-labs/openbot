@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
 import { promisify } from "node:util";
 import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
@@ -211,10 +212,7 @@ export class AcpConnection {
     error: unknown,
     ended: Deferred.Deferred<ProcessEnd> | null,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
-    if (!ended || this.#stopping) return yield* providerSync(() => error);
-    const message = error instanceof Error ? error.message : "";
-    if (message !== "ACP connection closed" && message !== "ACP client is not running.")
-      return yield* providerSync(() => error);
+    if (!ended || this.#stopping || !isClosedConnection(error)) return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),
     );
@@ -231,11 +229,32 @@ export class AcpConnection {
     );
   });
 
+  /**
+   * The failure of a prompt on a process that all sessions of the agent share, as Cursor's. It does
+   * not wait for the process to end, as `explainEnd` does: the runtime hears that end first and then
+   * keeps the turn for its recovery, so the turn did not fail as before. The chat showed only "ACP
+   * connection closed" (#7185).
+   */
+  explainClose(error: unknown): unknown {
+    if (!this.#ended || this.#stopping || !isClosedConnection(error)) return error;
+    return new AgentProcessExitError(
+      sourceText("error.provider.acpProcessStopped", { provider: this.options.label() }),
+      null,
+      { cause: error },
+    );
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
     this.#process = null;
     if (!this.#stopping) this.options.exit(error);
   }
+}
+
+/** The SDK's failure of each open request when the agent's output ends. */
+function isClosedConnection(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return message === "ACP connection closed" || message === "ACP client is not running.";
 }
 
 /**

@@ -242,6 +242,7 @@ export const messages = {
     "O modelo do OpenCode encerrou o turno depois do raciocínio, sem resposta. Tente novamente ou escolha outro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} encerrou o turno sem resposta. Envie a mensagem novamente ou inicie um novo chat.",
+  "error.provider.acpProcessStopped": "{provider} parou antes de responder. Envie a mensagem novamente.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",
