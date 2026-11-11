@@ -175,6 +175,7 @@ import {
   decodeHostVaultImport,
   decodeHostVaultState,
   decodeInstalledSkills,
+  decodeMcpAccessSnapshot,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
   decodeMcpSignInStates,
@@ -221,6 +222,7 @@ import {
   isAgentModel,
   isAgentStatus,
   isSharedTable,
+  type McpAccessSnapshot,
   type McpServerConfig,
   type McpSignInAppInput,
   type McpSignInAppState,
@@ -258,6 +260,7 @@ import {
   type SetAgentProviderAccountInput,
   type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
+  type SetMcpAccessInput,
   type SetMcpServerEnabledInput,
   type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
@@ -321,6 +324,7 @@ import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
@@ -1070,6 +1074,28 @@ export function setMcpServerEnabled(
   input: SetMcpServerEnabledInput,
 ): Effect.Effect<McpServerConfig[], TeamAdminRequestError> {
   return adminCall(() => request("POST", MCP_ROUTES.toggle, decodeMcpServerConfigs, { ...input }));
+}
+
+/** Who gets each MCP server of the host (`mcp-access-v1`). A member reads only `mine`. */
+export function getHostMcpAccess(request: TeamApiRequest): Effect.Effect<McpAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() => request("POST", MCP_ACCESS_ROUTES.read, decodeMcpAccessSnapshot, {}));
+}
+
+/**
+ * A full replace of the access of one MCP server. The host answers only an owner or admin, and refuses
+ * a revision other than the one it holds with 409.
+ */
+export function setHostMcpAccess(
+  request: TeamApiRequest,
+  input: SetMcpAccessInput,
+): Effect.Effect<McpAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MCP_ACCESS_ROUTES.set, decodeMcpAccessSnapshot, {
+      revision: input.revision,
+      mcpServerId: input.mcpServerId,
+      access: { agents: input.access.agents, everyone: input.access.everyone, roles: { ...input.access.roles } },
+    }),
+  );
 }
 
 /** The host makes the connection with its own stored credentials, and opens no browser. */

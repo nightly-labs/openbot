@@ -401,6 +401,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
+  // A named function, not a ternary in the prop: a ternary makes a memo on each read, and a read
+  // from an effect callback (a select that reports a change) then halts the renderer.
+  const hostName = () => (local() ? undefined : props.server.name);
   // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
   // because its owner chooses there who can control the computer.
   const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
@@ -1009,7 +1012,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(providers) => (
                 <HostProviderSettingsPanel
                   {...providers()}
-                  hostName={local() ? undefined : props.server.name}
+                  hostName={hostName()}
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}

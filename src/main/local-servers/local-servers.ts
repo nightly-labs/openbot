@@ -3,8 +3,9 @@
 // over the loopback Team API, as it reaches a joined server, and logs in as its owner at each start.
 //
 // A child ends when its control pipe closes, so it stops also when this process is killed. The
-// supervisor starts a child again after it stops on its own, a few times only, so a child that cannot
-// start does not use the computer's power in a loop.
+// supervisor starts a child again after it stops on its own or after a start that nobody waits for
+// fails, a few times only, so a child that cannot start does not use the computer's power in a loop.
+// After that, Retry on the server's connection screen starts it again.
 //
 // The owner password goes to the child in its environment, and the child removes it from there at
 // once. No password or session token is written to a log.
@@ -262,8 +263,15 @@ export class LocalServers {
   readonly #spawn: SpawnChild;
   readonly #scope = Scope.makeUnsafe("parallel");
   readonly #running = new Map<string, RunningChild>();
-  /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
+  /**
+   * The times each server stopped on its own or failed a start that nobody waits for, in the last
+   * `RESTART_WINDOW_MS`. A restart or a Retry from the user clears them.
+   */
   readonly #exits = new Map<string, number[]>();
+  /** The registry ids that wait for a start after a stop. */
+  readonly #restartPending = new Set<string>();
+  /** The starts in progress of `#startIfStopped`, by registry id. Another caller waits for the same start. */
+  readonly #starts = new Map<string, Deferred.Deferred<ServerSummary, LocalServerFailure>>();
   /** The agents that work on each running server, by registry id. */
   readonly #working = new Map<string, AgentSummary[]>();
   /** The last ready line of each running server, by registry id. */
@@ -364,7 +372,23 @@ export class LocalServers {
           .detachLocalServer(entry.serverId, false)
           .pipe(Effect.catch(() => Effect.void));
     }
-    for (const entry of this.#registry.servers) this.#background(this.#start(entry, false));
+    for (const entry of this.#registry.servers) this.#startInBackground(entry);
+  });
+
+  /**
+   * Retry on the connection screen of a server on this computer. A server with no child starts again,
+   * and a Retry during a start waits for that start. Null when its child runs: the caller then retries
+   * the connection. Not a server on this computer: null.
+   */
+  readonly startStopped = Effect.fn("LocalServers.startStopped")(function* (
+    this: LocalServers,
+    serverId: string,
+  ): Effect.fn.Return<ServerSummary | null, LocalServerFailure> {
+    const entry = this.#registry.findByServerId(serverId);
+    if (!entry) return null;
+    // The user asks for this start, so the stops before it do not count against the next restarts.
+    if (!this.#running.has(entry.id)) this.#exits.delete(entry.id);
+    return yield* this.#startIfStopped(entry);
   });
 
   /**
@@ -790,21 +814,58 @@ export class LocalServers {
     const serverId = this.#registry.find(entry.id)?.serverId;
     if (serverId)
       this.#background(this.#options.remoteServers.detachLocalServer(serverId, false).pipe(toLocalServerFailure));
+    this.#scheduleRestart(entry);
+  }
+
+  /** A start that nobody waits for. A failed one counts as a stop, so it is tried again a few times only. */
+  #startInBackground(entry: StoredLocalServer): void {
+    this.#background(
+      this.#startIfStopped(entry).pipe(Effect.tapError(() => Effect.sync(() => this.#scheduleRestart(entry)))),
+    );
+  }
+
+  /**
+   * Starts the server again after `RESTART_DELAY`, at most `RESTART_LIMIT` times in `RESTART_WINDOW_MS`.
+   * A child that stops during its start also fails the start: the restart that waits counts the two once.
+   */
+  #scheduleRestart(entry: StoredLocalServer): void {
+    if (this.#stopped || this.#restartPending.has(entry.id)) return;
     const now = Date.now();
     const exits = (this.#exits.get(entry.id) ?? []).filter((time) => now - time < RESTART_WINDOW_MS);
     exits.push(now);
     this.#exits.set(entry.id, exits);
     if (exits.length > RESTART_LIMIT) return;
+    this.#restartPending.add(entry.id);
     this.#background(
       Effect.sleep(RESTART_DELAY).pipe(
         Effect.andThen(
-          Effect.suspend(() => {
+          Effect.sync(() => {
+            this.#restartPending.delete(entry.id);
             const current = this.#registry.find(entry.id);
-            return current && !this.#running.has(entry.id) ? this.#start(current, false) : Effect.void;
+            if (current) this.#startInBackground(current);
           }),
         ),
       ),
     );
+  }
+
+  /** Starts the server when it has no child. A start in progress is shared; a running child gives null. */
+  #startIfStopped(entry: StoredLocalServer): Effect.Effect<ServerSummary | null, LocalServerFailure> {
+    return Effect.suspend(() => {
+      const pending = this.#starts.get(entry.id);
+      if (pending) return Deferred.await(pending);
+      if (this.#running.has(entry.id)) return Effect.succeed(null);
+      const done = Deferred.makeUnsafe<ServerSummary, LocalServerFailure>();
+      this.#starts.set(entry.id, done);
+      return this.#start(entry, false).pipe(
+        Effect.onExit((exit) =>
+          Effect.sync(() => {
+            if (this.#starts.get(entry.id) === done) this.#starts.delete(entry.id);
+            Deferred.doneUnsafe(done, exit);
+          }),
+        ),
+      );
+    });
   }
 
   /**

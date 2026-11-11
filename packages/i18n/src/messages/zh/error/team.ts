@@ -78,6 +78,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
+  "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "error.team.sidebarPinsUnsupported": "此服务器无法为你的所有设备保存已置顶的聊天。请在运行它的电脑上更新 OpenBot。",
@@ -156,6 +157,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "当前客户端不支持安全认证。",
   "error.team.agentSettingsUnsupported": "当前连接不支持助手设置。",
   "error.team.adminRequired": "需要管理员权限。",
+  "error.team.mcpAccessStale": "有人更改了此 MCP 服务器的访问权限。请重新进行更改。",
   "error.team.mcpServerNotYours": "只有添加此 MCP 服务器的人或管理员可以更改它。",
   "error.team.ownerRequired": "只有此服务器的所有者可以执行此操作。",
   "error.team.requestTooLarge": "请求体过大。",
@@ -171,6 +173,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "该服务器上没有任何助手展示过该登录链接。",
   "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
   "error.team.agentWaitsUnsupported": "此连接不支持未关闭的等待。",
+  "error.team.messagePinsUnsupported": "此连接不支持置顶消息。",
   "error.team.queuedMessageThreadUnsupported": "此连接不支持将排队的消息作为新线程运行。",
   "error.team.backgroundProcessesUnsupported": "此连接不支持后台进程。",
   "error.team.providerUseUnsupported": "当前连接不支持开启和关闭服务商。",

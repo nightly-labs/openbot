@@ -6,6 +6,7 @@ import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
+  type AgentAccessRole,
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
@@ -175,12 +176,15 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   type MachineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -243,10 +247,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import { agentAccessLevel } from "./agent-access-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { listenLoopback } from "./listen-loopback";
+import { mcpAccessLevel } from "./mcp-access-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
-import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
+import type { TeamApiMcpServerOwners, TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
 import {
   hiddenAgentView,
@@ -334,15 +339,18 @@ import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
+import { routeLibraryFolders } from "./team-api/route-library-folders";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./team-api/route-live-voice";
 import { routeLocalServers } from "./team-api/route-local-servers";
 import { routeMachineResources } from "./team-api/route-machine-resources";
 import { routeMcpServers } from "./team-api/route-mcp";
+import { routeMcpAccess } from "./team-api/route-mcp-access";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
 import { routeMessageDelete } from "./team-api/route-message-delete";
+import { routeMessagePins } from "./team-api/route-message-pins";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
@@ -1104,7 +1112,13 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
-      const { mcpServers, mcpServerOwners } = this.#options;
+      const { mcpServers } = this.#options;
+      const mcpServerOwners = this.#mcpServerOwners();
+      if (
+        (await routeMcpAccess(context, mcpServers, this.#options.mcpAccess, mcpServerOwners, () => this.#roles())) ===
+        "handled"
+      )
+        return;
       if (
         (await routeMcpServers(context, mcpServers, this.#options.mcpToolRuntimePreparation, mcpServerOwners)) ===
         "handled"
@@ -1140,7 +1154,17 @@ export class TeamApiServer {
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeProviderSignOut(context, this.#options.providerSignOut)) === "handled") return;
-      if ((await routeStorage(context, this.#options.storage, this.#options.channels, hidden)) === "handled") return;
+      if (
+        (await routeStorage(
+          context,
+          this.#options.storage,
+          this.#options.channels,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+          this.#options.libraryFolders,
+        )) === "handled"
+      )
+        return;
       if ((await routeMachineResources(context, this.#options.machine)) === "handled") return;
       if ((await routeBackgroundProcesses(context, this.#options.backgroundProcesses, hidden)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
@@ -1177,6 +1201,15 @@ export class TeamApiServer {
       )
         return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
+      if (
+        (await routeLibraryFolders(
+          context,
+          this.#options.libraryFolders,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+        )) === "handled"
+      )
         return;
       if (
         (await routeAgentNotificationLevels(
@@ -1241,6 +1274,8 @@ export class TeamApiServer {
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
+        return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
@@ -1380,6 +1415,7 @@ export class TeamApiServer {
       agents: this.#options.agents,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
+      libraryFolders: this.#options.libraryFolders,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
       ...(this.#options.admin?.modelVisibility ? { visibleModels: this.#options.admin.modelVisibility } : {}),
     });
@@ -2368,6 +2404,34 @@ export class TeamApiServer {
     return blocked;
   }
 
+  /** The roles of this host, or none when a damaged file closes them. */
+  #roles(): readonly AgentAccessRole[] {
+    const serverId = this.#options.store.getIdentity()?.serverId;
+    const levels = serverId ? this.#options.agentAccess?.levels(serverId) : undefined;
+    return levels && levels !== "closed" ? levels.roles : [];
+  }
+
+  /**
+   * Who added each MCP server, with the level of a member for it when the host keeps access entries
+   * (`mcp-access-v1`). A removed server also loses its entry.
+   */
+  #mcpServerOwners(): TeamApiMcpServerOwners | undefined {
+    const { mcpServerOwners: owners, mcpAccess } = this.#options;
+    if (!owners || !mcpAccess) return owners;
+    return {
+      addedBy: (mcpServerId, memberId) => owners.addedBy(mcpServerId, memberId),
+      add: (mcpServerId, memberId) => owners.add(mcpServerId, memberId),
+      remove: (mcpServerId) => owners.remove(mcpServerId).pipe(Effect.andThen(mcpAccess.remove(mcpServerId))),
+      level: (mcpServerId, memberId) =>
+        mcpAccessLevel(
+          mcpAccess.get(mcpServerId),
+          this.#accessMember(memberId),
+          this.#roles(),
+          owners.addedBy(mcpServerId, memberId),
+        ),
+    };
+  }
+
   // A push or a socket has only a member ID. A member that the store does not know gets the
   // levels of a plain member, so an unknown ID does not get more than the roles give.
   #accessMember(member: AccessMember | string): AccessMember {
@@ -2442,6 +2506,8 @@ export class TeamApiServer {
           // A member changes only the servers that they added, so the host must know who added each.
           if (capability === MCP_MEMBER_ACCESS_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpServerOwners !== undefined;
+          if (capability === MCP_ACCESS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpAccess !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === SIGN_IN_RELAY_CAPABILITY)
@@ -2472,6 +2538,7 @@ export class TeamApiServer {
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === LIBRARY_FOLDERS_CAPABILITY) return this.#options.libraryFolders !== undefined;
           if (capability === STORAGE_CHANNEL_CAPABILITY)
             return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
@@ -2740,6 +2807,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   )
     return "channel-chats-v1";
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
+  if (event.type === "message-pins-changed") return MESSAGE_PINS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
   if (event.type === "agent-colors-changed") return AGENT_COLORS_CAPABILITY;
   if (event.type === "chat-colors-changed") return CHAT_COLORS_CAPABILITY;

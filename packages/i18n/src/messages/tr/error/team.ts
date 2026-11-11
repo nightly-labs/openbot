@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
   "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
+  "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.sidebarPinsUnsupported":
@@ -158,6 +159,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Güvenli kimlik doğrulaması bu istemci tarafından desteklenmiyor.",
   "error.team.agentSettingsUnsupported": "Ajan ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.adminRequired": "Yönetici erişimi gereklidir.",
+  "error.team.mcpAccessStale": "Birisi bu MCP sunucusuna erişimi değiştirdi. Değişikliğinizi yeniden yapın.",
   "error.team.mcpServerNotYours": "Bu MCP sunucusunu yalnızca onu ekleyen kişi veya bir yönetici değiştirebilir.",
   "error.team.ownerRequired": "Bunu yalnızca bu sunucunun sahibi yapabilir.",
   "error.team.requestTooLarge": "İstek gövdesi çok büyük.",
@@ -172,6 +174,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Bu sunucudaki hiçbir ajan bu oturum açma bağlantısını göstermedi.",
   "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
   "error.team.agentWaitsUnsupported": "Bu bağlantı açık beklemeleri desteklemiyor.",
+  "error.team.messagePinsUnsupported": "Bu bağlantı sabitlenen mesajları desteklemiyor.",
   "error.team.queuedMessageThreadUnsupported":
     "Bu bağlantı kuyruktaki bir mesajı yeni bir ileti dizisi olarak çalıştırmayı desteklemiyor.",
   "error.team.backgroundProcessesUnsupported": "Bu bağlantı arka plan işlemlerini desteklemiyor.",

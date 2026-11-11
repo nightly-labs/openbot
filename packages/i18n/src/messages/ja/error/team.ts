@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
   "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
+  "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
   "error.team.sidebarPinsUnsupported":
@@ -159,6 +160,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "このクライアントは安全な認証に対応していません。",
   "error.team.agentSettingsUnsupported": "この接続ではエージェントの設定を利用できません。",
   "error.team.adminRequired": "管理者のアクセス権が必要です。",
+  "error.team.mcpAccessStale": "他の人がこの MCP サーバーへのアクセスを変更しました。もう一度変更してください。",
   "error.team.mcpServerNotYours": "この MCP サーバーを変更できるのは、追加した人か管理者だけです。",
   "error.team.ownerRequired": "この操作ができるのはこのサーバーのオーナーだけです。",
   "error.team.requestTooLarge": "リクエストの本文が大きすぎます。",
@@ -175,6 +177,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
   "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
+  "error.team.messagePinsUnsupported": "この接続はピン留めしたメッセージに対応していません。",
   "error.team.queuedMessageThreadUnsupported":
     "この接続では、キュー内のメッセージを新しいスレッドとして実行できません。",
   "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",

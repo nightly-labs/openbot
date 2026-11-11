@@ -139,6 +139,7 @@ import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } from "../backend/library-folders-store";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { discordDriver, downloadDiscordAttachment } from "../backend/messaging/discord/discord-driver";
@@ -270,6 +271,7 @@ import { InstanceTransferService } from "./instance-transfer-service";
 import { InterfaceSizeService } from "./interface-size-service";
 import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
+import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
@@ -308,6 +310,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
+import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -676,6 +679,7 @@ export interface ApplicationServices {
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
+  libraryFoldersService: LibraryFoldersService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
   localSignIn: LocalSignInWindows;
@@ -717,6 +721,7 @@ export interface ApplicationServices {
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
+  mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
@@ -1329,6 +1334,8 @@ export async function createApplicationServices({
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await runCauseEffect(sidebarLayout.initialize());
+  const libraryFolders = new LibraryFoldersStore(join(app.getPath("userData"), LIBRARY_FOLDERS_FILE));
+  await runCauseEffect(libraryFolders.initialize());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();
@@ -1498,6 +1505,7 @@ export async function createApplicationServices({
       ),
   });
   const mcpServerOwners = new McpServerOwnersStore(join(app.getPath("userData"), MCP_SERVER_OWNERS_FILE));
+  const mcpAccessStore = new McpAccessStore(join(app.getPath("userData"), MCP_ACCESS_FILE));
   const serverTimezone = new ServerTimezonePreferenceStore(
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
   );
@@ -1562,10 +1570,11 @@ export async function createApplicationServices({
     ],
     { concurrency: "unbounded", discard: true },
   );
-  const [setupState, palettesWatch, rolesLoaded] = await Promise.all([
+  const [setupState, palettesWatch, rolesLoaded, mcpAccessLoaded] = await Promise.all([
     runCauseEffect(readSetupState(setupFile)),
     runCauseEffect(appearance.load()).then(() => Effect.runPromise(appearance.followPalettes())),
     runCauseEffect(agentAccess.load()),
+    runCauseEffect(mcpAccessStore.load()),
     runCauseEffect(loadPreferences),
   ]);
   const analyticsPreference = await Effect.runPromise(
@@ -1574,6 +1583,10 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.themePalettes, "the theme palette watch", palettesWatch);
   if (!rolesLoaded)
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
+  if (!mcpAccessLoaded)
+    logger.warn(
+      "The MCP access file did not load. No agent or member gets an MCP server until an admin saves its access.",
+    );
   void Effect.runPromise(appBehavior.refreshLoginItem()).catch((error) =>
     logger.warn("The login item did not refresh.", toLogValue(error)),
   );
@@ -1696,11 +1709,13 @@ export async function createApplicationServices({
   );
   performance.mark("openbot:services.preferences");
   await runCauseEffect(providerDetectionSettings.load());
+  const modelReleaseCatalog = new ModelReleaseCatalog();
   const providerDetection = await Effect.runPromise(
     createProviderDetection({
       settings: providerDetectionSettings,
       customProviders,
       customAgents,
+      catalog: modelReleaseCatalog,
     }),
   );
   teardown.push(TEARDOWN_ORDER.providerDetection, "model server discovery", () =>
@@ -2129,6 +2144,7 @@ export async function createApplicationServices({
       const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
       return config ? { config, setupSteps: server.setupSteps } : null;
     },
+    mcpAgentAccess: (mcpServerId, agentId) => mcpAccessStore.allowsAgent(mcpServerId, agentId),
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
         startToolRuntimes: () => {
@@ -2174,6 +2190,7 @@ export async function createApplicationServices({
       delete: (siteId) => hostedSites.delete(siteId).pipe(toHostedSiteOperationFailed),
     },
     sidebarLayout,
+    libraryFolders,
     preferredModel: setupState.preferredModel,
     // Only a dev build leads with the OpenCode development model; a packaged app keeps the
     // built-in default.
@@ -2292,7 +2309,7 @@ export async function createApplicationServices({
   // The models that the model picker shows. Agents, tools and automations keep `service.listModels()`.
   const modelVisibility = new ModelVisibility({
     path: join(app.getPath("userData"), MODEL_VISIBILITY_PREFERENCE_FILE),
-    catalog: new ModelReleaseCatalog(),
+    catalog: modelReleaseCatalog,
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
     modelsChanged: () => service.notifyProviderSettingsChanged(),
@@ -2574,6 +2591,10 @@ export async function createApplicationServices({
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
+  await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
+  await runCauseEffect(
+    libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
+  );
 
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
@@ -2671,6 +2692,12 @@ export async function createApplicationServices({
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
+  // The Library shows the files of the host scan, so a folder change reads the agent of a file there.
+  const libraryFoldersService = new LibraryFoldersService({
+    store: libraryFolders,
+    storage: storageUsage,
+    agents: () => service.listAgents(),
+  });
   // A deleted or renamed agent changes every scope, so no surface keeps its old answer.
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
@@ -3053,6 +3080,24 @@ export async function createApplicationServices({
   );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
+  // A set that changes which agents get the server gives each agent a new provider session, as a saved
+  // server does. A set that changes only the levels of members leaves the sessions as they are.
+  const mcpAccess: McpAccessControl = {
+    revision: () => mcpAccessStore.revision(),
+    get: (mcpServerId) => mcpAccessStore.get(mcpServerId),
+    set: (change, existing) =>
+      Effect.suspend(() => {
+        const before = mcpAccessStore.get(change.mcpServerId).agents;
+        return mcpAccessStore
+          .set(change, existing)
+          .pipe(
+            Effect.andThen(
+              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+            ),
+          );
+      }),
+    remove: (mcpServerId) => mcpAccessStore.remove(mcpServerId),
+  };
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3071,6 +3116,8 @@ export async function createApplicationServices({
     // Present, so the host advertises `mcp-member-access-v1`. A member then uses the MCP routes too,
     // and changes only the servers that they added.
     mcpServerOwners,
+    // Present, so the host advertises `mcp-access-v1`: the agents of each MCP server and the level of each role.
+    mcpAccess,
     // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpSignIns: mcpHostSignIns,
     // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only, but for a member's
@@ -3100,6 +3147,8 @@ export async function createApplicationServices({
     providerSignOut: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
+    // Present, so the host advertises `library-folders-v1`. Each member reads and changes the folders.
+    libraryFolders: libraryFoldersService,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
     // Present, so the host advertises `background-processes-v1`. The routes are admin-only. A Windows
@@ -4213,6 +4262,7 @@ export async function createApplicationServices({
     vault,
     mailbox,
     storageUsage,
+    libraryFoldersService,
     browser,
     browserPictureInPicture,
     localSignIn,
@@ -4243,6 +4293,7 @@ export async function createApplicationServices({
     agentNotificationLevels,
     sidebarPins,
     agentAccess,
+    mcpAccess,
     serverAudit,
     serverTimezone,
     serverPersonality,

@@ -144,6 +144,11 @@ export const messages = defineMessages("marketplace", {
   // The plugin page section with one row for each app, and the row text by how the app connects.
   // {name} is the app name, {field} the label of its key field, {host} "this computer" or a server name.
   "marketplace.app.connection": "Connection",
+  "marketplace.app.access.use": "Can use",
+  "marketplace.app.access.noAgents": "No agents",
+  "marketplace.app.access.agentsOf": "Agents that can use {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Choose agents",
+  "marketplace.app.access.level": "Access of {role} to {name}",
   "marketplace.app.setup.account": "Sign in with your {name} account in the browser.",
   "marketplace.app.setup.key": "Needs an API key from your {name} account.",
   "marketplace.app.setup.keySaved": "{field} saved on {host}.",

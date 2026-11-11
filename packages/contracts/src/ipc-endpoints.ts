@@ -136,8 +136,10 @@ import type {
   AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  AgentTaskWindow,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
@@ -370,6 +372,7 @@ import type {
   InstanceTransferResult,
   InstanceTransferSummary,
 } from "./ipc-instance-transfer";
+import type { LibraryFolderAction, LibraryFoldersSnapshot } from "./ipc-library-folders";
 import type { LinkAccountStatus } from "./ipc-link-account";
 import type { MachineAlertSettings, MachineMetrics } from "./ipc-machine-resources";
 import type {
@@ -382,6 +385,7 @@ import type {
   MarketplaceAgentQuery,
   SubmitMarketplaceAgentInput,
 } from "./ipc-marketplace-agents";
+import type { McpAccessSnapshot, SetMcpAccessInput } from "./ipc-mcp-access";
 import type {
   CancelMcpSignInInput,
   CompleteMcpSignInRelayInput,
@@ -398,6 +402,7 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
   AddMessagingOrchestratorResult,
@@ -1768,11 +1773,16 @@ export const IPC_ENDPOINTS = {
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
+    // The pins of all chats of an agent. A joined server takes both through `message-pins-v1`.
+    listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
+    setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     // A joined server takes this through `agent-thread-pages-v1`.
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
+    // A joined server takes this through `message-pins-v1`: it opens a pin of a side thread at its message.
+    readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.
@@ -2175,6 +2185,10 @@ export const IPC_ENDPOINTS = {
     removeMcpSignInApp: scopedRequest<McpSignInAppInput, McpSignInAppState, "required">()(
       "servers:mcp:remove-sign-in-app",
     ),
+    // Which agents get an MCP server, and the level of each role for it (`mcp-access-v1`). A set
+    // replaces the entry of one MCP server and answers with the whole snapshot.
+    getMcpAccess: scopedQuery<McpAccessSnapshot, "required">()("servers:mcp:get-access"),
+    setMcpAccess: scopedRequest<SetMcpAccessInput, McpAccessSnapshot, "required">()("servers:mcp:set-access"),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {
@@ -2187,6 +2201,12 @@ export const IPC_ENDPOINTS = {
     clear: scopedRequest<ClearStorageInput, void, "required">()("storage:clear"),
     openFile: scopedRequest<OpenStoredFileInput, void, "required">()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
+    // The folders of the Library. Null before `library-folders-v1`: the Library then shows no folders.
+    getLibraryFolders: scopedQuery<LibraryFoldersSnapshot | null, "required">()("storage:get-library-folders"),
+    /** Applies one folder change and answers the new snapshot. */
+    changeLibraryFolders: scopedRequest<LibraryFolderAction, LibraryFoldersSnapshot, "required">()(
+      "storage:change-library-folders",
+    ),
     // Local only, like `openLocation`: a server removes its own old provider CLI versions.
     getRemovableRuntimes: request<undefined, RemovableRuntimes>()("storage:get-removable-runtimes"),
     /** Removes the old versions no instance uses now and the downloads it named, and answers what is left. */

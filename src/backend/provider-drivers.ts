@@ -1136,7 +1136,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                   antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
                   ANTIGRAVITY_TOKEN_FILE,
                 ),
-                version: cli.version,
                 model,
               }),
       }),

@@ -25,6 +25,7 @@ import type {
   AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  AgentTaskWindow,
   AgentWaitsSnapshot,
   AskSideQuestionInput,
   AttachmentDataInput,
@@ -72,10 +73,13 @@ import type {
   McpSignInAppState,
   McpSignInState,
   McpTestResult,
+  MessagePinner,
+  PinnedMessagesSnapshot,
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RemoveMcpServerInput,
   ReorderQueueInput,
@@ -97,6 +101,7 @@ import type {
   SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
   SetMcpServerEnabledInput,
+  SetMessagePinnedInput,
   SetMessageReactionInput,
   SharedTable,
   SidebarLayoutSnapshot,
@@ -180,6 +185,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
+import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
@@ -189,6 +195,7 @@ import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
 import type { ReviewSkill } from "./agent/memory-review-prompt";
 import { MessageDeletion } from "./agent/message-deletion";
+import { MessagePins } from "./agent/message-pins";
 import {
   creationModel,
   developmentDefaultsApply,
@@ -277,6 +284,7 @@ import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
+import type { MessagePinRefused } from "./message-pins";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
@@ -364,6 +372,11 @@ export interface AgentServiceOptions {
    * runtimes a stdio command may need. Without it the test runs with what this machine holds.
    */
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
+  /**
+   * Whether an agent gets an MCP server (`mcp-access-v1`). `null` is a session with no known agent.
+   * Absent, each agent gets each enabled server.
+   */
+  mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   /** This build's version and system, which `send_feedback` adds to a bug report or an idea. */
@@ -373,6 +386,8 @@ export interface AgentServiceOptions {
   /** Makes one-time claims for `create_server_install_command` with the account session. */
   serverClaims?: AgentServerClaims | null;
   sidebarLayout?: AgentSidebar | null;
+  /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
+  libraryFolders?: AgentLibraryFolders | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
    * endpoints. The main process owns both, because they carry secrets that must not reach the
@@ -554,6 +569,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #tasks: AgentTasks;
   readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
+  readonly #messagePins: MessagePins;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
@@ -561,6 +577,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Agent and channel routines of every trigger kind, with their webhook routes. */
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
+  readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
   readonly #endpoints: CustomEndpoints;
@@ -588,6 +605,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #removal: AgentRemoval;
   readonly #tools: OpenBotToolRouter;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
@@ -608,6 +626,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   constructor(options: AgentServiceOptions) {
     super();
+    this.#mcpAgentAccess = options.mcpAgentAccess;
     const {
       store,
       mailbox,
@@ -620,6 +639,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       prepareAgentWorkspace = () => Effect.void,
       hostedSites = null,
       sidebarLayout = null,
+      libraryFolders = null,
       credentials = NO_PROVIDER_CREDENTIALS,
       localSkillTools,
       routineFlowTools,
@@ -652,6 +672,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.#sidebarLayout = sidebarLayout;
+    this.#libraryFolders = libraryFolders;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure, sender) =>
         this.createAgent(
@@ -726,6 +747,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       conversation: this.#conversation,
       tasks: this.#tasks,
+    });
+    this.#messagePins = new MessagePins({
+      store,
+      tasks: this.#tasks,
+      changed: (agentId) => this.#emit({ type: "message-pins-changed", agentId }),
     });
     this.#tables = options.tables ?? null;
     this.#memories = new AgentMemories({
@@ -1067,7 +1093,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.
-        mcpServers: () => this.#mcp.record(credentials.mcpServers()),
+        mcpServers: (agentId) => this.#mcp.record(this.#mcpServersFor(credentials.mcpServers(), agentId)),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
         mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       },
@@ -1220,6 +1246,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailbox,
       sharedRoot: store.sharedRoot,
+      libraryFolders,
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -1237,7 +1264,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       memories: this.#memories,
       compaction: this.#compaction,
-      mcpServers: () => this.#mcp.enabled(),
+      mcpServers: (agentId) => this.#mcpServersFor(this.#mcp.enabled(), agentId),
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       mcpProxyFingerprint: (configs) => this.#mcp.proxyFingerprint(configs).pipe(toMcpOperationError),
@@ -1386,6 +1413,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
       },
       reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
+      quietTurn: (turnId) => this.#turn.quietChannelTurn(turnId),
       provisionalAnswers: (agentId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         return (agent ? this.#providers.clientForAgent(agent)?.provisionalAnswers : undefined) === true;
@@ -1409,9 +1437,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       usageLimited: (agentId) => this.#channelHeld(agentId),
       retry: (agentId) => this.#usageLimits.retry(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
+      quietRoutineRequest: (requestMessageId) => this.#channelRoutines.quietRun(requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
       steer: (agentId, threadId, turnId, messageId, text) =>
         Effect.gen({ self: this }, function* () {
+          // A person's correction joins the turn and waits for its answer.
+          this.#turn.keepChannelTurnAnswers(turnId);
           const agent = this.#store.list().find((item) => item.id === agentId);
           const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
           const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -1829,9 +1860,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memories: this.#memories,
       waits: this.#waits,
       tasks: this.#tasks,
+      messagePins: this.#messagePins,
       drain: this.#drain,
       tables: this.#tables,
       sidebarLayout: this.#sidebarLayout,
+      libraryFolders: this.#libraryFolders,
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
@@ -1870,7 +1903,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         updateAgent: (input, initiatingAgentId) =>
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
-        enabledMcpServers: () => this.enabledMcpServers(),
+        enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         redactMcpForAgent: (text) => this.#mcp.redactForAgent(text),
@@ -1881,7 +1914,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
-        requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
+        requestNoUpdate: (agentId, threadId, turnId, channelRun) =>
+          this.#turn.requestNoUpdate(agentId, threadId, turnId, channelRun),
         reportRoutineFailure: (agentId, turnId, reason, channelRun) =>
           this.#turn.reportRoutineFailure(agentId, turnId, reason, channelRun),
         requestNewChat: (agentId) => {
@@ -2458,8 +2492,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  enabledMcpServers(): McpServerConfig[] {
-    return this.#mcp.enabled();
+  /** The enabled MCP servers. With an agent, only the servers that the agent gets. */
+  enabledMcpServers(agentId?: string | null): McpServerConfig[] {
+    return this.#mcpServersFor(this.#mcp.enabled(), agentId);
+  }
+
+  /**
+   * Only a saved row has an access entry. A server that OpenBot adds itself, such as Computer Use, goes
+   * to each agent: nothing in Settings can open it again if an entry closed it.
+   */
+  #mcpServersFor(configs: readonly McpServerConfig[], agentId: string | null | undefined): McpServerConfig[] {
+    const allows = this.#mcpAgentAccess;
+    if (agentId === undefined || !allows) return [...configs];
+    const saved = new Set(this.#mcp.list().map((server) => server.id));
+    return configs.filter((config) => !saved.has(config.id) || allows(config.id, agentId));
   }
 
   /**
@@ -4045,6 +4091,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
+    // "Delete history" removed the pins of the chat.
+    this.#messagePins.messagesDeleted(agentId);
     yield* this.#threads.endThreadContext(target.threadId);
     yield* this.#memoryReview.chatCleared(agentId);
   }, Effect.uninterruptible).bind(this);
@@ -5363,6 +5411,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
+  /**
+   * The messages of a task around one of its messages, so its panel opens at that message without the
+   * pages between. A message that the thread does not hold, or that `exclusions` leave out, has none.
+   */
+  readTaskAround(input: ReadAgentTaskAroundInput, exclusions: ConversationMarkerExclusions = {}): AgentTaskWindow {
+    const { threadId } = this.#tasks.require(input.agentId, input.taskId);
+    const database = this.#store.database;
+    const page = database.readConversationPage(
+      input.agentId,
+      threadId,
+      { type: "around", messageId: input.messageId },
+      input.limit,
+      exclusions,
+    );
+    const last = page.messages.at(-1);
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId,
+        activeTurnId: page.activeTurnId,
+        revision: page.revision,
+        messages: page.messages,
+      },
+      hasOlder: page.pageInfo.hasOlder,
+      hasNewer: last ? database.conversationHasAfter(threadId, last.id, exclusions) : false,
+    };
+  }
+
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */
   readonly startTask = Effect.fn("AgentService.startTask")(function* (
     this: AgentService,
@@ -5598,6 +5674,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.backend.threadStillRunning"));
       this.#tasks.delete(task);
     });
+    // The pins of the thread went with it.
+    this.#messagePins.messagesDeleted(task.agentId);
     this.#browser.unshareThread(task.threadId);
     this.#drain.scheduleDrain(task.agentId);
   }).bind(this);
@@ -5611,11 +5689,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: DeleteConversationMessageInput,
     access: MessageDeleteAccess,
   ): Effect.Effect<void, MessageDeleteRefused | AgentLifecycleFailed> {
-    return this.#messageDeletion
-      .delete(input, access)
+    return this.#messageDeletion.delete(input, access).pipe(
+      // The delete removed the pin of the message, if it had one.
+      Effect.tap(() => Effect.sync(() => this.#messagePins.messagesDeleted(input.agentId))),
+      Effect.catchTag("StoredStateFailure", ({ cause }) =>
+        Effect.fail(new AgentLifecycleFailed({ operation: "deleteConversationMessage", cause })),
+      ),
+    );
+  }
+
+  /** The pinned messages of all chats of the agent: its own chat and its side threads. The newest pin is first. */
+  listPinnedMessages(agentId: string): PinnedMessagesSnapshot {
+    return this.#messagePins.list(agentId);
+  }
+
+  /** Pins or unpins one shown message for a person, and answers the pins of the agent after the change. */
+  setMessagePinned(
+    input: SetMessagePinnedInput,
+    pinner: Extract<MessagePinner, { kind: "person" }>,
+  ): Effect.Effect<PinnedMessagesSnapshot, MessagePinRefused | AgentLifecycleFailed> {
+    return this.#messagePins
+      .set(input, pinner)
       .pipe(
         Effect.catchTag("StoredStateFailure", ({ cause }) =>
-          Effect.fail(new AgentLifecycleFailed({ operation: "deleteConversationMessage", cause })),
+          Effect.fail(new AgentLifecycleFailed({ operation: "setMessagePinned", cause })),
         ),
       );
   }

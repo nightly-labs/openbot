@@ -78,6 +78,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "החיבור הזה אינו יכול לייבא פרופילי Hermes מהשרת.",
   "error.team.providerDetectionUnsupported": "החיבור הזה אינו יכול למצוא את שרתי המודלים והסוכנים של השרת.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
+  "error.team.libraryFoldersUnsupported": "תיקיות הספרייה אינן נתמכות בחיבור הזה.",
   "error.team.agentNotificationLevelsUnsupported":
     "השרת הזה אינו יכול לשמור רמת התראות אישית לכל סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "error.team.sidebarPinsUnsupported":
@@ -159,6 +160,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "אימות מאובטח אינו נתמך בלקוח הזה.",
   "error.team.agentSettingsUnsupported": "הגדרות סוכן אינן נתמכות בחיבור הזה.",
   "error.team.adminRequired": "נדרשת גישת מנהל.",
+  "error.team.mcpAccessStale": "מישהו שינה את הגישה לשרת ה-MCP הזה. יש לבצע את השינוי שוב.",
   "error.team.mcpServerNotYours": "רק מי שהוסיף את שרת ה-MCP הזה, או מנהל, יכול לשנות אותו.",
   "error.team.ownerRequired": "רק הבעלים של השרת הזה יכול לבצע זאת.",
   "error.team.requestTooLarge": "גוף הבקשה גדול מדי.",
@@ -174,6 +176,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "אף סוכן בשרת הזה לא הציג את קישור ההתחברות הזה.",
   "error.team.hostPersonalityUnsupported": "אישיות השרת אינה נתמכת בחיבור הזה.",
   "error.team.agentWaitsUnsupported": "החיבור הזה לא תומך בהמתנות פתוחות.",
+  "error.team.messagePinsUnsupported": "החיבור הזה אינו תומך בהודעות מוצמדות.",
   "error.team.queuedMessageThreadUnsupported": "החיבור הזה לא תומך בהרצת הודעה מהתור כשרשור חדש.",
   "error.team.backgroundProcessesUnsupported": "החיבור הזה לא תומך בתהליכי רקע.",
   "error.team.providerUseUnsupported": "החיבור הזה לא תומך בהפעלה ובכיבוי של ספקים.",

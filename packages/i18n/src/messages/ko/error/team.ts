@@ -78,6 +78,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "이 연결에서는 서버의 Hermes 프로필을 가져올 수 없어요.",
   "error.team.providerDetectionUnsupported": "이 연결에서는 서버의 모델 서버와 에이전트를 찾을 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
+  "error.team.libraryFoldersUnsupported": "이 연결에서는 라이브러리 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "error.team.sidebarPinsUnsupported":
@@ -161,6 +162,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "이 클라이언트는 보안 인증을 지원하지 않아요.",
   "error.team.agentSettingsUnsupported": "이 연결에서는 에이전트 설정을 지원하지 않아요.",
   "error.team.adminRequired": "관리자 권한이 필요해요.",
+  "error.team.mcpAccessStale": "다른 사람이 이 MCP 서버의 접근 권한을 변경했어요. 다시 변경해 주세요.",
   "error.team.mcpServerNotYours": "이 MCP 서버는 추가한 사람이나 관리자만 변경할 수 있어요.",
   "error.team.ownerRequired": "이 서버의 소유자만 할 수 있어요.",
   "error.team.requestTooLarge": "요청 본문이 너무 커요.",
@@ -174,6 +176,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "이 서버의 어떤 에이전트도 이 로그인 링크를 표시하지 않았어요.",
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
+  "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",
   "error.team.backgroundProcessesUnsupported": "이 연결에서는 백그라운드 프로세스를 지원하지 않아요.",
   "error.team.providerUseUnsupported": "이 연결에서는 제공자를 켜고 끌 수 없어요.",

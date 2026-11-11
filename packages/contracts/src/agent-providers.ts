@@ -869,6 +869,30 @@ export function isFreeOpencodeModelName(name: string): boolean {
  */
 const FREE_TIER_MODEL_IDS = new Set(["opencode/big-pickle"]);
 
+/** The first of `OPENCODE_RECOMMENDED_FREE_MODELS`, which a development build starts on too. */
+export const OPENCODE_DEFAULT_FREE_MODEL: AgentModelId = "opencode/beam-free";
+
+/**
+ * The free OpenCode models a new agent is offered first, best first. The first one is the model a
+ * new OpenCode agent starts on.
+ *
+ * Chosen on 2026-11-11 (OpenCode 2.2.7, from the EU) with `bun run bench:opencode-free-models
+ * --repeats=1 --task=fix-bug --task=feature --task=data --task=search`: four of its tasks, one run
+ * each. All 11 models that answered passed all four, so the order is total time: 29 s, 35 s and 39 s,
+ * then 52 s and more. Inkling 2 Small Free refuses requests from the EU. The free tier's usage limit
+ * stopped the harder tasks of the bench, so run all of them before the order changes. Run it again
+ * also when OpenCode changes its free tier: a model that left the tier only loses its place, and a
+ * new one goes after these three.
+ *
+ * `src/backend/agent/provider-models.ts` puts them first in the catalog, and the model picker of each
+ * server always shows them in its main list (`src/main/model-visibility.ts`).
+ */
+export const OPENCODE_RECOMMENDED_FREE_MODELS: readonly AgentModelId[] = [
+  OPENCODE_DEFAULT_FREE_MODEL,
+  "opencode/big-pickle",
+  "opencode/glm-5.3-flash-free",
+];
+
 export function isFreeOpencodeModel(id: string, name: string): boolean {
   return FREE_TIER_MODEL_IDS.has(id.trim().toLowerCase()) || isFreeOpencodeModelName(name);
 }

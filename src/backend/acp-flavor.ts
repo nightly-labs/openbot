@@ -192,6 +192,11 @@ export interface AcpFlavor {
   enableMcpServers?(cwd: string, names: readonly string[]): void;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
+  /**
+   * The agent opens a saved session again with all of its prompts. A session that an idle release
+   * closed keeps the instructions that it got, so its next prompt does not send them again.
+   */
+  reopenKeepsPrompts?: true;
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
   /**

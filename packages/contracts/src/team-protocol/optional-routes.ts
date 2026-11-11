@@ -72,14 +72,17 @@ import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
+import { LIBRARY_FOLDERS_CODECS } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
 import { LIVE_VOICE_CODECS } from "./live-voice-v1";
 import { LOCAL_SERVERS_CODECS } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
+import { MCP_ACCESS_CODECS } from "./mcp-access-v1";
 import { MCP_SIGN_IN_APP_CODECS } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
+import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
@@ -213,6 +216,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_DETECTION_CODECS,
   ...AGENT_QUEUE_TASK_CODECS,
   ...AGENT_WAITS_CODECS,
+  ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RUN_PLACE_CODECS,
@@ -230,6 +234,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
+  ...MCP_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_COLORS_CODECS,
   ...CHAT_COLORS_CODECS,
@@ -260,6 +265,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_CODECS,
   ...WORKFLOWS_GITHUB_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
+  ...LIBRARY_FOLDERS_CODECS,
   ...VAULT_CODECS,
   ...BROWSER_SECRET_VAULT_CODECS,
   ...VAULT_IMPORT_CODECS,

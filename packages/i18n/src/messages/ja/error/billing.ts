@@ -6,6 +6,7 @@ export const messages = {
     "サーバーのプランを変更できませんでした。「お支払い」を更新して、もう一度お試しください。",
   "error.billing.confirmMismatch": "削除するにはサーバー名を入力してください。",
   "error.billing.restartBusy": "サーバーは今は再起動できません。1 分後にもう一度お試しください。",
+  "error.billing.restartUnavailable": "このサーバーはここから再起動できません。サポートにお問い合わせください。",
   "error.billing.planRequired": "このサーバーのプランは終了しました。サーバーを起動するにはプランを更新してください。",
   "error.billing.planSoldOut": "このプランは売り切れです。別のプランを選んでください。",
   // Billing errors.

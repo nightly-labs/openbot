@@ -35,6 +35,8 @@ export interface RemoteHostSummary {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
+  restartAvailable?: boolean;
   /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
   storageGb?: number;
 }
@@ -196,6 +198,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       ...(validLimit ? { memberLimit } : {}),
       // A bad value drops only the flag, as for the limit.
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
+      ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),
     };
   });

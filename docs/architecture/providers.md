@@ -696,8 +696,9 @@ SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
 services the user signed in to before its own — so the fallback used to pick a model behind a token
-OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
-the rest, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first, with
+`OPENCODE_RECOMMENDED_FREE_MODELS` (`packages/contracts/src/agent-providers.ts`, chosen by
+`bun run bench:opencode-free-models`) ahead of the rest in their order, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
 tier the newest version comes first. The sort is stable, so the CLI's order stays between models of
 one version.
 
@@ -886,7 +887,11 @@ Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
 (`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
 Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
 `retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent is `antigravity/<version> <os>/<arch>`. OpenBot does not refresh the token: it
+unless the User-Agent is `antigravity/<version> <os>/<arch>`, and it sends the "Gemini Models" group only
+to the desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). 
+`loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
+that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
+"spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
 does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
 reading. Only a new CLI session refreshes the token, so an idle sign-in loses it after an hour. The
 driver sets `usageLeavesSession`: an account after the first and the own sign-in keep their last

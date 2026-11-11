@@ -27,12 +27,14 @@ import {
   type DeleteChannelMessageInput,
   isContextResetMarker,
   type QueueHold,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
   assignmentText,
@@ -87,6 +89,8 @@ export interface ChannelHooks {
    * result. It settles the routine run before the task is cancelled.
    */
   skipAtLimit?(task: ChannelTask): boolean;
+  /** Whether nobody waits for the answer of the routine run that posted this request, as in a Test run. */
+  quietRoutineRequest?(requestMessageId: string): boolean;
   /** Whether this agent switches without asking and has a backup model that is ready now. */
   usageLimitBackup?(agentId: string): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
@@ -99,6 +103,11 @@ export interface ChannelHooks {
   reportsCompactions?(agentId: string): boolean;
   /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
   provisionalAnswers?(agentId: string): boolean;
+  /**
+   * Whether the running turn owns a channel routine's request and has nothing to report
+   * (`routine_no_update`). Its answers show as steps, as they do after the turn as quiet answers.
+   */
+  quietTurn?(turnId: string): boolean;
   /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -2808,6 +2817,13 @@ export class ChannelService {
           : activeAssignment(assignment))
       )
         message = { ...message, itemType: "commentary" };
+      // A channel routine run with nothing to report posts no message: its answers are steps (#7166).
+      if (
+        message.author === "assistant" &&
+        (message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+          (isTextAnswer(message) && message.turnId !== undefined && this.hooks.quietTurn?.(message.turnId) === true))
+      )
+        message = { ...message, itemType: "commentary" };
       // The answer to a member reply shows as a reply to it, so the thread reads as an exchange.
       if (
         task &&
@@ -3196,6 +3212,37 @@ export class ChannelService {
   });
 
   /**
+   * The task that a `channel_result` call reports on. A provider can end the channel turn while a
+   * background job still runs, as Claude does for an install or a dev server, so the assignment
+   * completes. When the job ends, the provider answers it in a turn of its own, with no assignment.
+   * Its result belongs to the member's last task while that task has no result from another turn.
+   * Before, the call failed and the result stayed in the agent's own chat (#7220).
+   */
+  readonly #resultTask = Effect.fn("ChannelService.resultTask")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+  ) {
+    if (!this.#providerTurns.has(turnId)) return yield* this.#runningTask(channelId, agentId, turnId);
+    const channel = yield* channelSync(() => this.store.get(channelId));
+    yield* channelSync(() => this.requireMember(channel, agentId));
+    const assignment = (yield* channelSync(() => this.store.assignments(channelId)))
+      .filter((item) => item.agentId === agentId && item.turnId !== null)
+      .at(-1);
+    const result = assignment
+      ? yield* channelSync(() => this.store.message(channelId, channelResultId(assignment)))
+      : null;
+    if (assignment?.state !== "completed" || channel.archived || (result && result.message.turnId !== turnId))
+      return yield* channelFailure(new Error("The channel assignment is no longer active."));
+    const tasks = yield* channelSync(() => this.store.tasks(channelId));
+    const task = tasks.find((item) => item.id === assignment.taskId);
+    if (!task || task.revision !== assignment.taskRevision || task.state !== "completed")
+      return yield* channelFailure(new Error("The channel task has changed."));
+    return { channel, assignment, tasks, task };
+  });
+
+  /**
    * The person whose request started the work of the agent's running task. The turn that a member
    * reply started reads another agent's words, so it has no requester, whoever made the request of
    * its run.
@@ -3227,7 +3274,7 @@ export class ChannelService {
    * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
    * of the routine's request, also one that the lead routed to a member: its failure call ends the
    * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
-   * Null when a routine did not start the task.
+   * `quiet` is a run that nobody waits for, not a Test run. Null when a routine did not start the task.
    */
   readonly routineRunPart = Effect.fn("ChannelService.routineRunPart")(function* (
     this: ChannelService,
@@ -3239,8 +3286,11 @@ export class ChannelService {
     // The root task holds the run's request, as for `channelRequester`; a member reply has its own.
     const root = tasks.find((item) => item.id === task.rootTaskId);
     const request = root ? yield* channelSync(() => this.store.message(channelId, root.requestMessageId)) : null;
-    if (request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
-    return task.parentTaskId === null ? ("owner" as const) : ("member" as const);
+    if (!root || request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
+    return {
+      part: task.parentTaskId === null ? ("owner" as const) : ("member" as const),
+      quiet: this.hooks.quietRoutineRequest?.(root.requestMessageId) === true,
+    };
   });
 
   readonly tool = Effect.fn("ChannelService.tool")(function* (
@@ -3252,7 +3302,10 @@ export class ChannelService {
     tool: string,
     args: unknown,
   ): Effect.fn.Return<unknown, ChannelOperationError> {
-    const { channel, assignment, tasks, task } = yield* this.#runningTask(channelId, agentId, turnId);
+    const { channel, assignment, tasks, task } =
+      tool === "channel_result"
+        ? yield* this.#resultTask(channelId, agentId, turnId)
+        : yield* this.#runningTask(channelId, agentId, turnId);
     if (!isDynamicRecord(args)) return yield* channelFailure(new Error("Provide channel tool arguments."));
     const requester = () => this.#requester(channelId, task, tasks);
     if (tool === "channel_cancel") {

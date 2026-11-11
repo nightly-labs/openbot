@@ -42,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-sign-in-app-v1" ||
       capability === "mcp-accounts-v1" ||
       capability === "mcp-member-access-v1" ||
+      capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||
@@ -95,6 +96,7 @@ export function serverSupportsCapability(
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
+      capability === "library-folders-v1" ||
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
       capability === "whatsapp-working-message-v1" ||
@@ -127,6 +129,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||
       capability === "conversation-file-search-v1" ||

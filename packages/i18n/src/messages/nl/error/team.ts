@@ -81,6 +81,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
+  "error.team.libraryFoldersUnsupported": "Deze verbinding ondersteunt geen bibliotheekmappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.sidebarPinsUnsupported":
@@ -167,6 +168,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Deze client ondersteunt geen beveiligde verificatie.",
   "error.team.agentSettingsUnsupported": "Deze verbinding ondersteunt geen instellingen van agents.",
   "error.team.adminRequired": "Beheerderstoegang is verplicht.",
+  "error.team.mcpAccessStale": "Iemand heeft de toegang tot deze MCP-server gewijzigd. Breng je wijziging opnieuw aan.",
   "error.team.mcpServerNotYours":
     "Alleen de persoon die deze MCP-server heeft toegevoegd, of een beheerder, kan hem wijzigen.",
   "error.team.ownerRequired": "Alleen de eigenaar van deze server kan dit doen.",
@@ -184,6 +186,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Geen enkele agent op deze server heeft deze inloglink getoond.",
   "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
   "error.team.agentWaitsUnsupported": "Deze verbinding ondersteunt geen open wachtpunten.",
+  "error.team.messagePinsUnsupported": "Deze verbinding ondersteunt geen vastgemaakte berichten.",
   "error.team.queuedMessageThreadUnsupported":
     "Deze verbinding ondersteunt het uitvoeren van een bericht in de wachtrij als nieuwe thread niet.",
   "error.team.backgroundProcessesUnsupported": "Deze verbinding ondersteunt geen achtergrondprocessen.",

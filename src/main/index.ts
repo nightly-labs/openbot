@@ -776,6 +776,7 @@ function registerIpcHandlers({
   skillLearning,
   browsingMemory,
   agentAccess,
+  mcpAccess,
   serverAudit,
   teamStore,
   serverTimezone,
@@ -830,6 +831,7 @@ function registerIpcHandlers({
   cuaDriver,
   computerUsePermissionHelp,
   storageUsage,
+  libraryFoldersService,
   machineAlerts,
   trace,
   resourceMonitor,
@@ -987,6 +989,7 @@ function registerIpcHandlers({
     }),
     ...teamIpcHandlers({
       host,
+      localServers,
       remoteDesktop,
       remoteServers,
       takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
@@ -1055,6 +1058,7 @@ function registerIpcHandlers({
     }),
     ...mcpServerIpcHandlers({
       service,
+      mcpAccess,
       remoteServers,
       startToolRuntimes: () => {
         Effect.runFork(providerRuntimes.ensureToolRuntimes());
@@ -1072,6 +1076,7 @@ function registerIpcHandlers({
     }),
     ...storageIpcHandlers({
       storage: storageUsage,
+      libraryFolders: libraryFoldersService,
       machine: machineAlerts,
       providerRuntimes,
       mailbox,
@@ -1084,6 +1089,7 @@ function registerIpcHandlers({
     ...agentIpcHandlers({
       service,
       sidebarLayout,
+      libraryFolders: libraryFoldersService,
       sidebarPins,
       host,
       remoteServers,

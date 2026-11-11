@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",
   "error.team.providerDetectionUnsupported": "لا يمكن لهذا الاتصال العثور على خوادم النماذج والوكلاء على الخادم.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
+  "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.sidebarPinsUnsupported":
@@ -161,6 +162,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "المصادقة الآمنة غير مدعومة في هذا العميل.",
   "error.team.agentSettingsUnsupported": "إعدادات الوكيل غير مدعومة في هذا الاتصال.",
   "error.team.adminRequired": "يلزم وصول المسؤول.",
+  "error.team.mcpAccessStale": "غيّر شخص ما صلاحيات الوصول إلى خادم MCP هذا. أجرِ تغييرك مرة أخرى.",
   "error.team.mcpServerNotYours": "لا يمكن تغيير خادم MCP هذا إلا للشخص الذي أضافه أو لمسؤول.",
   "error.team.ownerRequired": "لا يمكن إلا لمالك هذا الخادم فعل ذلك.",
   "error.team.requestTooLarge": "نص الطلب كبير جدًا.",
@@ -176,6 +178,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "لم يعرض أي وكيل على هذا الخادم رابط تسجيل الدخول هذا.",
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
+  "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",
   "error.team.backgroundProcessesUnsupported": "هذا الاتصال لا يدعم العمليات في الخلفية.",
   "error.team.providerUseUnsupported": "هذا الاتصال لا يدعم تشغيل المزوّدين وإيقافهم.",
