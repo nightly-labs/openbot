@@ -31,6 +31,7 @@
     "./pointer-focus": "./src/pointer-focus.ts",
     "./document-color-scheme": "./src/document-color-scheme.ts",
     "./document-rendering": "./src/document-rendering.ts",
+    "./ambient-motion": "./src/ambient-motion.tsx",
     "./menu-motion": "./src/menu-motion.tsx",
     "./item": "./src/item.tsx",
     "./skill-gradient": "./src/skill-gradient.tsx",

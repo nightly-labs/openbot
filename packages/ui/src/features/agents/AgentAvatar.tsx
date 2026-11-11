@@ -320,8 +320,8 @@ function GeneratedAvatar(props: {
   // A mood that carries its own motion has to be seen without being pointed at, and so do eyes that
   // follow the pointer; the resting moods keep the hover gating that the perf note above is about.
   // An avatar that moves only as decoration rests while another app has the focus: the empty chat
-  // kept the loop running for as long as the window stayed open. A surface above the other apps keeps
-  // a busy mood still until the user looks at it: see `AmbientMotion`.
+  // kept the loop running for as long as the window stayed open. A window keeps a busy mood still until
+  // the user looks at it: see `AmbientMotion`.
   const animated = () =>
     props.followPointer ||
     (plushMood().busy && ambientMotion()) ||

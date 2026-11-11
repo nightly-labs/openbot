@@ -48,6 +48,11 @@
   }
 }
 
+/* A main window that the user does not look at keeps the working dots still. See `AmbientMotion`. */
+:root[data-openbot-ambient-motion-paused] .agent-row-thinking-dots i {
+  animation-play-state: paused;
+}
+
 /* A low hop with a soft squash, so each ball stays inside the pill border. */
 @keyframes agent-row-ball-hop {
   0%,
