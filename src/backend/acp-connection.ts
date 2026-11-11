@@ -230,10 +230,10 @@ export class AcpConnection {
   });
 
   /**
-   * The failure of a prompt on a process that all sessions of the agent share, as Cursor's. It does
-   * not wait for the process to end, as `explainEnd` does: the runtime hears that end first and then
-   * keeps the turn for its recovery, so the turn did not fail as before. The chat showed only "ACP
-   * connection closed" (#7185).
+   * The failure of a prompt on a process that all sessions of the agent share, as Cursor's. Before,
+   * the chat showed only "ACP connection closed" (#7185). It does not wait for the process to end, as
+   * `explainEnd` does. With a wait, the runtime hears the end first and keeps the turn for its
+   * recovery, and the turn does not fail at once.
    */
   explainClose(error: unknown): unknown {
     if (!this.#ended || this.#stopping || !isClosedConnection(error)) return error;
@@ -251,7 +251,10 @@ export class AcpConnection {
   }
 }
 
-/** The SDK's failure of each open request when the agent's output ends. */
+/**
+ * A request that failed because the agent's output ended: the SDK's failure of each open request,
+ * or OpenBot's own failure when the client has no process.
+ */
 function isClosedConnection(error: unknown): boolean {
   const message = error instanceof Error ? error.message : "";
   return message === "ACP connection closed" || message === "ACP client is not running.";
