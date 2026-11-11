@@ -1,4 +1,4 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Minimize2, Tabs } from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Tabs, X } from "@openbot/ui";
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
@@ -174,7 +174,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
 
   const hideBrowserButton = () => (
     <Button
-      variant="ghost"
+      variant="secondary"
       size="icon-sm"
       ref={(element) => (hideButton = element)}
       class="no-drag browser-hide"
@@ -183,7 +183,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       data-cuelume-tap="close"
       onClick={props.onBack}
     >
-      <Minimize2 aria-hidden="true" />
+      <X aria-hidden="true" />
     </Button>
   );
 

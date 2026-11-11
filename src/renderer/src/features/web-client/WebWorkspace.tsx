@@ -2836,6 +2836,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
                             else showAgents();
                           }}
+                          onClose={showAgents}
                         >
                           <Show when={kind === "server"}>
                             <SettingsSearchField
