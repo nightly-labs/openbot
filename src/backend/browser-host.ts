@@ -1864,19 +1864,7 @@ export class BrowserHost {
     const protection = tab?.secret;
     if (tab && protection?.submitted && !protection.running)
       Effect.runFork(
-        this.#enqueue(
-          tabId,
-          (current) =>
-            Effect.gen(function* () {
-              // A sign-in that the person started in the takeover can still commit a new document,
-              // which ends the protection. Do not cancel that load with the reload.
-              if (current.contents.isLoadingMainFrame())
-                yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
-              if (current.secret !== protection) return;
-              yield* untilStopped(current, reloadWithGet(current));
-            }),
-          true,
-        ).pipe(
+        this.#reloadProtected(tab, protection).pipe(
           Effect.tapError((error) =>
             Effect.sync(() =>
               logger.warn("Unable to reload a protected browser tab after a takeover", { error: toLogValue(error) }),
@@ -1886,6 +1874,23 @@ export class BrowserHost {
           Effect.forkIn(tab.scope, { startImmediately: true }),
         ),
       );
+  }
+
+  /** Loads a tab that still holds a submitted secret again with GET. The commit ends the protection. */
+  #reloadProtected(tab: BrowserHostTab, protection: NonNullable<BrowserHostTab["secret"]>) {
+    return this.#enqueue(
+      tab.id,
+      (current) =>
+        Effect.gen(function* () {
+          // A sign-in that the person started in the takeover can still commit a new document,
+          // which ends the protection. Do not cancel that load with the reload.
+          if (current.contents.isLoadingMainFrame())
+            yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
+          if (current.secret !== protection) return;
+          yield* untilStopped(current, reloadWithGet(current));
+        }),
+      true,
+    );
   }
 
   readonly setVisible = Effect.fn("BrowserHost.setVisible")(function* (
@@ -2140,6 +2145,12 @@ export class BrowserHost {
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
     const { onCursor, viewport } = options;
     const tab = yield* this.#requireTab(tabId);
+    // The local window shows a protected tab during a takeover. A live view goes to another computer,
+    // so the page loads again first: the secret leaves it, and the person signs in by hand. Without
+    // this the person that the agent waits for cannot see the tab.
+    const protection = tab.secret;
+    if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
+      yield* this.#reloadProtected(tab, protection).pipe(Effect.ignore);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
