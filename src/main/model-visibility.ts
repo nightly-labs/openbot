@@ -10,9 +10,9 @@ import type {
   ProviderModelVisibility,
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
+import { OPENCODE_RECOMMENDED_FREE_MODELS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
-import { OPENCODE_RECOMMENDED_FREE_MODELS } from "../backend/agent/provider-models";
 import { isMissingFileError } from "../backend/file-errors";
 import { OPENCODE_CONFINED_ENV } from "../backend/process-confinement";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";

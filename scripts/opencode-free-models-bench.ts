@@ -1,5 +1,5 @@
 // Ranks the free OpenCode models on real agent tasks, to choose the models that a new OpenCode agent
-// starts on (`OPENCODE_RECOMMENDED_FREE_MODELS` in `src/backend/agent/provider-models.ts`).
+// starts on (`OPENCODE_RECOMMENDED_FREE_MODELS` in `packages/contracts/src/agent-providers.ts`).
 //
 // Each run is `opencode run --standalone --auto --format json` in a new temporary HOME and XDG
 // folders, so OpenCode never reads the developer's config, keys or sessions, and a new workspace
@@ -139,8 +139,8 @@ interface Task {
   check(workspace: string, reply: string): Promise<Check>;
 }
 
-const node = (workspace: string, script: string) =>
-  exec(process.execPath.includes("bun") ? "node" : process.execPath, [script], {
+const node = (workspace: string, ...args: string[]) =>
+  exec(process.execPath.includes("bun") ? "node" : process.execPath, args, {
     cwd: workspace,
     env: { PATH: process.env.PATH },
   });
@@ -152,7 +152,7 @@ assert.equal(sumRange(5, 5), 5);
 assert.equal(sumRange(-2, 2), 0);
 assert.equal(average([2, 4]), 3);
 assert.equal(average([]), 0);
-print("ok");
+console.log("ok");
 `;
 
 const SALES: [string, string, number, number][] = [
@@ -185,7 +185,7 @@ const SECURITY_TREE: Record<string, string> = {
   "scripts/deploy.sh": "#!/bin/sh\n# TODO(security): do not echo the token\necho deploy\n",
   "docs/notes.md": "Nothing to see. TODO(docs): write more.\n",
   "web/index.html": "<!-- TODO(security): add a CSP header -->\n<html></html>\n",
-  "web/app.js": "print('app');\n",
+  "web/app.js": "console.log('app');\n",
 };
 
 const TASKS: Task[] = [
@@ -259,7 +259,7 @@ assert.equal(list.remove(a), false);
 assert.deepEqual(list.pending(), ["c"]);
 assert.deepEqual(list.list().map((item) => [item.id, item.done]), [[b, true], [c, false]]);
 assert.equal(list.add("d"), 4);
-print("ok");
+console.log("ok");
 `,
       );
       const result = await node(workspace, script);
@@ -333,7 +333,7 @@ print("ok");
       "lib/cart.js":
         'import { fmtPrice } from "./format.js";\n\nexport function cartLine(name, cents, qty) {\n  return `${name} x${qty}: ${fmtPrice(cents * qty)}`;\n}\n',
       "main.js":
-        'import { cartLine } from "./lib/cart.js";\nimport { fmtPrice } from "./lib/format.js";\n\nprint(cartLine("pen", 150, 3));\nprint("total", fmtPrice(450));\n',
+        'import { cartLine } from "./lib/cart.js";\nimport { fmtPrice } from "./lib/format.js";\n\nconsole.log(cartLine("pen", 150, 3));\nconsole.log("total", fmtPrice(450));\n',
     },
     prompt:
       "Rename the function fmtPrice to formatPrice everywhere in this project. `node main.js` must print the same output as before.",
@@ -357,7 +357,7 @@ print("ok");
 const config = JSON.parse(readFileSync(new URL("./config.json", import.meta.url), "utf8"));
 if (typeof config.server?.port !== "number") throw new Error("config: server.port must be a number");
 if (!config.server.host) throw new Error("config: server.host is missing");
-print(\`ready on \${config.server.host}:\${config.server.port}\`);
+console.log(\`ready on \${config.server.host}:\${config.server.port}\`);
 `,
       "config.json": '{\n  "server": {\n    "Port": "8080",\n    "hostname": "localhost"\n  }\n}\n',
     },
@@ -445,7 +445,7 @@ assert.deepEqual(parseLine('a,"b,c",d'), ["a", "b,c", "d"]);
 assert.deepEqual(parseLine('"say ""hi""",x'), ['say "hi"', "x"]);
 assert.deepEqual(parseLine("a,,c,"), ["a", "", "c", ""]);
 assert.deepEqual(parseLine('" padded ",y'), [" padded ", "y"]);
-print("ok");
+console.log("ok");
 `,
     },
     prompt:
@@ -461,7 +461,7 @@ assert.deepEqual(parseLine('"",""'), ["", ""]);
 assert.deepEqual(parseLine('x,"a ""b"", c",'), ["x", 'a "b", c', ""]);
 assert.deepEqual(parseLine('"q"""'), ['q"']);
 assert.deepEqual(parseLine("1, 2 ,3"), ["1", "2", "3"]);
-print("ok");
+console.log("ok");
 `,
       );
       const visible = await node(workspace, "test.js");
@@ -510,7 +510,7 @@ c.set("y", 5); assert.equal(c.get("y"), 5);
 t = 399; assert.equal(c.get("y"), 5, "set again renews the expiry");
 const d = new TtlLru(1, 10, () => t); d.set("k", 1); t += 10; assert.equal(d.delete("k"), false);
 const real = new TtlLru(1, 60000); real.set("r", 1); assert.equal(real.get("r"), 1);
-print("ok");
+console.log("ok");
 `,
       );
       const result = await node(workspace, script);
@@ -535,14 +535,14 @@ export function lowStock(items) {
       "cli.js": `import { ITEMS, lowStock } from "./inventory.js";
 
 const low = lowStock(ITEMS);
-print(\`\${low.length} of \${ITEMS.length} items are low:\`);
-for (const item of low) print(\`- \${item.sku} \${item.name}: \${item.stock}/\${item.min}\`);
+console.log(\`\${low.length} of \${ITEMS.length} items are low:\`);
+for (const item of low) console.log(\`- \${item.sku} \${item.name}: \${item.stock}/\${item.min}\`);
 `,
       "test.js": `import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 const text = execFileSync("node", ["cli.js"], { encoding: "utf8" });
 assert.equal(text, "2 of 3 items are low:\\n- B-7 Nut: 30/40\\n- C-3 Washer: 0/10\\n");
-print("ok");
+console.log("ok");
 `,
     },
     prompt: [
@@ -551,10 +551,10 @@ print("ok");
       "Without the flag the output must not change. Add a check for --json to test.js, and make sure `node test.js` passes.",
     ].join(NL),
     async check(workspace) {
-      const text = await exec("node", ["cli.js"], { cwd: workspace, env: { PATH: process.env.PATH } });
+      const text = await node(workspace, "cli.js");
       if (text.stdout !== "2 of 3 items are low:\n- B-7 Nut: 30/40\n- C-3 Washer: 0/10\n")
         return { pass: false, detail: "text output changed" };
-      const json = await exec("node", ["cli.js", "--json"], { cwd: workspace, env: { PATH: process.env.PATH } });
+      const json = await node(workspace, "cli.js", "--json");
       const lines = json.stdout.trim().split(NL);
       let parsed: unknown;
       try {

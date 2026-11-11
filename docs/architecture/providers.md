@@ -696,8 +696,9 @@ SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
 services the user signed in to before its own — so the fallback used to pick a model behind a token
-OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
-the rest, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first, with
+`OPENCODE_RECOMMENDED_FREE_MODELS` (`packages/contracts/src/agent-providers.ts`, chosen by
+`bun run bench:opencode-free-models`) ahead of the rest in their order, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
 tier the newest version comes first. The sort is stable, so the CLI's order stays between models of
 one version.
 

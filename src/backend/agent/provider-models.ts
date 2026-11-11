@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentModelOption } from "@openbot/contracts/ipc";
-import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
+import { isFreeOpencodeModel, OPENCODE_RECOMMENDED_FREE_MODELS } from "@openbot/contracts/ipc";
 import type { AgentProvider } from "./../agent-client";
 import type { ModelListResponse } from "./../protocol";
 
@@ -33,24 +33,6 @@ export function isOpencodeModelUnusableWithStoredKey(id: string, name: string): 
   if (lower.startsWith("opencode-go/")) return false;
   return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
 }
-
-/**
- * The free OpenCode models a new agent is offered first, best first. The first one is the model a
- * new OpenCode agent starts on.
- *
- * Chosen by `bun run bench:opencode-free-models` on 2026-11-11 (OpenCode 2.2.7, from the EU): four
- * tasks (fix a bug, add a feature, sum a CSV, find a symbol), one run each. All 11 models that
- * answered passed all four, so the order is total time: 29 s, 35 s and 39 s, then 52 s and more.
- * Inkling 2 Small Free refuses requests from the EU. The free tier's usage limit stopped the harder
- * tasks of the bench, so run it again, all tasks, before the order changes. Run it again also when
- * OpenCode changes its free tier: a model that left the tier only loses its place, and a new one goes
- * after these three.
- */
-export const OPENCODE_RECOMMENDED_FREE_MODELS: readonly string[] = [
-  "opencode/beam-free",
-  "opencode/big-pickle",
-  "opencode/glm-5.3-flash-free",
-];
 
 /**
  * Which OpenCode model a new agent runs, as the tier its catalog leads with.
