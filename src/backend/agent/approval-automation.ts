@@ -1,4 +1,5 @@
 import type { AgentApproval } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 
 /**
  * Answers one question for `AttentionRegistry`: may this approval be accepted without asking?
@@ -15,10 +16,13 @@ import type { AgentApproval } from "@openbot/contracts/ipc";
 export interface ApprovalAutomationPolicy {
   /** Whether this agent's eligible approvals are answered for it. */
   autoApproves(agentId: string): boolean;
+  /** Saves that this agent asks before it acts. Only the user can give the grant again. */
+  set(input: { agentId: string; autoApprove: false }): Effect.Effect<unknown, { readonly cause: unknown }>;
 }
 
 export const NO_APPROVAL_AUTOMATION: ApprovalAutomationPolicy = {
   autoApproves: () => false,
+  set: () => Effect.void,
 };
 
 export function shouldAutoApprove(policy: ApprovalAutomationPolicy, approval: Pick<AgentApproval, "agentId">): boolean {
