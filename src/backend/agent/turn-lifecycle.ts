@@ -1146,8 +1146,9 @@ export class TurnLifecycle {
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
         const message = getString(params, "message") ?? getString(error, "message") ?? "";
-        // An ACP or Pi client names the cause that it read from structured fields, before the
-        // error became a sentence for the user. The other clients leave it to the error.
+        // An ACP, Pi or Claude client names the cause that it read from structured fields or from its
+        // own CLI text, before the error became a sentence for the user. The other clients leave it
+        // to the error.
         const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
         const causeCode = reportedCause ?? classifyFailure(error ?? message);
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) {
