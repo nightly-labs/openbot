@@ -368,10 +368,7 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
  * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50".
  */
 export function isImageCountDiagnostic(message: string): boolean {
-  return (
-    /\bat most \d+ image(?:s|\(s\))? may be provided\b/iu.test(message) ||
-    /\btoo many images\b/iu.test(message) ||
-    /\bmaximum of \d+ images\b/iu.test(message) ||
-    /\b\d+ images\b[^.\n]{0,40}\bexceed/iu.test(message)
+  return /\bat most \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\bmaximum of \d+ images\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+ (?:images|allowed)\b/iu.test(
+    message,
   );
 }
