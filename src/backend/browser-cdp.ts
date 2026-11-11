@@ -757,7 +757,9 @@ export class BrowserCdpEngine {
       }
       // Pages such as mail apps navigate their frames all the time. The refs of the main process stay:
       // its node ids are not used again, so a ref of a replaced frame document fails and cannot hit a
-      // new element. A frame in another process can get a new process with the same ids.
+      // new element. A frame in another process can get a new process with the same ids. A navigation
+      // in the same document keeps all nodes.
+      if (details.isSameDocument) return;
       for (const [ref, record] of this.#targets) {
         if (record.targetId !== undefined) this.#targets.delete(ref);
       }
