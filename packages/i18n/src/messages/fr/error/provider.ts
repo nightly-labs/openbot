@@ -348,6 +348,10 @@ export const messages = {
     "{provider} a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis réessayez.",
   "error.provider.keyProviderNoBalance":
     "Le compte {provider} de la clé d’API enregistrée n’a pas de solde. Ajoutez du crédit au compte, puis réessayez.",
+  "error.provider.modelServiceRefused":
+    "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
+  "error.provider.modelServiceRefusedReason":
+    "Le service du modèle a refusé la requête : {reason}. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.messageTooLarge": "OpenBot a arrêté {provider}, car il a envoyé un message de plus de {limit} Mo.",
   "error.provider.customAgentIdInvalid":
     "Un ID d’agent ne peut contenir que des lettres minuscules, des chiffres ou `-`, et ne peut pas être l’ID d’un fournisseur intégré.",

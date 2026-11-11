@@ -325,6 +325,10 @@ export const messages = {
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":
     "저장된 API 키의 {provider} 계정에 잔액이 없어요. 계정에 크레딧을 추가한 후 다시 시도하세요.",
+  "error.provider.modelServiceRefused":
+    "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
+  "error.provider.modelServiceRefusedReason":
+    "모델 서비스가 요청을 거부했어요: {reason}. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.messageTooLarge":
     "{provider}이(가) {limit}MB보다 큰 메시지를 보내서 OpenBot이 {provider}을(를) 중지했어요.",
   "error.provider.customAgentIdInvalid":

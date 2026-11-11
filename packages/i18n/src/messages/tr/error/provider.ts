@@ -333,6 +333,10 @@ export const messages = {
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":
     "Kayıtlı API anahtarının {provider} hesabında bakiye yok. Hesaba kredi ekleyin, ardından yeniden deneyin.",
+  "error.provider.modelServiceRefused":
+    "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
+  "error.provider.modelServiceRefusedReason":
+    "Model hizmeti isteği reddetti: {reason}. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.messageTooLarge":
     "OpenBot, {limit} MB'tan daha büyük bir mesaj gönderdiği için {provider} sağlayıcısını durdurdu.",
   "error.provider.customAgentIdInvalid":

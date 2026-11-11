@@ -323,6 +323,10 @@ export const messages = {
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":
     "Konto {provider} zapisanego klucza API nie ma środków. Doładuj konto, a następnie spróbuj ponownie.",
+  "error.provider.modelServiceRefused":
+    "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
+  "error.provider.modelServiceRefusedReason":
+    "Usługa modelu odrzuciła żądanie: {reason}. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.messageTooLarge":
     "OpenBot zatrzymał {provider}, ponieważ wysłał on wiadomość większą niż {limit} MB.",
   "error.provider.customAgentIdInvalid":
