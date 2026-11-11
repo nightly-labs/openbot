@@ -95,6 +95,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    */
   readonly #serverRequestIds = new Map<string, RequestId>();
   readonly #interruptedTurns = new Set<string>();
+  /**
+   * The threads with an answered turn that did not complete. A process that ends during the turn may
+   * not have saved the blocks of that turn, so the next turn sends them again.
+   */
+  readonly #openTurns = new Set<string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
   #ending: Fiber.Fiber<void> | null = null;
@@ -457,7 +462,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (!isRecord(params) || !isString(params.threadId)) return;
-    if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
+    if (method === "turn/start") this.#openTurns.add(params.threadId);
+    else if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
     else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
   }
 
@@ -467,6 +473,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    */
   #observeTurnContext(method: string, params: unknown): void {
     if (!isRecord(params) || !isString(params.threadId)) return;
+    if (method === "turn/completed") this.#openTurns.delete(params.threadId);
     const failed = method === "turn/completed" && isRecord(params.turn) && params.turn.status === "failed";
     const compacted =
       method === "thread/compacted" ||
@@ -595,6 +602,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (this.#process !== child) return;
     this.#cancelToolRequests();
     this.#process = null;
+    for (const threadId of this.#openTurns) this.#turnContext.resend(threadId);
+    this.#openTurns.clear();
 
     for (const pending of this.#pending.values()) {
       pending.reject(error);

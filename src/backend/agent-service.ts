@@ -1061,7 +1061,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         servesModel: (modelId) => this.#endpoints.serves(modelId, "opencode"),
         // One for the service, not for each client: the idle release replaces the Codex client, and
         // its threads hold the blocks that they were sent (#6963).
-        codexTurnContext: credentials.codexTurnContext ?? new TurnContext(),
+        codexTurnContext: new TurnContext(),
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.
