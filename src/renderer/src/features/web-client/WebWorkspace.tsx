@@ -1980,9 +1980,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (channelOpenInRoutines) layout.setSidebarView("agents");
     },
   );
+  /**
+   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
+   * again until it opens again, as on the desktop.
+   */
+  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   const readState = () => workspace.conversation()?.page?.readState;
   const readsOpenChat = () =>
-    !agentFormOpen() && !channelOpen() && canMarkRead() && heldUnreadAgentId() !== workspace.state.selectedId;
+    workspace.state.status === "online" &&
+    !agentFormOpen() &&
+    !channelOpen() &&
+    canMarkRead() &&
+    heldUnreadAgentId() !== workspace.state.selectedId;
   /*
    * The read state that the chat shows. The host counts a reply as unread until this tab marks it
    * read, so each reply would move the unread line to it and the chat would jump. A reply that comes
@@ -1996,7 +2005,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const visit = `${workspace.state.host?.hostId ?? ""}:${workspace.state.selectedId ?? ""}:${page?.threadId ?? ""}`;
       const readable = readsOpenChat();
       const seenBefore = previous?.visit === visit && previous.seen;
-      const seen = seenBefore || (readable && Boolean(page) && conversation?.loading === false);
+      // A time away ends the visit's read: what comes next keeps its unread line.
+      const seen = readable && (seenBefore || (Boolean(page) && conversation?.loading === false));
       if (seenBefore && readable) return { visit, seen, unreadCount: 0, firstUnread: null };
       return {
         visit,
@@ -2182,11 +2192,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     };
   };
-  /**
-   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
-   * again until it opens again, as on the desktop.
-   */
-  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   /**
    * Marks a chat unread. The open chat stays unread until it opens again; another chat marks itself
    * read only when it opens. A failure releases the hold.
