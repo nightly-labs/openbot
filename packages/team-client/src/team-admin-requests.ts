@@ -37,6 +37,7 @@ import {
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
   isWhatsAppGroupList,
+  isWhatsAppWorkingMessageList,
   type MessagingWorkspaceInput,
   type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
@@ -49,6 +50,7 @@ import {
   type SetMessagingEnabledInput,
   type SetOwnServerNotificationLevelInput,
   type SetWhatsAppOwnNumberInput,
+  type SetWhatsAppWorkingMessageInput,
   type SidebarPin,
   type SidebarPinsSnapshot,
   type StartWhatsAppLinkInput,
@@ -56,6 +58,7 @@ import {
   type WhatsAppLinkState,
   type WhatsAppOverview,
   type WhatsAppSenderInput,
+  type WhatsAppWorkingMessageList,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -93,6 +96,7 @@ import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -2285,4 +2289,31 @@ export function whatsappConnectorSetOwnNumber(
   input: SetWhatsAppOwnNumberInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, ignoreResponse, { ...input }));
+}
+
+/**
+ * The "Working on it…" setting of each WhatsApp number of the host (`whatsapp-working-message-v1`).
+ * Merge it into the overview with `withWhatsAppWorkingMessages`.
+ */
+export function whatsappConnectorWorkingMessages(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppWorkingMessageList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_WORKING_MESSAGE_ROUTES.list,
+      (value) => {
+        if (!isWhatsAppWorkingMessageList(value)) throw new Error("Invalid WhatsApp working message response.");
+        return value;
+      },
+      {},
+    ),
+  );
+}
+
+export function whatsappConnectorSetWorkingMessage(
+  request: TeamApiRequest,
+  input: SetWhatsAppWorkingMessageInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, ignoreResponse, { ...input }));
 }

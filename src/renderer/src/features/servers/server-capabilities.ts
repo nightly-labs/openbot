@@ -97,6 +97,7 @@ export function serverSupportsCapability(
       capability === "sidebar-folders-v1" ||
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
+      capability === "whatsapp-working-message-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||

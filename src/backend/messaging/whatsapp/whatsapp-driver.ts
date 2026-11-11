@@ -79,6 +79,8 @@ export interface WhatsAppCredentials {
   storeId: string;
   storeKey: Uint8Array;
   ownNumber: boolean;
+  /** False when the owner turned off the "Working on it…" post: a request then gets only its answer. */
+  workingMessage: boolean;
 }
 
 export function whatsAppCredentials(values: Record<string, string>): WhatsAppCredentials {
@@ -86,6 +88,7 @@ export function whatsAppCredentials(values: Record<string, string>): WhatsAppCre
     storeId: values.storeId ?? "",
     storeKey: Buffer.from(values.whatsappStoreKey ?? "", "base64"),
     ownNumber: values.ownNumber !== "0",
+    workingMessage: values.workingMessage !== "0",
   };
 }
 
