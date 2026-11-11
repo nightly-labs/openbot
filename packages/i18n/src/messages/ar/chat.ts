@@ -144,6 +144,7 @@ export const messages = {
   "chat.trace.duration": "المدة",
   "chat.trace.cost": "التكلفة",
   "chat.trace.tokens": "الرموز المميزة",
+  "chat.trace.cachedInput": "مدخلات مخزّنة مؤقتًا",
   "chat.trace.llmCalls": "استدعاءات LLM",
   "chat.trace.toolCalls": "استدعاءات الأدوات",
   "chat.trace.errors": "الأخطاء",

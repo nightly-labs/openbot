@@ -340,6 +340,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
       { id: `${turnId}:answer`, kind: "message", startedAt: at(5_560), endedAt: at(6_400) },
     ],
     tokens: 18_342,
+    cachedInput: 14_120,
     costUsd: 0.0427,
   };
 }

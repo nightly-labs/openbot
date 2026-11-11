@@ -66,6 +66,7 @@ export const messages = defineMessages("chat", {
   "chat.trace.duration": "Duration",
   "chat.trace.cost": "Cost",
   "chat.trace.tokens": "Tokens",
+  "chat.trace.cachedInput": "Cached input",
   "chat.trace.llmCalls": "LLM calls",
   "chat.trace.toolCalls": "Tool calls",
   "chat.trace.errors": "Errors",

@@ -67,6 +67,7 @@ export const messages = {
   "chat.trace.duration": "Duração",
   "chat.trace.cost": "Custo",
   "chat.trace.tokens": "Tokens",
+  "chat.trace.cachedInput": "Entrada em cache",
   "chat.trace.llmCalls": "Chamadas ao LLM",
   "chat.trace.toolCalls": "Chamadas a ferramentas",
   "chat.trace.errors": "Erros",

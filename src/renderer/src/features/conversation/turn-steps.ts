@@ -379,7 +379,13 @@ export function createTurnSteps(deps: {
           icon: "agent",
           start: turnStart,
           end: turnEnd,
-          ...(stored?.tokens === undefined ? {} : { tokens: stored.tokens }),
+          // The trace shows the tokens without cache reads, as the Usage tab does. Each model call reads
+          // the cached conversation again, so cache reads can be many times larger than the new tokens.
+          ...(stored?.tokens === undefined
+            ? {}
+            : stored.cachedInput === undefined
+              ? { tokens: stored.tokens }
+              : { tokens: Math.max(0, stored.tokens - stored.cachedInput), cachedInput: stored.cachedInput }),
           ...(typeof stored?.costUsd === "number" ? { costUsd: stored.costUsd } : {}),
         },
       ];

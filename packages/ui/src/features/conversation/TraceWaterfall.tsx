@@ -63,8 +63,10 @@ export interface TraceSpan {
   start: number;
   /** Epoch milliseconds, or null while the span runs: its bar then grows to `now`. */
   end: number | null;
-  /** The tokens of this span's own work, without its children. */
+  /** The tokens of this span's own work, without its children and without `cachedInput`. */
   tokens?: number;
+  /** The cache reads of this span's own work, without its children. */
+  cachedInput?: number;
   /** The cost of this span's own work, without its children. A parent row shows its total. */
   costUsd?: number;
 }
@@ -228,7 +230,7 @@ function spanEnd(span: TraceSpan, now: number): number {
 
 /** A span as it was before it ended: it has no result, tokens or cost yet. */
 function unfinished(span: TraceSpan): TraceSpan {
-  const { failed: _failed, tokens: _tokens, costUsd: _costUsd, ...open } = span;
+  const { failed: _failed, tokens: _tokens, cachedInput: _cachedInput, costUsd: _costUsd, ...open } = span;
   return { ...open, end: null };
 }
 
@@ -470,12 +472,14 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     const children = tree();
     let cost: number | null = null;
     let tokens: number | null = null;
+    let cachedInput: number | null = null;
     let modelCalls = 0;
     let toolCalls = 0;
     let errors = 0;
     for (const span of view().spans) {
       if (span.costUsd !== undefined) cost = (cost ?? 0) + span.costUsd;
       if (span.tokens !== undefined) tokens = (tokens ?? 0) + span.tokens;
+      if (span.cachedInput !== undefined) cachedInput = (cachedInput ?? 0) + span.cachedInput;
       if (span.failed) errors += 1;
       // An agent row holds calls; it is not one.
       if (children.has(span.id)) continue;
@@ -483,7 +487,7 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
       // A handoff is the tool call that sends a message or starts a subagent.
       else if (span.kind === "tool" || span.kind === "handoff") toolCalls += 1;
     }
-    return { cost, tokens, modelCalls, toolCalls, errors };
+    return { cost, tokens, cachedInput, modelCalls, toolCalls, errors };
   });
 
   /** The cost of each span with all the spans under it. */
@@ -810,6 +814,9 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
         </Show>
         <Show when={totals().tokens}>
           {(tokens) => <TraceTotal label={t("chat.trace.tokens")} value={tokens()} format={format.compact} />}
+        </Show>
+        <Show when={totals().cachedInput}>
+          {(cached) => <TraceTotal label={t("chat.trace.cachedInput")} value={cached()} format={format.compact} />}
         </Show>
         <TraceTotal label={t("chat.trace.llmCalls")} value={totals().modelCalls} format={format.number} />
         <TraceTotal label={t("chat.trace.toolCalls")} value={totals().toolCalls} format={format.number} />

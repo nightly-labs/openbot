@@ -39,6 +39,7 @@ const TURN: readonly FixtureSpan[] = [
     from: 0,
     to: 3_200,
     tokens: 1_840,
+    cachedInput: 12_400,
     costUsd: 0.011,
   },
   {
