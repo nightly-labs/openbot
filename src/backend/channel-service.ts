@@ -2958,7 +2958,11 @@ export class ChannelService {
                 "The agent could not complete this task.")
               : state === "interrupted"
                 ? sourceText("error.backend.channelTaskStopped")
-                : null,
+                : // The owner of a routine's request reported that the run failed (`routine_report_failure`).
+                  // The task completes, as the agent answered, and the routine run reads the reason. A task
+                  // that waits for its subtasks keeps the reason until its last turn (#6667).
+                  ((assignment.deliveryId ? this.mailbox.getDelivery(assignment.deliveryId)?.delivery.error : null) ??
+                  task.error),
         });
       }
       updated.push(...releasedParent(tasks, task, state));
@@ -3267,6 +3271,26 @@ export class ChannelService {
     const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
     const person = this.#requester(channelId, task, tasks);
     return person !== null && !(this.hooks.remotePerson?.(person.id) ?? false);
+  });
+
+  /**
+   * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
+   * of the routine's request, also one that the lead routed to a member: its failure call ends the
+   * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
+   * Null when a routine did not start the task.
+   */
+  readonly routineRunPart = Effect.fn("ChannelService.routineRunPart")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+  ) {
+    const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
+    // The root task holds the run's request, as for `channelRequester`; a member reply has its own.
+    const root = tasks.find((item) => item.id === task.rootTaskId);
+    const request = root ? yield* channelSync(() => this.store.message(channelId, root.requestMessageId)) : null;
+    if (request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
+    return task.parentTaskId === null ? ("owner" as const) : ("member" as const);
   });
 
   readonly tool = Effect.fn("ChannelService.tool")(function* (
