@@ -213,6 +213,8 @@ export const messages = {
   "settings.notch.xwayland.restart": "重新启动",
   "settings.notch.idle.title": "空闲时显示灵动岛",
   "settings.notch.idle.description": "没有活跃状态时显示 OpenBot 标志和问候语。",
+  "settings.notch.animate.title": "始终显示动画",
+  "settings.notch.animate.description": "始终为灵动岛和智能体停靠栏显示动画，而不仅在指针悬停时。会消耗更多电量。",
   "settings.notch.displays.title": "在其他显示器上显示",
   "settings.notch.displays.description": "在已连接的外接显示器上显示灵动岛。",
   "settings.notch.haptics.title": "触觉反馈",

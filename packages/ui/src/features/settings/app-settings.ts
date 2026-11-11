@@ -43,6 +43,8 @@ export interface GeneralSettingsValue {
   macBookNotch: boolean;
   macBookNotchHaptics: boolean;
   macBookNotchIdle: boolean;
+  /** The island and the agent dock animate all the time, not only while the pointer is on them. */
+  macBookNotchAlwaysAnimate: boolean;
   macBookNotchAdditionalDisplays: boolean;
   /** The compact Dynamic Island size, as percents of the default. */
   macBookNotchWidthPercent: number;
@@ -90,6 +92,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   macBookNotch: true,
   macBookNotchHaptics: true,
   macBookNotchIdle: true,
+  macBookNotchAlwaysAnimate: false,
   macBookNotchAdditionalDisplays: true,
   macBookNotchWidthPercent: 100,
   macBookNotchHeightPercent: 100,

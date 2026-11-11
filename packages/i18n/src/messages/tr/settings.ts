@@ -218,6 +218,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "Yeniden başlat",
   "settings.notch.idle.title": "Boştaki adayı göster",
   "settings.notch.idle.description": "Hiçbir durum etkin olmadığında OpenBot logosunu ve selamlamasını gösterin.",
+  "settings.notch.animate.title": "Her zaman canlandır",
+  "settings.notch.animate.description":
+    "Adayı ve ajan yuvasını yalnızca işaretçi üzerindeyken değil, her zaman canlandırın. Daha fazla güç kullanır.",
   "settings.notch.displays.title": "Ek ekranlarda göster",
   "settings.notch.displays.description": "Bağlı harici ekranlarda Dynamic Island'ı gösterin.",
   "settings.notch.haptics.title": "Dokunsal geri bildirim",

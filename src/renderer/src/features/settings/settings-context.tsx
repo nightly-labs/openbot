@@ -37,6 +37,7 @@ function islandSettings(preference: DynamicIslandPreference) {
     macBookNotch: preference.enabled,
     macBookNotchHaptics: preference.hapticsEnabled,
     macBookNotchIdle: preference.idleVisible,
+    macBookNotchAlwaysAnimate: preference.alwaysAnimate ?? false,
     macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
     macBookNotchWidthPercent: preference.widthPercent,
     macBookNotchHeightPercent: preference.heightPercent,
@@ -428,6 +429,7 @@ const Settings = createSimpleContext({
         previous.macBookNotch !== value.macBookNotch ||
         previous.macBookNotchHaptics !== value.macBookNotchHaptics ||
         previous.macBookNotchIdle !== value.macBookNotchIdle ||
+        previous.macBookNotchAlwaysAnimate !== value.macBookNotchAlwaysAnimate ||
         previous.macBookNotchAdditionalDisplays !== value.macBookNotchAdditionalDisplays ||
         previous.macBookNotchWidthPercent !== value.macBookNotchWidthPercent ||
         previous.macBookNotchHeightPercent !== value.macBookNotchHeightPercent ||
@@ -442,6 +444,7 @@ const Settings = createSimpleContext({
             enabled: value.macBookNotch,
             hapticsEnabled: value.macBookNotchHaptics,
             idleVisible: value.macBookNotchIdle,
+            alwaysAnimate: value.macBookNotchAlwaysAnimate,
             additionalDisplaysEnabled: value.macBookNotchAdditionalDisplays,
             widthPercent: value.macBookNotchWidthPercent,
             heightPercent: value.macBookNotchHeightPercent,
@@ -463,6 +466,7 @@ const Settings = createSimpleContext({
               macBookNotch: previous.macBookNotch,
               macBookNotchHaptics: previous.macBookNotchHaptics,
               macBookNotchIdle: previous.macBookNotchIdle,
+              macBookNotchAlwaysAnimate: previous.macBookNotchAlwaysAnimate,
               macBookNotchAdditionalDisplays: previous.macBookNotchAdditionalDisplays,
               macBookNotchWidthPercent: previous.macBookNotchWidthPercent,
               macBookNotchHeightPercent: previous.macBookNotchHeightPercent,

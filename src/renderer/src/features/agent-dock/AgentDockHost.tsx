@@ -465,12 +465,13 @@ function WindowAgentDock(props: { serverId: string }) {
   const { sendMessage } = useConversation();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, generalSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
   const voice = createAgentDockVoice(() => props.serverId);
 
   return (
     <AgentDock
+      alwaysAnimate={generalSettings().macBookNotchAlwaysAnimate}
       seats={dock.seats()}
       available={dock.available()}
       availableChannels={dock.availableChannels()}
@@ -504,7 +505,7 @@ function WindowAgentDock(props: { serverId: string }) {
 function ScreenAgentDock(props: { serverId: string }) {
   const { selectAgent } = useNavigation();
   const channels = useChannels();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, generalSettings } = useSettings();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
 
@@ -517,6 +518,7 @@ function ScreenAgentDock(props: { serverId: string }) {
       autoHide: preference().autoHide,
       edgeStrip: preference().edgeStrip,
       sizePercent: preference().sizePercent,
+      alwaysAnimate: generalSettings().macBookNotchAlwaysAnimate,
       offsets: preference().offsets.map((item) => ({ ...item })),
       seats: dock
         .seats()

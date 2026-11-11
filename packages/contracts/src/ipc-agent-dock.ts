@@ -180,6 +180,8 @@ export interface AgentDockPresentation {
   chats: AgentDockChat[];
   /** The unread results of the seated agents, oldest first. Channels have none. Empty when the user turned the shelf off. */
   results: AgentDockResult[];
+  /** The dock animates all the time, as the Dynamic Island setting says. Absent is off. */
+  alwaysAnimate?: boolean;
 }
 
 export type AgentDockAction =
@@ -244,7 +246,8 @@ export function isAgentDockPresentation(value: unknown): value is AgentDockPrese
     isList(value.availableChannels, AGENT_DOCK_LIMITS.channels, isChannel) &&
     isList(value.agents, INPUT_LIMITS.agents, isAgent) &&
     isList(value.chats, AGENT_DOCK_LIMITS.seats, isChat) &&
-    isList(value.results, AGENT_DOCK_LIMITS.results, isResult)
+    isList(value.results, AGENT_DOCK_LIMITS.results, isResult) &&
+    (value.alwaysAnimate === undefined || isBoolean(value.alwaysAnimate))
   );
 }
 

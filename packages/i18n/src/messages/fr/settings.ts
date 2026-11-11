@@ -230,6 +230,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "Redémarrer",
   "settings.notch.idle.title": "Afficher l’îlot au repos",
   "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
+  "settings.notch.animate.title": "Toujours animer",
+  "settings.notch.animate.description":
+    "Animer l’îlot et le dock des agents en permanence, pas seulement lorsque le pointeur est dessus. Consomme plus d’énergie.",
   "settings.notch.displays.title": "Afficher sur les écrans supplémentaires",
   "settings.notch.displays.description": "Afficher l’îlot dynamique sur les écrans externes connectés.",
   "settings.notch.haptics.title": "Retour haptique",

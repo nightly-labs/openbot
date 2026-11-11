@@ -218,6 +218,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "再起動",
   "settings.notch.idle.title": "待機中のアイランドを表示する",
   "settings.notch.idle.description": "表示する状況がないときに OpenBot のロゴとあいさつを表示します。",
+  "settings.notch.animate.title": "常にアニメーションする",
+  "settings.notch.animate.description":
+    "ポインタが乗っているときだけでなく、アイランドとエージェントドックを常にアニメーションします。電力を多く使います。",
   "settings.notch.displays.title": "追加のディスプレイにも表示する",
   "settings.notch.displays.description": "接続された外部ディスプレイにも Dynamic Island を表示します。",
   "settings.notch.haptics.title": "触覚フィードバック",

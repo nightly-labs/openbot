@@ -19,6 +19,11 @@ export interface DynamicIslandPreference {
   serverVisibility: Record<string, boolean>;
   /** Whether a server with no choice of its own, such as a server the user adds later, shows its items. */
   newServersVisible: boolean;
+  /**
+   * The island and the agent dock animate all the time, not only while the pointer is on them. Absent
+   * is off: an island above every app all day draws frames all day when it animates.
+   */
+  alwaysAnimate?: boolean;
 }
 
 /** The most server choices that a preference can hold. A user has far fewer servers. */
@@ -60,6 +65,7 @@ export const DEFAULT_DYNAMIC_ISLAND_PREFERENCE = {
   heightPercent: 100,
   serverVisibility: {},
   newServersVisible: true,
+  alwaysAnimate: false,
 } as const satisfies DynamicIslandPreference;
 
 /** Returns whether the island shows the items of a server. A muted server is hidden separately. */
@@ -214,7 +220,8 @@ export function isDynamicIslandPreference(value: unknown): value is DynamicIslan
     isDynamicIslandSizePercent(value.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent) &&
     isDynamicIslandSizePercent(value.heightPercent, DYNAMIC_ISLAND_SIZE_LIMITS.heightPercent) &&
     isDynamicIslandServerVisibility(value.serverVisibility) &&
-    isBoolean(value.newServersVisible)
+    isBoolean(value.newServersVisible) &&
+    (value.alwaysAnimate === undefined || isBoolean(value.alwaysAnimate))
   );
 }
 

@@ -222,6 +222,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "إعادة التشغيل",
   "settings.notch.idle.title": "عرض الجزيرة في وضع الخمول",
   "settings.notch.idle.description": "عرض شعار OpenBot والتحية عند عدم وجود حالة نشطة.",
+  "settings.notch.animate.title": "تحريك دائم",
+  "settings.notch.animate.description":
+    "تحريك الجزيرة وشريط الوكلاء طوال الوقت، وليس فقط أثناء وجود المؤشر عليهما. يستهلك طاقة أكثر.",
   "settings.notch.displays.title": "العرض على شاشات إضافية",
   "settings.notch.displays.description": "عرض Dynamic Island على الشاشات الخارجية المتصلة.",
   "settings.notch.haptics.title": "الاستجابة اللمسية",

@@ -222,6 +222,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "Riavvia",
   "settings.notch.idle.title": "Mostra l'isola a riposo",
   "settings.notch.idle.description": "Mostra il logo di OpenBot e il saluto quando non c'è nessuno stato attivo.",
+  "settings.notch.animate.title": "Anima sempre",
+  "settings.notch.animate.description":
+    "Anima l'isola e il dock degli agenti sempre, non solo quando il puntatore è sopra. Consuma più energia.",
   "settings.notch.displays.title": "Mostra sugli schermi aggiuntivi",
   "settings.notch.displays.description": "Mostra la Dynamic Island sugli schermi esterni collegati.",
   "settings.notch.haptics.title": "Feedback aptico",
