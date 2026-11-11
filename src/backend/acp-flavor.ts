@@ -1,10 +1,24 @@
 import { win32 } from "node:path";
-import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import {
+  type LoadSessionResponse,
+  type NewSessionRequest,
+  type PromptResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import type { CauseCode } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
+
+/** An agent's notice that it sends a failed model request again (`AcpFlavor.retryNotice`). */
+interface AcpRetryNotice {
+  readonly sessionId: string;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  /** The agent could not connect to its server. Else the server answered with an error or stopped answering. */
+  readonly unreachable: boolean;
+}
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
@@ -165,6 +179,12 @@ export interface AcpFlavor {
    */
   childSessionUpdates?: true;
   /**
+   * An extension notification that says that the agent sends a failed model request again, else null.
+   * The prompt is still in progress, so such a notice keeps its turn from ending as stalled, as a
+   * session update does, and the chat shows the retry.
+   */
+  retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
    */
@@ -250,7 +270,52 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  retryNotice: grokRetryNotice,
+  turnFailure: grokTurnFailure,
 };
+
+/**
+ * Grok CLI 1.0.77 fails a prompt after its last retry with the error of the model request, such as
+ * `Internal error: API error (status 503 Service Unavailable)` or `reqwest error stream: error sending
+ * request for url (…)`. The user reads what failed and what to do; the cause still comes from the
+ * agent's own text (#6883).
+ */
+function grokTurnFailure(error: unknown, detail: string): string {
+  if (!(error instanceof RequestError)) return detail;
+  const cause = classifyFailure(detail);
+  if (cause === "network") return sourceText("error.provider.grokConnectionFailed");
+  if (cause === "provider_unavailable" || cause === "timeout") return sourceText("error.provider.grokServiceFailure");
+  return detail;
+}
+
+/**
+ * The `error_type` of a Grok retry, with whether Grok could not connect. Grok CLI 1.0.77 sends `api`
+ * for a 5xx status, `idle_timeout` for a stream that stopped for 10 minutes, and `http` for a failed
+ * connection. A retry after an answer of only reasoning (`empty_response`) sends that reasoning as a
+ * session update, so it needs no notice.
+ */
+const GROK_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
+  ["api", false],
+  ["idle_timeout", false],
+  ["http", true],
+]);
+
+/**
+ * Grok CLI 1.0.77 sends a model request that fails with a 5xx status again 14 times in about five
+ * minutes, then starts again, and sends no session update meanwhile. It tells of each attempt only in
+ * an `x.ai/session_notification` with a `retry_state` update. Without it, OpenBot ended the turn as
+ * stalled before Grok gave its error, so a backup model did not start (#6883).
+ */
+function grokRetryNotice(method: string, params: DynamicRecord): AcpRetryNotice | null {
+  if (method.replace(/^_/u, "") !== "x.ai/session_notification") return null;
+  const { sessionId, update } = params;
+  if (!isRecord(update) || update.sessionUpdate !== "retry_state" || update.type !== "retrying") return null;
+  const unreachable = typeof update.error_type === "string" ? GROK_RETRY_TYPES.get(update.error_type) : undefined;
+  const { attempt, max_retries: maxAttempts } = update;
+  if (unreachable === undefined || typeof sessionId !== "string") return null;
+  if (typeof attempt !== "number" || typeof maxAttempts !== "number") return null;
+  return { sessionId, attempt, maxAttempts, unreachable };
+}
 
 /**
  * Hermes Agent 0.22 marks a turn as lost when its gateway restarts during the turn. It then refuses
