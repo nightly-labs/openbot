@@ -16,6 +16,8 @@ export interface RepeatableColumn<T> {
   identifier?: boolean;
   /** A count, such as a number of tokens: touch keyboards show digits. */
   numeric?: boolean;
+  /** The value is code, such as a model ID, and shows in the code font. */
+  mono?: boolean;
   read: (row: T) => string;
   write: (index: number, value: string) => void;
 }
@@ -27,14 +29,10 @@ interface RepeatableRowsProps<T> {
   removeLabel: (number: number) => string;
   addLabel: string;
   /**
-   * One column for a plain list, such as addresses; two for a name and its value; four for a model
-   * with its context window and output cap.
+   * One column for a plain list, such as addresses; two for a name and its value. A table has the
+   * columns that its header names.
    */
-  columns:
-    | readonly [RepeatableColumn<T>]
-    | readonly [RepeatableColumn<T>, RepeatableColumn<T>]
-    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>]
-    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>];
+  columns: readonly RepeatableColumn<T>[];
   rows: readonly T[];
   limit: number;
   busy: boolean;
@@ -46,8 +44,16 @@ interface RepeatableRowsProps<T> {
   action?: JSX.Element;
   /** Content between the label and the rows, such as the models that an endpoint reports. */
   children?: JSX.Element;
-  /** Controls under the fields of one row, such as the efforts of a model. */
-  rowDetails?: ((row: T, index: () => number) => JSX.Element) | undefined;
+  /** Makes the rows a table, as the models of this computer. */
+  table?: RepeatableTable<T> | undefined;
+}
+
+/** The rows as a table: the name of each column once above the rows, not in each row. */
+export interface RepeatableTable<T> {
+  /** The names of the columns, then the names of the cells, in the sequence of one row. */
+  header: readonly string[];
+  /** The cells of one row after its fields, such as the efforts of a model. */
+  cells: (row: T, index: () => number) => JSX.Element;
 }
 
 /**
@@ -69,6 +75,20 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
         </Show>
       </div>
       {props.children}
+      <Show when={props.table}>
+        {(table) => (
+          // Each field has its own accessible name, so a screen reader does not need the column names.
+          <div class="custom-provider-row-inputs custom-provider-row-table custom-provider-row-head" aria-hidden="true">
+            <For each={table().header}>
+              {(name) => (
+                <Text tone="muted" variant="caption">
+                  {name}
+                </Text>
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
       <For each={props.rows}>
         {(row, index) => (
           <div class="custom-provider-row">
@@ -77,8 +97,7 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 "custom-provider-row-inputs",
                 {
                   "custom-provider-row-single": props.columns.length === 1,
-                  "custom-provider-row-triple": props.columns.length === 3,
-                  "custom-provider-row-quad": props.columns.length === 4,
+                  "custom-provider-row-table": Boolean(props.table),
                 },
               ]}
             >
@@ -92,11 +111,13 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                     autocomplete={column.identifier ? "off" : undefined}
                     spellcheck={column.identifier ? false : undefined}
                     inputmode={column.numeric ? "numeric" : undefined}
+                    class={column.mono ? "custom-provider-mono" : undefined}
                     maxlength={column.maxlength}
                     disabled={props.busy}
                   />
                 )}
               </For>
+              {props.table?.cells(row, index)}
               <IconButton
                 label={props.removeLabel(index() + 1)}
                 variant="ghost"
@@ -106,7 +127,6 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 <Trash2 />
               </IconButton>
             </div>
-            {props.rowDetails?.(row, index)}
             <Show when={props.rowError(index())}>
               {(message) => (
                 <Text class="custom-provider-row-error" tone="danger" variant="caption" role="alert">
