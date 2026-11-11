@@ -986,7 +986,10 @@ jobs:
 
       - name: Build the image
         run: |
-          docker build --file docker/Dockerfile --platform "$PLATFORM" \
+          # `--network=host` gives the build steps the DNS resolver of the runner. On the default
+          # bridge network, `apt-get update` could not resolve the Ubuntu mirrors on hosted runners
+          # (v0.68.0), while the runner itself resolved them.
+          docker build --network=host --file docker/Dockerfile --platform "$PLATFORM" \
             --build-arg "VERSION=$RELEASE_VERSION" --build-arg "REVISION=$GITHUB_SHA" \
             --tag openbot:release image
         env:
