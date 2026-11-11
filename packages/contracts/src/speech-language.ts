@@ -87,7 +87,9 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "je",
       "sur",
     ]),
-    letters: /[çèêàùœ]/gu,
+    // Italian also writes è, à and ù, but at the end of a word: French has them inside a word, and
+    // in the words à, là, déjà, voilà and où.
+    letters: /[çêœ]|[èàù](?=\p{L})|(?:^|\P{L})(?:déj|voil|l)?à(?!\p{L})|(?:^|\P{L})où(?!\p{L})/gu,
   },
   {
     language: "it",
@@ -107,7 +109,10 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "questo",
       "come",
       "ma",
+      "la",
     ]),
+    // A word that ends in an accented vowel, such as città, più or così; not là, déjà, voilà or où.
+    letters: /(?:^|\P{L})(?!(?:l|o|déj|voil)[àù](?!\p{L}))\p{L}+[àèìòù](?!\p{L})/gu,
   },
   {
     language: "pt",
