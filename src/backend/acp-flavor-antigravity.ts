@@ -106,6 +106,10 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityServiceFailure",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
+  // Google's generic text for a 400 INVALID_ARGUMENT that names no field. The chat stopped with only
+  // this text, and another model let the user continue (#7116). Not the status name: a refused API
+  // key is also INVALID_ARGUMENT.
+  ["error.provider.antigravityRequestRejected", /\bRequest contains an invalid argument\b/iu],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */

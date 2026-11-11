@@ -229,6 +229,8 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
