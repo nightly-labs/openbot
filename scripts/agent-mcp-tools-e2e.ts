@@ -2,14 +2,15 @@
 // SQLite MCP store and the probe, against local MCP servers. The approval and the sign-in card are
 // recorded where the router would show them. No provider or account is used. It also checks what
 // suggest_marketplace_app answers for a Marketplace app that is already installed, and that a
-// startup moves an app installed from an earlier catalog pin to the current pin.
+// startup moves an app installed from an earlier catalog pin to the current pin, and that the
+// built-in GitHub connection is listed as the agents get it (#7088).
 // bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
@@ -104,7 +105,7 @@ interface ToolAnswer {
   error?: string;
   toolCount?: number;
   tools?: string[];
-  servers?: Array<{ name: string; headerNames?: string[] }>;
+  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean }>;
   enabled?: boolean;
   removed?: boolean;
   setupSteps?: string[];
@@ -156,11 +157,11 @@ try {
   });
   const tools = mcpServersFromGateway(gateway);
 
-  const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true) => {
+  const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true, using = tools) => {
     const approvals: string[] = [];
     const signInCards: string[] = [];
     const response = await runCauseEffect(
-      handleMcpServerTool(tools, {
+      handleMcpServerTool(using, {
         tool,
         arguments: args,
         approve: (reason) =>
@@ -354,6 +355,57 @@ try {
   const removed = await call("remove a server", "remove_mcp_server", { name: "calendar" });
   assert.equal(removed.success, true);
   assert.equal(row("calendar"), undefined);
+
+  // The GitHub connection is not a row, but the agents get it: the list shows it, and the other
+  // tools say that it is part of OpenBot (#7088).
+  const githubGateway = new McpGateway({
+    servers: store,
+    credentials: NO_PROVIDER_CREDENTIALS,
+    computerUseMcpServer: () => null,
+    githubConnector: {
+      mcpServer: () => ({
+        id: GITHUB_CONNECTOR_MCP_SERVER_ID,
+        name: "github",
+        transport: "http",
+        enabled: true,
+        command: "",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: servers.open.url,
+        headers: [],
+      }),
+      mcpAuthorization: () => Effect.succeed(null),
+    },
+    logger: createOpenBotLogger("agent-service", () => undefined),
+    hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+  });
+  const githubTools = mcpServersFromGateway(githubGateway);
+  assert.ok(githubGateway.enabled().some((config) => config.name === "github"));
+  const githubListed = await call("the GitHub connection is listed", "list_mcp_servers", {}, true, githubTools);
+  assert.deepEqual(
+    githubListed.result.servers?.find((entry) => entry.name === "github"),
+    { name: "github", transport: "http", enabled: true, builtIn: true },
+  );
+  const githubTested = await call(
+    "the GitHub connection is not tested",
+    "test_mcp_server",
+    { name: "github" },
+    true,
+    githubTools,
+  );
+  assert.equal(githubTested.success, false);
+  assert.match(githubTested.result.error ?? "", /built-in server of OpenBot/u);
+  const githubRemoved = await call(
+    "the GitHub connection is not removed",
+    "remove_mcp_server",
+    { name: "github" },
+    true,
+    githubTools,
+  );
+  assert.equal(githubRemoved.success, false);
+  assert.equal(githubRemoved.approvals.length, 0);
 
   const reserved = await call("a reserved name is refused", "save_mcp_server", {
     name: "openbot",
