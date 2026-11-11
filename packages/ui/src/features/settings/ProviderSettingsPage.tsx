@@ -557,6 +557,23 @@ function ProviderPage(props: PageProps) {
   // The source can arrive after the page opens, such as when the host's capabilities load.
   // Each status makes a new option, so the section keeps its list until the provider or the source changes.
   const provider = createMemo(() => props.option.id);
+  /**
+   * The host has no CLI for this provider: OpenBot did not download one, and the user installed
+   * none. The page then shows only the download, because nothing else can have an effect.
+   */
+  const runtimeMissing = () => {
+    const runtime = props.option.runtimeStatus;
+    return (
+      Boolean(runtime) &&
+      runtime?.phase !== "ready" &&
+      runtime?.version === null &&
+      !row.available() &&
+      // A CLI that is too old is there: it keeps its key, Runtime and Use. A missing ChatGPT or
+      // Claude CLI reports "error", so that state cannot tell a broken CLI from none.
+      props.option.state !== "outdated" &&
+      !row.off()
+    );
+  };
   const modelVisibility = createMemo(() => props.modelVisibility);
   const models = createMemo(() => modelVisibility()?.(provider()));
   return (
@@ -569,9 +586,14 @@ function ProviderPage(props: PageProps) {
         subtitle={subtitle()}
       />
       <Show when={!row.off()}>
-        <Show when={accountsShown()} fallback={<SignInSection {...props} row={row} keyShown={keyShown()} />}>
+        <Show
+          when={accountsShown()}
+          fallback={<SignInSection {...props} row={row} keyShown={keyShown()} runtimeMissing={runtimeMissing()} />}
+        >
           <AccountsSection {...props} row={row} />
         </Show>
+      </Show>
+      <Show when={!(row.off() || runtimeMissing())}>
         <Show when={keyShown()}>
           <ApiKeySection {...props} row={row} />
         </Show>
@@ -589,7 +611,9 @@ function ProviderPage(props: PageProps) {
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
       </Show>
-      <UseSection {...props} row={row} />
+      <Show when={!runtimeMissing()}>
+        <UseSection {...props} row={row} />
+      </Show>
       <DeleteSection {...props} row={row} />
     </>
   );
@@ -1116,7 +1140,7 @@ function LowUsageBadge(props: { reading: AccountUsageProviderRow; name: string; 
 /* ---------------------------------------------- Sign-in (one account) */
 
 /** The provider's one sign-in: the same buttons that its onboarding row has, on a card. */
-function SignInSection(props: SectionProps & { keyShown: boolean }) {
+function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing: boolean }) {
   const { t, format, sourceText, errorMessage } = useText();
   const row = () => props.row;
   /**
@@ -1138,16 +1162,50 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
       setDisconnectError(errorMessage(failure, t("provider.account.actionFailed", { name: props.option.name }))),
     );
   };
-  /** Download, its cancel and its retry are on the Version row. */
+  /**
+   * Download, its cancel and its retry are on the Version row. A provider with no CLI has no Version
+   * row, so they are here, where Connect comes when the download ends.
+   */
+  const downloadAction = () => {
+    if (!props.runtimeMissing) return;
+    const action = row().runtimeAction();
+    return action === "download" || action === "cancel" || action === "retry" ? action : undefined;
+  };
+  const progress = () => {
+    const runtime = row().runtimeStatus();
+    if (!props.runtimeMissing || runtime?.phase !== "downloading" || runtime.message) return null;
+    return Math.round(Math.max(0, Math.min(100, runtime.progress ?? 0)));
+  };
   const connectAction = () => {
     const action = row().runtimeAction();
     return action === "connect" || action === "reconnect" || action === "restart" ? action : undefined;
   };
   const browserAction = () => providerAction(row().state(), row().connecting());
   /** The key providers open the key dialog from their API key card. */
-  const signInButton = () => row().signInOffered() && !props.keyShown;
-  const title = () =>
-    props.option.email ?? providerStatusLabel(t, format, row().state(), row().connecting(), undefined);
+  const signInButton = () => row().signInOffered() && !props.keyShown && !props.runtimeMissing;
+  const title = () => {
+    const percent = progress();
+    if (percent !== null) return t("provider.picker.downloading", { percent: format.percent(percent / 100) });
+    // The CLI is downloaded, and the provider status has not yet found it or the host reports no
+    // sign-in: the card offers Connect, so it must not say that the CLI is not installed.
+    if (
+      !props.option.email &&
+      row().state() === "not-installed" &&
+      !row().connecting() &&
+      row().runtimeStatus()?.phase === "ready"
+    )
+      return t("provider.status.notConnected");
+    return (
+      props.option.email ??
+      providerStatusLabel(
+        t,
+        format,
+        row().state(),
+        row().connecting(),
+        props.runtimeMissing ? row().runtimeStatus() : undefined,
+      )
+    );
+  };
   const messages = () =>
     [
       props.option.checkError ? sourceText(props.option.checkError) : null,
@@ -1180,8 +1238,29 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 </ItemDescription>
               )}
             </Show>
+            <Show when={progress() !== null}>
+              <Progress
+                class="provider-settings-progress"
+                value={progress() ?? 0}
+                aria-label={t("provider.settings.downloadLabel", { name: props.option.name })}
+              />
+            </Show>
           </ItemContent>
           <ItemActions>
+            <Show when={downloadAction()}>
+              {(action) => (
+                <Button
+                  type="button"
+                  variant={action() === "download" ? "default" : "outline"}
+                  size="sm"
+                  aria-label={t(PROVIDER_ACTION_LABEL[action()], { name: props.option.name })}
+                  disabled={props.disabled}
+                  onClick={() => row().runAction(action())}
+                >
+                  {t(PROVIDER_ACTION_TEXT[action()])}
+                </Button>
+              )}
+            </Show>
             <Show when={row().codeFallbackOffered()}>
               <Button
                 type="button"

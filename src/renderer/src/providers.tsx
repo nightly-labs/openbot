@@ -1,3 +1,4 @@
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -100,6 +101,8 @@ const Providers = createSimpleContext({
           try {
             const result = await api.setProviderApiKey(input);
             analytics.track("provider_action", { ...tracked, result: "succeeded" });
+            // The host downloads Pi for the key when it has none. A joined host sends no event for it.
+            if (isKeyOnlyProvider(input.provider)) runtimes.refreshProviderRuntimes();
             return result;
           } catch (error) {
             analytics.track("provider_action", { ...tracked, result: "failed", failure_code: "update_failed" });

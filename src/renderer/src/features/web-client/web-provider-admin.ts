@@ -1,4 +1,4 @@
-import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
@@ -429,13 +429,19 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
   const readsCodexKey = createMemo(() => serverSupportsCapability(options.server(), CODEX_API_KEY_CAPABILITY));
   const providerKeys = createMemo(() => {
     const id = serverId();
-    return id
-      ? {
-          ...hostProviderKeyApi(() => admin, id, openWebDestination),
-          readsClaudeKey: readsClaudeKey(),
-          readsCodexKey: readsCodexKey(),
-        }
-      : undefined;
+    if (!id) return undefined;
+    const api = hostProviderKeyApi(() => admin, id, openWebDestination);
+    return {
+      ...api,
+      readsClaudeKey: readsClaudeKey(),
+      readsCodexKey: readsCodexKey(),
+      setProviderApiKey: async (input: { provider: AgentProviderId; key: string }) => {
+        const result = await api.setProviderApiKey(input);
+        // The host downloads Pi for the key when it has none, and sends no event for it.
+        if (isKeyOnlyProvider(input.provider)) runtimes.refreshProviderRuntimes();
+        return result;
+      },
+    };
   });
   // The released status and agent routes carry no account, so `provider-accounts-v1` adds them.
   const accountsServerId = createMemo(() => remoteAdminServer(options.server(), PROVIDER_ACCOUNTS_CAPABILITY)?.id);
