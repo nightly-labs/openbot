@@ -348,9 +348,9 @@ export const messages = {
   "error.provider.modelServiceRefusedReason":
     "Der Modelldienst hat die Anfrage abgelehnt: {reason}. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
   "error.provider.safetyStop":
-    "Die Sicherheitsprüfung von OpenAI hat diesen Chat gestoppt. Nachrichten in diesem Chat können erneut stoppen. Starten Sie zum Fortfahren einen Neuen Chat. Der Agent behält seine Einrichtung.",
+    "Die Sicherheitsprüfung von OpenAI hat diesen Chat gestoppt. Nachrichten in diesem Chat können erneut stoppen. Starte zum Fortfahren einen Neuen Chat. Der Agent behält seine Einrichtung.",
   "error.provider.safetyStopReason":
-    "Die Sicherheitsprüfung von OpenAI hat diesen Chat gestoppt. Nachrichten in diesem Chat können erneut stoppen. Starten Sie zum Fortfahren einen Neuen Chat. Der Agent behält seine Einrichtung. Grund: {detail}",
+    "Die Sicherheitsprüfung von OpenAI hat diesen Chat gestoppt. Nachrichten in diesem Chat können erneut stoppen. Starte zum Fortfahren einen Neuen Chat. Der Agent behält seine Einrichtung. Grund: {detail}",
   "error.provider.messageTooLarge":
     "OpenBot hat {provider} gestoppt, da eine Nachricht mit mehr als {limit} MB gesendet wurde.",
   "error.provider.customAgentIdInvalid":

@@ -1074,12 +1074,13 @@ export class TurnLifecycle {
         // clients send a flat `message`. Reading only the flat field turned every Codex failure,
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
-        // A safety stop keeps the session: the user decides to start a new chat.
+        const reported = getString(params, "message") ?? getString(error, "message") ?? "";
+        // A safety stop keeps the session: the user decides to start a new chat. The text checks below
+        // read the provider's own text, so the explanation in the sentence does not change the path.
         const message =
-          codexSafetyStopFailure(error, (text) => this.#hooks.redactMcp(text)) ??
-          getString(params, "message") ??
-          getString(error, "message") ??
-          "";
+          (notification.method === "error"
+            ? codexSafetyStopFailure(error, (text) => this.#hooks.redactMcp(text))
+            : null) ?? reported;
         // An ACP or Pi client names the cause that it read from structured fields, before the
         // error became a sentence for the user. The other clients leave it to the error.
         const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
@@ -1122,9 +1123,9 @@ export class TurnLifecycle {
           return;
         }
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-          this.#turnErrors.set(errorTurnId, message);
+          this.#turnErrors.set(errorTurnId, reported);
           // The turn's completion runs it again or reports it in words the user can act on.
-          if (refusedSessionFailure(source.provider, message) !== null) return;
+          if (refusedSessionFailure(source.provider, reported) !== null) return;
         }
         // A spent quota or balance is explained by the usage notice, so only a provider that reports
         // usage can leave it out of the banner. Gemini's 429 reads as a spent quota, and it failed
@@ -1136,19 +1137,19 @@ export class TurnLifecycle {
         // reset for every provider.
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
-          (isUsageLimitDiagnostic(message) &&
+          (isUsageLimitDiagnostic(reported) &&
             ((source.provider !== "antigravity" &&
               source.provider !== "cursor" &&
               source.provider !== "opencode" &&
               source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
-              isPlanLimitDiagnostic(message))) ||
+              isPlanLimitDiagnostic(reported))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
           // Only a plan window resets by itself. A spent balance fails as before, with its reason.
           const planLimit =
-            isPlanLimitDiagnostic(message) ||
-            (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
+            isPlanLimitDiagnostic(reported) ||
+            (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(reported));
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
           }
