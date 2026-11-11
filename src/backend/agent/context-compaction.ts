@@ -314,7 +314,14 @@ export class ContextCompaction {
     const contextWindow = finiteNumberOrNull(usage?.modelContextWindow);
     if (usedTokens === null || usedTokens < 0 || contextWindow === null || contextWindow <= 0) return;
 
-    const budget = this.#budgets.get(threadId) ?? {
+    const current = this.#budgets.get(threadId);
+    // While a compaction runs, Codex 0.167.0 reports an estimate of its result, which can be much smaller
+    // than the next request. Only that request tells whether the compaction helped. The estimate reset
+    // the count of compactions that left the session almost full, so each turn compacted again
+    // (#6845). The display still shows it.
+    if (current && (current.phase !== "idle" || this.#display.get(threadId)?.compaction?.status === "running")) return;
+
+    const budget = current ?? {
       usedTokens,
       contextWindow,
       pending: false,
