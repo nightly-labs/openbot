@@ -53,7 +53,8 @@ waits for the answer of such a run (`quietRoutineRun`). The run history stores w
 run in `run_source` (`test`, `script` or `webhook`); a manual run from before migration 35 has none
 and is read as a Test run. The agent calls the
 `routine_no_update` tool, which the run prompt names, or the user asks in the routine task
-for an answer of only `[[no-update]]`. Models often write a short sentence instead of an exact
+for an answer of only `[[no-update]]`. An answer of only `[SILENT]`, the Hermes Agent cron token
+that the Hermes import copies, is also the marker. Models often write a short sentence instead of an exact
 token, so the tool is the main path. There is no setting. The tool and the marker do not
 depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
 held in memory until the turn completes; the history import finds it again by the tool name, as
