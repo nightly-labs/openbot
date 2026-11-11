@@ -1600,8 +1600,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (recovering && held.transport) yield* held.transport.stop(Effect.void).pipe(Effect.ignore);
     // A shared process that still holds the session can refuse to load it again: GitHub Copilot CLI
     // 1.0.108 answers "Session <id> is already loaded" to each load (#6962). `session/close` also
-    // cancels the stopped turn, and the load then opens the session as after an idle release.
-    else if (recovering && this.#closesSessions)
+    // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
+    // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
+    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0)
       yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
         this.#backgroundTimeout("session/close"),
         Effect.ignore,
