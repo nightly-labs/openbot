@@ -7,7 +7,7 @@ import { useText } from "../../text";
 import { useSidebarScope } from "./sidebar-scope";
 import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "./sidebar-types";
 
-const ORDER_LABEL = {
+export const SIDEBAR_CHAT_ORDER_LABEL = {
   manual: "sidebar.order.manual",
   "unread-group": "sidebar.order.unreadGroup",
   "unread-first": "sidebar.order.unreadFirst",
@@ -44,7 +44,7 @@ export function SidebarChatOrderSubmenu() {
                       <Check />
                     </Show>
                   </span>
-                  <span>{t(ORDER_LABEL[order])}</span>
+                  <span>{t(SIDEBAR_CHAT_ORDER_LABEL[order])}</span>
                 </ContextMenu.RadioItem>
               )}
             </For>

@@ -7,7 +7,7 @@
  * is the one part that needs a closure of its own, and `createSidebarDragEngine` is it.
  */
 
-import { createContext, createEffect, onCleanup, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, onCleanup, useContext } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createSidebarDragEngine } from "./createSidebarDragEngine";
 import type { SidebarProps } from "./sidebar-types";
@@ -27,6 +27,12 @@ export function createSidebarScope(props: SidebarProps) {
   // The drag state is built from the data store, so the data store reads it through this reference,
   // which is set once the drag state exists.
   let dragActive = () => false;
+  /**
+   * True while a mouse or pen is over the list, or over a menu that is open on it. The read open chat
+   * keeps its place in an unread order only then. A touch is false: a finger leaves nothing under it
+   * after a tap.
+   */
+  const [pointerInList, setPointerInList] = createSignal(false);
   const {
     assignedSectionId,
     chatKind,
@@ -55,7 +61,7 @@ export function createSidebarScope(props: SidebarProps) {
     visiblePinnedKeys,
     visibleSectionIds,
     waitingChats,
-  } = createSidebarDataStore({ props, dragActive: () => dragActive() });
+  } = createSidebarDataStore({ props, dragActive: () => dragActive(), pointerInList });
   const {
     cancelSectionEditor,
     closeDelete,
@@ -142,7 +148,26 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
   });
 
+  // `pointerover` also fires when a menu closes and the pointer moves on, which a `pointerleave` on
+  // the list does not report.
+  const trackListPointer = (event: PointerEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    setPointerInList(
+      event.pointerType !== "touch" &&
+        target !== null &&
+        (agentList?.contains(target) === true || target.closest(".agent-context-menu") !== null),
+    );
+  };
+  // The pointer left the window.
+  const releaseListPointer = (event: PointerEvent) => {
+    if (event.relatedTarget === null) setPointerInList(false);
+  };
+  document.addEventListener("pointerover", trackListPointer);
+  document.addEventListener("pointerout", releaseListPointer);
+
   onCleanup(() => {
+    document.removeEventListener("pointerover", trackListPointer);
+    document.removeEventListener("pointerout", releaseListPointer);
     stopSidebarDragging();
     scrollFades.stop();
   });

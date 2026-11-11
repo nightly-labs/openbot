@@ -98,6 +98,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "O link abriu no navegador padrão.",
   "settings.sendShortcut.title": "Atalho de envio",
   "settings.sendShortcut.description": "Escolha as teclas que enviam uma mensagem neste dispositivo e navegador.",
+  "settings.chatOrder.description":
+    "Escolha onde a barra lateral mostra as conversas não lidas neste dispositivo. Manual desativa o grupo Não lidas.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",

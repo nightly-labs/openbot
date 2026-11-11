@@ -94,6 +94,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "فُتح الرابط في المتصفح الافتراضي.",
   "settings.sendShortcut.title": "اختصار الإرسال",
   "settings.sendShortcut.description": "اختر المفاتيح التي ترسل رسالة على هذا الجهاز والمتصفح.",
+  "settings.chatOrder.description":
+    "اختر مكان عرض الدردشات غير المقروءة في الشريط الجانبي على هذا الجهاز. الخيار يدوي يوقف مجموعة غير المقروءة.",
   "settings.sendShortcut.enter": "Enter للإرسال",
   "settings.sendShortcut.modEnterMac": "⌘Enter للإرسال",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter للإرسال",

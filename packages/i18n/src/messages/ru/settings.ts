@@ -97,6 +97,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Ссылка открылась в основном браузере.",
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description": "Выберите клавиши для отправки сообщения на этом устройстве и в этом браузере.",
+  "settings.chatOrder.description":
+    "Выберите, где боковая панель показывает непрочитанные чаты на этом устройстве. «Вручную» отключает группу «Непрочитанные».",
   "settings.sendShortcut.enter": "Отправка по Enter",
   "settings.sendShortcut.modEnterMac": "Отправка по ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Отправка по Ctrl+Enter",

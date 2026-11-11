@@ -96,6 +96,7 @@ export const messages = {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "发送快捷键",
   "settings.sendShortcut.description": "选择在这台设备和浏览器上发送消息的按键。",
+  "settings.chatOrder.description": "选择此设备的侧栏在哪里显示未读聊天。选择手动会关闭未读分组。",
   "settings.sendShortcut.enter": "按 Enter 发送",
   "settings.sendShortcut.modEnterMac": "按 ⌘Enter 发送",
   "settings.sendShortcut.modEnterWin": "按 Ctrl+Enter 发送",

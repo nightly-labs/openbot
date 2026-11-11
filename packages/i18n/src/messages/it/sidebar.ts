@@ -100,6 +100,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "Ha bisogno di te, {count} chat", other: "Hanno bisogno di te, {count} chat" },
   "sidebar.unread.title": "Non lette",
   "sidebar.unread.label": { one: "Non lette, {count} chat", other: "Non lette, {count} chat" },
+  "sidebar.unread.actions": "Azioni per Non lette",
+  "sidebar.unread.turnOff": "Disattiva il gruppo Non lette",
   "sidebar.waiting.action.question": "Rispondi",
   "sidebar.waiting.action.approval": "Controlla",
   "sidebar.waiting.action.takeover": "Intervieni",

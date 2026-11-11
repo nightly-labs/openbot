@@ -139,6 +139,8 @@ export const messages = {
     many: "غير مقروءة، {count} دردشة",
     other: "غير مقروءة، {count} دردشة",
   },
+  "sidebar.unread.actions": "إجراءات غير المقروءة",
+  "sidebar.unread.turnOff": "إيقاف مجموعة غير المقروءة",
   "sidebar.waiting.action.question": "إجابة",
   "sidebar.waiting.action.approval": "مراجعة",
   "sidebar.waiting.action.takeover": "تولّي التحكم",

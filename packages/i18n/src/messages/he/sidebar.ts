@@ -109,6 +109,8 @@ export const messages = {
   },
   "sidebar.unread.title": "לא נקראו",
   "sidebar.unread.label": { one: "לא נקראו, צ'אט אחד", two: "לא נקראו, שני צ'אטים", other: "לא נקראו, {count} צ'אטים" },
+  "sidebar.unread.actions": "פעולות לא נקראו",
+  "sidebar.unread.turnOff": "כיבוי הקבוצה לא נקראו",
   "sidebar.waiting.action.question": "מענה",
   "sidebar.waiting.action.approval": "סקירה",
   "sidebar.waiting.action.takeover": "השתלטות",

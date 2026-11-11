@@ -96,6 +96,8 @@ export const messages = {
   "settings.sendShortcut.title": "Skrót wysyłania",
   "settings.sendShortcut.description":
     "Wybierz klawisze, które wysyłają wiadomość na tym urządzeniu i w tej przeglądarce.",
+  "settings.chatOrder.description":
+    "Wybierz, gdzie pasek boczny pokazuje nieprzeczytane czaty na tym urządzeniu. Ręcznie wyłącza grupę Nieprzeczytane.",
   "settings.sendShortcut.enter": "Enter wysyła",
   "settings.sendShortcut.modEnterMac": "⌘Enter wysyła",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter wysyła",

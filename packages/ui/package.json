@@ -262,6 +262,7 @@
     "./features/settings/SoundChoiceSelect": "./src/features/settings/SoundChoiceSelect.tsx",
     "./features/settings/NotificationMatrix": "./src/features/settings/NotificationMatrix.tsx",
     "./features/settings/SendShortcutSelect": "./src/features/settings/SendShortcutSelect.tsx",
+    "./features/settings/SidebarChatOrderSelect": "./src/features/settings/SidebarChatOrderSelect.tsx",
     "./features/settings/McpConnectDialog": "./src/features/settings/McpConnectDialog.tsx",
     "./features/settings/McpConnectShell": "./src/features/settings/McpConnectShell.tsx",
     "./features/settings/McpKeyDialog": "./src/features/settings/McpKeyDialog.tsx",
