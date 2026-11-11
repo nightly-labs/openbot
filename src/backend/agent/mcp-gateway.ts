@@ -139,7 +139,7 @@ export class McpGateway {
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
-      signInEnded: (url) => oauth?.needsSignIn(url) ?? true,
+      signInEnded: (url) => !oauth?.signedIn(url),
       ...(credentials.appVersion
         ? {
             client: {

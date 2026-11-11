@@ -78,9 +78,10 @@ export interface McpOAuthProxyOptions {
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
   /**
-   * Whether the sign-in of `url` ended after a refusal: the refresh was refused, or there was no
-   * refresh token. A server can refuse a request when the sign-in is still good, for example for a
-   * tool that the account cannot use, and then a new sign-in alone does not help.
+   * Whether the sign-in of `url` ended after a refusal: the refresh was refused, there was no
+   * refresh token, or the user signed out. It is the opposite of the row's "Signed in". A server can
+   * refuse a request when the sign-in is still good, for example for a tool that the account cannot
+   * use, and then a new sign-in alone does not help.
    */
   signInEnded: (url: string) => boolean;
   /** What the proxy tells a server about the client. Without it, the provider's own `clientInfo` goes through. */
