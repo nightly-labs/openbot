@@ -197,8 +197,13 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
-/** A CLI built for a processor feature that this computer does not have, such as AES (#7111). */
-const UNSUPPORTED_PROCESSOR = /\(signal SIGILL\)/u;
+/**
+ * A CLI built for a processor feature that this computer does not have, such as AES (#7111). Its Go
+ * runtime names the feature and then stops with SIGILL. Only that line counts: a crash bug in a
+ * running CLI can also end with SIGILL, and that CLI works on this computer.
+ */
+const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
+const PROCESSOR_FEATURE_MISSING = /\bthis feature is not available on this processor\b/iu;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -3030,7 +3035,7 @@ export class ProviderRuntime implements ProviderPort {
     // counts: the stderr line can quote another process.
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
-    if (UNSUPPORTED_PROCESSOR.test(error.message))
+    if (ILLEGAL_INSTRUCTION.test(error.message) && PROCESSOR_FEATURE_MISSING.test(detailed.message))
       return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
     return detailed;
   }

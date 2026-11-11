@@ -554,6 +554,7 @@ const SAFE_FAILURE_CODES = new Set([
   "archive_invalid",
   "checksum_failed",
   "version_mismatch",
+  "cpu_unsupported",
   "cli_update_failed",
   "cli_activate_failed",
   "cli_select_failed",
