@@ -309,6 +309,8 @@ const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
 /** Homes this much farther than the nearest home are near too, so the hash spreads hosts over one region. */
 const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
 const EARTH_RADIUS_KM = 6_371;
+/** A host ticket waits this long for a nearer home to answer before the host keeps its stored home. */
+const SIGNAL_HOME_MOVE_TIMEOUT_MS = 2_000;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -3220,7 +3222,9 @@ export class RemoteControlPlane {
    * The home of a host that asks for one. The stored home stays while it is one of the homes near the
    * host and its URL is not the one that failed for the host. Else the rendezvous choice over those
    * homes replaces it, so a removed or failed machine moves only its own hosts, and a new machine near
-   * a host takes it from a far one. When two requests race, both use the home that the first one stored.
+   * a host takes it from a far one. A stored home that did not fail is left only for a home that answers
+   * `/health/ready`: a host that moved away from a failed near home does not go back while it is down.
+   * When two requests race, both use the home that the first one stored.
    */
   readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
     this: RemoteControlPlane,
@@ -3235,6 +3239,12 @@ export class RemoteControlPlane {
     if (current && candidates.includes(current.id)) return current;
     const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
+    if (
+      current &&
+      current.url !== failedSignalUrl &&
+      !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
+    )
+      return current;
     const stored = yield* remoteCall(() =>
       dependencies.database
         .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
@@ -3520,6 +3530,31 @@ function nearSignalHomes(
   );
   const nearest = Math.min(...distances.values());
   return ids.filter((id) => (distances.get(id) ?? Number.POSITIVE_INFINITY) <= nearest + NEAR_SIGNAL_HOME_MARGIN_KM);
+}
+
+/** The `/health/ready` URL of the machine of a Signal WebSocket URL. */
+export function signalHealthUrl(signalUrl: string): string {
+  const parsed = new URL(signalUrl);
+  return `${parsed.protocol === "ws:" ? "http:" : "https:"}//${parsed.host}/health/ready`;
+}
+
+/** Whether the machine of a Signal URL answers `/health/ready`. A failed request is a false answer, not an error. */
+export function signalAnswers(
+  fetcher: (input: string, init: RequestInit) => Promise<Response>,
+  signalUrl: string,
+  timeoutMs: number,
+): Effect.Effect<boolean> {
+  return Effect.tryPromise({
+    try: (signal) =>
+      fetcher(signalHealthUrl(signalUrl), {
+        method: "GET",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+      }),
+    catch: () => null,
+  }).pipe(
+    Effect.map((response) => response.ok),
+    Effect.orElseSucceed(() => false),
+  );
 }
 
 /** The great-circle distance between two places, in kilometres (haversine). */

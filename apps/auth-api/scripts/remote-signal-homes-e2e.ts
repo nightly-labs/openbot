@@ -3,7 +3,7 @@
 // moves only when that home failed for it, and its members follow it. Other host tickets, and a
 // Worker with no homes, name the entry Signal and no `signal` claim. Two requests that race store
 // one home. With home locations, a host gets one of the homes near the place of its request and
-// moves to it from a far home.
+// moves to it from a far home, but only when that home answers `/health/ready`.
 //
 // Run: bun apps/auth-api/scripts/remote-signal-homes-e2e.ts
 // It writes .openbot-build/remote-signal-homes-e2e/report.json and exits non-zero on a failure.
@@ -118,14 +118,28 @@ function storedHome(database: DatabaseSync, hostId: string): string {
   return row?.signal_home === null || row?.signal_home === undefined ? "none" : String(row.signal_home);
 }
 
+/** The Signal machines (host names) whose `/health/ready` fails, and each health URL that was asked. */
+const downMachines = new Set<string>();
+const healthRequests: string[] = [];
+async function healthFetch(input: string | URL | Request): Promise<Response> {
+  const url = new URL(input instanceof Request ? input.url : input);
+  if (url.pathname !== "/health/ready") throw new Error(`Unexpected request: ${url.pathname}`);
+  healthRequests.push(url.href);
+  if (downMachines.has(url.hostname)) throw new TypeError("fetch failed");
+  return new Response("{}", { status: 200 });
+}
+
 function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = ENTRY_URL, locations = "") {
-  return new RemoteControlPlane({
-    DB: database instanceof DatabaseSync ? sqliteD1(database) : database,
-    ...ticketKeys,
-    REMOTE_SIGNAL_URL: entryUrl,
-    REMOTE_SIGNAL_HOMES: homes,
-    REMOTE_SIGNAL_HOME_LOCATIONS: locations,
-  });
+  return new RemoteControlPlane(
+    {
+      DB: database instanceof DatabaseSync ? sqliteD1(database) : database,
+      ...ticketKeys,
+      REMOTE_SIGNAL_URL: entryUrl,
+      REMOTE_SIGNAL_HOMES: homes,
+      REMOTE_SIGNAL_HOME_LOCATIONS: locations,
+    },
+    { fetch: healthFetch },
+  );
 }
 
 async function hostTicket(
@@ -355,7 +369,7 @@ async function hostsSpreadOverTheHomes() {
 }
 
 async function hostsGetANearHome() {
-  const hostIds = ["near-1", "near-2", "near-3", "near-4", "near-5", "near-6"];
+  const hostIds = ["near-1", "near-2", "near-3", "near-4", "near-5", "near-6", "near-7"];
   const database = await hostsWithSessions(hostIds);
   const remote = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS);
   const newYork = await hostTicket(remote, "near-1", asksFrom(PLACES.newYork));
@@ -413,8 +427,35 @@ async function hostsGetANearHome() {
     failed.signal === "us" && storedHome(database, "near-2") === "us",
     { failed },
   );
+  downMachines.add("signal-au.test");
+  healthRequests.length = 0;
+  const stillDown = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
+  check(
+    "while its Sydney home does not answer, the host keeps the San Jose home and its members stay",
+    stillDown.signal === "us" &&
+      storedHome(database, "near-2") === "us" &&
+      (await sessionTicket(remote, "near-2")).signal === "us" &&
+      healthRequests.includes("https://signal-au.test/health/ready"),
+    { stillDown, healthRequests: [...healthRequests] },
+  );
+  downMachines.delete("signal-au.test");
   const back = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
-  check("when its Sydney home works again, the host goes back to it", back.signal === "au", { back });
+  check(
+    "when its Sydney home answers again, the host goes back to it",
+    back.signal === "au" && storedHome(database, "near-2") === "au",
+    { back },
+  );
+  downMachines.add("signal-us.test");
+  healthRequests.length = 0;
+  const firstHome = await hostTicket(remote, "near-7", asksFrom(PLACES.newYork));
+  const failedAway = await hostTicket(remote, "near-1", asksFrom(PLACES.newYork, REGION_URLS.us));
+  downMachines.delete("signal-us.test");
+  check(
+    "a host with no stored home, or whose home failed, gets its home with no health request",
+    firstHome.signal === "us" && failedAway.signal !== "us" && healthRequests.length === 0,
+    { firstHome, failedAway, healthRequests: [...healthRequests] },
+  );
+  database.prepare("UPDATE remote_hosts SET signal_home = 'us' WHERE host_id = 'near-1'").run();
   const tokyo = await hostTicket(remote, "near-1", asksFrom(PLACES.tokyo));
   check(
     "a host whose stored home is within the margin of the nearest home keeps it (Tokyo: Sydney 7,800 km, San Jose 8,200 km)",

@@ -310,7 +310,9 @@ Placement: `REMOTE_SIGNAL_HOME_LOCATIONS` gives each home a place as `id=latitud
 ticket route reads the host place from the Cloudflare request (`request.cf`). The Worker keeps the
 available homes that are at most 1000 km farther from the host than the nearest one, and picks one of
 them with the same rendezvous hash as before. A host keeps its stored home while that home is one of
-them; otherwise it moves at its next ticket. A host with no known place, or a Worker with no places,
+them; otherwise it moves at its next ticket. A host leaves a stored home that did not fail for it
+only when the new home answers `/health/ready` within 2 seconds, so a host that moved away from a
+failed near home stays on the far one until the near one is back. A host with no known place, or a Worker with no places,
 uses all homes. The value must be empty or name each home one time; an invalid value makes each ticket
 request fail with `503 remote_not_configured`. The entry failover tries the homes in list order, so
 keep `a` and `b` first.

@@ -1,5 +1,5 @@
 import { type Duration, Effect, Schema } from "effect";
-import { type RemoteSignalPlan, remoteSignalPlan } from "./remote-control-plane";
+import { type RemoteSignalPlan, remoteSignalPlan, signalAnswers } from "./remote-control-plane";
 import type { WorkerBindings } from "./types";
 
 /**
@@ -53,7 +53,7 @@ const DnsRecordUpdate = Schema.Struct({ success: Schema.Literal(true) });
 interface SignalMachine {
   id: string;
   host: string;
-  healthUrl: string;
+  url: string;
 }
 
 /**
@@ -105,26 +105,12 @@ export const checkSignalEntry = Effect.fn("SignalEntry.check")(function* (
 });
 
 function signalMachines(plan: RemoteSignalPlan): SignalMachine[] {
-  return [...plan.homes].map(([id, url]) => {
-    const parsed = new URL(url);
-    const protocol = parsed.protocol === "ws:" ? "http:" : "https:";
-    return { id, host: parsed.hostname, healthUrl: `${protocol}//${parsed.host}/health/ready` };
-  });
+  return [...plan.homes].map(([id, url]) => ({ id, host: new URL(url).hostname, url }));
 }
 
 /** Whether the Signal of the machine answers. A failed request is an unhealthy machine, not an error. */
 function isHealthy(fetcher: SignalEntryFetch, machine: SignalMachine): Effect.Effect<boolean> {
-  return Effect.tryPromise({
-    try: (signal) =>
-      fetcher(machine.healthUrl, {
-        method: "GET",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(HEALTH_TIMEOUT_MS)]),
-      }),
-    catch: () => null,
-  }).pipe(
-    Effect.map((response) => response.ok),
-    Effect.orElseSucceed(() => false),
-  );
+  return signalAnswers(fetcher, machine.url, HEALTH_TIMEOUT_MS);
 }
 
 interface CloudflareDnsApi {
