@@ -340,7 +340,9 @@ try {
   assert.equal(cli.source, "managed");
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  report.userAgent = `antigravity/${VERSION} ${os}/${arch}`;
+  // The quota calls name the desktop app's version, not the CLI's: Google returns the "Gemini
+  // Models" group only to a desktop `User-Agent` (`src/backend/antigravity-usage.ts`).
+  report.userAgent = `antigravity/2.31.0 ${os}/${arch}`;
 
   // 1. A Google sign-in: the Gemini group's weekly window, from the account's project.
   await writeToken(ACCESS_TOKEN, inOneHour());

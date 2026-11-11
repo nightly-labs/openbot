@@ -37,6 +37,13 @@ const DEV_CODE_ASSIST_URL = "OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL";
 /** How long each quota call may take before the reading gives up. */
 const QUOTA_CALL_TIMEOUT_MS = 10_000;
 
+/**
+ * The desktop app's version, which the quota `User-Agent` names. Google returns the "Gemini Models"
+ * group only to a desktop version: the CLI's own version gets the third-party group alone, and the
+ * Gemini ring then hides (#7215).
+ */
+const DESKTOP_USER_AGENT_VERSION = "2.31.0";
+
 const FIVE_HOUR_WINDOW_MINS = 300;
 const WEEKLY_WINDOW_MINS = 10_080;
 
@@ -80,11 +87,10 @@ type QuotaGroup = AccountRateLimitGroupResult & { primary: UsageWindow | null; s
 
 /**
  * The plan usage of the Antigravity account whose token file is `tokenFile`, for `model`. Every
- * failure gives no reading. `version` is the CLI's version, which the User-Agent names.
+ * failure gives no reading.
  */
 export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
   tokenFile: string;
-  version: string;
   model: string | null;
 }) {
   const accessToken = yield* Effect.tryPromise(() => readFile(options.tokenFile, "utf8")).pipe(
@@ -100,7 +106,7 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          "User-Agent": antigravityUserAgent(options.version),
+          "User-Agent": antigravityUserAgent(),
         },
         body: JSON.stringify(body),
         signal: AbortSignal.any([signal, AbortSignal.timeout(QUOTA_CALL_TIMEOUT_MS)]),
@@ -133,11 +139,11 @@ function validAccessToken(text: string): string | null {
   return token?.access_token && expiry > Date.now() + 60_000 ? token.access_token : null;
 }
 
-/** The CLI's own User-Agent, such as `antigravity/1.5.4 darwin/arm64`, in Go's platform names. */
-function antigravityUserAgent(version: string): string {
+/** The desktop app's User-Agent, such as `antigravity/2.31.0 darwin/arm64`, in Go's platform names. */
+function antigravityUserAgent(): string {
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  return `antigravity/${version} ${os}/${arch}`;
+  return `antigravity/${DESKTOP_USER_AGENT_VERSION} ${os}/${arch}`;
 }
 
 /**
