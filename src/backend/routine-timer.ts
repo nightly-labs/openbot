@@ -15,8 +15,12 @@ export interface RoutineDueSource {
   processDue(now: Date, active: () => boolean): Effect.Effect<void, { readonly cause: unknown }>;
 }
 
-/** `setTimeout` rejects a delay above this and fires at once instead, which would spin. */
-const MAX_DELAY = 2_147_000_000;
+/**
+ * A timeout counts elapsed time, not the clock. A computer that starts with a wrong clock and
+ * corrects it later would otherwise wait the full, wrong delay, so the timer reads the clock again
+ * at least this often.
+ */
+const MAX_DELAY = 60_000;
 
 export class RoutineTimer {
   #timer: NodeJS.Timeout | null = null;
@@ -42,9 +46,15 @@ export class RoutineTimer {
     if (this.#paused() || !this.isRunning()) return;
     const earliest = this.nextDueAt();
     if (!earliest) return;
-    const delay = Math.max(0, Math.min(new Date(earliest).getTime() - Date.now(), MAX_DELAY));
+    const dueAt = new Date(earliest).getTime();
+    const delay = Math.max(0, Math.min(dueAt - Date.now(), MAX_DELAY));
     this.#timer = setTimeout(() => {
       this.#timer = null;
+      // A capped wait ends before the routine is due: plan again, and run no pass.
+      if (Date.now() < dueAt) {
+        this.arm();
+        return;
+      }
       Effect.runFork(this.#fire());
     }, delay);
     this.#timer.unref?.();
