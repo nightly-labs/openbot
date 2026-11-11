@@ -257,6 +257,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         layoutMutable={activeServerSupportsCapability("sidebar-layout")}
         chatOrder={layout.sidebarChatOrder()}
         onChatOrderChange={layout.setSidebarChatOrder}
+        unreadExcludedAgentIds={layout.unreadExcludedAgentIds(activeServerId())}
+        onShowAgentInUnreadChange={(agentId, show) => layout.setAgentShownInUnread(activeServerId(), agentId, show)}
         foldersSupported={activeServerSupportsCapability("sidebar-folders-v1")}
         collapsedSectionIds={collapsedSidebarSectionIds()}
         onMutateLayout={mutateSidebarLayout}

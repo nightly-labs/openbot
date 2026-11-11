@@ -344,6 +344,7 @@ interface ContextMenuApi {
   SubTrigger: typeof ContextMenuPrimitive.SubTrigger;
   SubContent: typeof ContextMenuPrimitive.SubContent;
   Item: typeof MenuItemAfterClose;
+  CheckboxItem: typeof ContextMenuPrimitive.CheckboxItem;
   RadioGroup: typeof ContextMenuPrimitive.RadioGroup;
   RadioItem: typeof ContextMenuPrimitive.RadioItem;
   Separator: typeof ContextMenuPrimitive.Separator;
@@ -395,6 +396,7 @@ export const ContextMenu: ContextMenuApi = {
     return <ContextMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
   },
   Item: MenuItemAfterClose,
+  CheckboxItem: (props) => <ContextMenuPrimitive.CheckboxItem data-cuelume-toggle="" {...props} />,
   RadioGroup: (props) => <ContextMenuPrimitive.RadioGroup {...props} />,
   RadioItem: (props) => <ContextMenuPrimitive.RadioItem data-cuelume-select="" {...props} />,
   Separator: (props) => <ContextMenuPrimitive.Separator {...props} />,

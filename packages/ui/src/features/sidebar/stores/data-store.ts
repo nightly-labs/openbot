@@ -122,7 +122,8 @@ export function createSidebarDataStore(deps: {
   /**
    * The chats that an unread order puts first: the unread chats, and the open chat when it was in the
    * set before. The open chat keeps its place until the user opens another chat, so that a row does
-   * not move away under the pointer when the user reads it. The manual order has none.
+   * not move away under the pointer when the user reads it. The manual order has none, and an agent in
+   * `unreadExcludedAgentIds` is never in the set.
    *
    * The key is a string and holds still during a drag, for the same reasons as `waitingKey`.
    */
@@ -134,7 +135,9 @@ export function createSidebarDataStore(deps: {
     }
     const previous = new Set(heldUnreadKey ? heldUnreadKey.split("\n") : []);
     const active = activeChatId();
-    const next = [...props.agents.map((agent) => agent.id), ...channels().map((channel) => channel.id)]
+    const excluded = props.unreadExcludedAgentIds;
+    const agentIds = props.agents.map((agent) => agent.id).filter((agentId) => !excluded?.has(agentId));
+    const next = [...agentIds, ...channels().map((channel) => channel.id)]
       .filter((chatId) => chatIsUnread(chatId) || (chatId === active && previous.has(chatId)))
       .sort()
       .join("\n");

@@ -101,6 +101,17 @@ export interface SidebarProps {
   chatOrder?: SidebarChatOrder | undefined;
   /** Saves the user's choice of order. Without it, the list menu has no "Sort chats" item. */
   onChatOrderChange?: ((order: SidebarChatOrder) => void) | undefined;
+  /**
+   * The agents that the user keeps out of the unread order. Their unread chats stay in their own
+   * section: they do not go into the "Unread" group, and they do not move to the top of the section.
+   * Their unread badge does not change.
+   */
+  unreadExcludedAgentIds?: ReadonlySet<string> | undefined;
+  /**
+   * Saves whether the unread order moves an agent. Without it, the agent menu has no
+   * "Show in Unread" item.
+   */
+  onShowAgentInUnreadChange?: ((agentId: string, show: boolean) => void) | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
   /**

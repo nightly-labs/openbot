@@ -5,6 +5,7 @@
 
 import {
   AppWindow,
+  Check,
   CheckCheck,
   CircleDot,
   ContextMenu,
@@ -29,6 +30,7 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
   const { t } = useText();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
   const unread = () => props.unreadAgentIds?.has(menuProps.agent.id) ?? false;
+  const shownInUnread = () => !(props.unreadExcludedAgentIds?.has(menuProps.agent.id) ?? false);
   const restoreLabel = () => {
     const assigned = props.layout.agentAssignments[menuProps.agent.id];
     const section = assigned ? customSectionById().get(assigned) : undefined;
@@ -60,6 +62,23 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
               <CircleDot class="agent-context-icon size-4" aria-hidden="true" />
               <span>{t("sidebar.agentMenu.markUnread")}</span>
             </ContextMenu.Item>
+          )}
+        </Show>
+        <Show
+          when={!menuProps.userHidden && (props.chatOrder ?? "manual") !== "manual" && props.onShowAgentInUnreadChange}
+        >
+          {(setShown) => (
+            <ContextMenu.CheckboxItem
+              checked={shownInUnread()}
+              onChange={(show: boolean) => setShown()(menuProps.agent.id, show)}
+            >
+              <span class="ui-menu-check" data-checked={shownInUnread() ? "" : undefined} aria-hidden="true">
+                <Show when={shownInUnread()}>
+                  <Check />
+                </Show>
+              </span>
+              <span>{t("sidebar.agentMenu.showInUnread")}</span>
+            </ContextMenu.CheckboxItem>
           )}
         </Show>
         <Show when={!menuProps.userHidden && props.onNewAgentThread}>

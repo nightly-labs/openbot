@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.duplicating": "Duplication…",
   "sidebar.agentMenu.markRead": "Marquer comme lu",
   "sidebar.agentMenu.markUnread": "Marquer comme non lu",
+  "sidebar.agentMenu.showInUnread": "Afficher dans Non lues",
   "sidebar.agentMenu.delete": "Supprimer l’agent",
   "sidebar.agentMenu.hide": "Masquer l’agent",
   "sidebar.agentMenu.restore": "Restaurer",

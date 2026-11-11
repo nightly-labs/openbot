@@ -2918,6 +2918,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     }
                     chatOrder={layout.sidebarChatOrder()}
                     onChatOrderChange={layout.setSidebarChatOrder}
+                    unreadExcludedAgentIds={layout.unreadExcludedAgentIds(server()?.id)}
+                    onShowAgentInUnreadChange={(agentId, show) => {
+                      const serverId = server()?.id;
+                      if (serverId) layout.setAgentShownInUnread(serverId, agentId, show);
+                    }}
                     collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                     onMutateLayout={workspace.mutateSidebarLayout}
                     sectionDuplicateSupported={
