@@ -102,6 +102,7 @@ export const messages = {
   "browser.secret.takeOver": "تولّي التحكم",
   "browser.secret.failed": "تعذّر إكمال الطلب. تحقّق من الاتصال وحاول مرة أخرى.",
   "browser.error.openAddress": "تعذّر فتح العنوان في علامة التبويب هذه.",
+  "browser.error.channelNoBrowserMember": "لا يمكن لأي عضو فتح علامة تبويب جديدة في هذه القناة.",
   "browser.error.closeTab": "تعذّر إغلاق علامة تبويب المتصفح.",
   "browser.error.reloadTab": "تعذّرت إعادة تحميل علامة تبويب المتصفح.",
   "browser.error.stopLoading": "تعذّر إيقاف تحميل الصفحة.",

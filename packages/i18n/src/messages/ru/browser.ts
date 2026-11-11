@@ -94,6 +94,7 @@ export const messages = {
   "browser.secret.takeOver": "Взять управление",
   "browser.secret.failed": "Не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
   "browser.error.openAddress": "Не удалось открыть адрес в этой вкладке.",
+  "browser.error.channelNoBrowserMember": "Ни один участник не может открыть новую вкладку в этом канале.",
   "browser.error.closeTab": "Не удалось закрыть вкладку браузера.",
   "browser.error.reloadTab": "Не удалось перезагрузить вкладку браузера.",
   "browser.error.stopLoading": "Не удалось остановить загрузку страницы.",

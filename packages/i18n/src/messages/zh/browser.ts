@@ -98,6 +98,7 @@ export const messages = {
   "browser.secret.takeOver": "接管",
   "browser.secret.failed": "无法完成该请求，请检查连接后重试。",
   "browser.error.openAddress": "无法在该标签页中打开该地址。",
+  "browser.error.channelNoBrowserMember": "此频道中没有成员可以打开新标签页。",
   "browser.error.closeTab": "无法关闭浏览器标签页。",
   "browser.error.reloadTab": "无法刷新浏览器标签页。",
   "browser.error.stopLoading": "无法停止加载页面。",

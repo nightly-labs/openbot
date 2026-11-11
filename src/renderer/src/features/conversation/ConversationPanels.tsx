@@ -396,16 +396,16 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (channel) return serverHasChannelStorage(server) ? server : undefined;
     return serverHasStorage(server) ? server : undefined;
   };
-  /**
-   * A channel has a Browser pane while a member can open a tab there, or while its members' threads
-   * have tabs. A member with no thread in the channel yet has no tab there.
-   */
   const filesTitle = () => channel?.name() ?? props.agent?.name ?? "this chat";
   /** A channel message shows in this view. An agent chat opens it as a search result does. */
   function showFileMessage(messageId: string) {
     if (channel) void replyJump.reveal(messageId, undefined, undefined);
     else void props.onOpenSearchMessage?.(messageId);
   }
+  /**
+   * A channel has a Browser pane while a member can open a tab there, or while its members' threads
+   * have tabs. A member with no thread in the channel yet has no tab there.
+   */
   const channelBrowserPane = () => !channel || channel.browserOwner() !== null || browserTabs().length > 0;
   /**
    * The panes this chat can open. The web client has a Files pane only when its runtime has the storage

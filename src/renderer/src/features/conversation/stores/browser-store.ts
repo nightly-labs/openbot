@@ -478,7 +478,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
       return;
     }
-    if (!owner) return;
+    if (!owner) {
+      // A channel that gives the browser to no member, or whose browser member has no thread here yet.
+      deps.setComposerError(currentText().t("browser.error.channelNoBrowserMember"), target);
+      return;
+    }
     const serverId = deps.props.server?.id ?? "local";
     const agentId = viewId();
     const canonicalUrl = canonicalBrowserUrl(url);

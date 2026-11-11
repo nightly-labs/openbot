@@ -654,7 +654,11 @@ export class OpenBotToolRouter {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
             // A channel can give the browser to one member, or to none (#4135).
-            const channelRefusal = this.#channelBrowserRefusal(toolRequest.params.threadId, agentId);
+            // The provider names its own thread. The channel knows the OpenBot thread.
+            const channelRefusal = this.#channelBrowserRefusal(
+              this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              agentId,
+            );
             if (channelRefusal) {
               client.respond(toolRequest.id, channelRefusal);
               return;

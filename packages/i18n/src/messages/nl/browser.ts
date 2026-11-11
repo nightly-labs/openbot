@@ -99,6 +99,7 @@ export const messages = {
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
   "browser.error.openAddress": "Kan het adres niet openen in dit tabblad.",
+  "browser.error.channelNoBrowserMember": "Geen lid kan een nieuw tabblad openen in dit kanaal.",
   "browser.error.closeTab": "Kan het browsertabblad niet sluiten.",
   "browser.error.reloadTab": "Kan het browsertabblad niet opnieuw laden.",
   "browser.error.stopLoading": "Kan het laden van de pagina niet stoppen.",

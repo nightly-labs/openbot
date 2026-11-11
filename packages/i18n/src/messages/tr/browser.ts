@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
   "browser.error.openAddress": "Adres bu sekmede açılamadı.",
+  "browser.error.channelNoBrowserMember": "Bu kanalda hiçbir üye yeni sekme açamaz.",
   "browser.error.closeTab": "Tarayıcı sekmesi kapatılamadı.",
   "browser.error.reloadTab": "Tarayıcı sekmesi yeniden yüklenemedi.",
   "browser.error.stopLoading": "Sayfanın yüklenmesi durdurulamadı.",

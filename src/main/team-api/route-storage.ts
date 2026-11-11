@@ -20,7 +20,7 @@ import type { TeamApiStorage } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
-import { requireVisibleChannel } from "./route-channels";
+import { hiddenAuthor, requireVisibleChannel } from "./route-channels";
 
 /**
  * The disk use of the machine that runs this host, read from a joined server.
@@ -49,7 +49,22 @@ export async function routeStorage(
     requireVisibleChannel(channels, channelId, canAdministerServer(member.role) ? new Set() : hiddenAgentIds);
     try {
       const usage = await runCauseEffect(storage.usage(body));
-      return json(200, { channelId, scannedAt: usage.scannedAt, files: usage.files, truncated: usage.truncated });
+      // As on the channel read route, a message of an agent hidden from this peer is not shown, and its
+      // files are not shown either.
+      const hiddenMessages = new Set(
+        hiddenAgentIds.size === 0
+          ? []
+          : channels.store
+              .messages(channelId)
+              .filter((message) => hiddenAuthor(message, hiddenAgentIds))
+              .map((message) => message.id),
+      );
+      const files = usage.files.filter(
+        (file) =>
+          !(file.messageId && hiddenMessages.has(file.messageId)) &&
+          !(file.agentId && hiddenAgentIds.has(file.agentId)),
+      );
+      return json(200, { channelId, scannedAt: usage.scannedAt, files, truncated: usage.truncated });
     } catch (error) {
       if (error instanceof StorageNotFoundError) throw new HttpError(404, error.message);
       throw error;

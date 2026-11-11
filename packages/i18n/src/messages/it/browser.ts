@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.takeOver": "Intervieni",
   "browser.secret.failed": "Non è stato possibile completare la richiesta. Controlla la connessione e riprova.",
   "browser.error.openAddress": "Impossibile aprire l'indirizzo in questa scheda.",
+  "browser.error.channelNoBrowserMember": "Nessun membro può aprire una nuova scheda in questo canale.",
   "browser.error.closeTab": "Impossibile chiudere la scheda del browser.",
   "browser.error.reloadTab": "Impossibile ricaricare la scheda del browser.",
   "browser.error.stopLoading": "Impossibile interrompere il caricamento della pagina.",
