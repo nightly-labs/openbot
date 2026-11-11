@@ -864,6 +864,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   readonly #secrets = new Set<string>();
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** A client that this sign-in registered while tokens were on file. See `saveClientInformation`. */
+  #registeredClient: OAuthClientInformationFull | undefined;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
   #activeIssuer: string | undefined;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
@@ -995,7 +997,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         ...(issuer ? { issuer } : {}),
       };
     }
-    const client = this.#credential(record.client);
+    const client = this.#registeredClient ?? this.#credential(record.client);
     this.recordSecret(record.client?.client_secret);
     if (!client) {
       // The token endpoint refused the client, and the SDK dropped it before it tried again. The
@@ -1124,13 +1126,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // For a client metadata document the SDK passes only its URL and the issuer. The store
         // refuses a client with no `redirect_uris`, so the address of this run is added, as a
         // registration has it. A later run on another port then uses the document again.
-        if (information.client_id === MCP_CLIENT_METADATA_URL) {
-          yield* this.#save({
-            client: { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" },
-          });
+        const client: OAuthClientInformationFull =
+          information.client_id === MCP_CLIENT_METADATA_URL
+            ? { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" }
+            : information;
+        // The tokens on file belong to the client on file: the silent refresh and the revocation at
+        // sign-out send them with it. A sign-in that registers again keeps its client here until its
+        // grant is exchanged, so a cancel or a timeout keeps the stored sign-in usable (#6975).
+        if (this.#options.state && !this.#exchangingCode && this.#record().tokens) {
+          this.#registeredClient = client;
           return;
         }
-        yield* this.#save({ client: information });
+        yield* this.#save({ client });
       }),
     );
   }
@@ -1153,7 +1160,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
-        yield* this.#save({ tokens, obtainedAt: Date.now(), lostAt: undefined });
+        const client = this.#registeredClient;
+        yield* this.#save({ ...(client ? { client } : {}), tokens, obtainedAt: Date.now(), lostAt: undefined });
+        this.#registeredClient = undefined;
       }),
     );
   }
@@ -1365,6 +1374,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // A sign-in app stays through every refusal: the administrator typed it, and only they
         // can change it.
         const record = yield* mcpSync(() => this.#record());
+        if (scope !== "tokens") this.#registeredClient = undefined;
         if (scope === "all") {
           this.#codeVerifier = null;
           if (record.app) yield* this.#options.storage.write(this.#options.key, { app: record.app });

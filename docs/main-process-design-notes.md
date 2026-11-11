@@ -84,7 +84,9 @@ There is no configuration for a developer or for a packaged build:
   without the refresh token until the grant is in hand, so a token that the server refuses opens
   the browser. Before, the SDK refreshed it, and a server that had ended the sign-in also refused
   the new token, so Sign in opened no page (#6975). A stored token that the server accepts still
-  connects with no page, and the stored record changes only when the new grant is exchanged.
+  connects with no page. When tokens are on file, a registration that this sign-in makes stays in
+  memory and is written with the tokens of its grant: the stored tokens keep the client that they
+  were issued to, so a cancel or a timeout keeps the stored sign-in usable.
 - `describeUnusableRedirectUrl` refuses an address that cannot receive a grant: an `https` address,
   or a plain-text address that is not on this machine.
 - A registration endpoint that refuses the `127.0.0.1` address with `invalid_redirect_uri` or
