@@ -100,9 +100,9 @@
     },
     {
       "slug": "apple-apps",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "featured": false,
-      "detailSha256": "cc20bfdb822a69b7fb543dbb294d9c4ba9a5a104041497fc90e04232e07462b2"
+      "detailSha256": "f65b7f2d31d489f42dd45f2b888959bd9d90ff6cf1abd9568ecc5fb58cf81b7b"
     },
     {
       "slug": "sentry",

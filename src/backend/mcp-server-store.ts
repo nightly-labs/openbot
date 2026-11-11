@@ -59,6 +59,28 @@ const MCP_REMOTE_BRIDGES: ReadonlyArray<{ name: string; remoteUrl: string; url: 
 
 const MCP_REMOTE_ARGS = (remoteUrl: string): string[] => ["-y", "mcp-remote@latest", remoteUrl];
 
+/**
+ * The arguments that earlier catalogs pinned for a stdio listing, and the arguments the current
+ * catalog installs. A row keeps the arguments it was installed with, so without this an installed
+ * app would run the old package for good, and the marketplace would not know it. The migration
+ * below moves exactly these rows. When the catalog pin moves again, set `current` to the new pin
+ * and add the previous one to `earlier`, so that every earlier row moves in one start.
+ * `scripts/agent-mcp-tools-e2e.ts` checks that `current` is the shipped catalog's pin.
+ */
+export const CATALOG_PIN_MOVES: ReadonlyArray<{
+  name: string;
+  earlier: ReadonlyArray<readonly string[]>;
+  current: readonly string[];
+}> = [
+  // 2.1.3 looks up an Apple Mail message outside its mailbox, so reading an email always fails.
+  { name: "apple-apps", earlier: [["-y", "mcp-icloud@2.1.3"]], current: ["-y", "mcp-icloud@2.1.4"] },
+];
+
+/** A row with the catalog name that runs `npx` with exactly these arguments. */
+function isCatalogNpxRow(row: DynamicRecord, name: string, args: readonly string[]): boolean {
+  return row.name === name && row.transport === "stdio" && row.command === "npx" && isStringList(row.args_json, args);
+}
+
 export class McpServerStore {
   /** Each unreadable row is said once a process, because `list()` runs for every save and hand-off. */
   private readonly reported = new Set<string>();
@@ -166,19 +188,21 @@ export class McpServerStore {
 
   /**
    * Converts rows installed from the old catalog's `mcp-remote` bridge definitions to the native
-   * http rows the current catalog installs, and answers how many rows changed.
+   * http rows the current catalog installs, moves rows that run a package version an earlier
+   * catalog pinned to the version it pins now, and answers how many rows changed.
    *
    * Only a row that still matches a shipped definition exactly - name, stdio transport, `npx`,
-   * and the bridge arguments - is converted. A renamed row cannot be told apart from one the user
-   * wrote by hand, and changed arguments are the user's own edits: both stay as they are. Every
-   * other column (id, enabled state, position, credentials, working directory) is kept, so the
-   * row the user sees is the row they had, reaching its server natively. The converted row holds
-   * no sign-in yet; Sign in on it opens the browser like any new installation.
+   * and the bridge or pinned arguments - is converted. A renamed row cannot be told apart from one
+   * the user wrote by hand, and changed arguments are the user's own edits: both stay as they are.
+   * Every other column (id, enabled state, position, credentials, working directory) is kept, so
+   * the row the user sees is the row they had, reaching its server natively or on the fixed
+   * package. A converted bridge row holds no sign-in yet; Sign in on it opens the browser like any
+   * new installation.
    *
    * This is a data rewrite rather than a schema migration: no DDL changes, and running it again
    * converts nothing, so it runs on every startup rather than behind a schema version.
    */
-  migrateCatalogBridgesToHttp(now = new Date().toISOString()): number {
+  migrateCatalogRows(now = new Date().toISOString()): number {
     const db = this.database.connection;
     let converted = 0;
     db.exec("BEGIN IMMEDIATE");
@@ -187,12 +211,20 @@ export class McpServerStore {
         db.prepare("SELECT mcp_server_id, name, transport, command, args_json FROM projection_mcp_servers").all(),
       );
       for (const row of rows) {
-        const bridge = MCP_REMOTE_BRIDGES.find(
-          (candidate) =>
-            row.name === candidate.name &&
-            row.transport === "stdio" &&
-            row.command === "npx" &&
-            isStringList(row.args_json, MCP_REMOTE_ARGS(candidate.remoteUrl)),
+        const pin = CATALOG_PIN_MOVES.find((candidate) =>
+          candidate.earlier.some((args) => isCatalogNpxRow(row, candidate.name, args)),
+        );
+        if (pin) {
+          db.prepare("UPDATE projection_mcp_servers SET args_json = ?, updated_at = ? WHERE mcp_server_id = ?").run(
+            JSON.stringify(pin.current),
+            now,
+            requiredStringColumn(row, "mcp_server_id"),
+          );
+          converted += 1;
+          continue;
+        }
+        const bridge = MCP_REMOTE_BRIDGES.find((candidate) =>
+          isCatalogNpxRow(row, candidate.name, MCP_REMOTE_ARGS(candidate.remoteUrl)),
         );
         if (!bridge) continue;
         db.prepare(

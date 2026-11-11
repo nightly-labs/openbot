@@ -116,9 +116,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "apple-apps",
-      version: "1.1.0",
+      version: "1.1.1",
       featured: false,
-      detailSha256: "cc20bfdb822a69b7fb543dbb294d9c4ba9a5a104041497fc90e04232e07462b2",
+      detailSha256: "f65b7f2d31d489f42dd45f2b888959bd9d90ff6cf1abd9568ecc5fb58cf81b7b",
     },
     {
       slug: "sentry",
@@ -2180,7 +2180,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     category: "productivity",
     creatorName: "MrGo2",
     iconUrl: "https://www.apple.com/apple-touch-icon.png",
-    version: "1.1.0",
+    version: "1.1.1",
     prompts: [
       { id: "prompt-unread", text: "Summarize my unread email in Apple Mail from today." },
       { id: "prompt-today", text: "What is on my Apple Calendar today and tomorrow?" },
@@ -2196,7 +2196,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         description:
           "Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari, over the local mcp-icloud server. Needs macOS and Automation access.",
         iconUrl: "https://www.apple.com/apple-touch-icon.png",
-        server: { name: "apple-apps", transport: "stdio", command: "npx", args: ["-y", "mcp-icloud@2.1.3"] },
+        server: { name: "apple-apps", transport: "stdio", command: "npx", args: ["-y", "mcp-icloud@2.1.4"] },
         macAutomation: ["calendar", "contacts", "mail", "notes", "reminders", "messages", "safari"],
       },
     ],
