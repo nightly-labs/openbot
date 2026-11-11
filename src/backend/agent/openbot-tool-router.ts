@@ -601,9 +601,11 @@ export class OpenBotToolRouter {
             // The agent's other conversations open only from its own chat and its side threads. A
             // messaging chat is neither: other people can write there, and must not read the owner's chats.
             const mainThreadId = this.#store.list().find((agent) => agent.id === scope.agentId)?.threadId ?? null;
-            const scopeTask = this.#tasks.taskForThread(scope.threadId);
-            const ownConversation =
-              scope.threadId === mainThreadId || (scopeTask !== null && this.#tasks.has(scope.agentId, scopeTask));
+            const ownsThread = (threadId: string) => {
+              const task = this.#tasks.taskForThread(threadId);
+              return threadId === mainThreadId || (task !== null && this.#tasks.has(scope.agentId, task));
+            };
+            const ownConversation = ownsThread(scope.threadId);
             // A taskId reads a side thread of the same agent, or "main" its own chat. A thread of another
             // agent reads as unknown.
             const taskId = isRecord(params.arguments) ? params.arguments.taskId : undefined;
@@ -615,12 +617,7 @@ export class OpenBotToolRouter {
                     params.tool === "history_read" ? params.arguments.before : params.arguments.cursor,
                   )
                 : null;
-            const cursorTask = cursorThreadId === null ? null : this.#tasks.taskForThread(cursorThreadId);
-            const cursorTarget =
-              cursorThreadId !== null &&
-              (cursorThreadId === mainThreadId || (cursorTask !== null && this.#tasks.has(scope.agentId, cursorTask)))
-                ? cursorThreadId
-                : null;
+            const cursorTarget = cursorThreadId !== null && ownsThread(cursorThreadId) ? cursorThreadId : null;
             const targetThreadId =
               taskId === undefined
                 ? (cursorTarget ?? scope.threadId)
