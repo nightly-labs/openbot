@@ -70,6 +70,7 @@ import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
+  acpMcpServerName,
   acpMcpServers,
   agentMcpServers,
   computerUseParam,
@@ -78,7 +79,6 @@ import {
   type McpServerSource,
   type McpToolRuntimeSource,
   mcpAgentParam,
-  providerMcpServerName,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { PendingServerRequests } from "./pending-server-requests";
@@ -1684,6 +1684,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                   ).pipe(toProviderClientOperationError),
                 ),
               ),
+              this.#ownMcpServerNames(cwd),
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
             const mcpServers = [...handoff.servers, ...mcp.servers];
@@ -2578,9 +2579,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         )
       : undefined;
     if (!failure || !server) return false;
-    const configured = this.options
-      .mcpServers?.()
-      .find((config) => providerMcpServerName(config.name) === failure.name);
+    const own = this.#ownMcpServerNames(thread.cwd);
+    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === failure.name);
     this.options.reportMcpDrops?.(this.provider, [
       {
         name: configured?.name ?? failure.name,
@@ -2600,6 +2600,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return true;
   });
 
+  /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
+  #ownMcpServerNames(cwd: string): readonly string[] {
+    return this.#flavor.ownMcpServerNames?.(cwd, this.options.argv) ?? [];
+  }
+
   /**
    * The message of a turn that an MCP server's failed start ended, or `null` for another failure.
    * The server's own reason is runtime output, often a traceback with a Windows path, which the chat
@@ -2611,9 +2616,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const failure = this.#flavor.sdkHarness?.mcpLoadFailure(detail);
     if (!failure || thread.mcp.servers.some((bridge) => bridge.name === failure.name)) return null;
     this.emit("diagnostic", this.#redact(detail));
-    const configured = this.options
-      .mcpServers?.()
-      .find((config) => providerMcpServerName(config.name) === failure.name);
+    const own = this.#ownMcpServerNames(thread.cwd);
+    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === failure.name);
     return configured
       ? sourceText("error.backend.mcpServerFailedForProvider", { provider: this.#label, name: configured.name })
       : sourceText("error.provider.acpOwnMcpServerFailed", { provider: this.#label, name: failure.name });

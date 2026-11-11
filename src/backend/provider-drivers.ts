@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
 import {
@@ -24,7 +24,7 @@ import {
   KIMI_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
-import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
+import { ANTIGRAVITY_ACP_FLAVOR, antigravityGeminiHome, GEMINI_DIR_FLAG } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
@@ -275,11 +275,6 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
  */
 const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
 
-/** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
-function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
-  return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
-}
-
 /** The CLI's app data folder, which holds the sign-in and the sessions. 1.4 kept them there too. */
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
@@ -295,7 +290,7 @@ function antigravityAppDataDir(env: Readonly<Record<string, string | undefined>>
  */
 const antigravityArgv = (env: Readonly<Record<string, string | undefined>>): readonly string[] => [
   "acp",
-  `--gemini-dir=${antigravityGeminiHome(env)}`,
+  `${GEMINI_DIR_FLAG}${antigravityGeminiHome(env)}`,
   `--app-data-dir=${ANTIGRAVITY_APP_DATA}`,
 ];
 
