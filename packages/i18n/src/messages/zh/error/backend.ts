@@ -44,6 +44,8 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "该服务器不支持删除频道。",
   "error.backend.browserNavigateUnsupported": "该远程主机不支持在已打开的标签页中通过地址栏跳转。",
   "error.backend.browserUserControlBusy": "该浏览器标签页正在等待一个密钥。请先回答密钥请求。",
+  "error.backend.browserTeachUnavailable": "此浏览器标签页没有可以学习任务的智能体。",
+  "error.backend.browserTeachUnsupported": "此远程主机不支持录制任务。",
   "error.backend.browserUserControlUnsupported": "该远程主机不支持接管浏览器标签页。",
   "error.backend.browserSignInUnsupported": "该远程主机无法接收来自这台电脑的登录。",
   "error.backend.browserSignInOpenFailed": "OpenBot 无法打开登录窗口。",

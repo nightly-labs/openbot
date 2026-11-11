@@ -78,6 +78,7 @@ export const messages = {
   "composer.placeholder.messageAgent": "Bericht aan agent",
   "composer.add.label": "Toevoegen aan prompt",
   "composer.add.files": "Bestanden bijvoegen",
+  "composer.add.teach": "Een taak aanleren",
   "composer.add.skill": "Vaardigheid gebruiken",
   "composer.upload.cancel": "Uploaden annuleren",
   "composer.upload.uploading": "{name} wordt geüpload",

@@ -47,6 +47,8 @@ export const messages = {
   "error.backend.browserNavigateUnsupported":
     "Этот удалённый хост не поддерживает переход через адресную строку в существующей вкладке.",
   "error.backend.browserUserControlBusy": "Эта вкладка браузера ждёт секрет. Сначала ответьте на запрос секрета.",
+  "error.backend.browserTeachUnavailable": "У этой вкладки браузера нет агента, который может изучить задачу.",
+  "error.backend.browserTeachUnsupported": "Этот удалённый хост не поддерживает запись задачи.",
   "error.backend.browserUserControlUnsupported": "Этот удалённый хост не поддерживает управление вкладкой браузера.",
   "error.backend.browserSignInUnsupported": "Этот удалённый хост не может принять вход с этого компьютера.",
   "error.backend.browserSignInOpenFailed": "OpenBot не удалось открыть окно входа.",

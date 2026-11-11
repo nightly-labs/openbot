@@ -549,6 +549,21 @@ export interface BrowserUserBrowsing {
 
 /** Who controls a tab: the person at this computer, or one session of a team member. */
 export type BrowserUserControlHolder = { kind: "local" } | { kind: "member"; memberId: string; sessionId: string };
+/** One step of a task that a person shows: a page that loaded or a click on a control. No typed text. */
+export type BrowserTeachStep = Omit<UserBrowsingStep, "at">;
+/** The most steps of one teach recording, as `browser-teach-v1` says. */
+const TEACH_MAX_STEPS = 200;
+/** A teach recording takes no step after this time. */
+const TEACH_MAX_DURATION_MS = 10 * 60 * 1000;
+interface BrowserTeachRecording {
+  holder: BrowserUserControlHolder;
+  startedAt: number;
+  steps: BrowserTeachStep[];
+}
+function sameUserControlHolder(left: BrowserUserControlHolder, right: BrowserUserControlHolder): boolean {
+  if (left.kind === "local" || right.kind === "local") return left.kind === right.kind;
+  return left.sessionId === right.sessionId && left.memberId === right.memberId;
+}
 /** The holds to release when a window, a session or a member ends. */
 export type BrowserUserControlOwner =
   | { kind: "local" }
@@ -628,6 +643,11 @@ export class BrowserHost {
   readonly #takeoverTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
+  /**
+   * The tasks that people show now (`browser-teach-v1`), by tab. A recording lives in memory only and
+   * ends with the person's control of the tab.
+   */
+  readonly #teachRecordings = new Map<string, BrowserTeachRecording>();
   /** The agent tool calls that wait for the release of a tab. */
   readonly #userControlWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /**
@@ -1124,6 +1144,7 @@ export class BrowserHost {
               this.#unmountView(tab.view);
               this.#tabs.delete(tab.id);
               this.#userControlTabIds.delete(tab.id);
+              this.#teachRecordings.delete(tab.id);
               this.#completeUserControlWaiters(tab.id);
               yield* tab.engine.destroy();
               tab.contents.close();
@@ -1316,6 +1337,7 @@ export class BrowserHost {
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
     this.#userControlTabIds.delete(tabId);
+    this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
 
     if (this.#activeTabId === tabId) {
@@ -1431,6 +1453,61 @@ export class BrowserHost {
     this.#endUserControl(tabId);
   }
 
+  /**
+   * A person starts to show a task in an agent's tab (`browser-teach-v1`). The person takes the tab,
+   * and each page that loads and each control that they click becomes a step until `stopTeach` or the
+   * end of their control. A tab that another person holds is refused.
+   */
+  readonly startTeach = Effect.fn("BrowserHost.startTeach")(function* (
+    this: BrowserHost,
+    tabId: string,
+    holder: BrowserUserControlHolder,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
+    if (tab.ownerAgentId === null || tab.privateSession)
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTeachUnavailable")));
+    const held = this.#userControlTabIds.get(tabId);
+    if (held && !sameUserControlHolder(held, holder))
+      return yield* browserFailure(new Error(sourceText("error.backend.browserUserControlBusy")));
+    yield* this.takeUserControl(tabId, holder);
+    // The tab can close or change hands while the take waits for its place in the tab queue.
+    const current = this.#userControlTabIds.get(tabId);
+    if (this.#tabs.get(tabId) !== tab || !current || !sameUserControlHolder(current, holder))
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
+    this.#teachRecordings.set(tabId, { holder: current, startedAt: Date.now(), steps: [] });
+    const place = stepPlace(tab.contents.getURL());
+    const title = stepText(tab.contents.getTitle());
+    if (place) this.#recordTeachStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
+  }).bind(this);
+
+  /**
+   * Ends the recording of a tab and gives the tab back. Only the holder that started the recording
+   * can end it, and gets its steps only with `save`. A call from another holder changes nothing.
+   */
+  stopTeach(tabId: string, holder: BrowserUserControlHolder, save: boolean): BrowserTeachStep[] {
+    const recording = this.#teachRecordings.get(tabId);
+    if (!recording || !sameUserControlHolder(recording.holder, holder)) return [];
+    this.#teachRecordings.delete(tabId);
+    this.releaseUserControl(tabId);
+    return save ? recording.steps : [];
+  }
+
+  /** Adds a step to the recording of the tab. False when the tab has no recording. */
+  #recordTeachStep(tab: BrowserHostTab, step: BrowserTeachStep): boolean {
+    const recording = this.#teachRecordings.get(tab.id);
+    if (!recording) return false;
+    if (tab.secret || tab.privateSession || tab.contents.isDestroyed()) return true;
+    if (recording.steps.length >= TEACH_MAX_STEPS || Date.now() - recording.startedAt > TEACH_MAX_DURATION_MS)
+      return true;
+    const last = recording.steps.at(-1);
+    // A page that is the same as the step before it is not added again; a later title replaces the first.
+    if (step.kind === "page" && last?.kind === "page" && last.host === step.host && last.path === step.path) {
+      if (step.title !== undefined) recording.steps[recording.steps.length - 1] = step;
+    } else recording.steps.push(step);
+    return true;
+  }
+
   /** Releases the tabs of a closed window, session or member. */
   releaseUserControlHeldBy(owner: BrowserUserControlOwner): void {
     for (const [tabId, holder] of [...this.#userControlTabIds]) {
@@ -1487,6 +1564,7 @@ export class BrowserHost {
 
   #endUserControl(tabId: string): void {
     this.#userControlTabIds.delete(tabId);
+    this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
     this.#emitChanged();
   }
@@ -4305,17 +4383,25 @@ export class BrowserHost {
     return this.#userBrowsing?.enabled() ? agentId : null;
   }
 
-  /** Records the pages that load and the controls that a person clicks, as `#userBrowsingAgent` permits. */
+  /**
+   * Keeps one step of what a person did. A teach recording of the tab takes it; without one it goes to
+   * the browsing steps of the agent, as `#userBrowsingAgent` permits.
+   */
+  #recordUserStep(tab: BrowserHostTab, step: BrowserTeachStep): void {
+    if (this.#recordTeachStep(tab, step)) return;
+    const agentId = this.#userBrowsingAgent(tab);
+    if (agentId !== null) this.#userBrowsing?.record(agentId, step);
+  }
+
+  /** Records the pages that load and the controls that a person clicks, for `#recordUserStep`. */
   #bindUserBrowsing(tab: BrowserHostTab): void {
-    const userBrowsing = this.#userBrowsing;
-    if (!userBrowsing) return;
     const contents = tab.contents;
+    const records = () => this.#teachRecordings.has(tab.id) || this.#userBrowsingAgent(tab) !== null;
     const recordPage = () => {
-      const agentId = this.#userBrowsingAgent(tab);
-      const place = agentId === null ? null : stepPlace(contents.getURL());
-      if (agentId === null || !place) return;
+      const place = records() ? stepPlace(contents.getURL()) : null;
+      if (!place) return;
       const title = stepText(contents.getTitle());
-      userBrowsing.record(agentId, { kind: "page", ...place, ...(title ? { title } : {}) });
+      this.#recordUserStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
     };
     contents.on("did-finish-load", recordPage);
     contents.on("page-title-updated", recordPage);
@@ -4325,13 +4411,12 @@ export class BrowserHost {
     contents.on("input-event", (_event, input) => {
       if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
       const { x, y } = input;
-      if (typeof x !== "number" || typeof y !== "number" || this.#userBrowsingAgent(tab) === null) return;
+      if (typeof x !== "number" || typeof y !== "number" || !records()) return;
       const place = stepPlace(contents.getURL());
       if (!place) return;
       void readClickTarget(contents, x, y).then((target) => {
         // The tab can change hands while the page answers.
-        const agentId = this.#userBrowsingAgent(tab);
-        if (target && agentId !== null) userBrowsing.record(agentId, { kind: "click", ...place, ...target });
+        if (target) this.#recordUserStep(tab, { kind: "click", ...place, ...target });
       });
     });
   }

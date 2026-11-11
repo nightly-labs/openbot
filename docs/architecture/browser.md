@@ -240,6 +240,24 @@ the review reads the steps; the agent has no tool to search them. Browsing alone
 review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
 covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
 
+"Teach a task" (composer `+` menu, `browser-teach-v1`) uses the same step recorder for a task that a
+person shows on purpose. It does not depend on the setting above. The menu item opens the full view
+with a teach bar above the page (`BrowserTeachBar`) and no dock; "Start recording" in the bar calls
+`startTeach`. `BrowserHost.startTeach` gives the
+agent's tab to the person and keeps the steps in memory for that tab, not in `UserBrowsingLog`: at
+most 200 steps and 10 minutes, with the same rules for a page and a press. The bar then shows the
+time on a button that saves the recording, a discard button, and a frame around the page. `stopTeach` gives the tab back; only the
+holder that started the recording can end it, and it gets the steps only with `save`. The recording
+also ends, with no steps, when the control of the tab ends. On Save the client sends a short
+user message that asks for a skill and a plain answer, with the numbered steps in an attached text
+file `recorded-task.txt` (`browser-teach-message.ts`, `sendCardFile`), and closes the full view so that
+the chat shows. The request is in the message, not in the file: an agent does not obey a file. A
+recording with no step after its first page sends nothing and shows a toast. When the chat cannot
+send, the steps go to the draft as text. The host stores no step. The
+menu item is not in a channel and not on mobile: a task of many steps on a web page does not fit a
+phone. `bun scripts/browser-user-control-e2e.ts` covers the recording, and
+`bun run test:team-api-routes` covers the routes.
+
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
 go and the DOM is unchanged for 150 ms, for up to 2 seconds, and reads again (`browser-settle.ts`).

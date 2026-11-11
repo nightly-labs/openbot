@@ -629,6 +629,9 @@ export type TeamApiBrowser = Pick<
   | "takeUserControl"
   | "releaseUserControl"
   | "releaseUserControlHeldBy"
+  // A task that a person shows, behind `browser-teach-v1`.
+  | "startTeach"
+  | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
   // Behind `browser-sign-in`.

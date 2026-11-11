@@ -47,6 +47,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserNavigateUnsupported":
     "This remote host does not support address-bar navigation in an existing tab.",
   "error.backend.browserUserControlBusy": "This browser tab waits for a secret. Answer the secret request first.",
+  "error.backend.browserTeachUnavailable": "This browser tab has no agent that can learn a task.",
+  "error.backend.browserTeachUnsupported": "This remote host does not support the recording of a task.",
   "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
   "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",

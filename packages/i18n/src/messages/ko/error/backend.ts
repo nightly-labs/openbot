@@ -47,6 +47,8 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "이 서버는 채널 삭제를 지원하지 않아요.",
   "error.backend.browserNavigateUnsupported": "이 원격 호스트는 기존 탭에서 주소 표시줄 이동을 지원하지 않아요.",
   "error.backend.browserUserControlBusy": "이 브라우저 탭이 비밀 값을 기다리고 있어요. 먼저 비밀 값 요청에 답하세요.",
+  "error.backend.browserTeachUnavailable": "이 브라우저 탭에는 작업을 배울 수 있는 에이전트가 없습니다.",
+  "error.backend.browserTeachUnsupported": "이 원격 호스트는 작업 기록을 지원하지 않습니다.",
   "error.backend.browserUserControlUnsupported": "이 원격 호스트는 브라우저 탭 제어권 가져오기를 지원하지 않아요.",
   "error.backend.browserSignInUnsupported": "이 원격 호스트는 이 컴퓨터에서 로그인을 받을 수 없어요.",
   "error.backend.browserSignInOpenFailed": "OpenBot이 로그인 창을 열 수 없었어요.",

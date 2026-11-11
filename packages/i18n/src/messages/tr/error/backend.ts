@@ -47,6 +47,8 @@ export const messages = {
     "Bu uzak ana makine mevcut bir sekmede adres çubuğuyla gezinmeyi desteklemiyor.",
   "error.backend.browserUserControlBusy":
     "Bu tarayıcı sekmesi bir gizli bilgi bekliyor. Önce gizli bilgi isteğini yanıtlayın.",
+  "error.backend.browserTeachUnavailable": "Bu tarayıcı sekmesinde görev öğrenebilecek bir ajan yok.",
+  "error.backend.browserTeachUnsupported": "Bu uzak ana makine görev kaydını desteklemiyor.",
   "error.backend.browserUserControlUnsupported":
     "Bu uzak ana makine bir tarayıcı sekmesinin denetimini almayı desteklemiyor.",
   "error.backend.browserSignInUnsupported": "Bu uzak ana makine bu bilgisayardan oturum açma alamaz.",
