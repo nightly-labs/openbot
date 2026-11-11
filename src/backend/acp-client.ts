@@ -2933,10 +2933,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread: AcpThread,
     turn: AcpTurn,
   ) {
-    const limit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
+    const agentLimit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
     let answeredAt = 0;
     // A stopped turn ends by its stop, as interrupted, and not as a stall.
     while (thread.activeTurn === turn && !turn.completing && !turn.stopped) {
+      // Read on each pass: the model of the thread can change while the turn runs.
+      const limit = this.options.customEndpoint?.(thread.currentModelId)?.stallMs ?? agentLimit;
       if (this.#flavor.promptOpenForBackgroundTasks) {
         const silentFor = Date.now() - Math.max(turn.lastActivityAt, answeredAt);
         if (silentFor < limit) {

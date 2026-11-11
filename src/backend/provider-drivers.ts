@@ -73,6 +73,7 @@ import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntim
 import { MuseAgentClient } from "./muse-client";
 import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
+  CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
@@ -1042,7 +1043,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
           return endpoint
-            ? { name: endpoint.name, hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0 }
+            ? {
+                name: endpoint.name,
+                hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
+                stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+              }
             : null;
         },
         servesModel: context.servesModel,

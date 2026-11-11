@@ -11,6 +11,8 @@ export interface AcpCustomEndpoint {
   readonly name: string;
   /** Whether the endpoint has a saved API key or header. */
   readonly hasCredentials: boolean;
+  /** How long a turn on this endpoint may send nothing before it fails. The agent's own limit when absent. */
+  readonly stallMs?: number;
 }
 
 /**
