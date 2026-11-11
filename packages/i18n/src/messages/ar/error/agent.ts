@@ -139,6 +139,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
     "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في إعدادات الخادم، MCP.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} خادم مدمج في OpenBot. لا يمكنك اختباره أو تغييره أو إزالته بأدوات MCP. يتحكم فيه المستخدم في OpenBot، ويوضّح list_mcp_servers المكان.",
   "error.agent.mcpServerUnknown": "لا يوجد خادم MCP باسم {name}. استدعِ list_mcp_servers لمعرفة الأسماء.",
   "error.agent.screenCaptureWindowMissing":
     "تلك النافذة غير مفتوحة الآن. استدعِ list_capture_sources للحصول على معرّفات النوافذ الحالية.",

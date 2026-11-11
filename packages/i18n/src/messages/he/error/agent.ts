@@ -138,6 +138,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בהגדרות השרת, MCP.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} הוא שרת מובנה של OpenBot. אי אפשר לבדוק, לשנות או להסיר אותו בכלי ה-MCP. המשתמש שולט בו ב-OpenBot, ו-list_mcp_servers מציין איפה.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",
   "error.agent.screenCaptureWindowMissing":
     "החלון הזה אינו פתוח כעת. יש לקרוא ל-list_capture_sources כדי לקבל את מזהי החלונות הנוכחיים.",
