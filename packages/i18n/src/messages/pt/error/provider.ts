@@ -14,6 +14,8 @@ export const messages = {
     "O {provider} informa que seu plano se esgotou. Escolha outro modelo ou faça upgrade do seu plano do {provider}.",
   "error.provider.acpMcpNotLoaded":
     "O {provider} não carregou as ferramentas do OpenBot, então este agente não pode usá-las nem falar com os colegas. Uma política de equipe do {provider} pode bloquear servidores MCP locais. Peça ao administrador da sua equipe para permiti-los e tente de novo.",
+  "error.provider.acpOwnMcpServerFailed":
+    "O {provider} não conseguiu iniciar o servidor MCP {name}, então a resposta parou. Este servidor está nas suas próprias configurações do {provider}, não no OpenBot. Remova ou repare o servidor lá e depois inicie um novo chat.",
   "error.provider.endpointsReadOnly":
     "Os endpoints salvos foram gravados por uma versão mais recente do OpenBot, ou o arquivo não pode ser lido. Atualize o OpenBot para alterá-los.",
   "error.provider.endpointNoSecureStorage":

@@ -14,6 +14,8 @@ export const messages = {
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
   "error.provider.acpMcpNotLoaded":
     "{provider} n’a pas chargé les outils d’OpenBot : cet agent ne peut donc ni les utiliser ni joindre ses coéquipiers. Une règle d’équipe {provider} peut bloquer les serveurs MCP locaux. Demandez à l’administrateur de votre équipe de les autoriser, puis réessayez.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, la réponse s’est donc arrêtée. Ce serveur est dans vos propres réglages de {provider}, pas dans OpenBot. Supprimez-le ou réparez-le à cet endroit, puis démarrez une nouvelle conversation.",
   "error.provider.endpointsReadOnly":
     "Les points de terminaison enregistrés ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
   "error.provider.endpointNoSecureStorage":

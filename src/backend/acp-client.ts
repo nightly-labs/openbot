@@ -2380,7 +2380,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
             turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
-            turn.providerError = sdkHarness.turnFailure(detail);
+            turn.providerError = this.#mcpLoadFailureMessage(detail) ?? sdkHarness.turnFailure(detail);
             turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
@@ -2599,6 +2599,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.lastChunkAt = null;
     return true;
   });
+
+  /**
+   * The message of a turn that an MCP server's failed start ended, or `null` for another failure.
+   * The server's own reason is runtime output, often a traceback with a Windows path, which the chat
+   * replaced with a message that names no cause (#7046). It goes to the diagnostics instead.
+   */
+  #mcpLoadFailureMessage(detail: string): string | null {
+    const failure = this.#flavor.sdkHarness?.mcpLoadFailure(detail);
+    if (!failure) return null;
+    this.emit("diagnostic", this.#redact(detail));
+    const configured = this.options
+      .mcpServers?.()
+      .find((config) => providerMcpServerName(config.name) === failure.name);
+    return configured
+      ? sourceText("error.backend.mcpServerFailedForProvider", { provider: this.#label, name: configured.name })
+      : sourceText("error.provider.acpOwnMcpServerFailed", { provider: this.#label, name: failure.name });
+  }
 
   #sessionUpdate(notification: SessionNotification): void {
     if (notification.sessionId === this.#privateSession?.sessionId) {
