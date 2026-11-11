@@ -186,7 +186,7 @@ function openbotGuidance(namespace: string, tool: string): string {
       ].join("\n");
     case "list_channels":
     case "send_to_channel":
-      return "Call openbot.list_channels first. When the user named no channel or recipient and more than one fits, ask with ask_ui. The text is the whole brief: goal, context, decisions, expected result, and file paths. Send once, do not also do the work here, and tell the user to follow it in the channel.";
+      return "Call openbot.list_channels first. When the user named no channel or recipient and more than one fits, use ask_user. The text is the whole brief: goal, context, decisions, expected result, and file paths. Send once, do not also do the work here, and tell the user to follow it in the channel.";
     case "create_channel":
     case "update_channel":
       return "First call openbot.list_channels with {} (no search needed) and change a channel that fits instead of making a second one. Pick an icon and hue that match the channel's purpose. Removing a member or archiving stops open channel work: confirm with ask_ui unless the user asked for exactly that.";

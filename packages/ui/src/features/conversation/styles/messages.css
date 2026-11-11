@@ -1365,11 +1365,6 @@ button.chat-action-target:active,
   max-width: var(--message-wide-bubble-width);
 }
 
-.message-entry-agent .ui-bubble:has(.choice-card) {
-  width: min(500px, 100%);
-  max-width: min(500px, 100%);
-}
-
 /* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
 .message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
@@ -1382,9 +1377,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(
-    :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
-  )
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .image-gallery, .message-code-block, .message-data-table-scroll))
   > .ui-bubble-content {
   width: 100%;
 }
