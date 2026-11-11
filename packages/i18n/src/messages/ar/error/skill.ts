@@ -45,6 +45,8 @@ export const messages = {
   "error.skill.managedSlug": "يمنح OpenBot كل وكيل مهارة {slug} خاصة به. أعطِ هذه المهارة اسمًا مختلفًا.",
   "error.skill.templateMarkdownTooLarge": "{name}: حجم SKILL.md أكبر من 64 KB. اختصره قبل النشر.",
   "error.skill.localNoRevisions": "لا توجد مراجعات منشورة للمهارة المحلية.",
+  "error.skill.localNotFound": "هذه المهارة المحلية غير موجودة. تحقّق من معرّفها في قائمة المهارات المحلية.",
+  "error.skill.localRevisionNotFound": "لا توجد للمهارة المحلية المراجعة {revision}. أحدث مراجعة لها هي {latest}.",
   "error.skill.localNameTaken": "توجد مهارة محلية بهذا الاسم بالفعل. راجعها بدلًا من ذلك.",
   "error.skill.localKeepName": "أبقِ اسم المهارة دون تغيير عند مراجعتها.",
   "error.skill.localRelativeFolder": "استخدم مجلد مهارة نسبيًا داخل مساحة العمل للوكيل الحالي.",

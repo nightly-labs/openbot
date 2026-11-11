@@ -48,6 +48,9 @@ export const messages = {
   "error.skill.managedSlug": "OpenBot da a cada agente su propia habilidad {slug}. Ponle otro nombre a esta habilidad.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md supera los 64 KB. Acórtalo antes de publicar.",
   "error.skill.localNoRevisions": "La habilidad local no tiene revisiones publicadas.",
+  "error.skill.localNotFound": "Esta habilidad local no existe. Comprueba su ID en la lista de habilidades locales.",
+  "error.skill.localRevisionNotFound":
+    "Esta habilidad local no tiene la revisión {revision}. Su última revisión es {latest}.",
   "error.skill.localNameTaken": "Ya existe una habilidad local con este nombre. Modifícala en su lugar.",
   "error.skill.localKeepName": "Mantén el nombre de la habilidad al modificarla.",
   "error.skill.localRelativeFolder":

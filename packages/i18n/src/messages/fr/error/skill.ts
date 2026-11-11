@@ -54,6 +54,10 @@ export const messages = {
     "OpenBot donne à chaque agent sa propre compétence {slug}. Donnez un autre nom à cette compétence.",
   "error.skill.templateMarkdownTooLarge": "{name} : SKILL.md dépasse 64 Ko. Raccourcissez-le avant la publication.",
   "error.skill.localNoRevisions": "La compétence locale n’a aucune révision publiée.",
+  "error.skill.localNotFound":
+    "Cette compétence locale n’existe pas. Vérifiez son ID dans la liste des compétences locales.",
+  "error.skill.localRevisionNotFound":
+    "Cette compétence locale n’a pas de révision {revision}. Sa dernière révision est {latest}.",
   "error.skill.localNameTaken": "Une compétence locale porte déjà ce nom. Révisez-la plutôt.",
   "error.skill.localKeepName": "Gardez le même nom de compétence lors de sa révision.",
   "error.skill.localRelativeFolder":

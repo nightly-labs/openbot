@@ -50,6 +50,10 @@ export const messages = {
   "error.skill.templateMarkdownTooLarge":
     "{name}: SKILL.md is groter dan 64 KB. Maak het korter voordat je publiceert.",
   "error.skill.localNoRevisions": "De lokale vaardigheid heeft geen gepubliceerde revisies.",
+  "error.skill.localNotFound":
+    "Deze lokale vaardigheid bestaat niet. Controleer de ID in de lijst met lokale vaardigheden.",
+  "error.skill.localRevisionNotFound":
+    "Deze lokale vaardigheid heeft geen revisie {revision}. De nieuwste revisie is {latest}.",
   "error.skill.localNameTaken": "Er bestaat al een lokale vaardigheid met deze naam. Herzie die in plaats daarvan.",
   "error.skill.localKeepName": "Wijzig de naam van de vaardigheid niet als je haar herziet.",
   "error.skill.localRelativeFolder": "Gebruik een relatieve vaardigheidsmap in de huidige werkruimte van de agent.",
