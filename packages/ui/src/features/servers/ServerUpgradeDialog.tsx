@@ -1,9 +1,10 @@
 import {
-  BILLING_PLANS,
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
   billingListPrices,
+  serverStorageGb,
+  serverStorageGbAfter,
 } from "@openbot/contracts/billing";
 import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZES } from "@openbot/contracts/hosted-servers";
 import { Button, Dialog, Progress } from "@openbot/ui";
@@ -24,6 +25,8 @@ export interface ServerUpgradeDialogProps {
   freeBytes: number;
   totalBytes: number;
   plan: BillingPlanId;
+  /** The storage of the server now in GB, from the account server. Without it the plan table decides. */
+  storageGb?: number | undefined;
   nextPlan: BillingPlanId;
   interval: BillingInterval;
   currency: BillingCurrency;
@@ -47,7 +50,6 @@ export function ServerUpgradeDialog(props: ServerUpgradeDialogProps) {
   const usedBytes = () => Math.max(0, props.totalBytes - props.freeBytes);
   // Round down so that a nearly full disk does not show 100% while space is left.
   const percent = () => (props.totalBytes > 0 ? Math.floor((usedBytes() / props.totalBytes) * 100) : 0);
-  const storageGb = (plan: BillingPlanId) => BILLING_PLANS.find((candidate) => candidate.id === plan)?.storageGb ?? 0;
   const memoryGb = (plan: BillingPlanId) => HOSTED_SERVER_SIZES[HOSTED_PLAN_SIZE[plan]].memoryGb;
   const price = (amount: number) =>
     t(props.interval === "month" ? "billing.server.price.month" : "billing.server.price.year", {
@@ -59,8 +61,8 @@ export function ServerUpgradeDialog(props: ServerUpgradeDialogProps) {
   const rows = () => [
     {
       label: t("files.machine.disk"),
-      now: gigabytes(storageGb(props.plan)),
-      next: gigabytes(storageGb(props.nextPlan)),
+      now: gigabytes(serverStorageGb(props)),
+      next: gigabytes(serverStorageGbAfter(props, props.nextPlan)),
     },
     {
       label: t("files.machine.memory"),

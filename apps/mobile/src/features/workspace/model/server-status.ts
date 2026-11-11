@@ -118,6 +118,7 @@ export function serverFromHost(
     role: host.role,
     ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
     ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+    ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
     ...(host.keyChangedAt === undefined ? {} : { keyChangedAt: host.keyChangedAt }),
   };
 }

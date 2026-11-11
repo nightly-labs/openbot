@@ -12,7 +12,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { BILLING_PLANS } from "@openbot/contracts/billing";
+import { serverStorageGb } from "@openbot/contracts/billing";
 import { parseHostedServerList } from "@openbot/contracts/hosted-servers";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
@@ -150,12 +150,12 @@ const hostedServerName = Effect.fn("HostedServer.name")(function* (
 /**
  * The plan storage of this hosted server in GB, for the agent instructions. Null when the list has no
  * record of the server. A plan change applies at the next start of the server, so one read at the
- * start is enough.
+ * start is enough. A move to a machine of the operator also ends with a start there.
  */
 export const hostedServerStorageGb = Effect.fn("HostedServer.storageGb")(function* (
   centralAuth: Pick<CentralAuthManager, "requestAuthorized">,
   hostId: string,
 ) {
   const server = yield* hostedServerRecord(centralAuth, hostId);
-  return server ? (BILLING_PLANS.find((plan) => plan.id === server.plan)?.storageGb ?? null) : null;
+  return server ? serverStorageGb(server) : null;
 });

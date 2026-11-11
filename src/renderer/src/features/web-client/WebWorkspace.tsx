@@ -637,6 +637,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         remoteDesktopAvailable: false,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+        ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
         compatibility: {
           localAppVersion: "web",

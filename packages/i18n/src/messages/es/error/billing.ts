@@ -6,6 +6,7 @@ export const messages = {
     "No se pudo cambiar el plan del servidor. Actualiza Facturación e inténtalo de nuevo.",
   "error.billing.confirmMismatch": "Escribe el nombre del servidor para eliminarlo.",
   "error.billing.restartBusy": "El servidor no puede reiniciarse ahora. Inténtalo de nuevo en un minuto.",
+  "error.billing.restartUnavailable": "Este servidor no puede reiniciarse desde aquí. Contacta con soporte.",
   "error.billing.planRequired": "El plan de este servidor terminó. Renuévalo para iniciar el servidor.",
   "error.billing.planSoldOut": "Este plan está agotado. Elige otro plan.",
   "error.billing.licenseExists": "Esta cuenta ya tiene una licencia. Cambia sus usuarios en su lugar.",

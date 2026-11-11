@@ -6,6 +6,7 @@ export const messages = {
     "L’offre du serveur n’a pas pu être modifiée. Actualisez « Facturation » et réessayez.",
   "error.billing.confirmMismatch": "Saisissez le nom du serveur pour le supprimer.",
   "error.billing.restartBusy": "Le serveur ne peut pas redémarrer maintenant. Réessayez dans une minute.",
+  "error.billing.restartUnavailable": "Ce serveur ne peut pas redémarrer d’ici. Contactez l’assistance.",
   "error.billing.planRequired": "L’offre de ce serveur a pris fin. Renouvelez-la pour démarrer le serveur.",
   "error.billing.planSoldOut": "Cette offre est épuisée. Choisissez une autre offre.",
   // Billing errors.
