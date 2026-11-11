@@ -521,6 +521,11 @@ export class DrainScheduler {
     return this.#hold(this.#settingsHolds, agentId);
   }
 
+  /** True while a read or a change of this agent's session settings runs. */
+  holdsSessionSettings(agentId: string): boolean {
+    return this.#settingsHolds.has(agentId);
+  }
+
   #hold(holds: Map<string, number>, agentId: string): () => void {
     holds.set(agentId, (holds.get(agentId) ?? 0) + 1);
     let released = false;

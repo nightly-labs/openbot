@@ -1796,11 +1796,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .stopAgentProcess(agentId)
               .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
             if (process.platform !== "win32") return;
-            const used = yield* Effect.try({
-              try: () => this.#usedSharedOpenCode(agentId),
+            const release = yield* Effect.try({
+              try: () => this.#releasesSharedOpenCode(agentId),
               catch: (cause) => new AgentRemovalFailed({ cause }),
             });
-            if (used) yield* this.#providers.releaseSharedProcess("opencode");
+            if (release) yield* this.#providers.releaseSharedProcess("opencode");
           }),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
@@ -4809,10 +4809,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#conversation.anyWorkingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId);
   }
 
-  /** Whether the shared OpenCode process can have worked in this agent's folder: the agent is set to it or has a session on it. */
-  #usedSharedOpenCode(agentId: string): boolean {
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+  /**
+   * Whether the delete stops the shared OpenCode process, which can have worked in this agent's folder: the agent is set to it or
+   * has a session on it. False while another OpenCode agent's session settings are read: that read uses the process.
+   */
+  #releasesSharedOpenCode(agentId: string): boolean {
+    const agents = this.#store.list();
+    const agent = agents.find((candidate) => candidate.id === agentId);
     if (!agent) return false;
+    if (
+      agents.some(
+        (candidate) => providerForAgent(candidate) === "opencode" && this.#drain.holdsSessionSettings(candidate.id),
+      )
+    )
+      return false;
     if (providerForAgent(agent) === "opencode") return true;
     return agent.threadId
       ? this.#store.database.listProviderSessions(agent.threadId).some((session) => session.provider === "opencode")
