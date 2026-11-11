@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "Local",
   "sidebar.resizer.compactWidth": "Compacta ({width}px)",
   "sidebar.topbar.expand": "Expandir barra lateral",
+  "sidebar.topbar.collapse": "Recolher barra lateral",
   "sidebar.topbar.openMarketplace": "Abrir loja",
   "sidebar.topbar.marketplace": "Loja",
   "sidebar.topbar.back": "Voltar",

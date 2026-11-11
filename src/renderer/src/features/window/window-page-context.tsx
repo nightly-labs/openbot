@@ -64,12 +64,6 @@ const context = createSimpleContext({
       return usage.state.serverId ? usage.state.view : "agents";
     });
 
-    /** Whether the agent list shows beside the Tasks page. Each time the page opens, the list is hidden. */
-    const [tasksAgentsOpen, setTasksAgentsOpen] = createSignal(false);
-    createEffect(page, (next) => {
-      if (next !== "tasks") setTasksAgentsOpen(false);
-    });
-
     // Opening the user settings closes the server settings, the Marketplace and the host pane.
     createEffect(settings.appSettingsOpenRequest, (request, previous) => {
       if (previous === undefined || request === previous) return;
@@ -138,8 +132,6 @@ const context = createSimpleContext({
       page,
       /** Whether a page other than the agents covers the conversation. A message there is not seen. */
       conversationCovered: () => page() !== "agents",
-      tasksAgentsOpen: () => page() === "tasks" && tasksAgentsOpen(),
-      setTasksAgentsOpen: (open: boolean) => setTasksAgentsOpen(open),
       setSettingsMounts,
       settingsPlacement,
       serverSettingsQuery,

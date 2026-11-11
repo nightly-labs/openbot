@@ -24,33 +24,7 @@
 }
 
 .tasks-page-header {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
   padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-3);
-}
-
-/* The arrow lines up with the content edge, not its hit area. */
-.tasks-page-header .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-
-/* Back and the agents panel toggle follow the reading direction. */
-.tasks-page-header svg:is([class~="lucide-arrow-left"], [class~="lucide-panel-left"]):dir(rtl) {
-  transform: scaleX(-1);
-}
-
-.tasks-page-header h2 {
-  min-width: 0;
-  flex: 1;
-  margin: 0;
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.tasks-page-header h2 span {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
 }
 
 .tasks-page-avatar.agent-avatar {

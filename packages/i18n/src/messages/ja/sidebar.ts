@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "ローカル",
   "sidebar.resizer.compactWidth": "コンパクト（{width}px）",
   "sidebar.topbar.expand": "サイドバーを展開",
+  "sidebar.topbar.collapse": "サイドバーを折りたたむ",
   "sidebar.topbar.openMarketplace": "マーケットプレイスを開く",
   "sidebar.topbar.marketplace": "マーケットプレイス",
   "sidebar.topbar.back": "戻る",

@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "Yerel",
   "sidebar.resizer.compactWidth": "Kompakt ({width}px)",
   "sidebar.topbar.expand": "Kenar çubuğunu genişlet",
+  "sidebar.topbar.collapse": "Kenar çubuğunu daralt",
   "sidebar.topbar.openMarketplace": "Pazaryerini aç",
   "sidebar.topbar.marketplace": "Pazaryeri",
   "sidebar.topbar.back": "Geri",

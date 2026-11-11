@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "محلي",
   "sidebar.resizer.compactWidth": "مضغوط ({width}px)",
   "sidebar.topbar.expand": "توسيع الشريط الجانبي",
+  "sidebar.topbar.collapse": "طي الشريط الجانبي",
   "sidebar.topbar.openMarketplace": "فتح المتجر",
   "sidebar.topbar.marketplace": "المتجر",
   "sidebar.topbar.back": "رجوع",

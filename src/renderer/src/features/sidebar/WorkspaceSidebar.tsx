@@ -303,6 +303,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         windowAgentIds={windowAgentIds()}
         compact={layout.leftPanelCompact()}
         onExpand={layout.expandSidebar}
+        onCollapse={() => layout.setSidebarClosed(true)}
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>

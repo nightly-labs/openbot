@@ -11,6 +11,7 @@ import { z } from "zod";
 import { readPanelWidth } from "./components/panel-width-storage";
 import {
   CONVERSATION_MIN_WIDTH,
+  LEFT_PANEL_CLOSED_STORAGE_KEY,
   LEFT_PANEL_COLLAPSED_STORAGE_KEY,
   LEFT_PANEL_DEFAULT,
   LEFT_PANEL_MAX,
@@ -134,7 +135,14 @@ const Layout = createSimpleContext({
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
     });
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
-    const leftPanelCompact = createMemo(() => leftPanelCollapsed() || leftPanelAutoCompact());
+    // A closed sidebar shows no agent list. A window with no page rail has no room to close it, so
+    // there the styles show it compact; that is why closed is also compact.
+    const [sidebarClosed, setSidebarClosedSignal] = createSignal(
+      window.localStorage.getItem(LEFT_PANEL_CLOSED_STORAGE_KEY) === "true",
+    );
+    /** The window has no room for the full sidebar. A closed sidebar does not make this true. */
+    const leftPanelNarrow = createMemo(() => leftPanelCollapsed() || leftPanelAutoCompact());
+    const leftPanelCompact = createMemo(() => sidebarClosed() || leftPanelNarrow());
     /**
      * Whether the window draws the vertical server rail. The frame class and
      * the rail itself need the answer. `appInfo` is null
@@ -178,6 +186,11 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(LEFT_PANEL_COLLAPSED_STORAGE_KEY, String(collapsed));
     }
 
+    function setSidebarClosed(closed: boolean): void {
+      setSidebarClosedSignal(closed);
+      window.localStorage.setItem(LEFT_PANEL_CLOSED_STORAGE_KEY, String(closed));
+    }
+
     function setServerView(view: ServerView): void {
       setServerViewSignal(view);
       window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
@@ -209,6 +222,7 @@ const Layout = createSimpleContext({
     }
 
     function expandSidebar(): void {
+      setSidebarClosed(false);
       setSidebarCollapsed(false);
       setLeftPanelAutoCompact(false);
     }
@@ -217,7 +231,10 @@ const Layout = createSimpleContext({
       leftPanelWidth,
       setLeftPanelWidth,
       leftPanelCompact,
+      leftPanelNarrow,
       setSidebarCollapsed,
+      sidebarClosed,
+      setSidebarClosed,
       expandSidebar,
       serverView,
       setServerView,

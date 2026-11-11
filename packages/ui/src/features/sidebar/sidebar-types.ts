@@ -167,6 +167,8 @@ export interface SidebarProps {
   /** A card under the chat list, such as an announcement. The compact sidebar has no room for it. */
   footer?: JSX.Element;
   onExpand: () => void;
+  /** Closes the sidebar. With it, the top row of the expanded sidebar shows the sidebar toggle. */
+  onCollapse?: (() => void) | undefined;
   /** Opens the global search. The search field and the compact search button both call it. */
   onOpenSearch: () => void;
   onOpenMarketplace: () => void;

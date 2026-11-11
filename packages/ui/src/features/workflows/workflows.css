@@ -1282,12 +1282,16 @@
   display: none;
 }
 
-/* The server menu keeps the start of the top row, so the bar starts after it. */
+/* The controls of the window keep the start of the top row, so the bar starts after them. A window
+ * with the page rail sets `--top-row-tabs-start`; another window has the server menu there. */
 .wfn-canvas[data-frame="window"] .wfn-hud-top {
   top: 0;
   inset-inline-end: var(--openbot-space-3);
-  inset-inline-start: calc(var(--left-panel-width) + var(--openbot-space-3));
+  inset-inline-start: var(--top-row-tabs-start, calc(var(--left-panel-width) + var(--openbot-space-3)));
+  box-sizing: border-box;
   height: var(--left-header-height);
+  /* The centre line of the buttons of the frame, as each page header has (`window.css`). */
+  padding-block: var(--top-row-padding-block, 2px 0);
   align-items: center;
 }
 

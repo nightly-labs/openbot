@@ -1,0 +1,93 @@
+/* The header of a full page (`PageHeader.tsx`). The page sets its padding; `window.css` puts the
+ * header in the top row of the app window. */
+.page-header {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.page-header-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The arrow lines up with the content edge, not its hit area. */
+.page-header-back {
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+}
+
+/* Back points to the start of the reading direction, and the separator of a path to its end. */
+.page-header-back > svg:dir(rtl),
+.page-header-separator:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.page-header-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+}
+
+.page-header-host {
+  color: var(--openbot-text-muted);
+  font-weight: var(--openbot-weight-regular);
+}
+
+/* The title takes focus when its page opens. The focus is for screen readers, not a control. */
+.page-header-title:focus {
+  outline: none;
+}
+
+/*
+ * The path to an open page, such as `Providers › ChatGPT`. A parent is plain text until the pointer is on it: then it
+ * shows the button chip. The start margin cancels the padding and border of the chip, so the text stays on the inset.
+ * The end margin cancels less, so the chip does not touch the separator.
+ */
+.page-header-identity[data-path] {
+  gap: var(--openbot-space-1-5);
+  white-space: nowrap;
+}
+
+.page-header .page-header-parent {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline: calc(-1 * var(--openbot-space-2) - 1px) calc(-1 * var(--openbot-space-1));
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-header .page-header-parent:focus-visible {
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .page-header .page-header-parent:hover:not(:disabled) {
+    border-color: var(--openbot-border);
+    background: var(--openbot-bg-control);
+    color: var(--openbot-text-primary);
+  }
+}
+
+.page-header-separator {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
