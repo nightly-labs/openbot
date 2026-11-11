@@ -54,7 +54,7 @@ export class FilePreviewPages {
 
   response(request: Request): Response {
     const bytes = request.method === "GET" ? this.get(new URL(request.url)) : undefined;
-    return bytes ? chatVisualResponse(bytes) : new Response("Not found", { status: 404 });
+    return bytes ? chatVisualResponse(bytes, { localFile: true }) : new Response("Not found", { status: 404 });
   }
 }
 
