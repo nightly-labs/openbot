@@ -232,6 +232,8 @@ import type {
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
+  BrowserTeachStopInput,
   BrowserVisibilityInput,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
@@ -1969,6 +1971,10 @@ export const IPC_ENDPOINTS = {
     close: request<string, void>()("browser:close"),
     takeControl: request<string, void>()("browser:take-control"),
     releaseControl: request<string, void>()("browser:release-control"),
+    // A person shows a task in an agent's tab (`browser-teach-v1`). Start takes the tab; stop gives
+    // it back and, with `save`, answers the recorded steps.
+    startTeach: request<string, void>()("browser:teach-start"),
+    stopTeach: request<BrowserTeachStopInput, BrowserTeachStep[]>()("browser:teach-stop"),
     listTabs: request<undefined, BrowserTab[]>()("browser:list-tabs"),
     getDisplayState: request<undefined, BrowserDisplayState>()("browser:get-display-state"),
     getControlState: request<undefined, BrowserControlState>()("browser:get-control-state"),

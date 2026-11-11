@@ -47,6 +47,10 @@ export const messages = {
     "Dieser entfernte Host unterstützt die Navigation über die Adressleiste in einem vorhandenen Tab nicht.",
   "error.backend.browserUserControlBusy":
     "Dieser Browser-Tab wartet auf ein Geheimnis. Beantworte zuerst die Anfrage nach dem Geheimnis.",
+  "error.backend.browserTeachBusy":
+    "Eine andere Person steuert diesen Browser-Tab. Versuche es erneut, wenn sie fertig ist.",
+  "error.backend.browserTeachUnavailable": "Dieser Browser-Tab hat keinen Agenten, der eine Aufgabe lernen kann.",
+  "error.backend.browserTeachUnsupported": "Dieser Remote-Host unterstützt die Aufzeichnung einer Aufgabe nicht.",
   "error.backend.browserUserControlUnsupported":
     "Dieser entfernte Host unterstützt die Übernahme eines Browser-Tabs nicht.",
   "error.backend.browserSignInUnsupported":

@@ -50,6 +50,10 @@ export const messages = {
     "Este computador anfitrião remoto não oferece suporte à navegação pela barra de endereços em uma aba existente.",
   "error.backend.browserUserControlBusy":
     "Esta aba do navegador está esperando um segredo. Responda primeiro ao pedido do segredo.",
+  "error.backend.browserTeachBusy": "Outra pessoa controla esta aba do navegador. Tente novamente quando ela terminar.",
+  "error.backend.browserTeachUnavailable":
+    "Este separador do navegador não tem um agente que possa aprender uma tarefa.",
+  "error.backend.browserTeachUnsupported": "Este anfitrião remoto não suporta a gravação de uma tarefa.",
   "error.backend.browserUserControlUnsupported":
     "Este computador anfitrião remoto não oferece suporte para assumir o controle de uma aba do navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto não pode receber um início de sessão deste computador.",

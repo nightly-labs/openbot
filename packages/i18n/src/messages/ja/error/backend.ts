@@ -47,6 +47,10 @@ export const messages = {
     "このリモートホストは、既存のタブでのアドレスバーによる移動に対応していません。",
   "error.backend.browserUserControlBusy":
     "このブラウザーのタブはシークレットを待っています。先にシークレットの要求に応答してください。",
+  "error.backend.browserTeachBusy":
+    "別のユーザーがこのブラウザーのタブを操作しています。操作が終わってからもう一度お試しください。",
+  "error.backend.browserTeachUnavailable": "このブラウザーのタブには、タスクを学習できるエージェントがありません。",
+  "error.backend.browserTeachUnsupported": "このリモートホストは、タスクの記録に対応していません。",
   "error.backend.browserUserControlUnsupported":
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",

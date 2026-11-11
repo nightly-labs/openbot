@@ -89,7 +89,14 @@ const readShape = {
   includeWorkSteps: z.boolean().optional(),
   workStepsOffset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 };
-const searchSchema = z.strictObject(searchShape);
+// A search cursor continues one query. Without a query, the cursor fits no call of this tool (#6995).
+const searchSchema = z
+  .strictObject(searchShape)
+  .refine((value) => value.cursor === undefined || value.query !== undefined, {
+    path: ["cursor"],
+    message:
+      "A cursor continues the call that gave it. Send a history_search cursor with the same query, and a history_read cursor to history_read as before.",
+  });
 const readSchema = z
   .strictObject(readShape)
   .refine(
@@ -105,6 +112,24 @@ const cursorSchema = z.strictObject({
   anchorMessageId: id,
   query: z.string().nullable(),
 });
+
+/**
+ * The thread that a cursor from an earlier answer continues, or null for text that is not a cursor.
+ * The cursor is not signed: the caller checks that the thread is one of the agent's own conversations.
+ */
+export function historyCursorThread(text: unknown): string | null {
+  if (typeof text !== "string" || !cursorText.safeParse(text).success) return null;
+  try {
+    return decodeCursor(text).threadId;
+  } catch {
+    return null;
+  }
+}
+
+/** The fields of a cursor from an earlier answer. Throws for text that is not a cursor. */
+function decodeCursor(text: string) {
+  return cursorSchema.parse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+}
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
@@ -366,9 +391,7 @@ export class HistoryTools {
     const query = search?.query;
     const limit = search?.limit ?? read?.limit ?? (search ? 5 : 10);
     const suppliedCursor = search?.cursor ?? read?.before;
-    const cursor = suppliedCursor
-      ? yield* toolStep(() => cursorSchema.parse(JSON.parse(Buffer.from(suppliedCursor, "base64url").toString("utf8"))))
-      : null;
+    const cursor = suppliedCursor ? yield* toolStep(() => decodeCursor(suppliedCursor)) : null;
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let

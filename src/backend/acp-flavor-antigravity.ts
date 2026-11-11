@@ -23,10 +23,17 @@ const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could n
  * Google refuses a request until the user verifies the account (`VALIDATION_REQUIRED`, #2419).
  * Antigravity 1.4.5 `format_execution_error` then sends Google's message, an empty line, and
  * `<link text>: <validation_url>` as the answer, with no `Agent execution error:` prefix. The link
- * is a Google sign-in page that continues to the Gemini Code Assist success page.
+ * is a Google sign-in page that continues to the Gemini Code Assist success page. The Antigravity
+ * CLI 1.5.4 puts the link on its own line after "Please verify your account in your browser to
+ * continue:" (#6985).
  */
 const GEMINI_VERIFICATION_ANSWER =
-  /(?:^|\n)[^\n]*: (https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+/**
+ * The verification link anywhere in a failure text. The text is cut for the banner, so a link that
+ * is not found there lost its end and could not open (#6985).
+ */
+const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
 /**
  * The Antigravity CLI 1.5 sends a failed request as an answer that starts with a line break, a
  * warning sign and a space, such as "\n⚠ Agent Platform API has not been used in project ...", and
@@ -39,8 +46,9 @@ const GEMINI_FAILURE_ANSWER = new RegExp(
   "u",
 );
 
+/** Only for a text that is already a failure: a model's answer can name a Google page. */
 function geminiAccountLink(text: string): string | null {
-  return GEMINI_VERIFICATION_ANSWER.exec(text)?.[1] ?? null;
+  return GEMINI_ACCOUNT_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "") ?? null;
 }
 /**
  * Antigravity's SDK error when a model step returns neither text nor a tool call, as when an agent

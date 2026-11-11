@@ -111,7 +111,11 @@ export const messages = {
     other: "エンドポイントに {count} 個のモデルがあります。追加するモデルを選んでください。",
   },
   "customProvider.discovery.empty": "エンドポイントにモデルがありません。モデル ID を自分で追加してください。",
-  "customProvider.discovery.label": "エンドポイントにあるモデル",
+  "customProvider.discovery.choose": "モデルを選択",
+  "customProvider.discovery.search": "モデルを検索",
+  "customProvider.discovery.selectAll": "すべて選択",
+  "customProvider.discovery.deselectAll": "選択を解除",
+  "customProvider.discovery.noMatch": "検索に一致するモデルはありません。",
 
   "customProvider.preset.title": "プロバイダーまたはエージェントを追加",
   "customProvider.preset.description":

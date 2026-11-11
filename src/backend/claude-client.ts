@@ -25,7 +25,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AgentContextCategoryUsage, defaultProviderModel } from "@openbot/contracts/ipc";
+import { type AgentContextCategoryUsage, agentProviderName, defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
@@ -400,6 +400,8 @@ interface ActiveTurn {
    * message that only states the limit, so its text is held here and not published as the answer.
    */
   usageLimit: { resetsAt: number | null; text: string | null } | null;
+  /** The CLI refused the turn with `authentication_failed`, so a backup model can take it (#7014). */
+  authenticationFailed: boolean;
   /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
   retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
@@ -1608,6 +1610,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       assistantMessages: new Map<string, string>(),
       toolCalls: new Map<string, { name: string; input: Record<string, string> }>(),
       usageLimit: null,
+      authenticationFailed: false,
       retrying: false,
       unprompted,
     };
@@ -1892,6 +1895,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       // The CLI's own report of a failed request, such as "Invalid API key · Please run /login", is not
       // an answer. The result after it carries the same text and fails the turn.
+      if (message.error === "authentication_failed") turn.authenticationFailed = true;
       if (message.error && message.error !== "max_output_tokens") return;
       const thinking = messageThinking(message.message);
       /* The message's own order is all there is to say what came before its thinking. Text the
@@ -2377,9 +2381,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       },
     });
     if (status === "failed" && error) {
+      // A sign-in failure moves the turn to a backup model, as an invalid key does. The shared
+      // classifier does not find this cause in the CLI text, so the client names it.
+      const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
       this.emit("notification", {
         method: "error",
-        params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error, this.#usesApiKey()) },
+        params: {
+          threadId: runtime.id,
+          turnId: turn.id,
+          message: claudeTurnError(error, this.#usesApiKey()),
+          ...(signInFailed ? { causeCode: "authentication" } : {}),
+        },
       });
     }
     this.#emitSubagents(runtime, endSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
@@ -2819,6 +2831,14 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
 /**
+ * The CLI's report that it has no sign-in that it can read: "Not logged in · Please run /login"
+ * (Claude Code 2.1.322), for example while the macOS login keychain is locked (#7014). The text
+ * names a CLI command, and the shared classifier does not read it as a sign-in failure. The words
+ * also occur in other tools, so only the Claude client reads them.
+ */
+const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
+
+/**
  * The chat text for a fast mode turn that Claude Code ran at the standard speed. `pending` and
  * `sdk_opt_in_required` are states of the client itself, so only the log keeps them.
  */
@@ -2846,6 +2866,9 @@ function claudeFastModeWarning(reason: string): string | null {
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
+  if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
+    return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
   return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
 }

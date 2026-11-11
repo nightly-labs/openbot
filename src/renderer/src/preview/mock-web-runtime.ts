@@ -32,6 +32,8 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     closeBrowserTab: (tabId) => mock.api.browser.close(tabId),
     takeBrowserControl: (tabId) => mock.api.browser.takeControl(tabId),
     releaseBrowserControl: (tabId) => mock.api.browser.releaseControl(tabId),
+    startBrowserTeach: (tabId) => mock.api.browser.startTeach(tabId),
+    stopBrowserTeach: (input) => mock.api.browser.stopTeach(input),
     getSidebarLayout: () => agent.getSidebarLayout(),
     mutateSidebarLayout: (action) => agent.mutateSidebarLayout(action),
     channels: agent,

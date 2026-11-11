@@ -78,11 +78,15 @@ There is no configuration for a developer or for a packaged build:
 - A stored registration that names a different address is replaced, but only for the attempt that
   needs the browser. `clientInformation()` in `src/backend/mcp-oauth-provider.ts` answers
   `undefined` when the stored `redirect_uris` do not hold this run's address, which makes the SDK
-  register again. A record that still has a refresh token keeps its client for one pass first: a
-  refresh uses no redirect address, and a refresh token spent against a new `client_id` is refused
-  and costs the user a sign-in. Two attempts never replace the registration: a silent refresh, and
-  the exchange of a grant already in hand, which must use the `client_id` that grant was issued
-  to.
+  register again. Two attempts never replace the registration: a silent refresh, and the exchange
+  of a grant already in hand, which must use the `client_id` that grant was issued to.
+- A sign-in that the user asked for does not refresh. `tokens()` gives the SDK the stored tokens
+  without the refresh token until the grant is in hand, so a token that the server refuses opens
+  the browser. Before, the SDK refreshed it, and a server that had ended the sign-in also refused
+  the new token, so Sign in opened no page (#6975). A stored token that the server accepts still
+  connects with no page. When tokens are on file, a registration that this sign-in makes stays in
+  memory and is written with the tokens of its grant: the stored tokens keep the client that they
+  were issued to, so a cancel or a timeout keeps the stored sign-in usable.
 - `describeUnusableRedirectUrl` refuses an address that cannot receive a grant: an `https` address,
   or a plain-text address that is not on this machine.
 - A registration endpoint that refuses the `127.0.0.1` address with `invalid_redirect_uri` or

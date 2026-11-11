@@ -338,10 +338,11 @@ export class McpGateway {
 
   /**
    * Rows installed from the old catalog's `mcp-remote` bridge definitions reach their servers
-   * natively from here on. Exact matches only; anything the user changed stays as it is.
+   * natively from here on, and rows on a package version an earlier catalog pinned run the version
+   * it pins now. Exact matches only; anything the user changed stays as it is.
    */
-  migrateCatalogBridgesToHttp(): void {
-    this.#servers.migrateCatalogBridgesToHttp();
+  migrateCatalogRows(): void {
+    this.#servers.migrateCatalogRows();
   }
 
   /**

@@ -102,7 +102,16 @@ export interface RoutineRunMarkerModel {
 }
 
 export type ChatActionMarkerModel =
-  | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
+  | (SkillConversationEvent & {
+      kind: "skill-lifecycle";
+      timestamp: string;
+      /**
+       * Set when this row stands for consecutive installs of one skill revision, one for each agent:
+       * the ids of their messages, oldest first. Only the timeline joins them, and `timestamp` is the
+       * time of the newest one.
+       */
+      installMessageIds?: readonly string[];
+    })
   | AgentMessageMarkerModel
   /**
    * Consecutive agent messages, oldest first, drawn as one row. Only the timeline joins them: each

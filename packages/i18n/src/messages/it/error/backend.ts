@@ -47,6 +47,9 @@ export const messages = {
     "Questo host remoto non supporta la navigazione dalla barra degli indirizzi in una scheda esistente.",
   "error.backend.browserUserControlBusy":
     "Questa scheda del browser attende un segreto. Rispondi prima alla richiesta del segreto.",
+  "error.backend.browserTeachBusy": "Un’altra persona controlla questa scheda del browser. Riprova quando ha finito.",
+  "error.backend.browserTeachUnavailable": "Questa scheda del browser non ha un agente che può imparare un’attività.",
+  "error.backend.browserTeachUnsupported": "Questo host remoto non supporta la registrazione di un’attività.",
   "error.backend.browserUserControlUnsupported":
     "Questo host remoto non supporta il controllo di una scheda del browser.",
   "error.backend.browserSignInUnsupported": "Questo host remoto non può ricevere un accesso da questo computer.",

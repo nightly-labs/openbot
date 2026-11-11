@@ -224,11 +224,6 @@ export interface TurnHooks {
   /** The error of a task turn. It shows in the task's panel, not in the agent's own chat. */
   taskFailed(taskId: string, message: string): void;
   /**
-   * The agent preview before the routine run of this delivery showed its task, and that task, once.
-   * Null after a restart or for any other delivery.
-   */
-  takeRoutinePreview(deliveryId: string): { previous: string; shown: string } | null;
-  /**
    * A turn of the agent's own chat (`sideThreadId` null) or of its side thread ended. `counts` is true
    * for a completed turn that a person started, and `memoryCommitted` when the agent changed its
    * memories in it.
@@ -1151,8 +1146,9 @@ export class TurnLifecycle {
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
         const message = getString(params, "message") ?? getString(error, "message") ?? "";
-        // An ACP or Pi client names the cause that it read from structured fields, before the
-        // error became a sentence for the user. The other clients leave it to the error.
+        // An ACP, Pi or Claude client names the cause that it read from structured fields or from its
+        // own CLI text, before the error became a sentence for the user. The other clients leave it
+        // to the error.
         const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
         const causeCode = reportedCause ?? classifyFailure(error ?? message);
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) {
@@ -1780,21 +1776,9 @@ export class TurnLifecycle {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
         }
       }
-      // Each run start saved the earlier preview; a quiet turn puts back the oldest one, unless
-      // something else changed the preview since. Every turn takes its entries, so none stays behind.
-      const savedPreviews = deliveries.flatMap(({ delivery }) =>
-        delivery.sender.kind === "routine" ? (this.#hooks.takeRoutinePreview(delivery.id) ?? []) : [],
-      );
       if (latestAssistant && !markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId)) {
         yield* this.#store.updatePreview(agentId, latestAssistant.text).pipe(toTurnOperationFailed);
         this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
-      } else if (quiet || (markerAnswer && !this.#conversation.isExecutionThread(snapshot.threadId))) {
-        const saved = savedPreviews[0];
-        const current = this.#store.list().find((entry) => entry.id === agentId)?.preview;
-        if (saved && current === savedPreviews.at(-1)?.shown) {
-          yield* this.#store.updatePreview(agentId, saved.previous).pipe(toTurnOperationFailed);
-          this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
-        }
       }
       if (outcome === "completed" && latestAssistant && !quiet && !markerAnswer) {
         const paths = answerFilePaths(latestAssistant.text);

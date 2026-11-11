@@ -862,10 +862,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * is too late: `invalidateCredentials` has often already dropped the value the attempt spent.
    */
   readonly #secrets = new Set<string>();
-  /** Whether the stored registration has already had its one pass with a stale redirect address. */
-  #redirectAddressChecked = false;
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** A client that this sign-in registered while tokens were on file. See `saveClientInformation`. */
+  #registeredClient: OAuthClientInformationFull | undefined;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
   #activeIssuer: string | undefined;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
@@ -972,12 +972,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * do nothing about it. Answering `undefined` makes the SDK register again, which costs one
    * request and is the whole repair.
    *
-   * It is answered that way as late as it can be, because a refresh uses no redirect address at
-   * all. Registering in front of one would spend a refresh token against a `client_id` it was
-   * never issued to: the authorization server refuses it, and the user is sent to the browser for
-   * a sign-in a plain refresh would have avoided. So a record with a refresh token keeps its
-   * client for one pass; when that refresh is refused the SDK drops the tokens and asks again,
-   * and the pass that goes to the browser is the one that registers.
+   * A sign-in that the user asked for does not refresh (see `tokens`), so it goes to the browser,
+   * and that pass registers.
    *
    * Two attempts never reach here: a silent refresh, which has no browser to register for, and
    * the exchange of a grant already in hand, which must spend it against the `client_id` it was
@@ -1001,7 +997,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         ...(issuer ? { issuer } : {}),
       };
     }
-    const client = this.#credential(record.client);
+    const client = this.#registeredClient ?? this.#credential(record.client);
     this.recordSecret(record.client?.client_secret);
     if (!client) {
       // The token endpoint refused the client, and the SDK dropped it before it tried again. The
@@ -1024,9 +1020,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       !discovery?.resourceMetadata?.scopes_supported?.length ||
       !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
     if (client.redirect_uris.includes(this.redirectUrl) && scopeAllowed) return client;
-    const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
-    this.#redirectAddressChecked = true;
-    return refreshWorthTrying ? client : this.#register();
+    return this.#register();
   }
 
   get openedRedirectUrl(): string | null {
@@ -1132,13 +1126,18 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // For a client metadata document the SDK passes only its URL and the issuer. The store
         // refuses a client with no `redirect_uris`, so the address of this run is added, as a
         // registration has it. A later run on another port then uses the document again.
-        if (information.client_id === MCP_CLIENT_METADATA_URL) {
-          yield* this.#save({
-            client: { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" },
-          });
+        const client: OAuthClientInformationFull =
+          information.client_id === MCP_CLIENT_METADATA_URL
+            ? { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" }
+            : information;
+        // The tokens on file belong to the client on file: the silent refresh and the revocation at
+        // sign-out send them with it. A sign-in that registers again keeps its client here until its
+        // grant is exchanged, so a cancel or a timeout keeps the stored sign-in usable (#6975).
+        if (this.#options.state && !this.#exchangingCode && this.#record().tokens) {
+          this.#registeredClient = client;
           return;
         }
-        yield* this.#save({ client: information });
+        yield* this.#save({ client });
       }),
     );
   }
@@ -1146,14 +1145,24 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   tokens(): OAuthTokens | undefined {
     const tokens = this.#credential(this.#record().tokens);
     this.#recordTokens(tokens);
-    return tokens;
+    // A sign-in that the user asked for (it has a `state`) gets a new grant from the browser. The
+    // SDK refreshes when it sees a refresh token, and a server that refuses the sign-in on file
+    // also refuses the refreshed token: the press then opened no page (#6975). The stored access
+    // token is still sent, so a sign-in that the server accepts connects at once. The record on
+    // disk is not changed: a cancel or a timeout keeps it. Once the grant is in hand, the tokens
+    // it earns are given as they are.
+    if (!tokens?.refresh_token || !this.#options.state || this.#exchangingCode) return tokens;
+    const { refresh_token: _refreshToken, ...withoutRefresh } = tokens;
+    return withoutRefresh;
   }
 
   saveTokens(tokens: OAuthTokens): Promise<void> {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
-        yield* this.#save({ tokens, obtainedAt: Date.now(), lostAt: undefined });
+        const client = this.#registeredClient;
+        yield* this.#save({ ...(client ? { client } : {}), tokens, obtainedAt: Date.now(), lostAt: undefined });
+        this.#registeredClient = undefined;
       }),
     );
   }
@@ -1365,6 +1374,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // A sign-in app stays through every refusal: the administrator typed it, and only they
         // can change it.
         const record = yield* mcpSync(() => this.#record());
+        if (scope !== "tokens") this.#registeredClient = undefined;
         if (scope === "all") {
           this.#codeVerifier = null;
           if (record.app) yield* this.#options.storage.write(this.#options.key, { app: record.app });

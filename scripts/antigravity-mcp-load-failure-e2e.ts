@@ -123,6 +123,8 @@ try {
   report.turns.foreign = foreign;
   assert.equal(foreign.status, "failed", "The turn fails.");
   assert.match(foreign.error ?? "", /cloudflare/u, "The error names the server.");
+  // The server's own reason is runtime output, such as a traceback with a path (#7046).
+  assert.doesNotMatch(foreign.error ?? "", /Unauthorized|Fix the MCP server/u, "The error has no raw server output.");
 
   const requests = await readJsonl<LogEntry>(log);
   report.requests = requests;

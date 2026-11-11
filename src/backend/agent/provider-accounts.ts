@@ -516,7 +516,10 @@ export class ProviderAccounts {
     return limits;
   }).bind(this);
 
-  /** The reading of one account for the usage limit check: its agent's process, or the kept one. */
+  /**
+   * The reading of one account for the usage limit check: its agent's process, or the kept one. While
+   * the account's gate waits after a failed read, the process is not asked, and there is no reading.
+   */
   readonly usageFor = Effect.fn("ProviderAccounts.usageFor")(function* (
     this: ProviderAccounts,
     provider: AgentProviderId,
@@ -524,7 +527,11 @@ export class ProviderAccounts {
     model: string,
   ) {
     const client = this.#host.agentClient(provider, accountId);
-    if (client) return yield* this.#host.readUsage(client, model);
+    if (client)
+      return yield* this.#usageGate(accountId).unlessWaiting({
+        read: this.#host.readUsage(client, model),
+        waiting: (): AccountUsage => ({ limits: [] }),
+      });
     // The kept reading has no model: take the windows of the model's quota group from it.
     const kept = this.#usage.get(accountId)?.limit;
     const quota = kept && usageQuotaForModel(kept, model);

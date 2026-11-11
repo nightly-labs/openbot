@@ -118,7 +118,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
-import { HistoryTools, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
+import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
@@ -601,15 +601,26 @@ export class OpenBotToolRouter {
             // The agent's other conversations open only from its own chat and its side threads. A
             // messaging chat is neither: other people can write there, and must not read the owner's chats.
             const mainThreadId = this.#store.list().find((agent) => agent.id === scope.agentId)?.threadId ?? null;
-            const scopeTask = this.#tasks.taskForThread(scope.threadId);
-            const ownConversation =
-              scope.threadId === mainThreadId || (scopeTask !== null && this.#tasks.has(scope.agentId, scopeTask));
+            const ownsThread = (threadId: string) => {
+              const task = this.#tasks.taskForThread(threadId);
+              return threadId === mainThreadId || (task !== null && this.#tasks.has(scope.agentId, task));
+            };
+            const ownConversation = ownsThread(scope.threadId);
             // A taskId reads a side thread of the same agent, or "main" its own chat. A thread of another
             // agent reads as unknown.
             const taskId = isRecord(params.arguments) ? params.arguments.taskId : undefined;
+            // A cursor holds its conversation. A next page without the taskId of the first page reads
+            // that conversation when it is one that a taskId can read (#6995).
+            const cursorThreadId =
+              taskId === undefined && ownConversation && isRecord(params.arguments)
+                ? historyCursorThread(
+                    params.tool === "history_read" ? params.arguments.before : params.arguments.cursor,
+                  )
+                : null;
+            const cursorTarget = cursorThreadId !== null && ownsThread(cursorThreadId) ? cursorThreadId : null;
             const targetThreadId =
               taskId === undefined
-                ? scope.threadId
+                ? (cursorTarget ?? scope.threadId)
                 : !ownConversation
                   ? null
                   : taskId === MAIN_CHAT_TASK_ID

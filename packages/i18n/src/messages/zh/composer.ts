@@ -74,6 +74,7 @@ export const messages = {
   "composer.placeholder.messageAgent": "给助手发消息",
   "composer.add.label": "添加到提示词",
   "composer.add.files": "附加文件",
+  "composer.add.teach": "教一项任务",
   "composer.add.skill": "使用技能",
   "composer.upload.cancel": "取消上传",
   "composer.upload.uploading": "正在上传 {name}",

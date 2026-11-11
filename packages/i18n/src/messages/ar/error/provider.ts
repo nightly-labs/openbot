@@ -12,6 +12,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
     "لم يحمّل {provider} أدوات OpenBot، لذا لا يمكن لهذا الوكيل استخدامها أو الوصول إلى زملائه. قد تحظر سياسة فريق {provider} خوادم MCP المحلية. اطلب من مسؤول فريقك السماح بها، ثم أعد المحاولة.",
+  "error.provider.acpOwnMcpServerFailed":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لذا توقّف الرد. هذا الخادم موجود في إعدادات {provider} الخاصة بك، وليس في OpenBot. أزِل الخادم من هناك أو أصلحه، ثم ابدأ محادثة جديدة.",
   "error.provider.endpointsReadOnly":
     "كُتبت نقاط النهاية المحفوظة بإصدار أحدث من OpenBot، أو تتعذّر قراءة الملف. حدّث OpenBot لتغييرها.",
   "error.provider.endpointNoSecureStorage":
@@ -179,6 +181,8 @@ export const messages = {
     "لا يملك OpenCode تسجيل دخول لمزوّد النموذج «{provider}». اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
   "error.provider.opencodeAuthRequiredUnknown":
     "لا يملك OpenCode تسجيل دخول لمزوّد هذا النموذج. اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
+  "error.provider.opencodeFreeModelRefused":
+    "رفض OpenCode هذا النموذج المجاني. بعض النماذج المجانية غير متاحة في كل البلدان. اختر نموذجًا آخر يحمل التسمية Free، أو الصق مفتاح OpenCode Go في إعدادات OpenCode واختر نموذج OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "رفضت نقطة النهاية «{provider}» مفتاح API أو الترويسات. أدخلها مرة أخرى في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
   "error.provider.customEndpointKeyMissing":

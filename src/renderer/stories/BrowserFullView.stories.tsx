@@ -241,6 +241,14 @@ export const PopupBlocked: Story = {
 };
 
 /** No tab is open. */
+const teach = { agentName: chief.name, pending: false, onStart: fn(), onSave: fn(), onClose: fn() };
+
+/** The user shows a task: the bar starts the recording, and the dock is hidden. */
+export const TeachTask: Story = { args: { teach: { ...teach, startedAt: null } } };
+
+/** The recording runs: the button with the time saves it, and the page has a frame. */
+export const TeachTaskRecording: Story = { args: { teach: { ...teach, startedAt: Date.now() - 6000 } } };
+
 export const Empty: Story = { args: { tabs: [], activeTab: undefined, canReopen: false } };
 
 /** A host that sends one 4:3 frame, drawn in the theme's colors. */

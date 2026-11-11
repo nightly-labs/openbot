@@ -138,6 +138,8 @@ export function ConversationComposer() {
     providerOffline,
     agentProviderName,
     sideThreadOpen,
+    canTeachBrowserTask,
+    openBrowserTeach,
   } = useConversationViewScope();
   const { t, format, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
@@ -149,6 +151,8 @@ export function ConversationComposer() {
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
   const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
+  /** As for a skill: the task is for one agent. Hidden while the host cannot record the steps. */
+  const teachTask = () => (channel || !canTeachBrowserTask() ? undefined : () => void openBrowserTeach());
   /**
    * The draft goes to the side question, so that the chat gets nothing of it. A draft with attachments
    * stays: the side question cannot send files.
@@ -792,6 +796,7 @@ export function ConversationComposer() {
               attachDisabled={attachmentBusy()}
               onAttach={openAttachmentPicker}
               onPickSkill={pickSkill()}
+              onTeach={teachTask()}
               onSideQuestion={askSideQuestion()}
               onVoice={openVoiceConversation()}
             />
