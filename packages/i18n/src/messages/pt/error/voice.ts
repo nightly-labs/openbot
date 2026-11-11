@@ -33,5 +33,7 @@ export const messages = {
   "error.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
   "error.voice.live.unavailable":
     "A OpenAI não conseguiu iniciar a voz ao vivo. O problema é da OpenAI. Tente novamente mais tarde.",
+  "error.voice.live.refused":
+    "A OpenAI recusou iniciar a voz ao vivo. Para falar por voz, desative a voz ao vivo do Codex em Definições → Voz.",
   "error.voice.live.off": "A voz ao vivo do Codex está desativada. Ative-a em Definições → Voz.",
 } as const satisfies PartialTranslation<typeof source>;

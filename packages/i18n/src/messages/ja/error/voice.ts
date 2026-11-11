@@ -34,5 +34,7 @@ export const messages = {
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
   "error.voice.live.unavailable":
     "OpenAI がライブ音声を開始できませんでした。OpenAI 側の問題です。しばらくしてからもう一度お試しください。",
+  "error.voice.live.refused":
+    "OpenAI がライブ音声の開始を拒否しました。音声で話すには、設定 → 音声 で Codex ライブ音声をオフにしてください。",
   "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
 } as const satisfies PartialTranslation<typeof source>;
