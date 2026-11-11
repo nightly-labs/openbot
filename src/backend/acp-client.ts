@@ -3451,16 +3451,36 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const sessionId = getString(params, "sessionId") ?? [...this.#threads.ids()][0];
     if (sessionId && this.#historyReplays.has(sessionId)) return {};
     const thread = sessionId ? this.#threads.get(sessionId) : undefined;
+    // The agent's own question method has questions without ids, and needs its own reply shape.
+    const own = this.#flavor.userQuestions;
+    const asked =
+      own?.method === method.replace(/^_/u, "")
+        ? getArray(params, "questions")
+            .filter(isRecord)
+            .map((question, index) => ({
+              ...question,
+              id: `question-${index}`,
+              question: getString(question, "question") ?? "",
+            }))
+        : null;
     const result = yield* this.#waitForUser(
       thread?.activeTurn,
       this.#serverRequests.call("item/tool/requestUserInput", {
         ...params,
+        ...(asked ? { questions: asked } : {}),
         threadId: sessionId,
         turnId: thread?.activeTurn?.id ?? randomUUID(),
         sourceMethod: method,
       }),
     ).pipe(toProviderClientOperationError);
-    return yield* providerSync(() => (isRecord(result) ? result : {}));
+    return yield* providerSync(() => {
+      if (!(own && asked)) return isRecord(result) ? result : {};
+      const answers = getRecord(result, "answers") ?? {};
+      return own.reply(
+        asked,
+        Object.fromEntries(asked.map(({ id }) => [id, getArray(answers[id], "answers").filter(isString)])),
+      );
+    });
   });
 
   readonly #createElicitation = Effect.fn("AcpAgentClient.createElicitation")(function* (

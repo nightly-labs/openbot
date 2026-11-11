@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Resposta necessária",
   "prompt.question.label": "Perguntas do agente",
   "prompt.question.cancelled": "Perguntas canceladas",
   "prompt.question.expired": "Perguntas expiradas",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Próximo",
   "prompt.question.cancel": "Cancelar perguntas",
   "prompt.question.privatePlaceholder": "Digite uma resposta privada",
-  "prompt.customPlaceholder": "Digite sua própria resposta",
   "prompt.question.customAnswerFor": "Resposta personalizada para: {question}",
   "prompt.question.skip": "Pular",
   "prompt.question.chooseAll": "Escolha todas as opções que se aplicam.",
   "prompt.question.somethingElse": "Outra coisa",
   "prompt.question.emptyTitle": "Nenhuma pergunta aguardando.",
   "prompt.question.emptyBody": "O agente continuará quando precisar de outra decisão.",
-  "prompt.choice.hint": "Escolha o que se aplica ou digite sua própria resposta.",
-  "prompt.choice.customLabel": "Resposta personalizada",
   "prompt.approval.answerFailed": "Não foi possível responder a esta aprovação. Tente novamente.",
   "prompt.approval.grantFailed": "Não foi possível salvar a aprovação permanente. Tente novamente.",
   "prompt.approval.label": "Aprovação do agente",
