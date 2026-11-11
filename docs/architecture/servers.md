@@ -1546,7 +1546,18 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
   from the host, so no host request starts before the connection.
 - Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
   host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
-  agent avatars load only when the host is online. The web connect starts before the frame renders.
+  an agent avatar with no saved copy loads only when the host is online. The web connect starts
+  before the frame renders.
+- The frame names each picture by a host URL, which only the host can answer. Each client thus keeps
+  a copy of the pictures that it loaded, and shows the agent pictures while the host is offline. The
+  frame keeps no channel picture URL, so a channel copy only saves a download while the host is online. Desktop keeps agent
+  and channel pictures on disk in the main process (`src/main/remote-picture-cache.ts`, folder
+  `remote-pictures` in `userData`, one account, 400 pictures for each server). Web keeps agent
+  pictures in the browser's Cache storage
+  (`src/renderer/src/features/web-client/web-agent-pictures.ts`). A picture URL names a version, so
+  a new picture is a miss and replaces the copy. Sign-out, a change of account, server removal and
+  the end of access (`authentication_required`, a revoked session) delete the copies; a download
+  that started before the delete stores nothing.
 - A frame agent's row shows no preview: the last message is not known, so it does not say that
   there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
   and a channel row with no last message shows no preview and no time.
