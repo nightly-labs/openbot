@@ -2675,7 +2675,8 @@ export class MailboxStore {
    * A steer that came after the running turn's last request, which the provider answers in a turn of
    * its own named by the delivery. The message moves to that turn, so the chat shows it above its own
    * answer and not above the answer of the turn it was sent to (#6673). Its state stays: a delivery
-   * that the earlier turn already ended is not started again.
+   * that the earlier turn already ended is not started again, and the new turn ends one that the
+   * earlier turn has not ended yet, because the new turn answers it.
    */
   moveSteerToTurn = Effect.fn("MailboxStore.moveSteerToTurn")(function* (
     this: MailboxStore,
