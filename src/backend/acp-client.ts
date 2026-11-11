@@ -2617,7 +2617,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* stale.stop(Effect.void).pipe(Effect.ignore);
     }
     const restore = { ...thread.restore, mcpServers: thread.restore.mcpServers.filter((entry) => entry !== server) };
-    yield* this.#resumeWithTurnSettings(thread, restore, params);
+    yield* this.#resumeWithTurnSettings(thread, restore, params).pipe(
+      // The new process holds the session only after the resume. The next prompt opens it again.
+      Effect.onError(() =>
+        Effect.sync(() => {
+          if (started && stale) thread.needsResume = true;
+        }),
+      ),
+    );
     turn.text = "";
     turn.sdkFailureAt = null;
     turn.receivedOutput = false;
@@ -2632,7 +2639,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * The server that OpenBot gave whose failure ended the turn, and the reason for the user. A server
    * that did not start is named in the failure text. A tool schema that the agent refused is named
    * only in the agent's log, as the tool `mcp_<server>_<tool>` (#7228). A server name can hold `_`,
-   * so the longest given name wins. `started`: the server started, as a server with tools did.
+   * so the longest name wins, also against the agent's own servers: a tool of the user's
+   * `github_enterprise` does not leave out OpenBot's `github`. `started`: the server started, as a
+   * server with tools did.
    */
   #failedMcpServer(
     thread: AcpThread,
@@ -2646,13 +2655,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = sourceText("error.backend.mcpServerFailedToStart", { reason: failure.reason });
       return server && { server, detail, started: false };
     }
-    for (const tool of harness?.refusedMcpTools?.(text, this.options.argv, thread.id) ?? []) {
-      const server = given
-        .filter((entry) => tool.startsWith(`mcp_${entry.name}_`))
-        .sort((a, b) => b.name.length - a.name.length)[0];
+    if (given.length === 0 || !harness?.refusedMcpTools) return undefined;
+    const names = [...given.map((entry) => entry.name), ...this.#ownMcpServerNames(thread.cwd)];
+    for (const tool of harness.refusedMcpTools(text, this.options.argv, thread.id)) {
+      const name = names
+        .filter((candidate) => tool.startsWith(`mcp_${candidate}_`))
+        .sort((a, b) => b.length - a.length)[0];
+      const server = given.find((entry) => entry.name === name);
       if (server) {
-        const name = tool.slice(`mcp_${server.name}_`.length);
-        return { server, detail: sourceText("error.backend.mcpToolSchemaRefused", { tool: name }), started: true };
+        const shown = tool.slice(`mcp_${server.name}_`.length);
+        return { server, detail: sourceText("error.backend.mcpToolSchemaRefused", { tool: shown }), started: true };
       }
     }
     return undefined;

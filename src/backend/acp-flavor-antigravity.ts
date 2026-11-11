@@ -198,8 +198,9 @@ function logTail(file: string, size: number): string {
 
 /**
  * The tools that the CLI refused after the last prompt of the session. Each session has a process,
- * and so a log, of its own; a resumed session can have a second one. A log that cannot be read
- * gives no tools: the turn then fails as before.
+ * and so a log, of its own. A session that opened again on a new process has an older log too, so
+ * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
+ * the turn then fails as before.
  */
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
   if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
@@ -209,24 +210,34 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
   const folder = join(home, appData, "log");
   const since = Date.now() - GEMINI_LOG_RECENT_MS;
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
-  let names: string[];
+  let logs: { file: string; size: number; mtimeMs: number }[];
   try {
-    names = readdirSync(folder).filter((name) => name.endsWith(".log"));
+    logs = readdirSync(folder)
+      .filter((name) => name.endsWith(".log"))
+      .flatMap((name) => {
+        const file = join(folder, name);
+        try {
+          const stat = statSync(file);
+          return stat.isFile() && stat.mtimeMs >= since ? [{ file, size: stat.size, mtimeMs: stat.mtimeMs }] : [];
+        } catch {
+          return [];
+        }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
   } catch {
     return [];
   }
-  return names.flatMap((name) => {
+  for (const { file, size } of logs) {
+    let log: string;
     try {
-      const file = join(folder, name);
-      const stat = statSync(file);
-      if (!stat.isFile() || stat.mtimeMs < since) return [];
-      const log = logTail(file, stat.size);
-      const at = log.lastIndexOf(prompt);
-      return at < 0 ? [] : Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+      log = logTail(file, size);
     } catch {
-      return [];
+      continue;
     }
-  });
+    const at = log.lastIndexOf(prompt);
+    if (at >= 0) return Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  }
+  return [];
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
