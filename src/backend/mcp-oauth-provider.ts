@@ -862,14 +862,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * is too late: `invalidateCredentials` has often already dropped the value the attempt spent.
    */
   readonly #secrets = new Set<string>();
-  /** Whether the stored registration has already had its one pass with a stale redirect address. */
-  #redirectAddressChecked = false;
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
   #activeIssuer: string | undefined;
-  /** Set once this attempt saved a token set. See `tokens`. */
-  #tokensSaved = false;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
   #discoveryState: OAuthDiscoveryState | undefined;
   /**
@@ -974,12 +970,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * do nothing about it. Answering `undefined` makes the SDK register again, which costs one
    * request and is the whole repair.
    *
-   * It is answered that way as late as it can be, because a refresh uses no redirect address at
-   * all. Registering in front of one would spend a refresh token against a `client_id` it was
-   * never issued to: the authorization server refuses it, and the user is sent to the browser for
-   * a sign-in a plain refresh would have avoided. So a record with a refresh token keeps its
-   * client for one pass; when that refresh is refused the SDK drops the tokens and asks again,
-   * and the pass that goes to the browser is the one that registers.
+   * A sign-in that the user asked for does not refresh (see `tokens`), so it goes to the browser,
+   * and that pass registers.
    *
    * Two attempts never reach here: a silent refresh, which has no browser to register for, and
    * the exchange of a grant already in hand, which must spend it against the `client_id` it was
@@ -1026,9 +1018,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       !discovery?.resourceMetadata?.scopes_supported?.length ||
       !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
     if (client.redirect_uris.includes(this.redirectUrl) && scopeAllowed) return client;
-    const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
-    this.#redirectAddressChecked = true;
-    return refreshWorthTrying ? client : this.#register();
+    return this.#register();
   }
 
   get openedRedirectUrl(): string | null {
@@ -1152,8 +1142,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     // SDK refreshes when it sees a refresh token, and a server that refuses the sign-in on file
     // also refuses the refreshed token: the press then opened no page (#6975). The stored access
     // token is still sent, so a sign-in that the server accepts connects at once. The record on
-    // disk is not changed: a cancel or a timeout keeps it.
-    if (!tokens?.refresh_token || this.#options.state === null || this.#tokensSaved) return tokens;
+    // disk is not changed: a cancel or a timeout keeps it. Once the grant is in hand, the tokens
+    // it earns are given as they are.
+    if (!tokens?.refresh_token || !this.#options.state || this.#exchangingCode) return tokens;
     const { refresh_token: _refreshToken, ...withoutRefresh } = tokens;
     return withoutRefresh;
   }
@@ -1163,7 +1154,6 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
         yield* this.#save({ tokens, obtainedAt: Date.now(), lostAt: undefined });
-        this.#tokensSaved = true;
       }),
     );
   }
