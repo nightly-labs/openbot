@@ -89,7 +89,13 @@ const readShape = {
   includeWorkSteps: z.boolean().optional(),
   workStepsOffset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 };
-const searchSchema = z.strictObject(searchShape);
+// A search cursor continues one query. Without a query, the agent wants the next page of a read (#6995).
+const searchSchema = z
+  .strictObject(searchShape)
+  .refine((value) => value.cursor === undefined || value.query !== undefined, {
+    path: ["cursor"],
+    message: "A cursor without query does not work here. Use history_read with before set to the cursor.",
+  });
 const readSchema = z
   .strictObject(readShape)
   .refine(
@@ -105,6 +111,20 @@ const cursorSchema = z.strictObject({
   anchorMessageId: id,
   query: z.string().nullable(),
 });
+
+/**
+ * The thread that a cursor from an earlier answer continues, or null for text that is not a cursor.
+ * The cursor is not signed: the caller checks that the thread is one of the agent's own conversations.
+ */
+export function historyCursorThread(text: unknown): string | null {
+  if (typeof text !== "string" || !cursorText.safeParse(text).success) return null;
+  try {
+    const cursor = cursorSchema.safeParse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+    return cursor.success ? cursor.data.threadId : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
