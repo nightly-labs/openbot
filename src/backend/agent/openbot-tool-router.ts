@@ -345,8 +345,11 @@ export interface OpenBotToolRouterHooks {
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
-  /** Records a no-update tool call for the turn; null when no routine run started the turn. */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
+  /**
+   * Records a no-update tool call for the turn; null when no routine run started the turn.
+   * `channelRun` is a turn that owns a main task of a channel routine's request.
+   */
+  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -1815,7 +1818,22 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === ROUTINE_NO_UPDATE_TOOL) {
-      const outcome = this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId);
+      // As for the failure tool below: the owner of a channel routine's request ends the run quiet, and
+      // a member reports to that owner (#7166).
+      const channelRun = channelId
+        ? yield* this.#channels
+            .routineRunPart(channelId, senderAgentId, params.turnId)
+            .pipe(Effect.catch(() => Effect.succeed(null)))
+        : null;
+      if (channelRun?.part === "member")
+        return openBotToolFailure(
+          "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
+        );
+      // A person who started a Test run waits for its answer, as in an agent's own routine.
+      const outcome =
+        channelRun?.part === "owner" && !channelRun.quiet
+          ? "shown"
+          : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
           "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
@@ -1837,11 +1855,11 @@ export class OpenBotToolRouter {
             .routineRunPart(channelId, senderAgentId, params.turnId)
             .pipe(Effect.catch(() => Effect.succeed(null)))
         : null;
-      if (channelRun === "member")
+      if (channelRun?.part === "member")
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run as failed. Say in your result that the task could not be done, and why.",
         );
-      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun === "owner"))
+      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
     }
