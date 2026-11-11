@@ -345,7 +345,7 @@ export function ChatConfirmPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
+        className="w-full max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="min-w-0 flex-1 pt-1">
