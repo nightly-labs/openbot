@@ -117,14 +117,22 @@ because a frame in another process can keep its active element after the page ta
 `bun run test:browser --scenario=typing-focus` covers it and writes
 `.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
-tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
+tokens. They keep the installed Chromium major version and host platform, and give the other version
+parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
+Electron sends. The `Accept-Language` header adds the base language of each regional language
+(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
 loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
 be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
 chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
-It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
+It preserves hints supplied by Chromium. As Chrome does, it adds a high-entropy hint (full version,
+platform version, architecture, bitness, model, form factor) only after the response of a page load
+of that origin asks for it with `Accept-CH`, and only on requests from a page of that origin. Each
+value is the one that `getHighEntropyValues()` gives the page. The record is in memory, so the first
+load after a restart is as a first visit. Windows sends no platform version: the page reads a
+contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation

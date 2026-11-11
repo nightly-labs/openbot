@@ -114,7 +114,10 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   const cloudflare = frame(/challenges\.cloudflare\.com/) || has("script[src*='/cdn-cgi/challenge-platform/']");
   if ((cloudflare || short) && has("#challenge-form, #challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #cf-please-wait"))
     return found("cloudflare", "non-interactive", "cloudflare-challenge-markup");
-  if ((/^(just a moment|attention required)/i.test(title) && short) || (/^one more step/i.test(title) && cloudflare))
+  // The interstitial of a site can load a consent banner, which makes the page long. Its own script
+  // still identifies it.
+  const challengePage = has("script[src*='/cdn-cgi/challenge-platform/'][src*='/orchestrate/chl_page/']");
+  if ((/^(just a moment|attention required)/i.test(title) && (short || challengePage)) || (/^one more step/i.test(title) && cloudflare))
     return found("cloudflare", "non-interactive", "cloudflare-title");
   if (frame(/captcha-delivery\.com/)) return found("datadome", "interactive", "datadome-frame");
   if (has("#px-captcha")) return found("perimeterx", "interactive", "px-captcha");

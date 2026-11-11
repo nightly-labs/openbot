@@ -63,6 +63,7 @@ import {
   type BrowserScreencastFrame,
   type BrowserUploadAssignment,
   type BrowserViewportInput,
+  SNAPSHOT_NAVIGATED_MESSAGE,
   type SnapshotReadResult,
 } from "./browser-cdp";
 import { refuseCookieBanners, stopCookieBanners } from "./browser-consent";
@@ -79,7 +80,7 @@ import {
   restoreWebContentsFocus,
   toPublicTab,
 } from "./browser-host-tab";
-import { sessionBrowserUserAgent } from "./browser-identity";
+import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
 import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
 import {
   browserLoadOptions,
@@ -244,6 +245,10 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
  * in the tab queue for the action, under the action's own deadline.
  */
 const DIALOG_ACTION_WAIT_MS = 10_000;
+/** How long `open` waits for the load of a redirect before its second read. */
+const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A site can redirect more than one time before its page stays. */
+const OPEN_REDIRECT_READS = 2;
 /**
  * How long an agent tool waits for the earlier operations of its tab. One operation takes at most about
  * a minute: a 30 s action, its read, and the bot check waits. A longer wait means that an operation
@@ -2256,7 +2261,22 @@ export class BrowserHost {
         const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
         this.#controls.updateTab(params, tab.id);
         // The agent reads a page that it opens, so the first snapshot comes with the tab and saves a call.
-        const read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        // A page that redirects at once navigates during the first read. The next read waits for
+        // the page that the redirect loads, and saves the agent a call.
+        for (
+          let again = 0;
+          again < OPEN_REDIRECT_READS &&
+          Result.isFailure(read) &&
+          read.failure.cause instanceof Error &&
+          read.failure.cause.message === SNAPSHOT_NAVIGATED_MESSAGE;
+          again += 1
+        ) {
+          const contents = this.#tabs.get(tab.id)?.contents;
+          if (contents?.isLoadingMainFrame())
+            yield* waitForLoading(contents, OPEN_REDIRECT_WAIT_MS).pipe(Effect.ignore);
+          read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        }
         if (Result.isSuccess(read)) return snapshotTextResult(read.success);
         const error = read.failure.cause;
         return textResult({
@@ -3363,10 +3383,26 @@ export class BrowserHost {
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     target.setUserAgent(sessionBrowserUserAgent(target.getUserAgent()), preferredBrowserLanguageCodes());
+    const hintRequests = new BrowserHintRequests();
     target.webRequest.onBeforeSendHeaders((details, callback) => {
+      const contents = details.webContents;
+      const pageUrl =
+        details.resourceType === "mainFrame"
+          ? details.url
+          : contents && !contents.isDestroyed()
+            ? contents.getURL()
+            : "";
       callback({
-        requestHeaders: browserRequestHeaders(details.url, details.requestHeaders),
+        requestHeaders: browserRequestHeaders(
+          details.url,
+          details.requestHeaders,
+          hintRequests.requested(details.url, pageUrl),
+        ),
       });
+    });
+    target.webRequest.onHeadersReceived((details, callback) => {
+      if (details.resourceType === "mainFrame") hintRequests.note(details.url, details.responseHeaders);
+      callback({});
     });
     target.webRequest.onCompleted((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
