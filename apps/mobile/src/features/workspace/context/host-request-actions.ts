@@ -131,6 +131,7 @@ import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sig
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -202,7 +203,7 @@ import {
   listMcpServers,
   listMcpSignIns,
   listPasswordManagers,
-  listProviderAccounts,
+  listProviderAccountsWithModels,
   listRoutineResultOptions,
   listSharedTables,
   messagingConnectorAddOrchestrator,
@@ -1262,7 +1263,11 @@ export function createHostRequestActions({
       );
     },
     loadProviderAccounts: async (serverId) =>
-      has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,
+      has(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
+        ? runTeamRequest(
+            listProviderAccountsWithModels(teamApi(serverId), has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)),
+          )
+        : null,
     loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),
     setAgentProviderAccount: async (input, serverId) => {
       requireCapability(

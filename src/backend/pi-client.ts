@@ -488,6 +488,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             const id = getString(model, "id");
             // A key provider's client lists only its own models. Pi also lists the models of other signed-in providers.
             if (!provider || !id || (keyProvider && provider !== keyProvider.id)) continue;
+            // OpenRouter's `:batch` models work only through its batch API: a chat turn fails with 404.
+            if (provider === "openrouter" && id.endsWith(":batch")) continue;
             const reasoning = isRecord(model) && model.reasoning === true;
             let levels: string[] = [];
             if (reasoning) {

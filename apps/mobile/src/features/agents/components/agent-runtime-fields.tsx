@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
-import { useAgentModelPicker } from "@/features/agents/model/agent-model-picker";
+import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   PLAN_LIMIT_RESET_FORMAT,
@@ -150,7 +150,8 @@ export function AgentRuntimeFields({
     enabled: available,
     retry: false,
   });
-  const options = models.data?.filter((option) => option.provider === provider) ?? [];
+  const accountModels = accounts.find((account) => account.id === accountId)?.models ?? [];
+  const options = withAccountModels(models.data?.filter((option) => option.provider === provider) ?? [], accountModels);
   const selected = options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
@@ -244,7 +245,7 @@ export function AgentRuntimeFields({
             value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
             onPress={() => {
               if (!provider) return;
-              openModelPicker({ serverId, provider, model, choose: chooseModel });
+              openModelPicker({ serverId, provider, model, accountModels, choose: chooseModel });
               router.push(modelPickerRoute);
             }}
           >

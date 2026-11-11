@@ -3,7 +3,8 @@
 // set through `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`, answers `loadCodeAssist` and
 // `retrieveUserQuotaSummary` with the CLI's token in a temporary `GEMINI_HOME`. Checks that a Google
 // sign-in gives the Gemini weekly window and not the Claude and GPT one, that a model with a quota
-// group of its own gets that group's window (#3055), that the reading names every group for the usage
+// group of its own gets that group's window (#3055), that on a plan with no Gemini group the dock shows
+// the group with the least room left and a Gemini model still has no reading, that the reading names every group for the usage
 // popover and the composer notice, that the fake gets Antigravity's User-Agent, the bearer token and
 // the account's project, that an API key sign-in, an access token that expires within a minute, a 403
 // and a missing project give no reading and no error, and that a usage read sends nothing to the ACP
@@ -105,6 +106,24 @@ const ARGON_QUOTA = {
   ],
 };
 
+/** A plan whose answer has no Gemini group, only the Claude and GPT one, as Google sent in November 2026. */
+const NO_GEMINI_QUOTA = {
+  groups: [
+    {
+      displayName: "Claude and GPT models",
+      description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+      buckets: [
+        {
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-17T11:59:31Z",
+          remainingFraction: 0.96,
+        },
+      ],
+    },
+  ],
+};
+
 // An Antigravity CLI that prints its version, and otherwise logs its start and every ACP method.
 // Its models come from `session/new`; a prompt ends with no answer.
 const FAKE_ANTIGRAVITY = `#!/usr/bin/env node
@@ -179,6 +198,7 @@ interface Report {
   userAgent?: string;
   googleSignIn?: UsageCase & { acpMethodsDuringLaterReads: string[] };
   perModel?: UsageCase[];
+  noGeminiGroup?: UsageCase[];
   groups?: AccountUsage;
   apiKeySignIn?: UsageCase;
   expiringToken?: UsageCase;
@@ -423,6 +443,29 @@ try {
   assert.equal(usageQuotaForModel(dock, "gemini-4-argon-high")?.secondary?.usedPercent, 100, "Argon's own quota");
   assert.equal(usageQuotaForModel(dock, ""), dock, "no model keeps the reading");
   assert.equal(usageQuotaForModel(dock, "gemini-codename-x"), undefined, "an unlisted model has no quota");
+
+  // 3b. A plan with no Gemini group: the dock shows the Claude and GPT group, so the account still has a
+  // ring, and a Gemini model has no reading, since that group's room does not say that it can run.
+  service.quota = NO_GEMINI_QUOTA;
+  const claudeRoom = weekly(4, "2026-11-17T11:59:31Z");
+  const noGeminiGroup: UsageCase[] = [];
+  report.noGeminiGroup = noGeminiGroup;
+  for (const [model, expected] of [
+    [undefined, claudeRoom],
+    ["claude-opus-4-6-thinking", claudeRoom],
+    ["gemini-3.8-flash-high", null],
+  ] as const) {
+    const reading = await readUsage(cli, `no Gemini group, model ${model ?? "of the dock"}`, 1, model);
+    noGeminiGroup.push(reading);
+    assert.deepEqual(reading.readings[0]?.rateLimits ?? null, expected, `no Gemini group: ${model ?? "the dock"}`);
+  }
+  const noGeminiUsage = normalizeAccountUsage(noGeminiGroup[0]?.readings[0] ?? null);
+  assert.ok(isAccountUsage(noGeminiUsage), "the reading with one group passes the IPC decoder");
+  assert.deepEqual(
+    noGeminiUsage.limits[0]?.groups?.map((group) => group.name),
+    ["Claude and GPT models"],
+    "the popover names the one group",
+  );
 
   // 4. An API key sign-in has no plan quota, and its token is not sent.
   service.quota = GOOGLE_QUOTA;

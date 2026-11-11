@@ -1,5 +1,9 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import {
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -62,6 +66,22 @@ export async function routeProviderAccounts(
       await runCauseEffect(accounts.setAgentAccount(body.agentId, accountId));
       return json(200, {});
   }
+}
+
+/**
+ * The models that each account after the first serves and the provider's own sign-in does not.
+ * Frozen by `provider-account-models-v1`. `requireAdmin` runs on the route.
+ */
+export async function routeProviderAccountModels(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, json } = context;
+  if (method !== "POST" || url.pathname !== PROVIDER_ACCOUNT_MODELS_ROUTES.list) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_MODELS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  return json(200, accounts.models());
 }
 
 function requiredAccount(accountId: string | null): string {
