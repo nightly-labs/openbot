@@ -1913,8 +1913,17 @@ export class MailboxStore {
       if (seen.has(key)) return false;
       seen.add(key);
       return this.#state.deliveries.some((delivery) => {
-        if (delivery.recipientAgentId !== agent || delivery.turnId !== turn) return false;
-        if (activeOnly && delivery.status !== "starting" && delivery.status !== "running") return false;
+        if (delivery.recipientAgentId !== agent) return false;
+        if (activeOnly) {
+          if (delivery.turnId !== turn || (delivery.status !== "starting" && delivery.status !== "running"))
+            return false;
+          // A delivery that ran again has a new turn id. Its earlier turns can have sent the request.
+        } else if (
+          delivery.turnId !== turn &&
+          delivery.resumeAfterUsageLimit?.previousTurnIds.includes(turn) !== true &&
+          delivery.planContinuation?.turnIds.includes(turn) !== true
+        )
+          return false;
         const message = messages.get(delivery.messageId);
         if (!message) return false;
         if (message.messaging || message.messagingReturn) return true;

@@ -430,6 +430,20 @@ try {
       );
       assert.equal(secondRead.success, false, "A teammate of a teammate read a named place for an external chat.");
       assert.deepEqual(secondRead.reads, []);
+      // The first teammate continues its plan in a new turn. The second request still comes from a turn
+      // that worked for the external chat.
+      await runCauseEffect(mailbox.requeueForPlan(delivery.id, "turn-teammate-e2e"));
+      await runCauseEffect(mailbox.markStarting(delivery.id));
+      await runCauseEffect(mailbox.markRunning(delivery.id, "turn-teammate-later-e2e"));
+      const afterContinuation = await call(
+        threads,
+        "messaging_history",
+        { connection, place: CHANNEL },
+        { threadId: "thread-second-own-chat", turnId: "turn-second-e2e" },
+        SECOND_AGENT,
+      );
+      assert.equal(afterContinuation.success, false, "A plan continuation of the sender opened the named place read.");
+      assert.deepEqual(afterContinuation.reads, []);
       // A different turn of the same agent, such as a routine run, still reads.
       const routine = await call(threads, "messaging_history", { connection, place: CHANNEL, limit: 1 });
       assert.equal(routine.success, true, JSON.stringify(routine.result));
