@@ -495,7 +495,7 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
     // The sign-in hold reads the provider the agent has now. A provider change that waits for the
-    // next turn applies first, so the queue waits for the sign-in of the new provider, if any (#6862).
+    // next turn applies first, and the drain that follows reads the new provider (#6862).
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
       return true;
