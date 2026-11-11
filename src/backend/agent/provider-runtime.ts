@@ -157,6 +157,11 @@ const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
  */
 const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+/**
+ * How many of the other providers start at the same time at launch. One at a time lets one CLI that
+ * does not answer hold all the others for its full timeout.
+ */
+const LAUNCH_START_CONCURRENCY = 2;
 /** How often the host reads a signed-out provider's sign-in file. A read is one `stat`. */
 const SIGN_IN_FILE_POLL_MS = 2_000;
 
@@ -1434,10 +1439,25 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#idleCheck.unref?.();
     this.#watchSignInFiles();
-    yield* this.#connect(
-      "starting",
-      BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id),
-    );
+    // All providers together start a process each, and a version check before it, in the same second.
+    // That made a slow computer stop responding after launch. The provider that chat uses goes first
+    // and alone, so chat is ready when it answers. The others follow, a few at a time.
+    const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id);
+    const first = providers.includes(this.#preferredProvider) ? this.#preferredProvider : providers[0];
+    const others = providers.filter((provider) => provider !== first);
+    // Without another start to come, a failed first provider must show as "blocked" at once.
+    const othersFollow = others.some((provider) => !this.#off.has(provider) && !this.#startStopped(provider));
+    if (first) yield* this.#connect("starting", [first], { othersFollow, refreshRuntimeInBackground: true });
+    // Chat can be ready now, so a refresh or a turn can ask for one of the others. As in
+    // `#refreshProviders`, they join this start and do not start a second process.
+    const starting = others.filter((provider) => !this.#clients.has(provider) && !this.#providerStarts.has(provider));
+    const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
+    for (const provider of starting) this.#providerStarts.set(provider, completion);
+    const exit = yield* Effect.exit(this.#connect("starting", starting, { concurrency: LAUNCH_START_CONCURRENCY }));
+    yield* Deferred.done(completion, exit);
+    for (const provider of starting)
+      if (this.#providerStarts.get(provider) === completion) this.#providerStarts.delete(provider);
+    yield* exit;
   }).bind(this);
 
   /**
@@ -3521,6 +3541,10 @@ export class ProviderRuntime implements ProviderPort {
       notifyReady?: boolean;
       startTimeoutMs?: number;
       preferInstalled?: boolean;
+      /** How many providers start at the same time. Without it, all of them do. */
+      concurrency?: number;
+      /** A second connect of this launch follows, so no client here is not yet "blocked". */
+      othersFollow?: boolean;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3723,7 +3747,7 @@ export class ProviderRuntime implements ProviderPort {
           }),
         );
       },
-      { concurrency: "unbounded" },
+      { concurrency: options.concurrency ?? "unbounded" },
     );
     if (disposed()) return;
     for (const provider of requestedProviders) this.#released.delete(provider);
@@ -3732,6 +3756,10 @@ export class ProviderRuntime implements ProviderPort {
 
     if (this.#clients.size === 0 && this.#released.size > 0) {
       // Every other provider is released, not gone: chat stays ready and starts one on the next turn.
+      this.#setStatus({ providers: finalProviderStatuses });
+      return;
+    }
+    if (this.#clients.size === 0 && options.othersFollow) {
       this.#setStatus({ providers: finalProviderStatuses });
       return;
     }
