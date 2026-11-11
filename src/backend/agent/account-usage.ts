@@ -5,6 +5,7 @@ import {
   type AccountUsageLimit,
   type AccountUsageWindow,
   MAX_USAGE_GROUPS,
+  usageQuotaForModel,
 } from "@openbot/contracts/ipc";
 import { isNumber } from "@openbot/contracts/runtime-values";
 import type { AccountRateLimitGroupResult, AccountRateLimitResult, AccountRateLimitsReadResult } from "../protocol";
@@ -63,6 +64,15 @@ export function usageWindowResetSince(limit: AccountUsageLimit, sinceMs: number)
   return [limit, ...(limit.groups ?? [])].some((group) =>
     usageWindows(group).some((window) => window?.resetsAt != null && window.resetsAt > since && window.resetsAt <= now),
   );
+}
+
+/**
+ * A kept reading of a sign-in as the usage limit check of `model` reads it. The kept reading has no model:
+ * take the windows of the model's quota group from it.
+ */
+export function keptUsageForModel(kept: AccountUsageLimit | null | undefined, model: string): AccountUsage {
+  const quota = kept && usageQuotaForModel(kept, model);
+  return { limits: kept && quota ? [{ ...kept, primary: quota.primary, secondary: quota.secondary }] : [] };
 }
 
 function usageWindows(limit: Pick<AccountUsageLimit, "primary" | "secondary" | "tertiary">) {
