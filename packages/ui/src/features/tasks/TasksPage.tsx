@@ -40,6 +40,7 @@ import {
   type ComposerSelection,
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import {
   type VoicePhase,
@@ -460,18 +461,22 @@ function TasksComposer(props: TasksPageProps) {
   );
   return (
     <div class="composer-wrap tasks-page-composer">
-      <Show when={props.startError}>
-        {(body) => (
-          <ComposerNotice
-            tone="danger"
-            title={t("conversation.tasks.error.start")}
-            body={body()}
-            onDismiss={props.onDismissStartError}
-          />
-        )}
-      </Show>
+      <div class="composer-stack">
+        <ComposerStackCard when={props.startError}>
+          {(body) => (
+            <ComposerNotice
+              tone="danger"
+              title={t("conversation.tasks.error.start")}
+              body={body()}
+              onDismiss={props.onDismissStartError}
+            />
+          )}
+        </ComposerStackCard>
+      </div>
       <form
         class="composer"
+        // One row, as the chat input. With files, the file row is above the text and the agent is under it.
+        data-compact={hasRow() ? undefined : ""}
         data-has-attachments={hasRow() ? "" : undefined}
         onSubmit={(event) => {
           event.preventDefault();

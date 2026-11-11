@@ -48,6 +48,7 @@ import {
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import {
@@ -855,73 +856,78 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         </div>
       </section>
       <div class="composer-wrap">
-        <Show when={failed()}>
-          {(task) => (
-            <ComposerNotice
-              tone="danger"
-              title={t("conversation.threads.view.failed")}
-              body={task().error || t("conversation.threads.view.failedBody")}
-            />
-          )}
-        </Show>
-        <Show when={props.replyTo}>
-          {(message) => (
-            <ComposerReplyPreview
-              message={message()}
-              agents={props.agents}
-              skills={props.skills}
-              disabled={sending() || voicePhase() === "transcribing"}
-              onCancel={() => props.onCancelReply?.()}
-            />
-          )}
-        </Show>
-        <Show when={props.queue}>
-          {(queue) => (
-            <div class="composer-stack">
-              <div
-                class="agent-queue-slot"
-                data-open={queueOpen() ? "true" : "false"}
-                aria-hidden={queueOpen() ? undefined : "true"}
-                inert={queueOpen() ? undefined : true}
-              >
-                <div class="agent-queue-slot-inner">
-                  {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
-                  <Show when={queuePanelOwner()} keyed>
-                    {(_taskId) => (
-                      <QueuePanel
-                        deliveries={queueRows().deliveries}
-                        agents={props.agents}
-                        skills={props.skills}
-                        editingDeliveryId={queue().editingDeliveryId}
-                        canSteer={Boolean(props.task?.activeTurnId)}
-                        onSteer={queue().onSteer}
-                        onCancel={(deliveryId) => queue().onCancel(deliveryId)}
-                        onEdit={(delivery) => queue().onEdit(delivery)}
-                        onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
-                      />
-                    )}
-                  </Show>
+        {/* One card for everything above the input: see composer-stack.css. */}
+        <div class="composer-stack">
+          <ComposerStackCard when={failed()}>
+            {(task) => (
+              <ComposerNotice
+                tone="danger"
+                title={t("conversation.threads.view.failed")}
+                body={task().error || t("conversation.threads.view.failedBody")}
+              />
+            )}
+          </ComposerStackCard>
+          <Show when={props.queue}>
+            {(queue) => (
+              <>
+                <div
+                  class="agent-queue-slot"
+                  data-open={queueOpen() ? "true" : "false"}
+                  aria-hidden={queueOpen() ? undefined : "true"}
+                  inert={queueOpen() ? undefined : true}
+                >
+                  <div class="agent-queue-slot-inner">
+                    {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
+                    <Show when={queuePanelOwner()} keyed>
+                      {(_taskId) => (
+                        <QueuePanel
+                          deliveries={queueRows().deliveries}
+                          agents={props.agents}
+                          skills={props.skills}
+                          editingDeliveryId={queue().editingDeliveryId}
+                          canSteer={Boolean(props.task?.activeTurnId)}
+                          onSteer={queue().onSteer}
+                          onCancel={(deliveryId) => queue().onCancel(deliveryId)}
+                          onEdit={(delivery) => queue().onEdit(delivery)}
+                          onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
+                        />
+                      )}
+                    </Show>
+                  </div>
                 </div>
-              </div>
-              <Show when={queue().editingDeliveryId}>
-                <ComposerNotice
-                  body={t("composer.queueEdit.body")}
-                  action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      disabled={queue().editBusy}
-                      onClick={() => queue().onCancelEdit()}
-                    >
-                      {t("composer.queueEdit.cancel")}
-                    </Button>
-                  }
-                />
-              </Show>
-            </div>
-          )}
-        </Show>
+                <ComposerStackCard when={queue().editingDeliveryId}>
+                  {() => (
+                    <ComposerNotice
+                      body={t("composer.queueEdit.body")}
+                      action={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          disabled={queue().editBusy}
+                          onClick={() => queue().onCancelEdit()}
+                        >
+                          {t("composer.queueEdit.cancel")}
+                        </Button>
+                      }
+                    />
+                  )}
+                </ComposerStackCard>
+              </>
+            )}
+          </Show>
+          <ComposerStackCard when={props.replyTo}>
+            {(message) => (
+              <ComposerReplyPreview
+                message={message()}
+                agents={props.agents}
+                skills={props.skills}
+                disabled={sending() || voicePhase() === "transcribing"}
+                onCancel={() => props.onCancelReply?.()}
+              />
+            )}
+          </ComposerStackCard>
+        </div>
         <form
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
