@@ -235,19 +235,23 @@ Troubleshooting:
 
 ## Elixir Games
 
-Elixir Games is a Mac app that makes games with AI. A game build can stop and wait for an answer.
-Elixir Games installs a program at `~/.elixir-games/bin/elixir-games-mcp`. The program is a stdio
-relay to the local server of the Elixir Games app, a Streamable HTTP server on `127.0.0.1`. It adds
-the key to each message as `Authorization: Bearer <key>`. It finds the address of the server itself,
-so the connection continues to work when the server moves to another port. The listing gives the key
-to the program as `ELIXIR_GAMES_BOT_KEY`. The program accepts the key (`egb_…`) or `Bearer egb_…`.
+Elixir Games is a desktop app that makes games with AI. A game build can stop and wait for an
+answer. Elixir Games installs a program at `~/.elixir-games/bin/elixir-games-mcp`. The program
+is a stdio relay to the local server of the Elixir Games app, a Streamable HTTP server on
+`127.0.0.1`. It adds the key to each message as `Authorization: Bearer <key>`. It finds the address
+of the server itself, so the connection continues to work when the server moves to another port.
+The listing gives the key to the program as `ELIXIR_GAMES_BOT_KEY`. The program accepts the key
+(`egb_…`) or `Bearer egb_…`.
+
+The listing works on macOS only. On Windows, Elixir Games does not install the program.
 
 The server runs on the computer that runs OpenBot (the host, on a joined server), so Elixir Games
 must be open on that computer:
 
-1. Install Elixir Games from <https://elixir.games> and open it.
+1. Install Elixir Games from <https://elixir.games/download> and open it.
 2. In Elixir Games, open Settings > Bots and turn on "Let your bots answer".
-3. Select "Add a bot", type a name, and copy its key. Elixir Games shows the key one time.
+3. Type a name for the bot, select "Add a bot", and copy its key. Elixir Games shows the key one
+   time.
 4. In OpenBot, open Marketplace › Apps › Elixir Games, select Connect, and paste the key.
 
 Elixir Games can also wake an agent when a build waits, so the agent does not check again and again:
@@ -258,13 +262,14 @@ Elixir Games can also wake an agent when a build waits, so the agent does not ch
    routine.
 4. Select "Copy the instruction" and paste it as the instruction of the routine.
 
-Elixir Games then runs the routine through the [Local scripts API](../../docs/automation.md). A paused
-routine also runs this way.
+Elixir Games then runs the routine through the [Local scripts API](../../docs/automation.md). A
+paused routine also runs this way.
 
 Troubleshooting:
 
 - "Command not found: ~/.elixir-games/bin/elixir-games-mcp": install Elixir Games from
-  <https://elixir.games> and open it once.
+  <https://elixir.games/download>, open it, and turn on "Let your bots answer" in Settings > Bots.
+  On Windows, Elixir Games does not install the program, so the listing does not work there.
 - The program cannot connect to Elixir Games: Elixir Games is closed, or "Let your bots answer" is
   off. Open Elixir Games and turn it on in Settings > Bots.
 - Elixir Games does not accept the key: the bot was removed, or the key is not complete. Add a bot

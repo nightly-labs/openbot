@@ -3476,7 +3476,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Elixir Games",
     tagline: "Answers for your game builds",
     description:
-      'Elixir Games lets agents answer the questions that your game builds ask in the Elixir Games app, so the builds continue while you are away. Agents read the questions that wait, wait for the next one, and answer each with one of its options. Install Elixir Games on this computer and open it. In Settings > Bots, turn on "Let your bots answer", add a bot, and copy its key. OpenBot starts the program that Elixir Games installs and gives it the key. It needs no OpenBot account. An answer can let a build spend credits, up to the daily limit that you set in Elixir Games.',
+      'Elixir Games lets agents answer the questions that your game builds ask in the Elixir Games app, so the builds continue while you are away. It works on macOS only. Agents read the questions that wait, wait for the next one, and answer each with one of its options. Install Elixir Games on this computer and open it. In Settings > Bots, turn on "Let your bots answer", add a bot, and copy its key. OpenBot starts the program that Elixir Games installs and gives it the key. It needs no OpenBot account. An answer can let a build spend credits or paid build time, up to the daily limits that you set in Elixir Games.',
     category: "automation",
     creatorName: "Elixir Games",
     version: "1.0.0",
