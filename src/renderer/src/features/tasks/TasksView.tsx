@@ -47,6 +47,7 @@ import { insertAtSelection, insertPastedText, rowAttachments } from "../conversa
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
 /** How long a start waits before it reaches the agent. Undo cancels it in this time. */
@@ -100,8 +101,6 @@ interface TasksViewProps {
   serverId: string;
   hostName: string;
   onBack?: (() => void) | undefined;
-  agentsOpen?: boolean | undefined;
-  onToggleAgents?: (() => void) | undefined;
   source: TasksSource;
   agents: AgentProfile[];
   /** Absent where the client cannot record. */
@@ -916,12 +915,12 @@ export function TasksView(props: TasksViewProps) {
     return current && task ? { task, pending: current.pending } : null;
   };
 
+  const headerFrame = createPageHeaderFrame();
   return (
     <TasksPage
       hostName={props.hostName}
       onBack={props.onBack}
-      agentsOpen={props.agentsOpen}
-      onToggleAgents={props.onToggleAgents}
+      frame={headerFrame()}
       agents={props.agents}
       tasks={tasks()}
       // A list that did not load keeps its agent out, so a failed load does not show the empty page.

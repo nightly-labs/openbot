@@ -713,6 +713,16 @@ export function codexDeferredMcpServers(configs: readonly McpServerConfig[]): Mc
   return configs.filter((config) => config.enabled && config.id !== COMPUTER_USE_MCP_SERVER_ID);
 }
 
+/**
+ * The servers whose tools OpenCode 2.2.7 puts only in `execute`: each server that it is given. Its
+ * catalog shows a large server as a count with some of its tools, and the model finds the others
+ * with `search(...)` there. A model that searched with openbot.tool_search found none and said
+ * that the tools were not enabled (#7097).
+ */
+export function openCodeMcpServers(configs: readonly McpServerConfig[]): McpServerConfig[] {
+  return configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
+}
+
 export function codexMcpServers(
   servers: readonly UsableMcpServer[],
   own: CodexOwnTransports = {},

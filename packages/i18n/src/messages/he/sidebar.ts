@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "מקומי",
   "sidebar.resizer.compactWidth": "קומפקטי ({width}px)",
   "sidebar.topbar.expand": "הרחבת סרגל הצד",
+  "sidebar.topbar.collapse": "כיווץ סרגל הצד",
   "sidebar.topbar.openMarketplace": "פתיחת החנות",
   "sidebar.topbar.marketplace": "חנות",
   "sidebar.topbar.back": "חזרה",

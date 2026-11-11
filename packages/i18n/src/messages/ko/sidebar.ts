@@ -23,6 +23,7 @@ export const messages = {
   "sidebar.topbar.localServer": "로컬",
   "sidebar.resizer.compactWidth": "간략히({width}px)",
   "sidebar.topbar.expand": "사이드바 펼치기",
+  "sidebar.topbar.collapse": "사이드바 접기",
   "sidebar.topbar.openMarketplace": "마켓플레이스 열기",
   "sidebar.topbar.marketplace": "마켓플레이스",
   "sidebar.topbar.back": "뒤로",

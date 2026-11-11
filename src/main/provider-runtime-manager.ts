@@ -44,6 +44,7 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { PROCESSOR_FEATURE_MISSING } from "../backend/agent-client";
 import {
   type BundledProviderExecutables,
   compareReleases,
@@ -328,7 +329,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         concurrency: "unbounded",
         discard: true,
       });
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, VERSION_RETENTION_MS);
+      if (this.#target) {
+        const stale = Date.now() - VERSION_RETENTION_MS;
+        const paths = yield* this.#oldVersionPathsEffect(this.#target, stale, true);
+        // Forked, as in the update check: the removal can take gigabytes off a slow disk, and the
+        // window waits for this start. The stamps above are done, so a sibling keeps these versions.
+        yield* Effect.forkIn(this.#removeOldVersionPathsEffect(paths, stale), this.#scope);
+      }
       return this.getStatus();
     });
   }
@@ -1571,23 +1578,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #collectVersionsEffect(target: RuntimeTarget, retentionMs: number): Effect.Effect<void> {
     const stale = Date.now() - retentionMs;
     return this.#oldVersionPathsEffect(target, stale, true).pipe(
-      Effect.flatMap((paths) =>
-        Effect.forEach(
-          paths,
-          (path) =>
-            removeStaleRuntimeDirectory(path, stale).pipe(
-              Effect.andThen(pathExists(path)),
-              Effect.flatMap((kept) =>
-                kept
-                  ? Effect.void
-                  : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
-              ),
-            ),
-          { concurrency: "unbounded", discard: true },
-        ),
-      ),
-      Effect.catch(() => Effect.void),
+      Effect.flatMap((paths) => this.#removeOldVersionPathsEffect(paths, stale)),
     );
+  }
+
+  /** Removes each of `paths` that is still not stamped after `stale`, with its verification record. */
+
+  #removeOldVersionPathsEffect(paths: readonly string[], stale: number): Effect.Effect<void> {
+    return Effect.forEach(
+      paths,
+      (path) =>
+        removeStaleRuntimeDirectory(path, stale).pipe(
+          Effect.andThen(pathExists(path)),
+          Effect.flatMap((kept) =>
+            kept ? Effect.void : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    ).pipe(Effect.catch(() => Effect.void));
   }
 
   /**
@@ -1777,12 +1785,38 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })))
-        .stdout;
+    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
+        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
+      )).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
 });
+
+/**
+ * A CLI built for a processor feature that this computer does not have names the feature and stops
+ * with SIGILL before it answers, such as Antigravity on a processor without AES or PCLMUL (#7111).
+ * Another try of the same copy stops in the same way, so the row names the cause instead of "Try
+ * again". Only provider runtimes get this text, because it names a provider. The log keeps the
+ * original failure.
+ */
+function unsupportedProcessorFailure(
+  runtime: ManagedRuntimeId,
+  failure: ProviderRuntimeFailure,
+): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    !("signal" in cause) ||
+    cause.signal !== "SIGILL" ||
+    !("stderr" in cause) ||
+    typeof cause.stderr !== "string" ||
+    !PROCESSOR_FEATURE_MISSING.test(cause.stderr)
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */
 const VERIFICATION_RECORD_LAYOUT = 1;

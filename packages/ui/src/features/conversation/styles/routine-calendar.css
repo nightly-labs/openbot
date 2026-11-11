@@ -12,37 +12,6 @@
   gap: var(--openbot-space-3);
 }
 
-.routine-planner-title {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-3);
-}
-
-.routine-planner-identity {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--openbot-space-2);
-}
-
-/* The arrow lines up with the content edge, not its hit area. */
-.routine-planner-identity .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-
-.routine-planner-title h2 {
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.routine-planner-title h2 span {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
-}
-
 .routine-planner-title p,
 .routine-planner-note {
   color: var(--openbot-text-muted);
@@ -740,8 +709,7 @@
   clip-path: inset(-0.4em -0.2em -0.4em 100%);
 }
 
-/* Back and the previous and next steps point the other way in RTL. */
-:dir(rtl) .routine-planner-identity svg[class~="lucide-arrow-left"],
+/* The previous and next steps point the other way in RTL. */
 :dir(rtl) .routine-planner-nav :is(svg[class~="lucide-chevron-left"], svg[class~="lucide-chevron-right"]) {
   transform: scaleX(-1);
 }

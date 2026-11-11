@@ -152,6 +152,7 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
@@ -695,6 +696,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return () => phoneQuery?.removeEventListener("change", update);
   });
   const compact = () => !phone() && layout.leftPanelCompact();
+  const closeSidebar = () => layout.setSidebarClosed(true);
+  /** A phone shows the agent list as a page, not as a column, so it has no button that closes the list. */
+  const collapseSidebar = () => (phone() ? undefined : closeSidebar);
   /** The Marketplace page. As on desktop, opening another page closes it. */
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
@@ -1166,23 +1170,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   /** Whether a page other than the agents covers the conversation. A message there is not seen. */
   const pageCovered = () => page() !== "agents";
   /**
-   * As on desktop: the Tasks page shows in the middle pane, and wins over the other panes. The agent list
-   * is hidden each time the page opens, until the user shows it. A row of the list closes the page, as
-   * each row calls `showAgents`.
+   * As on desktop: the Tasks page shows in the middle pane, and wins over the other panes. A row of
+   * the agent list closes the page, as each row calls `showAgents`.
    */
   const tasksOpen = () => page() === "tasks";
-  const [tasksAgentsOpen, setTasksAgentsOpen] = createSignal(false);
-  createEffect(page, (next) => {
-    if (next !== "tasks") setTasksAgentsOpen(false);
-  });
-  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
-  const tasksAgentsHidden = () =>
-    tasksOpen() &&
-    !tasksAgentsOpen() &&
-    workspace.state.status === "online" &&
-    !workspace.state.panelsFailed &&
-    !hostOffline() &&
-    !blockedServer();
   /** Shows the agents and closes the other pages. */
   function showAgents() {
     setAccountSettingsOpen(false);
@@ -2703,6 +2694,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
+              server={
+                <ServerMenu
+                  rail
+                  serverName={workspace.state.host?.name ?? "OpenBot"}
+                  servers={servers()}
+                  view={layout.serverView()}
+                  onViewChange={layout.setServerView}
+                  onSelect={selectServer}
+                  onAdd={() => hostedServers.openAddServer("server_rail")}
+                  addCreatesServer={hostedServers.available()}
+                  {...serverActionCallbacks}
+                />
+              }
               help={
                 <RailHelpMenu
                   version={null}
@@ -2751,7 +2755,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 })
               }
               windowPage={page()}
-              sidebarHidden={tasksAgentsHidden()}
               page={
                 <Show
                   when={page() === "usage" || page() === "schedule" || page() === "workflows" ? server() : undefined}
@@ -3027,6 +3030,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRestoreAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, false) : undefined}
                     compact={compact()}
                     onExpand={layout.expandSidebar}
+                    onCollapse={collapseSidebar()}
                     onOpenSearch={() => setSearchOpen(true)}
                     onOpenMarketplace={openMarketplace}
                     footer={
@@ -3346,8 +3350,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       serverId={target().id}
                       hostName={target().name}
                       onBack={closeHostPage}
-                      agentsOpen={!tasksAgentsHidden()}
-                      onToggleAgents={() => setTasksAgentsOpen(tasksAgentsHidden())}
                       source={tasksSource}
                       mediaSource={runtime.attachmentMedia}
                       files={{

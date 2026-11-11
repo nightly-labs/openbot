@@ -39,7 +39,12 @@ import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
-import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
+import {
+  type AgentClient,
+  AgentProcessExitError,
+  type AgentProvider,
+  PROCESSOR_FEATURE_MISSING,
+} from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
@@ -157,6 +162,11 @@ const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
  */
 const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+/**
+ * How many of the other providers start at the same time at launch. One at a time lets one CLI that
+ * does not answer hold all the others for its full timeout.
+ */
+const LAUNCH_START_CONCURRENCY = 2;
 /** How often the host reads a signed-out provider's sign-in file. A read is one `stat`. */
 const SIGN_IN_FILE_POLL_MS = 2_000;
 
@@ -197,6 +207,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
+/** A CLI that a processor stopped; `PROCESSOR_FEATURE_MISSING` tells whether a missing feature is the cause. */
+const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -428,6 +440,12 @@ export class ProviderRuntime implements ProviderPort {
   readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
+  /**
+   * True from launch until each provider of the launch has a client or a failure. `onProvidersReady`
+   * settles every unresolved delivery, and would record a turn of a provider that has no client yet
+   * as interrupted. Thus no connect runs it during this time; the last connect of the launch does.
+   */
+  #launchStartsPending = false;
   readonly #providerConnectionCommands = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   readonly #replacingCli = new Set<AgentProvider>();
   #removingCustomRuntime = false;
@@ -1434,10 +1452,59 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#idleCheck.unref?.();
     this.#watchSignInFiles();
-    yield* this.#connect(
-      "starting",
-      BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id),
+    // All providers together start a process each, and a version check before it, in the same second.
+    // That made a slow computer stop responding after launch. The provider that chat uses goes first
+    // and alone, so chat is ready when it answers. The others follow, a few at a time.
+    const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id);
+    // A provider that is off or stopped starts no process, so it cannot make chat ready.
+    const canStart = providers.filter((provider) => !this.#off.has(provider) && !this.#startStopped(provider));
+    const first = canStart.includes(this.#preferredProvider) ? this.#preferredProvider : canStart[0];
+    const others = providers.filter((provider) => provider !== first);
+    // Without another start to come, a failed first provider must show as "blocked" at once.
+    const othersFollow = others.some((provider) => canStart.includes(provider));
+    // With no other start to come, the first connect is the whole launch: it reads the model
+    // catalogue and runs the ready hook before the start ends, as one connect of all providers did.
+    this.#launchStartsPending = othersFollow;
+    const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
+    let starting: AgentProvider[] = [];
+    let startsReleased = false;
+    // A turn that joined this start must not wait for the model catalogue and the ready hook, and
+    // must not get their failure. The processes are all it needs.
+    const releaseStarts = Effect.gen({ self: this }, function* () {
+      startsReleased = true;
+      this.#launchStartsPending = false;
+      yield* Deferred.succeed(completion, undefined);
+      for (const provider of starting)
+        if (this.#providerStarts.get(provider) === completion) this.#providerStarts.delete(provider);
+    });
+    const exit = yield* Effect.exit(
+      Effect.gen({ self: this }, function* () {
+        if (first)
+          yield* this.#connect(
+            "starting",
+            [first],
+            othersFollow ? { othersFollow, refreshRuntimeInBackground: true, skipReadyHook: true } : {},
+          );
+        // Chat can be ready now, so a refresh or a turn can ask for one of the others. As in
+        // `#refreshProviders`, they join this start and do not start a second process.
+        starting = others.filter((provider) => !this.#clients.has(provider) && !this.#providerStarts.has(provider));
+        for (const provider of starting) this.#providerStarts.set(provider, completion);
+        yield* this.#connect("starting", starting, {
+          concurrency: LAUNCH_START_CONCURRENCY,
+          afterStarts: releaseStarts,
+        });
+        if (startsReleased || !othersFollow) return;
+        // A different start took each of the other providers, so the connect above did nothing and
+        // the first one's connect did not run the ready hook.
+        this.#launchStartsPending = false;
+        if (this.#clients.size > 0) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
+      }),
     );
+    this.#launchStartsPending = false;
+    yield* Deferred.done(completion, exit);
+    for (const provider of starting)
+      if (this.#providerStarts.get(provider) === completion) this.#providerStarts.delete(provider);
+    yield* exit;
   }).bind(this);
 
   /**
@@ -3028,6 +3095,8 @@ export class ProviderRuntime implements ProviderPort {
     // counts: the stderr line can quote another process.
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
+    if (ILLEGAL_INSTRUCTION.test(error.message) && PROCESSOR_FEATURE_MISSING.test(detailed.message))
+      return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
     return detailed;
   }
 
@@ -3521,6 +3590,14 @@ export class ProviderRuntime implements ProviderPort {
       notifyReady?: boolean;
       startTimeoutMs?: number;
       preferInstalled?: boolean;
+      /** How many providers start at the same time. Without it, all of them do. */
+      concurrency?: number;
+      /** A second connect of this launch follows, so no client here is not yet "blocked". */
+      othersFollow?: boolean;
+      /** Runs when each requested provider has a client or a failure, before the status and the catalogue. */
+      afterStarts?: Effect.Effect<void>;
+      /** The caller runs `onProvidersReady` itself. Unlike `notifyReady: false`, this is a full activation. */
+      skipReadyHook?: boolean;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3723,8 +3800,9 @@ export class ProviderRuntime implements ProviderPort {
           }),
         );
       },
-      { concurrency: "unbounded" },
+      { concurrency: options.concurrency ?? "unbounded" },
     );
+    if (options.afterStarts) yield* options.afterStarts;
     if (disposed()) return;
     for (const provider of requestedProviders) this.#released.delete(provider);
     const failures = results.filter((message): message is string => message !== null);
@@ -3732,6 +3810,10 @@ export class ProviderRuntime implements ProviderPort {
 
     if (this.#clients.size === 0 && this.#released.size > 0) {
       // Every other provider is released, not gone: chat stays ready and starts one on the next turn.
+      this.#setStatus({ providers: finalProviderStatuses });
+      return;
+    }
+    if (this.#clients.size === 0 && options.othersFollow) {
       this.#setStatus({ providers: finalProviderStatuses });
       return;
     }
@@ -3784,7 +3866,8 @@ export class ProviderRuntime implements ProviderPort {
       // This used to ride along with a Computer Use probe that no longer exists.
       this.#setStatus({});
       if (codexClient) yield* this.#refreshUsage(codexClient).pipe(Effect.ignore, Effect.forkIn(this.#scope));
-      if (options.notifyReady !== false) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
+      if (options.notifyReady !== false && !options.skipReadyHook && !this.#launchStartsPending)
+        yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
     });
     if (options.refreshRuntimeInBackground) {
       yield* refreshRuntime.pipe(
@@ -4073,6 +4156,8 @@ export class ProviderRuntime implements ProviderPort {
     // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     if (reason === realtimeLimitZero) return realtimeLimitZero;
+    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
+    if (reason === cpuUnsupported) return cpuUnsupported;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 

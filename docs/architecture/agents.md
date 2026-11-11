@@ -779,12 +779,38 @@ error. With no backup, a turn that only teammate results started runs once more 
 the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
 shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
-A message from another agent follows the recipient's busy-message mode, as a message from the
-person does. When the mode is "steer", the provider steers natively and the recipient runs a chat
-turn, `send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). Channel, messaging and task work, and each answer to a request
-that went to two or more teammates, stay queued (`MailboxStore.steersChatTurn`), so those answers
-still start together. A message from an agent that cannot steer gets no fallback reason on its row.
+A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
+running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
+Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
+reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
+"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
+modes.
+
+A steered message joins work that the model already does, and a model that gets it as plain user
+text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block
+(`steerNote` in `src/backend/agent/developer-instructions.ts`) in front of a message from the person
+or a teammate: the message adds to the current work, a question gets a short answer first, a
+correction applies from this point, and the unfinished work continues unless the message stops it.
+The block is a text item of its own, as the turn context blocks are, so the history readers remove
+it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
+with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
+block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
+block.
+
+A message from another agent that only gives information follows the recipient's busy-message mode,
+as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
+When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
+`send_message` and the result relay take the message into that turn
+(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
+turn automatically, in each mode: it asks for work and a result, and in a running turn that result
+and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
+tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
+Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
+messaging and task work, and each answer to a request that went to two or more teammates, stay
+queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
+agent that cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.

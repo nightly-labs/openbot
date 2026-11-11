@@ -10,6 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
+import { withoutTurnContext } from "./agent/developer-instructions";
 import { secretElicitationField } from "./agent/prompts";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
@@ -912,7 +913,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       yield* thread.rpc.request({ type: "clear_queue" }).pipe(Effect.ignore);
       return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
     }
-    this.#addUserMessage(turn, prompt.message);
+    // Pi takes one message, so the steer note is at its start. The user did not write it.
+    this.#addUserMessage(turn, withoutTurnContext(prompt.message));
     return { turn: { id: turn.id, status: "inProgress" }, turnId: turn.id };
   });
 

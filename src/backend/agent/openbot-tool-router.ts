@@ -70,9 +70,9 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
-import { agentMcpServers, codexDeferredMcpServers } from "../mcp-provider-shapes";
+import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
-import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
+import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
   acknowledgeRequestToolSchema,
@@ -175,6 +175,7 @@ import {
   discoverTools,
   givesBrowserSchemas,
   namesInSearch,
+  OPENCODE_DEFERRED_MCP_NOTE,
   resolveDeferredTool,
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
@@ -236,6 +237,7 @@ export type FeedbackSendResult =
  */
 export type AgentMessageSteer =
   | "steered"
+  | "own-turn"
   | "recipient-queues"
   | "provider-unsupported"
   | "routine-run"
@@ -902,6 +904,8 @@ export class OpenBotToolRouter {
    */
   #deferredMcpNote(client: AgentClient, threadId: string): string | null {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
+    if (client.provider === "opencode")
+      return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
@@ -1567,27 +1571,33 @@ export class OpenBotToolRouter {
     }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel.
-    if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
-      return yield* this.#messaging.outboundTool(senderAgentId, params.tool, params.arguments, (paths) =>
-        // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
-        // which holds the files the user attached. The adapters read each file again by its path.
-        Effect.acquireUseRelease(
-          this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
-          (sources) =>
-            Effect.forEach(sources, (source) =>
-              Effect.gen(function* () {
-                const name = basename(source.path);
-                const { size } = yield* attachmentCall(() => source.handle.stat());
-                if (size > ATTACHMENT_LIMITS.fileBytes)
-                  return yield* attachmentFailure(
-                    new Error(`${name} is larger than ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
-                  );
-                return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
-              }),
-            ),
-          (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
-        ),
+    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel,
+    // and read a place that it names, such as a routine that summarizes a WhatsApp chat.
+    if (isMessagingOutboundCall(params.tool, params.arguments))
+      return yield* this.#messaging.outboundTool(
+        senderAgentId,
+        { threadId: executionThreadId, turnId: params.turnId },
+        params.tool,
+        params.arguments,
+        (paths) =>
+          // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
+          // which holds the files the user attached. The adapters read each file again by its path.
+          Effect.acquireUseRelease(
+            this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
+            (sources) =>
+              Effect.forEach(sources, (source) =>
+                Effect.gen(function* () {
+                  const name = basename(source.path);
+                  const { size } = yield* attachmentCall(() => source.handle.stat());
+                  if (size > ATTACHMENT_LIMITS.fileBytes)
+                    return yield* attachmentFailure(
+                      new Error(`${name} is larger than ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
+                    );
+                  return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
+                }),
+              ),
+            (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+          ),
       );
     if (params.tool.startsWith("messaging_")) {
       // Only the agent that answers a platform conversation, in that conversation's own thread.
@@ -2239,7 +2249,11 @@ export class OpenBotToolRouter {
     if (!agentId || !servers || !isMcpServerTool(params.tool))
       return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
-    return yield* handleMcpServerTool(servers, {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const computerUse = agent ? agentComputerUseEnabled(agent) : false;
+    // The built-in servers that read_agent reports for this agent, so the two agree (#7088).
+    const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
+    return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
       arguments: params.arguments,
       approve: (reason, cwd) =>
@@ -2899,6 +2913,10 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   note?: string;
 };
 
+/** A request does not join the recipient's running turn, so the sender does not wait for a steer. */
+const OWN_TURN_NOTE =
+  "The recipient works now. A request gets a turn of its own after that work, so its result stays separate.";
+
 /** The one reason that the user can change, named as the agent settings show it. */
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
@@ -2911,6 +2929,7 @@ const RECIPIENT_QUEUES_NOTE =
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;
+  if (steer === "own-turn") return { ...delivery, outcome: "queued", queuedBecause: steer, note: OWN_TURN_NOTE };
   if (steer === "recipient-queues")
     return { ...delivery, outcome: "queued", queuedBecause: steer, note: RECIPIENT_QUEUES_NOTE };
   return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };

@@ -222,6 +222,8 @@ export interface PageRailProps {
   settingsNotice?: string | undefined;
   /** The Help menu, between Marketplace and Settings. */
   help: JSX.Element;
+  /** The menu of the open server, below Settings. Absent where the window has one server and no menu. */
+  server?: JSX.Element;
   /**
    * The OpenBot logo in the top row, for a window that has no macOS window buttons there. With
    * `href`, the logo is a link to the OpenBot site.
@@ -403,40 +405,44 @@ export function PageRail(props: PageRailProps) {
         </For>
         <RailMoreMenu pages={pages()} current={props.current} pinned={props.pinned} onPinChange={props.onPinChange} />
       </div>
-      <div class="window-rail-group">
-        {/* A status update builds new rows. The key keeps each ring, and its open hover card, mounted. */}
-        <For each={rings()} keyed={(ring) => accountUsageRowKey(ring.row)}>
-          {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
-        </For>
-        <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
-          {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
-        </For>
-        <Show when={props.onMarketplace}>
-          {(onMarketplace) => (
-            <RailButton
-              label={t("app.rail.marketplace")}
-              current={props.current === "marketplace"}
-              onClick={() => onMarketplace()()}
-            >
-              <Store aria-hidden="true" />
-            </RailButton>
-          )}
-        </Show>
-        {props.help}
-        <RailButton
-          label={
-            props.settingsNotice
-              ? t("app.rail.settingsNotice", { notice: props.settingsNotice })
-              : t("app.rail.settings")
-          }
-          current={props.current === "settings"}
-          onClick={props.onSettings}
-        >
-          <Settings aria-hidden="true" />
-          <Show when={props.settingsNotice}>
-            <span class="window-rail-notice" aria-hidden="true" />
+      <div class="window-rail-end">
+        <div class="window-rail-group">
+          {/* A status update builds new rows. The key keeps each ring, and its open hover card, mounted. */}
+          <For each={rings()} keyed={(ring) => accountUsageRowKey(ring.row)}>
+            {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
+          </For>
+          <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
+            {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
+          </For>
+          <Show when={props.onMarketplace}>
+            {(onMarketplace) => (
+              <RailButton
+                label={t("app.rail.marketplace")}
+                current={props.current === "marketplace"}
+                onClick={() => onMarketplace()()}
+              >
+                <Store aria-hidden="true" />
+              </RailButton>
+            )}
           </Show>
-        </RailButton>
+          {props.help}
+          <RailButton
+            label={
+              props.settingsNotice
+                ? t("app.rail.settingsNotice", { notice: props.settingsNotice })
+                : t("app.rail.settings")
+            }
+            current={props.current === "settings"}
+            onClick={props.onSettings}
+          >
+            <Settings aria-hidden="true" />
+            <Show when={props.settingsNotice}>
+              <span class="window-rail-notice" aria-hidden="true" />
+            </Show>
+          </RailButton>
+        </div>
+        {/* The slot shows no line while it is empty. */}
+        <div class="window-rail-server-slot">{props.server}</div>
       </div>
     </nav>
   );

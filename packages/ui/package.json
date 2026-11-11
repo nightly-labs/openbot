@@ -394,6 +394,8 @@
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",
     "./features/updates/whats-new.css": "./src/features/updates/whats-new.css",
+    "./features/window/PageHeader": "./src/features/window/PageHeader.tsx",
+    "./features/window/page-header.css": "./src/features/window/page-header.css",
     "./features/window/PageRail": "./src/features/window/PageRail.tsx",
     "./features/window/page-rail.css": "./src/features/window/page-rail.css",
     "./features/usage/AgentUsageReport": "./src/features/usage/AgentUsageReport.tsx",

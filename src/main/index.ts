@@ -1233,6 +1233,9 @@ function forwardCentralAuth(state: CentralAuthState): void {
                 ),
               );
             yield* services.host.applySignedInAccount(null);
+            // Also for a sign-out with no account before it, such as a session that ended while
+            // the app was closed: the copies of the joined servers' pictures go.
+            yield* services.remoteServers.forgetSavedPictures();
           }
           return;
         }
@@ -1522,6 +1525,10 @@ if (!hasSingleInstanceLock) {
       activeAnalyticsPrincipalId = centralAuthPrincipalId(appliedAccount);
       activeRemotePrincipalId = centralAuthPrincipalId(appliedAccount);
       const currentAccount = built.centralAuth.getState();
+      // A start with no account keeps no picture copies. The gate above deletes them only for a
+      // sign-out that it sees.
+      if (currentAccount.status === "signed_out" && !localServerChild)
+        void runCauseEffect(built.remoteServers.forgetSavedPictures());
       if (
         currentAccount.status !== appliedAccount.status ||
         centralAuthPrincipalId(currentAccount) !== centralAuthPrincipalId(appliedAccount)

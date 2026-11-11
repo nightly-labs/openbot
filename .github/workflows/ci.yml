@@ -405,6 +405,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-embeds
 
+      - name: Run the place history E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-place-history
+
       - name: Run the Telegram answer mentions E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-telegram-mentions
@@ -665,6 +669,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:pi-sign-in-watch
 
+      - name: Run the provider launch order E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:provider-launch-order
+
       - name: Run the agent API key E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-api-keys
@@ -706,6 +714,7 @@ jobs:
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
+            .openbot-build/messaging-place-history-e2e/
             .openbot-build/messaging-telegram-mentions-e2e/
             .openbot-build/messaging-slack-ping-reply-e2e/
             .openbot-build/turn-input-e2e/
@@ -765,6 +774,7 @@ jobs:
             .openbot-build/cursor-usage-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
+            .openbot-build/provider-launch-order-e2e/
             .openbot-build/agent-api-keys-e2e/
             .openbot-build/remote-connect-analytics-e2e/
             .openbot-build/memory-review-e2e/

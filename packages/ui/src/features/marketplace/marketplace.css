@@ -191,74 +191,12 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
 
 /* ---------------------------------------------------------------- heading */
 
-.marketplace-heading {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  min-width: 0;
-}
-
-.marketplace-title {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-lg);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
- * A parent in the path is plain text until the pointer is on it: then it shows the outline button chip, as the parent
- * in the path did before. The start margin cancels the chip's padding and border, so the text stays on the inset. The
- * end margin cancels less, so the chip does not touch the separator.
- */
-.skills-marketplace .marketplace-crumb-parent {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-inline: calc(-1 * var(--openbot-space-2) - 1px) calc(-1 * var(--openbot-space-1));
-  overflow: hidden;
-  border-color: transparent;
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skills-marketplace .marketplace-crumb-parent:focus-visible {
-  border-color: var(--openbot-border);
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .skills-marketplace .marketplace-crumb-parent:hover:not(:disabled) {
-    border-color: var(--openbot-border);
-    background: var(--openbot-bg-control);
-    color: var(--openbot-text-primary);
-  }
-}
-
-.marketplace-crumb-separator {
-  flex: 0 0 auto;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  color: var(--openbot-text-muted);
-}
-
 /* Right to left, the arrow points the other way. */
-.marketplace-crumb-separator:dir(rtl),
 .marketplace-skill-group-head .ui-button > svg[class~="lucide-chevron-right"]:dir(rtl) {
   transform: scaleX(-1);
 }
 
 /* A title takes focus when its view opens. The focus is for screen readers, not a control. */
-.marketplace-title:focus,
 .skills-marketplace-body h3[tabindex="-1"]:focus {
   outline: none;
 }
