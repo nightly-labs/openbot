@@ -821,6 +821,11 @@ interface MessagingServicesContext {
   teardown: TeardownRegistry;
   secretCipher: SecretStorageCipher;
   centralAuth: CentralAuthManager;
+  /**
+   * Makes the requests that need the account session: the start of a Slack or Discord connect. A
+   * server on this computer has no session, so the desktop app makes them for it.
+   */
+  accountSession: Pick<CentralAuthManager, "requestAuthorized">;
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
   /** Read on each call: the team store that names this host is built after messaging. */
@@ -838,6 +843,7 @@ async function createMessagingServices({
   teardown,
   secretCipher,
   centralAuth,
+  accountSession,
   service,
   sidebarLayout,
   readHostId,
@@ -862,6 +868,10 @@ async function createMessagingServices({
   const signalIngress = new SignalIngress({
     hostId: readHostId,
     signedIn: () => {
+      // A server on this computer has no account. The machine token that the desktop app gave it
+      // gets its tickets.
+      const hostId = readHostId();
+      if (hostId && centralAuth.hostSiteCredential(hostId)) return true;
       try {
         centralAuth.getSignedInUser();
         return true;
@@ -925,7 +935,7 @@ async function createMessagingServices({
             return Effect.fail(
               new SlackConnectFailed({ cause: new Error(sourceText("error.messaging.relayUnavailable")) }),
             );
-          return centralAuth
+          return accountSession
             .requestAuthorized(
               "/v2/slack/authorize",
               {
@@ -960,7 +970,7 @@ async function createMessagingServices({
             return Effect.fail(
               new DiscordConnectFailed({ cause: new Error(sourceText("error.messaging.discordRelayUnavailable")) }),
             );
-          return centralAuth
+          return accountSession
             .requestAuthorized(
               "/v2/discord/authorize",
               {
@@ -2511,10 +2521,17 @@ export async function createApplicationServices({
     githubToken: () => githubConnector.accessToken(),
     ingress: () => signalIngress,
   });
+  // A server on this computer has no account session: the desktop app makes the Marketplace reads that
+  // adding an agent needs, and the start of a Slack or Discord connect.
+  const localServerMarketplace = new LocalServerMarketplace(
+    (line) => process.stdout.write(line),
+    (path) => centralAuth.resolveApiUrl(path),
+  );
   const { messaging, signalIngress } = await createMessagingServices({
     teardown,
     secretCipher,
     centralAuth,
+    accountSession: localServerChild ? localServerMarketplace : centralAuth,
     service,
     sidebarLayout,
     readHostId: () => ingressHostId(),
@@ -2704,12 +2721,6 @@ export async function createApplicationServices({
   });
   // A grant changed on this computer must reach the phones and web clients that show it.
   approvalAutomation.subscribe(() => service.notifyAgentsChanged());
-  // A server on this computer has no account session: the desktop app makes the Marketplace reads that
-  // adding an agent needs.
-  const localServerMarketplace = new LocalServerMarketplace(
-    (line) => process.stdout.write(line),
-    (path) => centralAuth.resolveApiUrl(path),
-  );
   const marketplaceAuth = localServerChild ? localServerMarketplace : centralAuth;
   const skills = new SkillMarketplaceService(
     marketplaceAuth,
@@ -3820,6 +3831,8 @@ export async function createApplicationServices({
                 );
               registerSecretValue(machineToken);
               centralAuth.useHostCredential(serverId, machineToken);
+              // The Signal socket of the Slack, Discord and Telegram connections opens with this token.
+              signalIngress.reconnect();
               return host.publishLocalServer();
             }),
           unpublish: () =>
@@ -3828,6 +3841,7 @@ export async function createApplicationServices({
                 Effect.sync(() => {
                   const serverId = teamStore.getIdentity()?.serverId;
                   if (serverId) centralAuth.useHostCredential(serverId, null);
+                  signalIngress.reconnect();
                 }),
               ),
             ),

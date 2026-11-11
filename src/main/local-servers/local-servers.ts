@@ -19,7 +19,8 @@
 // The child has no account session, so it cannot read its members from the account directory. It
 // asks on stdout, and this process writes the list to its control pipe. After this app changes a
 // member of the server, it writes the new list without a request. In the same way, this process makes
-// the Marketplace reads that adding an agent needs, with its own session, and only those reads.
+// the Marketplace reads that adding an agent needs, and the start of a Slack or Discord connect of that
+// server, with its own session, and only those requests.
 //
 // Each child writes the agents that work on it when the list changes. A quit of the desktop app stops
 // the children, so `Cmd + Q` asks for a hold while one of them works, as it does for the local agents.
@@ -166,7 +167,7 @@ interface LocalServerAccount {
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
   /** The origin of the account service. */
   apiOrigin: string;
-  /** A JSON request with this app's session. Only the Marketplace reads below get here. */
+  /** A JSON request with this app's session. Only the Marketplace reads and connect starts below get here. */
   requestAuthorized(path: string, init: RequestInit): Effect.Effect<unknown, RemoteWorkflowError>;
   /** A file with this app's session. Only the Marketplace reads below get here. */
   downloadAuthorized(path: string): Effect.Effect<Uint8Array, RemoteWorkflowError>;
@@ -190,13 +191,53 @@ const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boole
   { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
 ];
 
+/**
+ * The start of a Slack or Discord connect: the account service gives the install page only to the
+ * owner of the host, and the child has no session. A child starts it only for its own host.
+ */
+const CONNECT_STARTS: ReadonlySet<string> = new Set(["/v2/slack/authorize", "/v2/discord/authorize"]);
+
 const installReceiptSchema = Schema.Struct({ receiptId: Schema.String });
 const decodeInstallReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(installReceiptSchema));
+const connectStartSchema = Schema.Struct({
+  hostId: Schema.String,
+  hostNonce: Schema.String,
+  hostPublicKey: Schema.String,
+});
+const decodeConnectStart = Schema.decodeUnknownSync(Schema.fromJsonString(connectStartSchema));
 
-/** The path and the request to make for a child's read, or null when the read is not allowed. */
+/** The request to make for a child's connect start, or null when it is not for the child's own host. */
+function allowedConnectStart(
+  request: LocalServerMarketplaceRequest,
+  path: string,
+  hostId: string | null,
+): { path: string; init: RequestInit } | null {
+  if (hostId === null || request.method !== "POST" || request.download) return null;
+  try {
+    const body = decodeConnectStart(request.body);
+    if (body.hostId.toLowerCase() !== hostId.toLowerCase()) return null;
+    // Only these fields go on: a child cannot choose where the install page returns.
+    return {
+      path,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostId: body.hostId, hostNonce: body.hostNonce, hostPublicKey: body.hostPublicKey }),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The path and the request to make for a child's read, or null when the read is not allowed.
+ * `hostId` is the child's own server.
+ */
 function allowedMarketplaceRead(
   request: LocalServerMarketplaceRequest,
   apiOrigin: string,
+  hostId: string | null,
 ): { path: string; init: RequestInit } | null {
   let url: URL;
   try {
@@ -206,6 +247,8 @@ function allowedMarketplaceRead(
   }
   // An id never holds `%`, so an encoded `/` cannot move a read to another route.
   if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
+  if (CONNECT_STARTS.has(url.pathname))
+    return url.search === "" ? allowedConnectStart(request, url.pathname, hostId) : null;
   const allowed = MARKETPLACE_READS.some(
     (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
   );
@@ -556,7 +599,11 @@ export class LocalServers {
    * is not allowed, or that fails, gets the reason, so that the child does not wait.
    */
   #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
-    const read = allowedMarketplaceRead(request, this.#options.account.apiOrigin);
+    const read = allowedMarketplaceRead(
+      request,
+      this.#options.account.apiOrigin,
+      this.#ready.get(id)?.serverId ?? null,
+    );
     // The request holds the read and its ids only, no secret.
     if (!read)
       this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
