@@ -96,6 +96,11 @@ export interface DrainHooks {
    * again when it ends. Each path that starts a queue comes here, so no message runs on the wrong model.
    */
   followUsageLimit(agentId: string): boolean;
+  /**
+   * Starts the provider change that waits for the next turn, if the agent is idle. True when it
+   * started; it schedules the drain again when it ends.
+   */
+  followPendingRuntime(agentId: string): boolean;
   /** Whether this turn already ended. A provider can end a turn before its `turn/start` answer is read. */
   turnEnded(turnId: string): boolean;
   /** Forgets the end of an earlier turn with this id: a requeued delivery starts again under the same turn id. */
@@ -489,6 +494,9 @@ export class DrainScheduler {
       this.#heldBy(lane) ||
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
+    // The sign-in hold reads the provider the agent has now. A provider change that waits for the
+    // next turn applies first, so the queue waits for the sign-in of the new provider, if any (#6862).
+    if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
       return true;
     if (hold) return false;

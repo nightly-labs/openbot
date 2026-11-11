@@ -1602,19 +1602,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           if (this.#requestedNewChats.delete(agentId))
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
         },
+        followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
         followUsageLimit: (agentId) => {
-          if (this.#pendingRuntimeDue(agentId)) {
-            Effect.runFork(
-              this.#followPendingRuntime(agentId).pipe(
-                // A change that is gone, applied or dropped, lets the next drain make a due usage-limit move.
-                Effect.andThen((moved) =>
-                  Effect.sync(() => this.#drain.scheduleDrain(agentId, moved || !this.#pendingRuntimeDue(agentId))),
-                ),
-                Effect.forkIn(this.#scope, { startImmediately: true }),
-              ),
-            );
-            return true;
-          }
+          if (this.#startPendingRuntime(agentId)) return true;
           if (!this.#usageLimitMove(agentId)) return false;
           Effect.runFork(
             this.#followUsageLimit(agentId).pipe(
@@ -3665,6 +3655,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #pendingRuntimeDue(agentId: string): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return Boolean(agent?.pendingRuntime) && !this.#runtimeHandoverBusy(agentId);
+  }
+
+  /** Starts `#followPendingRuntime` when the queued change is due. True when it started. */
+  #startPendingRuntime(agentId: string): boolean {
+    if (!this.#pendingRuntimeDue(agentId)) return false;
+    Effect.runFork(
+      this.#followPendingRuntime(agentId).pipe(
+        // A change that is gone, applied or dropped, lets the next drain make a due usage-limit move.
+        Effect.andThen((moved) =>
+          Effect.sync(() => this.#drain.scheduleDrain(agentId, moved || !this.#pendingRuntimeDue(agentId))),
+        ),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
+    return true;
   }
 
   /** Applies `pendingRuntime` once the agent is idle. True when the agent moved. */
