@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { waitTaskCapability } from "./outside-target";
+import { sideThreadDestination, waitTaskCapability } from "./outside-target";
 
 /** A driven clock: each asked wait records itself and moves `now`. */
 function drivenClock() {
@@ -11,6 +11,46 @@ function drivenClock() {
   };
   return { waited, now: () => now, sleep };
 }
+
+describe("sideThreadDestination", () => {
+  const target = { agentId: "agent-1", serverId: "server-1", threadId: "openbot-thread-1" };
+  const sources = (loadThreads: () => Promise<unknown>) => ({ loadThreads });
+
+  it("opens the thread when the list answers within the window", async () => {
+    const destination = await sideThreadDestination(
+      target,
+      sources(() =>
+        new Promise((done) =>
+          setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 20),
+        ),
+      ),
+      5_000,
+    );
+    expect(destination).toEqual({ type: "thread", serverId: "server-1", agentId: "agent-1", taskId: "task-1" });
+  });
+
+  it("stays in the chat when the list answers after the window", async () => {
+    const destination = await sideThreadDestination(
+      target,
+      sources(() =>
+        new Promise((done) =>
+          setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 80),
+        ),
+      ),
+      40,
+    );
+    expect(destination).toBeNull();
+  });
+
+  it("stays in the chat when the list rejects", async () => {
+    const destination = await sideThreadDestination(
+      target,
+      sources(() => Promise.reject(new Error("transport not ready"))),
+      5_000,
+    );
+    expect(destination).toBeNull();
+  });
+});
 
 describe("waitTaskCapability", () => {
   it("returns at once when the server answers without agent tasks (an old host)", async () => {
