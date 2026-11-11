@@ -1416,7 +1416,7 @@ export class OpenBotToolRouter {
       ...agentAccountSetup(agent),
       access: workspaceAccessEnforced(agent) ? "workspace" : "full",
       computerUse,
-      // On is not usable: the driver tools exist only while the driver is ready (#6612).
+      // The setting can be on while the driver is not ready, and then the agent has no driver tools (#6612).
       ...(computerUse
         ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
         : {}),
