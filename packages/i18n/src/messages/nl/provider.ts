@@ -270,6 +270,8 @@ export const messages = {
   "provider.settings.keyAlternative": "Of plak een {name}-API-sleutel.",
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van dit Google-account. Verwijder de sleutel om het abonnement en de modellen van dit account te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",

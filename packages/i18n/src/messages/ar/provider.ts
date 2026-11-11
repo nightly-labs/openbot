@@ -320,6 +320,8 @@ export const messages = {
   "provider.settings.keyOptional": "اختياري. يضيف المفتاح نماذج مدفوعة.",
   "provider.settings.keyAlternative": "أو الصق مفتاح {name} API.",
   "provider.settings.geminiKeyInUse": "يستخدم Gemini هذا المفتاح، لا خطة Google AI. لا يُعرض استخدام الخطة.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "يُستخدم مفتاح Gemini API المحفوظ بدلًا من حساب Google هذا. أزِل المفتاح لاستخدام خطة هذا الحساب ونماذجه.",
   "provider.settings.claudeKeyInUse":
     "تحتسب Anthropic رصيد API للمفتاح، وليس خطة Claude. اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.settings.codexKeyInUse":

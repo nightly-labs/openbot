@@ -285,6 +285,8 @@ export const messages = {
   "provider.settings.keyOptional": "אופציונלי. מפתח מוסיף מודלים בתשלום.",
   "provider.settings.keyAlternative": "או להדביק מפתח API של {name}.",
   "provider.settings.geminiKeyInUse": "Gemini משתמש במפתח הזה, ולא בתוכנית Google AI שלך. השימוש בתוכנית לא מוצג.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "מפתח Gemini API שמור משמש במקום חשבון Google הזה. הסר את המפתח כדי להשתמש בתוכנית ובמודלים של החשבון.",
   "provider.settings.claudeKeyInUse":
     "Anthropic מחייבת את קרדיט ה-API של המפתח, ולא את מינוי Claude. יש לבחור את חשבון מפתח ה-API בתפריט המודל של סוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
   "provider.settings.codexKeyInUse":

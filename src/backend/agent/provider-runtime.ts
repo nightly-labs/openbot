@@ -1161,6 +1161,12 @@ export class ProviderRuntime implements ProviderPort {
               const client = this.#clients.get(provider);
               if (!client) return null;
               usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
+              // Gemini reads its usage with the CLI's access token, which only a new session refreshes. An
+              // idle own sign-in keeps its last reading after the token expires, as an account after the
+              // first does, so it does not leave the rail.
+              const first = usage.limits[0];
+              const last = this.#lastUsage.get(provider);
+              if (accounts?.usageLeavesSession && last && !first?.primary && !first?.secondary) return last;
             }
           }
           const limit = usage.limits[0];

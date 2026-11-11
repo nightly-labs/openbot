@@ -222,6 +222,7 @@ const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = [
   "devin",
   "copilot",
   "mistral",
+  "antigravity",
 ];
 
 /** Whether the phone can sign the host's own sign-in of the provider out. A saved key keeps it connected. */
