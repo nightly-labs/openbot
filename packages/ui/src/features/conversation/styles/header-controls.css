@@ -190,11 +190,13 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* An email can be long: the account gives way before the model name does. */
+/* An email can be long: the account gives way before the model name does. Shrink is in proportion
+   to the factor, so the account takes all of it until it has no width left. The factor is large
+   because a part of a pixel off the model name is sufficient to cut it with an ellipsis. */
 .provider-model-trigger-account {
   min-width: 0;
   max-width: 160px;
-  flex-shrink: 1;
+  flex-shrink: 100000;
   overflow: hidden;
 }
 
