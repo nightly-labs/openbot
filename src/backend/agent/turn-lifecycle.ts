@@ -1432,11 +1432,15 @@ export class TurnLifecycle {
                 )?.plan ?? null,
             })
           : null;
-      // After work started, only a ready backup in the agent's order, or the ready model that the agent
-      // left, continues it. A turn refused before work still waits for the reset when no backup is
-      // ready. A continuation that a backup refused before work keeps the earlier provider's work.
+      // After work started, a ready backup in the agent's order, or the ready model that the agent left,
+      // continues it. With neither, the work of the agent's chat or a task waits in the queue, and the
+      // model continues it when its limit ends (#6660). A channel task goes back to its channel only
+      // for a backup. A turn refused before work waits for the reset too. A continuation that a backup
+      // refused before work keeps the earlier provider's work.
       const carriesWork = this.#carriesWork(agentId, turnId, running);
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
+      const waitsHere = !channelTurn && deliveries.every(({ channelId }) => channelId === undefined);
+      let continuing =
+        limited && carriesWork && deliveries.length > 0 && (waitsHere || this.#hooks.mayContinueOnBackup(agentId));
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {

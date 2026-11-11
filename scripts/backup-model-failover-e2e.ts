@@ -9,7 +9,8 @@
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error.
 //   4. read_agent shows the backup model, and the model to go back to with the provider error as cause.
 //   5. After a restart, the agent goes back to its own model, with a note.
-// Also checks continuation after a usage limit interrupts partial work.
+// Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
+// ready backup on the same model when its limit ends (#6660).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -23,6 +24,7 @@ import {
   type AgentBackupModels,
   type AgentEvent,
   type AgentModelId,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
   MODEL_SWITCH_ITEM_TYPES,
 } from "@openbot/contracts/ipc";
@@ -168,6 +170,8 @@ const { randomUUID } = require("node:crypto");
 if (process.argv.includes("--version")) { console.log("codex-cli 0.160.1"); process.exit(0); }
 const threads = new Map();
 const active = new Map();
+// A spent reset credit ends the limit, so later turns run.
+let reset = false;
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 const answer = (request) => {
@@ -177,7 +181,8 @@ const answer = (request) => {
   switch (request.method) {
     case "initialize": return reply({});
     case "account/read": return reply({ account: { type: "chatgpt", email: "codex@example.com" } });
-    case "account/rateLimits/read": return reply({ rateLimits: { limitId: "codex", primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1000) + 3600 }, secondary: null }, rateLimitsByLimitId: null });
+    case "account/rateLimits/read": return reply({ rateLimits: { limitId: "codex", primary: { usedPercent: reset ? 0 : 100, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1000) + 3600 }, secondary: null }, rateLimitsByLimitId: null });
+    case "account/rateLimitResetCredit/consume": reset = true; return reply({ outcome: "reset" });
     case "model/list": return reply({ data: [{ model: ${JSON.stringify(CODEX_MODEL)}, displayName: "Codex" }] });
     case "plugin/list": return reply({ marketplaces: [] });
     case "config/read": return reply(config);
@@ -201,7 +206,7 @@ const answer = (request) => {
       const input = JSON.stringify(params.input);
       const current = input.split("--- current message ---").at(-1);
       turn.input = current;
-      const limited = current.includes("usage-");
+      const limited = current.includes("usage-") && !reset;
       const caseId = /case:([a-z-]+)/.exec(current)?.[1] ?? "no-case";
       fs.appendFileSync(${JSON.stringify(codexLog)}, JSON.stringify({ model: params.model, threadId: thread.id, turnId: turn.id, input, limited }) + "\\n");
       reply({ turn });
@@ -222,6 +227,10 @@ const answer = (request) => {
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
         } else {
+          if (caseId !== "no-case") {
+            const continued = input.includes("Continue the unfinished task") && input.includes("checkpoint-result=" + caseId);
+            fs.appendFileSync(${JSON.stringify(workLog)}, JSON.stringify({ caseId, step: continued ? "final" : "repeated-checkpoint" }) + "\\n");
+          }
           item({ type: "agentMessage", id: randomUUID(), phase: "final_answer", text: "Done." });
           finish("completed");
         }
@@ -781,17 +790,51 @@ try {
     });
   }
 
-  await check("without a backup, partial work fails without replay", async () => {
+  await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();
     const agent = await createCodex("No fallback", { automatic: true, order: [] });
+    const since = events.length;
     const before = turns().length;
     const beforeCodex = readLog<CodexTurn>(codexLog).length;
-    const outcome = await send(agent.id, "usage-partial case:stopped");
-    assert.equal(outcome.status, "failed");
+    const beforeWork = readLog<{ caseId: string; step: string }>(workLog).length;
+    const receipt = await runCauseEffect(
+      service.sendMessage({ agentId: agent.id, text: "usage-partial case:stopped" }),
+    );
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId, "The message has a delivery.");
+    const continuation = await waitFor(
+      "the stopped work to wait in the queue",
+      () =>
+        mailbox.getDelivery(deliveryId)?.delivery.status === "queued" &&
+        mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit,
+    );
+    assert.ok(continuation.workSteps.includes("checkpoint-result=stopped"), "The completed action is kept.");
+    await waitFor("the limit to hold the agent", () =>
+      service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
+    );
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The held work does not run again.");
+    // A spent reset credit ends the limit as its reset time does.
+    await runCauseEffect(service.resetProviderUsage("codex", DEFAULT_PROVIDER_ACCOUNT_ID));
+    const status = await waitFor("the work to continue", () => {
+      const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+      return value === "completed" || value === "failed" ? value : null;
+    });
+    assert.equal(status, "completed", `The work completes: ${mailbox.getDelivery(deliveryId)?.delivery.error}`);
+    const attempts = readLog<CodexTurn>(codexLog).slice(beforeCodex);
+    assert.equal(attempts.length, 2, "The same model continues the work once.");
+    assert.ok(attempts[1]?.input.includes("Continue the unfinished task"), "The model gets a continuation request.");
+    assert.deepEqual(
+      readLog<{ caseId: string; step: string }>(workLog).slice(beforeWork),
+      [
+        { caseId: "stopped", step: "checkpoint" },
+        { caseId: "stopped", step: "final" },
+      ],
+      "The completed action runs once; the continuation runs only the remaining action.",
+    );
     assert.equal(turns().length, before, "No backup runs.");
-    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The original action is not replayed.");
     assert.equal(agentOf(agent.id).provider, "codex");
-    return outcome;
+    assert.deepEqual(errorsFor(agent.id, since), [], "Work that waited for the limit shows no failure.");
+    return { deliveryId, status, models: attempts.map((turn) => turn.model) };
   });
 
   await check("ask before switching continues partial work on the saved backup", async () => {
@@ -815,13 +858,23 @@ try {
     return { outcome, backups: backups.map((turn) => turn.model) };
   });
 
-  await check("an exhausted backup chain ends without cycling", async () => {
+  await check("an exhausted backup chain waits for a reset without cycling", async () => {
     await restart();
     const agent = await createCodex("Exhausted", automaticBackups);
     const before = turns().length;
     const beforeCodex = readLog<CodexTurn>(codexLog).length;
-    const outcome = await send(agent.id, "usage-exhausted case:exhausted");
-    assert.equal(outcome.status, "failed");
+    const receipt = await runCauseEffect(
+      service.sendMessage({ agentId: agent.id, text: "usage-exhausted case:exhausted" }),
+    );
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId, "The message has a delivery.");
+    await waitFor(
+      "the last backup's limit to hold the work",
+      () =>
+        mailbox.getDelivery(deliveryId)?.delivery.status === "queued" &&
+        turns().length - before === 2 &&
+        service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
+    );
     assert.deepEqual(
       turns()
         .slice(before)
@@ -829,7 +882,10 @@ try {
       [PRIMARY, BACKUP],
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1);
-    return outcome;
+    assert.ok(mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit, "The waiting work keeps its continuation.");
+    // The user can remove waiting work from the queue. Later checks start with no work held here.
+    await runCauseEffect(service.cancelQueuedMessage(agent.id, deliveryId));
+    return { deliveryId, status: mailbox.getDelivery(deliveryId)?.delivery.status };
   });
 
   await check("Stop ends an active task without starting a backup", async () => {
