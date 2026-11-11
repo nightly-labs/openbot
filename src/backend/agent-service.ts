@@ -596,6 +596,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The agents that asked for a new chat with `start_new_chat`. A restart forgets the request. */
   readonly #requestedNewChats = new Set<string>();
+  /**
+   * How many activations of each `catalog.partialListAtStart` provider still wait to read its list
+   * again. Until they have, the list may lack models that the provider serves (`#modelForAccount`).
+   */
+  readonly #listRechecks = new Map<AgentProvider, number>();
   /** A turn that ends with open plan steps runs again, at most 3 times for one request. */
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
   #initialized = false;
@@ -1001,8 +1006,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               (catalog.relistAfterStart || this.#endpoints.hasAgentsOffList(provider))
             ) {
               const client = this.#providers.currentClient(provider);
-              yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS);
-              const fresh = yield* this.#providers.refreshModels();
+              this.#listRechecks.set(provider, (this.#listRechecks.get(provider) ?? 0) + 1);
+              const fresh = yield* Effect.sleep(PARTIAL_LIST_RECHECK_MS).pipe(
+                Effect.andThen(this.#providers.refreshModels()),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    const waiting = (this.#listRechecks.get(provider) ?? 1) - 1;
+                    if (waiting > 0) this.#listRechecks.set(provider, waiting);
+                    else this.#listRechecks.delete(provider);
+                  }),
+                ),
+              );
               listConfirmed = fresh.has(provider) && this.#providers.currentClient(provider) === client;
             }
             yield* this.#endpoints.runExclusive(() =>
@@ -3158,6 +3172,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * The starting model of `accountId` when `choice` runs a model that only its own account serves:
    * that model fails each turn on the other account (#5217). Null when the model stays.
+   *
+   * While a provider that lists part of its models at start waits to read its list again, a list
+   * that lacks the model is no proof that the account lacks it, so the model stays. The second read
+   * moves the agent when that list lacks the model too (`moveAgentsOffUnlistedModels`).
    */
   #modelForAccount(
     choice: AgentModelChoice & { reasoningEffort: AgentReasoningEffort },
@@ -3167,6 +3185,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       models.some((model) => model.provider === choice.provider && model.id === choice.model);
     const models = this.#agentModels({ provider: choice.provider, providerAccountId: accountId });
     if (lists(models) || !lists(this.#providers.accountModels(choice.provider, choice.providerAccountId))) return null;
+    if (this.#listRechecks.has(choice.provider)) return null;
     const model = startingModel(choice.provider, models, this.#preference());
     if (!model) return null;
     return {
