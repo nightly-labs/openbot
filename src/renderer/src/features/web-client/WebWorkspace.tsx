@@ -794,6 +794,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     notifications,
     setLocalLevel: setNotificationLevel,
     setMuted,
+    onLevelsWritten: applyAgentLevels,
     openHostId: () => server()?.id ?? null,
   });
   /** The host whose notification row the account settings show. Each nonce moves there once. */

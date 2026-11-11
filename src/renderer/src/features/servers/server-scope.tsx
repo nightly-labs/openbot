@@ -95,6 +95,7 @@ const ServerScope = createSimpleContext({
       applyFrameAgents,
       applyUserHiddenAgents,
       applyOwnAgentLevels,
+      ownAgentLevelsApplied,
       userHiddenAgents,
     } = useAgents();
     const {
@@ -289,10 +290,12 @@ const ServerScope = createSimpleContext({
       // The user's own level of each agent, for the mute item of the agent menu and for the sounds.
       // A read that fails keeps the menu as it is: an event or the next load gives the levels.
       if (server && serverSupportsCapability(server, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) {
+        const appliedBefore = ownAgentLevelsApplied();
         void serversPort()
           .agent.listAgentNotificationLevels(server.id)
           .then((value) => {
-            if (isCurrent()) applyOwnAgentLevels(value);
+            // A write or an event during the read is newer than its answer.
+            if (isCurrent() && ownAgentLevelsApplied() === appliedBefore) applyOwnAgentLevels(value);
           })
           .catch(() => undefined);
       }

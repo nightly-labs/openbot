@@ -188,6 +188,8 @@ const Agents = createSimpleContext({
      * sounds read it; the notifications read the copy of main.
      */
     const [ownAgentLevels, setOwnAgentLevels] = createSignal<ReadonlyMap<string, ServerNotificationLevel>>(new Map());
+    /** Counts the applied levels, so the answer of a read that started before a write or an event is dropped. */
+    let ownAgentLevelsApplied = 0;
     /** The agents that the user muted: their own level is "nothing". */
     const mutedAgentIds = createMemo(
       () => new Set([...ownAgentLevels()].flatMap(([agentId, level]) => (level === "nothing" ? [agentId] : []))),
@@ -196,6 +198,7 @@ const Agents = createSimpleContext({
     /** Applies all levels of the user on this server, from a read, an event or a write. */
     function applyOwnAgentLevels(snapshot: Pick<AgentNotificationLevelsSnapshot, "agents">): void {
       if (!scopeIsCurrent()) return;
+      ownAgentLevelsApplied += 1;
       setOwnAgentLevels(agentNotificationLevelMap({ server: null, agents: snapshot.agents }));
     }
 
@@ -447,6 +450,7 @@ const Agents = createSimpleContext({
       ownAgentLevels,
       mutedAgentIds,
       applyOwnAgentLevels,
+      ownAgentLevelsApplied: () => ownAgentLevelsApplied,
       openAgentSetup,
       cancelAgentSetup,
       updateAgent,

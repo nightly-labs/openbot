@@ -58,6 +58,8 @@ export function createWebNotificationRouting(options: {
     Readonly<Record<string, ReadonlyMap<string, ServerNotificationLevel>>>
   >({});
   const NO_MUTED_AGENTS: ReadonlySet<string> = new Set();
+  /** Counts the applied levels of each host, so the answer of a read that started earlier is dropped. */
+  const applied = new Map<string, number>();
 
   /** Applies all levels of the user on a host, from a read, an event or a write. */
   function applyLevels(
@@ -65,6 +67,7 @@ export function createWebNotificationRouting(options: {
     snapshot: AgentNotificationLevelsSnapshot,
   ): ReadonlyMap<string, ServerNotificationLevel> {
     const levels = agentNotificationLevelMap(snapshot);
+    applied.set(hostId, (applied.get(hostId) ?? 0) + 1);
     setAgentLevels((current) => ({ ...current, [hostId]: levels }));
     notifications.setSyncedLevel(hostId, snapshot.server);
     return levels;
@@ -81,8 +84,12 @@ export function createWebNotificationRouting(options: {
   async function levelsOf(hostId: string): Promise<ReadonlyMap<string, ServerNotificationLevel> | null> {
     const read = options.readAgentLevels;
     if (!read) return null;
+    const before = applied.get(hostId) ?? 0;
     try {
-      return applyLevels(hostId, await read(hostId));
+      const snapshot = await read(hostId);
+      // A write or an event during the read is newer than its answer.
+      if ((applied.get(hostId) ?? 0) !== before) return untrack(agentLevels)[hostId] ?? null;
+      return applyLevels(hostId, snapshot);
     } catch {
       return untrack(agentLevels)[hostId] ?? null;
     }
