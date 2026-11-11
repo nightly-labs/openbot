@@ -19,6 +19,7 @@ import {
   CONVERSATION_PLAN_ITEM_TYPE,
   channelRoutingConversationEvent,
   isContextResetMarker,
+  marketplaceSuggestionEvent,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -52,6 +53,8 @@ export type ChatMessage =
     }
   /** Where a new chat started: the agent does not see the messages above it. */
   | { id: string; kind: "context-reset" }
+  /** A Marketplace app that an agent suggested, as the desktop card. `appId` is a plugin slug or a connector id. */
+  | { id: string; kind: "marketplace-suggestion"; appId: string }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
   | {
       id: string;
@@ -188,6 +191,7 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedSuggestions = new WeakMap<ConversationMessage, ChatMessage>();
 
 const ROUTINE_RUN_LABELS = {
   queued: "mobile.chat.routine.invoked",
@@ -363,6 +367,18 @@ export function projectChatMessages(
     if (isContextResetMarker(message)) {
       result.push(
         projectedMarker(projectedResets, message, () => ({ id: `context-reset:${message.id}`, kind: "context-reset" })),
+      );
+      continue;
+    }
+    // A suggested app is a system message too. The agent tells the reader to use its card, so it is not dropped.
+    const suggestion = marketplaceSuggestionEvent(message);
+    if (suggestion) {
+      result.push(
+        projectedMarker(projectedSuggestions, message, () => ({
+          id: message.id,
+          kind: "marketplace-suggestion",
+          appId: suggestion.appId,
+        })),
       );
       continue;
     }
