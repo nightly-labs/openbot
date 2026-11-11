@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -207,6 +207,37 @@ describe("the copy of openbot.db before a migration", () => {
 
     expect(await copyNames(root)).toEqual([]);
     expect(readContents(join(root, "openbot.db")).version).toBe(LATEST_VERSION);
+  });
+
+  it("removes the oldest copy first when only that gives enough free space", async () => {
+    const root = await userData();
+    const directory = join(root, DATABASE_COPY_DIRECTORY);
+    await mkdir(directory, { recursive: true });
+    const oldest = "20200101T000000000Z-schema-40-before-0.40.0.db";
+    const old = "20210101T000000000Z-schema-50-before-0.50.0.db";
+    await writeFile(join(directory, oldest), "older");
+    await writeFile(join(directory, old), "old");
+    writeDatabaseAt(root, LATEST_VERSION - 1);
+
+    // The old copies are too small to give enough space: the start removes none of them and makes no copy.
+    await start(root, { freeDiskBytes: async () => 0 });
+    closeAll();
+    expect(await copyNames(root)).toEqual([oldest, old]);
+
+    // A large oldest copy (a sparse file) gives enough space when the start removes it.
+    await truncate(join(directory, oldest), 256 * 1024 * 1024);
+    await rm(join(root, "openbot.db"));
+    writeDatabaseAt(root, LATEST_VERSION - 1);
+    await start(root, { freeDiskBytes: async () => 0 });
+    closeAll();
+
+    const names = await copyNames(root);
+    expect(names).toHaveLength(2);
+    expect(names[0]).toBe(old);
+    expect(names[1]).toMatch(
+      new RegExp(`-schema-${LATEST_VERSION - 1}-before-${APP_VERSION.replaceAll(".", "\\.")}\\.db$`, "u"),
+    );
+    expect(readContents(join(directory, names[1] ?? "")).contents.projection_threads).toHaveLength(1);
   });
 
   it("rolls the database back and keeps the copy unchanged when a migration fails", async () => {

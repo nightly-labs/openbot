@@ -1,4 +1,4 @@
-import { chmod, mkdir, readdir, rename, rm, statfs } from "node:fs/promises";
+import { chmod, mkdir, readdir, rename, rm, stat, statfs } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -47,7 +47,9 @@ interface DatabaseCopyInput extends DatabaseCopyOptions {
  * it. `VACUUM INTO` reads one consistent snapshot, the write-ahead log included. The copy gets its
  * final name only after it opens and passes `PRAGMA integrity_check` with the source schema version,
  * so a file with that name is always a complete copy. Then only the newest `KEPT_DATABASE_COPIES`
- * copies stay. When the disk has not enough free space, it makes no copy and returns `skipped`.
+ * copies stay. When the disk has not enough free space, it first removes the copies that this
+ * rotation removes anyway. When that also does not give enough space, it removes nothing, makes no
+ * copy and returns `skipped`.
  *
  * A start after a failed migration tries again. When this app version already copied the database
  * at a lower schema version, some of its migrations committed before the failure, and only that
@@ -66,20 +68,34 @@ export const copyDatabaseBeforeMigration = Effect.fn("copyDatabaseBeforeMigratio
   // A copy that a kill or a crash stopped. It has no final name, so no one can mistake it for a copy.
   yield* step("prepare", () => removeFiles(directory, (name) => isCopyName(name, PARTIAL_SUFFIX)));
 
+  const appVersion = safeAppVersion(input.appVersion);
+  const copies = yield* step("prepare", () => readCopies(directory));
+  const earlier = copies.filter((copy) => copy.appVersion === appVersion);
+  const older = earlier.find((copy) => copy.sourceVersion < input.sourceVersion);
+  if (older) return { status: "kept", fileName: older.name } satisfies DatabaseCopyResult;
+  // The copies that the rotation after this copy removes. A replaced copy stays until the new copy
+  // exists: it can be the only copy from before this upgrade.
+  const replaced = new Set(
+    earlier.filter((copy) => copy.sourceVersion === input.sourceVersion).map((copy) => copy.name),
+  );
+  const others = copies.filter((copy) => !replaced.has(copy.name));
+  const surplus = others.slice(0, Math.max(0, others.length - (KEPT_DATABASE_COPIES - 1)));
+
   const sizes = yield* stage(
     "prepare",
     storedSync(() => readSizes(input.db)),
   );
   const requiredBytes = sizes.copyBytes + sizes.databaseBytes + SPACE_RESERVE_BYTES;
   const freeBytes = yield* step("prepare", () => freeDiskBytes(directory));
-  if (freeBytes < requiredBytes) return { status: "skipped", requiredBytes, freeBytes } satisfies DatabaseCopyResult;
-
-  const appVersion = safeAppVersion(input.appVersion);
-  const earlier = yield* step("prepare", () => readCopies(directory)).pipe(
-    Effect.map((copies) => copies.filter((copy) => copy.appVersion === appVersion)),
-  );
-  const older = earlier.find((copy) => copy.sourceVersion < input.sourceVersion);
-  if (older) return { status: "kept", fileName: older.name } satisfies DatabaseCopyResult;
+  let removedFirst = 0;
+  if (freeBytes < requiredBytes) {
+    const surplusBytes = surplus.reduce((total, copy) => total + copy.bytes, 0);
+    if (freeBytes + surplusBytes < requiredBytes) {
+      return { status: "skipped", requiredBytes, freeBytes } satisfies DatabaseCopyResult;
+    }
+    const names = new Set(surplus.map((copy) => copy.name));
+    removedFirst = yield* step("rotate", () => removeFiles(directory, (name) => names.has(name)));
+  }
 
   const fileName = copyFileName(input.sourceVersion, appVersion, input.now ?? new Date());
   const target = join(directory, fileName);
@@ -97,13 +113,8 @@ export const copyDatabaseBeforeMigration = Effect.fn("copyDatabaseBeforeMigratio
     yield* step("copy", () => rename(partial, target));
   }).pipe(Effect.onError(() => storedIO(() => rm(partial, { force: true })).pipe(Effect.ignore)));
 
-  const replaced = new Set(
-    earlier
-      .filter((copy) => copy.sourceVersion === input.sourceVersion && copy.name !== fileName)
-      .map((copy) => copy.name),
-  );
   const removedCopies = yield* step("rotate", () => removeOlderCopies(directory, replaced));
-  return { status: "copied", fileName, removedCopies } satisfies DatabaseCopyResult;
+  return { status: "copied", fileName, removedCopies: removedFirst + removedCopies } satisfies DatabaseCopyResult;
 });
 
 function stage<A>(name: DatabaseCopyFailure["stage"], effect: Effect.Effect<A, StoredStateFailure>) {
@@ -172,14 +183,19 @@ interface StoredCopy {
   name: string;
   sourceVersion: number;
   appVersion: string;
+  bytes: number;
 }
 
 /** The copies in `directory`, oldest first. Files with other names are not copies. */
 async function readCopies(directory: string): Promise<StoredCopy[]> {
-  return (await readdir(directory)).sort().flatMap((name) => {
+  const copies: StoredCopy[] = [];
+  for (const name of (await readdir(directory)).sort()) {
     const match = COPY_NAME.exec(name);
-    return match ? [{ name, sourceVersion: Number(match[1]), appVersion: match[2] ?? "" }] : [];
-  });
+    if (!match) continue;
+    const { size } = await stat(join(directory, name));
+    copies.push({ name, sourceVersion: Number(match[1]), appVersion: match[2] ?? "", bytes: size });
+  }
+  return copies;
 }
 
 /** Removes the `replaced` copies, then every copy except the newest `KEPT_DATABASE_COPIES`. Files with other names stay. */
