@@ -272,7 +272,9 @@ An agent can also give work to a channel from another conversation, such as its 
 the user. `list_channels` lists the open channels with their lead and members.
 `send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
 recipient agents, and optional file paths that the channel copies as attachments. The message has
-the sending agent as a member author with the id `agent:<agentId>`. The assignment of a root task
+the sending agent as a member author with the id `agent:<agentId>` (`channelHandoffAuthorId`). The
+channel view reads that id (`channelHandoffAgentId`) and draws the message as the agent's, on the
+agent side with the agent's name and face, not as a person's. The assignment of a root task
 from it starts with "Request from OpenBot teammate <name> (<agentId>)" (`assignmentText`), so the
 member does not read the agent's words as the user's. A follow-up under that line names its
 sender, such as "Follow-up from the user". Routing is the same as for a person's request: each named recipient and each opening @mention gets a root task, and with none the

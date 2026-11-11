@@ -22,6 +22,7 @@ import {
   CONTEXT_RESET_ITEM_TYPE,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
+  channelHandoffAuthorId,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
   type DeleteChannelMessageInput,
@@ -202,11 +203,6 @@ interface ChannelHandoffCommand {
 }
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
-
-/** The author id of a handoff request. Like `routine:`, it tells the message from a person's. */
-function channelHandoffAuthorId(agentId: string): string {
-  return `agent:${agentId}`;
-}
 
 /**
  * Owns channel commands and assignment scheduling. It never starts provider turns itself.
