@@ -70,8 +70,8 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   },
   {
     name: "channel_remember",
-    description:
-      "Save one short, durable fact about this channel that every member should keep. Save the same text again to correct it. This writes immediately.",
+    // The advertised schema has no maxLength, so the limit is in the description.
+    description: `Save one durable fact for every channel member to keep, up to ${INPUT_LIMITS.agentMemoryText} characters. Save the same text again to correct it. This writes immediately.`,
     shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
   },
   {

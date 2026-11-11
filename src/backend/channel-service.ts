@@ -3443,9 +3443,15 @@ export class ChannelService {
      * single dispatch keyed on this call, so a retried call reads its receipt and writes nothing.
      */
     if (tool === "channel_remember" || tool === "channel_forget_memory") {
-      if (!isString(args.text) || !args.text.trim() || args.text.length > INPUT_LIMITS.agentMemoryText)
+      if (!isString(args.text) || !args.text.trim())
         return yield* channelFailure(new Error("Provide the memory text."));
       const text = args.text;
+      // A refusal, not a failure: the agent reads the reason and can save shorter facts (#6632).
+      if (tool === "channel_remember" && text.length > INPUT_LIMITS.agentMemoryText)
+        return {
+          accepted: false,
+          reason: `A channel memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
+        };
       if (tool === "channel_remember")
         yield* channelSync(() => this.memories.saveFromTool(channelId, text, turnId, `channel-memory:${operationId}`));
       else if (!(yield* channelSync(() => this.memories.deleteByText(channelId, text))))
