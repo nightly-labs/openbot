@@ -172,7 +172,12 @@ function compact(schema: unknown): JsonValue | undefined {
     }
   }
   const { [KEEP_UNION_KEY]: keep, ...unmarked } = result;
-  if (keep === true) return unmarked;
+  if (keep === true) {
+    // As `anyOf`: Kimi Code CLI types a schema with no `type` as `string`, but keeps an `anyOf`. The tags
+    // differ, so one branch at most matches, as with `oneOf`.
+    const { oneOf, ...rest } = unmarked;
+    return Array.isArray(oneOf) && rest.anyOf === undefined ? { ...rest, anyOf: oneOf } : unmarked;
+  }
   result = unmarked;
   for (const union of ["oneOf", "anyOf"] as const) {
     const branches = result[union];
