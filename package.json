@@ -364,6 +364,7 @@
     "test:opencode-token-stream": "bun scripts/opencode-token-stream-e2e.ts",
     "test:provider-transcript-replay": "bun scripts/provider-transcript-replay-e2e.ts",
     "test:codex-transport-fallback": "bun scripts/codex-transport-fallback-e2e.ts",
+    "test:codex-warning-banner": "bun scripts/codex-warning-banner-e2e.ts",
     "test:filesystem": "bun scripts/filesystem-smoke.ts",
     "test:imagegen": "bun scripts/filesystem-smoke.ts --provider codex --imagegen",
     "test:workspace-only": "bun scripts/filesystem-smoke.ts --workspace-only",
