@@ -254,9 +254,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       return railPool(rail) ? [rail, ...keys] : keys;
     }),
   );
-  /** The account for `onChange`: only a provider with account entries sends one. */
-  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined =>
-    railAccounts(provider).length ? accountId : undefined;
+  /**
+   * The account for `onChange`: only a provider with account entries sends one. The pool entry keeps
+   * the account that the pool picked, and sends one only to move the agent off an API key.
+   */
+  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined => {
+    if (!railAccounts(provider).length) return undefined;
+    const keepsPoolPick = railPool(provider) && accountId === null && currentAccount() === null;
+    return keepsPoolPick ? undefined : accountId;
+  };
   /** The agent's account when the rail lists it; otherwise the provider's own sign-in. */
   const currentAccount = (): string | null => {
     const id = props.providerAccountId;
