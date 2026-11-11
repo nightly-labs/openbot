@@ -46,6 +46,7 @@ const PRESENTATION: AgentDockPresentation = {
   edge: "right",
   autoHide: false,
   edgeStrip: true,
+  sizePercent: 120,
   offsets: [{ displayId: 1, offset: 0.25 }],
   seats: [
     { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" } },
@@ -173,6 +174,10 @@ describe("agent dock handlers", () => {
       { edge: "top" },
       { autoHide: "yes" },
       { edgeStrip: "yes" },
+      { sizePercent: 141 },
+      { sizePercent: 69 },
+      { sizePercent: 100.5 },
+      { sizePercent: undefined },
       { offsets: [{ displayId: 1, offset: 1.5 }] },
       { offsets: [{ displayId: 1, offset: Number.NaN }] },
       { offsets: [{ displayId: -1, offset: 0.5 }] },

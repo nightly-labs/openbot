@@ -264,6 +264,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Перетащите док вверх или вниз, чтобы сдвинуть его вдоль края.",
   "settings.agentDock.edge.right": "Справа",
   "settings.agentDock.edge.left": "Слева",
+  "settings.agentDock.size.title": "Размер дока",
+  "settings.agentDock.size.description":
+    "Перетащите, чтобы изменить размер дока поверх других приложений. В главном окне док следует размеру интерфейса.",
   "settings.agentDock.autoHide.title": "Скрывать, когда не используется",
   "settings.agentDock.autoHide.description": "Док уходит за край. Подведите указатель к краю, чтобы показать его.",
   "settings.agentDock.edgeStrip.title": "Показывать полоску у края",

@@ -258,6 +258,9 @@ export const messages = {
   "settings.agentDock.edge.description": "ドックを上下にドラッグすると、端に沿って移動できます。",
   "settings.agentDock.edge.right": "右",
   "settings.agentDock.edge.left": "左",
+  "settings.agentDock.size.title": "ドックのサイズ",
+  "settings.agentDock.size.description":
+    "ドラッグして、他のアプリの上に表示するドックのサイズを変更します。メインウィンドウでは、ドックはインターフェイスのサイズに従います。",
   "settings.agentDock.autoHide.title": "使用していないときは隠す",
   "settings.agentDock.autoHide.description": "ドックが端に隠れます。ポインタを端に移動すると表示されます。",
   "settings.agentDock.edgeStrip.title": "端に細い帯を表示",

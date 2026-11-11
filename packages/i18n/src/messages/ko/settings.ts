@@ -257,6 +257,9 @@ export const messages = {
   "settings.agentDock.edge.description": "독을 위아래로 드래그하면 가장자리를 따라 이동합니다.",
   "settings.agentDock.edge.right": "오른쪽",
   "settings.agentDock.edge.left": "왼쪽",
+  "settings.agentDock.size.title": "독 크기",
+  "settings.agentDock.size.description":
+    "드래그하여 다른 앱 위에 표시되는 독의 크기를 바꿉니다. 기본 창에서는 독이 인터페이스 크기를 따릅니다.",
   "settings.agentDock.autoHide.title": "사용하지 않을 때 숨기기",
   "settings.agentDock.autoHide.description": "독이 가장자리 안으로 들어갑니다. 포인터를 가장자리로 옮기면 나타납니다.",
   "settings.agentDock.edgeStrip.title": "가장자리에 띠 표시",

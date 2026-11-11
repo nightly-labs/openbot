@@ -10,7 +10,8 @@
 }
 
 .settings-dynamic-island-size > .ui-slider-field,
-.settings-dynamic-island-preview {
+.settings-dynamic-island-preview,
+.settings-agent-dock-size {
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 

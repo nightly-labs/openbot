@@ -120,6 +120,7 @@ import {
   BrowserWindow,
   clipboard,
   desktopCapturer,
+  Menu,
   Notification,
   nativeImage,
   powerMonitor,
@@ -271,7 +272,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
-import { aboveAppsWindowKind, ozonePlatformArguments } from "./linux-wayland-output";
+import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -1085,6 +1086,11 @@ export async function createApplicationServices({
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
   const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
+  // Made here so the island menu can read it; it loads the saved language below, before the first window.
+  const language = new LanguageService({
+    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
+    systemLocale: app.getLocale(),
+  });
   // Windows: the dock and the island get the pointer moves only near them, not through a hook on each
   // mouse move of the computer.
   const pointerForwarding =
@@ -1104,6 +1110,23 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
+    showContextMenu: (window) =>
+      Menu.buildFromTemplate([
+        {
+          label: language.translate("menu.hideDynamicIsland"),
+          // Linux: as the switch in Settings, an island that is off does not need XWayland at the next start.
+          click: () =>
+            void runCauseEffect(
+              dynamicIsland
+                .hide()
+                .pipe(
+                  Effect.andThen(
+                    setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", false).pipe(Effect.ignore),
+                  ),
+                ),
+            ).catch((error: unknown) => logger.warn("The Dynamic Island did not turn off.", toLogValue(error))),
+        },
+      ]).popup({ window }),
     pointerForwarding,
     performCriticalAction: (action) =>
       Effect.suspend(() => {
@@ -1439,10 +1462,6 @@ export async function createApplicationServices({
   );
   // Loaded before the first window and before the application menu is built, so every native
   // surface draws in the saved language on the first frame rather than switching after startup.
-  const language = new LanguageService({
-    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
-    systemLocale: app.getLocale(),
-  });
   await runCauseEffect(language.load());
   const logoColor = new LogoColorService({ path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE) });
   await runCauseEffect(logoColor.load());

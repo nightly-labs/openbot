@@ -263,6 +263,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.edge.description": "Drag the dock up or down to move it along the edge.",
   "settings.agentDock.edge.right": "Right",
   "settings.agentDock.edge.left": "Left",
+  "settings.agentDock.size.title": "Dock size",
+  "settings.agentDock.size.description":
+    "Drag to change the size of the dock above the other apps. In the main window, the dock follows the interface size.",
   "settings.agentDock.autoHide.title": "Hide when not in use",
   "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
   "settings.agentDock.edgeStrip.title": "Show a strip at the edge",

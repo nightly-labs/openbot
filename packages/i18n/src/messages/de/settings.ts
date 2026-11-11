@@ -264,6 +264,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Zieh das Dock nach oben oder unten, um es am Rand zu verschieben.",
   "settings.agentDock.edge.right": "Rechts",
   "settings.agentDock.edge.left": "Links",
+  "settings.agentDock.size.title": "Dock-Größe",
+  "settings.agentDock.size.description":
+    "Ziehe, um die Größe des Docks über anderen Apps zu ändern. Im Hauptfenster folgt das Dock der Größe der Oberfläche.",
   "settings.agentDock.autoHide.title": "Ausblenden, wenn nicht benutzt",
   "settings.agentDock.autoHide.description":
     "Das Dock gleitet in den Rand. Beweg den Zeiger an den Rand, um es zu zeigen.",

@@ -18,6 +18,7 @@ export const messages = {
   "menu.trayOpen": "OpenBot 열기",
   "menu.trayQuit": "OpenBot 종료",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "Dynamic Island 숨기기",
   "menu.undo": "실행 취소",
   "menu.redo": "다시 실행",
   "menu.cut": "잘라내기",

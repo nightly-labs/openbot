@@ -263,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Trascina il dock in alto o in basso per spostarlo lungo il bordo.",
   "settings.agentDock.edge.right": "Destra",
   "settings.agentDock.edge.left": "Sinistra",
+  "settings.agentDock.size.title": "Dimensione del dock",
+  "settings.agentDock.size.description":
+    "Trascina per cambiare la dimensione del dock sopra le altre app. Nella finestra principale, il dock segue la dimensione dell'interfaccia.",
   "settings.agentDock.autoHide.title": "Nascondi quando non in uso",
   "settings.agentDock.autoHide.description": "Il dock scivola nel bordo. Porta il puntatore sul bordo per mostrarlo.",
   "settings.agentDock.edgeStrip.title": "Mostra una striscia sul bordo",

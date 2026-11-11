@@ -251,6 +251,9 @@ export const messages = {
   "settings.agentDock.edge.description": "גרירת המעגן למעלה או למטה מזיזה אותו לאורך הקצה.",
   "settings.agentDock.edge.right": "ימין",
   "settings.agentDock.edge.left": "שמאל",
+  "settings.agentDock.size.title": "גודל המעגן",
+  "settings.agentDock.size.description":
+    "גררו כדי לשנות את גודל המעגן מעל אפליקציות אחרות. בחלון הראשי, המעגן עוקב אחר גודל הממשק.",
   "settings.agentDock.autoHide.title": "הסתרה כשלא בשימוש",
   "settings.agentDock.autoHide.description": "המעגן נכנס לקצה. הזזת המצביע לקצה מציגה אותו.",
   "settings.agentDock.edgeStrip.title": "הצגת פס בקצה",

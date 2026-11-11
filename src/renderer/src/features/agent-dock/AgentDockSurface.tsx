@@ -331,6 +331,15 @@ export function AgentDockSurface() {
             onRemove={(seat) =>
               void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
             }
+            onMove={async (seat, before) => {
+              // A failed move puts the seats back in the dock.
+              await perform({
+                type: "move",
+                serverId: server,
+                seat: contractSeat(seat),
+                before: before ? contractSeat(before) : null,
+              });
+            }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
               const clientMessageId =
@@ -362,6 +371,7 @@ export function AgentDockSurface() {
             }
             onOpenLink={(url) => void perform({ type: "open-link", url }).catch(() => undefined)}
             onOpenSettings={() => void perform({ type: "open-settings" }).catch(() => undefined)}
+            onHide={() => void perform({ type: "hide" }).catch(() => undefined)}
             results={results()}
             onShelfChange={(shown) => {
               // A result that came shows the hidden dock until the shelf is empty.
