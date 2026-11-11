@@ -230,11 +230,19 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 /**
  * The live view's frames. The quality is what a page of text survives on a slow link, and the size
  * is the client's panel rather than the host's monitor: a frame larger than the panel that draws it
- * is bytes nobody sees.
+ * is bytes nobody sees. A client that names the screen pixels it draws at gets frames up to that size,
+ * so a wide panel or a high-density screen does not stretch a smaller frame. It never gets less than
+ * the size a client that names none gets.
  */
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+/** The largest frame side for any client, as Chrome's own screencast panel uses. */
+const VIEW_FRAME_LIMIT = 2_048;
+
+function viewFrameSide(asked: number | undefined, fallback: number): number {
+  return asked === undefined ? fallback : Math.min(VIEW_FRAME_LIMIT, Math.max(fallback, Math.round(asked)));
+}
 /** The agent browser tools that read or change the agent's tab set, and not one tab. */
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 /** How long after a live view's right-click the page's menu still belongs to that view. */
@@ -265,6 +273,8 @@ export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
   /** The page size, in CSS pixels, that the page keeps while the view is open. */
   viewport?: BrowserViewViewport;
+  /** The screen pixels the client draws a frame at. */
+  frameSize?: BrowserViewViewport;
 }
 
 /** A web address a member may copy from a menu. Other schemes and long addresses are left out. */
@@ -2138,7 +2148,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport } = options;
+    const { onCursor, viewport, frameSize } = options;
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
@@ -2169,8 +2179,8 @@ export class BrowserHost {
       const stop = yield* tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
-          maxWidth: VIEW_FRAME_MAX_WIDTH,
-          maxHeight: VIEW_FRAME_MAX_HEIGHT,
+          maxWidth: viewFrameSide(frameSize?.width, VIEW_FRAME_MAX_WIDTH),
+          maxHeight: viewFrameSide(frameSize?.height, VIEW_FRAME_MAX_HEIGHT),
           ...(viewport ? { viewport } : {}),
         },
         (frame) => {

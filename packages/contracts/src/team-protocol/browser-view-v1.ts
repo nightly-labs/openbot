@@ -91,6 +91,26 @@ export function browserViewClientViewport(url: URL): BrowserViewViewport | null 
 }
 
 /**
+ * A host that sends frames as large as the client draws them, up to its own limit. An older host
+ * sends at most 1280 by 800, which a wide panel or a high-density screen stretches and blurs.
+ */
+export const TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY = "browser-view-frame-size";
+/** The most screen pixels a client draws a frame at, on the view socket, as `2560x1600`. */
+export const BROWSER_VIEW_FRAME_SIZE_QUERY = "frame";
+
+export function browserViewFrameSizeQuery(size: BrowserViewViewport): string {
+  const bound = (value: number) => (Number.isFinite(value) ? Math.min(9_999, Math.max(1, Math.round(value))) : 1);
+  return `${bound(size.width)}x${bound(size.height)}`;
+}
+
+/** The frame size this client draws at, or null when it named none. The host applies its own limits. */
+export function browserViewClientFrameSize(url: URL): BrowserViewViewport | null {
+  const match = /^([1-9]\d{0,3})x([1-9]\d{0,3})$/u.exec(url.searchParams.get(BROWSER_VIEW_FRAME_SIZE_QUERY) ?? "");
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+/**
  * A host that sends the menu of a right-click to the client that made it, as a `context-menu`
  * message, and does not open its own menu. The host's menu opens on the host's screen, where a
  * member on a phone never sees it. The menu's Select All is the client's Cmd+A or Ctrl+A.
