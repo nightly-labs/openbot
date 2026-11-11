@@ -11,6 +11,13 @@ Claude uses its native question tool instead of `ask_user`. The direct tools are
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
 `routine_report_failure`. External plugin registration stays with each provider adapter.
 
+A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
+and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
+turn with no more text. Without the variable, Claude Code asked the model for a visible answer, and
+the agent wrote its result again (#6923). The CLI reads only direct tool names, not a `tool_call`.
+A refused call of these tools is a failed call, so the CLI still asks for an answer after it. Other
+threads do not get these tools, so their requests do not grow.
+
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or
 one `query` string, because models often send one string. Up to three strong results, an exact name or

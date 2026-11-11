@@ -65,6 +65,7 @@ import {
   RequestTimeoutError,
 } from "./agent-client";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
 import { claudeContextCategories } from "./claude-context-categories";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
@@ -276,6 +277,18 @@ const OPENBOT_CLAUDE_CLIENT = {
   CLAUDE_CODE_ENTRYPOINT: "openbot",
 };
 /**
+ * The channel tools whose accepted call ends the turn: the tool result tells the agent to end it with no
+ * more text. When a step ends with no text, Claude Code asks the model for a visible answer, and the agent
+ * wrote its channel result again (#6923). The CLI does not ask after a successful call of a tool in
+ * `CLAUDE_CODE_TERMINAL_MCP_TOOLS` (2.1.322). A refused call is a failed call (`openbot-tool-router.ts`),
+ * so after a refusal the CLI still asks. The CLI knows only the direct name of a tool, not a call
+ * through `tool_call`, so a channel thread gets these tools directly.
+ */
+const CLAUDE_TERMINAL_CHANNEL_TOOLS: readonly string[] = [
+  "mcp__openbot__channel_result",
+  "mcp__openbot__channel_reply",
+];
+/**
  * The client labels for a CLI environment. Anthropic bills a request with a label other than `sdk-*`
  * as Claude Code, and promotional API credit can leave Claude Code out: a key with $200 of such credit
  * got "Credit balance is too low" with `openbot`, and an answer with `sdk-ts` (#5550). An API key has
@@ -319,6 +332,8 @@ interface ThreadConfig {
   profileGeneration: boolean;
   /** Part of the config so that a change restarts the query with the new servers. */
   computerUse: boolean;
+  /** A channel thread: the channel tools that end a turn are direct tools (`CLAUDE_TERMINAL_CHANNEL_TOOLS`). */
+  channelTools: boolean;
   /**
    * Workspace only: Bash runs in the Claude sandbox, a file write outside the roots asks the user, and
    * the project settings do not load. See `claude-workspace-sandbox.ts`.
@@ -1279,7 +1294,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         : null;
     const plugins = [skillPlugin, homeSkillPlugin].filter((plugin) => plugin !== null);
     const launchPath = yield* cliLaunchPath(this.#cli.executable, this.#cli.source);
-    const openBotServers = handoff ? this.#createOpenBotServers(threadId) : {};
+    const openBotServers = handoff ? this.#createOpenBotServers(threadId, config.channelTools) : {};
     const nodeOptions = this.#agentEnvironment?.().NODE_OPTIONS;
     const mcpConfigFile =
       handoff && stateDirectory && Object.keys(handoff.servers).length > 0
@@ -1412,6 +1427,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // kept a second store under `~/.claude/projects` that the app cannot see, and its rules
             // took about 0.7k tokens in each request. The files stay on disk.
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+            ...(config.channelTools && handoff
+              ? { CLAUDE_CODE_TERMINAL_MCP_TOOLS: CLAUDE_TERMINAL_CHANNEL_TOOLS.join(",") }
+              : {}),
           },
         },
       }),
@@ -2487,14 +2505,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { thread: { id: threadId, turns } };
   });
 
-  #createOpenBotServers(threadId: string) {
+  #createOpenBotServers(threadId: string, channelTools: boolean) {
     const call = (namespace: string, name: string, args: unknown) =>
       runCauseEffect(this.#callDynamicTool(threadId, namespace, name, args));
     return {
       openbot: createSdkMcpServer({
         name: "openbot",
         version: "0.1.0",
-        tools: claudeOpenBotTools((name, args) => call("openbot", name, args)),
+        tools: claudeOpenBotTools((name, args) => call("openbot", name, args), channelTools),
       }),
       // Without alwaysLoad, the CLI puts these tools behind its ToolSearch, and Haiku loaded them with
       // a search before 23 of 30 browser tasks (`bun run bench:browser-tools`, 2026-11-10).
@@ -2693,9 +2711,18 @@ const writeClaudeFlagSettings = Effect.fn("ClaudeAgentClient.writeFlagSettings")
  * The tools of OpenBot's in-process MCP server for Claude. Claude uses the SDK's AskUserQuestion permission
  * flow. The SDK lists the JSON Schema of each shape, so the shape is the advertised schema that Codex also
  * gets, without validation-only keywords. The OpenBot tool router decodes each call with the full schema.
+ * A channel thread also gets the channel tools that end a turn (`CLAUDE_TERMINAL_CHANNEL_TOOLS`).
  */
-export function claudeOpenBotTools(call: (name: string, args: unknown) => Promise<CallToolResult>) {
-  return visibleToolDefinitions("claude")
+export function claudeOpenBotTools(
+  call: (name: string, args: unknown) => Promise<CallToolResult>,
+  channelTools = false,
+) {
+  const channel = channelTools
+    ? CHANNEL_TOOL_DEFINITIONS.filter((definition) =>
+        CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${definition.name}`),
+      )
+    : [];
+  return [...visibleToolDefinitions("claude"), ...channel]
     .filter((definition) => definition.name !== "ask_user")
     .map((definition) => {
       const shape = advertisedZodShape(z.strictObject(definition.shape));
@@ -3048,6 +3075,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     persistSession: !isRecord(params) || params.persistSession !== false,
     profileGeneration: isRecord(params) && params.profileGeneration === true,
     computerUse: computerUseParam(params),
+    channelTools: isRecord(params) && params.channelTools === true,
     workspaceOnly: isRecord(params) && params.workspaceOnly === true,
     excludedFolders:
       isRecord(params) && Array.isArray(params.excludedFolders)
