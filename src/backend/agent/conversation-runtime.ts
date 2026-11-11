@@ -372,23 +372,23 @@ export class ConversationRuntime {
         if (other !== cached && other.snapshot.messages === cached.snapshot.messages) committed.delete(other);
       }
     };
+    // The least recently used first. The sort is stable, so of two chats used at the same time, an
+    // agent chat goes before a thread, and each in map order, as before.
+    let byAge: Array<{ kind: "agent" | "execution"; id: string; cached: CachedSnapshot }> | undefined;
     while (this.#cachedSnapshotBytes > CONVERSATION_CACHE_TOTAL_BYTES_LIMIT) {
-      let oldest:
-        | { kind: "agent"; id: string; usedAt: number }
-        | { kind: "execution"; id: string; usedAt: number }
-        | undefined;
-      for (const [id, cached] of this.#cachedSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
+      byAge ??= [
+        ...[...this.#cachedSnapshots].map(([id, cached]) => ({ kind: "agent" as const, id, cached })),
+        ...[...this.#cachedExecutionSnapshots].map(([id, cached]) => ({ kind: "execution" as const, id, cached })),
+      ].sort((left, right) => left.cached.usedAt - right.cached.usedAt);
+      // A full signature is computed only for a chat that is the oldest one left, not for each
+      // cached chat. Each call on a full cache otherwise serialized the whole budget again (#7250).
+      const oldest = byAge.find(({ kind, id, cached }) => {
+        const current = kind === "agent" ? this.#cachedSnapshots.get(id) : this.#cachedExecutionSnapshots.get(id);
+        if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "agent", id, usedAt: cached.usedAt };
-      }
-      for (const [id, cached] of this.#cachedExecutionSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
-        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "execution", id, usedAt: cached.usedAt };
-      }
+          return false;
+        return isCommitted(cached);
+      });
       if (!oldest) return;
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
