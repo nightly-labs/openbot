@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Le impostazioni del canale hanno un'impostazione Browser. Scegli se ogni membro, un solo membro o nessun membro può usare il browser nel canale.",
+          "Il pannello laterale del canale ha un pannello Browser e un pannello File. Mostrano le schede dei membri del canale e i file inviati nel canale.",
+          "Fai clic destro sulla Dynamic Island o sul dock degli agenti per nasconderli. Puoi anche trascinare un agente in un nuovo punto del dock e cambiare la dimensione del dock nelle Impostazioni.",
+          "Puoi disattivare il gruppo Non lette nella barra laterale. Fai clic destro sul titolo Non lette oppure imposta Ordina chat su Manuale.",
+          "Quando una nuova versione non riesce ad avviarsi 3 volte di seguito, si apre una finestra di ripristino. Puoi riprovare, scaricare la versione precedente o esportare la diagnostica."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una nuova versione ora arriva prima a circa 1 computer su 10 e, circa un giorno dopo, a tutti i computer. Per riceverla subito, seleziona Cerca aggiornamenti.",
+          "Gli agenti fanno domande con opzioni nella finestra delle domande. Le schede con i pulsanti servono solo per le approvazioni."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una chat che hai letto non resta più nel gruppo Non lette. I thread secondari non letti, come quello di una routine, non tengono più lì un agente.",
+          "Su Windows, il dock degli agenti e la Dynamic Island non rallentano più il puntatore in tutte le app mentre molti agenti lavorano.",
+          "Un team non si ferma più quando il responsabile del canale termina il turno senza risposta, dopo che i membri del team hanno riportato i risultati.",
+          "Una chat di Claude diventata troppo lunga ora avvia una nuova sessione con la cronologia della chat. Prima, ogni messaggio falliva con \"Prompt is too long\".",
+          "Quando un account Claude raggiunge il limite di 5 ore, l'agente passa al modello di backup o attende il ripristino.",
+          "Un agente può salvare uno screenshot del browser come file e allegarlo alla sua risposta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

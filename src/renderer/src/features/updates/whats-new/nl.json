@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanaalinstellingen hebben een instelling Browser. Kies of elk lid, één lid of niemand de browser in het kanaal mag gebruiken.",
+          "Het zijpaneel van een kanaal heeft een paneel Browser en een paneel Bestanden. Ze tonen de tabbladen van de leden van het kanaal en de bestanden die in het kanaal zijn verstuurd.",
+          "Klik met de rechtermuisknop op het Dynamic Island of het agentdock om het te verbergen. Je kunt een agent ook naar een nieuwe plek op het dock slepen en de grootte van het dock wijzigen in Instellingen.",
+          "Je kunt de groep Ongelezen in de zijbalk uitzetten. Klik met de rechtermuisknop op de kop Ongelezen, of zet Chats sorteren op Handmatig.",
+          "Als een nieuwe versie 3 keer na elkaar niet kan starten, opent een herstelvenster. Je kunt het opnieuw proberen, de vorige versie downloaden of diagnostiek exporteren."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een nieuwe versie gaat nu eerst naar ongeveer 1 op de 10 computers, en ongeveer een dag later naar alle computers. Om hem meteen te krijgen, selecteer je Zoeken naar updates.",
+          "Agents stellen vragen met opties in het vraagvenster. Kaarten met knoppen zijn alleen voor goedkeuringen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een chat die je hebt gelezen, blijft niet langer in de groep Ongelezen. Ongelezen zijthreads, zoals de thread van een routine, houden een agent daar niet langer vast.",
+          "Op Windows maken het agentdock en het Dynamic Island de muisaanwijzer niet langer traag in alle apps terwijl veel agents werken.",
+          "Een team stopt niet langer wanneer de leider zijn beurt eindigt zonder antwoord nadat zijn teamgenoten hebben gerapporteerd.",
+          "Een Claude-chat die te lang was geworden, start nu een nieuwe sessie met de chatgeschiedenis. Eerder mislukte elk bericht met \"Prompt is too long\".",
+          "Wanneer een Claude-account zijn limiet van 5 uur bereikt, gaat de agent naar zijn reservemodel of wacht hij tot de limiet is gereset.",
+          "Een agent kan een browserscreenshot als bestand opslaan en aan zijn antwoord toevoegen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanal ayarlarında bir Tarayıcı ayarı var. Tarayıcıyı kanalda her üyenin, yalnızca bir üyenin veya hiçbir üyenin kullanıp kullanamayacağını seçin.",
+          "Kanalın yan panelinde Tarayıcı ve Dosyalar bölmeleri var. Bunlar kanal üyelerinin sekmelerini ve kanalda gönderilen dosyaları gösterir.",
+          "Dynamic Island'ı veya ajan yuvasını gizlemek için sağ tıklayın. Ayrıca bir ajanı yuvada yeni bir yere sürükleyebilir ve Ayarlar'da yuvanın boyutunu değiştirebilirsiniz.",
+          "Kenar çubuğundaki Okunmamış grubunu kapatabilirsiniz. Okunmamış başlığına sağ tıklayın veya Sohbetleri sırala'yı Elle olarak ayarlayın.",
+          "Yeni bir sürüm 3 kez üst üste başlatılamazsa bir kurtarma penceresi açılır. Yeniden deneyebilir, önceki sürümü indirebilir veya tanılamayı dışa aktarabilirsiniz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yeni sürüm önce bilgisayarların yaklaşık onda birine, yaklaşık bir gün sonra da tüm bilgisayarlara gider. Hemen almak için Güncellemeleri denetle'yi seçin.",
+          "Ajanlar soruları seçeneklerle soru penceresinde sorar. Düğmeli kartlar yalnızca onaylar için kullanılır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Okuduğunuz bir sohbet artık Okunmamış grubunda kalmaz. Bir rutinin konusu gibi okunmamış yan konular artık bir ajanı bu grupta tutmaz.",
+          "Windows'ta ajan yuvası ve Dynamic Island, birçok ajan çalışırken tüm uygulamalarda imleci yavaşlatmaz artık.",
+          "Lider, takım arkadaşları sonuç bildirdikten sonra yanıt vermeden turunu bitirdiğinde takım artık durmaz.",
+          "Uzun olan bir Claude sohbeti artık sohbet geçmişiyle yeni bir oturum başlatır. Önceden her ileti \"Prompt is too long\" hatasıyla başarısız oluyordu.",
+          "Bir Claude hesabı 5 saatlik sınırına ulaştığında ajan yedek modeline geçer veya sıfırlanmayı bekler.",
+          "Bir ajan, tarayıcı ekran görüntüsünü dosya olarak kaydedip yanıtına ekleyebilir."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

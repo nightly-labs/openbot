@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "As configurações do canal têm uma opção Navegador. Escolha se todos os membros, um membro ou nenhum membro pode usar o navegador no canal.",
+          "O painel lateral do canal tem um painel Navegador e um painel Arquivos. Eles mostram as abas dos membros do canal e os arquivos enviados no canal.",
+          "Clique com o botão direito na Dynamic Island ou no dock de agentes para ocultá-los. Você também pode arrastar um agente para outro lugar no dock e mudar o tamanho do dock em Configurações.",
+          "Você pode desativar o grupo Não lidas na barra lateral. Clique com o botão direito no título Não lidas ou defina Ordenar conversas como Manual.",
+          "Quando uma nova versão não consegue iniciar 3 vezes seguidas, abre uma janela de recuperação. Você pode tentar de novo, baixar a versão anterior ou exportar o diagnóstico."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Uma nova versão agora vai primeiro para cerca de 1 em cada 10 computadores, e para todos os computadores cerca de um dia depois. Para recebê-la logo, selecione Buscar atualizações.",
+          "Os agentes fazem perguntas com opções na janela de perguntas. Os cartões com botões são só para aprovações."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Um chat que você leu não fica mais no grupo Não lidas. Threads paralelas não lidas, como a thread de uma rotina, não mantêm mais um agente ali.",
+          "No Windows, o dock de agentes e a Dynamic Island não deixam mais o ponteiro lento em todos os apps enquanto vários agentes trabalham.",
+          "Uma equipe não para mais quando o líder encerra a vez sem resposta depois que os colegas enviam os resultados.",
+          "Um chat do Claude que ficou longo demais agora inicia uma nova sessão com o histórico do chat. Antes, cada mensagem falhava com \"Prompt is too long\".",
+          "Quando uma conta do Claude atinge o limite de 5 horas, o agente passa para o modelo de reserva ou espera a redefinição.",
+          "Um agente pode salvar uma captura de tela do navegador como arquivo e anexá-la à resposta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],
