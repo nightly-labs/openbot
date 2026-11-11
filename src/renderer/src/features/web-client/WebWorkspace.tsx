@@ -1981,16 +1981,37 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
   );
   const readState = () => workspace.conversation()?.page?.readState;
+  const readsOpenChat = () =>
+    !agentFormOpen() && !channelOpen() && canMarkRead() && heldUnreadAgentId() !== workspace.state.selectedId;
+  /*
+   * The read state that the chat shows. The host counts a reply as unread until this tab marks it
+   * read, so each reply would move the unread line to it and the chat would jump. A reply that comes
+   * while the reader can read the loaded chat is read at once, as on the desktop: the chat keeps the
+   * line of its opening. The messages of the opening, of a time away and of Mark unread keep theirs.
+   */
+  const shownReadState = createMemo<{ visit: string; seen: boolean; unreadCount: number; firstUnread: string | null }>(
+    (previous) => {
+      const conversation = workspace.conversation();
+      const page = conversation?.page;
+      const visit = `${workspace.state.host?.hostId ?? ""}:${workspace.state.selectedId ?? ""}:${page?.threadId ?? ""}`;
+      const readable = readsOpenChat();
+      const seenBefore = previous?.visit === visit && previous.seen;
+      const seen = seenBefore || (readable && Boolean(page) && conversation?.loading === false);
+      if (seenBefore && readable) return { visit, seen, unreadCount: 0, firstUnread: null };
+      return {
+        visit,
+        seen,
+        unreadCount: page?.readState?.unreadCount ?? 0,
+        firstUnread: page?.readState?.firstUnreadMessageId ?? null,
+      };
+    },
+  );
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
   // coming back reads the page again.
   createEffect(
     () =>
-      (readState()?.unreadCount ?? 0) > 0 &&
-      !agentFormOpen() &&
-      !channelOpen() &&
-      canMarkRead() &&
-      heldUnreadAgentId() !== workspace.state.selectedId
+      (readState()?.unreadCount ?? 0) > 0 && readsOpenChat()
         ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
         : null,
     (unread) => {
@@ -3656,8 +3677,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   messages={view.messages}
                   messageReferences={view.messageReferences()}
                   missingMessageReferences={view.missingMessageReferences()}
-                  unreadCount={readState()?.unreadCount ?? 0}
-                  firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
+                  unreadCount={shownReadState().unreadCount}
+                  firstUnreadMessageId={shownReadState().firstUnread}
                   loaded={Boolean(workspace.conversation()?.page)}
                   hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
                   unloadedHistory={unloadedHistory(workspace.conversation()?.page?.pageInfo)}
