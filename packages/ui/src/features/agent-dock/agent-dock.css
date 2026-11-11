@@ -525,11 +525,6 @@
   font-weight: 500;
 }
 
-.agent-dock-text {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
 /* The chat's Markdown, a size down to fit the panel. */
 .agent-dock-markdown {
   min-width: 0;
