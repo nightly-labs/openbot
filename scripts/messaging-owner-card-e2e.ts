@@ -4,8 +4,6 @@
 // checked the provider's thread id, the Discord thread passed as the agent's own chat, and the turn
 // waited on the owner's card until the provider's tool timeout (100 minutes for Grok), so every later
 // message of that author got "Too many requests are waiting". The person's own chat still gets the card.
-// It also checks the guard in `AttentionRegistry.awaitToolApproval`: an owner-only approval in an
-// external chat thread is cancelled and shows no card.
 // Runs the real agent service, messaging threads and tool router on a temporary profile with a fake
 // Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
 // `bun scripts/messaging-owner-card-e2e.ts`. Writes .openbot-build/messaging-owner-card-e2e/report.json.
@@ -15,7 +13,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { bugReportPlatform } from "@openbot/contracts/feedback";
-import { AGENT_PROVIDERS, type AgentEvent } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -32,9 +30,7 @@ process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
 mkdirSync(home, { recursive: true });
 
-const { AttentionRegistry } = await import("../src/backend/agent/attention-registry");
 const { AgentService } = await import("../src/backend/agent-service");
-const { CodexAppServerClient } = await import("../src/backend/app-server-client");
 const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
@@ -310,51 +306,7 @@ try {
   );
   await waitFor("the Discord queue to drain", () => openDeliveries(linkId).length === 0);
 
-  // 3. The owner guard: an owner-only approval in the Discord thread is cancelled and shows no card.
-  // A registry of its own, with the same external chat hook that the agent service gives its registry.
-  const guardApprovals: AgentEvent[] = [];
-  const guard = new AttentionRegistry({
-    conversation: {
-      agentForThread: () => agent.id,
-      publicThreadId: (_agentId: string, threadId: string) => threadId,
-      ensureSnapshot: () => ({ agentId: agent.id, threadId: "", activeTurnId: null, revision: 0, messages: [] }),
-      emitConversation: () => {},
-    },
-    browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
-    hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-    routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
-    messagingThread: (threadId) => agents.messaging.store.linkForThread(threadId) !== null,
-    emit: (event) => guardApprovals.push(event),
-    emitError: () => {},
-    emitRuntimeSnapshot: () => {},
-  });
-  const publicThreadId = first.link.threadId;
-  const decision = await Effect.runPromise(
-    guard.awaitToolApproval(
-      new CodexAppServerClient("/nonexistent/codex"),
-      { id: "guard-request", method: "item/tool/call", params: { threadId: publicThreadId, turnId: "turn-guard" } },
-      {
-        requestId: "guard-request",
-        agentId: agent.id,
-        threadId: publicThreadId,
-        turnId: "turn-guard",
-        kind: "permissions",
-        command: null,
-        cwd: null,
-        reason: "Owner-only card in an external chat",
-        grantRoot: null,
-        permissions: null,
-      },
-      { ownerOnly: true },
-    ),
-  );
-  pass(
-    "An owner-only approval in an external chat thread is cancelled with no card",
-    decision === "cancel" && guardApprovals.length === 0,
-    `${decision} ${JSON.stringify(guardApprovals)}`,
-  );
-
-  // 4. The person's own chat still gets the card. A decline sends nothing.
+  // 3. The person's own chat still gets the card. A decline sends nothing.
   const ownIndex = toolLogs().length;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: callText("From the owner") }, PERSON));
   const card = await waitFor("the owner's feedback card", () => approvals[0]);

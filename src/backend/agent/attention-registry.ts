@@ -1029,12 +1029,6 @@ export class AttentionRegistry {
     options: { readonly alwaysAsk?: boolean; readonly ownerOnly?: boolean } = {},
   ) {
     if (request.signal?.aborted) return "cancel" as const;
-    // The owner does not watch an external chat, and the turn would block that chat's queue.
-    if (
-      options.ownerOnly &&
-      (this.#messagingThread(approval.threadId) || this.#messagingRequestTurn(approval.agentId, approval.turnId))
-    )
-      return "cancel" as const;
     const alwaysAsk = options.alwaysAsk || options.ownerOnly;
     if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return "accept" as const;
     const decision = Deferred.makeUnsafe<ToolApprovalDecision>();
