@@ -51,6 +51,9 @@ export const messages = {
     "OpenBot はすべてのエージェントに独自の {slug} スキルを提供します。このスキルには別の名前を付けてください。",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md が 64 KB を超えています。公開する前に短くしてください。",
   "error.skill.localNoRevisions": "ローカルスキルに公開済みのリビジョンがありません。",
+  "error.skill.localNotFound": "このローカルスキルは存在しません。ローカルスキルの一覧で ID を確認してください。",
+  "error.skill.localRevisionNotFound":
+    "このローカルスキルにはリビジョン {revision} がありません。最新のリビジョンは {latest} です。",
   "error.skill.localNameTaken": "この名前のローカルスキルはすでに存在します。代わりにそのスキルを改訂してください。",
   "error.skill.localKeepName": "スキルを改訂するときは、スキル名を変更しないでください。",
   "error.skill.localRelativeFolder":
