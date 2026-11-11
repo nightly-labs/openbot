@@ -751,7 +751,8 @@ export class OpenBotToolRouter {
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
                   if (params.tool !== "screenshot") return result;
-                  const workspacePath = this.#hooks.listAgents().find((agent) => agent.id === agentId)?.workspacePath;
+                  // The attachment gateway resolves the same workspace when the agent attaches the file.
+                  const workspacePath = () => this.#conversation.requireKnownAgent(agentId).workspacePath;
                   return yield* saveBrowserScreenshot(workspacePath, params.arguments, result);
                 }
               }
