@@ -12,7 +12,7 @@ import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
 /** An agent's notice that it sends a failed model request again (`AcpFlavor.retryNotice`). */
-export interface AcpRetryNotice {
+interface AcpRetryNotice {
   readonly sessionId: string;
   readonly attempt: number;
   readonly maxAttempts: number;
