@@ -173,6 +173,21 @@ await scenario("F A quoted frontmatter with another unsaved edit still refuses",
   return { revise };
 });
 
+await scenario("G Copies at the new revision and at another saved revision install", async (context) => {
+  await mkdir(join(context.workspace, "other"), { recursive: true });
+  await writeFile(join(context.workspace, "other/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  await Effect.runPromise(context.library.revise(AGENT_ID, context.skillId, 1, "other"));
+  const skillFile = (folder: string) => join(context.workspace, folder, context.slug, "SKILL.md");
+  await writeFile(skillFile(".claude/skills"), skillMarkdown("First.", "Revision 2."));
+  await writeFile(skillFile(".agents/skills"), skillMarkdown("First.", "Revision 3."));
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 3."));
+  const revise = await reviseFrom(context, 2, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@3");
+  return { revise, after };
+});
+
 await mkdir(".openbot-build", { recursive: true });
 await writeFile(".openbot-build/skill-install-local-changes-e2e.json", `${JSON.stringify(report, null, 2)}\n`);
 if (report.some((entry) => !entry.passed)) process.exitCode = 1;

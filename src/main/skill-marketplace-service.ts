@@ -481,7 +481,10 @@ export class SkillMarketplaceService {
           state === "modified" &&
           !replaceModified &&
           !(yield* onlyNewFiles(agent.workspacePath, existing, [folders])) &&
-          !(yield* onlyNewFiles(agent.workspacePath, existing, yield* this.savedRevisionFolders(detail)))
+          !(yield* onlyNewFiles(agent.workspacePath, existing, [
+            folders,
+            ...(yield* this.savedRevisionFolders(detail)),
+          ]))
         )
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.replaceModified")) });
       }
