@@ -390,9 +390,27 @@ export const NATURAL_TURN_REMINDER = [
   "</openbot_turn_style>",
 ].join("\n");
 
+const STEER_NOTE_START = "<openbot_steer>";
+const STEER_NOTE_BODY =
+  "It adds to your current work and does not cancel it. If it asks a question, answer the question first in a short line. If it changes or corrects the work, apply the change from this point. Then continue the unfinished work; do not start it again. Stop the current work only when the message tells you to stop or to do different work.";
+
+/**
+ * The block in front of a message that joins a running turn. A provider that sends such a message
+ * to its model as plain user text gives no sign that the turn was in progress, and the model can
+ * then drop its work for the new message. Claude Code and Grok Build write a note of their own,
+ * so their steers get none (`steerNoteFor`).
+ */
+export function steerNote(sender: "user" | "teammate"): string {
+  return [
+    STEER_NOTE_START,
+    `${sender === "user" ? "The user" : "A teammate"} sent the next message while you work on this turn. ${STEER_NOTE_BODY}`,
+    "</openbot_steer>",
+  ].join("\n");
+}
+
 /**
  * Whether a user text block is one that `memoryContextUpdate`, `sectionTeammatesUpdate`,
- * `instructionsFileUpdate` or the turn style reminder wrote, not text that a person wrote.
+ * `instructionsFileUpdate`, the turn style reminder or `steerNote` wrote, not text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {
   return [
@@ -402,6 +420,7 @@ export function isTurnContextBlock(text: string): boolean {
     INSTRUCTIONS_FILE_BLOCK_START,
     SAVED_LOGINS_BLOCK_START,
     TURN_STYLE_START,
+    STEER_NOTE_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
@@ -413,7 +432,7 @@ export function isTurnContextBlock(text: string): boolean {
  */
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
