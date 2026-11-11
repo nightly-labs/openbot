@@ -23,6 +23,12 @@ export interface ServerSkillLearningOptions {
 }
 
 /**
+ * The last value that this window read for each server. The row shows it at once when the settings
+ * open again, so the row does not change its size when the host answers.
+ */
+const lastSettings = new Map<string, HostSkillLearning>();
+
+/**
  * Server Settings > General: whether the memory review of the agents of this computer or a joined
  * server saves the skills it learns, asks first, or does not look for skills (`skill-learning-v1`).
  * The values come from the host. The host checks the role again.
@@ -46,16 +52,21 @@ export function ServerSkillLearningSetting(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getSkillLearning(serverId)
         .then(
           (next) => {
+            lastSettings.set(serverId, next);
             if (current === generation) setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.skillLearningLoadFailed")));
+            lastSettings.delete(serverId);
+            if (current === generation) {
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.skillLearningLoadFailed")));
+            }
           },
         );
     },
@@ -77,6 +88,7 @@ export function ServerSkillLearningSetting(
     const request = generation;
     void props.run("skillLearning", async () => {
       const next = await calls().setSkillLearning(mode, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }

@@ -23,6 +23,12 @@ export interface ServerMemoryLimitOptions {
 }
 
 /**
+ * The last value that this window read for each server. The row shows it at once when the settings
+ * open again, so the row does not change its size when the host answers.
+ */
+const lastSettings = new Map<string, HostAgentMemoryLimit>();
+
+/**
  * Server Settings > General: how many memories each agent of this computer or a joined server can
  * keep (`agent-memory-limit-v1`). The values come from the host. The host checks the role again.
  */
@@ -45,16 +51,21 @@ export function ServerMemoryLimitSetting(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getAgentMemoryLimit(serverId)
         .then(
           (next) => {
+            lastSettings.set(serverId, next);
             if (current === generation) setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.memoryLimitLoadFailed")));
+            lastSettings.delete(serverId);
+            if (current === generation) {
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.memoryLimitLoadFailed")));
+            }
           },
         );
     },
@@ -67,6 +78,7 @@ export function ServerMemoryLimitSetting(
     const request = generation;
     void props.run("memoryLimit", async () => {
       const next = await calls().setAgentMemoryLimit(limit, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }

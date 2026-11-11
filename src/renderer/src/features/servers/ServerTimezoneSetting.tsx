@@ -40,6 +40,12 @@ function zoneNames(locale: string, zone: string): string {
 const AUTOMATIC = "automatic";
 
 /**
+ * The last value that this window read for each server. The row shows it at once when the settings
+ * open again, so the row does not change its size when the host answers.
+ */
+const lastSettings = new Map<string, HostTimezoneSettings>();
+
+/**
  * Server Settings > General: the zone of a routine that an agent creates when neither the tool call
  * nor the sender's message names one (`host-timezone-v1`). The host checks the role again.
  */
@@ -62,16 +68,21 @@ export function ServerTimezoneSetting(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getTimezone(serverId)
         .then(
           (next) => {
+            lastSettings.set(serverId, next);
             if (current === generation) setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.timezoneLoadFailed")));
+            lastSettings.delete(serverId);
+            if (current === generation) {
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.timezoneLoadFailed")));
+            }
           },
         );
     },
@@ -98,6 +109,7 @@ export function ServerTimezoneSetting(
     const request = generation;
     void props.run("timezone", async () => {
       const next = await calls().setTimezone(zone === AUTOMATIC ? null : zone, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }
@@ -108,7 +120,15 @@ export function ServerTimezoneSetting(
         <ItemTitle id="server-settings-timezone-label">{t("server.settings.timezone")}</ItemTitle>
         <ItemDescription>{loadError() ?? t("server.settings.timezoneDescription")}</ItemDescription>
       </ItemContent>
-      <Show when={settings()}>
+      <Show
+        when={settings()}
+        fallback={
+          // The zone list keeps its place while it loads, so the description does not wrap again when it shows.
+          <Show when={loadError() === null}>
+            <ItemActions class="server-settings-timezone-pending" />
+          </Show>
+        }
+      >
         {(current) => (
           <ItemActions>
             <SearchSelect<string>

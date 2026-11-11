@@ -12,6 +12,12 @@ export interface ServerBrowsingMemoryOptions {
 }
 
 /**
+ * The last value that this window read for each server. The row shows it at once when the settings
+ * open again, so the row does not change its size when the host answers.
+ */
+const lastSettings = new Map<string, HostBrowsingMemory>();
+
+/**
  * Server Settings > General: whether the host records what a person does in an agent tab they hold,
  * so that the memory review learns how those sites work (`browsing-memory-v1`). The host checks the
  * role again.
@@ -34,17 +40,21 @@ export function ServerBrowsingMemorySetting(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getBrowsingMemory(serverId)
         .then(
           (next) => {
+            lastSettings.set(serverId, next);
             if (current === generation) setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation)
+            lastSettings.delete(serverId);
+            if (current === generation) {
+              setSettings(null);
               setLoadError(errorMessage(error, t("server.settings.browsingMemoryLoadFailed")));
+            }
           },
         );
     },
@@ -57,6 +67,7 @@ export function ServerBrowsingMemorySetting(
     const request = generation;
     void props.run("browsingMemory", async () => {
       const next = await calls().setBrowsingMemory(enabled, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }

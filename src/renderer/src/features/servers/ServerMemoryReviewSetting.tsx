@@ -23,6 +23,12 @@ export interface ServerMemoryReviewOptions {
 }
 
 /**
+ * The last value that this window read for each server. The row shows it at once when the settings
+ * open again, so the row does not change its size when the host answers.
+ */
+const lastSettings = new Map<string, HostMemoryReview>();
+
+/**
  * Server Settings > General: how many completed turns of one conversation pass between two
  * background memory reviews of the agents of this computer or a joined server, or Off
  * (`memory-review-v1`). The values come from the host. The host checks the role again.
@@ -46,16 +52,21 @@ export function ServerMemoryReviewSetting(
     () => props.serverId,
     (serverId) => {
       const current = ++generation;
-      setSettings(null);
+      setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       untrack(calls)
         .getMemoryReview(serverId)
         .then(
           (next) => {
+            lastSettings.set(serverId, next);
             if (current === generation) setSettings(next);
           },
           (error: unknown) => {
-            if (current === generation) setLoadError(errorMessage(error, t("server.settings.memoryReviewLoadFailed")));
+            lastSettings.delete(serverId);
+            if (current === generation) {
+              setSettings(null);
+              setLoadError(errorMessage(error, t("server.settings.memoryReviewLoadFailed")));
+            }
           },
         );
     },
@@ -75,6 +86,7 @@ export function ServerMemoryReviewSetting(
     const request = generation;
     void props.run("memoryReview", async () => {
       const next = await calls().setMemoryReview(interval, serverId);
+      lastSettings.set(serverId, next);
       if (request === generation) setSettings(next);
     });
   }
