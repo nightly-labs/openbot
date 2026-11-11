@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.takeOver": "Assumir",
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
   "browser.error.openAddress": "Não foi possível abrir o endereço nesta aba.",
+  "browser.error.channelNoBrowserMember": "Nenhum membro pode abrir uma nova aba neste canal.",
   "browser.error.closeTab": "Não foi possível fechar a aba do navegador.",
   "browser.error.reloadTab": "Não foi possível recarregar a aba do navegador.",
   "browser.error.stopLoading": "Não foi possível parar o carregamento da página.",

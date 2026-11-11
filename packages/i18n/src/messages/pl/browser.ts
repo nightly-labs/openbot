@@ -94,6 +94,7 @@ export const messages = {
   "browser.secret.takeOver": "Przejmij",
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
   "browser.error.openAddress": "Nie udało się otworzyć adresu w tej karcie.",
+  "browser.error.channelNoBrowserMember": "Żaden członek nie może otworzyć nowej karty w tym kanale.",
   "browser.error.closeTab": "Nie udało się zamknąć karty przeglądarki.",
   "browser.error.reloadTab": "Nie udało się odświeżyć karty przeglądarki.",
   "browser.error.stopLoading": "Nie udało się zatrzymać wczytywania strony.",

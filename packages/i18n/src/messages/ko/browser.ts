@@ -89,6 +89,7 @@ export const messages = {
   "browser.secret.takeOver": "직접 제어",
   "browser.secret.failed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
   "browser.error.openAddress": "이 탭에서 주소를 열 수 없어요.",
+  "browser.error.channelNoBrowserMember": "이 채널에서는 새 탭을 열 수 있는 멤버가 없어요.",
   "browser.error.closeTab": "브라우저 탭을 닫을 수 없어요.",
   "browser.error.reloadTab": "브라우저 탭을 새로고침할 수 없어요.",
   "browser.error.stopLoading": "페이지 로딩을 중지할 수 없어요.",

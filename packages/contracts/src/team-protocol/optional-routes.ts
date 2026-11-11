@@ -116,6 +116,7 @@ import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
+import { STORAGE_CHANNEL_CODECS } from "./storage-channel-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { THREAD_MESSAGE_SEARCH_CODECS } from "./thread-message-search-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
@@ -215,6 +216,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WEBHOOK_TESTS_CODECS,
   ...WEBHOOK_SENDER_SECRET_CODECS,
   ...STORAGE_DISK_CODECS,
+  ...STORAGE_CHANNEL_CODECS,
   ...MACHINE_RESOURCES_CODECS,
   ...PROVIDER_ACCOUNTS_CODECS,
   ...PROVIDER_ACCOUNT_RELAY_CODECS,

@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.takeOver": "Prendre la main",
   "browser.secret.failed": "Impossible de terminer la demande. Vérifiez la connexion et réessayez.",
   "browser.error.openAddress": "Impossible d’ouvrir l’adresse dans cet onglet.",
+  "browser.error.channelNoBrowserMember": "Aucun membre ne peut ouvrir un nouvel onglet dans ce canal.",
   "browser.error.closeTab": "Impossible de fermer l’onglet du navigateur.",
   "browser.error.reloadTab": "Impossible d’actualiser l’onglet du navigateur.",
   "browser.error.stopLoading": "Impossible d’arrêter le chargement de la page.",

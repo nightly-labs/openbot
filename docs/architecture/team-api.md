@@ -539,6 +539,14 @@ bytes into a data URL. Over WebRTC, a `PUT` body and a `GET` answer go as file t
 avatars. Without the capability a client hides the picture control for that host, and the channel
 shows its member faces.
 
+The optional `channel-browser-v1` capability (protocol 9 only) adds `browser` to the channel side
+routes and to a `save` draft (#4135): `{ kind: "members" }`, `{ kind: "none" }` or
+`{ kind: "member", agentId }`. Absent on a draft keeps the stored value; absent on a record is every
+member. A present value that a client cannot read reads as `none`. The host adds and reads the key only
+for a request that advertises the capability, so released peers see the same `channels-v1` wire, and a
+save from such a peer keeps the setting. Without the capability a client hides the Browser select for
+that host.
+
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 
 Protocol support has no fixed time or release limit. Removal is an exceptional architecture decision. It requires a security issue, data-loss risk, semantics that cannot be kept, or technical cost that cannot be contained in an adapter. The decision must also include a changelog entry, update instructions, tests for old-client/new-host and new-client/old-host directions, and clear blocking UI.

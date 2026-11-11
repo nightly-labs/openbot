@@ -18,15 +18,18 @@ export function createMockStorage(): StorageDesktopApi {
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
+    // The fixtures hold no channel messages, so a channel has no files here.
     const inScope = (agentId: string | null, conversationId: string | null) =>
       input.scope === "host" ||
-      (input.scope === "agent" ? agentId === input.agentId : conversationId === input.conversationId);
+      (input.scope === "agent" && agentId === input.agentId) ||
+      (input.scope === "conversation" && conversationId === input.conversationId);
     const scopedFiles = files.filter((file) => inScope(file.agentId, file.conversation?.id ?? null));
     const agentBreakdown = input.scope === "agent" && input.agentId === "chief" ? FILES_CHIEF_BREAKDOWN : [];
     return structuredClone({
       scope: input.scope,
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
+      ...(input.channelId === undefined ? {} : { channelId: input.channelId }),
       scannedAt: new Date().toISOString(),
       freeBytes: FREE_BYTES,
       breakdown: input.scope === "host" ? breakdown : agentBreakdown,
