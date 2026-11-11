@@ -1660,8 +1660,9 @@ apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
-and asks Google's Code Assist service (`cloudcode-pa.googleapis.com`) for the account's project and
-quota, as the CLI does. The requests carry that token and a User-Agent with the CLI's version, your
+and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
+`daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
+The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
 operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.
