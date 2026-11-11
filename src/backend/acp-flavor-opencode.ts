@@ -1,4 +1,5 @@
 import { RequestError } from "@agentclientprotocol/sdk";
+import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
@@ -48,6 +49,11 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
  * OpenCode sign-in sent the user to the wrong place.
+ *
+ * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
+ * user's country: `opencode run` shows "This model is not available in your country". A free model
+ * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
+ * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
  */
 function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
@@ -56,6 +62,8 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
       endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
+  if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
+    return sourceText("error.provider.opencodeFreeModelRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
