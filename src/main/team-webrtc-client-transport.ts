@@ -74,8 +74,8 @@ interface TeamWebRtcClientTransportEvents {
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
-  /** An attempt to connect failed. A cancelled or replaced attempt does not count. */
-  connectFailed: [hostId: string];
+  /** An attempt to connect failed, with its failure. A cancelled or replaced attempt does not count. */
+  connectFailed: [hostId: string, failure: unknown];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
 
@@ -897,7 +897,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             CONNECT_RETRY_START_MILLISECONDS * 2 ** (failures - 1),
           );
           this.#connectRetries.set(hostId, { failure, failures, retryAt: Date.now() + delay });
-          this.emit("connectFailed", hostId);
+          this.emit("connectFailed", hostId, failure.cause);
         }),
       ),
       Effect.onExit((exit) => Deferred.done(done, exit)),
@@ -1053,7 +1053,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       const timeOut = () => {
         cleanup();
-        reject(new Error(sourceText("error.remote.hostDidNotConnect")));
+        // With no data channel open, the network path did not come up: a firewall, VPN or proxy can
+        // block it while the host is online on Signal (#6873).
+        reject(
+          active.authentication?.started
+            ? new Error(sourceText("error.remote.hostDidNotConnect"))
+            : new TeamWebRtcConnectError("connect_timeout", sourceText("error.remote.iceFailed")),
+        );
       };
       let timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
       let hostWaited = false;
@@ -1550,7 +1556,10 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
   }
 }
 
-/** The connection failed before the host answered. The code is the Signal or the bridge code. */
+/**
+ * The connection failed before the host answered. The code is the Signal or the bridge code, or
+ * `connect_timeout` when no data channel opened in time.
+ */
 class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
   code: Schema.String,
   message: Schema.String,
