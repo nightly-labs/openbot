@@ -564,7 +564,14 @@ function ProviderPage(props: PageProps) {
   const runtimeMissing = () => {
     const runtime = props.option.runtimeStatus;
     return (
-      Boolean(runtime) && runtime?.phase !== "ready" && runtime?.version === null && !row.available() && !row.off()
+      Boolean(runtime) &&
+      runtime?.phase !== "ready" &&
+      runtime?.version === null &&
+      !row.available() &&
+      // A CLI that is too old is there: it keeps its key, Runtime and Use. A missing ChatGPT or
+      // Claude CLI reports "error", so that state cannot tell a broken CLI from none.
+      props.option.state !== "outdated" &&
+      !row.off()
     );
   };
   const modelVisibility = createMemo(() => props.modelVisibility);
@@ -1181,7 +1188,12 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
     if (percent !== null) return t("provider.picker.downloading", { percent: format.percent(percent / 100) });
     // The CLI is downloaded, and the provider status has not yet found it or the host reports no
     // sign-in: the card offers Connect, so it must not say that the CLI is not installed.
-    if (!props.option.email && row().state() === "not-installed" && row().runtimeStatus()?.phase === "ready")
+    if (
+      !props.option.email &&
+      row().state() === "not-installed" &&
+      !row().connecting() &&
+      row().runtimeStatus()?.phase === "ready"
+    )
       return t("provider.status.notConnected");
     return (
       props.option.email ??

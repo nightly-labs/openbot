@@ -317,14 +317,16 @@ export function createProviderRuntimeStore(
       }
     }
     for (const provider of failed) {
-      if (updating.has(provider) || !isManagedRuntimeProvider(provider)) continue;
-      const previous = current.providers[provider];
-      const next = snapshot.providers[provider];
+      if (updating.has(provider)) continue;
+      const previous = runtimeStatus(provider, current);
+      const next = runtimeStatus(provider, snapshot);
       // Only the crossing into a current runtime: a failed check leaves a runtime that was ready
       // ready, and the next unrelated snapshot must not take that failure away.
-      if (next.phase !== "ready" || next.availableVersion) continue;
-      if (previous.phase === "ready" && previous.version === next.version) continue;
+      if (next?.phase !== "ready" || next.availableVersion) continue;
+      if (previous?.phase === "ready" && previous.version === next.version) continue;
       failed.delete(provider);
+      // The CLI is there now, so a later download of this provider is an update.
+      installing.delete(provider);
       hideProviderUpdateToast(provider);
     }
   }
