@@ -159,7 +159,7 @@ interface HostAdminIpcDependencies {
 }
 
 // The user of this computer owns its server, so the roles give them every agent.
-const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
+export const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
 
 /** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
 type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | HostUpdateSettingsChange;

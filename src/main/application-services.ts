@@ -310,6 +310,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
+import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -720,6 +721,7 @@ export interface ApplicationServices {
   agentNotificationLevels: AgentNotificationLevelStore;
   sidebarPins: SidebarPinStore;
   agentAccess: AgentAccessStore;
+  mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
@@ -1503,6 +1505,7 @@ export async function createApplicationServices({
       ),
   });
   const mcpServerOwners = new McpServerOwnersStore(join(app.getPath("userData"), MCP_SERVER_OWNERS_FILE));
+  const mcpAccessStore = new McpAccessStore(join(app.getPath("userData"), MCP_ACCESS_FILE));
   const serverTimezone = new ServerTimezonePreferenceStore(
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
   );
@@ -1567,10 +1570,11 @@ export async function createApplicationServices({
     ],
     { concurrency: "unbounded", discard: true },
   );
-  const [setupState, palettesWatch, rolesLoaded] = await Promise.all([
+  const [setupState, palettesWatch, rolesLoaded, mcpAccessLoaded] = await Promise.all([
     runCauseEffect(readSetupState(setupFile)),
     runCauseEffect(appearance.load()).then(() => Effect.runPromise(appearance.followPalettes())),
     runCauseEffect(agentAccess.load()),
+    runCauseEffect(mcpAccessStore.load()),
     runCauseEffect(loadPreferences),
   ]);
   const analyticsPreference = await Effect.runPromise(
@@ -1579,6 +1583,10 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.themePalettes, "the theme palette watch", palettesWatch);
   if (!rolesLoaded)
     logger.warn("The roles file did not load. Members get no access to agents until an admin saves the roles.");
+  if (!mcpAccessLoaded)
+    logger.warn(
+      "The MCP access file did not load. No agent or member gets an MCP server until an admin saves its access.",
+    );
   void Effect.runPromise(appBehavior.refreshLoginItem()).catch((error) =>
     logger.warn("The login item did not refresh.", toLogValue(error)),
   );
@@ -2136,6 +2144,7 @@ export async function createApplicationServices({
       const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
       return config ? { config, setupSteps: server.setupSteps } : null;
     },
+    mcpAgentAccess: (mcpServerId, agentId) => mcpAccessStore.allowsAgent(mcpServerId, agentId),
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
         startToolRuntimes: () => {
@@ -3071,6 +3080,24 @@ export async function createApplicationServices({
   );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
+  // A set that changes which agents get the server gives each agent a new provider session, as a saved
+  // server does. A set that changes only the levels of members leaves the sessions as they are.
+  const mcpAccess: McpAccessControl = {
+    revision: () => mcpAccessStore.revision(),
+    get: (mcpServerId) => mcpAccessStore.get(mcpServerId),
+    set: (change, existing) =>
+      Effect.suspend(() => {
+        const before = mcpAccessStore.get(change.mcpServerId).agents;
+        return mcpAccessStore
+          .set(change, existing)
+          .pipe(
+            Effect.andThen(
+              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+            ),
+          );
+      }),
+    remove: (mcpServerId) => mcpAccessStore.remove(mcpServerId),
+  };
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3089,6 +3116,8 @@ export async function createApplicationServices({
     // Present, so the host advertises `mcp-member-access-v1`. A member then uses the MCP routes too,
     // and changes only the servers that they added.
     mcpServerOwners,
+    // Present, so the host advertises `mcp-access-v1`: the agents of each MCP server and the level of each role.
+    mcpAccess,
     // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only without `mcpServerOwners`.
     mcpSignIns: mcpHostSignIns,
     // Present, so the host advertises `sign-in-relay-v1`. The routes are admin-only, but for a member's
@@ -4264,6 +4293,7 @@ export async function createApplicationServices({
     agentNotificationLevels,
     sidebarPins,
     agentAccess,
+    mcpAccess,
     serverAudit,
     serverTimezone,
     serverPersonality,

@@ -168,6 +168,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Deze client ondersteunt geen beveiligde verificatie.",
   "error.team.agentSettingsUnsupported": "Deze verbinding ondersteunt geen instellingen van agents.",
   "error.team.adminRequired": "Beheerderstoegang is verplicht.",
+  "error.team.mcpAccessStale": "Iemand heeft de toegang tot deze MCP-server gewijzigd. Breng je wijziging opnieuw aan.",
   "error.team.mcpServerNotYours":
     "Alleen de persoon die deze MCP-server heeft toegevoegd, of een beheerder, kan hem wijzigen.",
   "error.team.ownerRequired": "Alleen de eigenaar van deze server kan dit doen.",

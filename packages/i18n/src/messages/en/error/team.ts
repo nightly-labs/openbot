@@ -164,6 +164,7 @@ export const messages = defineMessages("error.team", {
   "error.team.secureAuthUnsupported": "Secure authentication is not supported by this client.",
   "error.team.agentSettingsUnsupported": "Agent settings are not supported by this connection.",
   "error.team.adminRequired": "Administrator access is required.",
+  "error.team.mcpAccessStale": "Someone changed the access to this MCP server. Make your change again.",
   "error.team.mcpServerNotYours": "Only the person who added this MCP server, or an admin, can change it.",
   "error.team.ownerRequired": "Only the owner of this server can do this.",
   "error.team.requestTooLarge": "Request body is too large.",

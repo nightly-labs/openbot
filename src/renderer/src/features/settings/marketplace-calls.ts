@@ -1,4 +1,10 @@
-import type { AddedAgent, InstallMarketplaceAgentInput, McpSignInRelayPage } from "@openbot/contracts/ipc";
+import type {
+  AddedAgent,
+  InstallMarketplaceAgentInput,
+  McpAccessSnapshot,
+  McpSignInRelayPage,
+  SetMcpAccessInput,
+} from "@openbot/contracts/ipc";
 import { appPort } from "../../app-port";
 import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } from "../../skills-port";
 
@@ -20,6 +26,8 @@ export interface MarketplaceCalls {
     | "signInMcpServer"
     | "testMcpServer"
   >;
+  /** Who gets each MCP server (`mcp-access-v1`). Absent: this client cannot change it. */
+  mcpAccess?: MarketplaceMcpAccessCalls | undefined;
   /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
   addAgent: (input: InstallMarketplaceAgentInput, serverId: string | undefined) => Promise<AddedAgent>;
   openUrl: (url: string) => Promise<void>;
@@ -32,6 +40,13 @@ export interface MarketplaceCalls {
    * browser client gives the local Worker's origin while a developer runs it.
    */
   shareOrigin?: string | undefined;
+}
+
+/** The MCP access of this computer (`serverId` absent) or of a joined server, and the roles it names. */
+interface MarketplaceMcpAccessCalls {
+  get: (serverId: string) => Promise<McpAccessSnapshot>;
+  set: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
+  roles: (serverId: string) => Promise<readonly { id: string; name: string }[]>;
 }
 
 /** The relayed sign-in of the app at `url` on the joined server `serverId`, while it waits. */
@@ -49,6 +64,11 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
     agents: port.marketplaceAgents,
     agentSkills: agentSkillCalls,
     mcp: port.agent,
+    mcpAccess: {
+      get: (serverId) => port.agent.getMcpAccess(serverId),
+      set: (input, serverId) => port.agent.setMcpAccess(input, serverId),
+      roles: async (serverId) => (await port.hostAdmin.getAgentAccess(serverId)).roles ?? [],
+    },
     addAgent: async (input, serverId) =>
       serverId ? port.agent.addMarketplaceAgent(input, serverId) : (await port.marketplaceAgents.install(input)).agent,
     openUrl: (url) => appPort().openUrl(url),

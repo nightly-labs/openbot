@@ -182,6 +182,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L’authentification sécurisée n’est pas prise en charge par ce client.",
   "error.team.agentSettingsUnsupported": "Les réglages des agents ne sont pas pris en charge par cette connexion.",
   "error.team.adminRequired": "Un accès administrateur est requis.",
+  "error.team.mcpAccessStale": "Quelqu’un a modifié l’accès à ce serveur MCP. Refaites votre modification.",
   "error.team.mcpServerNotYours":
     "Seule la personne qui a ajouté ce serveur MCP, ou un administrateur, peut le modifier.",
   "error.team.ownerRequired": "Seul le propriétaire de ce serveur peut faire cela.",

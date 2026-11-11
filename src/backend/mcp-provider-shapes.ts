@@ -23,8 +23,12 @@ import { getRecord } from "./protocol";
 
 const execFileAsync = promisify(execFile);
 
-/** Where a provider client reads the enabled configurations at spawn. */
-export type McpServerSource = () => readonly McpServerConfig[];
+/**
+ * Where a provider client reads the enabled configurations at spawn. With an agent, the answer has
+ * only the servers that the agent gets (`mcp-access-v1`); `null` is a session with no known agent.
+ * Without an argument the answer has each enabled server, which is what secret redaction reads.
+ */
+export type McpServerSource = (agentId?: string | null) => readonly McpServerConfig[];
 
 /**
  * What OpenBot can lend a machine that does not have it: the `bin` directories of the tool runtimes

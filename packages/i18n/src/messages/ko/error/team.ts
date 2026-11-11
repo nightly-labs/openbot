@@ -162,6 +162,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "이 클라이언트는 보안 인증을 지원하지 않아요.",
   "error.team.agentSettingsUnsupported": "이 연결에서는 에이전트 설정을 지원하지 않아요.",
   "error.team.adminRequired": "관리자 권한이 필요해요.",
+  "error.team.mcpAccessStale": "다른 사람이 이 MCP 서버의 접근 권한을 변경했어요. 다시 변경해 주세요.",
   "error.team.mcpServerNotYours": "이 MCP 서버는 추가한 사람이나 관리자만 변경할 수 있어요.",
   "error.team.ownerRequired": "이 서버의 소유자만 할 수 있어요.",
   "error.team.requestTooLarge": "요청 본문이 너무 커요.",

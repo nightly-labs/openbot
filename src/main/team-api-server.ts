@@ -6,6 +6,7 @@ import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
+  type AgentAccessRole,
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
@@ -181,6 +182,7 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   type MachineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
@@ -245,10 +247,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import { agentAccessLevel } from "./agent-access-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { listenLoopback } from "./listen-loopback";
+import { mcpAccessLevel } from "./mcp-access-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
-import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
+import type { TeamApiMcpServerOwners, TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
 import {
   hiddenAgentView,
@@ -342,6 +345,7 @@ import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./tea
 import { routeLocalServers } from "./team-api/route-local-servers";
 import { routeMachineResources } from "./team-api/route-machine-resources";
 import { routeMcpServers } from "./team-api/route-mcp";
+import { routeMcpAccess } from "./team-api/route-mcp-access";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
@@ -1108,7 +1112,13 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
-      const { mcpServers, mcpServerOwners } = this.#options;
+      const { mcpServers } = this.#options;
+      const mcpServerOwners = this.#mcpServerOwners();
+      if (
+        (await routeMcpAccess(context, mcpServers, this.#options.mcpAccess, mcpServerOwners, () => this.#roles())) ===
+        "handled"
+      )
+        return;
       if (
         (await routeMcpServers(context, mcpServers, this.#options.mcpToolRuntimePreparation, mcpServerOwners)) ===
         "handled"
@@ -2394,6 +2404,34 @@ export class TeamApiServer {
     return blocked;
   }
 
+  /** The roles of this host, or none when a damaged file closes them. */
+  #roles(): readonly AgentAccessRole[] {
+    const serverId = this.#options.store.getIdentity()?.serverId;
+    const levels = serverId ? this.#options.agentAccess?.levels(serverId) : undefined;
+    return levels && levels !== "closed" ? levels.roles : [];
+  }
+
+  /**
+   * Who added each MCP server, with the level of a member for it when the host keeps access entries
+   * (`mcp-access-v1`). A removed server also loses its entry.
+   */
+  #mcpServerOwners(): TeamApiMcpServerOwners | undefined {
+    const { mcpServerOwners: owners, mcpAccess } = this.#options;
+    if (!owners || !mcpAccess) return owners;
+    return {
+      addedBy: (mcpServerId, memberId) => owners.addedBy(mcpServerId, memberId),
+      add: (mcpServerId, memberId) => owners.add(mcpServerId, memberId),
+      remove: (mcpServerId) => owners.remove(mcpServerId).pipe(Effect.andThen(mcpAccess.remove(mcpServerId))),
+      level: (mcpServerId, memberId) =>
+        mcpAccessLevel(
+          mcpAccess.get(mcpServerId),
+          this.#accessMember(memberId),
+          this.#roles(),
+          owners.addedBy(mcpServerId, memberId),
+        ),
+    };
+  }
+
   // A push or a socket has only a member ID. A member that the store does not know gets the
   // levels of a plain member, so an unknown ID does not get more than the roles give.
   #accessMember(member: AccessMember | string): AccessMember {
@@ -2468,6 +2506,8 @@ export class TeamApiServer {
           // A member changes only the servers that they added, so the host must know who added each.
           if (capability === MCP_MEMBER_ACCESS_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpServerOwners !== undefined;
+          if (capability === MCP_ACCESS_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpAccess !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
           if (capability === SIGN_IN_RELAY_CAPABILITY)

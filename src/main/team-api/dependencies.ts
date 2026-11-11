@@ -53,6 +53,7 @@ import type {
   CentralAuthUser,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
+  McpAccessLevel,
   RemoteControlAccess,
   RoutineResultConnectionOption,
   RoutineResultDestination,
@@ -88,6 +89,7 @@ import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { LibraryFoldersService } from "../library-folders-service";
 import type { LiveActivityPushService } from "../live-activity-push";
+import type { McpAccessControl } from "../mcp-access-store";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { McpServerOwnersStore } from "../mcp-server-owners-store";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
@@ -210,7 +212,19 @@ export type TeamApiMcpServers = Pick<
  * Who added each MCP server. Its presence, beside `mcpServers`, is what `#protocolSupport` advertises
  * `mcp-member-access-v1` on.
  */
-export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove">;
+export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove"> & {
+  /**
+   * The level of a member for an MCP server (`mcp-access-v1`). Absent on a host without the access
+   * entries: a member then manages a server that the member added, and uses each other one.
+   */
+  level?(mcpServerId: string, memberId: string): McpAccessLevel;
+};
+
+/**
+ * Which agents get each MCP server, and the level of each role for it. Its presence, beside
+ * `mcpServers`, is what `#protocolSupport` advertises `mcp-access-v1` on.
+ */
+export type TeamApiMcpAccess = McpAccessControl;
 
 /** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
 export type TeamApiMcpSignIns = Pick<
@@ -706,6 +720,7 @@ export interface TeamApiOptions {
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;
   mcpServerOwners?: TeamApiMcpServerOwners | undefined;
+  mcpAccess?: TeamApiMcpAccess | undefined;
   mcpSignIns?: TeamApiMcpSignIns | undefined;
   signInRelay?: TeamApiSignInRelay | undefined;
   connectors?: TeamApiConnectors | undefined;

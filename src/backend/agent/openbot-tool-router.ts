@@ -343,7 +343,8 @@ export interface OpenBotToolRouterHooks {
   updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Effect.Effect<AgentSummary, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
-  enabledMcpServers(): McpServerConfig[];
+  /** With an agent, only the servers that the agent gets. */
+  enabledMcpServers(agentId?: string): McpServerConfig[];
   emitError(code: string, error: unknown, agentId?: string): void;
   /** Masks the MCP secret values and handoff values that `redactText` does not know. */
   redactMcp(text: string): string;
@@ -1476,7 +1477,7 @@ export class OpenBotToolRouter {
   readonly #readAgent = Effect.fn("OpenBotToolRouter.readAgent")(function* (this: OpenBotToolRouter, agentId: string) {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
-    const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(), computerUse);
+    const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(

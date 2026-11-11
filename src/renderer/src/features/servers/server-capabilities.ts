@@ -42,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-sign-in-app-v1" ||
       capability === "mcp-accounts-v1" ||
       capability === "mcp-member-access-v1" ||
+      capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||

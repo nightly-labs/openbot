@@ -776,6 +776,7 @@ function registerIpcHandlers({
   skillLearning,
   browsingMemory,
   agentAccess,
+  mcpAccess,
   serverAudit,
   teamStore,
   serverTimezone,
@@ -1057,6 +1058,7 @@ function registerIpcHandlers({
     }),
     ...mcpServerIpcHandlers({
       service,
+      mcpAccess,
       remoteServers,
       startToolRuntimes: () => {
         Effect.runFork(providerRuntimes.ensureToolRuntimes());

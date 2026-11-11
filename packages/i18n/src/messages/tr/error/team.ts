@@ -159,6 +159,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Güvenli kimlik doğrulaması bu istemci tarafından desteklenmiyor.",
   "error.team.agentSettingsUnsupported": "Ajan ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.adminRequired": "Yönetici erişimi gereklidir.",
+  "error.team.mcpAccessStale": "Birisi bu MCP sunucusuna erişimi değiştirdi. Değişikliğinizi yeniden yapın.",
   "error.team.mcpServerNotYours": "Bu MCP sunucusunu yalnızca onu ekleyen kişi veya bir yönetici değiştirebilir.",
   "error.team.ownerRequired": "Bunu yalnızca bu sunucunun sahibi yapabilir.",
   "error.team.requestTooLarge": "İstek gövdesi çok büyük.",

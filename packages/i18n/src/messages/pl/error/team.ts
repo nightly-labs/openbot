@@ -160,6 +160,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Ten klient nie obsługuje bezpiecznego uwierzytelniania.",
   "error.team.agentSettingsUnsupported": "To połączenie nie obsługuje ustawień agentów.",
   "error.team.adminRequired": "Wymagany jest dostęp administratora.",
+  "error.team.mcpAccessStale": "Ktoś zmienił dostęp do tego serwera MCP. Wprowadź zmianę ponownie.",
   "error.team.mcpServerNotYours": "Ten serwer MCP może zmienić tylko osoba, która go dodała, albo administrator.",
   "error.team.ownerRequired": "Tylko właściciel tego serwera może to zrobić.",
   "error.team.requestTooLarge": "Treść żądania jest za duża.",
