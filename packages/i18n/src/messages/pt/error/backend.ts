@@ -161,6 +161,10 @@ export const messages = {
     "O estado da caixa de mensagens está corrompido ou é de uma versão mais recente do OpenBot; ele não será sobrescrito.",
   "error.backend.recipientDeleting": "O destinatário está sendo excluído. Tente novamente quando a exclusão terminar.",
   "error.backend.recipientHidden": "Este agente está oculto. Restaure-o para enviar mensagens.",
+  "error.backend.agentIdUnknown":
+    "Nenhum agente tem o ID {id}. Obtenha os IDs com openbot.list_agents e tente novamente.",
+  "error.backend.agentIdNear":
+    "Nenhum agente tem o ID {id}. O agente {name} tem o ID {nearId}, quase igual. Se você quer esse agente, tente novamente com o ID dele.",
   "error.backend.attachBetween": "Anexe de 1 a {limit} arquivos.",
   "error.backend.attachmentNotFile": "O anexo não é um arquivo: {path}",
   "error.backend.generatedImageTooLarge": "A imagem gerada excede o limite de 100 MB.",

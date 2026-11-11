@@ -13,6 +13,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
+import { unknownAgentMessage } from "./unknown-agent";
 
 export const interruptAgentToolSchema = z.strictObject({
   agentId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
@@ -73,8 +74,9 @@ export class AgentInterruptTool {
   ) {
     const { agentId, reason } = yield* toolStep(() => interruptAgentToolSchema.parse(params.arguments));
     if (agentId === callerAgentId) return openBotToolFailure(sourceText("error.backend.interruptSelf"));
-    if (!this.#hooks.listAgents().some((agent) => agent.id === agentId)) {
-      return yield* new ToolOperationFailed({ cause: new Error(`Unknown OpenBot agent: ${agentId}`) });
+    const agents = this.#hooks.listAgents();
+    if (!agents.some((agent) => agent.id === agentId)) {
+      return yield* new ToolOperationFailed({ cause: new Error(unknownAgentMessage(agentId, agents)) });
     }
 
     // A delivery on its way to a turn has no turn id yet. Wait for the drain that starts it, as

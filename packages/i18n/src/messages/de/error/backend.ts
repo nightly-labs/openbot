@@ -165,6 +165,10 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Der Empfänger wird gelöscht. Versuche es nach Abschluss des Löschvorgangs erneut.",
   "error.backend.recipientHidden": "Dieser Agent ist ausgeblendet. Stelle ihn wieder her, um Nachrichten zu senden.",
+  "error.backend.agentIdUnknown":
+    "Kein Agent hat die ID {id}. Hole die IDs mit openbot.list_agents und versuche es erneut.",
+  "error.backend.agentIdNear":
+    "Kein Agent hat die ID {id}. Der Agent {name} hat die fast gleiche ID {nearId}. Wenn du diesen Agenten meinst, versuche es mit seiner ID erneut.",
   "error.backend.attachBetween": "Hänge zwischen 1 und {limit} Dateien an.",
   "error.backend.attachmentNotFile": "Der Anhang ist keine Datei: {path}",
   "error.backend.generatedImageTooLarge": "Das erstellte Bild überschreitet die Grenze von 100 MB.",

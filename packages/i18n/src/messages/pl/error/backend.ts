@@ -156,6 +156,10 @@ export const messages = {
     "Stan skrzynki jest uszkodzony lub pochodzi z nowszej wersji OpenBot; odmowa nadpisania.",
   "error.backend.recipientDeleting": "Odbiorca jest usuwany. Spróbuj ponownie po zakończeniu usuwania.",
   "error.backend.recipientHidden": "Ten agent jest ukryty. Przywróć go, aby wysyłać wiadomości.",
+  "error.backend.agentIdUnknown":
+    "Żaden agent nie ma identyfikatora {id}. Pobierz identyfikatory z openbot.list_agents i spróbuj ponownie.",
+  "error.backend.agentIdNear":
+    "Żaden agent nie ma identyfikatora {id}. Agent {name} ma prawie taki sam identyfikator {nearId}. Jeśli chodzi o tego agenta, spróbuj ponownie z jego identyfikatorem.",
   "error.backend.attachBetween": "Załącz od 1 do {limit} plików.",
   "error.backend.attachmentNotFile": "Załącznik nie jest plikiem: {path}",
   "error.backend.generatedImageTooLarge": "Wygenerowany obraz przekracza limit 100 MB.",

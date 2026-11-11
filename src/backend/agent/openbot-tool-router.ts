@@ -176,6 +176,7 @@ import {
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
+import { unknownAgentMessage } from "./unknown-agent";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
 import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
 
@@ -2684,10 +2685,11 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
-      const known = new Map(this.#hooks.listAgents().map((agent) => [agent.id, agent]));
+      const agents = this.#hooks.listAgents();
+      const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        if (!agent) throw new Error(`Unknown OpenBot agent: ${recipient}`);
+        if (!agent) throw new Error(unknownAgentMessage(recipient, agents));
         // A hidden agent receives no new messages until the user restores it.
         if (agent.hiddenAt !== undefined)
           throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);
