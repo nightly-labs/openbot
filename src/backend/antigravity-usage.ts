@@ -12,8 +12,8 @@
 // (403) unless the User-Agent names Antigravity. Google sends the "Gemini Models" group only to the
 // desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). A
 // Google account sign-in (`oauth-personal`, the only one whose token OpenBot reads) uses its quota on
-// the daily host, so its answer comes first; the other host only adds the groups that the daily host
-// left out, and gives the whole reading when the daily host fails. OpenBot reads the access token from
+// the daily host, so the quota comes only from that host: the other host's room for the account can
+// be wrong, and a wrong "spent" reading would hold Gemini turns. OpenBot reads the access token from
 // the CLI's token file and never refreshes it: the CLI refreshes it while it runs. A token that has
 // expired, an API key sign-in, or a failed call gives no reading, and the usage popover then shows no
 // Gemini usage.
@@ -103,7 +103,6 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
   );
   if (!accessToken) return NO_USAGE;
   const testEndpoint = localTestUrl(process.env[DEV_CODE_ASSIST_URL]);
-  const quotaEndpoints = testEndpoint ? [testEndpoint] : [DAILY_CODE_ASSIST_URL, CODE_ASSIST_URL];
   const call = <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
     Effect.tryPromise(async (signal) => {
       const response = await fetch(`${endpoint}:${method}`, {
@@ -119,17 +118,12 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
       if (!response.ok) throw new Error(`Code Assist answered ${response.status}.`);
       return await response.text();
     }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(answer))));
-  const quotaSummary = (project: string) =>
-    Effect.forEach(
-      quotaEndpoints,
-      (endpoint) =>
-        call(endpoint, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary).pipe(
-          Effect.orElseSucceed((): AntigravityQuotaSummary => ({})),
-        ),
-      { concurrency: "unbounded" },
-    ).pipe(Effect.map(firstGroupByName));
   return yield* call(testEndpoint ?? CODE_ASSIST_URL, "loadCodeAssist", {}, LoadCodeAssistAnswer).pipe(
-    Effect.flatMap(({ cloudaicompanionProject: project }) => (project ? quotaSummary(project) : Effect.succeed({}))),
+    Effect.flatMap(({ cloudaicompanionProject: project }) =>
+      project
+        ? call(testEndpoint ?? DAILY_CODE_ASSIST_URL, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary)
+        : Effect.succeed({}),
+    ),
     Effect.map((summary) => antigravityRateLimits(summary, options.model)),
     Effect.orElseSucceed(() => NO_USAGE),
   );
@@ -140,26 +134,6 @@ function localTestUrl(override: string | undefined): string | null {
   const url = override && URL.canParse(override) ? new URL(override) : null;
   const local = url?.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
   return local && override ? override.replace(/\/+$/u, "") : null;
-}
-
-/**
- * The groups of each host's answer, in host order. A later host adds only a group that no earlier host
- * gave with a reading: its room is not the room of the account's own host.
- */
-function firstGroupByName(summaries: readonly AntigravityQuotaSummary[]): AntigravityQuotaSummary {
-  const named = new Set<string>();
-  const groups: NonNullable<AntigravityQuotaSummary["groups"]>[number][] = [];
-  for (const summary of summaries) {
-    const added: string[] = [];
-    for (const group of summary.groups ?? []) {
-      const name = group.displayName?.trim().toLowerCase();
-      if (name && named.has(name)) continue;
-      groups.push(group);
-      if (name && group.buckets?.some((bucket) => bucket.remainingFraction !== undefined)) added.push(name);
-    }
-    for (const name of added) named.add(name);
-  }
-  return { groups };
 }
 
 /**
