@@ -397,7 +397,7 @@ function createTransport(
   }
   return new StdioClientTransport({
     command: server.command ?? config.command,
-    args: config.args,
+    args: server.args,
     // The resolved directory, not the stored one: process creation does not expand a leading `~`,
     // which the form's own example uses.
     ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
