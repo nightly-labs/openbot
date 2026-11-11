@@ -39,7 +39,12 @@ import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
-import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
+import {
+  type AgentClient,
+  AgentProcessExitError,
+  type AgentProvider,
+  PROCESSOR_FEATURE_MISSING,
+} from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
@@ -197,13 +202,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
-/**
- * A CLI built for a processor feature that this computer does not have, such as AES (#7111). Its Go
- * runtime names the feature and then stops with SIGILL. Only that line counts: a crash bug in a
- * running CLI can also end with SIGILL, and that CLI works on this computer.
- */
+/** A CLI that a processor stopped; `PROCESSOR_FEATURE_MISSING` tells whether a missing feature is the cause. */
 const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
-const PROCESSOR_FEATURE_MISSING = /\bthis feature is not available on this processor\b/iu;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
