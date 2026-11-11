@@ -64,6 +64,8 @@ interface DockWindow {
   window: BrowserWindow;
   rendererId: number;
   displayId: number;
+  /** X11: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
+  shape?: AgentDockInputRect[];
 }
 
 export class AgentDockWindowController {
@@ -202,9 +204,15 @@ export class AgentDockWindowController {
   /** X11: only these parts of the window take the pointer, and only they show. */
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
     if (this.#options.windowKind !== "x11") return;
-    const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
-    // The renderer measures in CSS px. The shape is in window px, which the page zoom makes larger or smaller.
-    window?.setShape(rects.map((rect) => zoomedRect(rect, this.#zoom())));
+    const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
+    if (!entry) return;
+    entry.shape = rects;
+    this.#applyShape(entry);
+  }
+
+  /** The renderer measures in CSS px. The shape is in window px, which the page zoom makes larger or smaller. */
+  #applyShape(entry: DockWindow): void {
+    if (entry.shape) entry.window.setShape(entry.shape.map((rect) => zoomedRect(rect, this.#zoom())));
   }
 
   /**
@@ -265,9 +273,12 @@ export class AgentDockWindowController {
   }
 
   /** The dock window has its own zoom (`setZoomMode("isolated")`), so the main window zoom does not change it. */
-  #applyZoom(window: BrowserWindow): void {
+  #applyZoom(entry: DockWindow): void {
     const zoom = this.#zoom();
-    if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
+    if (entry.window.webContents.getZoomFactor() === zoom) return;
+    entry.window.webContents.setZoomFactor(zoom);
+    // The renderer does not send a shape again when it is the same in CSS px.
+    if (this.#options.windowKind === "x11") this.#applyShape(entry);
   }
 
   /** `rendererId` is the dock window that sends the action. */
@@ -355,7 +366,7 @@ export class AgentDockWindowController {
               continue;
             }
             current.displayId = display.id;
-            this.#applyZoom(current.window);
+            this.#applyZoom(current);
             const bounds = this.#boundsFor(display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
             if (!current.window.isVisible()) this.#show(current.window);
@@ -401,7 +412,7 @@ export class AgentDockWindowController {
         window.setFocusable(false);
         // A navigation can reset the zoom, so it is set on each one, as for the main window.
         window.webContents.on("did-navigate", () => {
-          if (owned()) this.#applyZoom(window);
+          if (owned()) this.#applyZoom(entry);
         });
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;

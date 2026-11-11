@@ -133,11 +133,19 @@ export class DynamicIslandWindowController {
 
   /** Writes run in the order of the calls; each one reconciles the windows before the next. */
   setPreference(preference: DynamicIslandPreference): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference(() => preference);
+  }
+
+  /** `change` reads the preference only after the writes before it end, so it does not undo one of them. */
+  #updatePreference(
+    change: (current: DynamicIslandPreference) => DynamicIslandPreference,
+  ): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
     return this.#preferenceMutation.withPermit(
       Effect.gen({ self: this }, function* () {
-        const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          toDynamicIslandFailed,
-        );
+        const savedPreference = yield* writeDynamicIslandPreference(
+          this.#options.preferencePath,
+          change(this.#preference),
+        ).pipe(toDynamicIslandFailed);
         this.#preference = savedPreference;
         yield* this.reconcileWindow();
         this.publishPreference();
@@ -151,7 +159,7 @@ export class DynamicIslandWindowController {
    * saved preference, so its Settings do not turn the island on again with the next change.
    */
   hide(): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
-    return Effect.suspend(() => this.setPreference({ ...this.#preference, enabled: false })).pipe(
+    return this.#updatePreference((current) => ({ ...current, enabled: false })).pipe(
       Effect.tap((saved) =>
         Effect.sync(() => sendToRenderer(this.#options.getMainWindow(), IPC_ENDPOINTS.dynamicIsland.preference, saved)),
       ),

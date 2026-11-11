@@ -306,14 +306,15 @@ export function AgentDockSurface() {
             onRemove={(seat) =>
               void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
             }
-            onMove={(seat, before) =>
-              void perform({
+            onMove={async (seat, before) => {
+              // A failed move puts the seats back in the dock.
+              await perform({
                 type: "move",
                 serverId: server,
                 seat: contractSeat(seat),
                 before: before ? contractSeat(before) : null,
-              }).catch(() => undefined)
-            }
+              });
+            }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
               const clientMessageId =

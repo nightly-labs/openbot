@@ -217,9 +217,9 @@ export interface AgentDockProps {
   onHide?: (() => void) | undefined;
   /**
    * Moves a seat before another seat, or to the end when `before` is null. When it is set, the user
-   * drags a seat to a new place.
+   * drags a seat to a new place. When the promise fails, the seats go back to the order of `seats`.
    */
-  onMove?: ((seat: AgentDockSeatRef, before: AgentDockSeatRef | null) => void) | undefined;
+  onMove?: ((seat: AgentDockSeatRef, before: AgentDockSeatRef | null) => Promise<void> | void) | undefined;
   /** A change closes the chat, for example when the dock window loses the focus. */
   closeRequest?: number | undefined;
   /** The window edge that holds the dock. The dock and the panel are mirrored on the left edge. */
@@ -930,7 +930,7 @@ export function AgentDock(props: AgentDockProps) {
   /** A drag ended on this seat, so the click that the release makes does not open its chat. */
   let draggedClick: string | null = null;
   /** Ends the seat drag that runs. True keeps the new order. */
-  let endSeatDrag: ((keep: boolean) => void) | undefined;
+  let endSeatDrag: ((keep: boolean, released?: boolean) => void) | undefined;
   onCleanup(() => endSeatDrag?.(false));
 
   /**
@@ -993,7 +993,8 @@ export function AgentDock(props: AgentDockProps) {
       if (!started) start();
       follow();
     };
-    const finish = (keep: boolean) => {
+    /** `released` is false while the button can still be down, such as after Escape. */
+    const finish = (keep: boolean, released = false) => {
       endSeatDrag = undefined;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", release);
@@ -1003,10 +1004,14 @@ export function AgentDock(props: AgentDockProps) {
       if (!started) return;
       if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
       setDraggedSeat(null);
+      // The click comes after the release, so the guard ends on the next task after it.
       draggedClick = id;
-      window.setTimeout(() => {
-        if (draggedClick === id) draggedClick = null;
-      });
+      const endGuard = () =>
+        window.setTimeout(() => {
+          if (draggedClick === id) draggedClick = null;
+        });
+      if (released) endGuard();
+      else window.addEventListener("pointerup", endGuard, { capture: true, once: true });
       // Seats that came or went during the drag make the order of the drag out of date.
       const sameSeats = order.length === state.seats.length && order.every((seat) => state.seats.includes(seat));
       const changed = order.some((seat, index) => seat !== initial[index]);
@@ -1016,17 +1021,21 @@ export function AgentDock(props: AgentDockProps) {
           draft.seats = [...next];
         });
         const before = next[next.indexOf(id) + 1];
-        props.onMove?.(refOfKey(id), before ? refOfKey(before) : null);
+        const moved = props.onMove?.(refOfKey(id), before ? refOfKey(before) : null);
         layout(next);
+        void moved?.catch(() => {
+          endSeatDrag?.(false);
+          setSeats(props.seats.map((seat) => agentDockSeatKey(seatRef(seat))));
+        });
         return;
       }
       layout(state.seats);
     };
     const release = (released: PointerEvent) => {
-      if (released.pointerId === pointerId) finish(true);
+      if (released.pointerId === pointerId) finish(true, true);
     };
     const cancel = (cancelled: PointerEvent) => {
-      if (cancelled.pointerId === pointerId) finish(false);
+      if (cancelled.pointerId === pointerId) finish(false, true);
     };
     const cancelOnEscape = (pressed: KeyboardEvent) => {
       if (pressed.key !== "Escape" || !started) return;
@@ -1052,6 +1061,8 @@ export function AgentDock(props: AgentDockProps) {
         const moved = [...state.seats.filter((id) => !leaving.has(id) && !removed.includes(id)), ...added];
         const inOrder = moved.length === ids.length && moved.every((id, index) => id === ids[index]);
         if (inOrder && removed.length + added.length === 0) return;
+        // The order of a drag that runs does not have the new seats.
+        endSeatDrag?.(false);
         if (!inOrder || removed.length + added.length > 1) {
           setSeats(ids);
           return;
