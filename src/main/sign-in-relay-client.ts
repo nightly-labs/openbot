@@ -31,10 +31,11 @@ export interface SignInRelayRemote<E> {
   complete: (flowId: string, query: string) => Effect.Effect<SignInRelayStatus, E>;
   cancel: (flowId: string) => Effect.Effect<void, E>;
   /**
-   * The same sign-in in a private tab of the host's browser, for a page that only the host can reach
-   * (`hostOnlySignInPage`). Without it, such a page ends the sign-in.
+   * What the sign-in does with a page that only the host can reach (`hostOnlySignInPage`), after the
+   * relayed sign-in ended: for an administrator, the same sign-in in a private tab of the host's
+   * browser. Without it, such a page ends the sign-in.
    */
-  hostTab?: Effect.Effect<McpTestResult, E>;
+  onHostOnlyPage?: Effect.Effect<McpTestResult, E>;
 }
 
 /** A `POST` to one route of a joined server, decoded. */
@@ -169,10 +170,10 @@ export class SignInRelayClient {
       if (first.result) return first.result;
       const authorizeUrl = first.authorizeUrl ?? "";
       const page = safePage(authorizeUrl);
-      if (!page && remote.hostTab && hostOnlySignInPage(authorizeUrl)) {
-        // The relayed sign-in ends first, so the host's tab is the only sign-in of this server.
+      if (!page && remote.onHostOnlyPage && hostOnlySignInPage(authorizeUrl)) {
+        // The relayed sign-in ends first, so a sign-in in the host's tab is the only one of this server.
         yield* remote.cancel(flowId);
-        return yield* remote.hostTab;
+        return yield* remote.onHostOnlyPage;
       }
       if (!page) return { toolCount: 0, error: sourceText("error.backend.mcpSignInNotWebPage") };
       if (chosen !== null && page.toString() !== safePage(chosen.page)?.toString())

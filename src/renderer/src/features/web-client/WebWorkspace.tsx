@@ -1133,6 +1133,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     hostTabSupported: () =>
       workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
       workspace.state.capabilities.includes("browser-view"),
+    administers: () => canAdministerServer(workspace.state.host?.role),
   });
   /** Only the owner of a host with `host-key-rotation-v1` changes its key. A named function, not a ternary prop. */
   function rotateHostKeyAction() {

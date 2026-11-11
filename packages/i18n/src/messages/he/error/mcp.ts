@@ -16,5 +16,6 @@ export const messages = {
   "error.mcp.redirectRelayed": "OpenBot שלח את ההתחברות לשרת. אפשר לסגור את החלון הזה.",
   "error.mcp.relayEnded": "ההתחברות הזו הסתיימה. יש להתחיל אותה מחדש.",
   "error.mcp.relayNoState": "דף ההתחברות של השרת אינו מגן על כתובת החזרה שלו, ולכן OpenBot אינו פותח אותו במחשב הזה.",
+  "error.mcp.signInPageOnServer": "דף הכניסה הזה נמצא רק בשרת. בקשו מהבעלים או ממנהל של השרת להתחבר.",
   "error.mcp.relayAddressInvalid": "זו אינה הכתובת שבסוף ההתחברות הזו. יש להעתיק את הכתובת המלאה מהדפדפן.",
 } as const satisfies PartialTranslation<typeof source>;

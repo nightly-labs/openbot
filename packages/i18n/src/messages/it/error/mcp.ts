@@ -17,6 +17,8 @@ export const messages = {
   "error.mcp.relayEnded": "Questo accesso è terminato. Avvialo di nuovo.",
   "error.mcp.relayNoState":
     "La pagina di accesso del server non protegge il proprio indirizzo di ritorno, quindi OpenBot non la apre su questo computer.",
+  "error.mcp.signInPageOnServer":
+    "Questa pagina di accesso è solo sul server. Chiedi a un proprietario o a un amministratore del server di accedere.",
   "error.mcp.relayAddressInvalid":
     "Questo non è l'indirizzo alla fine di questo accesso. Copia l'indirizzo completo dal browser.",
 } as const satisfies PartialTranslation<typeof source>;

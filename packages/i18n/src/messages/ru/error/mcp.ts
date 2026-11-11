@@ -17,6 +17,8 @@ export const messages = {
   "error.mcp.relayEnded": "Этот вход завершён. Начните его снова.",
   "error.mcp.relayNoState":
     "Страница входа сервера не защищает свой обратный адрес, поэтому OpenBot не открывает её на этом компьютере.",
+  "error.mcp.signInPageOnServer":
+    "Эта страница входа есть только на сервере. Попросите владельца или администратора сервера войти.",
   "error.mcp.relayAddressInvalid":
     "Это не тот адрес, которым завершается этот вход. Скопируйте полный адрес из браузера.",
 } as const satisfies PartialTranslation<typeof source>;

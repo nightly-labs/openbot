@@ -13,6 +13,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelMcpSignIn as cancelMcpSignInRequest,
@@ -74,6 +75,8 @@ export function createWebServerSettings(options: {
   relaySupported: () => boolean;
   /** Whether the host opens a sign-in page in its own browser for the live view (`mcp-sign-in-v1`). */
   hostTabSupported: () => boolean;
+  /** Whether this user administers the host. The host shows its private tabs only to an administrator. */
+  administers: () => boolean;
 }) {
   const [state, setState] = createStore<WebServerSettingsState>({
     open: false,
@@ -291,15 +294,21 @@ export function createWebServerSettings(options: {
 
   /**
    * A relayed sign-in waits in this browser: see `webMcpRelay`. A page that only the host can reach
-   * opens in the host's tab, and the live view shows it here.
+   * opens in the host's tab, and the live view shows it here. A member cannot watch that tab, so a
+   * member is told to ask an administrator.
    */
   async function signInRelayed(admin: WebAdminRuntime, config: McpServerConfig): Promise<McpTestResult> {
-    const hostTab = options.hostTabSupported() ? () => signInInHostTab(admin, config) : undefined;
     try {
-      return await relay.signIn(admin.request, config, hostTab);
+      return await relay.signIn(admin.request, config, hostOnlyPage(admin, config));
     } finally {
       void refreshMcpSignIns().catch(() => undefined);
     }
+  }
+
+  function hostOnlyPage(admin: WebAdminRuntime, config: McpServerConfig) {
+    if (!options.administers())
+      return async (): Promise<McpTestResult> => ({ toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") });
+    return options.hostTabSupported() ? () => signInInHostTab(admin, config) : undefined;
   }
 
   /** The host answers each change with the whole list. A read still in flight has the old list. */

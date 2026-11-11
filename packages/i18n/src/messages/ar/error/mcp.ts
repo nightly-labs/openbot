@@ -16,6 +16,8 @@ export const messages = {
   "error.mcp.redirectRelayed": "أرسل OpenBot تسجيل الدخول إلى الخادم. يمكنك إغلاق هذه النافذة.",
   "error.mcp.relayEnded": "انتهى تسجيل الدخول هذا. ابدأه من جديد.",
   "error.mcp.relayNoState": "صفحة تسجيل الدخول في الخادم لا تحمي عنوان العودة، لذا لا يفتحها OpenBot على هذا الحاسوب.",
+  "error.mcp.signInPageOnServer":
+    "صفحة تسجيل الدخول هذه موجودة على الخادم فقط. اطلب من مالك الخادم أو أحد مسؤوليه تسجيل الدخول.",
   "error.mcp.relayAddressInvalid":
     "هذا ليس العنوان الذي يظهر في نهاية تسجيل الدخول هذا. انسخ العنوان الكامل من المتصفح.",
 } as const satisfies PartialTranslation<typeof source>;

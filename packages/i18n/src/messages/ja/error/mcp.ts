@@ -19,6 +19,8 @@ export const messages = {
   "error.mcp.relayEnded": "このサインインは終了しました。もう一度開始してください。",
   "error.mcp.relayNoState":
     "サーバーのサインインページは戻り先アドレスを保護していないため、OpenBot はこのコンピューターでは開きません。",
+  "error.mcp.signInPageOnServer":
+    "このサインインページはサーバー上にしかありません。サーバーのオーナーまたは管理者にサインインを依頼してください。",
   "error.mcp.relayAddressInvalid":
     "これはこのサインインの最後のアドレスではありません。ブラウザーからアドレス全体をコピーしてください。",
 } as const satisfies PartialTranslation<typeof source>;

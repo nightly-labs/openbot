@@ -7,6 +7,7 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // why nothing routes through the selected server.
 
 import {
+  canAdministerServer,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
   decodeMcpSignInStates,
@@ -15,6 +16,7 @@ import {
   decodeSignInRelayFlow,
   MCP_SERVERS_CAPABILITY,
   type McpServerConfig,
+  type ServerSummary,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
@@ -66,6 +68,7 @@ type McpServerService = Pick<
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface McpRemoteServers {
+  list(): ServerSummary[];
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(
     serverId: string,
@@ -192,13 +195,23 @@ export function mcpServerIpcHandlers({
     // back: the host already started it.
     if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY)) {
       const remote = relayRemote(serverId, input);
-      const hostTab = remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)
-        ? signInInHostTab(serverId, input, key)
-        : undefined;
-      return yield* relay.run(key, { ...remote, hostTab });
+      return yield* relay.run(key, { ...remote, onHostOnlyPage: hostOnlyPage(serverId, input, key) });
     }
     return yield* signInInHostTab(serverId, input, key);
   });
+
+  /**
+   * A sign-in page that only the host can reach. The host shows its private tabs only to an
+   * administrator, so a member cannot watch the page and is told to ask one.
+   */
+  function hostOnlyPage(serverId: string, input: TestMcpServerInput, key: string) {
+    const role = remoteServers.list().find((server) => server.id === serverId)?.role;
+    if (!canAdministerServer(role))
+      return Effect.succeed({ toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") });
+    return remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)
+      ? signInInHostTab(serverId, input, key)
+      : undefined;
+  }
 
   /** The sign-in in a private tab of the host's browser, which the panel shows through its live view. */
   function signInInHostTab(serverId: string, input: TestMcpServerInput, key: string) {

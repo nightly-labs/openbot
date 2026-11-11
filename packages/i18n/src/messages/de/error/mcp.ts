@@ -17,6 +17,8 @@ export const messages = {
   "error.mcp.relayEnded": "Diese Anmeldung ist beendet. Starte sie erneut.",
   "error.mcp.relayNoState":
     "Die Anmeldeseite des Servers schützt ihre Rückkehradresse nicht, darum öffnet OpenBot sie nicht auf diesem Computer.",
+  "error.mcp.signInPageOnServer":
+    "Diese Anmeldeseite gibt es nur auf dem Server. Bitte einen Inhaber oder Administrator des Servers, sich anzumelden.",
   "error.mcp.relayAddressInvalid":
     "Das ist nicht die Adresse am Ende dieser Anmeldung. Kopiere die vollständige Adresse aus dem Browser.",
 } as const satisfies PartialTranslation<typeof source>;
