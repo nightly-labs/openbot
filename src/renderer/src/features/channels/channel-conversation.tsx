@@ -5,7 +5,12 @@
  */
 
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
-import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import {
+  type AgentApproval,
+  type AgentEvent,
+  type BrowserTakeoverRequest,
+  channelBrowserAgent,
+} from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { useText } from "@openbot/ui/text";
@@ -67,6 +72,20 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const summary = () => channels.state.channels.find((channel) => channel.id === channelId);
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
+  const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
+  /** A hidden agent gets no tab here, as it gets no work. A member with no thread here cannot use a tab yet. */
+  const browserOwner = createMemo(() => {
+    const channel = page()?.channel;
+    const allowed = channel ? channelBrowserAgent(channel) : false;
+    if (!channel || allowed === false) return null;
+    const hidden = env.hiddenAgentIds();
+    const owners = channel.members.flatMap((member) => {
+      const threadId = threads()?.find((thread) => thread.agentId === member.agentId)?.threadId;
+      return threadId && !hidden.has(member.agentId) ? [{ agentId: member.agentId, threadId }] : [];
+    });
+    if (typeof allowed === "string") return owners.find((owner) => owner.agentId === allowed) ?? null;
+    return owners.find((owner) => owner.agentId === channel.leadAgentId) ?? owners[0] ?? null;
+  });
   const agentName = (agentId: string | null | undefined) => {
     const agent = channels.agents().find((candidate) => candidate.id === agentId);
     const authored = page()?.messages.find((entry) => entry.author.id === agentId);
@@ -251,6 +270,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.hiddenAgentIds())
         : [];
     },
+    memberThreadIds,
+    browserOwner,
     workingTurns,
     interactionAgentName: () => {
       const agentId = approval()?.agentId ?? browserTakeover()?.agentId ?? prompt()?.agentId;

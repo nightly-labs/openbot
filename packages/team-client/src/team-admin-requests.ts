@@ -141,6 +141,7 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
+  decodeChannelStorageUsage,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
   decodeCustomProviderResult,
@@ -341,6 +342,7 @@ import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-aud
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
@@ -1199,7 +1201,16 @@ export const getStorageUsage = Effect.fn("TeamAdmin.getStorageUsage")(function* 
   request: TeamApiRequest,
   input: GetStorageUsageInput,
 ) {
-  const result = yield* adminCall(() => request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, { ...input }));
+  // The channel scope has its own route, `storage-channel-v1`; the storage-v1 wire does not carry it.
+  const { channelId, force } = input;
+  const result = yield* adminCall(() =>
+    input.scope === "channel"
+      ? request("POST", STORAGE_CHANNEL_ROUTES.files, decodeChannelStorageUsage, {
+          channelId: channelId ?? "",
+          ...(force === undefined ? {} : { force }),
+        })
+      : request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, { ...input }),
+  );
   return yield* Effect.try({
     try: () => assertStorageUsageScope(result, input),
     catch: (cause) => new TeamAdminRequestError({ cause }),

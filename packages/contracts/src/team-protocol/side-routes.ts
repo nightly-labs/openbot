@@ -8,6 +8,7 @@
 // below does not change which codec a route gets.
 import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
+import { withChannelBrowser, withChannelDraftBrowser } from "./channel-browser-v1";
 import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
 import {
   channelPictureRoute,
@@ -46,6 +47,8 @@ export interface TeamSideRouteOptions {
    * Passed as `channelIsolation` is.
    */
   channelPicture?: boolean;
+  /** channel-browser-v1: a channel keeps `browser`, as `channelIsolation` keeps `isolated`. */
+  channelBrowser?: boolean;
   /**
    * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
    * `channelAttention` is.
@@ -62,7 +65,8 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
   request: (path, value, options) => {
     const projected = channelRequest(path, value);
     const isolated = options?.channelIsolation ? withChannelDraftIsolation(path, projected, value) : projected;
-    return options?.channelPicture ? withChannelDraftPicture(path, isolated, value) : isolated;
+    const pictured = options?.channelPicture ? withChannelDraftPicture(path, isolated, value) : isolated;
+    return options?.channelBrowser ? withChannelDraftBrowser(path, pictured, value) : pictured;
   },
   response: (path, status, value, options) => {
     const projected = channelResponse(path, status, value);
@@ -72,9 +76,10 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
         : projected;
     const isolated = options?.channelIsolation && status < 400 ? withChannelIsolation(path, extended, value) : extended;
     const pictured = options?.channelPicture && status < 400 ? withChannelPicture(path, isolated, value) : isolated;
+    const browser = options?.channelBrowser && status < 400 ? withChannelBrowser(path, pictured, value) : pictured;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, pictured, value)
-      : pictured;
+      ? withChannelAttention(path, browser, value)
+      : browser;
   },
 };
 /** The image route of channel-picture-v1. Its channel answer is the answer of a channel command. */
@@ -86,7 +91,8 @@ const CHANNEL_PICTURE_CODEC: TeamSideRouteCodec = {
     const isolated = options?.channelIsolation
       ? withChannelIsolation(CHANNEL_ROUTES.command, projected, value)
       : projected;
-    return options?.channelPicture ? withChannelPicture(path, isolated, value) : isolated;
+    const pictured = options?.channelPicture ? withChannelPicture(path, isolated, value) : isolated;
+    return options?.channelBrowser ? withChannelBrowser(CHANNEL_ROUTES.command, pictured, value) : pictured;
   },
 };
 const MCP_CODEC: TeamSideRouteCodec = {

@@ -99,9 +99,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     allBrowserTabs().filter((tab) => ownsTab(agent, tab));
   /** The agent of a tab. A tab of an old agent run has only the thread. */
   const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsTab(agent, tab));
+  /** A channel is read once, when the view opens. */
+  const channel = untrack(() => deps.props.channel);
+  /** The agent or the channel on screen: the side panel keeps its tabs and its pending opens apart. */
+  const viewId = () => deps.props.agent?.id ?? channel?.id ?? null;
+  const viewOwner = () => ({ agentId: deps.props.agent?.id ?? null, threadId: deps.props.agent?.threadId ?? null });
+  /** The side panel tabs: the agent's, or in a channel the tabs of its members' threads there. */
   const browserTabs = createMemo(() => {
     const agent = deps.props.agent;
-    return agent ? tabsOwnedBy(agent) : [];
+    if (agent) return tabsOwnedBy(agent);
+    if (!channel) return [];
+    const threadIds = channel.memberThreadIds();
+    return allBrowserTabs().filter((tab) => tab.ownerThreadId !== null && threadIds.has(tab.ownerThreadId));
   });
   const closingBrowserTabIds = new Set<string>();
   createEffect(
@@ -116,7 +125,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     () => browserTabs().map((tab) => ({ id: tab.id, url: tab.url })),
     (tabs) => {
       const serverId = untrack(() => deps.props.server?.id ?? "local");
-      const agentId = untrack(() => deps.props.agent?.id ?? null);
+      const agentId = untrack(viewId);
       for (const [requestKey, request] of deps.browserOpenRequests) {
         if (request.serverId !== serverId || request.agentId !== agentId) continue;
         const tabAppeared = tabs.some(
@@ -132,7 +141,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const lastShownTabs = new Map<string, { id: string; index: number }>();
   const activeBrowserTab = createMemo(() => {
     const tabs = browserTabs();
-    const agentId = deps.props.agent?.id;
+    const agentId = viewId();
     const shownIndex = tabs.findIndex((tab) => tab.id === deps.props.activeBrowserTabId);
     const shown = tabs[shownIndex];
     if (shown) {
@@ -279,8 +288,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       deps.panels.setActiveRightPanel("browser-expanded");
       return;
     }
-    // In a channel, the page opens in the chat of the agent that owns the tab. That chat mounts a new store,
-    // so main shows the tab first.
+    // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat
+    // of the agent that owns it. That chat mounts a new store, so main shows the tab first.
     const owner = browserTabOwner(tab);
     if (!owner || !browserInteractionAvailable() || closingBrowserTabIds.has(tab.id)) return;
     deps.props.onActivateBrowserTab(tab.id);
@@ -296,7 +305,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     serverSupportsCapability(deps.props.server, "browser-sign-in") &&
     webHost(tab?.url) !== null;
 
-  /** A channel opens the takeover page in the owner's chat and this store unmounts, so only the owner's chat signs in. */
+  /** A tab that this view does not list opens in the owner's chat and this store unmounts, so only that chat signs in. */
   const canSignInTakeoverLocally = () => {
     const tab = browserTakeoverTab();
     return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
@@ -448,6 +457,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (!browserInteractionAvailable()) return;
     const value = address.trim();
     if (!value) return;
+    // In a channel, a new tab goes to the member that can use the browser there.
+    const owner = channel && !deps.props.agent ? channel.browserOwner() : viewOwner();
     const targetAgentId = deps.props.agent?.id;
     const target = targetAgentId ? { agentId: targetAgentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
@@ -467,8 +478,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
       return;
     }
+    if (!owner) return;
     const serverId = deps.props.server?.id ?? "local";
-    const agentId = deps.props.agent?.id ?? null;
+    const agentId = viewId();
     const canonicalUrl = canonicalBrowserUrl(url);
     const requestKey = JSON.stringify([serverId, agentId, canonicalUrl]);
     const pendingRequest = deps.browserOpenRequests.get(requestKey);
@@ -477,8 +489,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       try {
         const tab = await conversationRuntime(deps.props).browser.open({
           url,
-          ownerThreadId: deps.props.agent?.threadId ?? null,
-          ownerAgentId: deps.props.agent?.id ?? null,
+          ownerThreadId: owner.threadId,
+          ownerAgentId: owner.agentId,
           focus: true,
         });
         deps.setBrowserAddress(tab.url);

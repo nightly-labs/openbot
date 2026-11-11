@@ -43,6 +43,8 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
+  channelAllowsBrowser,
+  channelBrowserAgent,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -651,6 +653,12 @@ export class OpenBotToolRouter {
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
+            // A channel can give the browser to one member, or to none (#4135).
+            const channelRefusal = this.#channelBrowserRefusal(toolRequest.params.threadId, agentId);
+            if (channelRefusal) {
+              client.respond(toolRequest.id, channelRefusal);
+              return;
+            }
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               // A takeover of a stopped client ends with a cancel, and that process has nothing to answer.
@@ -2255,6 +2263,24 @@ export class OpenBotToolRouter {
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  /**
+   * The answer to a browser call of `agentId` in the channel thread `threadId`, when the channel's
+   * Browser setting gives the browser to another member or to none. `null` outside a channel and
+   * for a member that can use it.
+   */
+  #channelBrowserRefusal(threadId: string, agentId: string): DynamicToolResult | null {
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId || !this.#channels.store.exists(channelId)) return null;
+    const channel = this.#channels.store.get(channelId);
+    if (channelAllowsBrowser(channel, agentId)) return null;
+    const browserAgent = channelBrowserAgent(channel);
+    const text =
+      typeof browserAgent === "string"
+        ? `In this channel, only ${this.#channels.hooks.agents().find((agent) => agent.id === browserAgent)?.name ?? browserAgent} (agentId ${browserAgent}) can use the browser. Give the browser step to that member with channel_assign, and use its result.`
+        : "No member can use the browser in this channel. Do the work without it, or tell the person that the browser is off in this channel.";
+    return { success: false, contentItems: [{ type: "inputText", text }] };
   }
 
   /** Whether a team member on another computer sent this message. */

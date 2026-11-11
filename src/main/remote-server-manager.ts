@@ -2482,6 +2482,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         teamSideRouteCodec(path)?.response(path, response.status, json, {
           channelIsolation: true,
           channelPicture: true,
+          channelBrowser: true,
         }),
       );
       if (!response.ok) {
