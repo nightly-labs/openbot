@@ -1449,11 +1449,15 @@ export class ProviderRuntime implements ProviderPort {
     // That made a slow computer stop responding after launch. The provider that chat uses goes first
     // and alone, so chat is ready when it answers. The others follow, a few at a time.
     const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id);
-    const first = providers.includes(this.#preferredProvider) ? this.#preferredProvider : providers[0];
+    // A provider that is off or stopped starts no process, so it cannot make chat ready.
+    const canStart = providers.filter((provider) => !this.#off.has(provider) && !this.#startStopped(provider));
+    const first = canStart.includes(this.#preferredProvider) ? this.#preferredProvider : canStart[0];
     const others = providers.filter((provider) => provider !== first);
     // Without another start to come, a failed first provider must show as "blocked" at once.
-    const othersFollow = others.some((provider) => !this.#off.has(provider) && !this.#startStopped(provider));
-    this.#launchStartsPending = true;
+    const othersFollow = others.some((provider) => canStart.includes(provider));
+    // With no other start to come, the first connect is the whole launch: it reads the model
+    // catalogue and runs the ready hook before the start ends, as one connect of all providers did.
+    this.#launchStartsPending = othersFollow;
     const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
     let starting: AgentProvider[] = [];
     let startsReleased = false;
@@ -1468,7 +1472,12 @@ export class ProviderRuntime implements ProviderPort {
     });
     const exit = yield* Effect.exit(
       Effect.gen({ self: this }, function* () {
-        if (first) yield* this.#connect("starting", [first], { othersFollow, refreshRuntimeInBackground: true });
+        if (first)
+          yield* this.#connect(
+            "starting",
+            [first],
+            othersFollow ? { othersFollow, refreshRuntimeInBackground: true, skipReadyHook: true } : {},
+          );
         // Chat can be ready now, so a refresh or a turn can ask for one of the others. As in
         // `#refreshProviders`, they join this start and do not start a second process.
         starting = others.filter((provider) => !this.#clients.has(provider) && !this.#providerStarts.has(provider));
@@ -1477,9 +1486,9 @@ export class ProviderRuntime implements ProviderPort {
           concurrency: LAUNCH_START_CONCURRENCY,
           afterStarts: releaseStarts,
         });
-        if (startsReleased) return;
-        // No other provider had to start, so the connect above did nothing and the first one's
-        // connect did not run the ready hook.
+        if (startsReleased || !othersFollow) return;
+        // A different start took each of the other providers, so the connect above did nothing and
+        // the first one's connect did not run the ready hook.
         this.#launchStartsPending = false;
         if (this.#clients.size > 0) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
       }),
@@ -3578,6 +3587,8 @@ export class ProviderRuntime implements ProviderPort {
       othersFollow?: boolean;
       /** Runs when each requested provider has a client or a failure, before the status and the catalogue. */
       afterStarts?: Effect.Effect<void>;
+      /** The caller runs `onProvidersReady` itself. Unlike `notifyReady: false`, this is a full activation. */
+      skipReadyHook?: boolean;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3846,7 +3857,7 @@ export class ProviderRuntime implements ProviderPort {
       // This used to ride along with a Computer Use probe that no longer exists.
       this.#setStatus({});
       if (codexClient) yield* this.#refreshUsage(codexClient).pipe(Effect.ignore, Effect.forkIn(this.#scope));
-      if (options.notifyReady !== false && !this.#launchStartsPending)
+      if (options.notifyReady !== false && !options.skipReadyHook && !this.#launchStartsPending)
         yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
     });
     if (options.refreshRuntimeInBackground) {
