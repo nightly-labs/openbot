@@ -1,7 +1,7 @@
 import { type AgentAccessRole, MCP_SERVERS_CAPABILITY, parseSetMcpAccessInput } from "@openbot/contracts/ipc";
 import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { runCauseEffect } from "../../backend/effect-boundary";
+import { Effect, Result } from "effect";
 import { mcpAccessSnapshot } from "../mcp-access-store";
 import type { TeamApiMcpAccess, TeamApiMcpServerOwners, TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -12,7 +12,8 @@ import { readJson, requireAdmin } from "./request-helpers";
 /**
  * Which agents get each MCP server of this host, and the level of each role for it. Each person who
  * can use the MCP routes reads the levels that apply to them; an owner or admin also reads and
- * replaces the entries. Frozen by `mcp-access-v1`.
+ * replaces the entries. A replace names the revision that the client read: the host refuses a stale one
+ * with 409, so two admins do not write over each other. Frozen by `mcp-access-v1`.
  */
 export async function routeMcpAccess(
   context: TeamApiRequestContext,
@@ -46,6 +47,10 @@ export async function routeMcpAccess(
   }
   const existing = new Set(mcpServers.listMcpServers().map((server) => server.id));
   if (!existing.has(change.mcpServerId)) throw new HttpError(400, "Invalid MCP access change.");
-  await runCauseEffect(access.set(change.mcpServerId, change.access, existing));
+  const saved = await Effect.runPromise(Effect.result(access.set(change, existing)));
+  if (Result.isFailure(saved)) {
+    if (saved.failure._tag === "McpAccessStale") throw new HttpError(409, sourceText("error.team.mcpAccessStale"));
+    throw saved.failure.cause;
+  }
   return json(200, snapshot());
 }

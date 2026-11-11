@@ -308,7 +308,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
-import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore } from "./mcp-access-store";
+import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -3062,12 +3062,22 @@ export async function createApplicationServices({
   );
   // A server on this computer has no account session: the desktop app reads its directory for it.
   const localServerMembers = new LocalServerMembers(() => process.stdout.write(formatLocalServerMembersRequest()));
-  // A set changes which agents get the server, so each agent gets a new provider session, as it does
-  // when a server is saved.
+  // A set that changes which agents get the server gives each agent a new provider session, as a saved
+  // server does. A set that changes only the levels of members leaves the sessions as they are.
   const mcpAccess: McpAccessControl = {
+    revision: () => mcpAccessStore.revision(),
     get: (mcpServerId) => mcpAccessStore.get(mcpServerId),
-    set: (mcpServerId, access, existing) =>
-      mcpAccessStore.set(mcpServerId, access, existing).pipe(Effect.andThen(service.refreshAllAgentRuntimes())),
+    set: (change, existing) =>
+      Effect.suspend(() => {
+        const before = mcpAccessStore.get(change.mcpServerId).agents;
+        return mcpAccessStore
+          .set(change, existing)
+          .pipe(
+            Effect.andThen(
+              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+            ),
+          );
+      }),
     remove: (mcpServerId) => mcpAccessStore.remove(mcpServerId),
   };
   const host = new HostService({

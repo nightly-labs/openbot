@@ -1,9 +1,9 @@
 import {
   MCP_ACCESS_LEVELS,
+  type McpAccessChange,
   type McpAccessLevel,
   type McpServerAccess,
   mcpAccessRank,
-  type SetMcpAccessInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -49,6 +49,9 @@ const LEVEL_LABELS = {
 } as const satisfies Record<McpAccessLevel, AppTextKey>;
 
 const allows = (access: McpServerAccess, agentId: string) => access.agents === null || access.agents.includes(agentId);
+
+const higher = (left: McpAccessLevel, right: McpAccessLevel) =>
+  mcpAccessRank(right) > mcpAccessRank(left) ? right : left;
 
 /** Chooses the agents of one MCP row, with a search. The change waits for Save. */
 function AccessAgentsDialog(props: {
@@ -238,8 +241,10 @@ function AccessLevelSelect(props: {
 }
 
 /**
- * Who gets a connected app: the agents of each MCP row, and the level of each role. The role levels
- * apply to each row of the app, so the first row gives the levels that the page shows.
+ * Who gets a connected app: the agents of each MCP row, and the level of each role. A level change
+ * goes to each row of the app. The rows can differ, for example after a new account, which starts
+ * with the default: the page then shows the highest level that a row gives, so it does not show an
+ * open row as closed.
  */
 export function AppAccessSections(props: {
   access: MarketplaceMcpAccess;
@@ -249,18 +254,18 @@ export function AppAccessSections(props: {
   name: string;
 }) {
   const { t } = useText();
-  const shown = (): McpServerAccess | undefined => {
-    const first = props.rows[0];
-    return first ? props.access.entry(first.id) : undefined;
-  };
-  const everyone = (): McpAccessLevel => shown()?.everyone ?? "use";
-  const roleLevel = (roleId: string): McpAccessLevel => {
-    const own = shown()?.roles[roleId];
-    return own !== undefined && mcpAccessRank(own) > mcpAccessRank(everyone()) ? own : everyone();
-  };
+  const entries = () => props.rows.map((row) => props.access.entry(row.id));
+  const everyone = (): McpAccessLevel =>
+    entries()
+      .map((access) => access.everyone)
+      .reduce(higher, "none");
+  const roleLevel = (roleId: string): McpAccessLevel =>
+    entries()
+      .map((access) => access.roles[roleId] ?? "none")
+      .reduce(higher, everyone());
   const setLevels = (change: (access: McpServerAccess) => McpServerAccess) =>
     void props.access.set(
-      props.rows.map((row): SetMcpAccessInput => ({ mcpServerId: row.id, access: change(props.access.entry(row.id)) })),
+      props.rows.map((row): McpAccessChange => ({ mcpServerId: row.id, access: change(props.access.entry(row.id)) })),
     );
   const setEveryone = (level: McpAccessLevel) =>
     setLevels((access) => ({

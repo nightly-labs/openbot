@@ -8,7 +8,8 @@
 //
 // With `mcp-access-v1` on the host, the level of the member decides instead: `none` hides the server
 // and refuses it, `use` gives the rights on a server of another person, and `manage` gives the rights
-// on a server that the member added.
+// on a server that the member added. `none` also refuses a test and the sign-in state of the server,
+// so the member cannot spend its stored sign-in or learn that it has one.
 
 import {
   canAdministerServer,
@@ -49,7 +50,38 @@ export function requireOwnMcpServer(access: McpMemberAccess, mcpServerId: string
 
 /** The rows that the caller can see: all of them, or for a member the rows that are not at `none`. */
 export function visibleMcpServers(access: McpMemberAccess, servers: McpServerConfig[]): McpServerConfig[] {
-  return access ? servers.filter((server) => memberLevel(access, server.id) !== "none") : servers;
+  return access ? servers.filter((server) => seesMcpServer(access, server.id)) : servers;
+}
+
+/** Whether the caller can see the row `mcpServerId`: for a member, a row that is not at `none`. */
+export function seesMcpServer(access: McpMemberAccess, mcpServerId: string): boolean {
+  return !access || memberLevel(access, mcpServerId) !== "none";
+}
+
+/** Refuses a member an address when rows use it and the member has `none` for each of them. */
+export function requireVisibleMcpAddress(
+  access: McpMemberAccess,
+  servers: readonly McpServerConfig[],
+  url: string,
+): void {
+  if (!access) return;
+  const key = signInKey(url);
+  const rows = servers.filter((server) => server.transport === "http" && signInKey(server.url) === key);
+  if (rows.length > 0 && rows.every((row) => memberLevel(access, row.id) === "none")) throw notYours();
+}
+
+/**
+ * Refuses a member the test of a row at `none`. A test spends the stored sign-in of the address, so a
+ * new configuration on the address of such a row is refused also.
+ */
+export function requireVisibleMcpTest(
+  access: McpMemberAccess,
+  servers: readonly McpServerConfig[],
+  config: McpServerConfig,
+): void {
+  if (!access) return;
+  if (servers.some((server) => server.id === config.id) && memberLevel(access, config.id) === "none") throw notYours();
+  if (config.transport === "http") requireVisibleMcpAddress(access, servers, config.url);
 }
 
 /** Refuses a member the sign-in of an address that a row of another person also uses. */

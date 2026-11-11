@@ -11,12 +11,14 @@
 // `mcp-servers-v1` for that member and refuses each route for it with 403. With `use` the member reads
 // and tests the server. With `manage` the member also changes it, signs in, signs out, and removes it.
 // A member reads only `mine`, the level of that member for each server that the member can see; the
-// host leaves out `servers`. A replace names one MCP server and sends its whole entry. Bounds and
-// meaning do not follow IPC changes; widening any of it needs a second capability string.
+// host leaves out `servers`. A replace names one MCP server and sends its whole entry, with the
+// revision that the client read; the host refuses a stale revision with 409. Bounds and meaning do not
+// follow IPC changes; widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,
   adminRoute,
+  count,
   empty,
   fields,
   identifier,
@@ -58,12 +60,15 @@ const servers: AdminDecoder = (input) => {
   if (entries.length > 1000) throw new Error("Invalid MCP access servers.");
   return Object.fromEntries(entries.map(([id, value]) => [identifier(id), access(value)]));
 };
-const snapshot = fields({ mine: levels(1000) }, { servers });
+const snapshot = fields({ revision: count, mine: levels(1000) }, { servers });
 
 export const MCP_ACCESS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [MCP_ACCESS_ROUTES.read, adminRoute(empty, snapshot)],
   [
     MCP_ACCESS_ROUTES.set,
-    adminRoute(exact(["mcpServerId", "access"], fields({ mcpServerId: identifier, access })), snapshot),
+    adminRoute(
+      exact(["revision", "mcpServerId", "access"], fields({ revision: count, mcpServerId: identifier, access })),
+      snapshot,
+    ),
   ],
 ]);

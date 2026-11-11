@@ -1,4 +1,4 @@
-import { Duration, Effect } from "effect";
+import { Duration, Effect, Result } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // MCP servers: the model-context servers an agent on this server may use.
 //
@@ -40,6 +40,7 @@ import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { type SignInRelayClient, type SignInRelayRemote, signInRelayRemote } from "../sign-in-relay-client";
 import type { IpcGroupHandlers } from "./define-ipc-group";
+import { LOCAL_OWNER } from "./host-admin-handlers";
 import {
   parseCancelMcpSignIn,
   parseCompleteMcpSignInRelay,
@@ -107,9 +108,6 @@ export const prepareToolRuntimeForTest = Effect.fn("Mcp.prepareToolRuntimeForTes
     );
   }
 });
-
-/** The user of this computer, who manages each of its MCP servers. */
-const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
 
 interface McpServerIpcDependencies {
   service: McpServerService;
@@ -274,7 +272,11 @@ export function mcpServerIpcHandlers({
         local: async (parsed) => {
           const existing = new Set(service.listMcpServers().map((server) => server.id));
           if (!existing.has(parsed.mcpServerId)) throw new Error("Invalid MCP access change.");
-          await runCauseEffect(mcpAccess.set(parsed.mcpServerId, parsed.access, existing));
+          const saved = await Effect.runPromise(Effect.result(mcpAccess.set(parsed, existing)));
+          if (Result.isFailure(saved)) {
+            if (saved.failure._tag === "McpAccessStale") throw new Error(sourceText("error.team.mcpAccessStale"));
+            throw saved.failure.cause;
+          }
           return localAccess();
         },
         remote: (parsed, serverId) => remoteAccess(serverId, MCP_ACCESS_ROUTES.set, parsed),

@@ -1,5 +1,5 @@
 import { isIdentifier } from "./ipc-bounded-values";
-import { isDynamicRecord, isOneOf } from "./runtime-values";
+import { isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 /** What a member can do with one MCP server. Each level includes the levels before it. */
 export const MCP_ACCESS_LEVELS = ["none", "use", "manage"] as const;
@@ -22,17 +22,23 @@ export const DEFAULT_MCP_SERVER_ACCESS: McpServerAccess = { agents: null, everyo
 /**
  * The MCP access of one server (`mcp-access-v1`), by MCP server id. `mine` holds the level of the
  * caller for each server that the caller can see. An owner or admin also gets `servers`, the stored
- * entries; a server with no entry has `DEFAULT_MCP_SERVER_ACCESS`.
+ * entries; a server with no entry has `DEFAULT_MCP_SERVER_ACCESS`. `revision` changes with each replace.
  */
 export interface McpAccessSnapshot {
+  revision: number;
   mine: Record<string, McpAccessLevel>;
   servers?: Record<string, McpServerAccess>;
 }
 
-/** A full replace of the access of one MCP server. */
-export interface SetMcpAccessInput {
+/** The new access of one MCP server. */
+export interface McpAccessChange {
   mcpServerId: string;
   access: McpServerAccess;
+}
+
+/** A full replace of the access of one MCP server. `revision` is the one the client read; the host refuses a stale one. */
+export interface SetMcpAccessInput extends McpAccessChange {
+  revision: number;
 }
 
 // The same bounds as mcp-access-v1.
@@ -42,6 +48,10 @@ const ROLE_LIMIT = 100;
 
 export function mcpAccessRank(level: McpAccessLevel): number {
   return MCP_ACCESS_LEVELS.indexOf(level);
+}
+
+function isRevision(value: unknown): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isLevels(value: unknown, maximum: number): value is Record<string, McpAccessLevel> {
@@ -66,7 +76,8 @@ function isAccess(value: unknown): value is McpServerAccess {
   );
 }
 
-function copyAccess(access: McpServerAccess): McpServerAccess {
+/** A copy that names each agent once. */
+export function copyMcpServerAccess(access: McpServerAccess): McpServerAccess {
   return {
     agents: access.agents === null ? null : [...new Set(access.agents)],
     everyone: access.everyone,
@@ -84,25 +95,32 @@ function isServers(value: unknown): value is Record<string, McpServerAccess> {
 export function decodeMcpAccessSnapshot(value: unknown): McpAccessSnapshot {
   if (
     !isDynamicRecord(value) ||
+    !isRevision(value.revision) ||
     !isLevels(value.mine, SERVER_LIMIT) ||
     (value.servers !== undefined && !isServers(value.servers))
   )
     throw new Error("Invalid MCP access.");
   return {
+    revision: value.revision,
     mine: { ...value.mine },
     ...(value.servers === undefined
       ? {}
-      : { servers: Object.fromEntries(Object.entries(value.servers).map(([id, access]) => [id, copyAccess(access)])) }),
+      : {
+          servers: Object.fromEntries(
+            Object.entries(value.servers).map(([id, access]) => [id, copyMcpServerAccess(access)]),
+          ),
+        }),
   };
 }
 
 export function parseSetMcpAccessInput(value: unknown): SetMcpAccessInput {
   if (
     !isDynamicRecord(value) ||
-    Object.keys(value).some((key) => key !== "mcpServerId" && key !== "access") ||
+    Object.keys(value).some((key) => key !== "revision" && key !== "mcpServerId" && key !== "access") ||
+    !isRevision(value.revision) ||
     !isIdentifier(value.mcpServerId) ||
     !isAccess(value.access)
   )
     throw new Error("Invalid MCP access change.");
-  return { mcpServerId: value.mcpServerId, access: copyAccess(value.access) };
+  return { revision: value.revision, mcpServerId: value.mcpServerId, access: copyMcpServerAccess(value.access) };
 }

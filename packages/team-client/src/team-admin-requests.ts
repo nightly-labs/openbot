@@ -1074,13 +1074,17 @@ export function getHostMcpAccess(request: TeamApiRequest): Effect.Effect<McpAcce
   return adminCall(() => request("POST", MCP_ACCESS_ROUTES.read, decodeMcpAccessSnapshot, {}));
 }
 
-/** A full replace of the access of one MCP server. The host answers only an owner or admin. */
+/**
+ * A full replace of the access of one MCP server. The host answers only an owner or admin, and refuses
+ * a revision other than the one it holds with 409.
+ */
 export function setHostMcpAccess(
   request: TeamApiRequest,
   input: SetMcpAccessInput,
 ): Effect.Effect<McpAccessSnapshot, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", MCP_ACCESS_ROUTES.set, decodeMcpAccessSnapshot, {
+      revision: input.revision,
       mcpServerId: input.mcpServerId,
       access: { agents: input.access.agents, everyone: input.access.everyone, roles: { ...input.access.roles } },
     }),

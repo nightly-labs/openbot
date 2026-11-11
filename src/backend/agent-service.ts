@@ -2463,10 +2463,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mcpServersFor(this.#mcp.enabled(), agentId);
   }
 
+  /**
+   * Only a saved row has an access entry. A server that OpenBot adds itself, such as Computer Use, goes
+   * to each agent: nothing in Settings can open it again if an entry closed it.
+   */
   #mcpServersFor(configs: readonly McpServerConfig[], agentId: string | null | undefined): McpServerConfig[] {
     const allows = this.#mcpAgentAccess;
     if (agentId === undefined || !allows) return [...configs];
-    return configs.filter((config) => allows(config.id, agentId));
+    const saved = new Set(this.#mcp.list().map((server) => server.id));
+    return configs.filter((config) => !saved.has(config.id) || allows(config.id, agentId));
   }
 
   /**

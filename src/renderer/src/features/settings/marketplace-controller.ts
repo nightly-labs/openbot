@@ -996,14 +996,26 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const [accessRoles, setAccessRoles] = createSignal<readonly { id: string; name: string }[]>([]);
   const [accessBusy, setAccessBusy] = createSignal(false);
   let accessRead = 0;
-  /** A failed read shows no access sections: the rest of the app page does not depend on them. */
-  async function readAccess(serverId: string) {
+  /* The revision of the entries on screen. The host refuses a change that names an older one. */
+  let accessRevision = 0;
+  /**
+   * A failed read shows no access sections: the rest of the app page does not depend on them. A host
+   * that gives no roles still gives the agents and Everyone. `keep` leaves the sections on screen
+   * during the read.
+   */
+  async function readAccess(serverId: string, keep = false) {
     const access = calls().mcpAccess;
     const request = ++accessRead;
-    setAccessServers(null);
+    if (!keep) setAccessServers(null);
     if (!access) return;
-    const answer = await Promise.all([access.get(serverId), access.roles(serverId)]).catch(() => undefined);
-    if (!answer || request !== accessRead) return;
+    const roles = access.roles(serverId).catch(() => []);
+    const answer = await Promise.all([access.get(serverId), roles]).catch(() => undefined);
+    if (request !== accessRead) return;
+    if (!answer) {
+      setAccessServers(null);
+      return;
+    }
+    accessRevision = answer[0].revision;
     setAccessRoles(answer[1]);
     setAccessServers(answer[0].servers ?? null);
   }
@@ -1027,14 +1039,22 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       if (!serverId || !access) return false;
       setAccessBusy(true);
       let saved = true;
+      const read = accessRead;
+      let revision = accessRevision;
       for (const change of changes) {
-        const answer = await run(() => access.set(change, serverId));
+        const answer = await run(() => access.set({ ...change, revision }, serverId));
         if (!answer) {
           saved = false;
           break;
         }
-        if (props.pluginServerId === serverId) setAccessServers(answer.servers ?? null);
+        revision = answer.revision;
+        // A read that started during the save holds the newer answer.
+        if (read !== accessRead) continue;
+        accessRevision = revision;
+        setAccessServers(answer.servers ?? null);
       }
+      // The host refused a change, possibly as stale: show what it holds now.
+      if (!saved && read === accessRead && props.pluginServerId === serverId) await readAccess(serverId, true);
       setAccessBusy(false);
       return saved;
     },

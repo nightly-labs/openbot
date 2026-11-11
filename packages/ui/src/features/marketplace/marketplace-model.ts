@@ -5,9 +5,9 @@ import type {
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillSummary,
+  McpAccessChange,
   McpServerAccess,
   McpServerConfig,
-  SetMcpAccessInput,
   SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
@@ -185,7 +185,7 @@ export interface MarketplaceMcpAccess {
   roles: () => readonly { id: string; name: string }[];
   busy: () => boolean;
   /** A full replace for each row. False when the host refused one; the error shows in the window. */
-  set: (changes: readonly SetMcpAccessInput[]) => Promise<boolean>;
+  set: (changes: readonly McpAccessChange[]) => Promise<boolean>;
 }
 
 export interface MarketplaceModel {

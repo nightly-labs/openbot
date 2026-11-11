@@ -15,7 +15,7 @@ import {
 import { type McpToolRuntimePreparation, prepareToolRuntimeForTest } from "../ipc/mcp-server-handlers";
 import type { TeamApiMcpServerOwners, TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
-import { requireMcpAccess, requireOwnMcpServer, visibleMcpServers } from "./mcp-member-access";
+import { requireMcpAccess, requireOwnMcpServer, requireVisibleMcpTest, visibleMcpServers } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
@@ -96,6 +96,7 @@ export async function routeMcpServers(
   }
   if (test) {
     const parsed = parseTestMcpServer(body);
+    requireVisibleMcpTest(access, mcpServers.listMcpServers(), parsed.config);
     if (toolRuntimes) await runCauseEffect(prepareToolRuntimeForTest(parsed.config, toolRuntimes));
     // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
     // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back;

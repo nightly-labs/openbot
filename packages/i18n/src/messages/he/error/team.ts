@@ -159,6 +159,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "אימות מאובטח אינו נתמך בלקוח הזה.",
   "error.team.agentSettingsUnsupported": "הגדרות סוכן אינן נתמכות בחיבור הזה.",
   "error.team.adminRequired": "נדרשת גישת מנהל.",
+  "error.team.mcpAccessStale": "מישהו שינה את הגישה לשרת ה-MCP הזה. יש לבצע את השינוי שוב.",
   "error.team.mcpServerNotYours": "רק מי שהוסיף את שרת ה-MCP הזה, או מנהל, יכול לשנות אותו.",
   "error.team.ownerRequired": "רק הבעלים של השרת הזה יכול לבצע זאת.",
   "error.team.requestTooLarge": "גוף הבקשה גדול מדי.",

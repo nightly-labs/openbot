@@ -167,6 +167,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Dieser Client unterstützt keine sichere Authentifizierung.",
   "error.team.agentSettingsUnsupported": "Diese Verbindung unterstützt keine Agenteneinstellungen.",
   "error.team.adminRequired": "Administratorzugriff ist erforderlich.",
+  "error.team.mcpAccessStale":
+    "Jemand hat den Zugriff auf diesen MCP-Server geändert. Nimm deine Änderung noch einmal vor.",
   "error.team.mcpServerNotYours":
     "Nur die Person, die diesen MCP-Server hinzugefügt hat, oder ein Admin kann ihn ändern.",
   "error.team.ownerRequired": "Nur der Eigentümer dieses Servers kann das tun.",

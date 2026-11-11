@@ -659,7 +659,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   }
   let mcpServers = clone(STORY_MCP_SERVERS);
   let mcpAccess: Record<string, McpServerAccess> = {};
+  let mcpAccessRevision = 0;
   const mcpAccessSnapshot = (): McpAccessSnapshot => ({
+    revision: mcpAccessRevision,
     mine: Object.fromEntries(mcpServers.map((server) => [server.id, "manage" as const])),
     servers: clone(mcpAccess),
   });
@@ -2433,6 +2435,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const change = parseSetMcpAccessInput(input);
         if (!mcpServers.some((server) => server.id === change.mcpServerId))
           throw new Error("Invalid MCP access change.");
+        if (change.revision !== mcpAccessRevision) throw new Error(sourceText("error.team.mcpAccessStale"));
+        mcpAccessRevision += 1;
         mcpAccess = { ...mcpAccess, [change.mcpServerId]: change.access };
         return mcpAccessSnapshot();
       },

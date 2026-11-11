@@ -43,7 +43,7 @@ export interface MarketplaceCalls {
 }
 
 /** The MCP access of this computer (`serverId` absent) or of a joined server, and the roles it names. */
-export interface MarketplaceMcpAccessCalls {
+interface MarketplaceMcpAccessCalls {
   get: (serverId: string) => Promise<McpAccessSnapshot>;
   set: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
   roles: (serverId: string) => Promise<readonly { id: string; name: string }[]>;

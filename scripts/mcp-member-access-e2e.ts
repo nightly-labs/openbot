@@ -180,6 +180,8 @@ const teamBrowser: TeamApiBrowser = {
 
 /** What the stand-ins were asked to do, in order. */
 const calls: string[] = [];
+/** What the host answers for its sign-ins. A step sets it. */
+let signedIn: McpSignInState[] = [];
 const signIns: TeamApiMcpSignIns = {
   start: (input: TestMcpServerInput) => Effect.sync(() => void calls.push(`start ${input.config.url}`)),
   status: () => ({ tabId: null, result: null }),
@@ -187,9 +189,9 @@ const signIns: TeamApiMcpSignIns = {
   signOut: (input) =>
     Effect.sync((): McpSignInState[] => {
       calls.push(`sign-out ${input.mcpServerId}`);
-      return [];
+      return signedIn;
     }),
-  list: () => [],
+  list: () => signedIn,
   app: () => ({ redirectUrl: null, app: null }),
   saveApp: (input) =>
     Effect.sync(() => {
@@ -363,8 +365,10 @@ async function readAccess(token: string): Promise<McpAccessSnapshot> {
   return decodeMcpAccessSnapshot(response.body);
 }
 
-function setAccess(token: string, mcpServerId: string, access: McpServerAccess) {
-  return call("POST", MCP_ACCESS_ROUTES.set, { token, body: { mcpServerId, access } });
+/** A replace on the revision that the host holds now, or on `revision`. */
+async function setAccess(token: string, mcpServerId: string, access: McpServerAccess, revision?: number) {
+  const body = { revision: revision ?? (await readAccess(token)).revision, mcpServerId, access };
+  return call("POST", MCP_ACCESS_ROUTES.set, { token, body });
 }
 
 async function listedNames(token: string): Promise<string[]> {
@@ -556,13 +560,33 @@ try {
     assert.deepEqual(forOwner.servers?.[ownerRow.id], OPEN, "A server with no entry is not open.");
     assert.equal(forOwner.mine[ownerRow.id], "manage");
     const forMember = await readAccess(member);
-    assert.deepEqual(forMember, { mine: { [ownerRow.id]: "use" } });
+    assert.deepEqual(forMember, { revision: forOwner.revision, mine: { [ownerRow.id]: "use" } });
     refused(await setAccess(member, ownerRow.id, { ...OPEN, everyone: "manage" }), ADMIN_REQUIRED, "member set");
     const released = await call("POST", MCP_ACCESS_ROUTES.read, { token: owner, body: {}, capabilities: RELEASED });
     assert.equal(released.status, 400, `A client without the capability got ${released.status}.`);
     const unknown = await setAccess(owner, "no-such-server", OPEN);
     assert.equal(unknown.status, 400, `An unknown server returned ${unknown.status}.`);
     return { owner: forOwner, member: forMember };
+  });
+
+  await step("access: the host refuses a replace on an old revision", async () => {
+    const { revision } = await readAccess(owner);
+    const first = await setAccess(owner, ownerRow.id, { ...OPEN, agents: ["agent-a"] }, revision);
+    assert.equal(first.status, 200, `Set returned ${first.status}: ${JSON.stringify(first.body)}`);
+    assert.equal(decodeMcpAccessSnapshot(first.body).revision, revision + 1);
+    // A second admin who read before that save.
+    const stale = await setAccess(owner, ownerRow.id, { ...OPEN, everyone: "none" }, revision);
+    assert.equal(stale.status, 409, `A stale replace returned ${stale.status}.`);
+    assert.ok(JSON.stringify(stale.body).includes(sourceText("error.team.mcpAccessStale")), JSON.stringify(stale.body));
+    const held = await readAccess(owner);
+    assert.deepEqual(
+      held.servers?.[ownerRow.id],
+      { ...OPEN, agents: ["agent-a"] },
+      "A stale replace changed the entry.",
+    );
+    assert.equal(held.revision, revision + 1);
+    assert.equal((await setAccess(owner, ownerRow.id, OPEN)).status, 200);
+    return { stale: stale.status, revision: held.revision + 1 };
   });
 
   await step("access: `none` hides the server from the member and refuses it", async () => {
@@ -585,7 +609,25 @@ try {
       servers(released.body).map((server) => server.name),
       [],
     );
-    return { memberList: [] };
+    // A test spends the stored sign-in of the address: the row and a new row on its address are refused.
+    refused(await call("POST", MCP_ROUTES.test, { token: member, body: { config: ownerRow } }), NOT_YOURS, "test");
+    refused(
+      await call("POST", MCP_ROUTES.test, { token: member, body: { config: httpServer("trello-copy", OWNER_URL) } }),
+      NOT_YOURS,
+      "test of a new row on the address",
+    );
+    // The sign-in state of the server stays with the people who can see it.
+    signedIn = [{ mcpServerId: ownerRow.id, signedIn: true }];
+    const states = await call("POST", MCP_SIGN_IN_ROUTES.list, { token: member, body: {} });
+    assert.deepEqual(states.body, [], "A member read the sign-in state of a hidden server.");
+    assert.deepEqual((await call("POST", MCP_SIGN_IN_ROUTES.list, { token: owner, body: {} })).body, signedIn);
+    refused(
+      await call("POST", MCP_SIGN_IN_ROUTES.status, { token: member, body: { url: OWNER_URL } }),
+      NOT_YOURS,
+      "sign-in status",
+    );
+    signedIn = [];
+    return { memberList: [], test: 403, signIns: 0 };
   });
 
   const roleId = "role-ops";

@@ -159,6 +159,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "このクライアントは安全な認証に対応していません。",
   "error.team.agentSettingsUnsupported": "この接続ではエージェントの設定を利用できません。",
   "error.team.adminRequired": "管理者のアクセス権が必要です。",
+  "error.team.mcpAccessStale": "他の人がこの MCP サーバーへのアクセスを変更しました。もう一度変更してください。",
   "error.team.mcpServerNotYours": "この MCP サーバーを変更できるのは、追加した人か管理者だけです。",
   "error.team.ownerRequired": "この操作ができるのはこのサーバーのオーナーだけです。",
   "error.team.requestTooLarge": "リクエストの本文が大きすぎます。",
