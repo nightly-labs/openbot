@@ -1825,7 +1825,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   function sidebarLoading(): boolean {
     return (
       !sidebarWaitOver() &&
-      (workspace.state.panelsLoading || (channelsSupported() && !routinesView() && !channels.state.listed))
+      (workspace.state.panelsLoading ||
+        // A failed channel list shows its error in the sidebar, so the cover does not wait for it.
+        (channelsSupported() && !routinesView() && !channels.state.listed && !channels.state.error))
     );
   }
   const savedChannelId = () => {
@@ -2731,31 +2733,36 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.conversation()?.loading === true;
   const conversationError = () =>
     workspace.state.status === "online" ? (workspace.conversation()?.error ?? null) : null;
-  const connectionNotice = (cover = false) => (
-    <ServerConnectionNotice
-      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-      initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
-      ready={cover ? !fullWindowLoading() : undefined}
-      onExited={cover ? () => setLoadingCover(false) : undefined}
-      fullWindow={fullWindowLoading()}
-      screen={!frameConnecting()}
-      issue={workspace.state.hostedIssue}
-      start={workspace.state.hostedStart}
-      updateVersion={workspace.state.hostRestart?.version ?? null}
-      detail={connectionDetail()?.message ?? null}
-      reference={connectionDetail()?.reference ?? null}
-      phase={connectionPhase()}
-      remainingSeconds={
-        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
-          ? workspace.state.recovery.remainingSeconds
-          : 0
-      }
-      busy={workspace.state.status === "connecting" || !workspace.state.host}
-      onRetry={() => void workspace.run(workspace.reconnect)}
-      onManage={() => setBillingOpen(true)}
-      upsell={offlineUpsell()}
-    />
-  );
+  /** While the page load waits for the sidebar, the host answered: the cover still loads, it does not reconnect. */
+  const coverPhase = () => (workspace.state.status === "online" ? "loading" : connectionPhase());
+  const connectionNotice = (cover = false) => {
+    const phase = cover ? coverPhase : connectionPhase;
+    return (
+      <ServerConnectionNotice
+        name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
+        initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
+        ready={cover ? !fullWindowLoading() : undefined}
+        onExited={cover ? () => setLoadingCover(false) : undefined}
+        fullWindow={fullWindowLoading()}
+        screen={!frameConnecting()}
+        issue={workspace.state.hostedIssue}
+        start={workspace.state.hostedStart}
+        updateVersion={workspace.state.hostRestart?.version ?? null}
+        detail={connectionDetail()?.message ?? null}
+        reference={connectionDetail()?.reference ?? null}
+        phase={phase()}
+        remainingSeconds={
+          workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
+            ? workspace.state.recovery.remainingSeconds
+            : 0
+        }
+        busy={workspace.state.status === "connecting" || !workspace.state.host}
+        onRetry={() => void workspace.run(workspace.reconnect)}
+        onManage={() => setBillingOpen(true)}
+        upsell={offlineUpsell()}
+      />
+    );
+  };
   return (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
