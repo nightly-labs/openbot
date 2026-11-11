@@ -53,6 +53,7 @@ import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { runIdOrigins } from "./message-run-ids";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
@@ -1847,7 +1848,10 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  /** Provider history can name a continuation turn instead of the original delivery. */
+  /**
+   * Provider history can name a continuation turn instead of the original delivery, or a run of the
+   * delivery in a Claude process that already took its id (#6676).
+   */
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find(
       (candidate) =>
@@ -1857,7 +1861,14 @@ export class MailboxStore {
             (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
           candidate.planContinuation?.turnIds.includes(messageId) === true),
     );
-    return delivery ? this.#context(delivery) : null;
+    if (delivery) return this.#context(delivery);
+    for (const origin of runIdOrigins(messageId).slice(1)) {
+      const run = this.#state.deliveries.find(
+        (candidate) => candidate.recipientAgentId === agentId && candidate.id === origin,
+      );
+      if (run) return this.#context(run);
+    }
+    return null;
   }
 
   /** The delivery of one message to one recipient. A message reaches each recipient once. */

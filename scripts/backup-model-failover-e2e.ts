@@ -6,7 +6,8 @@
 // Checks:
 //   1. A turn that wrote text before the error does not move: it fails with its error, as before.
 //   2. An agent with no backup models fails with its error, as before.
-//   3. A turn that did nothing yet runs again on the backup model, with a note and no error.
+//   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
+//      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
 //   4. read_agent shows the backup model, and the model to go back to with the provider error as cause.
 //   5. After a restart, the agent goes back to its own model, with a note.
 // Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
@@ -142,6 +143,8 @@ const turn = (message) => {
   assistant("Done.");
   result({ is_error: false, result: "Done." });
 };
+// As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
+const taken = new Set();
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -156,7 +159,10 @@ process.stdin.on("data", (chunk) => {
     if (message.type === "control_request") {
       if (message.request?.subtype === "set_model") model = message.request.model ?? model;
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
-    } else if (message.type === "user") turn(message);
+    } else if (message.type === "user" && !taken.has(message.uuid)) {
+      taken.add(message.uuid);
+      turn(message);
+    }
   }
 });
 process.stdin.on("end", () => process.exit(0));
@@ -662,6 +668,8 @@ try {
     assert.deepEqual(errorsFor(mover.id, since), [], "No error shows for the moved turn.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) })]);
+    // The same Claude process took the message, so it ran again with a new uuid (#6676).
+    await verifyHistoryKeepsRequests(mover.id);
     return { ran, notes };
   });
 
