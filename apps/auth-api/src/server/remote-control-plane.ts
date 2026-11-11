@@ -3533,7 +3533,7 @@ function nearSignalHomes(
 }
 
 /** The `/health/ready` URL of the machine of a Signal WebSocket URL. */
-export function signalHealthUrl(signalUrl: string): string {
+function signalHealthUrl(signalUrl: string): string {
   const parsed = new URL(signalUrl);
   return `${parsed.protocol === "ws:" ? "http:" : "https:"}//${parsed.host}/health/ready`;
 }
