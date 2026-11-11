@@ -318,8 +318,16 @@ try {
       );
       // The Vault folder is not an agent: a restart registers the agents' keys and skips it.
       await Effect.runPromise(keys.registerSaved());
+      // A file that an agent put here, such as a key that cannot be downloaded again, survives each
+      // Vault change (#7136). The temporary file of a stopped write does not.
+      const handPlaced = join(vaultFolder, "AuthKey_E2E.p8");
+      const stoppedWrite = join(vaultFolder, "GITHUB_TOKEN.0f8e6a52-3c1d-4b7e-9a20-5d6c7b8e9f10.tmp");
+      await writeFile(handPlaced, "e2e-hand-placed-private-key");
+      await mkdir(join(vaultFolder, "notes"));
+      await writeFile(stoppedWrite, "e2e-partial");
       await saveKey(githubId, "GITHUB_TOKEN", NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
+      await assert.rejects(stat(stoppedWrite));
       await Effect.runPromise(vault.delete(githubId));
       await synced;
       await assert.rejects(stat(join(vaultFolder, "GITHUB_TOKEN")));
@@ -329,6 +337,8 @@ try {
       await Effect.runPromise(vault.load());
       await Effect.runPromise(keys.syncVault());
       await assert.rejects(stat(join(vaultFolder, "OPENAI_API_KEY")));
+      assert.equal(await readFile(handPlaced, "utf8"), "e2e-hand-placed-private-key");
+      assert.ok((await stat(join(vaultFolder, "notes"))).isDirectory());
       assert.deepEqual(await Effect.runPromise(keys.list("agent-3")), [
         { name: "OPENAI_API_KEY", path: join(root, "agent-api-keys", "agent-3", "OPENAI_API_KEY") },
       ]);
