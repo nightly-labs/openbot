@@ -97,6 +97,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "Precisa de você, {count} conversa", other: "Precisam de você, {count} conversas" },
   "sidebar.unread.title": "Não lidas",
   "sidebar.unread.label": { one: "Não lidas, {count} conversa", other: "Não lidas, {count} conversas" },
+  "sidebar.unread.actions": "Ações de Não lidas",
+  "sidebar.unread.turnOff": "Desativar o grupo Não lidas",
   "sidebar.waiting.action.question": "Responder",
   "sidebar.waiting.action.approval": "Revisar",
   "sidebar.waiting.action.takeover": "Assumir",

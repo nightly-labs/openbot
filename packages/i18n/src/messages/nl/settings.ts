@@ -96,6 +96,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "De link is in de standaardbrowser geopend.",
   "settings.sendShortcut.title": "Sneltoets voor verzenden",
   "settings.sendShortcut.description": "Kies de toetsen die een bericht verzenden op dit apparaat en in deze browser.",
+  "settings.chatOrder.description":
+    "Kies waar de zijbalk ongelezen chats op dit apparaat toont. Handmatig zet de groep Ongelezen uit.",
   "settings.sendShortcut.enter": "Enter verstuurt",
   "settings.sendShortcut.modEnterMac": "⌘Enter verstuurt",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter verstuurt",

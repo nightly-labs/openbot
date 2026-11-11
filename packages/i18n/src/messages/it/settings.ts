@@ -97,6 +97,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Il link si è aperto nel browser predefinito.",
   "settings.sendShortcut.title": "Scorciatoia di invio",
   "settings.sendShortcut.description": "Scegli i tasti che inviano un messaggio su questo dispositivo e browser.",
+  "settings.chatOrder.description":
+    "Scegli dove la barra laterale mostra le chat non lette su questo dispositivo. Manuale disattiva il gruppo Non lette.",
   "settings.sendShortcut.enter": "Invio per inviare",
   "settings.sendShortcut.modEnterMac": "⌘Invio per inviare",
   "settings.sendShortcut.modEnterWin": "Ctrl+Invio per inviare",

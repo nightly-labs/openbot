@@ -100,6 +100,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "Besoin de vous, {count} discussion", other: "Besoin de vous, {count} discussions" },
   "sidebar.unread.title": "Non lues",
   "sidebar.unread.label": { one: "Non lues, {count} discussion", other: "Non lues, {count} discussions" },
+  "sidebar.unread.actions": "Actions des non lues",
+  "sidebar.unread.turnOff": "Désactiver le groupe Non lues",
   "sidebar.waiting.action.question": "Répondre",
   "sidebar.waiting.action.approval": "Examiner",
   "sidebar.waiting.action.takeover": "Prendre la main",

@@ -98,6 +98,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Der Link wurde im Standardbrowser geöffnet.",
   "settings.sendShortcut.title": "Tastenkürzel zum Senden",
   "settings.sendShortcut.description": "Wähle die Tasten zum Senden auf diesem Gerät und in diesem Browser.",
+  "settings.chatOrder.description":
+    "Wähle, wo die Seitenleiste ungelesene Chats auf diesem Gerät zeigt. „Manuell“ schaltet die Gruppe „Ungelesen“ aus.",
   "settings.sendShortcut.enter": "Mit Enter senden",
   "settings.sendShortcut.modEnterMac": "Mit ⌘Enter senden",
   "settings.sendShortcut.modEnterWin": "Mit Strg+Enter senden",

@@ -95,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "リンクは既定のブラウザーで開きました。",
   "settings.sendShortcut.title": "送信キー",
   "settings.sendShortcut.description": "このデバイスとこのブラウザーでメッセージを送信するキーを選びます。",
+  "settings.chatOrder.description":
+    "このデバイスのサイドバーで未読チャットを表示する場所を選びます。手動にすると未読グループはオフになります。",
   "settings.sendShortcut.enter": "Enter で送信",
   "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",

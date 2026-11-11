@@ -99,6 +99,8 @@ export const messages = defineMessages("settings", {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
+  "settings.chatOrder.description":
+    "Choose where the sidebar shows unread chats on this device. Manual turns off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",

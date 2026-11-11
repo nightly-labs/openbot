@@ -95,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "링크를 기본 브라우저에서 열었어요.",
   "settings.sendShortcut.title": "전송 단축키",
   "settings.sendShortcut.description": "이 기기와 브라우저에서 메시지를 보낼 키를 선택해요.",
+  "settings.chatOrder.description":
+    "이 기기의 사이드바에서 읽지 않은 채팅을 표시할 위치를 선택합니다. 수동을 선택하면 읽지 않음 그룹이 꺼집니다.",
   "settings.sendShortcut.enter": "Enter로 전송",
   "settings.sendShortcut.modEnterMac": "⌘Enter로 전송",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter로 전송",

@@ -104,6 +104,8 @@ export const messages = {
   "settings.sendShortcut.title": "Raccourci d’envoi",
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
+  "settings.chatOrder.description":
+    "Choisissez où la barre latérale affiche les discussions non lues sur cet appareil. Manuel désactive le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",

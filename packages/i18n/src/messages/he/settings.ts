@@ -94,6 +94,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "הקישור נפתח בדפדפן ברירת המחדל.",
   "settings.sendShortcut.title": "קיצור שליחה",
   "settings.sendShortcut.description": "בחירת המקשים ששולחים הודעה במכשיר ובדפדפן הזה.",
+  "settings.chatOrder.description":
+    "בחרו היכן סרגל הצד מציג צ'אטים שלא נקראו במכשיר הזה. ידני מכבה את הקבוצה לא נקראו.",
   "settings.sendShortcut.enter": "Enter לשליחה",
   "settings.sendShortcut.modEnterMac": "⌘Enter לשליחה",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter לשליחה",

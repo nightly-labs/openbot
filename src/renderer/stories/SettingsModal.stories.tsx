@@ -13,6 +13,7 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
 import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
+import { LayoutProvider } from "../src/layout";
 import { PlatformProvider } from "../src/platform";
 import { STORY_AGENTS, STORY_SERVERS } from "../src/preview/fixtures";
 import { createMockBilling } from "../src/preview/mock-billing";
@@ -162,74 +163,76 @@ function SettingsModalStory(props: {
 
   return (
     <PlatformProvider>
-      <SettingsPageStory
-        title="Settings"
-        controls={
-          <Button variant="outline" type="button" onClick={() => setOpen(true)}>
-            Open settings
-          </Button>
-        }
-        onEscape={() => setOpen(false)}
-      >
-        {(page) => (
-          <SettingsModal
-            page={page()}
-            initialTab={props.initialTab}
-            openTab={props.openTab}
-            codexLiveAccess={props.codexLiveAccess}
-            onConnectCodex={() => setOpen(false)}
-            open={open()}
-            value={value()}
-            onValueChange={(next) => {
-              previewStorySoundSettings(value(), next);
-              setValue(next);
-            }}
-            appInfo={storyAppInfo}
-            servers={servers()}
-            onSetServerNotificationLevel={async (serverId, level) =>
-              updateServer(serverId, { notificationLevel: level })
-            }
-            onSetServerMuted={async (serverId, muted, durationMs) =>
-              updateServer(serverId, {
-                notificationsMuted: muted,
-                notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
-              })
-            }
-            updateStatus={updateStatus()}
-            onCancelScheduledRestart={async () => {
-              const { scheduledRestart: _cancelled, ...rest } = updateStatus();
-              setUpdateStatus(rest);
-            }}
-            account={account()}
-            onUpdateAccountName={updateAccountName}
-            onUpdateAccountAvatar={updateAccountAvatar}
-            onSetChatColor={async (chatColor) => {
-              setAccount((current) => ({ ...current, chatColor }));
-            }}
-            onCreateMobileConnect={createMobileConnect}
-            onCancelMobileConnect={async () => {
-              window.clearTimeout(scanTimer);
-              await mock.api.auth.cancelMobileConnect();
-            }}
-            onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
-            onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
-            onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}
-            onListMobileConnectedDevices={async () => mobileDevices()}
-            onListAccountSessions={mock.api.auth.listAccountSessions}
-            onRevokeAccountSession={mock.api.auth.revokeAccountSession}
-            onRevokeMobileConnectedDevice={async (sessionId) => {
-              setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
-            }}
-            onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
-            onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
-            onUpdateAction={runUpdateAction}
-            billingApi={billingApi}
-            hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
-            onAddHostedServer={props.hostedServers ? fn() : undefined}
-            agentDock={props.agentDock ? storyAgentDock : undefined}
-          />
-        )}
-      </SettingsPageStory>
+      <LayoutProvider>
+        <SettingsPageStory
+          title="Settings"
+          controls={
+            <Button variant="outline" type="button" onClick={() => setOpen(true)}>
+              Open settings
+            </Button>
+          }
+          onEscape={() => setOpen(false)}
+        >
+          {(page) => (
+            <SettingsModal
+              page={page()}
+              initialTab={props.initialTab}
+              openTab={props.openTab}
+              codexLiveAccess={props.codexLiveAccess}
+              onConnectCodex={() => setOpen(false)}
+              open={open()}
+              value={value()}
+              onValueChange={(next) => {
+                previewStorySoundSettings(value(), next);
+                setValue(next);
+              }}
+              appInfo={storyAppInfo}
+              servers={servers()}
+              onSetServerNotificationLevel={async (serverId, level) =>
+                updateServer(serverId, { notificationLevel: level })
+              }
+              onSetServerMuted={async (serverId, muted, durationMs) =>
+                updateServer(serverId, {
+                  notificationsMuted: muted,
+                  notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
+                })
+              }
+              updateStatus={updateStatus()}
+              onCancelScheduledRestart={async () => {
+                const { scheduledRestart: _cancelled, ...rest } = updateStatus();
+                setUpdateStatus(rest);
+              }}
+              account={account()}
+              onUpdateAccountName={updateAccountName}
+              onUpdateAccountAvatar={updateAccountAvatar}
+              onSetChatColor={async (chatColor) => {
+                setAccount((current) => ({ ...current, chatColor }));
+              }}
+              onCreateMobileConnect={createMobileConnect}
+              onCancelMobileConnect={async () => {
+                window.clearTimeout(scanTimer);
+                await mock.api.auth.cancelMobileConnect();
+              }}
+              onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
+              onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
+              onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}
+              onListMobileConnectedDevices={async () => mobileDevices()}
+              onListAccountSessions={mock.api.auth.listAccountSessions}
+              onRevokeAccountSession={mock.api.auth.revokeAccountSession}
+              onRevokeMobileConnectedDevice={async (sessionId) => {
+                setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
+              }}
+              onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
+              onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
+              onUpdateAction={runUpdateAction}
+              billingApi={billingApi}
+              hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
+              onAddHostedServer={props.hostedServers ? fn() : undefined}
+              agentDock={props.agentDock ? storyAgentDock : undefined}
+            />
+          )}
+        </SettingsPageStory>
+      </LayoutProvider>
       <Toaster />
     </PlatformProvider>
   );

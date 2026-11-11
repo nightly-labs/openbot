@@ -127,6 +127,8 @@ export const messages = {
     many: "Непрочитанные: {count} чатов",
     other: "Непрочитанные: {count} чата",
   },
+  "sidebar.unread.actions": "Действия с непрочитанными",
+  "sidebar.unread.turnOff": "Отключить группу «Непрочитанные»",
   "sidebar.waiting.action.question": "Ответить",
   "sidebar.waiting.action.approval": "Проверить",
   "sidebar.waiting.action.takeover": "Взять управление",

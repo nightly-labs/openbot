@@ -109,6 +109,8 @@ export const messages = {
   },
   "sidebar.unread.title": "No leídos",
   "sidebar.unread.label": { one: "No leídos, {count} chat", other: "No leídos, {count} chats" },
+  "sidebar.unread.actions": "Acciones de No leídos",
+  "sidebar.unread.turnOff": "Desactivar el grupo No leídos",
   "sidebar.waiting.action.question": "Responder",
   "sidebar.waiting.action.approval": "Revisar",
   "sidebar.waiting.action.takeover": "Intervenir",
