@@ -955,3 +955,28 @@ div.dynamic-island-surface-context-line span {
     transform: translateY(0) scale(1);
   }
 }
+
+/* The top of an open island on a display without a notch, in the band where a notch would be. */
+.dynamic-island-surface-expanded-header {
+  position: absolute;
+  top: calc(-1 * var(--dynamic-island-notch-height));
+  right: 20px;
+  left: 20px;
+  display: flex;
+  height: var(--dynamic-island-notch-height);
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.dynamic-island-surface-expanded-header-app {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2, 8px);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xs, 12px);
+  font-weight: 600;
+}
+.dynamic-island-surface-expanded-header-logo {
+  width: 16px;
+  height: 16px;
+}

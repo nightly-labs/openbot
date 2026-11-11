@@ -704,6 +704,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
                 <ExpandedContent
                   presentation={presentation}
                   displayMode={props.displayMode}
+                  variant={props.variant}
                   inlineReply={props.inlineReply}
                   onAction={props.onAction}
                   onHaptic={props.onHaptic}
@@ -714,6 +715,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
               <ExpandedContent
                 presentation={visiblePresentation()}
                 displayMode={props.displayMode}
+                variant={props.variant}
                 inlineReply={props.inlineReply}
                 onAction={props.onAction}
                 actionError={props.actionError}
@@ -1012,6 +1014,7 @@ function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
 function ExpandedContent(props: {
   presentation: DynamicIslandPresentation;
   displayMode?: "notch" | "island" | undefined;
+  variant?: AppVariant | undefined;
   inlineReply?: boolean | undefined;
   onAction: (action: DynamicIslandAction) => Promise<boolean> | undefined;
   actionError?: UserErrorDetails | undefined;
@@ -1022,162 +1025,197 @@ function ExpandedContent(props: {
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
   const unreadCount = () => (props.presentation.mode === "message" ? props.presentation.unreadCount : 0);
   return (
-    <Switch>
-      <Match when={props.presentation.mode === "working"}>
-        <div class="dynamic-island-surface-panel">
-          <div class="dynamic-island-surface-list">
-            <For each={ROW_INDICES}>
-              {(index) => (
-                <Show when={working()[index]}>
-                  {(item) => (
-                    <div class="dynamic-island-surface-row-group">
-                      <Button
-                        variant="ghost"
-                        class="dynamic-island-surface-row dynamic-island-surface-animated-row"
-                        onClick={() =>
-                          props.onAction({
-                            type: "open-agent",
-                            serverId: props.presentation.serverId,
-                            agentId: item().agent.id,
-                          })
-                        }
-                      >
-                        <span class="dynamic-island-surface-working-avatar-slot" aria-hidden="true" />
-                        <IslandContentSwap contentKey={`${item().agent.id}:${item().task}`}>
-                          <span class="dynamic-island-surface-row-copy" data-island-motion-content>
-                            <strong>{item().agent.name}</strong>
-                            <small>{item().task}</small>
-                          </span>
-                        </IslandContentSwap>
-                      </Button>
-                      <Show when={props.inlineReply ? item().turnId : null}>
-                        {(turnId) => (
-                          <IconButton
-                            variant="ghost"
-                            class="dynamic-island-surface-row-stop"
-                            label={t("island.action.stopAgent", { name: item().agent.name })}
-                            data-cuelume-close=""
-                            data-island-motion-content
-                            onClick={() =>
-                              props.onAction({
-                                type: "stop-agent",
-                                serverId: props.presentation.serverId,
-                                agentId: item().agent.id,
-                                turnId: turnId(),
-                              })
-                            }
-                          >
-                            <StopIcon />
-                          </IconButton>
-                        )}
-                      </Show>
-                    </div>
+    <>
+      {/* Without a notch the top of the open island is empty: it shows the app and the status there. */}
+      <Show when={props.displayMode === "island" ? statusMode(props.presentation.mode) : undefined}>
+        {(mode) => <ExpandedHeader mode={mode()} variant={props.variant} />}
+      </Show>
+      <Switch>
+        <Match when={props.presentation.mode === "working"}>
+          <div class="dynamic-island-surface-panel">
+            <div class="dynamic-island-surface-list">
+              <For each={ROW_INDICES}>
+                {(index) => (
+                  <Show when={working()[index]}>
+                    {(item) => (
+                      <div class="dynamic-island-surface-row-group">
+                        <Button
+                          variant="ghost"
+                          class="dynamic-island-surface-row dynamic-island-surface-animated-row"
+                          onClick={() =>
+                            props.onAction({
+                              type: "open-agent",
+                              serverId: props.presentation.serverId,
+                              agentId: item().agent.id,
+                            })
+                          }
+                        >
+                          <span class="dynamic-island-surface-working-avatar-slot" aria-hidden="true" />
+                          <IslandContentSwap contentKey={`${item().agent.id}:${item().task}`}>
+                            <span class="dynamic-island-surface-row-copy" data-island-motion-content>
+                              <strong>{item().agent.name}</strong>
+                              <small>{item().task}</small>
+                            </span>
+                          </IslandContentSwap>
+                        </Button>
+                        <Show when={props.inlineReply ? item().turnId : null}>
+                          {(turnId) => (
+                            <IconButton
+                              variant="ghost"
+                              class="dynamic-island-surface-row-stop"
+                              label={t("island.action.stopAgent", { name: item().agent.name })}
+                              data-cuelume-close=""
+                              data-island-motion-content
+                              onClick={() =>
+                                props.onAction({
+                                  type: "stop-agent",
+                                  serverId: props.presentation.serverId,
+                                  agentId: item().agent.id,
+                                  turnId: turnId(),
+                                })
+                              }
+                            >
+                              <StopIcon />
+                            </IconButton>
+                          )}
+                        </Show>
+                      </div>
+                    )}
+                  </Show>
+                )}
+              </For>
+            </div>
+            <IslandActionError message={props.actionError} />
+          </div>
+        </Match>
+        <Match when={props.presentation.mode === "message" ? props.presentation.message : undefined}>
+          {(message) => (
+            <article class="dynamic-island-message-first-panel">
+              <IslandContentSwap contentKey={message().messageId} block>
+                <DynamicIslandIdentity
+                  name={message().agent.name}
+                  status={t("island.status.replied")}
+                  description={message().text}
+                  trailing={<time datetime={message().createdAt}>{t("chat.day.now")}</time>}
+                />
+              </IslandContentSwap>
+              <Show when={props.inlineReply}>
+                {/* Each recipient gets a new field, so a draft for one agent is not sent to another. */}
+                <Show keyed when={`${props.presentation.serverId}:${message().agent.id}`}>
+                  {(_recipient) => (
+                    <IslandReplyField
+                      label={t("island.reply.placeholder", { name: message().agent.name })}
+                      onSend={(text, clientMessageId) =>
+                        props.onAction({
+                          type: "send-message",
+                          serverId: props.presentation.serverId,
+                          agentId: message().agent.id,
+                          text,
+                          clientMessageId,
+                        })
+                      }
+                    />
                   )}
                 </Show>
-              )}
-            </For>
-          </div>
-          <IslandActionError message={props.actionError} />
-        </div>
-      </Match>
-      <Match when={props.presentation.mode === "message" ? props.presentation.message : undefined}>
-        {(message) => (
-          <article class="dynamic-island-message-first-panel">
-            <IslandContentSwap contentKey={message().messageId} block>
-              <DynamicIslandIdentity
-                name={message().agent.name}
-                status={t("island.status.replied")}
-                description={message().text}
-                trailing={<time datetime={message().createdAt}>{t("chat.day.now")}</time>}
-              />
-            </IslandContentSwap>
-            <Show when={props.inlineReply}>
-              {/* Each recipient gets a new field, so a draft for one agent is not sent to another. */}
-              <Show keyed when={`${props.presentation.serverId}:${message().agent.id}`}>
-                {(_recipient) => (
-                  <IslandReplyField
-                    label={t("island.reply.placeholder", { name: message().agent.name })}
-                    onSend={(text, clientMessageId) =>
-                      props.onAction({
-                        type: "send-message",
-                        serverId: props.presentation.serverId,
-                        agentId: message().agent.id,
-                        text,
-                        clientMessageId,
-                      })
-                    }
-                  />
-                )}
+                <IslandActionError message={props.actionError} />
               </Show>
-              <IslandActionError message={props.actionError} />
-            </Show>
-            <footer class="dynamic-island-message-first-footer" data-island-motion-content>
-              <span class="dynamic-island-message-first-unread">
-                {t("island.message.unread", { count: unreadCount() })}
-              </span>
-              <Button
-                size="sm"
-                onClick={() =>
-                  props.onAction({
-                    type: "open-message",
-                    serverId: props.presentation.serverId,
-                    agentId: message().agent.id,
-                    messageId: message().messageId,
-                  })
-                }
-              >
-                <MessageCircle aria-hidden="true" /> {t("island.action.openChat")}
-              </Button>
-            </footer>
-          </article>
+              <footer class="dynamic-island-message-first-footer" data-island-motion-content>
+                <span class="dynamic-island-message-first-unread">
+                  {t("island.message.unread", { count: unreadCount() })}
+                </span>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    props.onAction({
+                      type: "open-message",
+                      serverId: props.presentation.serverId,
+                      agentId: message().agent.id,
+                      messageId: message().messageId,
+                    })
+                  }
+                >
+                  <MessageCircle aria-hidden="true" /> {t("island.action.openChat")}
+                </Button>
+              </footer>
+            </article>
+          )}
+        </Match>
+        <Match when={props.presentation.mode === "takeover" ? props.presentation.item : undefined}>
+          {(item) => (
+            <TakeoverContent
+              item={item()}
+              serverId={props.presentation.serverId}
+              actionError={props.actionError}
+              onAction={props.onAction}
+            />
+          )}
+        </Match>
+        <Match when={props.presentation.mode === "failed" ? props.presentation.item : undefined}>
+          {(item) => (
+            <FailureContent
+              item={item()}
+              serverId={props.presentation.serverId}
+              actionError={props.actionError}
+              onAction={props.onAction}
+            />
+          )}
+        </Match>
+        <Match when={props.presentation.mode === "question" ? props.presentation : undefined}>
+          {(presentation) => (
+            <QuestionContent
+              item={presentation().item}
+              serverId={presentation().serverId}
+              remainingCount={presentation().remainingCount}
+              inlineReply={props.inlineReply}
+              actionError={props.actionError}
+              onAction={props.onAction}
+              onHaptic={props.onHaptic}
+              onClose={props.onClose}
+            />
+          )}
+        </Match>
+        <Match when={props.presentation.mode === "approval" ? props.presentation : undefined}>
+          {(presentation) => (
+            <ApprovalContent
+              item={presentation().item}
+              serverId={presentation().serverId}
+              remainingCount={presentation().remainingCount}
+              actionError={props.actionError}
+              onAction={props.onAction}
+            />
+          )}
+        </Match>
+      </Switch>
+    </>
+  );
+}
+
+/** The top of an open island on a display without a notch: the app, and the status badge of the compact island. */
+function ExpandedHeader(props: { mode: StatusMode; variant?: AppVariant | undefined }): JSX.Element {
+  const { t } = useText();
+  const badge = () => OPENBOT_ISLAND_MODE_CONFIG[props.mode].badge;
+  return (
+    <div class="dynamic-island-surface-expanded-header" aria-hidden="true">
+      <span class="dynamic-island-surface-expanded-header-app">
+        <AppLogo
+          variant={props.variant ?? "production"}
+          animation="none"
+          class="dynamic-island-surface-expanded-header-logo"
+        />
+        <span>{t("island.header.app")}</span>
+      </span>
+      <Show when={badge()}>
+        {(config) => (
+          <Badge
+            variant={config().variant}
+            class={["dynamic-island-surface-status-badge", config().className].join(" ")}
+          >
+            {config().icon()}
+            <span class="dynamic-island-surface-status-badge-label">{t(config().label)}</span>
+          </Badge>
         )}
-      </Match>
-      <Match when={props.presentation.mode === "takeover" ? props.presentation.item : undefined}>
-        {(item) => (
-          <TakeoverContent
-            item={item()}
-            serverId={props.presentation.serverId}
-            actionError={props.actionError}
-            onAction={props.onAction}
-          />
-        )}
-      </Match>
-      <Match when={props.presentation.mode === "failed" ? props.presentation.item : undefined}>
-        {(item) => (
-          <FailureContent
-            item={item()}
-            serverId={props.presentation.serverId}
-            actionError={props.actionError}
-            onAction={props.onAction}
-          />
-        )}
-      </Match>
-      <Match when={props.presentation.mode === "question" ? props.presentation : undefined}>
-        {(presentation) => (
-          <QuestionContent
-            item={presentation().item}
-            serverId={presentation().serverId}
-            remainingCount={presentation().remainingCount}
-            inlineReply={props.inlineReply}
-            actionError={props.actionError}
-            onAction={props.onAction}
-            onHaptic={props.onHaptic}
-            onClose={props.onClose}
-          />
-        )}
-      </Match>
-      <Match when={props.presentation.mode === "approval" ? props.presentation : undefined}>
-        {(presentation) => (
-          <ApprovalContent
-            item={presentation().item}
-            serverId={presentation().serverId}
-            remainingCount={presentation().remainingCount}
-            actionError={props.actionError}
-            onAction={props.onAction}
-          />
-        )}
-      </Match>
-    </Switch>
+      </Show>
+    </div>
   );
 }
 

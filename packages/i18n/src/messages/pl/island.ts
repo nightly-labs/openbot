@@ -20,6 +20,7 @@ export const messages = {
   "island.badge.takeover": "Przejmij",
   "island.badge.failed": "Błąd",
   "island.status.replied": "odpowiada",
+  "island.header.app": "OpenBot",
   "island.status.failed": "błąd",
   "island.status.needsYou": "potrzebuje cię",
   "island.status.needsApproval": "czeka na zatwierdzenie",

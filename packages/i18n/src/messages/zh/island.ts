@@ -21,6 +21,7 @@ export const messages = {
   "island.badge.takeover": "接管",
   "island.badge.failed": "失败",
   "island.status.replied": "已回复",
+  "island.header.app": "OpenBot",
   "island.status.failed": "失败",
   "island.status.needsYou": "需要你",
   "island.status.needsApproval": "待批准",
