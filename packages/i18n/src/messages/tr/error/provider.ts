@@ -343,6 +343,10 @@ export const messages = {
     "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.modelServiceRefusedReason":
     "Model hizmeti isteği reddetti: {reason}. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
+  "error.provider.safetyStop":
+    "OpenAI güvenlik denetimi bu sohbeti durdurdu. Bu sohbetteki mesajlar yeniden durabilir. Devam etmek için Yeni sohbet başlatın. Ajan yapılandırmasını korur.",
+  "error.provider.safetyStopReason":
+    "OpenAI güvenlik denetimi bu sohbeti durdurdu. Bu sohbetteki mesajlar yeniden durabilir. Devam etmek için Yeni sohbet başlatın. Ajan yapılandırmasını korur. Neden: {detail}",
   "error.provider.messageTooLarge":
     "OpenBot, {limit} MB'tan daha büyük bir mesaj gönderdiği için {provider} sağlayıcısını durdurdu.",
   "error.provider.customAgentIdInvalid":

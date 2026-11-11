@@ -338,6 +338,10 @@ export const messages = {
     "De modeldienst heeft het verzoek geweigerd. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
   "error.provider.modelServiceRefusedReason":
     "De modeldienst heeft het verzoek geweigerd: {reason}. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
+  "error.provider.safetyStop":
+    "De veiligheidscontrole van OpenAI heeft deze chat gestopt. Berichten in deze chat kunnen opnieuw stoppen. Start een Nieuwe chat om door te gaan. De agent houdt zijn instellingen.",
+  "error.provider.safetyStopReason":
+    "De veiligheidscontrole van OpenAI heeft deze chat gestopt. Berichten in deze chat kunnen opnieuw stoppen. Start een Nieuwe chat om door te gaan. De agent houdt zijn instellingen. Reden: {detail}",
   "error.provider.messageTooLarge":
     "OpenBot heeft {provider} gestopt, omdat het een bericht groter dan {limit} MB stuurde.",
   "error.provider.customAgentIdInvalid":

@@ -358,6 +358,10 @@ export const messages = {
     "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.modelServiceRefusedReason":
     "Le service du modèle a refusé la requête : {reason}. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
+  "error.provider.safetyStop":
+    "Le contrôle de sécurité d'OpenAI a arrêté cette discussion. Les messages de cette discussion peuvent s'arrêter de nouveau. Pour continuer, démarrez une Nouvelle discussion. L'agent garde sa configuration.",
+  "error.provider.safetyStopReason":
+    "Le contrôle de sécurité d'OpenAI a arrêté cette discussion. Les messages de cette discussion peuvent s'arrêter de nouveau. Pour continuer, démarrez une Nouvelle discussion. L'agent garde sa configuration. Raison : {detail}",
   "error.provider.messageTooLarge": "OpenBot a arrêté {provider}, car il a envoyé un message de plus de {limit} Mo.",
   "error.provider.customAgentIdInvalid":
     "Un ID d’agent ne peut contenir que des lettres minuscules, des chiffres ou `-`, et ne peut pas être l’ID d’un fournisseur intégré.",

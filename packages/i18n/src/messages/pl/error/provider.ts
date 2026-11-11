@@ -333,6 +333,10 @@ export const messages = {
     "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.modelServiceRefusedReason":
     "Usługa modelu odrzuciła żądanie: {reason}. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
+  "error.provider.safetyStop":
+    "Kontrola bezpieczeństwa OpenAI zatrzymała ten czat. Wiadomości w tym czacie mogą zatrzymać się ponownie. Aby kontynuować, rozpocznij Nowy czat. Agent zachowuje swoją konfigurację.",
+  "error.provider.safetyStopReason":
+    "Kontrola bezpieczeństwa OpenAI zatrzymała ten czat. Wiadomości w tym czacie mogą zatrzymać się ponownie. Aby kontynuować, rozpocznij Nowy czat. Agent zachowuje swoją konfigurację. Powód: {detail}",
   "error.provider.messageTooLarge":
     "OpenBot zatrzymał {provider}, ponieważ wysłał on wiadomość większą niż {limit} MB.",
   "error.provider.customAgentIdInvalid":

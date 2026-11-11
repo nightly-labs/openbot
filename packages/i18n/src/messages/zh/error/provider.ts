@@ -298,6 +298,10 @@ export const messages = {
   "error.provider.modelServiceRefused": "模型服务拒绝了该请求。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
   "error.provider.modelServiceRefusedReason":
     "模型服务拒绝了该请求：{reason}。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
+  "error.provider.safetyStop":
+    "OpenAI 安全检查停止了此对话。此对话中的消息可能会再次停止。要继续，请开始新对话。助手会保留已有设置。",
+  "error.provider.safetyStopReason":
+    "OpenAI 安全检查停止了此对话。此对话中的消息可能会再次停止。要继续，请开始新对话。助手会保留已有设置。原因：{detail}",
   "error.provider.messageTooLarge": "由于 {provider} 发送了大于 {limit} MB 的消息，OpenBot 已将其停止。",
   "error.provider.customAgentIdInvalid": "助手 ID 只能包含小写字母、数字或 `-`，且不能与内置服务商的 ID 相同。",
   "error.provider.customAgentEnvInvalid":

@@ -328,6 +328,10 @@ export const messages = defineMessages("error.provider", {
     "The model service refused the request. Select a different model, or check your access to this model at the service.",
   "error.provider.modelServiceRefusedReason":
     "The model service refused the request: {reason}. Select a different model, or check your access to this model at the service.",
+  "error.provider.safetyStop":
+    "The OpenAI safety check stopped this chat. Messages in this chat can stop again. To continue, start a New chat. The agent keeps its setup.",
+  "error.provider.safetyStopReason":
+    "The OpenAI safety check stopped this chat. Messages in this chat can stop again. To continue, start a New chat. The agent keeps its setup. Reason: {detail}",
   "error.provider.messageTooLarge": "OpenBot stopped {provider} because it sent a message larger than {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "An agent ID must be lowercase letters, digits or `-`, and cannot be the ID of a built-in provider.",

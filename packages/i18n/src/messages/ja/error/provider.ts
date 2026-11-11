@@ -349,6 +349,10 @@ export const messages = {
     "モデルサービスがリクエストを拒否しました。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
   "error.provider.modelServiceRefusedReason":
     "モデルサービスがリクエストを拒否しました: {reason}。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
+  "error.provider.safetyStop":
+    "OpenAI の安全チェックがこのチャットを停止しました。このチャットのメッセージは再び停止する可能性があります。続けるには、新しいチャットを開始してください。エージェントの設定はそのまま残ります。",
+  "error.provider.safetyStopReason":
+    "OpenAI の安全チェックがこのチャットを停止しました。このチャットのメッセージは再び停止する可能性があります。続けるには、新しいチャットを開始してください。エージェントの設定はそのまま残ります。理由: {detail}",
   "error.provider.messageTooLarge":
     "{limit} MB を超えるメッセージを送信したため、OpenBot は {provider} を停止しました。",
   "error.provider.customAgentIdInvalid":

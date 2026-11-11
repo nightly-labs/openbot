@@ -10,6 +10,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { classifyUserError, userErrorMessage } from "@openbot/user-errors";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
@@ -187,6 +188,28 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
   return null;
+}
+
+/** The chat shows at most 300 characters, and the translated sentence before the explanation needs room. */
+const SAFETY_STOP_DETAIL_LIMIT = 100;
+
+/**
+ * The sentence for a Codex turn that the OpenAI safety check stopped, or null for another error.
+ * Codex's own text is English and gives no next step (#6670). Codex can send its explanation: it is
+ * kept when it is short and reads as a sentence, because output, a path or a sign-in failure in it
+ * would replace the whole sentence on screen.
+ */
+export function codexSafetyStopFailure(error: DynamicRecord | null, redact: (text: string) => string): string | null {
+  if (error?.codexErrorInfo !== "misalignmentPolicyViolation") return null;
+  const plain = sourceText("error.provider.safetyStop");
+  const explanation = getString(getRecord(error, "misalignment"), "detailedExplanation") ?? "";
+  // Redact before the cut: a cut through a secret leaves a part that no longer matches.
+  const detail = redact(explanation).replace(/\s+/gu, " ").trim();
+  if (!detail) return plain;
+  const shown =
+    detail.length <= SAFETY_STOP_DETAIL_LIMIT ? detail : `${detail.slice(0, SAFETY_STOP_DETAIL_LIMIT - 1).trimEnd()}…`;
+  const full = sourceText("error.provider.safetyStopReason", { detail: shown });
+  return classifyUserError(full) === "unknown" && userErrorMessage(full, "") !== "" ? full : plain;
 }
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
