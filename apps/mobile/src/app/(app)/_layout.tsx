@@ -188,17 +188,26 @@ function AuthenticatedStack() {
         queryClient.getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope.current, serverId, agentId))
           ?.tasks,
       loadThreads: (serverId, agentId) => {
-        // A host without side threads has none, and its agents have no thread list to read.
-        if (!workspace().canUseTasks(serverId)) return Promise.resolve([]);
-        // The thread screen reads the same list, so it has it when the thread opens.
-        return queryClient
-          .fetchQuery({
-            queryKey: queryKeys.agentTasks(queryScope.current, serverId, agentId),
-            queryFn: () => workspace().loadAgentTasks(agentId, serverId),
-            // The list that the phone has does not have the thread, so only the host can answer.
-            staleTime: 0,
-          })
-          .then((snapshot) => snapshot.tasks);
+        // A cold-start tap can arrive before the server answered its compatibility read: the task
+        // capability is then unknown, not missing. The channel list waits for its host in the same
+        // window, so the task list waits for the answer too, and gives up at once when the host is
+        // offline or answered without agent tasks.
+        return waitTaskCapability(
+          () => workspace().canUseTasks(serverId),
+          () => workspace().servers.find((item) => item.id === serverId)?.state,
+          THREAD_LOOKUP_MS,
+        ).then((supported) => {
+          if (!supported) return [];
+          // The thread screen reads the same list, so it has it when the thread opens.
+          return queryClient
+            .fetchQuery({
+              queryKey: queryKeys.agentTasks(queryScope.current, serverId, agentId),
+              queryFn: () => workspace().loadAgentTasks(agentId, serverId),
+              // The list that the phone has does not have the thread, so only the host can answer.
+              staleTime: 0,
+            })
+            .then((snapshot) => snapshot.tasks);
+        });
       },
     }),
     [workspace, queryClient],
