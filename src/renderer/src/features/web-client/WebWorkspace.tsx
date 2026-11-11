@@ -3410,6 +3410,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         channel={channelView.source}
                         notice={<ChannelErrorNotice />}
                         connectors={connectors}
+                        // A member's Marketplace app card opens the app in Marketplace, as the chat's does.
+                        onOpenMarketplaceApp={(request) => {
+                          setSuggestedApp(request);
+                          openMarketplace();
+                        }}
                         agentStatus={workspace.state.status === "online" ? providerAdmin.status() : CONNECTING_STATUS}
                         agent={undefined}
                         agents={workspace.profiles()}

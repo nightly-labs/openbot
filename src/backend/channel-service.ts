@@ -42,6 +42,7 @@ import {
   type DeliveredChannelContext,
   type DeliveredChannelText,
   historyMessagePart,
+  isChannelCard,
   isMemberThinking,
   sameRequest,
 } from "./channel-history";
@@ -2791,10 +2792,12 @@ export class ChannelService {
     for (let message of turnId === undefined
       ? snapshot.messages
       : snapshot.messages.filter((item) => item.turnId === turnId)) {
+      // A card that the member's tool added for the person is the channel's too (#6691).
       if (
         message.author !== "assistant" &&
         !message.questionPrompt &&
-        !(message.attachments?.length && message.author !== "user")
+        !(message.attachments?.length && message.author !== "user") &&
+        !isChannelCard(message)
       )
         continue;
       const owner = assignments.find((item) => item.turnId === message.turnId);

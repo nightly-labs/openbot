@@ -55,7 +55,14 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { teamPresence, currentTeamMember } = usePresence();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
+  const {
+    appSettingsOpen,
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    setPendingPluginSlug,
+    setPendingPluginConnect,
+    generalSettings,
+  } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userHiddenAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
@@ -130,6 +137,12 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       notice={<ChannelErrorNotice />}
       platform={platform.appInfo()?.platform}
       connectors={connectors.active}
+      // A member's Marketplace app card opens the app in Marketplace, as the agent chat's does (#6691).
+      onOpenMarketplaceApp={(request) => {
+        setPendingPluginConnect(request.connect);
+        setPendingPluginSlug(request.appId);
+        setSkillsMarketplaceOpen(true);
+      }}
       agentStatus={shownAgentStatus()}
       agent={undefined}
       agents={agentList()}

@@ -19,7 +19,7 @@ import {
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { changesModelContent } from "./channel-history";
+import { CHANNEL_CARD_ITEM_TYPE_PREFIXES, changesModelContent } from "./channel-history";
 import { deleteAggregateHistory, deleteReceiptsOf, deleteThreadAttachments } from "./database/database-core";
 import {
   databaseRow,
@@ -194,7 +194,8 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
+                ${CHANNEL_CARD_ITEM_TYPE_PREFIXES.map(() => "AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?").join(" ")}) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
                 AND json_extract(t.task_json, '$.state') = 'running') AS running,
@@ -203,7 +204,14 @@ export class ChannelStore {
                 AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
-        .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
+        .all(
+          memberId,
+          memberId,
+          excludedId,
+          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+          // A card is an activity row, as the routing receipts are: the view's unread divider skips it too.
+          ...CHANNEL_CARD_ITEM_TYPE_PREFIXES.map((prefix) => `${prefix}%`),
+        ),
     );
     const threads = new Map<string, ChannelThread[]>();
     for (const row of databaseRows(
