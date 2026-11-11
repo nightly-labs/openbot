@@ -3212,6 +3212,37 @@ export class ChannelService {
   });
 
   /**
+   * The task that a `channel_result` call reports on. A provider can end the channel turn while a
+   * background job still runs, as Claude does for an install or a dev server, so the assignment
+   * completes. When the job ends, the provider answers it in a turn of its own, with no assignment.
+   * Its result belongs to the member's last task while that task has no result from another turn.
+   * Before, the call failed and the result stayed in the agent's own chat (#7220).
+   */
+  readonly #resultTask = Effect.fn("ChannelService.resultTask")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+  ) {
+    if (!this.#providerTurns.has(turnId)) return yield* this.#runningTask(channelId, agentId, turnId);
+    const channel = yield* channelSync(() => this.store.get(channelId));
+    yield* channelSync(() => this.requireMember(channel, agentId));
+    const assignment = (yield* channelSync(() => this.store.assignments(channelId)))
+      .filter((item) => item.agentId === agentId && item.turnId !== null)
+      .at(-1);
+    const result = assignment
+      ? yield* channelSync(() => this.store.message(channelId, channelResultId(assignment)))
+      : null;
+    if (assignment?.state !== "completed" || channel.archived || (result && result.message.turnId !== turnId))
+      return yield* channelFailure(new Error("The channel assignment is no longer active."));
+    const tasks = yield* channelSync(() => this.store.tasks(channelId));
+    const task = tasks.find((item) => item.id === assignment.taskId);
+    if (!task || task.revision !== assignment.taskRevision || task.state !== "completed")
+      return yield* channelFailure(new Error("The channel task has changed."));
+    return { channel, assignment, tasks, task };
+  });
+
+  /**
    * The person whose request started the work of the agent's running task. The turn that a member
    * reply started reads another agent's words, so it has no requester, whoever made the request of
    * its run.
@@ -3271,7 +3302,10 @@ export class ChannelService {
     tool: string,
     args: unknown,
   ): Effect.fn.Return<unknown, ChannelOperationError> {
-    const { channel, assignment, tasks, task } = yield* this.#runningTask(channelId, agentId, turnId);
+    const { channel, assignment, tasks, task } =
+      tool === "channel_result"
+        ? yield* this.#resultTask(channelId, agentId, turnId)
+        : yield* this.#runningTask(channelId, agentId, turnId);
     if (!isDynamicRecord(args)) return yield* channelFailure(new Error("Provide channel tool arguments."));
     const requester = () => this.#requester(channelId, task, tasks);
     if (tool === "channel_cancel") {
