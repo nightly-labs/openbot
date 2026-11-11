@@ -18,7 +18,8 @@ function isDamagedInstallation(error: unknown): boolean {
   if (!app.isPackaged || !(error instanceof Error)) return false;
   if (error instanceof SyntaxError) return true;
   const code = "code" in error ? error.code : undefined;
-  return code === "ERR_INVALID_PACKAGE_CONFIG" || code === "ERR_MODULE_NOT_FOUND";
+  // `MODULE_NOT_FOUND` is the code of the CommonJS loader, for a package such as `ws`.
+  return code === "ERR_INVALID_PACKAGE_CONFIG" || code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND";
 }
 
 /**
