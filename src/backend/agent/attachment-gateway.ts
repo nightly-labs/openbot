@@ -191,6 +191,8 @@ export class AttachmentGateway {
     turnId: string | undefined,
     staged: AttachmentSummary[],
   ) {
+    // A message with no turn has nothing to compare with: older history is not this answer.
+    if (turnId === undefined) return { attachments: staged, shown: [] };
     const shownByDigest = new Map<string, AttachmentSummary>();
     for (const message of snapshot.messages) {
       if (message.turnId !== turnId) continue;
@@ -210,10 +212,9 @@ export class AttachmentGateway {
         copies.push(attachment.id);
       } else attachments.push(attachment);
     }
-    if (copies.length > 0)
-      yield* this.#mailbox
-        .discardStagedGeneratedAttachments(copies)
-        .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
+    // The store forgets the copies before it removes their files, so a failed removal leaves only a
+    // file on disk. It must not fail the attachment of the other files.
+    if (copies.length > 0) yield* this.#mailbox.discardStagedGeneratedAttachments(copies).pipe(Effect.ignore);
     return { attachments, shown };
   });
 
