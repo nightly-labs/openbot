@@ -70,6 +70,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { z } from "zod";
 import { migrateOpenBotDatabase } from "../src/backend/openbot-database-schema";
+import { RUN_MARKER_FILE } from "../src/main/run-marker";
 
 // The page functions below run in the app window, where the preload bridge sets this.
 declare global {
@@ -160,7 +161,11 @@ interface QuitResult {
   /** True when the app exited on the quit request; false when the limit forced a kill. */
   clean: boolean;
   exitCode: number | null;
+  /** The state in the run marker file after the exit. Not read after a forced kill. */
+  runMarker?: string | null;
 }
+/** The part of the run marker file that this check reads. */
+const runMarkerFile = z.object({ state: z.string() });
 
 const report: Report = { passed: false, target, arch: process.arch, newVersion };
 const root = await mkdtemp(join(tmpdir(), "openbot-upgrade-"));
@@ -528,16 +533,19 @@ async function rendererCalledMain(): Promise<boolean> {
  * handles as a quit (`quitFor("signal")`), as a log-out or `kill` does. Windows closes the main
  * window, as the window's close button does: on Windows the app quits when its main window closes.
  * WM_CLOSE from `taskkill` without `/F` did not quit the app on the CI runner.
+ *
+ * The new build on Linux also closes the main window. That close sends a second quit request while
+ * the teardown runs, and the teardown must still end (`runMarker` is then `clean`).
  */
-async function quit(app: RunningApp): Promise<QuitResult> {
-  if (process.platform === "win32") {
+async function quit(app: RunningApp, byWindowClose = process.platform === "win32"): Promise<QuitResult> {
+  if (byWindowClose) {
     // The timer lets the call return before the page closes.
     await app.page.evaluate(() => {
       setTimeout(() => window.close(), 0);
     });
   }
   await app.browser.close().catch(() => undefined);
-  if (process.platform !== "win32") app.child.kill("SIGTERM");
+  if (!byWindowClose) app.child.kill("SIGTERM");
   const limit = sleep(QUIT_LIMIT_MS).then(() => "limit" as const);
   const outcome = await Promise.race([app.exited, limit]);
   current.app = null;
@@ -556,13 +564,23 @@ async function quit(app: RunningApp): Promise<QuitResult> {
         : null,
     );
     stopLeftovers(app);
-    return { clean: true, exitCode: outcome };
+    return { clean: true, exitCode: outcome, runMarker: await readRunMarkerState() };
   }
   logger.warn("OpenBot did not quit in time; it is killed.");
   forceKill(app.child);
   const exitCode = await app.exited;
   stopLeftovers(app);
   return { clean: false, exitCode };
+}
+
+/** How the run ended, as the next start reads it (`src/main/run-marker.ts`). Null: no readable file. */
+async function readRunMarkerState(): Promise<string | null> {
+  try {
+    const marker = runMarkerFile.parse(JSON.parse(await readFile(join(userDataPath, RUN_MARKER_FILE), "utf8")));
+    return marker.state;
+  } catch {
+    return null;
+  }
 }
 
 function forceKill(child: ChildProcess): void {
@@ -941,7 +959,7 @@ try {
   const newApp = await launch();
   report.installedVersion = await readAppVersion(newApp.page);
   report.afterUpgrade = await readSeed(newApp.page, seeded);
-  report.newQuit = await quit(newApp);
+  report.newQuit = await quit(newApp, process.platform !== "darwin");
   report.database = await checkDatabase(previousSchemaVersion, previousForeignKeyViolations);
 
   const { afterUpgrade, database } = report;
@@ -957,6 +975,11 @@ try {
   check(
     report.newQuit.clean && report.newQuit.exitCode === 0,
     `The new build did not quit cleanly on the quit request (exit code ${report.newQuit.exitCode}).`,
+  );
+  // The exit code is 0 also when Electron ends the process before the teardown is done.
+  check(
+    report.newQuit.runMarker === "clean",
+    `The new build ended before its teardown was done (run marker: ${report.newQuit.runMarker}).`,
   );
   check(
     JSON.stringify(afterUpgrade) === JSON.stringify(report.seeded),
