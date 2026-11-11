@@ -84,7 +84,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
-    userHiddenAgentIds,
+    userPausedAgentIds,
     userHiddenAgentsWork,
     mutedAgentIds,
   } = useAgents();
@@ -218,7 +218,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         }}
         hasUnread={
           agentList().some(
-            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
         view={layout.sidebarView()}

@@ -2944,7 +2944,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     hasUnread={
                       workspace.state.agents.some(
                         (agent) =>
-                          !hiddenAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
+                          !pausedAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
                       ) || channels.hasUnread()
                     }
                     view={layout.sidebarView()}

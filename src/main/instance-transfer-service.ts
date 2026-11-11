@@ -127,6 +127,7 @@ import {
 } from "./instance-transfer-manifest";
 import {
   applyPreferences,
+  hiddenAgentWasStopped,
   readPreferences,
   type TransferPreferenceAgents,
   type TransferPreferencePort,
@@ -1134,6 +1135,8 @@ export class InstanceTransferService {
     routineIds: Map<string, string>,
     warnings: string[],
     fallbackTimezone: string,
+    /** The owner is an agent that its source app had stopped, so each routine is added turned off. */
+    routinesOff = false,
   ) {
     const port = this.options.webhookRoutines;
     if (!port) return;
@@ -1145,7 +1148,7 @@ export class InstanceTransferService {
           owner,
           name: routine.name,
           instruction: routine.instruction,
-          active: routine.active,
+          active: routine.active && !routinesOff,
           timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
           trigger: routine.trigger,
           ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
@@ -1366,6 +1369,7 @@ export class InstanceTransferService {
             );
           }
 
+          const routinesOff = hiddenAgentWasStopped(source.preferences);
           for (const routine of transferRoutines(source)) {
             const created = yield* archiveSync(() =>
               this.options.agents.createRoutine(
@@ -1373,7 +1377,7 @@ export class InstanceTransferService {
                   agentId: agent.id,
                   name: routine.name,
                   instruction: routine.instruction,
-                  active: routine.active,
+                  active: routine.active && !routinesOff,
                   timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
                   schedule: routine.schedule,
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
@@ -1401,6 +1405,7 @@ export class InstanceTransferService {
             routineIds,
             warnings,
             fallbackTimezone,
+            routinesOff,
           );
 
           // The limit can be lower here than on the computer that made the file.

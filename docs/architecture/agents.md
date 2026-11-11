@@ -350,8 +350,9 @@ state needs no SQL migration and a duplicate does not copy it. The host reads th
 the hidden agents and to lower their notifications. A hide or a restore changes no routine and no
 queue.
 
-A client keeps a hidden agent in the collapsed "Hidden" group of the sidebar and out of the mention
-picker and the counts. A hidden agent that waits for the user (a question, an approval or a browser
+A client keeps a hidden agent in the collapsed "Hidden" group of the sidebar, and out of the dock and
+the ⌘1-9 order. It stays in the mention picker, and its unread replies count for "Mark all read". A
+hidden agent that waits for the user (a question, an approval or a browser
 handoff) shows in "Needs you". When the server level is "all" and the user set no level for the
 agent, a hidden agent notifies at "needs-me" (`agentNotificationLevel`), on the desktop, the web
 client and the host's push to a phone. A failed turn does not notify at that level.
@@ -362,6 +363,8 @@ later version turns off, one time, each active routine of an agent that is hidde
 (`AgentRoutineStore.pauseForAgentsHiddenBeforeWork`, with the command receipt
 `routine:hidden-agent-pause:v1`), so the update starts no routine that the user stopped. The user
 turns each one on again. The queued messages and channel tasks of such an agent run at the update.
+A transfer file from such a version has `preferences.hidden` and no `preferences.hiddenWorks`; the
+import then adds the routines of that agent turned off (`hiddenAgentWasStopped`).
 
 IPC `agent:hidden:list` and `agent:hidden:set` change the state, and the event
 `hidden-agents-changed` carries the whole list. A joined desktop, the web client and the mobile app
@@ -370,8 +373,8 @@ use the optional `agent-hidden-v1` capability
 owner or an admin hides or restores an agent on a host. `/v1/agents` and the released agent codecs
 do not carry `hiddenAt`. A host that keeps a hidden agent at work also advertises the optional
 marker capability `agent-hidden-work` on protocol 9. It adds no route. Without it, a client shows a
-hidden agent as paused ("Paused since"), keeps it out of "Needs you" and does not lower its
-notifications, because that host stops the agent. `scripts/agent-hide-restore-e2e.ts` checks the
+hidden agent as paused ("Paused since"), keeps it out of "Needs you" and the mention picker, and does
+not lower its notifications, because that host stops the agent. `scripts/agent-hide-restore-e2e.ts` checks the
 routes, a message and a routine run of a hidden agent, and the one-time step.
 
 ## New agent welcome
@@ -1085,7 +1088,8 @@ chat history.
 Fields added after version 1 shipped are optional, so an older app ignores them:
 
 - `agents[].preferences` (`src/main/instance-transfer-preferences.ts`): access, Computer Use, the agent
-  defaults, fast mode, backup models, hidden state, and the owner's notification level, pin and
+  defaults, fast mode, backup models, hidden state (`hidden`, with `hiddenWorks` from an app that keeps
+  a hidden agent at work), and the owner's notification level, pin and
   approval choice, plus the names of the agent's API keys and the count of its outside folders. A file
   can come from anywhere, so the import applies only values that keep the agent at or below a new
   agent's permissions (`workspace` access, Computer Use off, a setting off, "ask first"). "Local

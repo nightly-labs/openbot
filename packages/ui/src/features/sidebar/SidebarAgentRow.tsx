@@ -4,8 +4,8 @@
  * A waiting agent's row sits in the "Needs you" group instead. There it does not drag, because the
  * group is not a place in the layout, and its tooltip says what the agent waits for.
  *
- * A hidden agent's row sits in the "Hidden" group. It does not drag either. It sleeps, shows no state,
- * and shows when the user hid it in place of the last message.
+ * A hidden agent's row sits in the "Hidden" group. It does not drag either. On a host that stops a
+ * hidden agent, it shows when the user hid it in place of the last message and the time.
  */
 
 import { AppWindow, Badge, buttonVariants, Clock3, ContextMenu, Lock } from "@openbot/ui";

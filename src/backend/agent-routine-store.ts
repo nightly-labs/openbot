@@ -85,9 +85,10 @@ export class AgentRoutineStore extends RoutineStore {
    * Turns off, one time, each active routine of these agents, and answers the ids of the routines it
    * turned off. Before a hidden agent could work, a hide stopped the routines of the agent. The user
    * chose that stop, so the update must not start them: each one stays off until the user turns it on.
-   * The receipt of the command is the marker that stops a second run: the event of its own aggregate
-   * stays, so no sweep deletes the receipt. A new database has no hidden agent and gets the receipt
-   * at its first start.
+   * The receipt of the command is the marker that stops a second run. A hard delete of an agent
+   * removes the receipts of the events with the id of the agent as aggregate id. The aggregate id
+   * here is the command id: its ":" makes it no agent id, so the receipt stays. A new database has no
+   * hidden agent and gets the receipt at its first start.
    */
   pauseForAgentsHiddenBeforeWork(agentIds: readonly string[], now = new Date()): string[] {
     if (this.database.commandResult(HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID) !== undefined) return [];
@@ -99,7 +100,7 @@ export class AgentRoutineStore extends RoutineStore {
       [
         {
           aggregateType: "agent-hidden-routine-pause",
-          aggregateId: "v1",
+          aggregateId: HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID,
           eventType: "routine.hidden-agents-paused",
           payload: { agentIds, routineIds },
         },
