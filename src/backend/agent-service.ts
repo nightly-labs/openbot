@@ -237,6 +237,7 @@ import {
 } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
+import { TurnContext } from "./agent/turn-context";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
@@ -1058,6 +1059,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         // Of the clients that read this, only OpenCode runs custom endpoints.
         servesModel: (modelId) => this.#endpoints.serves(modelId, "opencode"),
+        // One for the service, not for each client: the idle release replaces the Codex client, and
+        // its threads hold the blocks that they were sent (#6963).
+        codexTurnContext: credentials.codexTurnContext ?? new TurnContext(),
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.

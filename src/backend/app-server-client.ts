@@ -79,10 +79,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly turnContext = true;
   /**
    * Kept by thread across process restarts: a resumed thread holds the blocks that it was sent.
-   * `releaseThread` ends it, as the Claude client does: a released session that comes back gets
-   * the blocks in full.
+   * Given by the provider context, so it also outlives this client: the idle release replaces the
+   * client, and the new one resumed the thread with all blocks again (#6963). `releaseThread` ends
+   * it, as the Claude client does: a released session that comes back gets the blocks in full.
    */
-  readonly #turnContext = new TurnContext();
+  readonly #turnContext: TurnContext;
   readonly #executable: string;
   readonly #requestTimeoutMs: number;
   #decoder = new JsonLineDecoder();
@@ -104,8 +105,14 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   /** Added to the inherited environment, such as the `CODEX_HOME` of an account after the first. */
   readonly #extraEnv: Readonly<Record<string, string>> | undefined;
 
-  constructor(executable: string, requestTimeoutMs = 30_000, extraEnv?: Readonly<Record<string, string>>) {
+  constructor(
+    executable: string,
+    requestTimeoutMs = 30_000,
+    extraEnv?: Readonly<Record<string, string>>,
+    turnContext = new TurnContext(),
+  ) {
     super();
+    this.#turnContext = turnContext;
     this.#executable = executable;
     this.#requestTimeoutMs = requestTimeoutMs;
     this.#extraEnv = extraEnv;
