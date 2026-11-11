@@ -34,11 +34,28 @@ export type McpServerSource = () => readonly McpServerConfig[];
  * a machine with nvm, Homebrew or mise keeps the Node it installed, and an alias is read only once
  * a lookup in that whole `PATH` has found nothing. That ordering is what makes the managed runtime
  * a pure addition: no machine that starts a server today starts a different one afterwards.
+ *
+ * `catalogCommand` is the one exception. A Marketplace app is a package OpenBot chose, and its
+ * package can need a newer Node than the machine has: `obsidian-mcp-server` stops at start below
+ * Node 24, and the user reads only that the server stopped (#7814). Such an app starts with the
+ * managed runtime on every machine, so it starts the same way everywhere. A server the user wrote
+ * is never changed.
  */
 export interface McpToolRuntimes {
   readonly binDirectories: readonly string[];
   /** Command word to the absolute program that answers it, such as `npx` to the managed `bunx`. */
   readonly commandAliases: Readonly<Record<string, string>>;
+  /**
+   * The managed program that starts a Marketplace app, with the arguments that go before the
+   * app's own. `"pending"` while the runtime is not downloaded: the app then starts as the machine
+   * can start it, and a connection test waits for the download. `null` for every other server.
+   */
+  readonly catalogCommand?: (config: McpServerConfig) => McpCatalogCommand | "pending" | null;
+}
+
+interface McpCatalogCommand {
+  command: string;
+  args: readonly string[];
 }
 
 /** The machine exactly as it is. Used by every caller that has no runtime manager, including tests. */
@@ -133,6 +150,8 @@ export type UsableMcpServer =
   | {
       config: McpServerConfig;
       command: string;
+      /** The arguments the server starts with: the configured ones, after any a managed runtime needs. */
+      args: string[];
       workingDirectory: string;
       path: string | null;
       /** Where an http server is reached: its own URL, or a route of the OAuth proxy. `""` for stdio. */
@@ -147,6 +166,7 @@ export type UsableMcpServer =
   | {
       config: McpServerConfig;
       command?: undefined;
+      args?: undefined;
       workingDirectory?: undefined;
       path?: undefined;
       url?: undefined;
@@ -220,13 +240,25 @@ export const usableMcpServer = Effect.fnUntraced(function* (
       : { url: config.url, authorization: null, proxied: false };
     // Never the raw token instead: a proxy that cannot start is a server this hand-off leaves out.
     if ("error" in resolved) return { config, error: resolved.error, reason: "unusable" };
-    return { config, command: "", workingDirectory: "", path: null, ...resolved };
+    return { config, command: "", args: [], workingDirectory: "", path: null, ...resolved };
   }
   // A `PATH` the configuration carries is the one the server runs with, so it is the one the command
   // is looked up in: `python` with a virtual environment's `PATH` names that interpreter, and the
   // absolute path a login shell answered with would silently be a different one.
   const configured = mcpEnvironment(config).PATH;
   const path = appendToolRuntimes(configured ?? (yield* agentLaunchPath()), tools.binDirectories);
+  const catalog = tools.catalogCommand?.(config) ?? null;
+  if (catalog !== null && catalog !== "pending")
+    return {
+      config,
+      command: catalog.command,
+      args: [...catalog.args, ...config.args],
+      workingDirectory: expandHomePath(config.workingDirectory),
+      path,
+      url: "",
+      authorization: null,
+      proxied: false,
+    };
   const command = (yield* resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
   if (!command)
     return {
@@ -237,6 +269,7 @@ export const usableMcpServer = Effect.fnUntraced(function* (
   return {
     config,
     command,
+    args: [...config.args],
     workingDirectory: expandHomePath(config.workingDirectory),
     path,
     url: "",
@@ -413,13 +446,16 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
  *
  * An http test waits for nothing, and neither does a stdio command this machine already resolves -
  * an installed interpreter, an absolute path, the user's own `npx`. Only a command nothing on the
- * search list names may arrive with the download, so only that one waits for it.
+ * search list names may arrive with the download, so only that one waits for it. A Marketplace app
+ * that the managed runtime starts waits too, whatever the machine has: see `McpToolRuntimes`.
  */
 export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(function* (
   config: McpServerConfig,
   tools: McpToolRuntimes,
 ) {
-  if (config.transport !== "stdio" || isAbsolute(expandHomePath(config.command))) return false;
+  if (config.transport !== "stdio") return false;
+  if (tools.catalogCommand?.(config) === "pending") return true;
+  if (isAbsolute(expandHomePath(config.command))) return false;
   const resolved = yield* usableMcpServer(config, tools);
   return resolved.error !== undefined && resolved.reason === "command_not_found";
 });
@@ -484,7 +520,7 @@ export function claudeMcpServers(
         ? {
             type: "stdio",
             command: server.command,
-            args: [...config.args],
+            args: server.args,
             env: mcpLaunchEnvironment(server),
             ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
@@ -565,7 +601,7 @@ export function acpMcpServers(
       entries.push({
         name,
         command: server.command,
-        args: [...config.args],
+        args: server.args,
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
       });
     } else {
@@ -761,7 +797,7 @@ export function codexMcpServers(
     if (server.config.transport === "stdio") {
       record[name] = {
         command: server.command,
-        args: [...server.config.args],
+        args: server.args,
         env: mcpLaunchEnvironment(server),
         ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
       };

@@ -33,6 +33,7 @@ import {
   MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
   type ManagedRuntimeId,
+  type McpServerConfig,
   type ProviderRuntimeDownload,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
@@ -233,6 +234,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #root: string;
   readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
+  #isCatalogNpxApp: (config: McpServerConfig) => boolean = () => false;
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
@@ -729,10 +731,27 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * nothing rewrites a stored command, the catalog, or the wire.
    */
   mcpToolRuntimes(): McpToolRuntimes {
-    const executable = this.#target && this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
-    if (!(executable && this.#target)) return NO_MCP_TOOL_RUNTIMES;
-    const bin = dirname(executable);
-    return { binDirectories: [bin], commandAliases: { npx: join(bin, bunxExecutableName(this.#target)) } };
+    const target = this.#target;
+    // No managed Bun exists for this machine, so a Marketplace app starts as the machine can start it.
+    if (!target) return NO_MCP_TOOL_RUNTIMES;
+    const executable = this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
+    const bunx = executable ? join(dirname(executable), bunxExecutableName(target)) : null;
+    const isCatalogNpxApp = this.#isCatalogNpxApp;
+    const catalogCommand: McpToolRuntimes["catalogCommand"] = (config) => {
+      if (!isCatalogNpxApp(config)) return null;
+      // `--bun`, because `bunx` alone starts the package with a `node` it finds on the `PATH`.
+      return bunx ? { command: bunx, args: ["--bun"] } : "pending";
+    };
+    if (!(executable && bunx)) return { ...NO_MCP_TOOL_RUNTIMES, catalogCommand };
+    return { binDirectories: [dirname(executable)], commandAliases: { npx: bunx }, catalogCommand };
+  }
+
+  /**
+   * Names the Marketplace apps that `npx` starts. The catalog is read after this manager is made,
+   * so it arrives here. Until then no server is a Marketplace app.
+   */
+  setCatalogNpxApps(isCatalogNpxApp: (config: McpServerConfig) => boolean): void {
+    this.#isCatalogNpxApp = isCatalogNpxApp;
   }
   download(
     runtime: ManagedRuntimeId | InstallerProviderId,

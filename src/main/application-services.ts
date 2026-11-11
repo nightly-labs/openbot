@@ -2079,6 +2079,13 @@ export async function createApplicationServices({
         : resolve(__dirname, "../../resources/plugin-catalog"),
     ),
   );
+  // A Marketplace app that `npx` starts runs on the managed Bun, not on the Node of this computer.
+  providerRuntimes.setCatalogNpxApps(
+    (config) =>
+      config.transport === "stdio" &&
+      config.command === "npx" &&
+      catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
+  );
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
   const service: AgentService = new AgentService({

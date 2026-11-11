@@ -1145,6 +1145,10 @@ export class ThreadLifecycle {
   ): string {
     const folders = existingAgentFolders(agent);
     const excluded = workspaceExcludedFolders(agent);
+    const catalogCommands = configs.flatMap((config) => {
+      const command = toolRuntimes.catalogCommand?.(config) ?? null;
+      return command === null ? [] : [[config.name, command]];
+    });
     return createHash("sha256")
       .update(
         JSON.stringify([
@@ -1176,6 +1180,9 @@ export class ThreadLifecycle {
           // to the file adds a new value. Only another file name, or a file with text, adds a value.
           ...(instructionsFile.fileName === "AGENTS.md" ? [] : [["instructions-file", instructionsFile.fileName]]),
           ...(instructionsFile.found?.text ? [["instructions", instructionsFile.found.text]] : []),
+          // A Marketplace app that starts on the managed Bun: a session from before that start has the
+          // `npx` command, and Codex keeps it on resume. Only an agent with such an app adds a value.
+          ...(catalogCommands.length > 0 ? [["catalog-commands", ...catalogCommands]] : []),
         ]),
       )
       .digest("hex");
