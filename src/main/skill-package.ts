@@ -14,13 +14,15 @@ export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
+/** The file macOS Finder writes into each folder it opens. A package made from a folder leaves it out. */
+export const FINDER_METADATA_FILE = ".DS_Store";
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
   let expandedSize = 0;
   function visit(directory: string): Effect.Effect<void, SkillArchiveFailure> {
     return Effect.gen(function* () {
       for (const entry of yield* archiveIO(() => readdir(directory, { withFileTypes: true }))) {
-        if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
+        if (entry.name === ".git" || entry.name === "node_modules" || entry.name === FINDER_METADATA_FILE) continue;
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
