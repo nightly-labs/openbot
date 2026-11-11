@@ -7,4 +7,6 @@
   time at the update, and you turn on the ones that you want. Their queued messages run at the update.
   An import of a transfer file from an older version also adds the routines of a hidden agent turned off.
   It works on this computer, on a joined server and in the web client. A joined server must also be on
-  the new version; an older server shows a hidden agent as paused, as before.
+  the new version; an older server shows a hidden agent as paused, as before. An app on an older
+  version still says that a hidden agent of a server on the new version is paused, but the agent
+  works. To stop such an agent, turn off its routines.
