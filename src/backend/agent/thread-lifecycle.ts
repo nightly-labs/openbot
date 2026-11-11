@@ -789,6 +789,7 @@ export class ThreadLifecycle {
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
+      ...this.#channelToolsParam(client, publicThreadId),
       ...this.#instructions(
         agent,
         client,
@@ -1297,6 +1298,16 @@ export class ThreadLifecycle {
     return client.provider === "codex" ? {} : { openbotAgentId: agent.id };
   }
 
+  /**
+   * A channel thread on Claude gets the channel tools that end a turn as direct tools, so Claude Code
+   * can let that turn end with no text (`claude-client.ts`). The other threads do not pay for them.
+   */
+  #channelToolsParam(client: AgentClient, publicThreadId: string): { channelTools?: true } {
+    return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
+      ? { channelTools: true }
+      : {};
+  }
+
   private readonly hasCurrentToolsEffect = Effect.fn("ThreadLifecycle.hasCurrentTools")(function* (
     this: ThreadLifecycle,
     agent: AgentSummary,
@@ -1503,6 +1514,7 @@ export class ThreadLifecycle {
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
       ...this.#mcpAgentParam(agent, client),
+      ...this.#channelToolsParam(client, publicThreadId),
       ...this.#instructions(
         agent,
         client,
