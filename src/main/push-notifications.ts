@@ -385,6 +385,8 @@ export class PushNotificationService {
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
+    // An agent that the user hid notifies only when it waits for the user, as on desktop.
+    const userHidden = agents.some((agent) => agent.id === subject.agentId && agent.hiddenAt !== undefined);
     // A prompt, an approval or a takeover on a channel thread names the channel, as on desktop.
     const requestThread = agentEventRequestThread(event);
     const channel = requestThread ? (this.#options.channelForThread?.(requestThread) ?? null) : null;
@@ -394,7 +396,12 @@ export class PushNotificationService {
       const { value, memberId, sessionId } = stored;
       const translate = translateFor(resolveLocale("system", value.locale));
       const chosen = this.#options.memberLevels?.(memberId);
-      const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);
+      const level = agentNotificationLevel(
+        chosen?.server ?? value.level,
+        chosen?.agents ?? null,
+        subject.agentId,
+        userHidden,
+      );
       // A phone from before channel-attention-v1 has no channel view, so its title names the agent only.
       const eventChannel = registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY) ? channel : null;
       // The fixed text, as the desktop shows it without a preview.

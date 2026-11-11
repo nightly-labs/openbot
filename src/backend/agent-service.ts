@@ -826,9 +826,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(toRoutineOperationFailed),
         syncMailboxMessages: (snapshot) => this.#mailboxSync.syncMailboxMessages(snapshot),
         listAgents: () => this.listAgents(),
-        // A hidden agent keeps its routines, but they do not run until the user restores it.
-        excludedAgents: () =>
-          new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting(), ...this.#hiddenAgentIds()]),
+        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
         usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
@@ -1308,7 +1306,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.channels = new ChannelService(store.database, mailbox, new ChannelImages(store.channelImagesRoot), {
       agents: () => this.listAgents(),
-      hidden: (agentId) => this.#store.isHidden(agentId),
       generate: (lead, prompt, fallbacks = [], background = false) =>
         Effect.gen({ self: this }, function* () {
           const modelOf = (agent: AgentSummary) =>
@@ -2003,11 +2000,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       return index === -1 ? Number.MAX_SAFE_INTEGER : index;
     };
     const members = this.listAgents()
-      // A hidden agent takes no new messages, so it is not offered as a teammate.
-      .filter(
-        (agent) =>
-          agent.id !== agentId && agent.hiddenAt === undefined && layout.agentAssignments[agent.id] === section.id,
-      )
+      // A hidden agent works as each other agent does, so it stays a teammate.
+      .filter((agent) => agent.id !== agentId && layout.agentAssignments[agent.id] === section.id)
       .sort((a, b) => rank(a.id) - rank(b.id))
       .slice(0, MAX_SECTION_TEAMMATES)
       .map((agent) => ({ id: agent.id, name: agent.name, title: agent.title }));
@@ -3037,18 +3031,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
-  #hiddenAgentIds(): string[] {
-    return this.#store
-      .list()
-      .filter((agent) => agent.hiddenAt !== undefined)
-      .map((agent) => agent.id);
-  }
-
   /**
-   * Hides or restores an agent. A request that does not change the state answers the same list. A
-   * hidden agent keeps all of its data. A turn that runs finishes, and its queued messages wait. On
-   * restore, the routine occurrences that came due while it was hidden are skipped, and its queue
-   * drains again.
+   * Hides or restores an agent. A request that does not change the state answers the same list. The
+   * hide changes only where clients show the agent: it keeps all of its data, its routines run, and
+   * it receives messages as each other agent does.
    */
   readonly setAgentHidden = Effect.fn("AgentService.setAgentHidden")(function* (
     this: AgentService,
@@ -3059,36 +3045,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
       }
       if (this.#store.isHidden(input.agentId) === input.hidden) return false;
-      const now = new Date();
-      // While the agent is still hidden, so the timer cannot fire an occurrence that this skips.
-      if (!input.hidden) this.#routines.skipMissedFor(input.agentId, now);
-      this.#store.setHidden(input.agentId, input.hidden ? now.toISOString() : null);
+      this.#store.setHidden(input.agentId, input.hidden ? new Date().toISOString() : null);
       return true;
     });
     const snapshot = this.listHiddenAgents();
     if (!changed) return snapshot;
-    this.#routines.arm();
-    if (input.hidden) {
-      // The channel work that waits in its queue goes back to the channel, so it holds nothing.
-      yield* this.channels
-        .releaseAgent(input.agentId)
-        .pipe(
-          Effect.catch((failure) => Effect.sync(() => this.#emitError("channel_coordination_failed", failure.cause))),
-        );
-    } else {
-      // The queue event also wakes the channels whose task waits for this agent.
-      this.#mailboxSync.emitQueue(input.agentId);
-      this.#drain.scheduleDrain(input.agentId);
-    }
     this.#emit({ type: "hidden-agents-changed", agents: snapshot.agents });
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return snapshot;
   }).bind(this);
-
-  /** Refuses new work for a hidden agent. A turn that already runs is not affected. */
-  #requireNotHidden(agentId: string): void {
-    if (this.#store.isHidden(agentId)) throw new Error(sourceText("error.backend.recipientHidden"));
-  }
 
   setMarketplaceSource(agentId: string, source: NonNullable<AgentSummary["marketplaceSource"]>): AgentSummary {
     const agent = this.#store.setMarketplaceSource(agentId, source);
@@ -4281,6 +4246,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* lifecycleStep("recover agent state", () => {
       this.#boot.recoverPersistedTurns();
       this.#hostedSites.restore();
+      // Before the timer reads the due routines, so an agent hidden by an earlier version starts none.
+      const paused = this.#routines.pauseForAgentsHiddenBeforeWork();
+      if (paused > 0)
+        logger.info("Routines of agents hidden by an earlier version were turned off.", { count: paused });
       this.#routines.skipMissed(new Date(), options.heldRoutines);
       this.#channelRoutines.skipMissed(new Date(), options.heldRoutines);
       this.#initialized = true;
@@ -5254,7 +5223,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const task = yield* lifecycleStep("start task", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
-      this.#requireNotHidden(input.agentId);
       // A start with files and no text takes its title from the first file.
       const firstDraft = input.attachmentDraftIds?.[0];
       const titleText = input.text.trim() || (firstDraft ? (this.#mailbox.draftName(firstDraft) ?? "") : "");
@@ -5330,7 +5298,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* lifecycleStep("find agent", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
-      this.#requireNotHidden(input.agentId);
     });
     const task = yield* this.#tasks.branch(input);
     const through = task.branch?.throughMessageId;
@@ -5601,14 +5568,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   steerQueuedMessage(input: SteerQueuedMessageInput): Effect.Effect<void, AgentLifecycleFailed> {
-    // A steer gives a queued message to the running turn. The queue of a hidden agent waits.
-    if (this.#store.isHidden(input.agentId))
-      return Effect.fail(
-        new AgentLifecycleFailed({
-          operation: "steerQueuedMessage",
-          cause: new Error(sourceText("error.backend.recipientHidden")),
-        }),
-      );
     return this.#queue
       .steer(input)
       .pipe(
@@ -5667,7 +5626,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         operation: "send message",
         cause: new Error(sourceText("error.agent.unknown", { id: input.agentId })),
       });
-    yield* lifecycleStep("send message", () => this.#requireNotHidden(input.agentId));
     const agent = yield* this.#store
       .getOrCreate(input.agentId)
       .pipe(
@@ -5682,11 +5640,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
         ),
       );
-    yield* lifecycleStep("validate message recipient", () => {
-      validateRecipient();
-      // The provider start can wait, and the user can hide the agent in that time.
-      this.#requireNotHidden(input.agentId);
-    });
+    yield* lifecycleStep("validate message recipient", validateRecipient);
     // A message to a task runs in the task's own thread and lane, beside the agent's own chat.
     const taskId = input.taskId;
     const task = taskId
@@ -5849,8 +5803,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.list().find((item) => item.id === recipientAgentId);
     // A recipient with no loaded chat runs no turn, so its page is not read for this.
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || this.#store.isHidden(agent.id) || !this.#mailbox.steersChatTurn(deliveryId))
-      return Effect.succeed(null);
+    if (!agent || !snapshot || !this.#mailbox.steersChatTurn(deliveryId)) return Effect.succeed(null);
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 

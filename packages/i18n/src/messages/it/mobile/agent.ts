@@ -579,6 +579,8 @@ export const messages = {
     "Le chat nascoste continuano a funzionare. Semplicemente non compaiono nella schermata Home.",
   "mobile.agent.hidden.bodySynced":
     "Una chat nascosta conserva la sua cronologia. Il suo agente non esegue routine e non riceve nuovi messaggi. Tutti i dispositivi di questo server la nascondono.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Una chat nascosta continua a funzionare. Tutti i dispositivi di questo server la nascondono.",
   "mobile.agent.hidden.showNamed": "Mostra {name}",
   "mobile.agent.hidden.show": "Mostra",
   "mobile.agent.hidden.showFailed": "Impossibile mostrare l'agente",

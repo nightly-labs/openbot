@@ -589,6 +589,8 @@ export const messages = {
     "Les discussions masquées continuent de fonctionner. Elles ne s’affichent simplement pas sur l’écran d’accueil.",
   "mobile.agent.hidden.bodySynced":
     "Une discussion masquée garde son historique. Son agent n’exécute pas de routines et ne reçoit pas de nouveaux messages. Tous les appareils de ce serveur la masquent.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Une discussion masquée continue de fonctionner. Tous les appareils de ce serveur la masquent.",
   "mobile.agent.hidden.showNamed": "Afficher {name}",
   "mobile.agent.hidden.show": "Afficher",
   "mobile.agent.hidden.showFailed": "Impossible d’afficher l’agent",

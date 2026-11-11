@@ -585,6 +585,8 @@ export const messages = {
     "Ausgeblendete Chats arbeiten weiter. Sie werden nur nicht auf dem Startbildschirm angezeigt.",
   "mobile.agent.hidden.bodySynced":
     "Ein ausgeblendeter Chat behält seinen Verlauf. Sein Agent führt keine Routinen aus und erhält keine neuen Nachrichten. Jedes Gerät auf diesem Server blendet ihn aus.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Ein ausgeblendeter Chat arbeitet weiter. Jedes Gerät auf diesem Server blendet ihn aus.",
   "mobile.agent.hidden.showNamed": "{name} anzeigen",
   "mobile.agent.hidden.show": "Anzeigen",
   "mobile.agent.hidden.showFailed": "Agent konnte nicht angezeigt werden",

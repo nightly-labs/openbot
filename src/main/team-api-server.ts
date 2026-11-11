@@ -68,6 +68,7 @@ import { CLAUDE_USER_SETUP_CAPABILITY } from "@openbot/contracts/team-protocol/c
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
+  AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_IMPORT_V2_CAPABILITY,
@@ -2475,6 +2476,7 @@ export class TeamApiServer {
           if (capability === AGENT_FOLDERS_CAPABILITY) return this.#options.admin?.folders !== undefined;
           if (capability === AGENT_INSTRUCTIONS_CAPABILITY) return this.#options.admin?.instructions !== undefined;
           if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
+          if (capability === AGENT_HIDDEN_WORK_CAPABILITY) return this.#options.hiddenAgents !== undefined;
           // The colour route uses the agent operations, which every host has.
           if (capability === AGENT_COLORS_CAPABILITY) return true;
           // The chat colour route uses the agent operations and the member list, which every host has.

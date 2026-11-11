@@ -565,6 +565,7 @@ export const messages = {
   "mobile.agent.hidden.body": "숨긴 채팅도 계속 작동해요. 홈 화면에만 표시되지 않을 뿐이에요.",
   "mobile.agent.hidden.bodySynced":
     "숨긴 채팅은 기록이 유지돼요. 해당 에이전트는 루틴을 실행하지 않고 새 메시지도 받지 않아요. 이 서버의 모든 기기에서 숨겨져요.",
+  "mobile.agent.hidden.bodySyncedWorking": "숨긴 채팅도 계속 작동해요. 이 서버의 모든 기기에서 숨겨져요.",
   "mobile.agent.hidden.showNamed": "{name} 표시",
   "mobile.agent.hidden.show": "표시",
   "mobile.agent.hidden.showFailed": "에이전트를 표시할 수 없어요",

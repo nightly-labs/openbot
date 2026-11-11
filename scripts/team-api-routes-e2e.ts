@@ -195,6 +195,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
@@ -2868,6 +2869,14 @@ try {
         readHiddenV6.status === 200 &&
         list(field(readHiddenV6.body, "agents")).length === 0,
       [summary(readHidden), summary(readHiddenV6)],
+    );
+    const hiddenWorkV9 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const hiddenWorkV8 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-hidden-work to a protocol 9 peer only",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(AGENT_HIDDEN_WORK_CAPABILITY) &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(AGENT_HIDDEN_WORK_CAPABILITY),
+      [summary(hiddenWorkV9), list(field(hiddenWorkV8.body, "capabilities")).length],
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(

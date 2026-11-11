@@ -139,11 +139,17 @@ export interface SidebarProps {
   onDuplicateAgent?: ((agentId: string) => Promise<void>) | undefined;
   onDeleteAgent: (agentId: string) => Promise<void>;
   /**
-   * The agents that a user hid on this server (`agent-hidden-v1`). They leave their sections, the
-   * pinned strip and "Needs you", and show only in the "Hidden" group at the end of the list. Each
-   * one keeps its section and its pin for a restore.
+   * The agents that a user hid on this server (`agent-hidden-v1`). They leave their sections and the
+   * pinned strip, and show in the "Hidden" group at the end of the list. Each one keeps its section
+   * and its pin for a restore.
    */
   userHiddenAgents?: HiddenAgent[] | undefined;
+  /**
+   * The host keeps a hidden agent at work (`agent-hidden-work`). A hidden agent that waits for the
+   * user then shows in "Needs you", and a row of the "Hidden" group shows the state of its agent.
+   * Without it the host stops a hidden agent, so each row shows the date of the hide instead.
+   */
+  userHiddenAgentsWork?: boolean | undefined;
   /**
    * The agents whose own chat or side threads have unread replies. Their menu offers Mark read; the
    * menu of the other agents offers Mark unread.

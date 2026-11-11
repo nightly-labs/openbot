@@ -396,8 +396,6 @@ export class DrainScheduler {
       this.#lanesOf(agentId).some((other) => other.taskId !== taskId && this.#laneRunning(other))
     )
       return "agent-client-changing";
-    // A hidden agent finishes the turn that runs. Its queued messages wait until the user restores it.
-    if (agent?.hiddenAt !== undefined) return "hidden";
     // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
     // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
     if (
