@@ -407,6 +407,8 @@ interface ThreadRuntime {
   backgroundTasks: number;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
+  /** The uuids of the messages that this process took. The CLI does not run one of them again. */
+  promptIds: Set<string>;
   /**
    * The uuid of the message that the CLI's next turn of its own answers, such as a steer that came
    * after the turn's last request. Its history names the turn by that uuid (#3365).
@@ -1432,6 +1434,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       lastOutputAt: Date.now(),
+      promptIds: new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
@@ -1510,7 +1513,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
     const clientId = getString(params, "clientUserMessageId");
     const requestedTurnId = getString(params, "clientTurnId") ?? clientId;
-    const turnId = requestedTurnId && isUuid(requestedTurnId) ? requestedTurnId : randomUUID();
+    // The CLI skips a message whose uuid this process already took, and sends no result for it. A
+    // message that runs again here, such as after a move to a backup model, gets a new turn (#6676).
+    const turnId =
+      requestedTurnId && isUuid(requestedTurnId) && !runtime.promptIds.has(requestedTurnId)
+        ? requestedTurnId
+        : randomUUID();
     const text = readInputText(params);
     // The CLI can start a turn of its own while the model or effort changes above.
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
@@ -1521,6 +1529,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
     const context = this.#turnContext.take(threadId, text.startsWith("/"));
+    runtime.promptIds.add(turnId);
     runtime.input.push({
       type: "user",
       message: {
@@ -1603,7 +1612,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new Error("The active Claude turn changed before steering was accepted."));
     }
     const clientId = getString(params, "clientUserMessageId");
-    const messageId = clientId && isUuid(clientId) ? clientId : randomUUID();
+    const messageId = clientId && isUuid(clientId) && !runtime.promptIds.has(clientId) ? clientId : randomUUID();
+    runtime.promptIds.add(messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },

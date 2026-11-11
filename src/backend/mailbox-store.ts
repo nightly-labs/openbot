@@ -1847,16 +1847,23 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  /** Provider history can name a continuation turn instead of the original delivery. */
+  /**
+   * Provider history can name a continuation turn instead of the original delivery, or the new turn
+   * of a message that ran again in a Claude process that already took it (#6676). The delivery with
+   * the ID comes first, so a batch's own message is not given to a message that ran with it.
+   */
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
-    const delivery = this.#state.deliveries.find(
-      (candidate) =>
-        candidate.recipientAgentId === agentId &&
-        (candidate.id === messageId ||
-          (candidate.resumeAfterUsageLimit !== undefined &&
-            (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
-          candidate.planContinuation?.turnIds.includes(messageId) === true),
-    );
+    const delivery =
+      this.#state.deliveries.find(
+        (candidate) => candidate.recipientAgentId === agentId && candidate.id === messageId,
+      ) ??
+      this.#state.deliveries.find(
+        (candidate) =>
+          candidate.recipientAgentId === agentId &&
+          (candidate.turnId === messageId ||
+            candidate.resumeAfterUsageLimit?.previousTurnIds.includes(messageId) === true ||
+            candidate.planContinuation?.turnIds.includes(messageId) === true),
+      );
     return delivery ? this.#context(delivery) : null;
   }
 
