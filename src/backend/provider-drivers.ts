@@ -538,8 +538,9 @@ export interface ProviderClientContext {
   /**
    * Variables that every provider process gets, and so every program an agent starts: the marker that
    * the server memory guard and `src/main/background-processes.ts` find leftover processes by, and on
-   * a server the CPU limit module for Node (`agentProcessEnvironment` in `src/main/server-memory.ts`).
-   * Fixed while the app runs. They are not part of `agentEnvironment`: Codex gets that in each thread
+   * a server the CPU limit module for Node (`agentProcessEnvironment` in `src/main/server-memory.ts`),
+   * and the file of system root certificates (`agentCertificateEnvironment` in
+   * `src/main/system-certificates.ts`). Fixed while the app runs. They are not part of `agentEnvironment`: Codex gets that in each thread
    * configuration and replaces a session whose variables change, so Codex gets these in the spawn
    * environment of its app-server instead.
    */
@@ -1597,11 +1598,14 @@ function customAgentChild(
       ? {}
       : {
           // A variable the user saved on this agent wins over the GitHub connection's. The
-          // `GIT_CONFIG_*` entries count on from the user's own, so they always apply.
+          // `GIT_CONFIG_*` entries count on from the user's own, so they always apply. A certificate
+          // folder saved here also keeps out OpenBot's `SSL_CERT_FILE`: `httpx` reads the file first.
           extraEnv: () =>
             Object.fromEntries(
               Object.entries(context.agentEnvironment?.({ ...process.env, ...env }) ?? {}).filter(
-                ([name]) => name.startsWith("GIT_CONFIG_") || !(name in env),
+                ([name]) =>
+                  name.startsWith("GIT_CONFIG_") ||
+                  !(name in env || (name === "SSL_CERT_FILE" && "SSL_CERT_DIR" in env)),
               ),
             ),
           mcpServers: context.mcpServers,

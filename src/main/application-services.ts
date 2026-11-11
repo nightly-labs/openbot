@@ -393,6 +393,7 @@ import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
+import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -1330,9 +1331,24 @@ export async function createApplicationServices({
   const cpuLimitModule = app.isPackaged
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
-  const serverEnvironment = hostMemory
-    ? agentProcessEnvironment(existsSync(cpuLimitModule) ? cpuLimitModule : null)
-    : { [AGENT_PROCESS_VARIABLE]: "1" };
+  // Every provider process also gets the system roots that this process trusts, so a Python agent CLI
+  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616).
+  const certificateEnvironment = await Effect.runPromise(
+    agentCertificateEnvironment(join(app.getPath("userData"), AGENT_CERTIFICATES_FILE)).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          logger.warn("Could not give the system root certificates to agent processes:", toLogValue(error));
+          return {};
+        }),
+      ),
+    ),
+  );
+  const serverEnvironment = {
+    ...(hostMemory
+      ? agentProcessEnvironment(existsSync(cpuLimitModule) ? cpuLimitModule : null)
+      : { [AGENT_PROCESS_VARIABLE]: "1" }),
+    ...certificateEnvironment,
+  };
   if (hostMemory) {
     hostMemory.start();
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
