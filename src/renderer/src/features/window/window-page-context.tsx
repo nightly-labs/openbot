@@ -19,9 +19,9 @@ export type WindowPage =
   | "server-settings";
 
 /**
- * How a page sits in the window. The tasks page shows in the middle pane, as the agents do. The agent
- * list beside it is hidden until the user shows it. A settings page starts below the top row. The title of a schedule, workflows, usage,
- * Library or Marketplace page goes in the top row after the server menu.
+ * How a page sits in the window. The tasks page shows in the middle pane, as the agents do, with the
+ * agent list beside it. A settings page starts below the top row. The title of a schedule, workflows
+ * or usage page goes in the top row after the buttons of the frame.
  */
 export type WindowPageKind = "agents" | "settings" | "titled";
 

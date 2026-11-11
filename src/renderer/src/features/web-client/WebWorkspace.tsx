@@ -694,6 +694,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return () => phoneQuery?.removeEventListener("change", update);
   });
   const compact = () => !phone() && layout.leftPanelCompact();
+  const closeSidebar = () => layout.setSidebarClosed(true);
+  /** A phone shows the agent list as a page, not as a column, so it has no button that closes the list. */
+  const collapseSidebar = () => (phone() ? undefined : closeSidebar);
   /** The Marketplace page. As on desktop, opening another page closes it. */
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
@@ -2983,7 +2986,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRestoreAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, false) : undefined}
                     compact={compact()}
                     onExpand={layout.expandSidebar}
-                    onCollapse={() => layout.setSidebarClosed(true)}
+                    onCollapse={collapseSidebar()}
                     onOpenSearch={() => setSearchOpen(true)}
                     onOpenMarketplace={openMarketplace}
                     footer={

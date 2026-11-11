@@ -21,7 +21,7 @@ type WorkspaceFrameProps = ParentProps<
     left: JSX.Element;
     /** The page of the rail. A page of another kind than the agents covers the middle panes, and makes them inert. */
     windowPage: WindowPage;
-    /** Hides the sidebar below the top row. The middle panes then span it; the server menu stays. */
+    /** A page that covers the sidebar and the middle panes below the top row. */
     page?: JSX.Element;
     connection?: JSX.Element;
     initialLoading?: boolean;

@@ -640,6 +640,15 @@
     margin-inline-start: var(--top-row-tabs-start);
   }
 
+  /* A narrow sidebar is compact but not closed. The buttons go past its end, as they do above a chat. */
+  .app-window
+    > .window-rail:not([hidden])
+    ~ .app-frame-edge.app-frame-sidebar-compact:not(.app-frame-sidebar-closed)
+    > .app-frame-panes
+    .tasks-page-header {
+    margin-inline-start: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
+  }
+
   /* The settings, schedule, usage and Marketplace pages cover the sidebar, so the week has room for
    * seven days. The server menu stays in the top row, so the user can select the server that the page
    * shows. The "settings" kind is both settings pages; the "titled" kind is schedule, usage and Marketplace. */

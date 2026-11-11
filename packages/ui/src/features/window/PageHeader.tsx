@@ -25,19 +25,19 @@ export type PageHeaderFrame = "window";
 export function PageHeader(props: {
   title: string;
   /** The server that the page shows. It follows the title. */
-  hostName?: string;
+  hostName?: string | undefined;
   /** The `id` of the heading, for `aria-labelledby` of the page. */
-  headingId?: string;
+  headingId?: string | undefined;
   /** With a way back, the header shows Back, and the heading takes focus when the page opens. */
-  onBack?: () => void;
+  onBack?: (() => void) | undefined;
   /** The pages above this one, first to last. Each one is a button that goes back to it. */
-  path?: readonly PageHeaderParent[];
+  path?: readonly PageHeaderParent[] | undefined;
   /** The name of the path for screen readers. With it, the path is a navigation landmark. */
-  pathLabel?: string;
-  frame?: PageHeaderFrame;
+  pathLabel?: string | undefined;
+  frame?: PageHeaderFrame | undefined;
   /** Lets the page move focus to the heading. */
-  headingRef?: (heading: HTMLHeadingElement) => void;
-  class?: string;
+  headingRef?: ((heading: HTMLHeadingElement) => void) | undefined;
+  class?: string | undefined;
   /** The controls at the end of the header. */
   children?: JSX.Element;
 }) {
