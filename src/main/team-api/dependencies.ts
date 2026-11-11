@@ -276,6 +276,8 @@ export type TeamApiProviderAccounts = Pick<
   ProviderAccountsHost,
   | "list"
   | "models"
+  | "pools"
+  | "setPool"
   | "usage"
   | "startSignIn"
   | "signInStatus"

@@ -1255,6 +1255,18 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.removeAccount": "Remove account",
   "mobile.server.providers.removeAccountTitle": "Remove {name}?",
   "mobile.server.providers.removeAccountBody": "The server removes this account and its sign-in.",
+  // The pool of a provider's accounts (`provider-account-pool-v1`), as the desktop Accounts section.
+  "mobile.server.providers.pool": "Pool accounts",
+  "mobile.server.providers.poolHint":
+    "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agents share these accounts. A new account signs in on its page on this phone.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agents share these accounts. Add an account in OpenBot on a computer.",
+  "mobile.server.providers.inUse": "In use",
+  "mobile.server.providers.notInPool": "Not in pool",
+  "mobile.server.providers.leaveOutOfPool": "Leave out of pool",
+  "mobile.server.providers.putBackInPool": "Put back in pool",
   "mobile.server.providers.models": "Models",
   "mobile.server.providers.modelsCount": "{shown} of {total}",
   "mobile.server.providers.modelsTitle": "{name} models",

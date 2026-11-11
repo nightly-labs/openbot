@@ -367,6 +367,42 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
+  /** The accounts that the provider's pool leaves out, or null while its pool is off. */
+  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+    return this.#support(provider) ? this.#store.pool(provider) : null;
+  }
+
+  /** Turns the provider's pool on with the accounts it leaves out, or off. Unknown accounts are dropped. */
+  readonly setPool = Effect.fn("ProviderAccounts.setPool")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    enabled: boolean,
+    leftOut: readonly string[],
+  ) {
+    const name = providerLabel(provider);
+    if (provider === "acp" || !this.#support(provider))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    const known = new Set([DEFAULT_PROVIDER_ACCOUNT_ID, ...this.#store.list(provider).map((account) => account.id)]);
+    yield* this.#store
+      .setPool(provider, enabled ? { leftOut: leftOut.filter((accountId) => known.has(accountId)) } : null)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    this.#host.changed();
+  }).bind(this);
+
+  /** The connected accounts after the first that have a plan. A key account has no plan to pool. */
+  planAccounts(provider: AgentProviderId): string[] {
+    if (!this.#support(provider)) return [];
+    return this.#store
+      .list(provider)
+      .filter((account) => !isKeyAccount(account) && this.#states.get(account.id)?.state === "connected")
+      .map((account) => account.id);
+  }
+
+  /** The last usage reading of an account after the first, or null before one. */
+  keptUsage(accountId: string): AccountUsageLimit | null {
+    return this.#usage.get(accountId)?.limit ?? null;
+  }
+
   /**
    * Stops the account's processes, signs it out, and removes its folder with the credentials in it.
    * The caller moves its agents to the provider's own sign-in first.

@@ -226,6 +226,17 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hesabında kullanım sıfırlama kredisi kalmadı.",
   "provider.account.resetUsageAlreadyRedeemed": "{name} hesabının bu sıfırlama kredisi zaten kullanıldı.",
   "provider.account.resetUsageFailed": "{name} kullanımı sıfırlanamadı.",
+  "provider.account.pool": "Hesapları havuzla",
+  "provider.account.poolDescription":
+    "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "provider.account.inUse": "Kullanımda",
+  "provider.account.notInPool": "Havuz dışı",
+  "provider.account.leaveOutOfPool": "Havuzdan çıkar",
+  "provider.account.putBackInPool": "Havuza geri koy",
+  "provider.account.poolChip": "Havuz",
+  "provider.account.poolCount": "{accounts} havuzu",
+  "provider.account.poolInUse": "{pool} · {name} kullanımda",
+  "provider.settings.accountsPooledDescription": "{count}/{max}. Ajanlar bu hesapları paylaşır.",
   "provider.settings.disconnectTitle": "{name} bağlantısı kesilsin mi?",
   "provider.settings.disconnectOthers": "Diğer {provider} hesapları, {provider} yeniden bağlanana kadar bekler.",
   "provider.settings.disconnectLocal":
