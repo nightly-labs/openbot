@@ -1382,6 +1382,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
       },
       reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
+      quietTurn: (turnId) => this.#turn.quietChannelTurn(turnId),
       provisionalAnswers: (agentId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         return (agent ? this.#providers.clientForAgent(agent)?.provisionalAnswers : undefined) === true;
@@ -1874,7 +1875,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
-        requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
+        requestNoUpdate: (agentId, threadId, turnId, channelRun) =>
+          this.#turn.requestNoUpdate(agentId, threadId, turnId, channelRun),
         reportRoutineFailure: (agentId, turnId, reason, channelRun) =>
           this.#turn.reportRoutineFailure(agentId, turnId, reason, channelRun),
         requestNewChat: (agentId) => {

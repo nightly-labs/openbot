@@ -119,6 +119,23 @@ export function settleQuietRoutineTurn(
   return !reported;
 }
 
+/**
+ * Settles the answers of a channel routine turn whose owner called the no-update tool (#7166). Each
+ * text answer becomes a quiet answer, which the channel shows as a step, so the run posts no message.
+ * Nothing goes: the channel already shows the turn's steps. A file, an image or a question is a
+ * report, and then nothing changes. Returns whether the turn is quiet.
+ */
+export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: string): boolean {
+  const answers = snapshot.messages.filter(
+    (message) => message.author === "assistant" && message.turnId === turnId && !isWorkNote(message),
+  );
+  if (answers.some((message) => !isTextAnswer(message))) return false;
+  for (const [index, message] of snapshot.messages.entries()) {
+    if (answers.includes(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+  }
+  return true;
+}
+
 /** A text answer of a quiet turn that says more than the marker. */
 export function keptQuietAnswer(message: ConversationMessage): boolean {
   return isTextAnswer(message) && message.text.trim() !== "" && !isNoUpdateAnswer(message.text);

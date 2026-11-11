@@ -27,12 +27,14 @@ import {
   type DeleteChannelMessageInput,
   isContextResetMarker,
   type QueueHold,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
   assignmentText,
@@ -99,6 +101,11 @@ export interface ChannelHooks {
   reportsCompactions?(agentId: string): boolean;
   /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
   provisionalAnswers?(agentId: string): boolean;
+  /**
+   * Whether the running turn owns a channel routine's request and has nothing to report
+   * (`routine_no_update`). Its answers show as steps, as they do after the turn as quiet answers.
+   */
+  quietTurn?(turnId: string): boolean;
   /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -2806,6 +2813,13 @@ export class ChannelService {
         (original
           ? original.message.itemType === "commentary" && original.sequence > end.sequence
           : activeAssignment(assignment))
+      )
+        message = { ...message, itemType: "commentary" };
+      // A channel routine run with nothing to report posts no message: its answers are steps (#7166).
+      if (
+        message.author === "assistant" &&
+        (message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+          (isTextAnswer(message) && message.turnId !== undefined && this.hooks.quietTurn?.(message.turnId) === true))
       )
         message = { ...message, itemType: "commentary" };
       // The answer to a member reply shows as a reply to it, so the thread reads as an exchange.
