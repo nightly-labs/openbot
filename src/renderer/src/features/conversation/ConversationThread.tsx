@@ -21,6 +21,7 @@ import { chatSearchOpensMessage } from "./chat-search";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
+import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { createTurnSteps } from "./turn-steps";
 
@@ -213,6 +214,8 @@ export function ConversationThread() {
   const mcpSignInCard = useThreadMcpSignInCard(
     (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
   );
+  const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const messageCard = (message: AgentMessage) => mcpSignInCard(message) ?? marketplaceCard(message);
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;
@@ -303,7 +306,7 @@ export function ConversationThread() {
             onCompactContext={current().threads.onCompactContext}
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
-            messageCard={mcpSignInCard}
+            messageCard={messageCard}
             olderMessages={current().threads.olderMessages}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
