@@ -75,6 +75,7 @@ export const messages = {
   "composer.placeholder.answer": "اكتب إجابتك",
   "composer.add.label": "إضافة إلى الطلب",
   "composer.add.files": "إرفاق ملفات",
+  "composer.add.teach": "تعليم مهمة",
   "composer.add.skill": "استخدام مهارة",
   "composer.upload.cancel": "إلغاء الرفع",
   "composer.upload.uploading": "جارٍ رفع {name}",

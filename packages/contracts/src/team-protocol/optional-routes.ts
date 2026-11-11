@@ -42,6 +42,7 @@ import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
+import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
@@ -239,6 +240,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...SIDEBAR_PINS_CODECS,
   ...AGENT_PLAN_CARD_CODECS,
   ...BROWSER_USER_CONTROL_CODECS,
+  ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
   ...AGENT_TASKS_CODECS,

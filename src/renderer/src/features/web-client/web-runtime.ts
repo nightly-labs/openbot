@@ -18,6 +18,8 @@ import type {
   BrowserOpenInput,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
+  BrowserTeachStopInput,
   CancelQueuedMessageInput,
   Channel,
   ChatColors,
@@ -103,6 +105,11 @@ import {
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -287,6 +294,9 @@ export interface WebWorkspaceRuntime {
   /** Behind `browser-user-control`: the owning agent waits on the tab until the release. */
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
+  /** Behind `browser-teach-v1`: the host records the steps that this member shows in the tab. */
+  startBrowserTeach(tabId: string): Promise<void>;
+  stopBrowserTeach(input: BrowserTeachStopInput): Promise<BrowserTeachStep[]>;
   respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
@@ -1215,6 +1225,18 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserUserControlUnsupported"));
       decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.release, { tabId }));
+    },
+    async startBrowserTeach(tabId) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      await request("POST", BROWSER_TEACH_ROUTES.start, { tabId });
+    },
+    async stopBrowserTeach(input) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      return decodeBrowserTeachSteps(
+        await request("POST", BROWSER_TEACH_ROUTES.stop, { tabId: input.tabId, save: input.save }),
+      );
     },
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));

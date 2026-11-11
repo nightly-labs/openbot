@@ -1194,3 +1194,15 @@
   margin-inline-end: -4px;
   color: var(--openbot-danger-text);
 }
+
+/* The record mark of "Teach a task" in the add menu: a ring with a filled centre, in the colour of the
+   recording controls. */
+.ui-action-menu [role="menuitem"] > svg.composer-add-record {
+  color: var(--openbot-danger);
+}
+
+.ui-action-menu [role="menuitem"] > svg.composer-add-record circle:last-of-type {
+  r: 4.5px;
+  fill: currentcolor;
+  stroke: none;
+}
