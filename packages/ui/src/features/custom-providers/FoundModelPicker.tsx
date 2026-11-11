@@ -1,6 +1,7 @@
 import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
 import { Check, ChevronsUpDown, DropdownMenu, Input, Search } from "@openbot/ui";
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import type { DiscoveredModel } from "./custom-provider-form";
@@ -44,40 +45,17 @@ export function FoundModelPicker(props: {
   const allListed = () => matches().length > 0 && matches().every((model) => props.listed(model.id));
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
-  let field: HTMLInputElement | undefined;
-  let list: HTMLDivElement | undefined;
+  const menu = createMenuSearch({ row: '[role="menuitemcheckbox"]:not([data-disabled])' });
 
   const search = (value: string) => {
     setQuery(value);
+    const list = menu.list();
     if (list) list.scrollTop = 0;
     fades.remeasure();
   };
-  const onSearchKey = (event: KeyboardEvent) => {
-    if (event.key === "Escape" || event.key === "Tab") return;
-    // The menu reads a letter as a jump to a row. In the field, letters are the search.
-    event.stopPropagation();
-    if (event.isComposing || event.key !== "ArrowDown") return;
-    const row = list?.querySelector<HTMLElement>('[role="menuitemcheckbox"]:not([data-disabled])');
-    if (!row) return;
-    event.preventDefault();
-    row.focus();
-  };
   const bindList = (element: HTMLDivElement) => {
-    list = element;
+    menu.bindList(element);
     fades.bind(element);
-    // A letter or Backspace typed on a row goes to the field, so typing always edits the search.
-    element.addEventListener(
-      "keydown",
-      (event) => {
-        if (!field) return;
-        const text = event.key !== " " && Array.from(event.key).length === 1;
-        if (!text && event.key !== "Backspace") return;
-        if (event.metaKey || event.ctrlKey || event.altKey) return;
-        event.stopPropagation();
-        field.focus();
-      },
-      true,
-    );
   };
 
   return (
@@ -99,22 +77,13 @@ export function FoundModelPicker(props: {
       <DropdownMenu.Portal mount={props.mount}>
         <DropdownMenu.Content
           class="custom-provider-found-menu"
-          onOpenAutoFocus={(event: Event) => {
-            event.preventDefault();
-            field?.focus();
-          }}
-          onFocusIn={(event: FocusEvent) => {
-            // The menu takes the focus itself when the pointer leaves a row. The focus goes on to the
-            // field, so typing searches and does not jump to a row.
-            if (event.target === event.currentTarget) field?.focus();
-          }}
+          onOpenAutoFocus={menu.onOpenAutoFocus}
+          onFocusIn={menu.onFocusIn}
         >
           <div class="ui-search-select-search custom-provider-found-search">
             <Search aria-hidden="true" />
             <Input
-              ref={(element: HTMLInputElement) => {
-                field = element;
-              }}
+              ref={menu.bindField}
               class="ui-search-select-input custom-provider-found-search-input"
               aria-label={t("customProvider.discovery.search")}
               placeholder={t("customProvider.discovery.search")}
@@ -122,7 +91,7 @@ export function FoundModelPicker(props: {
               spellcheck={false}
               value={query()}
               onValueChange={search}
-              onKeyDown={onSearchKey}
+              onKeyDown={menu.onFieldKey}
             />
           </div>
           <div class={["custom-provider-found-list", fades.classes()]} ref={bindList} onScroll={fades.measure}>
