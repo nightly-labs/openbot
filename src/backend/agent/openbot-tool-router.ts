@@ -105,6 +105,7 @@ import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approva
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
@@ -745,10 +746,13 @@ export class OpenBotToolRouter {
                   // A Link card is read from Link before the fill; a saved card comes from the Vault.
                   const linkVault = yield* this.#attention.linkCardVault(client, toolRequest, params);
                   if (linkVault && !("secret" in linkVault)) return linkVault;
-                  return yield* this.#browser.handleDynamicTool(params, {
+                  const result = yield* this.#browser.handleDynamicTool(params, {
                     onUserControl: userControl,
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                  if (params.tool !== "screenshot") return result;
+                  const workspacePath = this.#hooks.listAgents().find((agent) => agent.id === agentId)?.workspacePath;
+                  return yield* saveBrowserScreenshot(workspacePath, params.arguments, result);
                 }
               }
             });
