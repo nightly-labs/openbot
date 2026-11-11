@@ -1815,7 +1815,9 @@ export async function createApplicationServices({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
-    deepLinkRedirectUrl: MCP_OAUTH_REDIRECT_URL,
+    // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
+    // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
+    deepLinkRedirectUrl: () => (app.isDefaultProtocolClient("openbot") ? MCP_OAUTH_REDIRECT_URL : undefined),
     logger: createOpenBotLogger("mcp-oauth"),
   });
   mcpOAuthAuthority = mcpOAuth;

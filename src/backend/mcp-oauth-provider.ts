@@ -164,9 +164,11 @@ export interface McpOAuthOptions {
   /**
    * The `openbot://mcp-auth` deep link, which a sign-in in this computer's browser registers after
    * the browser did not come back on `127.0.0.1` or on `localhost`. TradingView's firewall blocks a
-   * sign-in page that names either one (#7230). Unset, the retry uses only the two loopback names.
+   * sign-in page that names either one (#7230). Read at each sign-in: `undefined` while the
+   * operating system does not open the link in this app, and then the retry uses only the two
+   * loopback names.
    */
-  deepLinkRedirectUrl?: string;
+  deepLinkRedirectUrl?: () => string | undefined;
   /** How long a sign-in may stay open before the wait is abandoned. */
   signInTimeoutMs?: number;
   /** How long a token exchange may hold a thread start or a test before the stored token answers. */
@@ -822,7 +824,7 @@ export class McpOAuth implements McpOAuthAuthority {
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
-      deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl,
+      deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl?.(),
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
