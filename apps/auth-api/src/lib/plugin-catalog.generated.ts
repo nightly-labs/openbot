@@ -613,6 +613,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "f77d58b834b80eae4d1763bb34602425348d36b9cf5848ed78f9964a6182c5a8",
     },
     {
+      slug: "elixir-games",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d770f2fbbe1945f5b959f0adb0516f5678ebeefab8df1b92334a85d9542859ab",
+    },
+    {
       slug: "era",
       version: "1.0.0",
       featured: false,
@@ -5164,6 +5170,60 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://eden.so",
     privacyPolicyUrl: "https://eden.so/privacy/",
     termsUrl: "https://eden.so/terms/",
+    skills: [],
+  },
+  "elixir-games": {
+    slug: "elixir-games",
+    name: "Elixir Games",
+    tagline: "Answers for your game builds",
+    description:
+      'Elixir Games lets agents answer the questions that your game builds ask in the Elixir Games app, so the builds continue while you are away. Agents read the questions that wait, wait for the next one, and answer each with one of its options. Install Elixir Games on this computer and open it. In Settings > Bots, turn on "Let your bots answer", add a bot, and copy its key. OpenBot starts the program that Elixir Games installs and gives it the key. It needs no OpenBot account. An answer can let a build spend credits, up to the daily limit that you set in Elixir Games.',
+    category: "automation",
+    creatorName: "Elixir Games",
+    iconUrl: "https://elixir.games/apple-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-answer-waiting", text: "Answer what my Elixir Games builds are waiting for." },
+      { id: "prompt-inbox-wait", text: "Check my Elixir Games inbox, then wait for the next question and answer it." },
+      {
+        id: "prompt-list-waiting",
+        text: "List the questions that my Elixir Games builds wait on. Do not answer them.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-elixir-games-mcp",
+        name: "Elixir Games",
+        description:
+          'Reads and answers the questions of your game builds, over the local MCP server that the Elixir Games program relays. Needs Elixir Games open, with "Let your bots answer" on.',
+        iconUrl: "https://elixir.games/apple-icon.png",
+        server: {
+          name: "elixir-games",
+          transport: "stdio",
+          command: "~/.elixir-games/bin/elixir-games-mcp",
+          args: [],
+          auth: [
+            {
+              id: "elixir-games-key",
+              kind: "key",
+              label: "Bot key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Bot key",
+                  env: "ELIXIR_GAMES_BOT_KEY",
+                  placeholder: "egb_…",
+                  hint: "Elixir Games → Settings → Bots → Add a bot",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://elixir.games",
+    privacyPolicyUrl: "https://elixir.games/privacy",
+    termsUrl: "https://elixir.games/terms",
     skills: [],
   },
   era: {
