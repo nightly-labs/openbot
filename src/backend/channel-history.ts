@@ -22,8 +22,9 @@ import type { ChannelStore } from "./channel-store";
 /**
  * The cards that a member's tool adds to its own thread for the person, such as the Marketplace app
  * card of `suggest_marketplace_app`. The member tells the channel that the card is in the chat, so
- * the channel copies it (#6691). A card is not a member's answer: no model reads it, and it does not
- * count as unread. A new kind of card goes in this list, and each of these rules follows.
+ * the channel copies it (#6691). A card is not a member's answer: the packet that a member gets leaves
+ * it out, so the member does not count as answered, and it does not count as unread. A new kind of card
+ * goes in this list, and each of these rules follows.
  */
 export const CHANNEL_CARD_ITEM_TYPE_PREFIXES = [MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX] as const;
 
