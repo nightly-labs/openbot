@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "このサーバーからエージェントを削除します。",
   "mobile.agent.menu.markRead": "既読にする",
   "mobile.agent.menu.markUnread": "未読にする",
+  "mobile.agent.menu.mute": "ミュート",
+  "mobile.agent.menu.unmute": "ミュートを解除",
   "mobile.agent.menu.hide": "非表示",
   "mobile.agent.menu.info": "情報",
   "mobile.agent.menu.more": "その他",

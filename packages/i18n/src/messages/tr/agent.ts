@@ -80,6 +80,7 @@ export const messages = {
   "agent.error.hideFailed": "Ajan gizlenemedi",
   "agent.error.restoreFailed": "Ajan geri yüklenemedi",
   "agent.error.hiddenFailed": "Değişiklik kaydedilmedi. Tekrar deneyin.",
+  "agent.error.muteFailed": "Bildirimler değiştirilemedi",
   "agent.error.settingsFailed": "Ajan ayarları kaydedilemedi",
   "agent.error.adminOnly": "Ajan ayarları yalnızca bir sunucu yöneticisi tarafından değiştirilebilir.",
   "agent.error.continueFailed": "Ajan devam edemedi. Tekrar deneyin.",

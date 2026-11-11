@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Bu işlem ajanı bu sunucudan kaldırır.",
   "mobile.agent.menu.markRead": "Okundu olarak işaretle",
   "mobile.agent.menu.markUnread": "Okunmadı olarak işaretle",
+  "mobile.agent.menu.mute": "Sessize al",
+  "mobile.agent.menu.unmute": "Sesi aç",
   "mobile.agent.menu.hide": "Gizle",
   "mobile.agent.menu.info": "Bilgi",
   "mobile.agent.menu.more": "Daha fazla",

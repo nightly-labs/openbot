@@ -81,6 +81,7 @@ export const messages = {
   "agent.error.hideFailed": "Impossible de masquer l’agent",
   "agent.error.restoreFailed": "Impossible de restaurer l’agent",
   "agent.error.hiddenFailed": "La modification n’a pas été enregistrée. Réessayez.",
+  "agent.error.muteFailed": "Impossible de modifier les notifications",
   "agent.error.settingsFailed": "Impossible d’enregistrer les réglages de l’agent",
   "agent.error.adminOnly": "Seul un administrateur du serveur peut modifier les réglages de l’agent.",
   "agent.error.continueFailed": "L’agent n’a pas pu continuer. Réessayez.",

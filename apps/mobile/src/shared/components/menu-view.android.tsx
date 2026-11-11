@@ -5,6 +5,8 @@ import Archive from "lucide-react-native/icons/archive";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
+import Bell from "lucide-react-native/icons/bell";
+import BellOff from "lucide-react-native/icons/bell-off";
 import Calendar from "lucide-react-native/icons/calendar";
 import ChartColumn from "lucide-react-native/icons/chart-column";
 import Circle from "lucide-react-native/icons/circle";
@@ -69,6 +71,8 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "arrow.down": ArrowDown,
   "arrow.up": ArrowUp,
   "arrow.up.arrow.down": ArrowUpDown,
+  bell: Bell,
+  "bell.slash": BellOff,
   "bubble.left.and.bubble.right": MessagesSquare,
   calendar: Calendar,
   "chart.bar": ChartColumn,

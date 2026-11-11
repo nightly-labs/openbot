@@ -57,6 +57,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.menu.deleteBody": "This removes the agent from this server.",
   "mobile.agent.menu.markRead": "Mark read",
   "mobile.agent.menu.markUnread": "Mark unread",
+  "mobile.agent.menu.mute": "Mute",
+  "mobile.agent.menu.unmute": "Unmute",
   "mobile.agent.menu.hide": "Hide",
   "mobile.agent.menu.info": "Info",
   "mobile.agent.menu.more": "More",

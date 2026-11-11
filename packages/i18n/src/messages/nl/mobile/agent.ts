@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Hiermee verwijder je de agent van deze server.",
   "mobile.agent.menu.markRead": "Markeer als gelezen",
   "mobile.agent.menu.markUnread": "Markeer als ongelezen",
+  "mobile.agent.menu.mute": "Dempen",
+  "mobile.agent.menu.unmute": "Niet meer dempen",
   "mobile.agent.menu.hide": "Verbergen",
   "mobile.agent.menu.info": "Info",
   "mobile.agent.menu.more": "Meer",

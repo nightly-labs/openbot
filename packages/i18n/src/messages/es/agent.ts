@@ -80,6 +80,7 @@ export const messages = {
   "agent.error.hideFailed": "No se pudo ocultar el agente",
   "agent.error.restoreFailed": "No se pudo restaurar el agente",
   "agent.error.hiddenFailed": "No se guardó el cambio. Inténtalo de nuevo.",
+  "agent.error.muteFailed": "No se pudieron cambiar las notificaciones",
   "agent.error.settingsFailed": "No se pudieron guardar los ajustes del agente",
   "agent.error.adminOnly": "Solo un administrador del servidor puede cambiar los ajustes del agente.",
   "agent.error.continueFailed": "El agente no pudo continuar. Vuelve a intentarlo.",

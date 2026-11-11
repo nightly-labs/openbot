@@ -79,6 +79,7 @@ export const messages = {
   "agent.error.hideFailed": "Не удалось скрыть агента",
   "agent.error.restoreFailed": "Не удалось восстановить агента",
   "agent.error.hiddenFailed": "Изменение не сохранено. Повторите попытку.",
+  "agent.error.muteFailed": "Не удалось изменить уведомления",
   "agent.error.settingsFailed": "Не удалось сохранить настройки агента",
   "agent.error.adminOnly": "Настройки агента может менять только администратор сервера.",
   "agent.error.continueFailed": "Агент не смог продолжить. Повторите попытку.",

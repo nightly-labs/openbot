@@ -82,6 +82,7 @@ export const messages = {
   "agent.error.hideFailed": "Kan agent niet verbergen",
   "agent.error.restoreFailed": "Kan agent niet herstellen",
   "agent.error.hiddenFailed": "De wijziging is niet opgeslagen. Probeer het opnieuw.",
+  "agent.error.muteFailed": "Kon meldingen niet wijzigen",
   "agent.error.settingsFailed": "Kan agentinstellingen niet opslaan",
   "agent.error.adminOnly": "Alleen een serverbeheerder kan agentinstellingen wijzigen.",
   "agent.error.continueFailed": "De agent kan niet doorgaan. Probeer het opnieuw.",

@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "يؤدي هذا إلى إزالة الوكيل من هذا الخادم.",
   "mobile.agent.menu.markRead": "تعليم كمقروء",
   "mobile.agent.menu.markUnread": "تعليم كغير مقروء",
+  "mobile.agent.menu.mute": "كتم",
+  "mobile.agent.menu.unmute": "إلغاء الكتم",
   "mobile.agent.menu.hide": "إخفاء",
   "mobile.agent.menu.info": "معلومات",
   "mobile.agent.menu.more": "المزيد",

@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "הפעולה מסירה את הסוכן מהשרת הזה.",
   "mobile.agent.menu.markRead": "סימון כנקרא",
   "mobile.agent.menu.markUnread": "סימון כלא נקרא",
+  "mobile.agent.menu.mute": "השתקה",
+  "mobile.agent.menu.unmute": "ביטול השתקה",
   "mobile.agent.menu.hide": "הסתרה",
   "mobile.agent.menu.info": "מידע",
   "mobile.agent.menu.more": "עוד",
