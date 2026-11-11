@@ -157,6 +157,7 @@
     "./team-protocol/custom-provider-harness-v1": "./src/team-protocol/custom-provider-harness-v1.ts",
     "./team-protocol/provider-default-v1": "./src/team-protocol/provider-default-v1.ts",
     "./team-protocol/discord-access-v1": "./src/team-protocol/discord-access-v1.ts",
+    "./team-protocol/whatsapp-working-message-v1": "./src/team-protocol/whatsapp-working-message-v1.ts",
     "./team-protocol/agent-import-v1": "./src/team-protocol/agent-import-v1.ts",
     "./team-protocol/agent-import-v2": "./src/team-protocol/agent-import-v2.ts",
     "./team-protocol/instance-transfer-v1": "./src/team-protocol/instance-transfer-v1.ts",

@@ -1061,6 +1061,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",

@@ -252,6 +252,7 @@ export interface TeamApiConnectors {
     | "removeWhatsAppSender"
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
+    | "setWhatsAppWorkingMessage"
   >;
 }
 

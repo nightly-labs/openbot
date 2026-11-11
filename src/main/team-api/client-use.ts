@@ -64,6 +64,7 @@ import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 
 /**
  * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
@@ -102,6 +103,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   DISCORD_ACCESS_ROUTES.access,
   WHATSAPP_CONNECTOR_ROUTES.overview,
   WHATSAPP_CONNECTOR_ROUTES.linkState,
+  WHATSAPP_WORKING_MESSAGE_ROUTES.list,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,

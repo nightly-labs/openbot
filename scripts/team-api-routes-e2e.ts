@@ -63,6 +63,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isWhatsAppWorkingMessageList,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type ProviderDetectionSettings,
@@ -76,7 +77,9 @@ import {
   type VoiceLiveEvent,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -307,6 +310,11 @@ import {
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CODECS,
+  WHATSAPP_WORKING_MESSAGE_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -1572,6 +1580,7 @@ const WHATSAPP_NUMBER = "48600100200";
 const whatsappAccount: WhatsAppAccount = {
   workspaceId: WHATSAPP_NUMBER,
   ownNumber: true,
+  workingMessage: true,
   allowedSenders: [],
   pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
 };
@@ -1670,6 +1679,11 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
     Effect.sync(() => {
       record("whatsapp.setOwnNumber", workspaceId, ownNumber);
       whatsappAccount.ownNumber = ownNumber;
+    }),
+  setWhatsAppWorkingMessage: (workspaceId, workingMessage) =>
+    Effect.sync(() => {
+      record("whatsapp.setWorkingMessage", workspaceId, workingMessage);
+      whatsappAccount.workingMessage = workingMessage;
     }),
 };
 const connectors: TeamApiConnectors = {
@@ -7381,6 +7395,97 @@ try {
         isDeepStrictEqual(callsOf("whatsapp.reconnect"), [["whatsapp", WHATSAPP_NUMBER, false]]) &&
         isDeepStrictEqual(callsOf("whatsapp.disconnect"), [[WHATSAPP_NUMBER]]),
       [summary(pause), summary(reconnect), summary(disconnect)],
+    );
+  }
+
+  // ---- The "Working on it…" post of a WhatsApp number (whatsapp-working-message-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_WORKING_MESSAGE_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setWorkingMessage");
+    /** The answer as the client reads it: the frozen codec, then the client's guard. */
+    const asClient = (reply: Reply): WhatsAppWorkingMessageList => {
+      const codec = WHATSAPP_WORKING_MESSAGE_CODECS.get(WHATSAPP_WORKING_MESSAGE_ROUTES.list);
+      assert(codec, WHATSAPP_WORKING_MESSAGE_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppWorkingMessageList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-working-message-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, workingMessage: false };
+    const unsupported = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberList = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberUpdate = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the working message",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        whatsappAccount.workingMessage === true,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const bad = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, workingMessage: "no" },
+      ...v9,
+    });
+    const off = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, { token: adaToken, json: update, ...v9 });
+    const after = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    // The frozen `whatsapp-connector-v1` overview carries no setting; the client adds it from the list.
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    const merged = withWhatsAppWorkingMessages(plain, asClient(after));
+    check(
+      "an admin reads the working message of each number and turns it off; a bad value is refused",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.workingMessage === true &&
+        bad.status === 400 &&
+        off.status === 200 &&
+        settingCalls().length === 1 &&
+        whatsappAccount.workingMessage === false &&
+        asClient(after).numbers[0]?.workingMessage === false &&
+        plain.accounts[0]?.workingMessage === undefined &&
+        merged.accounts[0]?.workingMessage === false &&
+        withWhatsAppWorkingMessages(plain, null).accounts[0]?.workingMessage === undefined,
+      [summary(before), summary(bad), summary(off), summary(after)],
+    );
+    // The reverse action.
+    const on = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, workingMessage: true },
+      ...v9,
+    });
+    const restored = await call("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin turns the working message on again",
+      on.status === 200 &&
+        whatsappAccount.workingMessage === true &&
+        asClient(restored).numbers[0]?.workingMessage === true,
+      [summary(on), summary(restored)],
     );
   }
 

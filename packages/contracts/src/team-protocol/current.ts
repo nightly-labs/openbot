@@ -161,6 +161,7 @@ import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -368,6 +369,7 @@ export {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -562,6 +564,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -766,7 +769,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY &&
     capability !== CHANNEL_BROWSER_CAPABILITY &&
-    capability !== STORAGE_CHANNEL_CAPABILITY,
+    capability !== STORAGE_CHANNEL_CAPABILITY &&
+    capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -847,6 +851,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1010,6 +1015,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY &&
       capability !== CHANNEL_BROWSER_CAPABILITY &&
-      capability !== STORAGE_CHANNEL_CAPABILITY,
+      capability !== STORAGE_CHANNEL_CAPABILITY &&
+      capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   );
 }
