@@ -283,7 +283,8 @@ interface AcpThread {
   developerInstructions: string;
   /**
    * The instructions that the session already has in its context, or null when the next prompt must
-   * carry them: a new or loaded session, a changed text, a compaction, or a failed prompt.
+   * carry them: a new session, a loaded session that lost its prompts, a changed text, a compaction,
+   * or a failed prompt.
    */
   instructionsSent: string | null;
   /** Tokens in the session's context at the last `usage_update`; null while the agent sends none. */
@@ -321,10 +322,21 @@ interface AcpThread {
   backgroundReplay: Deferred.Deferred<void> | null;
 }
 
-/** What a closed idle session needs to be loaded again. Completed history lives in storage. */
+/**
+ * What a closed idle session needs to be loaded again. Completed history lives in storage. The
+ * instruction state goes back to a session that opens again with its prompts (`reopenKeepsPrompts`).
+ */
 type ReleasedAcpThread = Pick<
   AcpThread,
-  "cwd" | "developerInstructions" | "dynamicTools" | "workspaceRoots" | "computerUse" | "agentId"
+  | "cwd"
+  | "developerInstructions"
+  | "dynamicTools"
+  | "workspaceRoots"
+  | "computerUse"
+  | "agentId"
+  | "instructionsSent"
+  | "contextUsed"
+  | "promptsSinceInstructions"
 >;
 
 /** Persistence hooks for provider history. The database owns the data; ACP only streams it. */
@@ -552,13 +564,26 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A watched session stays open: a closed one would not report the end of its background task.
     canRelease: (thread) =>
       this.#loadsSessions && (thread.transport !== null || this.#closesSessions) && thread.backgroundUntil === 0,
-    snapshot: ({ cwd, developerInstructions, dynamicTools, workspaceRoots, computerUse, agentId }) => ({
+    snapshot: ({
       cwd,
       developerInstructions,
       dynamicTools,
       workspaceRoots,
       computerUse,
       agentId,
+      instructionsSent,
+      contextUsed,
+      promptsSinceInstructions,
+    }) => ({
+      cwd,
+      developerInstructions,
+      dynamicTools,
+      workspaceRoots,
+      computerUse,
+      agentId,
+      instructionsSent,
+      contextUsed,
+      promptsSinceInstructions,
     }),
     dispose: (thread) => this.#closeSession(thread),
     reopen: (threadId, released) =>
@@ -1730,13 +1755,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
               throw new Error(sourceText("error.provider.acpMcpNotLoaded", { provider: this.#label }));
             mcp.setThreadId(id);
+            // The same session, opened again after an idle release, still has the instructions it got.
+            const kept = resume && this.#flavor.reopenKeepsPrompts ? this.#threads.released(id) : undefined;
             const thread: AcpThread = {
               id,
               cwd,
               developerInstructions: getString(params, "developerInstructions") ?? "",
-              instructionsSent: null,
-              contextUsed: null,
-              promptsSinceInstructions: 0,
+              instructionsSent: kept?.instructionsSent ?? null,
+              contextUsed: kept?.contextUsed ?? null,
+              promptsSinceInstructions: kept?.promptsSinceInstructions ?? 0,
               configOptions,
               currentModelId,
               mcp,
