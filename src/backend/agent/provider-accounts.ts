@@ -739,7 +739,7 @@ export class ProviderAccounts {
       return yield* accountFailure(
         sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) }),
       );
-    yield* this.#runSignOut(cli, command, {}).pipe(
+    yield* this.#runSignOut(provider, cli, command, {}).pipe(
       Effect.mapError((error) => accountFailure(this.#message(provider, error))),
     );
   });
@@ -753,7 +753,7 @@ export class ProviderAccounts {
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
-    yield* this.#runSignOut(cli, command, this.environment(account)).pipe(
+    yield* this.#runSignOut(account.provider, cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
         Effect.sync(() =>
@@ -767,10 +767,12 @@ export class ProviderAccounts {
   });
 
   #runSignOut(
+    provider: AgentProviderId,
     cli: AgentCliInfo,
     command: NonNullable<ProviderAccountSupport["signOut"]>,
     environment: Readonly<Record<string, string>>,
   ): Effect.Effect<void, ProviderProcessFailed | ProviderSignInError> {
+    const privateTemp = this.#host.signInTemp(provider);
     return Effect.scoped(
       Effect.gen(function* () {
         const env = { ...cliPathEnvironment(cli), ...command.env(cli), ...environment };
@@ -783,6 +785,8 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             logoutOnly: true,
             signOutMethod: command.acpLogout === true ? undefined : command.acpLogout,
+            // The Windows Gemini server unpacks into the temporary folder at each start (`antigravityTemp`).
+            privateTemp,
           });
           // A refused ACP sign-out has a safe message, which the account flow shows as the reason.
           return yield* logout.done.pipe(

@@ -243,7 +243,7 @@ export const messages = {
     "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
   "provider.settings.geminiKeyReplacesAccount":
-    "Una chiave API Gemini salvata viene usata al posto di questo account Google. Rimuovi la chiave per usare il piano e i modelli di questo account.",
+    "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
   "provider.settings.cache": "Cache",

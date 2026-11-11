@@ -252,7 +252,7 @@ export const messages = {
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
   "provider.settings.geminiKeyReplacesAccount":
-    "Une clé API Gemini enregistrée est utilisée à la place de ce compte Google. Supprimez la clé pour utiliser l'abonnement et les modèles de ce compte.",
+    "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.cache": "Cache",

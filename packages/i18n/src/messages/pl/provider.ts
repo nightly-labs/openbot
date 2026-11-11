@@ -266,7 +266,7 @@ export const messages = {
     "OpenBot wyloguje {provider} na tym komputerze. CLI {provider} w terminalu również zostanie wylogowane.",
   "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
   "provider.settings.geminiKeyReplacesAccount":
-    "Zapisany klucz API Gemini jest używany zamiast tego konta Google. Usuń klucz, aby używać planu i modeli tego konta.",
+    "Zapisany klucz API Gemini jest używany zamiast logowania przez Google. Aby używać planu Google i jego modeli, usuń klucz.",
   "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.cache": "Pamięć podręczna",

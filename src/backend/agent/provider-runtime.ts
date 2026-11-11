@@ -2006,6 +2006,8 @@ export class ProviderRuntime implements ProviderPort {
         yield* codex ? this.#codexLogin.cancel(null) : this.#cancelCliLogin(provider);
         const disposals = this.#disposals;
         yield* accounts.signOutDefault(provider).pipe(toProviderOperationFailed);
+        // The next sign-in can be another login, and a kept reading would show the old one's usage.
+        this.#forgetUsage(provider);
         yield* this.#endSignedOutClient(provider, disposals);
         return this.status();
       }),

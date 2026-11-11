@@ -246,7 +246,7 @@ export const messages = {
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
   "provider.settings.geminiKeyReplacesAccount":
-    "Se usa una clave de API de Gemini guardada en lugar de esta cuenta de Google. Elimina la clave para usar el plan y los modelos de esta cuenta.",
+    "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.cache": "Caché",

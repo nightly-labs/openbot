@@ -279,7 +279,7 @@ export const messages = {
   "provider.settings.keyAlternative": "或粘贴 {name} API 密钥。",
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
-    "已保存的 Gemini API 密钥代替此 Google 账号使用。删除该密钥即可使用此账号的套餐和模型。",
+    "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",

@@ -244,7 +244,7 @@ export const messages = {
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
   "provider.settings.geminiKeyReplacesAccount":
-    "保存された Gemini API キーがこの Google アカウントの代わりに使われます。このアカウントのプランとモデルを使うには、キーを削除してください。",
+    "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.cache": "キャッシュ",
