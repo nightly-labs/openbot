@@ -55,6 +55,8 @@ import {
   holdsFoundValues,
   keepsHeaderValue,
   type ModelDiscovery,
+  tokenCountEditText,
+  tokenCountRestText,
   tokenCountText,
   validateCustomProvider,
 } from "./custom-provider-form";
@@ -259,6 +261,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     identifier: true,
     numeric: true,
     read: (row) => row.contextWindow ?? "",
+    editText: tokenCountEditText,
+    restText: (value) => tokenCountRestText(value, format),
     write: (index, value) =>
       setDraft((state) => {
         const model = state.models[index];
@@ -272,6 +276,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     identifier: true,
     numeric: true,
     read: (row) => row.maxOutput ?? "",
+    editText: tokenCountEditText,
+    restText: (value) => tokenCountRestText(value, format),
     write: (index, value) =>
       setDraft((state) => {
         const model = state.models[index];

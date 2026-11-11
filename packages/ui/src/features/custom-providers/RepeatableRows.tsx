@@ -20,6 +20,10 @@ export interface RepeatableColumn<T> {
   mono?: boolean;
   read: (row: T) => string;
   write: (index: number, value: string) => void;
+  /** The text for the field while the user edits it, as a count in plain digits. */
+  editText?: (value: string) => string;
+  /** The text for the field after the user leaves it, as a count in groups of digits. */
+  restText?: (value: string) => string;
 }
 
 interface RepeatableRowsProps<T> {
@@ -61,6 +65,12 @@ export interface RepeatableTable<T> {
  * share one row, error and add-button shape instead of keeping two copies that drift apart.
  */
 export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
+  function retype(column: RepeatableColumn<T>, row: T, index: number, text: ((value: string) => string) | undefined) {
+    const shown = column.read(row);
+    const next = text ? text(shown) : shown;
+    if (next !== shown) column.write(index, next);
+  }
+
   return (
     <section class="custom-provider-rows" aria-label={props.label}>
       <div class="custom-provider-rows-heading">
@@ -107,6 +117,8 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                     aria-label={column.label(index() + 1)}
                     value={column.read(row)}
                     onValueChange={(value) => column.write(index(), value)}
+                    onFocus={() => retype(column, row, index(), column.editText)}
+                    onBlur={() => retype(column, row, index(), column.restText)}
                     placeholder={column.placeholder(row)}
                     autocomplete={column.identifier ? "off" : undefined}
                     spellcheck={column.identifier ? false : undefined}

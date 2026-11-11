@@ -110,10 +110,11 @@ export class ModelReleaseCatalog {
     const loaded = this.#loaded;
     if (loaded && loaded.path === newest.path && loaded.modified === newest.modified)
       return releaseLookup(loaded.releases);
-    const releases = yield* Effect.tryPromise(() => readFile(newest.path, "utf8")).pipe(
-      Effect.map((text) => parseReleases(JSON.parse(text))),
-      Effect.orElseSucceed(noReleases),
-    );
+    // The parse is in the try: OpenCode can write the file during the read, and text that is not
+    // JSON then gives no releases, as a file that cannot be read does.
+    const releases = yield* Effect.tryPromise(async () =>
+      parseReleases(JSON.parse(await readFile(newest.path, "utf8"))),
+    ).pipe(Effect.orElseSucceed(noReleases));
     this.#loaded = { ...newest, releases };
     return releaseLookup(releases);
   });

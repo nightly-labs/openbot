@@ -149,6 +149,21 @@ export function tokenCountText(value: number, format: Pick<AppFormat, "number">)
   return tokenCount(text, () => true) === value ? text : value.toString();
 }
 
+/**
+ * A token count while the user edits it: plain digits, so the change of one digit is always a valid
+ * count. Text that is not a count stays as typed.
+ */
+export function tokenCountEditText(text: string): string {
+  const value = tokenCount(text, () => true);
+  return typeof value === "number" ? value.toString() : text;
+}
+
+/** A token count when the user leaves its field: in groups again. Other text stays as typed. */
+export function tokenCountRestText(text: string, format: Pick<AppFormat, "number">): string {
+  const value = tokenCount(text, () => true);
+  return typeof value === "number" ? tokenCountText(value, format) : text;
+}
+
 function contextWindowValue(model: CustomModelDraft): number | null | undefined {
   return tokenCount(model.contextWindow, isCustomProviderContextWindow);
 }

@@ -88,6 +88,7 @@ interface Report {
     agentStarted: boolean;
   };
   catalogLimits?: unknown;
+  tornCatalog?: unknown;
   edit?: {
     keyKeptOnEdit: boolean;
     ciphertextUnchanged: boolean;
@@ -397,6 +398,23 @@ try {
     // By name: the window that most services give.
     { id: "Big.Model", contextWindow: 1_000_000, maxOutput: 64_000 },
     { id: "full-cap", contextWindow: 200_000 },
+    { id: "unknown-model" },
+    { id: "local/big-model", contextWindow: 32_768 },
+  ]);
+
+  // 6c. OpenCode can write the copy during the read. Text that is not JSON gives a list with no
+  // limits; it does not make the search fail.
+  await writeFile(copy, '{"google": {"models": {"gemini-3.8-fl');
+  const afterTear = new Date(later.getTime() + 60 * 1000);
+  await utimes(copy, afterTear, afterTear);
+  const torn = await Effect.runPromise(
+    withCatalog.discoverModels({ baseUrl: namesOnly.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.tornCatalog = torn.models;
+  assert.deepEqual(torn.models, [
+    { id: "proxy/google/gemini-3.8-flash" },
+    { id: "Big.Model" },
+    { id: "full-cap" },
     { id: "unknown-model" },
     { id: "local/big-model", contextWindow: 32_768 },
   ]);
