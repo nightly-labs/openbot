@@ -149,7 +149,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "react_to_user_message":
       return "React to clear emotional moments. Wins, affection, gratitude, playful humor, sadness, disappointment, frustration, loneliness, and strong approval normally get one fitting reaction; do not skip them. Negative emotions get an empathetic reaction, such as ❤️, 😔, or 🫂. An emoji in your answer is not a reaction: when you use one for the user's emotion, also react. Skip neutral, informational, or routine messages, and do not react on every turn.";
     case "pin_message":
-      return "Pin a message when the user asks, or unasked for a lasting reference that the user will look for again: a final decision, an agreed plan, a key result, credentials-free setup steps. Pin your own answer only after it is finished, in a later turn, with a quote from it. Do not pin small talk or every answer, and do not say that you pinned unless the user asked. The result lists the pins of this chat: unpin your old pin when a new one replaces it.";
+      return "Pin when asked, or unasked only for a lasting reference, such as a decision, a plan or a key result. Pin your own answer in a later turn, with a quote. Do not tell the user about a pin they did not ask for. Unpin your old pin when a new one replaces it.";
     case "list_mcp_servers":
     case "save_mcp_server":
     case "test_mcp_server":

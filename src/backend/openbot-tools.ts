@@ -755,14 +755,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "pin_message",
     description:
-      "Pin or unpin one finished message of this chat, so the user finds it again in the pin list of the chat header: a decision, a plan, a key result or a link that the user will need later. Pin only when the user asks or when the message is a lasting reference; never pin small talk. You cannot unpin a person's pin.",
+      "Pin or unpin one finished message of this chat in the pin list of the chat header. You cannot unpin a person's pin.",
     shape: {
       quote: z
         .string()
         .min(1)
         .max(500)
         .describe(
-          "A short exact part of the message text. The newest message of this chat that contains it is the target. Leave it out to pin the current user message.",
+          "Exact part of the message text; the newest message that contains it is the target. Omit for the current user message.",
         )
         .optional(),
       pinned: z.boolean().describe("False to unpin. Default true.").optional(),
