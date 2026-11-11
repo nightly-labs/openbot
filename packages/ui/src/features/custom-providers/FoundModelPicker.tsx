@@ -74,7 +74,7 @@ export function FoundModelPicker(props: {
           <ChevronsUpDown aria-hidden="true" />
         </span>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Portal mount={props.mount}>
+      <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content
           class="custom-provider-found-menu"
           onOpenAutoFocus={menu.onOpenAutoFocus}
