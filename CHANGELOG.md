@@ -229,6 +229,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - A GitHub Copilot agent answers again after a turn that stopped responding or that you stopped.
   Before, each new message failed with "Session … is already loaded" until you restarted OpenBot.
 - A message to a Gemini agent after an idle time now waits up to 3 minutes for Gemini to start, and longer after an earlier slow start. This also applies to an agent set to "Workspace only" or to its own account. Before, on a slow or busy computer, mostly on Windows, the message often failed after 30 s with "Gemini did not answer in time", and OpenBot did not send it again.
+- A Codex chat no longer sends the agent's memories and teammates again when you write after a pause
+  of 10 minutes or more. Before, OpenBot stopped the idle Codex process, and the next message sent
+  this unchanged context again, which used more tokens and more of the chat's context.
 
 ## [0.67.1] - 2026-11-10
 
