@@ -279,7 +279,12 @@ const installsRoot = join(OUT, "installs");
 const updaterResults: Record<string, { installs: number; offered: Record<string, number> }> = {};
 const serviceResults: Record<
   string,
-  { automatic: UpdateStatus["phase"]; staged: string | null; requested: UpdateStatus["phase"] }
+  {
+    automatic: UpdateStatus["phase"];
+    staged: string | null;
+    requested: UpdateStatus["phase"];
+    later?: { phase: UpdateStatus["phase"]; staged: string | null };
+  }
 > = {};
 try {
   for (const feed of feeds) {
@@ -347,13 +352,25 @@ try {
   }
   const { inside, outside } = placed;
   assert.ok(inside && outside);
-  serviceResults.outsideAt10 = await serviceChecks(outside, "0.66.0", feedUrl("10"));
+  // The next release, also at 10%. The requested check skips the stage only for the release it found.
+  const [major, minor] = VERSION.split(".");
+  const laterVersion = `${major}.${Number(minor) + 1}.0`;
+  served.set(
+    "/latest-linux.yml/later10/latest-linux.yml",
+    setStagingPercentage(original("latest-linux.yml"), 10).replace(/^version: .*$/m, `version: ${laterVersion}`),
+  );
+  serviceResults.outsideAt10 = await serviceChecks(outside, "0.66.0", feedUrl("10"), feedUrl("later10"));
   serviceResults.insideAt10 = await serviceChecks(inside, "0.66.0", feedUrl("10"));
   serviceResults.outsideAt0 = await serviceChecks(outside, "0.66.0", feedUrl("0"));
   serviceResults.insideAt0 = await serviceChecks(inside, "0.66.0", feedUrl("0"));
   serviceResults.currentAt10 = await serviceChecks(outside, VERSION, feedUrl("10"));
   // `staged` is the release that Settings > Updates names after the automatic check.
-  assert.deepEqual(serviceResults.outsideAt10, { automatic: "up-to-date", staged: VERSION, requested: "available" });
+  assert.deepEqual(serviceResults.outsideAt10, {
+    automatic: "up-to-date",
+    staged: VERSION,
+    requested: "available",
+    later: { phase: "up-to-date", staged: laterVersion },
+  });
   assert.deepEqual(serviceResults.insideAt10, { automatic: "available", staged: null, requested: "available" });
   assert.deepEqual(serviceResults.outsideAt0, { automatic: "up-to-date", staged: null, requested: "up-to-date" });
   assert.deepEqual(serviceResults.insideAt0, { automatic: "up-to-date", staged: null, requested: "up-to-date" });
@@ -383,9 +400,10 @@ logger.info(`The staged rollout checks passed. Report: ${join(OUT, "report.json"
 
 /**
  * Starts an UpdateService for the install in `userData`, waits for its first automatic check, then
- * asks for a check as the Settings button does. Returns the phase after each check.
+ * asks for a check as the Settings button does. Returns the phase after each check. With
+ * `laterFeedUrl`, the next automatic check reads that feed.
  */
-async function serviceChecks(userData: string, version: string, feedUrl: string) {
+async function serviceChecks(userData: string, version: string, feedUrl: string, laterFeedUrl?: string) {
   const updater = new ProbeUpdater(userData, version, "linux");
   updater.setFeedURL({ provider: "generic", url: feedUrl });
   const service = new UpdateService(updater, {
@@ -395,7 +413,8 @@ async function serviceChecks(userData: string, version: string, feedUrl: string)
     beforeInstall: async () => undefined,
     platform: "linux",
     initialCheckDelayMs: 0,
-    checkIntervalMs: 3_600_000,
+    // A short interval only when the test waits for the next automatic check.
+    checkIntervalMs: laterFeedUrl ? 100 : 3_600_000,
   });
   const automatic = new Promise<UpdateStatus>((resolvePhase) => {
     service.on("status", (status) => {
@@ -409,7 +428,19 @@ async function serviceChecks(userData: string, version: string, feedUrl: string)
     const requested = await Effect.runPromise(service.checkForUpdates());
     assert.equal(requested.errorCode, null, `the requested check has no error: ${requested.message}`);
     assert.equal(requested.stagedVersion, undefined, "the requested check names no waiting release");
-    return { automatic: first.phase, staged: first.stagedVersion ?? null, requested: requested.phase };
+    const result = { automatic: first.phase, staged: first.stagedVersion ?? null, requested: requested.phase };
+    if (!laterFeedUrl) return result;
+    updater.setFeedURL({ provider: "generic", url: laterFeedUrl });
+    // The first outcome after the next automatic check starts.
+    const later = await new Promise<UpdateStatus>((resolvePhase) => {
+      let checking = false;
+      service.on("status", (status) => {
+        if (status.phase === "checking") checking = true;
+        else if (checking) resolvePhase(status);
+      });
+    });
+    assert.equal(later.errorCode, null, `the later automatic check has no error: ${later.message}`);
+    return { ...result, later: { phase: later.phase, staged: later.stagedVersion ?? null } };
   } finally {
     await Effect.runPromise(service.stop());
   }

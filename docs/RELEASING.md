@@ -720,8 +720,9 @@ nothing, and Settings > Updates says that the new version is rolling out to some
 shows that OpenBot is up to date. A check that a person asks for skips the stage and gets the
 release. These checks are **Check for updates** in Settings > Updates or in the app menu, an update
 that a member of a joined server asks for, and the recovery when an older app opens newer data.
-After such a check, the other checks and download retries of that session also skip the stage. No
-check gets a paused release (0%). `UpdateService` does this through the `isUserWithinRollout` test of electron-updater.
+After such a check, the other checks and download retries of that session also get that release. A
+later release keeps its stage. No check gets a paused release (0%). A member of a joined server does
+not see the rolling-out text, because `host-update-v1` has no field for it. `UpdateService` does this through the `isUserWithinRollout` test of electron-updater.
 
 The publish job writes the percentage into the four manifests before it uploads them, with
 `scripts/update-rollout.ts`. The default is 10. To use a different first percentage, set the

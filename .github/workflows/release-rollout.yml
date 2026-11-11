@@ -75,7 +75,9 @@ jobs:
             echo "$RELEASE_TAG is not a published release. Wait for the publish job to end." >&2
             exit 1
           fi
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.yml' --dir manifests
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.yml --pattern latest-mac.yml \
+            --pattern latest-linux.yml --pattern latest-linux-arm64.yml --dir manifests
           cp -R manifests original
 
       - name: Set up Bun
@@ -110,7 +112,9 @@ jobs:
             manifests/latest-linux.yml \
             manifests/latest-linux-arm64.yml \
             --clobber --repo "$GITHUB_REPOSITORY"
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.yml' --dir published
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.yml --pattern latest-mac.yml \
+            --pattern latest-linux.yml --pattern latest-linux-arm64.yml --dir published
           for name in latest.yml latest-mac.yml latest-linux.yml latest-linux-arm64.yml; do
             cmp "manifests/$name" "published/$name"
           done
