@@ -264,6 +264,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":

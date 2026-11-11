@@ -10,6 +10,7 @@ import {
   type InitializeResponse,
   type LoadSessionRequest,
   type LoadSessionResponse,
+  type McpServer,
   type PermissionOption,
   type PromptResponse,
   RequestError,
@@ -2585,9 +2586,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     response: PromptResponse,
     params: unknown,
   ): Effect.fn.Return<boolean, ProviderClientOperationError> {
-    const mcpLoadFailure = this.#flavor.sdkHarness?.mcpLoadFailure;
     if (
-      !mcpLoadFailure ||
+      !this.#flavor.sdkHarness ||
       thread.activeTurn !== turn ||
       turn.completing ||
       turn.stopped ||
@@ -2599,22 +2599,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       !this.#supportsSessionResume
     )
       return false;
-    const failure = mcpLoadFailure(turn.text);
-    const server = failure
-      ? thread.restore.mcpServers.find(
-          (entry) => entry.name === failure.name && !thread.mcp.servers.some((bridge) => bridge === entry),
-        )
-      : undefined;
-    if (!failure || !server) return false;
+    const failed = this.#failedMcpServer(thread, turn.text);
+    if (!failed) return false;
+    const { server, detail, started } = failed;
     const own = this.#ownMcpServerNames(thread.cwd);
-    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === failure.name);
+    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === server.name);
     this.options.reportMcpDrops?.(this.provider, [
-      {
-        name: configured?.name ?? failure.name,
-        reason: "failed_to_start",
-        detail: sourceText("error.backend.mcpServerFailedToStart", { reason: failure.reason }),
-      },
+      { name: configured?.name ?? server.name, reason: "failed_to_start", detail },
     ]);
+    // Antigravity 1.5.6 keeps the servers that a session's process started, also after a resume
+    // without them. A server that started leaves only with that process (#7228).
+    const stale = thread.transport;
+    if (started && stale) {
+      const transport = yield* this.#startSessionProcess(() => thread);
+      this.#openingSessionProcesses.delete(transport);
+      thread.transport = transport;
+      yield* stale.stop(Effect.void).pipe(Effect.ignore);
+    }
     const restore = { ...thread.restore, mcpServers: thread.restore.mcpServers.filter((entry) => entry !== server) };
     yield* this.#resumeWithTurnSettings(thread, restore, params);
     turn.text = "";
@@ -2626,6 +2627,36 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.lastChunkAt = null;
     return true;
   });
+
+  /**
+   * The server that OpenBot gave whose failure ended the turn, and the reason for the user. A server
+   * that did not start is named in the failure text. A tool schema that the agent refused is named
+   * only in the agent's log, as the tool `mcp_<server>_<tool>` (#7228). A server name can hold `_`,
+   * so the longest given name wins. `started`: the server started, as a server with tools did.
+   */
+  #failedMcpServer(
+    thread: AcpThread,
+    text: string,
+  ): { server: McpServer; detail: string; started: boolean } | undefined {
+    const harness = this.#flavor.sdkHarness;
+    const given = thread.restore.mcpServers.filter((entry) => !thread.mcp.servers.some((bridge) => bridge === entry));
+    const failure = harness?.mcpLoadFailure(text);
+    if (failure) {
+      const server = given.find((entry) => entry.name === failure.name);
+      const detail = sourceText("error.backend.mcpServerFailedToStart", { reason: failure.reason });
+      return server && { server, detail, started: false };
+    }
+    for (const tool of harness?.refusedMcpTools?.(text, this.options.argv, thread.id) ?? []) {
+      const server = given
+        .filter((entry) => tool.startsWith(`mcp_${entry.name}_`))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+      if (server) {
+        const name = tool.slice(`mcp_${server.name}_`.length);
+        return { server, detail: sourceText("error.backend.mcpToolSchemaRefused", { tool: name }), started: true };
+      }
+    }
+    return undefined;
+  }
 
   /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
   #ownMcpServerNames(cwd: string): readonly string[] {

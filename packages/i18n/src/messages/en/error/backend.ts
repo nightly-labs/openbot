@@ -250,6 +250,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
