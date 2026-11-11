@@ -154,7 +154,8 @@ export interface DeveloperInstructionOptions {
   httpMcpServers?: boolean;
   /**
    * The user's MCP servers whose tools the provider can defer. A code-mode-only Codex model gets them
-   * in `exec`, and no request names them, so the instructions do (#4468).
+   * in `exec`, and no request names them, so the instructions do (#4468). OpenCode 2.2.7 puts them
+   * in `execute`, behind its own `search(...)` (#7097).
    */
   deferredMcpServers?: readonly string[];
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
@@ -505,7 +506,11 @@ export function developerInstructions(
     } For GitHub issues, pull requests, and comments, use GitHub MCP tools when you have them, so that the OpenBot app is the author; otherwise use gh as the signed-in user.`,
     ...(options.deferredMcpServers?.length
       ? [
-          `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
+          // OpenCode 2.2.7 lists only some tools of a large server in execute. A model that searched
+          // with openbot.tool_search found none and said that they were not enabled (#7097).
+          agent.provider === "opencode"
+            ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Their tools are only in execute, and openbot.tool_search does not find them. When a tool of one is not listed there, find it with search(...) inside execute and call the path that it returns.`
+            : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
         ]
       : []),
     ...(options.httpMcpServers
