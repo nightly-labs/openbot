@@ -26,8 +26,9 @@ import type { AttachmentSourceScope } from "./attachment-gateway";
 interface BrowserUploadRoot {
   path: string;
   bytes: number;
-  /** The staged paths, in the order of the upload's sources. */
+  /** The staged paths, in the order of the upload's sources, and the size of each. */
   files: readonly string[];
+  sizes: readonly number[];
   /** Which source files it copies (see `uploadKey`), or null when it cannot be reused. */
   key: string | null;
   /** The input assignments and in-flight uploads that hold it. The directory goes when none is left. */
@@ -106,12 +107,24 @@ const MAX_BROWSER_UPLOAD_BYTES_PER_TAB = ATTACHMENT_LIMITS.totalBytes;
 const MAX_BROWSER_UPLOAD_BYTES_TOTAL = ATTACHMENT_LIMITS.totalBytes * 2;
 
 /**
+ * How long a source file must be unchanged before its copy can be reused. FAT and some network volumes
+ * keep mtime in steps of up to 2 seconds and have no ctime, so a rewrite just after a recent change can
+ * keep every value of the key. After this time, a rewrite always gets a later mtime.
+ */
+const REUSE_SETTLED_MS = 5_000;
+
+/**
  * Which files a copy holds: each name, file identity, size and change times. A rewrite that keeps size and
  * mtime still moves ctime, and a replace by rename changes the inode. Null when the file system reports no
- * file identity (some network and FAT volumes report inode 0), since two different files could then match.
+ * file identity (some network and FAT volumes report inode 0), since two different files could then match,
+ * or when a file changed too recently to tell a later rewrite apart (`REUSE_SETTLED_MS`).
  */
-function uploadKey(sources: readonly GeneratedAttachmentSource[], stats: readonly BigIntStats[]): string | null {
-  if (stats.some((file) => file.ino === 0n)) return null;
+function uploadKey(
+  sources: readonly GeneratedAttachmentSource[],
+  stats: readonly BigIntStats[],
+  now: number,
+): string | null {
+  if (stats.some((file) => file.ino === 0n || now - Number(file.mtimeMs) < REUSE_SETTLED_MS)) return null;
   return JSON.stringify(
     stats.map((file, index) => [
       basename(sources[index]?.path ?? ""),
@@ -211,7 +224,7 @@ export class BrowserUploads {
               Promise.all(sources.map((source) => source.handle.stat({ bigint: true }))),
             );
             const sizes = stats.map((metadata) => Number(metadata.size));
-            const key = uploadKey(sources, stats);
+            const key = uploadKey(sources, stats, Date.now());
             if (sizes.some((size) => size > ATTACHMENT_LIMITS.fileBytes)) {
               return yield* attachmentFailure(
                 new Error(`Each browser upload file must not exceed ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
@@ -310,7 +323,7 @@ export class BrowserUploads {
                     const root: BrowserUploadRoot | null =
                       reused ??
                       (stagingRoot
-                        ? { path: stagingRoot, bytes: stagedBytes, files: stagedPaths, key, holders: 0 }
+                        ? { path: stagingRoot, bytes: stagedBytes, files: stagedPaths, sizes, key, holders: 0 }
                         : null);
                     if (!root || this.#isStopping() || !reservation || reservation.invalidated) {
                       throw new Error("The browser document changed while files were being staged.");
@@ -321,10 +334,18 @@ export class BrowserUploads {
                     // earlier directory here would break a page that is accumulating attachments across
                     // selections -- it reads a file that is no longer there. The earlier copies stay until the
                     // tab closes, and their bytes keep counting against the quotas.
-                    roots.set(inputId, [...(roots.get(inputId) ?? []), root]);
+                    // An input that already holds this root gains nothing from a second entry, so a retry of the
+                    // same files does not grow the list.
+                    const held = roots.get(inputId) ?? [];
+                    if (!held.includes(root)) {
+                      roots.set(inputId, [...held, root]);
+                      root.holders += 1;
+                    }
                     this.#roots.set(tabId, roots);
-                    root.holders += 1;
-                    if (root.key !== null && !this.#reusable.has(root.key)) this.#reusable.set(root.key, root);
+                    // Only a new copy is indexed: a reused root that `#holdReusable` dropped must stay dropped.
+                    if (root !== reused && root.key !== null && !this.#reusable.has(root.key)) {
+                      this.#reusable.set(root.key, root);
+                    }
                     // Ownership moves from the reservation to the root here: the `finally` below must not delete
                     // a directory the input is now reading from.
                     reservation.root = null;
@@ -488,7 +509,7 @@ export class BrowserUploads {
     if (!root) return null;
     root.holders += 1;
     const whole = yield* attachmentCall(() => Promise.all(root.files.map((file) => stat(file)))).pipe(
-      Effect.map((copies) => copies.reduce((total, copy) => total + copy.size, 0) === root.bytes),
+      Effect.map((copies) => copies.every((copy, index) => copy.size === root.sizes[index])),
       Effect.catch(() => Effect.succeed(false)),
     );
     if (whole) return root;
