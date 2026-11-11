@@ -137,10 +137,11 @@ const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
 /**
  * How long a start may take when it holds back no other provider: the first start of a CLI that was
- * just installed, a start that follows a sign-in or a key change, and each start of a provider that
- * did not finish a start in the request timeout. The Windows Gemini server unpacks about 310 MB at
- * every start, and an antivirus scan of the unpacked files can take minutes on a slow computer
- * (#1275, #2311). The Intel macOS server unpacks at every start too, for more than this (#3532), so
+ * just installed, a start that follows a sign-in or a key change, the wake of a provider stopped when
+ * idle, the start of an agent's own process, and each start of a provider that did not finish a start
+ * in the request timeout. The Windows Gemini server unpacks about 310 MB at every start, and an
+ * antivirus scan of the unpacked files can take minutes on a slow computer (#1275, #2311, #6961).
+ * The Intel macOS server unpacks at every start too, for more than this (#3532), so
  * each start that does not answer in time waits twice as long as the one before. A start in the
  * request timeout stopped it while it unpacked, and the next start unpacked again. A launch keeps
  * the request timeout: it waits for every provider, and one CLI that hangs would hold chat back for
@@ -1466,8 +1467,13 @@ export class ProviderRuntime implements ProviderPort {
     yield* providerStep(() => this.requireProviderOn(provider));
     this.#lastUsed.set(provider, Date.now());
     if (this.#clients.has(provider)) return;
+    // A wake starts one provider for one use, so it waits as a long start does. The Windows Gemini
+    // server unpacks at each start, and a wake in the request timeout failed the message (#6961).
     const wake = this.#released.has(provider);
-    yield* this.#startProvider(provider, wake ? { notifyReady: false } : {});
+    yield* this.#startProvider(
+      provider,
+      wake ? { notifyReady: false, startTimeoutMs: this.#longStartWaitMs(provider) } : {},
+    );
     if (this.#clients.has(provider)) return;
     const status = this.#status.providers?.find((candidate) => candidate.id === provider);
     return yield* new ProviderOperationFailed({
@@ -1520,7 +1526,12 @@ export class ProviderRuntime implements ProviderPort {
   readonly #startProvider = Effect.fn("ProviderRuntime.startProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
-    options: { notifyReady?: boolean; preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean },
+    options: {
+      notifyReady?: boolean;
+      preserveCheckErrors?: boolean;
+      refreshRuntimeInBackground?: boolean;
+      startTimeoutMs?: number;
+    },
     phase: "starting" | "restarting" = "starting",
   ) {
     if (this.#off.has(provider) || (provider === "acp" && this.#removingCustomRuntime)) return;
@@ -2553,9 +2564,9 @@ export class ProviderRuntime implements ProviderPort {
       });
     const disposals = this.#disposals;
     const accountEnvironment = own.account ? this.#providerAccounts?.environment(own.account) : undefined;
-    const slowStartTimeoutMs = this.#slowStarts.get(provider) ?? this.#defaultStartTimeoutMs(provider);
+    // A turn starts this process for one agent, so it waits as a long start does (#6961).
     const { client } = yield* this.#authenticateClient(provider, cli, {
-      ...(slowStartTimeoutMs === undefined ? {} : { startTimeoutMs: slowStartTimeoutMs }),
+      startTimeoutMs: this.#longStartWaitMs(provider),
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
     });
