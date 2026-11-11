@@ -18,4 +18,20 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot’u indir",
   "startup.newerDataGuide": "Kılavuzu aç",
   "startup.newerDataQuit": "Çık",
+  "startup.recoveryWindowTitle": "OpenBot kurtarma",
+  "startup.recoveryTitle": "OpenBot açılmadı",
+  "startup.recoveryBody": {
+    one: "OpenBot {version}, açılmadan önce art arda {count} kez durdu. Yerel verileriniz sıfırlanmadı veya üzerine yazılmadı.",
+    other:
+      "OpenBot {version}, açılmadan önce art arda {count} kez durdu. Yerel verileriniz sıfırlanmadı veya üzerine yazılmadı.",
+  },
+  "startup.recoveryHint":
+    "Yeniden deneyin veya açılan son sürümü yükleyin. Yardım almak için tanılamayı dışa aktarın ve dosyayı raporunuzla gönderin.",
+  "startup.recoveryRetry": "Yeniden dene",
+  "startup.recoveryPreviousVersion": "Önceki sürümü indir",
+  "startup.recoveryExportDiagnostics": "Tanılamayı dışa aktar",
+  "startup.recoveryOpenDataFolder": "Veri klasörünü aç",
+  "startup.recoveryQuit": "Çık",
+  "startup.recoveryDiagnosticsSaved": "Tanılama dosyası kaydedildi.",
+  "startup.recoveryActionFailed": "OpenBot bu işlemi yapamadı.",
 } as const satisfies PartialTranslation<typeof source>;

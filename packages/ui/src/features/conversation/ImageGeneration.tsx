@@ -15,6 +15,11 @@ export interface ImageGenerationProps {
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary | undefined;
   error?: string | undefined;
+  /**
+   * The image file is on its way, such as a file that the web client reads from the host. The stage
+   * shows its dots at the size of the image, so the chat does not grow when the image shows.
+   */
+  loading?: boolean | undefined;
   /** `origin` is the clicked image, for a viewer that zooms out of it. */
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
@@ -43,7 +48,8 @@ export function ImageGeneration(props: ImageGenerationProps) {
     },
   );
 
-  const previewUnavailable = () => props.status === "completed" && !props.attachment?.previewUrl;
+  const previewUnavailable = () =>
+    props.status === "completed" && !props.attachment?.previewUrl && props.loading !== true;
   const isAttachment = () => props.presentation === "attachment";
   const hasImage = () => props.status === "completed" && Boolean(props.attachment?.previewUrl) && !previewError();
   const hasFailure = () =>
@@ -98,7 +104,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
           role="img"
           aria-label={hasImage() ? undefined : label()}
           aria-hidden={hasImage() ? "true" : undefined}
-          aria-busy={props.status === "generating" ? "true" : undefined}
+          aria-busy={props.status === "generating" || props.loading === true ? "true" : undefined}
         >
           <Show
             when={!hasFailure()}
@@ -156,7 +162,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
           </Button>
         </Show>
       </div>
-      <Show when={!hasImage()}>
+      <Show when={!hasImage() && props.loading !== true}>
         <div class="image-generation-meta">
           <span class="image-generation-label">{label()}</span>
           <Show when={props.prompt}>

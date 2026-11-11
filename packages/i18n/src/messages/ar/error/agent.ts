@@ -9,6 +9,10 @@ export const messages = {
   "error.agent.toolRequestInvalid": "وسائط اكتشاف الأدوات غير صالحة. استخدم المخطط المُعلَن واسم الأداة المؤهَّل الأصلي.",
   "error.agent.toolCallArgumentsNotObject":
     "لم تعمل الأداة. في tool_call يجب أن تكون arguments كائن JSON وليست نصًا. أرسل الاستدعاء مرة أخرى مع arguments ككائن.",
+  "error.agent.toolCallDiscoveryTool":
+    "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "جدول المهمة الدورية غير صالح: {detail} صحّح الجدول وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
   "error.agent.accessLocalOnly": "لا يمكن تغيير وصول الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.duplicateCleanupFailed": "فشل تكرار الوكيل وتعذّرت إزالة النسخة غير المكتملة.",

@@ -61,6 +61,7 @@ export const messages = defineMessages("agent", {
   "agent.dock.writing": "{name} is writing",
   "agent.dock.empty": "No messages yet. Write to {name}.",
   "agent.dock.settings": "Dock settings",
+  "agent.dock.hide": "Hide the dock",
   "agent.dock.strip.show": "Show the agent dock",
   "agent.dock.strip.asks": "Show the agent dock. An agent asks you something",
   "agent.dock.search": "Search agents and channels",

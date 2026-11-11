@@ -1071,13 +1071,27 @@ export class ProviderRuntime implements ProviderPort {
             if (!agentProviderDescriptor(provider).reportsUsage) return null;
             // A Codex API-key login has no plan usage: Codex refuses the read.
             if (provider === "codex" && this.#accounts.get(provider)?.type === "apiKey") return null;
-            const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
-            if (kept && !usageWindowHasReset(kept)) return kept;
-            if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return null;
-            if (!this.#clients.has(provider)) yield* this.ensureProvider(provider);
-            const client = this.#clients.get(provider);
-            if (!client) return null;
-            usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
+            const released = this.#released.has(provider) && !this.#clients.has(provider);
+            const cli = this.#cli.get(provider);
+            const accounts = ProviderAccounts.support(provider);
+            if (released && !this.#usageUnreported.has(provider) && cli && accounts && !accounts.usageLeavesSession) {
+              // The CLI stopped when idle. A short process reads the usage, as for an account after the first,
+              // so use outside OpenBot shows and the CLI stays stopped (#6818). The gate paces these reads.
+              usage = yield* Effect.acquireUseRelease(
+                this.#authenticateClient(provider, cli, { interruptibleStart: true }),
+                ({ client }) => this.#refreshUsage(client, defaultUsageModel(provider), false),
+                ({ client }) =>
+                  client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
+              ).pipe(deadline);
+            } else {
+              const kept = released ? this.#lastUsage.get(provider) : undefined;
+              if (kept && !usageWindowHasReset(kept)) return kept;
+              if (released && this.#usageUnreported.has(provider)) return null;
+              if (!this.#clients.has(provider)) yield* this.ensureProvider(provider);
+              const client = this.#clients.get(provider);
+              if (!client) return null;
+              usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
+            }
           }
           const limit = usage.limits[0];
           if (!limit || (!limit.primary && !limit.secondary)) {

@@ -38,6 +38,7 @@ const PRESENTATION: AgentDockPresentation = {
   edge: "left",
   autoHide: true,
   edgeStrip: false,
+  sizePercent: 85,
   offsets: [{ displayId: 69733382, offset: 0 }],
   seats: [
     { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 } },
@@ -189,6 +190,27 @@ describe("agent dock decoding", () => {
       url: "https://example.com",
     });
     expect(decodeAgentDockAction({ type: "open-settings" })).toEqual({ type: "open-settings" });
+    expect(decodeAgentDockAction({ type: "hide" })).toEqual({ type: "hide" });
+    const move = {
+      type: "move",
+      serverId: "local",
+      seat: { kind: "agent", id: "agent-1" },
+      before: { kind: "channel", id: "channel-1" },
+    };
+    expect(decodeAgentDockAction(move)).toEqual(move);
+    const moveToEnd = { type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" }, before: null };
+    expect(decodeAgentDockAction(moveToEnd)).toEqual(moveToEnd);
+    expect(() =>
+      decodeAgentDockAction({ type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" } }),
+    ).toThrow("Invalid agent dock action.");
+    expect(() =>
+      decodeAgentDockAction({
+        type: "move",
+        serverId: "local",
+        seat: { kind: "agent", id: "agent-1" },
+        before: { kind: "group", id: "group-1" },
+      }),
+    ).toThrow("Invalid agent dock action.");
     expect(decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "agent-1" })).toEqual({
       type: "open-window",
       serverId: "local",

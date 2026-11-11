@@ -40,6 +40,7 @@ import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machi
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import { PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -56,6 +57,7 @@ import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-ta
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
@@ -93,6 +95,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_DEFAULT_ROUTES.settings,
   PROVIDER_USE_ROUTES.list,
   LOCAL_SERVERS_ROUTES.list,
@@ -113,6 +116,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PUSH_NOTIFICATION_THREADS_ROUTES.set,
   STORAGE_ROUTES.usage,
   STORAGE_DISK_ROUTES.disk,
+  STORAGE_CHANNEL_ROUTES.files,
   MACHINE_RESOURCES_ROUTES.metrics,
   MACHINE_RESOURCES_ROUTES.alerts,
   BACKGROUND_PROCESSES_ROUTES.list,

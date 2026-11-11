@@ -26,6 +26,7 @@ import {
   CONTEXT_RESET_ITEM_TYPE,
   channelRoutingConversationEventItemType,
   isContextResetMarker,
+  withBrowserMember,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText } from "@openbot/i18n/source";
@@ -37,6 +38,11 @@ function storedPicture(channel: Channel | undefined): Pick<Channel, "icon" | "im
     ...(channel?.icon === undefined ? {} : { icon: channel.icon }),
     ...(channel?.imageUrl === undefined ? {} : { imageUrl: channel.imageUrl }),
   };
+}
+
+/** A draft without `browser` keeps the stored setting, as the service does. */
+function storedBrowser(channel: Channel | undefined): Pick<Channel, "browser"> {
+  return channel?.browser === undefined ? {} : { browser: channel.browser };
 }
 
 /** A channel that exists when the preview starts, with its history. */
@@ -98,6 +104,7 @@ export function createMockChannels(
               ...storedPicture(channels.get(input.channelId)),
               // A draft without `isolated` keeps the stored value, as the service does.
               ...(channels.get(input.channelId)?.isolated ? { isolated: true } : {}),
+              ...storedBrowser(channels.get(input.channelId)),
               ...input.draft,
               id: input.channelId,
               revision: channels.get(input.channelId)?.revision ?? 0,
@@ -105,7 +112,8 @@ export function createMockChannels(
               createdAt: channels.get(input.channelId)?.createdAt ?? new Date().toISOString(),
             }
           : requireChannel(input.channelId);
-      channel = { ...channel, revision: channel.revision + 1 };
+      // A browser member that left the channel turns the setting to no member, as the service does.
+      channel = withBrowserMember({ ...channel, revision: channel.revision + 1 });
       if (input.type === "archive" || input.type === "restore") channel.archived = input.type === "archive";
       const work = tasks.get(channel.id) ?? [];
       if (input.type === "archive")

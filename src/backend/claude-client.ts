@@ -106,6 +106,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
+import { untakenRunId } from "./message-run-ids";
 import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
@@ -407,6 +408,8 @@ interface ThreadRuntime {
   backgroundTasks: number;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
+  /** The uuids of the messages that this process took. The CLI does not run one of them again. */
+  promptIds: Set<string>;
   /**
    * The uuid of the message that the CLI's next turn of its own answers, such as a steer that came
    * after the turn's last request. Its history names the turn by that uuid (#3365).
@@ -452,6 +455,9 @@ const CLAUDE_BACKGROUND_QUIET_RELEASE_MS = 30 * 60_000;
  * the stop otherwise holds the agent's queue until OpenBot restarts (#6348).
  */
 const CLAUDE_STOP_CONFIRM_MS = 10_000;
+
+/** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
+const TAKEN_PROMPT_LIMIT = 1_000;
 
 interface ClaudeStreamMessage {
   type: string;
@@ -1252,7 +1258,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
-      usable?.flatMap((server) => (server.proxied ? [server.config.name] : [])) ?? [],
+      usable?.flatMap((server) =>
+        server.proxied || (server.url && server.config.headers.length > 0) ? [server.config.name] : [],
+      ) ?? [],
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
@@ -1430,6 +1438,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       lastOutputAt: Date.now(),
+      promptIds: new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
@@ -1508,7 +1517,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
     const clientId = getString(params, "clientUserMessageId");
     const requestedTurnId = getString(params, "clientTurnId") ?? clientId;
-    const turnId = requestedTurnId && isUuid(requestedTurnId) ? requestedTurnId : randomUUID();
+    // A message that runs again in this process, such as after a move to a backup model, gets a new
+    // turn: the CLI does not run a uuid that it took (#6676).
+    const turnId = promptUuid(runtime, requestedTurnId);
     const text = readInputText(params);
     // The CLI can start a turn of its own while the model or effort changes above.
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
@@ -1519,6 +1530,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
     const context = this.#turnContext.take(threadId, text.startsWith("/"));
+    takePrompt(runtime, turnId);
     runtime.input.push({
       type: "user",
       message: {
@@ -1601,7 +1613,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new Error("The active Claude turn changed before steering was accepted."));
     }
     const clientId = getString(params, "clientUserMessageId");
-    const messageId = clientId && isUuid(clientId) ? clientId : randomUUID();
+    const messageId = promptUuid(runtime, clientId);
+    takePrompt(runtime, messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },
@@ -1733,9 +1746,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
       // The level can arrive after the turn that started the work ended, so it holds or frees the idle timer.
+      // When the work ends, the CLI starts a turn of its own to answer the result. Until that turn shows
+      // output, the idle limit must not close the thread (#6557).
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
-        else if (before > 0 && runtime.backgroundTasks === 0) yield* this.#threads.markIdle(runtime);
+        else if (before > 0 && runtime.backgroundTasks === 0) this.#threads.awaitOwnTurn(runtime);
       }
       return;
     }
@@ -2703,7 +2718,10 @@ export function claudeBrowserTools(call: (name: string, args: unknown) => Promis
  * folder, and for 15 minutes each new process skips a server of that name without a connection,
  * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
  * which never answers 401, so their marks are from before the sign-in, when the row's own URL
- * refused the CLI. The file is the CLI's own: a missing or unknown file stays as it is.
+ * refused the CLI. The names also include the http rows that send headers the user typed, such as
+ * an API key: a mark can be from before the key, and the CLI keeps it for the new key too (#6556).
+ * When the key is wrong, the CLI asks the server once and marks the row again. The file is the
+ * CLI's own: a missing or unknown file stays as it is.
  */
 const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
   function* (configDirectory: string, names: readonly string[]) {
@@ -3172,6 +3190,21 @@ function normalizeClaudeModel(model: string): string {
 
 function normalizeClaudeEffort(effort: string): ClaudeEffort {
   return isOneOf(CLAUDE_EFFORTS, effort) ? effort : "high";
+}
+
+/** The uuid of a message: its own, a run id when this process took it already, or a new one. */
+function promptUuid(runtime: ThreadRuntime, requested: string | null | undefined): UUID {
+  const run = requested && isUuid(requested) ? untakenRunId(requested, runtime.promptIds) : null;
+  return run && isUuid(run) ? run : randomUUID();
+}
+
+/** Keeps the uuid of a message that the process took. A message runs again soon, so the oldest go. */
+function takePrompt(runtime: ThreadRuntime, uuid: string): void {
+  runtime.promptIds.add(uuid);
+  for (const old of runtime.promptIds) {
+    if (runtime.promptIds.size <= TAKEN_PROMPT_LIMIT) break;
+    runtime.promptIds.delete(old);
+  }
 }
 
 function isUuid(value: string): value is UUID {

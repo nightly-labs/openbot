@@ -7,6 +7,7 @@ import {
   type StorageDisk,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
+import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
@@ -20,6 +21,11 @@ import { type FilesPort, filesPort } from "./files-port";
 /** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
 export function serverHasStorage(server: ServerSummary | undefined): server is ServerSummary {
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
+}
+
+/** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */
+export function serverHasChannelStorage(server: ServerSummary | undefined): server is ServerSummary {
+  return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CHANNEL_CAPABILITY)));
 }
 
 const GB = 1024 ** 3;

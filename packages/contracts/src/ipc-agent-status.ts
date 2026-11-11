@@ -376,6 +376,14 @@ export interface HostProviderAccounts {
   agents: { agentId: string; accountId: string }[];
 }
 
+/**
+ * The models that each account after the first serves and the provider's own sign-in does not
+ * (`provider-account-models-v1`). The client puts them on `ProviderAccountStatus.models`.
+ */
+export interface HostProviderAccountModels {
+  providers: { provider: AgentProviderId; accounts: { accountId: string; models: AgentModelOption[] }[] }[];
+}
+
 /** Moves an agent of a joined server to an account of its provider. Null is the provider's own sign-in. */
 export interface SetAgentProviderAccountInput {
   agentId: string;

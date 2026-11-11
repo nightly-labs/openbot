@@ -10,6 +10,10 @@ export const messages = {
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
   "error.agent.toolCallArgumentsNotObject":
     "De tool is niet uitgevoerd. In tool_call moet arguments een JSON-object zijn, geen tekst. Stuur de aanroep opnieuw met arguments als object.",
+  "error.agent.toolCallDiscoveryTool":
+    "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "De planning van de routine is ongeldig: {detail} Corrigeer de planning en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
   "error.agent.accessLocalOnly": "Toegang van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.duplicateCleanupFailed":

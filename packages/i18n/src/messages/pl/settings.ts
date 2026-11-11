@@ -96,6 +96,8 @@ export const messages = {
   "settings.sendShortcut.title": "Skrót wysyłania",
   "settings.sendShortcut.description":
     "Wybierz klawisze, które wysyłają wiadomość na tym urządzeniu i w tej przeglądarce.",
+  "settings.chatOrder.description":
+    "Wybierz, gdzie pasek boczny pokazuje nieprzeczytane czaty na tym urządzeniu. Ręcznie wyłącza grupę Nieprzeczytane.",
   "settings.sendShortcut.enter": "Enter wysyła",
   "settings.sendShortcut.modEnterMac": "⌘Enter wysyła",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter wysyła",
@@ -261,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Przeciągnij dok w górę lub w dół, aby przesunąć go wzdłuż krawędzi.",
   "settings.agentDock.edge.right": "Prawa",
   "settings.agentDock.edge.left": "Lewa",
+  "settings.agentDock.size.title": "Rozmiar doku",
+  "settings.agentDock.size.description":
+    "Przeciągnij, aby zmienić rozmiar doku nad innymi aplikacjami. W oknie głównym dok ma rozmiar interfejsu.",
   "settings.agentDock.autoHide.title": "Ukrywaj, gdy nieużywany",
   "settings.agentDock.autoHide.description": "Dok chowa się w krawędzi. Przesuń wskaźnik do krawędzi, aby go pokazać.",
   "settings.agentDock.edgeStrip.title": "Pokazuj pasek przy krawędzi",
@@ -529,6 +534,8 @@ export const messages = {
   "settings.updates.status.ready": "Gotowe: {target}. Uruchom ponownie, aby zastosować.",
   "settings.updates.status.installing": "Ponowne uruchamianie, aby zastosować: {target}…",
   "settings.updates.status.upToDate": "OpenBot jest aktualny w kanale Stabilny.",
+  "settings.updates.status.staged":
+    "{target} trafia najpierw do części komputerów. Sprawdź aktualizacje, aby pobrać tę wersję teraz.",
   "settings.updates.status.checkFailed": "OpenBot nie mógł sprawdzić aktualizacji. Spróbuj ponownie.",
   "settings.updates.status.unsupported": "Aktualizacje są niedostępne w tej kompilacji.",
   "settings.updates.actionFailed": "Nie udało się zaktualizować OpenBot.",

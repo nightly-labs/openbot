@@ -96,6 +96,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "De link is in de standaardbrowser geopend.",
   "settings.sendShortcut.title": "Sneltoets voor verzenden",
   "settings.sendShortcut.description": "Kies de toetsen die een bericht verzenden op dit apparaat en in deze browser.",
+  "settings.chatOrder.description":
+    "Kies waar de zijbalk ongelezen chats op dit apparaat toont. Handmatig zet de groep Ongelezen uit.",
   "settings.sendShortcut.enter": "Enter verstuurt",
   "settings.sendShortcut.modEnterMac": "⌘Enter verstuurt",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter verstuurt",
@@ -259,6 +261,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Sleep het dock omhoog of omlaag om het langs de rand te verplaatsen.",
   "settings.agentDock.edge.right": "Rechts",
   "settings.agentDock.edge.left": "Links",
+  "settings.agentDock.size.title": "Dockgrootte",
+  "settings.agentDock.size.description":
+    "Sleep om de grootte van de dock boven andere apps te wijzigen. In het hoofdvenster volgt de dock de interfacegrootte.",
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",
@@ -514,6 +519,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} is klaar. Start opnieuw om toe te passen.",
   "settings.updates.status.installing": "Opnieuw starten om {target} toe te passen…",
   "settings.updates.status.upToDate": "OpenBot is up-to-date op het kanaal Stabiel.",
+  "settings.updates.status.staged": "{target} wordt gefaseerd uitgerold. Zoek naar updates om het nu te krijgen.",
   "settings.updates.status.checkFailed": "OpenBot kan niet controleren op updates. Probeer het opnieuw.",
   "settings.updates.status.unsupported": "Updates zijn niet beschikbaar in deze build.",
   "settings.updates.actionFailed": "Kan OpenBot niet bijwerken.",

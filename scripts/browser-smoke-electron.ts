@@ -1037,8 +1037,8 @@ async function main(): Promise<void> {
       tabId: v2Tab.id,
       target: { kind: "ref", ref: String(staleFrameTarget.ref), revision: staleFrameRevision },
     });
-    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Stale browser reference")) {
-      throw new Error("V2 iframe navigation did not invalidate revision-bound references.");
+    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Element reference is no longer available")) {
+      throw new Error("V2 iframe navigation did not invalidate the references of that frame.");
     }
     const semanticChangeSnapshot = await runCauseEffect(browser.snapshot(v2Tab.id));
     const semanticChangeTarget = semanticChangeSnapshot.elements.find((element) => element.name === "SPA");

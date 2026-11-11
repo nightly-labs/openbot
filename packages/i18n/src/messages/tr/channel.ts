@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Bellekleri bu kanalda tut",
   "channel.settings.isolatedDescription":
     "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",
+  "channel.settings.browser": "Tarayıcı",
+  "channel.settings.browserEveryone": "Tüm üyeler",
+  "channel.settings.browserNone": "Hiç kimse",
   "channel.settings.memoryCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "channel.settings.newConversation.title": "Yeni konuşma",
   "channel.settings.newConversation.description": "Üyeler önceki mesajları unutur. Kanal ayarları kalır.",

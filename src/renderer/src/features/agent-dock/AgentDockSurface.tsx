@@ -19,7 +19,12 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowShape } from "../../window-shape";
-import { AGENT_DOCK_STRIP_REST, AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip } from "./AgentDockEdgeStrip";
+import {
+  AGENT_DOCK_STRIP_FEEL,
+  AGENT_DOCK_STRIP_REST,
+  AGENT_DOCK_STRIP_WIDTH,
+  AgentDockEdgeStrip,
+} from "./AgentDockEdgeStrip";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
@@ -32,6 +37,12 @@ const EDGE_STRIP = 4;
  * the dock: the pointer goes to the apps outside it, and nothing outside it shows.
  */
 const SHAPED_WINDOW = currentDevicePlatform() === "linux";
+/**
+ * Windows gives this window the pointer moves only in the zone that it reports: each forwarded move holds
+ * the cursor of the whole computer until main has it. The zone is the dock parts and the strip, out to
+ * the distance where the strip feels the pointer.
+ */
+const POINTER_ZONE_WINDOW = currentDevicePlatform() === "win32";
 
 /**
  * The agent dock in its own window at the left or right edge of the screen. The main renderer owns the
@@ -125,27 +136,41 @@ export function AgentDockSurface() {
    * Linux: tells main the parts of the window that take the pointer. The whole window while the dock
    * moves or a menu is open, so that nothing is cut off; the strip at the edge while the dock is hidden.
    * With the edge strip on, only the visible strip at rest takes the pointer: the pointer goes past it elsewhere.
+   * Windows: tells main the same parts, with all of the strip and the distance where the strip feels the
+   * pointer, as the zone that gets the pointer moves.
    */
   function syncShape() {
-    if (!SHAPED_WINDOW) return;
+    if (!SHAPED_WINDOW && !POINTER_ZONE_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
       const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
       const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
       const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
+      // The strip feels the pointer along all of the dock body.
+      const rest = POINTER_ZONE_WINDOW ? 1 : AGENT_DOCK_STRIP_REST;
       parts.push(
         body
           ? {
               x,
-              y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2),
+              y: Math.round(body.top + (body.height * (1 - rest)) / 2),
               width,
-              height: Math.round(body.height * AGENT_DOCK_STRIP_REST),
+              height: Math.round(body.height * rest),
             }
           : { x, y: 0, width, height: window.innerHeight },
       );
     }
-    const shape = windowShape(parts);
+    const feel = AGENT_DOCK_STRIP_FEEL;
+    const shape = windowShape(
+      POINTER_ZONE_WINDOW
+        ? parts.map((part) => ({
+            x: part.x - feel,
+            y: part.y - feel,
+            width: part.width + feel * 2,
+            height: part.height + feel * 2,
+          }))
+        : parts,
+    );
     const key = JSON.stringify(shape);
     if (key === sentShape) return;
     sentShape = key;
@@ -279,7 +304,7 @@ export function AgentDockSurface() {
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={
-              SHAPED_WINDOW
+              SHAPED_WINDOW || POINTER_ZONE_WINDOW
                 ? (parts) => {
                     dockShape = parts;
                     syncShape();
@@ -306,6 +331,15 @@ export function AgentDockSurface() {
             onRemove={(seat) =>
               void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
             }
+            onMove={async (seat, before) => {
+              // A failed move puts the seats back in the dock.
+              await perform({
+                type: "move",
+                serverId: server,
+                seat: contractSeat(seat),
+                before: before ? contractSeat(before) : null,
+              });
+            }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
               const clientMessageId =
@@ -337,6 +371,7 @@ export function AgentDockSurface() {
             }
             onOpenLink={(url) => void perform({ type: "open-link", url }).catch(() => undefined)}
             onOpenSettings={() => void perform({ type: "open-settings" }).catch(() => undefined)}
+            onHide={() => void perform({ type: "hide" }).catch(() => undefined)}
             results={results()}
             onShelfChange={(shown) => {
               // A result that came shows the hidden dock until the shelf is empty.

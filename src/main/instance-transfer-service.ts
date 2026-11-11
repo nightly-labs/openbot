@@ -28,6 +28,7 @@ import {
   AVATAR_SEED_PATTERN,
   type AvatarImageInput,
   type Channel,
+  type ChannelBrowser,
   type ChannelCommand,
   type ChannelMemory,
   type ChannelRoutine,
@@ -48,6 +49,7 @@ import {
   type InstanceTransferSummary,
   isAgentImportKey,
   isAvatarColor,
+  isChannelBrowser,
   isChannelDraft,
   isChannelIcon,
   isCustomProviderContextWindow,
@@ -507,6 +509,7 @@ export class InstanceTransferService {
         members,
         lead: channel.leadAgentId ? (keys.get(channel.leadAgentId) ?? null) : null,
         ...(channel.isolated === undefined ? {} : { isolated: channel.isolated }),
+        ...(channel.browser ? { browser: transferBrowser(channel.browser, (agentId) => keys.get(agentId)) } : {}),
         ...(channel.icon ? { icon: channel.icon } : {}),
         image,
         archived: channel.archived,
@@ -1191,6 +1194,14 @@ export class InstanceTransferService {
       members,
       leadAgentId,
       ...(source.isolated === undefined ? {} : { isolated: source.isolated }),
+      // A value this version cannot read, such as a kind from a later version, gives the browser to no member.
+      ...(source.browser === undefined
+        ? {}
+        : {
+            browser: isChannelBrowser(source.browser)
+              ? transferBrowser(source.browser, (key) => agentIds.get(key))
+              : { kind: "none" as const },
+          }),
       ...(isChannelIcon(source.icon) ? { icon: source.icon } : {}),
     };
     if (!isChannelDraft(draft)) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
@@ -1758,4 +1769,14 @@ function bounded(warnings: string[]): string[] {
 function message(error: unknown): string {
   const text = error instanceof Error ? error.message : "The import failed.";
   return text.slice(0, AGENT_IMPORT_LIMITS.message);
+}
+
+/**
+ * The browser rule with its member mapped between agent ids and archive keys. A named member that is not
+ * in the file, or that the user did not import, gives the browser to no member: the rule never opens up.
+ */
+function transferBrowser(browser: ChannelBrowser, map: (id: string) => string | undefined): ChannelBrowser {
+  if (browser.kind !== "member") return browser;
+  const agentId = map(browser.agentId);
+  return agentId ? { kind: "member", agentId } : { kind: "none" };
 }

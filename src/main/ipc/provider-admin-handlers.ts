@@ -13,6 +13,7 @@ import {
   type AgentStatus,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
+  decodeHostProviderAccountModels,
   decodeHostProviderAccountUsage,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
@@ -24,6 +25,7 @@ import {
   type PasteProviderRelaySignInInput,
   type ProviderRelaySignInStatus,
   type SubmitProviderCodeLoginInput,
+  withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -36,6 +38,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -379,7 +385,36 @@ export function providerAdminIpcHandlers({
       cancelHostSignIn: hostSignIn((provider, serverId) =>
         remoteChange(serverId, PROVIDER_HOST_SIGN_IN_ROUTES.cancel, { provider }),
       ),
-      accounts: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.list, decodeHostProviderAccountsFromHost),
+      // A host with `provider-account-models-v1` also gives the models of each account after the
+      // first. When that read fails, the accounts come without them, as from an older host.
+      accounts: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (serverId) => {
+          requireAccounts(serverId);
+          const list = remoteServers.request(
+            serverId,
+            PROVIDER_ACCOUNTS_ROUTES.list,
+            decodeHostProviderAccountsFromHost,
+            {
+              method: "POST",
+              body: {},
+            },
+          );
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY))
+            return runCauseEffect(list);
+          const models = remoteServers
+            .request(serverId, PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {
+              method: "POST",
+              body: {},
+            })
+            .pipe(Effect.orElseSucceed(() => null));
+          return runCauseEffect(
+            Effect.all([list, models], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra]) => (extra ? withHostProviderAccountModels(accounts, extra) : accounts)),
+            ),
+          );
+        },
+      }),
       accountUsage: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.usage, decodeHostProviderAccountUsage),
       startAccountSignIn: accountsRequest(
         parseConnectProviderAccountInput,

@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.takeOver": "Intervenir",
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
   "browser.error.openAddress": "No se pudo abrir la dirección en esta pestaña.",
+  "browser.error.channelNoBrowserMember": "Ningún miembro puede abrir una pestaña nueva en este canal.",
   "browser.error.closeTab": "No se pudo cerrar la pestaña del navegador.",
   "browser.error.reloadTab": "No se pudo recargar la pestaña del navegador.",
   "browser.error.stopLoading": "No se pudo detener la carga de la página.",

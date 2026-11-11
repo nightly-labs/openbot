@@ -854,8 +854,8 @@ A plan can serve models that the first account's does not, so the account check 
 `model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
 `models` only the ones that the provider's catalogue does not list: the picker shows the catalogue on the
 account's entry, with the models an admin turned off left out, and then these. `updateAgent` accepts a model
-of the agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it, so a joined server
-still shows the provider's catalogue for each account.
+of the agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it;
+`provider-account-models-v1` does, so the web client, a joined desktop and mobile show these models for the account.
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the

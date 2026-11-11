@@ -8,6 +8,7 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 
 import {
   assertStorageUsageScope,
+  decodeChannelStorageUsage,
   decodeMachineMetrics,
   decodeStorageDisk,
   decodeStorageUsage,
@@ -24,6 +25,10 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  STORAGE_CHANNEL_CAPABILITY,
+  STORAGE_CHANNEL_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -93,6 +98,16 @@ export function storageIpcHandlers({
       getUsage: scopedHandler(parseGetStorageUsageInput, {
         local: (parsed) => runCauseEffect(storage.usage(parsed)),
         remote: async (parsed, serverId) => {
+          if (parsed.scope === "channel") {
+            if (!remoteServers.supportsCapability(serverId, STORAGE_CHANNEL_CAPABILITY)) return null;
+            const usage = await runCauseEffect(
+              remoteServers.request(serverId, STORAGE_CHANNEL_ROUTES.files, decodeChannelStorageUsage, {
+                method: "POST",
+                body: { channelId: parsed.channelId, ...(parsed.force === undefined ? {} : { force: parsed.force }) },
+              }),
+            );
+            return assertStorageUsageScope(usage, parsed);
+          }
           if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY)) return null;
           const usage = await runCauseEffect(
             remoteServers.request(serverId, STORAGE_ROUTES.usage, decodeStorageUsage, {

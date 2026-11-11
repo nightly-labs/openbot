@@ -815,11 +815,15 @@ export class ConversationRuntime {
     return this.#threadToAgent.get(externalThreadId);
   }
 
-  /** Model retrieval must never fall back to the agent's personal conversation. */
+  /**
+   * Model retrieval must never fall back to the agent's personal conversation. The scope lasts as long
+   * as the client runs the session: `unloadAgentThreads` only reloads the instructions before the next
+   * turn, and the running turn must keep its history tools (#6584).
+   */
   historyScope(externalThreadId: string, client: AgentClient) {
     const agentId = this.#threadToAgent.get(externalThreadId);
     const threadId = this.#publicThreads.get(externalThreadId);
-    return agentId && threadId && this.#loadedThreads.get(externalThreadId) === client ? { agentId, threadId } : null;
+    return agentId && threadId && this.openClientFor(externalThreadId) === client ? { agentId, threadId } : null;
   }
 
   bindThread(externalThreadId: string, agentId: string, publicThreadId?: string): void {

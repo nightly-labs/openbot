@@ -143,6 +143,10 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "حالة صندوق البريد تالفة أو من إصدار أحدث من OpenBot؛ تم رفض الكتابة فوقها.",
   "error.backend.recipientDeleting": "يتم حذف المستلم. أعد المحاولة بعد انتهاء الحذف.",
   "error.backend.recipientHidden": "هذا الوكيل مخفي. استعده لإرسال الرسائل.",
+  "error.backend.agentIdUnknown":
+    "لا يوجد وكيل بالمعرّف {id}. احصل على المعرّفات من openbot.list_agents، ثم حاول مرة أخرى.",
+  "error.backend.agentIdNear":
+    "لا يوجد وكيل بالمعرّف {id}. للوكيل {name} المعرّف {nearId}، وهو مشابه جدًا. إذا كنت تقصد هذا الوكيل، فحاول مرة أخرى بمعرّفه.",
   "error.backend.attachBetween": "أرفق من 1 إلى {limit} ملفات.",
   "error.backend.attachmentNotFile": "المرفق ليس ملفًا: {path}",
   "error.backend.generatedImageTooLarge": "تتجاوز الصورة المُنشأة حد 100 MB.",

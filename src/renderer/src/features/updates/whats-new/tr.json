@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini, Windows'ta yeniden kurulur ve güncellenir. 0.67.0'da bir bağlantı veya özel dosyayla ilgili bir hatayla duruyordu.",
+          "Meşgul bir takım arkadaşına mesaj gönderen bir ajan, mesajın arkadaşının devam eden görevine girip girmediğini artık bilir. Mesaj beklediğinde ajan nedenini size söyleyebilir.",
+          "Bilgisayar Kullanımı sırasında ajanlar artık imlecin kullanılamadığını söylemez. OpenBot, imleci ajanın tıkladığı, kaydırdığı veya hareket ettirdiği yere çizer."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.0",
     "date": "2026-11-10",
     "notices": [

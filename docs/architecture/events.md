@@ -42,7 +42,7 @@ runs do not change.
 ## Route lifecycle
 
 The backend makes the route ID (a UUID) when a routine first gets a webhook trigger. Main makes the
-secret, `whsec_` and 32 random bytes in base64url, and encrypts it with the host secret cipher
+secret, `whsec_` and 32 random bytes in base64 (the Standard Webhooks format), and encrypts it with the host secret cipher
 (Electron `safeStorage`). The save result returns the secret one time. `rotateSecret` replaces the
 stored ciphertext; the next request uses the new secret, so the old secret stops working at once.
 A host has at most `WEBHOOK_ROUTES_LIMIT` (64) routes. Main and the account service both check it.

@@ -34,6 +34,14 @@ surface asks for an update; a change is refused before any request. The desktop 
 the phone Library (the server drawer) read the same `host` scope. The file types, the type filter
 and the order of both are in `@openbot/team-client/stored-files`.
 
+The optional `storage-channel-v1` capability adds `POST /v1/storage/channel-files`
+(`team-protocol/storage-channel-v1.ts`), with `channelId` and an optional `force`. It answers the file
+rows of the `channel` scope: the files of that channel's messages, with the message that carries each
+one. Every member who sees the channel can read them, as the channel routes decide; a channel that the
+member cannot see, or that the host does not have, gets 404. A delete stays on
+`/v1/storage/delete-file`, for an owner or an admin. The channel Files pane is shown only on a host
+with the capability.
+
 The optional `storage-disk-v1` capability adds `POST /v1/storage/disk` (`team-protocol/storage-disk-v1.ts`).
 It answers the free and total bytes of the disk that holds the host data, from one `statfs` call
 with no scan, so it is a passive route. Every member can read it. The sidebar storage card
@@ -614,8 +622,8 @@ the host computer needs no report: the host reads `powerMonitor` itself (`hostCo
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1` and
-`agent-fast-mode-v1`. The
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
+`storage-channel-v1` and `agent-fast-mode-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -666,6 +674,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
+| `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |

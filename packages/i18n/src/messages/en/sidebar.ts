@@ -96,6 +96,8 @@ export const messages = defineMessages("sidebar", {
   "sidebar.waiting.label": { one: "Needs you, {count} chat", other: "Needs you, {count} chats" },
   "sidebar.unread.title": "Unread",
   "sidebar.unread.label": { one: "Unread, {count} chat", other: "Unread, {count} chats" },
+  "sidebar.unread.actions": "Unread actions",
+  "sidebar.unread.turnOff": "Turn off Unread group",
   "sidebar.waiting.action.question": "Answer",
   "sidebar.waiting.action.approval": "Review",
   "sidebar.waiting.action.takeover": "Take over",

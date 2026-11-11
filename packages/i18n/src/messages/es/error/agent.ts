@@ -10,6 +10,10 @@ export const messages = {
     "Los argumentos de descubrimiento de herramientas no son válidos. Usa el esquema declarado y un nombre de herramienta cualificado original.",
   "error.agent.toolCallArgumentsNotObject":
     "La herramienta no se ejecutó. En tool_call, arguments debe ser un objeto JSON, no texto. Envía la llamada de nuevo con arguments como objeto.",
+  "error.agent.toolCallDiscoveryTool":
+    "La herramienta no se ejecutó. tool_call no puede ejecutar openbot.tool_search ni openbot.tool_describe. Llámalas directamente con los mismos argumentos.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La programación de la rutina no es válida: {detail} Corrige la programación y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",
   "error.agent.accessLocalOnly": "El acceso del agente solo se puede cambiar en el equipo que lo ejecuta.",
   "error.agent.duplicateCleanupFailed": "No se pudo duplicar el agente ni eliminar la copia incompleta.",

@@ -63,6 +63,7 @@ export const messages = {
   "agent.dock.writing": "{name} écrit",
   "agent.dock.empty": "Aucun message pour l’instant. Écrivez à {name}.",
   "agent.dock.settings": "Réglages du dock",
+  "agent.dock.hide": "Masquer le dock",
   "agent.dock.strip.show": "Afficher le dock des agents",
   "agent.dock.strip.asks": "Afficher le dock des agents. Un agent vous pose une question",
   "agent.dock.search": "Rechercher agents et canaux",

@@ -61,6 +61,7 @@ export const messages = {
   "agent.dock.writing": "{name} が入力中",
   "agent.dock.empty": "まだメッセージはありません。{name} に書いてみましょう。",
   "agent.dock.settings": "ドックの設定",
+  "agent.dock.hide": "ドックを隠す",
   "agent.dock.strip.show": "エージェントドックを表示",
   "agent.dock.strip.asks": "エージェントドックを表示。エージェントから質問があります",
   "agent.dock.search": "エージェントとチャンネルを検索",

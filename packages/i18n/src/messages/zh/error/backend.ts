@@ -140,6 +140,9 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "信箱状态已损坏或来自更新版本的 OpenBot，拒绝覆盖它。",
   "error.backend.recipientDeleting": "该收件人正在删除中，请等删除完成后再试。",
   "error.backend.recipientHidden": "该助手已隐藏，请恢复它后再发送消息。",
+  "error.backend.agentIdUnknown": "没有 ID 为 {id} 的助手。请用 openbot.list_agents 获取 ID，然后重试。",
+  "error.backend.agentIdNear":
+    "没有 ID 为 {id} 的助手。助手 {name} 的 ID {nearId} 几乎相同。如果你指的是该助手，请用它的 ID 重试。",
   "error.backend.attachBetween": "请附加 1 到 {limit} 个文件。",
   "error.backend.attachmentNotFile": "附件不是文件：{path}",
   "error.backend.generatedImageTooLarge": "生成的图片超过 100 MB 上限。",

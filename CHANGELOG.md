@@ -6,6 +6,25 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.67.1] - 2026-11-10
+
+### Fixed
+
+- An agent that sends a message to a working teammate now knows if the message went into the
+  teammate's running task, or why it waits. Before, the agent got "queued" every time, also when
+  the message went into the running task, so it could not tell you what happened. When the
+  teammate's "While working" setting is Queue, the agent can tell you to set it to Steer.
+- When you ask an agent to show its cursor during Computer Use, it no longer tells you that the
+  cursor overlay is unavailable. OpenBot draws the agent cursor where the agent clicks, scrolls or
+  moves in another app. Agents no longer get the driver's own cursor tools, which OpenBot turns off.
+- Agents can now use an n8n MCP server that you signed in to through OpenBot. Before, the server
+  test showed the server as ready, but each agent chat could not connect to it, because n8n blocked
+  the name that OpenBot sent with each request. You no longer need to add a `User-Agent` header to
+  the server to make it work.
+- Gemini installs and updates on Windows again. Before, OpenBot 0.67.0 stopped with "The runtime
+  archive contains a link or special file.", because the Windows download of the Antigravity CLI
+  does not mark its program as a file.
+
 ## [0.67.0] - 2026-11-10
 
 ### Added

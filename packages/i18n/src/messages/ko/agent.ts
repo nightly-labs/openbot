@@ -61,6 +61,7 @@ export const messages = {
   "agent.dock.writing": "{name}이(가) 입력 중",
   "agent.dock.empty": "아직 메시지가 없습니다. {name}에게 메시지를 보내세요.",
   "agent.dock.settings": "독 설정",
+  "agent.dock.hide": "독 숨기기",
   "agent.dock.strip.show": "에이전트 독 표시",
   "agent.dock.strip.asks": "에이전트 독 표시. 에이전트가 질문하고 있습니다",
   "agent.dock.search": "에이전트와 채널 검색",

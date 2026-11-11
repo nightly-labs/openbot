@@ -10,6 +10,10 @@ export const messages = {
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
   "error.agent.toolCallArgumentsNotObject":
     "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
+  "error.agent.toolCallDiscoveryTool":
+    "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",

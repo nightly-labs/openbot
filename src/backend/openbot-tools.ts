@@ -17,7 +17,7 @@ import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_L
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
-import { advertisedJsonSchema } from "./agent/advertised-json-schema";
+import { ADVERTISE_AS_UNION, advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
@@ -203,72 +203,75 @@ export const acknowledgeRequestToolSchema = z.object({
 
 export const askUiToolSchema = z.object({
   blockId: uiBlockIdSchema.optional().describe("Your id for this block. OpenBot makes one when you omit it."),
-  block: z.discriminatedUnion("type", [
-    z.strictObject({
-      type: z.literal("confirm"),
-      title: uiTextSchema(UI_BLOCK_LIMITS.title),
-      danger: z.boolean().optional().describe("Draw the block as dangerous; its primary button is held to press."),
-      confirmHold: z.number().int().min(UI_BLOCK_LIMITS.holdMinMs).max(UI_BLOCK_LIMITS.holdMaxMs).optional(),
-      fields: z
-        .array(
-          z.union([
-            z.strictObject({ label: uiLabelSchema, value: z.string().max(UI_BLOCK_LIMITS.text) }),
+  // Each type has its own fields: one merged object would offer `preview` to a form, which then fails.
+  block: z
+    .discriminatedUnion("type", [
+      z.strictObject({
+        type: z.literal("confirm"),
+        title: uiTextSchema(UI_BLOCK_LIMITS.title),
+        danger: z.boolean().optional().describe("Draw the block as dangerous; its primary button is held to press."),
+        confirmHold: z.number().int().min(UI_BLOCK_LIMITS.holdMinMs).max(UI_BLOCK_LIMITS.holdMaxMs).optional(),
+        fields: z
+          .array(
+            z.union([
+              z.strictObject({ label: uiLabelSchema, value: z.string().max(UI_BLOCK_LIMITS.text) }),
+              z.strictObject({
+                label: uiLabelSchema,
+                select: uiBlockIdSchema.describe("The key of the chosen option in values. Not action."),
+                options: uiStringOptionsSchema(UI_BLOCK_LIMITS.selectOptions).describe("The first one is the default."),
+              }),
+            ]),
+          )
+          .max(UI_BLOCK_LIMITS.confirmFields)
+          .optional(),
+        preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
+        actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
+      }),
+      z.strictObject({
+        type: z.literal("choice"),
+        title: uiTextSchema(UI_BLOCK_LIMITS.title),
+        multiple: z.boolean().optional(),
+        options: z
+          .array(
             z.strictObject({
+              id: uiBlockIdSchema,
               label: uiLabelSchema,
-              select: uiBlockIdSchema.describe("The key of the chosen option in values. Not action."),
-              options: uiStringOptionsSchema(UI_BLOCK_LIMITS.selectOptions).describe("The first one is the default."),
+              meta: uiTextSchema(UI_BLOCK_LIMITS.meta).optional(),
+              selected: z.boolean().optional(),
             }),
-          ]),
-        )
-        .max(UI_BLOCK_LIMITS.confirmFields)
-        .optional(),
-      preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
-      actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
-    }),
-    z.strictObject({
-      type: z.literal("choice"),
-      title: uiTextSchema(UI_BLOCK_LIMITS.title),
-      multiple: z.boolean().optional(),
-      options: z
-        .array(
-          z.strictObject({
-            id: uiBlockIdSchema,
-            label: uiLabelSchema,
-            meta: uiTextSchema(UI_BLOCK_LIMITS.meta).optional(),
-            selected: z.boolean().optional(),
-          }),
-        )
-        .min(1)
-        .max(UI_BLOCK_LIMITS.choiceOptions),
-      submit: uiLabelSchema.optional().describe("The submit button label."),
-    }),
-    z.strictObject({
-      type: z.literal("form"),
-      title: uiTextSchema(UI_BLOCK_LIMITS.title),
-      fields: z
-        .array(
-          z.discriminatedUnion("kind", [
-            uiFormTextField("text"),
-            uiFormTextField("textarea"),
-            uiFormOptionsField("select", UI_BLOCK_LIMITS.selectOptions),
-            uiFormOptionsField("segmented", UI_BLOCK_LIMITS.segmentedOptions),
-            z.strictObject({
-              ...uiFormFieldBase,
-              kind: z.literal("date"),
-              label: uiLabelSchema,
-              value: z
-                .string()
-                .regex(/^\d{4}-\d{2}-\d{2}$/)
-                .optional()
-                .describe("YYYY-MM-DD."),
-            }),
-          ]),
-        )
-        .min(1)
-        .max(UI_BLOCK_LIMITS.formFields),
-      submit: uiLabelSchema.optional().describe("The submit button label."),
-    }),
-  ]),
+          )
+          .min(1)
+          .max(UI_BLOCK_LIMITS.choiceOptions),
+        submit: uiLabelSchema.optional().describe("The submit button label."),
+      }),
+      z.strictObject({
+        type: z.literal("form"),
+        title: uiTextSchema(UI_BLOCK_LIMITS.title),
+        fields: z
+          .array(
+            z.discriminatedUnion("kind", [
+              uiFormTextField("text"),
+              uiFormTextField("textarea"),
+              uiFormOptionsField("select", UI_BLOCK_LIMITS.selectOptions),
+              uiFormOptionsField("segmented", UI_BLOCK_LIMITS.segmentedOptions),
+              z.strictObject({
+                ...uiFormFieldBase,
+                kind: z.literal("date"),
+                label: uiLabelSchema,
+                value: z
+                  .string()
+                  .regex(/^\d{4}-\d{2}-\d{2}$/)
+                  .optional()
+                  .describe("YYYY-MM-DD."),
+              }),
+            ]),
+          )
+          .min(1)
+          .max(UI_BLOCK_LIMITS.formFields),
+        submit: uiLabelSchema.optional().describe("The submit button label."),
+      }),
+    ])
+    .meta(ADVERTISE_AS_UNION),
 });
 
 const apiKeyNameSchema = z
@@ -434,7 +437,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "delete_section",
-    description: "Delete a custom sidebar section without deleting its agents; its agents become ungrouped.",
+    description: "Delete a custom sidebar section, not its agents; they and its folders move up one level.",
     shape: deleteSectionToolSchema.shape,
   },
   {

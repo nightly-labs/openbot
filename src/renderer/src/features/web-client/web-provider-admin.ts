@@ -22,6 +22,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import {
   type ProviderAccountRelay,
   providerAccountRelay,
@@ -69,7 +70,7 @@ import {
   type HostProviderDefault,
   listCustomAgents,
   listCustomProviders,
-  listProviderAccounts,
+  listProviderAccountsWithModels,
   type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
   providerAccountSignInStatus,
@@ -162,6 +163,8 @@ function webProviderAdmin(
   keyRoutes: () => typeof PROVIDERS_ADMIN_ROUTES | typeof PROVIDERS_V5_ROUTES | typeof PROVIDERS_V8_ROUTES,
   customRoutes: () => CustomProviderRoutes,
   accountRelay: () => ProviderAccountRelay | null,
+  /** Whether the host has `provider-account-models-v1`. */
+  accountModels: () => boolean,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -249,7 +252,11 @@ function webProviderAdmin(
         deleteCustomProvider(request(serverId), input, customRoutes()).pipe(Effect.mapError((error) => error.cause)),
       ),
     accounts: async (serverId) =>
-      runTeamEffect(listProviderAccounts(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        listProviderAccountsWithModels(request(serverId), accountModels()).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
     accountUsage: async (serverId) =>
       runTeamEffect(providerAccountUsage(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
     startAccountSignIn: async (input, serverId) =>
@@ -384,6 +391,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           ? CUSTOM_PROVIDER_HARNESS_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
     accountRelayOfServer,
+    () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(

@@ -442,6 +442,7 @@
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
+    "@modelcontextprotocol/sdk@1.32.1": "patches/@modelcontextprotocol%2Fsdk@1.32.1.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",

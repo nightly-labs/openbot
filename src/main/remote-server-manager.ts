@@ -559,9 +559,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).
-    this.#webrtcTransport?.on("connectFailed", (serverId) => {
+    // The failure says why, so a host that is online on Signal does not read as "not reachable" (#6873).
+    this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
-      this.#connections.reportUnreachable(serverId, "transport/connect_failed");
+      this.#connections.reportConnectFailure(serverId, failure);
       this.#emitChanged();
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
@@ -2482,6 +2483,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         teamSideRouteCodec(path)?.response(path, response.status, json, {
           channelIsolation: true,
           channelPicture: true,
+          channelBrowser: true,
         }),
       );
       if (!response.ok) {

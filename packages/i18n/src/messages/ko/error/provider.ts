@@ -213,10 +213,14 @@ export const messages = {
     "OpenCode 무료 모델이 사용 한도에 도달했어요. 모든 무료 모델이 이 한도를 함께 사용해요. 계속하려면 OpenCode 설정에 OpenCode Go 키를 붙여넣거나 다른 제공자의 모델을 선택하세요.",
   "error.provider.opencodeProviderFailed":
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT가 이전 시작 후 아직 로컬 기록을 준비하고 있어요. 몇 분 기다린 후 다시 시도해 주세요.",
+  "error.provider.codexThreadInUse":
+    "다른 Codex 앱(Codex 데스크톱 앱, Codex CLI, IDE 확장 프로그램 등)이 이 채팅을 열어 두었어요. Codex 채팅에는 한 번에 하나의 앱만 쓸 수 있어요. 그 앱에서 채팅을 닫은 후 메시지를 다시 보내 주세요.",
   "error.provider.realtimeLimitZero":
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.opencodeDatabaseNewer":
@@ -287,6 +291,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
+  "error.provider.claudeContextFull":
+    "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
   "error.provider.foreignReasoning":
@@ -295,6 +301,8 @@ export const messages = {
     "이미지가 너무 작아서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooLarge":
     "이미지가 너무 커서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.imageCountLimit":
+    "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
   "error.provider.museMcpStartupFault":
@@ -323,6 +331,10 @@ export const messages = {
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":
     "저장된 API 키의 {provider} 계정에 잔액이 없어요. 계정에 크레딧을 추가한 후 다시 시도하세요.",
+  "error.provider.modelServiceRefused":
+    "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
+  "error.provider.modelServiceRefusedReason":
+    "모델 서비스가 요청을 거부했어요: {reason}. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.messageTooLarge":
     "{provider}이(가) {limit}MB보다 큰 메시지를 보내서 OpenBot이 {provider}을(를) 중지했어요.",
   "error.provider.customAgentIdInvalid":

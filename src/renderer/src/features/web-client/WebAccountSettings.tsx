@@ -26,6 +26,7 @@ import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
+import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { useText } from "@openbot/ui/text";
@@ -35,6 +36,7 @@ import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preferen
 import { setCompactMessageActions, useCompactMessageActions } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { webReportsEnabled } from "../../error-reports";
+import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
@@ -95,6 +97,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const [activeTab, setActiveTab] = createSignal<WebAccountSettingsTab>("profile");
   const [taskSound, setTaskSoundChoice] = createSignal(readTaskSound());
   const sendShortcutMode = useSendShortcutMode();
+  const layout = useLayout();
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
   const webLiveVoice = useWebLiveVoice();
@@ -209,6 +212,19 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                     value={sendShortcutMode()}
                     onChange={(mode) => setSendShortcutMode(mode)}
                     devicePlatform={currentDevicePlatform()}
+                    {...(modalElement ? { mount: modalElement } : {})}
+                  />
+                </ItemActions>
+              </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("sidebar.order.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.chatOrder.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <SidebarChatOrderSelect
+                    value={layout.sidebarChatOrder()}
+                    onChange={layout.setSidebarChatOrder}
                     {...(modalElement ? { mount: modalElement } : {})}
                   />
                 </ItemActions>

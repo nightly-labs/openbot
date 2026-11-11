@@ -53,6 +53,7 @@ import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { runIdOrigins } from "./message-run-ids";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
@@ -1690,16 +1691,17 @@ export class MailboxStore {
   }
 
   /**
-   * The teammate answers that start in the same turn as this delivery. For an answer, these are the
-   * other answers to the same request. For a message from the person, these are the answers that
-   * wait for a slow teammate: the person writes before all answers are in, so they are read now.
+   * The teammate answers that start in the same turn as this answer: the other answers to the same
+   * request. A message from the person takes none. Answers that wait for a slow teammate stay held,
+   * so a turn that the person starts holds only the person's messages, and the tools that only a
+   * person's request can start still work in it (#6525).
    */
   repliesToStartWith(deliveryId: string): DeliveryContext[] {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next) return [];
     const message = this.#requireMessage(next.messageId);
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
-    if (message.sender.kind !== "user" && !requestId) return [];
+    if (!requestId) return [];
     // One turn runs in one lane: the agent's own chat, or the side thread that sent the request.
     const messages = this.#messagesById();
     const lane = this.#laneOf(next, messages);
@@ -1707,7 +1709,6 @@ export class MailboxStore {
       this.#queuedFor(next.recipientAgentId).filter((candidate) => {
         if (candidate.id === next.id || !this.#mayStart(candidate) || this.#laneOf(candidate, messages) !== lane)
           return false;
-        if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId, messages);
         return isAnswer(reply) && reply.replyToMessageId === requestId;
       }),
@@ -1847,7 +1848,10 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  /** Provider history can name a continuation turn instead of the original delivery. */
+  /**
+   * Provider history can name a continuation turn instead of the original delivery, or a run of the
+   * delivery in a Claude process that already took its id (#6676).
+   */
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find(
       (candidate) =>
@@ -1857,7 +1861,14 @@ export class MailboxStore {
             (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
           candidate.planContinuation?.turnIds.includes(messageId) === true),
     );
-    return delivery ? this.#context(delivery) : null;
+    if (delivery) return this.#context(delivery);
+    for (const origin of runIdOrigins(messageId).slice(1)) {
+      const run = this.#state.deliveries.find(
+        (candidate) => candidate.recipientAgentId === agentId && candidate.id === origin,
+      );
+      if (run) return this.#context(run);
+    }
+    return null;
   }
 
   /** The delivery of one message to one recipient. A message reaches each recipient once. */
@@ -2666,6 +2677,39 @@ export class MailboxStore {
       delete delivery.steeredAt;
       this.#changes.deliveryIds.add(delivery.id);
       this.#persist("delivery.updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * A steer that came after the running turn's last request, which the provider answers in a turn of
+   * its own named by the delivery. The message moves to that turn, so the chat shows it above its own
+   * answer and not above the answer of the turn it was sent to (#6673). Its state stays: a delivery
+   * that the earlier turn already ended is not started again, and the new turn ends one that the
+   * earlier turn has not ended yet, because the new turn answers it.
+   */
+  moveSteerToTurn = Effect.fn("MailboxStore.moveSteerToTurn")(function* (
+    this: MailboxStore,
+    agentId: string,
+    turnId: string,
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === turnId);
+      if (
+        !delivery ||
+        delivery.recipientAgentId !== agentId ||
+        delivery.steeredAt === undefined ||
+        delivery.turnId === null ||
+        delivery.turnId === turnId ||
+        delivery.status === "queued" ||
+        delivery.status === "cancelled"
+      )
+        return false;
+      delivery.turnId = turnId;
+      this.#changes.deliveryIds.add(delivery.id);
+      this.#persist("delivery.updated");
+      return true;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }

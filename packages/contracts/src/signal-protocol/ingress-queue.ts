@@ -21,11 +21,15 @@ import {
 import { decodeSignalServerMessage } from "./decode";
 import type { SignalServerMessage } from "./messages";
 
-/** A messaging route that Signal asks the account service about (`/v2/remote/route-wake`). */
+/**
+ * A route that Signal asks the account service about (`/v2/remote/route-wake`). A `webhook` route only
+ * starts its host: Signal never keeps a generic webhook, because only the host can check its signature.
+ */
 export type IngressRoute =
   | { platform: "slack"; appId: string; teamId: string }
   | { platform: "discord"; guildId: string }
-  | { platform: "telegram"; botId: string; chatId: string };
+  | { platform: "telegram"; botId: string; chatId: string }
+  | { platform: "webhook"; routeId: string };
 
 /** What the account service says of a route's host: `starting` is a hosted server that comes online. */
 export const ROUTE_HOST_STATES = ["not_hosted", "ended", "sleeping", "starting"] as const;

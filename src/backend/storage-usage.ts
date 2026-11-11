@@ -59,6 +59,17 @@ export interface StorageUsageSources {
     deleteStoredFile: OmitThisParameter<MailboxStore["deleteStoredFile"]>;
   };
   agents: () => readonly StorageAgent[];
+  /**
+   * The files of one channel's messages, by attachment id, or null when the host has no such channel.
+   * Absent on a host without channels.
+   */
+  channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
+}
+
+export interface StorageChannelFile {
+  attachmentId: string;
+  /** The channel message that carries the file. */
+  messageId: string;
 }
 
 /** The request names an agent or a file the host does not have. The Team API answers 404. */
@@ -166,6 +177,8 @@ interface MeasuredFile {
   placement: StoragePlacement | null;
   /** Every chat of the scope that shows the file. */
   threadIds: ReadonlySet<string>;
+  /** On the channel scope: the channel message that carries the file. */
+  channelMessageId: string | null;
   agentId: string | null;
   bytes: number;
   status: "available" | "missing";
@@ -200,12 +213,23 @@ export class StorageUsageScanner {
         cause: new StorageNotFoundError(sourceText("error.storage.agentMissing")),
       });
 
+    // A channel's members answer in channel threads, which hold no chat of their own: the channel
+    // scope is the files of the channel's messages only.
+    const channelFiles =
+      input.scope === "channel" && input.channelId !== undefined
+        ? (this.#sources.channelFiles?.(input.channelId) ?? null)
+        : undefined;
+    if (channelFiles === null)
+      return yield* new StoredStateFailure({
+        cause: new StorageNotFoundError(sourceText("error.backend.channelNotFound")),
+      });
+
     const db = this.#sources.database();
-    let threads = yield* storedSync(() => storageThreads(db, input.agentId));
+    let threads = channelFiles ? [] : yield* storedSync(() => storageThreads(db, input.agentId));
     if (input.scope === "conversation") threads = threads.filter((thread) => thread.threadId === input.conversationId);
     const threadById = new Map(threads.map((thread) => [thread.threadId, thread]));
     const placements = yield* this.#placements(db, threadById);
-    const files = yield* this.#measureFiles(input, placements, threadById);
+    const files = yield* this.#measureFiles(input, placements, threadById, channelFiles);
     const threadSizes = new Map<string, { messageCount: number; bytes: number }>();
     for (const thread of threads) {
       threadSizes.set(thread.threadId, yield* storedSync(() => storageThreadSize(db, thread.threadId)));
@@ -282,6 +306,7 @@ export class StorageUsageScanner {
       scope: input.scope,
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
+      ...(input.channelId === undefined ? {} : { channelId: input.channelId }),
       scannedAt,
       freeBytes: yield* freeBytes(this.#sources.roots.data),
       breakdown,
@@ -321,7 +346,9 @@ export class StorageUsageScanner {
     input: GetStorageUsageInput,
     placements: ReadonlyMap<string, StoragePlacement[]>,
     threadById: ReadonlyMap<string, StorageThread>,
+    channelFiles: readonly StorageChannelFile[] | undefined,
   ): Effect.fn.Return<MeasuredFile[], StoredStateFailure> {
+    const channelMessage = new Map(channelFiles?.map((entry) => [entry.attachmentId, entry.messageId]));
     const seen = new Set<string>();
     const selected: Omit<MeasuredFile, "bytes" | "status" | "modifiedAt">[] = [];
     for (const stored of this.#sources.mailbox.listStoredFiles()) {
@@ -330,7 +357,10 @@ export class StorageUsageScanner {
         left.createdAt.localeCompare(right.createdAt),
       );
       const inScope =
-        input.scope === "host" || shown.length > 0 || (input.scope === "agent" && stored.agentId === input.agentId);
+        input.scope === "host" ||
+        shown.length > 0 ||
+        (input.scope === "agent" && stored.agentId === input.agentId) ||
+        channelMessage.has(stored.attachment.id);
       if (!inScope) continue;
       seen.add(stored.attachment.id);
       const placement = shown[0] ?? null;
@@ -339,6 +369,7 @@ export class StorageUsageScanner {
         stored,
         placement,
         threadIds: new Set(shown.map((entry) => entry.threadId)),
+        channelMessageId: channelMessage.get(stored.attachment.id) ?? null,
         agentId: input.scope === "agent" ? (input.agentId ?? null) : (placementAgent ?? stored.agentId),
       });
     }
@@ -367,7 +398,7 @@ export class StorageUsageScanner {
   #fileRow(file: MeasuredFile, threadById: ReadonlyMap<string, StorageThread>, scannedAt: string): StoredFileRow {
     const thread = file.placement ? threadById.get(file.placement.threadId) : undefined;
     const conversationId = wireId(thread?.threadId);
-    const messageId = conversationId ? wireId(file.placement?.messageId) : null;
+    const messageId = conversationId ? wireId(file.placement?.messageId) : wireId(file.channelMessageId);
     return {
       ...file.stored.attachment,
       source: file.stored.source,
@@ -499,7 +530,7 @@ const clearStorageCategory = Effect.fn("StorageUsage.clearCategory")(function* (
 });
 
 function scopeKey(input: GetStorageUsageInput): string {
-  return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null]);
+  return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null, input.channelId ?? null]);
 }
 
 /**

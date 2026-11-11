@@ -120,6 +120,7 @@ import {
   BrowserWindow,
   clipboard,
   desktopCapturer,
+  Menu,
   Notification,
   nativeImage,
   powerMonitor,
@@ -271,7 +272,7 @@ import { prepareToolRuntimeForTest } from "./ipc/mcp-server-handlers";
 import { LanguageService } from "./language-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
-import { aboveAppsWindowKind, ozonePlatformArguments } from "./linux-wayland-output";
+import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -326,6 +327,7 @@ import { EncryptedRecordStore } from "./password-managers/encrypted-record-store
 import { PasswordManagersService } from "./password-managers/password-managers-service";
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
+import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
@@ -392,6 +394,7 @@ import { SkillMarketplaceService } from "./skill-marketplace-service";
 import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
+import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -547,7 +550,6 @@ const TEARDOWN_ORDER = {
   browserView: 45,
   providerDetection: 48,
   providerRuntimes: 50,
-  cuaDriver: 55,
   /** Before the remote servers: each child detaches from its entry when it stops. */
   localServers: 57,
   remoteServers: 60,
@@ -585,6 +587,9 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  // After the agent service, which stops the provider processes and with them each `cua-driver mcp`
+  // proxy. A turn that starts while the service stops still finds the daemon (#6494).
+  cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
   // After all account consumers have stopped.
@@ -1081,6 +1086,15 @@ export async function createApplicationServices({
   let criticalActionTargets: { agents: AgentService; host: HostService; remoteServers: RemoteServerManager } | null =
     null;
   const windowKind = aboveAppsWindowKind(Boolean(hostedServer || serverModeEnvironment || localServerChild));
+  // Made here so the island menu can read it; it loads the saved language below, before the first window.
+  const language = new LanguageService({
+    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
+    systemLocale: app.getLocale(),
+  });
+  // Windows: the dock and the island get the pointer moves only near them, not through a hook on each
+  // mouse move of the computer.
+  const pointerForwarding =
+    windowKind === "tool" ? new PointerForwardingGate(() => screen.getCursorScreenPoint()) : null;
   const dynamicIsland = new DynamicIslandWindowController({
     windowKind,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -1096,6 +1110,24 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
+    showContextMenu: (window) =>
+      Menu.buildFromTemplate([
+        {
+          label: language.translate("menu.hideDynamicIsland"),
+          // Linux: as the switch in Settings, an island that is off does not need XWayland at the next start.
+          click: () =>
+            void runCauseEffect(
+              dynamicIsland
+                .hide()
+                .pipe(
+                  Effect.andThen(
+                    setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", false).pipe(Effect.ignore),
+                  ),
+                ),
+            ).catch((error: unknown) => logger.warn("The Dynamic Island did not turn off.", toLogValue(error))),
+        },
+      ]).popup({ window }),
+    pointerForwarding,
     performCriticalAction: (action) =>
       Effect.suspend(() => {
         if (!criticalActionTargets) {
@@ -1120,6 +1152,7 @@ export async function createApplicationServices({
     getMainWindow: windows.getMainWindow,
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
+    pointerForwarding,
     // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
     // A channel message is the same send command as in the channel view of the main window.
     sendMessage: (action) =>
@@ -1321,9 +1354,24 @@ export async function createApplicationServices({
   const cpuLimitModule = app.isPackaged
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
-  const serverEnvironment = hostMemory
-    ? agentProcessEnvironment(existsSync(cpuLimitModule) ? cpuLimitModule : null)
-    : { [AGENT_PROCESS_VARIABLE]: "1" };
+  // Every provider process also gets the system roots that this process trusts, so a Python agent CLI
+  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616).
+  const certificateEnvironment = await Effect.runPromise(
+    agentCertificateEnvironment(join(app.getPath("userData"), AGENT_CERTIFICATES_FILE)).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          logger.warn("Could not give the system root certificates to agent processes:", toLogValue(error));
+          return {};
+        }),
+      ),
+    ),
+  );
+  const serverEnvironment = {
+    ...(hostMemory
+      ? agentProcessEnvironment(existsSync(cpuLimitModule) ? cpuLimitModule : null)
+      : { [AGENT_PROCESS_VARIABLE]: "1" }),
+    ...certificateEnvironment,
+  };
   if (hostMemory) {
     hostMemory.start();
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
@@ -1414,10 +1462,6 @@ export async function createApplicationServices({
   );
   // Loaded before the first window and before the application menu is built, so every native
   // surface draws in the saved language on the first frame rather than switching after startup.
-  const language = new LanguageService({
-    path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
-    systemLocale: app.getLocale(),
-  });
   await runCauseEffect(language.load());
   const logoColor = new LogoColorService({ path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE) });
   await runCauseEffect(logoColor.load());
@@ -1905,8 +1949,9 @@ export async function createApplicationServices({
     },
     quitting,
   });
-  // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
-  // daemon: stopping it first would leave them reading a socket nothing answers.
+  // After the agent service, whose provider processes hold the `cua-driver mcp` children that talk
+  // to this daemon: stopping it first would leave them reading a socket nothing answers, and a
+  // Hermes turn that starts then fails as a whole.
   teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => runCauseEffect(cuaDriver.stop()));
   /*
    * The rim OpenBot draws over the window an agent works in.
@@ -2589,6 +2634,15 @@ export async function createApplicationServices({
     database: () => store.database.connection,
     mailbox,
     agents: () => service.listAgents(),
+    channelFiles: (channelId: string) =>
+      service.channels.store.exists(channelId)
+        ? service.channels.store.messages(channelId).flatMap((entry) =>
+            (entry.message.attachments ?? []).map((attachment) => ({
+              attachmentId: attachment.id,
+              messageId: entry.id,
+            })),
+          )
+        : null,
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
