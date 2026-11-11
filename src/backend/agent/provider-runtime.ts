@@ -1190,7 +1190,11 @@ export class ProviderRuntime implements ProviderPort {
         .pipe(toProviderOperationFailed);
     const client = this.#clients.get(scope.provider);
     if (!client) return { limits: [] };
-    return yield* this.#refreshUsage(client, scope.model, false);
+    // While the sign-in's gate waits after a failed read, the provider is not asked, and there is no reading.
+    return yield* this.#usageGate(scope.provider).unlessWaiting({
+      read: this.#refreshUsage(client, scope.model, false),
+      waiting: (): AccountUsage => ({ limits: [] }),
+    });
   }).bind(this);
 
   /**
