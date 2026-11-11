@@ -807,6 +807,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+  "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",

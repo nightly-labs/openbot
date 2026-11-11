@@ -847,6 +847,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Número personal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Desactívalo para un número solo para OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",

@@ -104,6 +104,8 @@ export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
   onSetOwnNumber: (workspaceId: string, ownNumber: boolean) => void;
+  /** Shown only for a number whose account carries `workingMessage`: an older joined server cannot set it. */
+  onSetWorkingMessage: (workspaceId: string, workingMessage: boolean) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
   /** The groups of a linked number, to choose from. Rejects with the reason. */
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
@@ -340,14 +342,26 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                     />
                     <Show when={account(connection.workspaceId)}>
                       {(settings) => (
-                        <SwitchField
-                          class="settings-modal-row"
-                          checked={settings().ownNumber}
-                          disabled={props.busy}
-                          onChange={(checked) => props.onSetOwnNumber(connection.workspaceId, checked)}
-                          label={t("connector.whatsapp.ownNumber")}
-                          description={t("connector.whatsapp.ownNumberDescription")}
-                        />
+                        <>
+                          <SwitchField
+                            class="settings-modal-row"
+                            checked={settings().ownNumber}
+                            disabled={props.busy}
+                            onChange={(checked) => props.onSetOwnNumber(connection.workspaceId, checked)}
+                            label={t("connector.whatsapp.ownNumber")}
+                            description={t("connector.whatsapp.ownNumberDescription")}
+                          />
+                          <Show when={settings().workingMessage !== undefined}>
+                            <SwitchField
+                              class="settings-modal-row"
+                              checked={settings().workingMessage !== false}
+                              disabled={props.busy}
+                              onChange={(checked) => props.onSetWorkingMessage(connection.workspaceId, checked)}
+                              label={t("connector.whatsapp.workingMessage")}
+                              description={t("connector.whatsapp.workingMessageDescription")}
+                            />
+                          </Show>
+                        </>
                       )}
                     </Show>
                   </>

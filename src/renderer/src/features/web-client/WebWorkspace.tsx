@@ -87,6 +87,7 @@ import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -1280,7 +1281,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
-  const webWhatsApp = webHostWhatsApp(hostRequest);
+  const webWhatsApp = webHostWhatsApp(hostRequest, () =>
+    workspace.state.capabilities.includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY),
+  );
   const whatsappPort = hostWhatsAppPort(
     () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
     () => webWhatsApp,
@@ -2836,6 +2839,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
                             else showAgents();
                           }}
+                          onClose={showAgents}
                         >
                           <Show when={kind === "server"}>
                             <SettingsSearchField
