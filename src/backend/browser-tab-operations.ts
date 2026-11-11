@@ -165,7 +165,10 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
  */
 function queueWaitError(tab: BrowserHostTab) {
   const dialog = tab.engine.dialog;
-  if (dialog && !dialog.agent)
+  // A call that was queued before the dialog opened. A later call gets this advice from the tab check.
+  if (dialog?.agent)
+    return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
+  if (dialog)
     return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
   return "An earlier action on this tab did not finish, so this call did not run. Open the page in a new tab, or try again later.";
 }
