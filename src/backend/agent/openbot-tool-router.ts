@@ -317,8 +317,11 @@ export interface OpenBotToolRouterHooks {
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   /** Records a no-update tool call for the turn; null when no routine run started the turn. */
   requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
-  /** Records the reason a routine run failed for the turn; false when no routine run started the turn. */
-  reportRoutineFailure(agentId: string, turnId: string, reason: string): boolean;
+  /**
+   * Records the reason a routine run failed for the turn; false when no routine run started the turn.
+   * `channelRun` is a turn that owns a main task of a channel routine's request.
+   */
+  reportRoutineFailure(agentId: string, turnId: string, reason: string, channelRun: boolean): boolean;
   /** Starts a new chat with the agent when its turn ends and its queue is empty. */
   requestNewChat(agentId: string): void;
   /**
@@ -1747,7 +1750,16 @@ export class OpenBotToolRouter {
 
     if (params.tool === ROUTINE_REPORT_FAILURE_TOOL) {
       const { reason } = routineReportFailureToolSchema.parse(params.arguments ?? {});
-      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason))
+      // A channel routine runs as a request in the channel. The owner of its main task ends the run;
+      // a member that works on a part of it reports to that owner (#6667).
+      const channelRun = channelId
+        ? yield* this.#channels.routineRunPart(channelId, senderAgentId, params.turnId)
+        : null;
+      if (channelRun === "member")
+        return openBotToolFailure(
+          "In a channel routine run, only the owner of the request can end the run as failed. Say in your result that the task could not be done, and why.",
+        );
+      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
     }

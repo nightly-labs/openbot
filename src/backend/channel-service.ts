@@ -2958,7 +2958,11 @@ export class ChannelService {
                 "The agent could not complete this task.")
               : state === "interrupted"
                 ? sourceText("error.backend.channelTaskStopped")
-                : null,
+                : // The owner of a routine's request reported that the run failed (`routine_report_failure`).
+                  // The task completed, as the agent answered; the routine run reads the reason (#6667).
+                  nextState === "completed" && assignment.deliveryId
+                  ? (this.mailbox.getDelivery(assignment.deliveryId)?.delivery.error ?? null)
+                  : null,
         });
       }
       updated.push(...releasedParent(tasks, task, state));
@@ -3267,6 +3271,24 @@ export class ChannelService {
     const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
     const person = this.#requester(channelId, task, tasks);
     return person !== null && !(this.hooks.remotePerson?.(person.id) ?? false);
+  });
+
+  /**
+   * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
+   * of the routine's request, also one that the lead routed to a member: its failure call ends the
+   * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
+   * Null when a routine did not start the task.
+   */
+  readonly routineRunPart = Effect.fn("ChannelService.routineRunPart")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+  ) {
+    const { task } = yield* this.#runningTask(channelId, agentId, turnId);
+    const request = yield* channelSync(() => this.store.message(channelId, task.requestMessageId));
+    if (request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
+    return task.parentTaskId === null ? ("owner" as const) : ("member" as const);
   });
 
   readonly tool = Effect.fn("ChannelService.tool")(function* (

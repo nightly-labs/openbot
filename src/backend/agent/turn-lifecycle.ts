@@ -1290,10 +1290,12 @@ export class TurnLifecycle {
   /**
    * Records a call to the failure tool; the latest reason wins. False when no routine run started the
    * turn. A flow handoff counts: its call fails that step only, because a handoff has no run of its own.
+   * `channelRun` is a turn that owns a main task of a channel routine's request: the channel reads
+   * the reason from the task's delivery and ends the run failed (#6667).
    */
-  reportRoutineFailure(agentId: string, turnId: string, reason: string): boolean {
+  reportRoutineFailure(agentId: string, turnId: string, reason: string, channelRun = false): boolean {
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return false;
+    if (!channelRun && !deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return false;
     this.#reportedFailures.set(turnId, reason);
     return true;
   }
@@ -1640,7 +1642,9 @@ export class TurnLifecycle {
           const reason =
             terminal === "failed" && failure
               ? this.#hooks.redactMcp(failure)
-              : terminal === "completed" && reportedFailure !== undefined && delivery.delivery.sender.kind === "routine"
+              : terminal === "completed" &&
+                  reportedFailure !== undefined &&
+                  (delivery.delivery.sender.kind === "routine" || delivery.channelId !== undefined)
                 ? this.#hooks.redactMcp(reportedFailure)
                 : null;
           yield* this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason).pipe(toTurnOperationFailed);
