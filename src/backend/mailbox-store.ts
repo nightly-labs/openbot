@@ -1899,6 +1899,46 @@ export class MailboxStore {
     );
   }
 
+  /**
+   * Whether a turn of the agent works for an external conversation: on a message from it, on a
+   * request that an agent sent from it, or on a request from a turn that works for it. A steered
+   * request counts: its answer can go back there too.
+   */
+  turnServesExternalChat(agentId: string, turnId: string): boolean {
+    const sourceTurnIds = this.#sourceTurnIds();
+    const messages = this.#messagesById();
+    const seen = new Set<string>();
+    const serves = (agent: string, turn: string, activeOnly: boolean): boolean => {
+      const key = `${agent}:${turn}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return this.#state.deliveries.some((delivery) => {
+        if (delivery.recipientAgentId !== agent) return false;
+        if (activeOnly) {
+          if (delivery.turnId !== turn || (delivery.status !== "starting" && delivery.status !== "running"))
+            return false;
+          // A delivery that ran again has a new turn id. Its earlier turns can have sent the request.
+        } else if (
+          delivery.turnId !== turn &&
+          delivery.resumeAfterUsageLimit?.previousTurnIds.includes(turn) !== true &&
+          delivery.planContinuation?.turnIds.includes(turn) !== true
+        )
+          return false;
+        const message = messages.get(delivery.messageId);
+        if (!message) return false;
+        if (message.messaging || message.messagingReturn) return true;
+        // The turn that sent this request can be complete, so its deliveries count in any status.
+        const sourceTurn = sourceTurnIds.get(message.id);
+        return (
+          message.sender.kind === "agent" &&
+          sourceTurn !== undefined &&
+          serves(message.sender.agentId, sourceTurn, false)
+        );
+      });
+    };
+    return serves(agentId, turnId, true);
+  }
+
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {
     return this.#contexts(
       this.#state.deliveries.filter(

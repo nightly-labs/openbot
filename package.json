@@ -402,6 +402,7 @@
     "test:messaging-pause-resume": "bun scripts/messaging-pause-resume-e2e.ts",
     "test:messaging-discord-access": "bun scripts/messaging-discord-access-e2e.ts",
     "test:messaging-discord-embeds": "bun scripts/messaging-discord-embeds-e2e.ts",
+    "test:messaging-place-history": "bun scripts/messaging-place-history-e2e.ts",
     "test:messaging-telegram-mentions": "bun scripts/messaging-telegram-mentions-e2e.ts",
     "test:messaging-slack-ping-reply": "bun scripts/messaging-slack-ping-reply-e2e.ts",
     "test:turn-input": "bun scripts/turn-input-e2e.ts",

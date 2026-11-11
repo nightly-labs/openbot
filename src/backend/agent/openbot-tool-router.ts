@@ -72,7 +72,7 @@ import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
-import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
+import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
   acknowledgeRequestToolSchema,
@@ -1570,27 +1570,33 @@ export class OpenBotToolRouter {
     }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel.
-    if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
-      return yield* this.#messaging.outboundTool(senderAgentId, params.tool, params.arguments, (paths) =>
-        // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
-        // which holds the files the user attached. The adapters read each file again by its path.
-        Effect.acquireUseRelease(
-          this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
-          (sources) =>
-            Effect.forEach(sources, (source) =>
-              Effect.gen(function* () {
-                const name = basename(source.path);
-                const { size } = yield* attachmentCall(() => source.handle.stat());
-                if (size > ATTACHMENT_LIMITS.fileBytes)
-                  return yield* attachmentFailure(
-                    new Error(`${name} is larger than ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
-                  );
-                return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
-              }),
-            ),
-          (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
-        ),
+    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel,
+    // and read a place that it names, such as a routine that summarizes a WhatsApp chat.
+    if (isMessagingOutboundCall(params.tool, params.arguments))
+      return yield* this.#messaging.outboundTool(
+        senderAgentId,
+        { threadId: executionThreadId, turnId: params.turnId },
+        params.tool,
+        params.arguments,
+        (paths) =>
+          // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
+          // which holds the files the user attached. The adapters read each file again by its path.
+          Effect.acquireUseRelease(
+            this.#attachments.openSources(senderAgentId, paths, { allowAnyReadablePath: false }),
+            (sources) =>
+              Effect.forEach(sources, (source) =>
+                Effect.gen(function* () {
+                  const name = basename(source.path);
+                  const { size } = yield* attachmentCall(() => source.handle.stat());
+                  if (size > ATTACHMENT_LIMITS.fileBytes)
+                    return yield* attachmentFailure(
+                      new Error(`${name} is larger than ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
+                    );
+                  return { name, path: source.path, mimeType: attachmentMimeTypeForName(name) };
+                }),
+              ),
+            (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+          ),
       );
     if (params.tool.startsWith("messaging_")) {
       // Only the agent that answers a platform conversation, in that conversation's own thread.
