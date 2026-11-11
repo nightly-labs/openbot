@@ -14,6 +14,7 @@ import { version as developmentVersion } from "../../package.json";
 import type { AgentFeedback, FeedbackSendResult } from "../backend/agent/openbot-tool-router";
 import { type ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
 import type { CentralAuthOperationError } from "./central-auth-effects";
+import { authApiRateLimit } from "./central-auth-manager";
 
 const logger = createOpenBotLogger("feedback");
 
@@ -101,7 +102,19 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
               } as const;
             },
           )
-          .pipe(toToolOperationFailed);
+          .pipe(
+            // The account takes a few reports a minute and more a day. The agent says when it can send again.
+            Effect.catch((error) => {
+              const limit = authApiRateLimit(error.cause);
+              if (!limit) return Effect.fail(error);
+              return Effect.succeed({
+                status: "limited",
+                daily: limit.code === "feedback_daily_limit",
+                retryAfterSeconds: limit.retryAfterSeconds,
+              } as const);
+            }),
+            toToolOperationFailed,
+          );
       }),
   };
 }

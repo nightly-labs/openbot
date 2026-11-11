@@ -211,7 +211,10 @@ const LISTED_DESCRIPTION_LENGTH = 300;
 /** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
 const FEEDBACK_URL_LIMIT = 8000;
 
-/** The result of sent feedback, or "signedOut" when no account can send it. */
+/**
+ * The result of sent feedback, "signedOut" when no account can send it, or "limited" when the account
+ * sent too many reports, today or in the last minute.
+ */
 export type FeedbackSendResult =
   | {
       readonly status: "sent";
@@ -220,7 +223,8 @@ export type FeedbackSendResult =
       /** True when the report is a comment on an open issue of the same problem. */
       readonly comment: boolean;
     }
-  | { readonly status: "signedOut" };
+  | { readonly status: "signedOut" }
+  | { readonly status: "limited"; readonly daily: boolean; readonly retryAfterSeconds: number | null };
 
 /**
  * What became of a message from another agent while its recipient's chat turn runs: `steered` into
@@ -260,6 +264,26 @@ export interface AgentServerClaims {
 
 const FEEDBACK_SIGNED_OUT_NEXT =
   "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
+
+/**
+ * The account service takes a few reports from an account in a minute, and more in a UTC day. A send
+ * before the limit starts again fails the same way, so the agent tells the user when, and gives the link.
+ */
+function feedbackLimitedNext(limit: { readonly daily: boolean; readonly retryAfterSeconds: number | null }): string {
+  const minutes = limit.retryAfterSeconds === null ? null : Math.max(1, Math.ceil(limit.retryAfterSeconds / 60));
+  const wait =
+    minutes === null
+      ? limit.daily
+        ? "tomorrow (UTC)"
+        : "in about one minute"
+      : minutes < 90
+        ? `in about ${minutes === 1 ? "one minute" : `${minutes} minutes`}`
+        : `in about ${Math.round(minutes / 60)} hours`;
+  const why = limit.daily
+    ? "this account sent the most reports that OpenBot takes in one day"
+    : "this account sent too many reports in the last minute";
+  return `OpenBot did not send it, because ${why}. It can send reports again ${wait}. Tell the user this in one sentence, and give them this link to the same text on GitHub, to check and submit. Do not call send_feedback again before then, and do not send it another way.`;
+}
 
 /** The prefilled issue form, which the user submits in the browser. */
 function feedbackForm(url: string, next: string): OpenBotToolResponse {
@@ -1191,6 +1215,13 @@ export class OpenBotToolRouter {
       );
     }
     if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
+    if (sent.success.status === "limited") {
+      logger.warn("The account service limits feedback for this account.", {
+        daily: sent.success.daily,
+        retryAfterSeconds: sent.success.retryAfterSeconds,
+      });
+      return form(feedbackLimitedNext(sent.success));
+    }
     const issue = sent.success;
     // The thank-you card in the chat links the issue. The issue is open also when the card fails.
     const card = yield* Effect.result(
