@@ -340,6 +340,10 @@ export const messages = {
     "El servicio del modelo rechazó la solicitud. Elige otro modelo o comprueba tu acceso a este modelo en el servicio.",
   "error.provider.modelServiceRefusedReason":
     "El servicio del modelo rechazó la solicitud: {reason}. Elige otro modelo o comprueba tu acceso a este modelo en el servicio.",
+  "error.provider.safetyStop":
+    "La comprobación de seguridad de OpenAI detuvo este chat. Los mensajes de este chat pueden detenerse de nuevo. Para continuar, inicia un Nuevo chat. El agente conserva su configuración.",
+  "error.provider.safetyStopReason":
+    "La comprobación de seguridad de OpenAI detuvo este chat. Los mensajes de este chat pueden detenerse de nuevo. Para continuar, inicia un Nuevo chat. El agente conserva su configuración. Motivo: {detail}",
   "error.provider.messageTooLarge": "OpenBot detuvo {provider} porque envió un mensaje de más de {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "Un ID de agente debe contener letras minúsculas, dígitos o `-`, y no puede ser el ID de un proveedor integrado.",

@@ -198,6 +198,8 @@ const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   internalServerError: "provider_unavailable",
   flexUnavailable: "provider_unavailable",
   insufficient_quota: "billing",
+  // Codex's code for a turn that the OpenAI safety check stopped (#6670).
+  misalignmentPolicyViolation: "content_blocked",
   ECONNREFUSED: "network",
   ECONNRESET: "network",
   ENOTFOUND: "network",

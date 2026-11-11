@@ -329,6 +329,10 @@ export const messages = {
     "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.modelServiceRefusedReason":
     "모델 서비스가 요청을 거부했어요: {reason}. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
+  "error.provider.safetyStop":
+    "OpenAI 안전 검사가 이 채팅을 중지했어요. 이 채팅의 메시지가 다시 중지될 수 있어요. 계속하려면 새 채팅을 시작하세요. 에이전트의 설정은 그대로 유지돼요.",
+  "error.provider.safetyStopReason":
+    "OpenAI 안전 검사가 이 채팅을 중지했어요. 이 채팅의 메시지가 다시 중지될 수 있어요. 계속하려면 새 채팅을 시작하세요. 에이전트의 설정은 그대로 유지돼요. 이유: {detail}",
   "error.provider.messageTooLarge":
     "{provider}이(가) {limit}MB보다 큰 메시지를 보내서 OpenBot이 {provider}을(를) 중지했어요.",
   "error.provider.customAgentIdInvalid":

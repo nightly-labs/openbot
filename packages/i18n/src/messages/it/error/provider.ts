@@ -335,6 +335,10 @@ export const messages = {
     "Il servizio del modello ha rifiutato la richiesta. Scegli un altro modello o controlla il tuo accesso a questo modello presso il servizio.",
   "error.provider.modelServiceRefusedReason":
     "Il servizio del modello ha rifiutato la richiesta: {reason}. Scegli un altro modello o controlla il tuo accesso a questo modello presso il servizio.",
+  "error.provider.safetyStop":
+    "Il controllo di sicurezza di OpenAI ha fermato questa chat. I messaggi in questa chat possono fermarsi di nuovo. Per continuare, avvia una Nuova chat. L'agente mantiene la sua configurazione.",
+  "error.provider.safetyStopReason":
+    "Il controllo di sicurezza di OpenAI ha fermato questa chat. I messaggi in questa chat possono fermarsi di nuovo. Per continuare, avvia una Nuova chat. L'agente mantiene la sua configurazione. Motivo: {detail}",
   "error.provider.messageTooLarge":
     "OpenBot ha fermato {provider} perché ha inviato un messaggio più grande di {limit} MB.",
   "error.provider.customAgentIdInvalid":

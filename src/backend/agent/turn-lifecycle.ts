@@ -77,6 +77,7 @@ import {
 } from "./subagent-updates";
 import { shellReadPaths, ThreadFileHistory } from "./thread-file-history";
 import {
+  codexSafetyStopFailure,
   isNonActionableCodexWarning,
   isToolItem,
   refusedSessionFailure,
@@ -1073,7 +1074,12 @@ export class TurnLifecycle {
         // clients send a flat `message`. Reading only the flat field turned every Codex failure,
         // an exhausted plan included, into the renderer's generic sentence under the usage notice.
         const error = getRecord(params, "error");
-        const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        // A safety stop keeps the session: the user decides to start a new chat.
+        const message =
+          codexSafetyStopFailure(error, (text) => this.#hooks.redactMcp(text)) ??
+          getString(params, "message") ??
+          getString(error, "message") ??
+          "";
         // An ACP or Pi client names the cause that it read from structured fields, before the
         // error became a sentence for the user. The other clients leave it to the error.
         const reportedCause = isRecord(params) && isCauseCode(params.causeCode) ? params.causeCode : null;
