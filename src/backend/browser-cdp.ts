@@ -750,8 +750,17 @@ export class BrowserCdpEngine {
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       if (details.isMainFrame && !details.isSameDocument) this.#documentGeneration += 1;
-      this.#targets.clear();
-      this.#lastSnapshot = null;
+      if (details.isMainFrame) {
+        this.#targets.clear();
+        this.#lastSnapshot = null;
+        return;
+      }
+      // Pages such as mail apps navigate their frames all the time. The refs of the main process stay:
+      // its node ids are not used again, so a ref of a replaced frame document fails and cannot hit a
+      // new element. A frame in another process can get a new process with the same ids.
+      for (const [ref, record] of this.#targets) {
+        if (record.targetId !== undefined) this.#targets.delete(ref);
+      }
     });
     // Main frame only. The payment frames of the old document go with it.
     contents.on("did-navigate", () => this.#cardScrub.endDocument());
