@@ -126,12 +126,14 @@ export function settleQuietRoutineTurn(
  * report, and then nothing changes. Returns whether the turn is quiet.
  */
 export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: string): boolean {
-  const answers = snapshot.messages.filter(
-    (message) => message.author === "assistant" && message.turnId === turnId && !isWorkNote(message),
+  const answers = new Set(
+    snapshot.messages.filter(
+      (message) => message.author === "assistant" && message.turnId === turnId && !isWorkNote(message),
+    ),
   );
-  if (answers.some((message) => !isTextAnswer(message))) return false;
+  if ([...answers].some((message) => !isTextAnswer(message))) return false;
   for (const [index, message] of snapshot.messages.entries()) {
-    if (answers.includes(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+    if (answers.has(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
   }
   return true;
 }

@@ -401,7 +401,8 @@ export class TurnLifecycle {
   readonly #noUpdateTurns = new Set<string>();
   /**
    * Running turns whose agent owns a main task of a channel routine's request and called the no-update
-   * tool. The channel shows their answers as steps. The completion of the turn takes the entry.
+   * tool. The channel shows their answers as steps. The entry stays until the completion has marked
+   * them as quiet answers, so no capture in between posts them.
    */
   readonly #quietChannelTurns = new Set<string>();
   /** Quiet routine turns whose provider failed with no answer after the no-update call. The completion takes the entry. */
@@ -1179,7 +1180,7 @@ export class TurnLifecycle {
         const errorTurnId = getString(params, "turnId");
         // The no-update tool tells the model to end its turn, and a model that then sends only its
         // reasoning makes Grok fail the prompt with no answer. The run had nothing to report, so it
-        // ends quiet and shows no error (#6247).
+        // ends quiet and shows no error (#6247). A quiet channel routine turn too (#7166).
         if (
           notification.method === "error" &&
           causeCode === "empty_answer" &&
@@ -1187,9 +1188,10 @@ export class TurnLifecycle {
           threadId &&
           errorTurnId &&
           this.#runningTurns.has(errorTurnId) &&
-          this.#noUpdateTurns.has(errorTurnId) &&
           !this.#reportedFailures.has(errorTurnId) &&
-          this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))
+          (this.#quietChannelTurns.has(errorTurnId) ||
+            (this.#noUpdateTurns.has(errorTurnId) &&
+              this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))))
         ) {
           this.#quietEmptyAnswers.add(errorTurnId);
           logger.info("A quiet turn ended with no answer after its no-update call.", {
@@ -1396,6 +1398,11 @@ export class TurnLifecycle {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
   }
 
+  /** A person's message joined this channel turn, so its answers show in the channel again. */
+  keepChannelTurnAnswers(turnId: string): void {
+    this.#quietChannelTurns.delete(turnId);
+  }
+
   /**
    * Records a call to the failure tool; the latest reason wins. False when no routine run started the
    * turn. A flow handoff counts: its call fails that step only, because a handoff has no run of its own.
@@ -1436,7 +1443,7 @@ export class TurnLifecycle {
       // A turn that runs again below starts a new trace, so each path takes this one.
       const trace = this.#traces.take(turnId, new Date().toISOString());
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
-      const quietChannelRun = this.#quietChannelTurns.delete(turnId);
+      const quietChannelRun = this.#quietChannelTurns.has(turnId);
       this.#quietEmptyAnswers.delete(turnId);
       const reportedFailure = this.#reportedFailures.get(turnId);
       this.#reportedFailures.delete(turnId);
@@ -1725,6 +1732,8 @@ export class TurnLifecycle {
         (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries)
           ? settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled)
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
+      // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
+      if (!quiet) this.#quietChannelTurns.delete(turnId);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);
       // A routine run that answered only the no-update marker, also a Test run that shows it in the
       // chat, does not put the marker in the preview.
@@ -1883,7 +1892,10 @@ export class TurnLifecycle {
         ),
         Effect.ensuring(
           Effect.andThen(
-            Effect.sync(() => this.#completingTurns.delete(turnId)),
+            Effect.sync(() => {
+              this.#completingTurns.delete(turnId);
+              this.#quietChannelTurns.delete(turnId);
+            }),
             this.#hooks.closeRoutineSession(threadId),
           ),
         ),

@@ -89,6 +89,8 @@ export interface ChannelHooks {
    * result. It settles the routine run before the task is cancelled.
    */
   skipAtLimit?(task: ChannelTask): boolean;
+  /** Whether nobody waits for the answer of the routine run that posted this request, as in a Test run. */
+  quietRoutineRequest?(requestMessageId: string): boolean;
   /** Whether this agent switches without asking and has a backup model that is ready now. */
   usageLimitBackup?(agentId: string): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
@@ -3241,7 +3243,7 @@ export class ChannelService {
    * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
    * of the routine's request, also one that the lead routed to a member: its failure call ends the
    * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
-   * Null when a routine did not start the task.
+   * `quiet` is a run that nobody waits for, not a Test run. Null when a routine did not start the task.
    */
   readonly routineRunPart = Effect.fn("ChannelService.routineRunPart")(function* (
     this: ChannelService,
@@ -3253,8 +3255,11 @@ export class ChannelService {
     // The root task holds the run's request, as for `channelRequester`; a member reply has its own.
     const root = tasks.find((item) => item.id === task.rootTaskId);
     const request = root ? yield* channelSync(() => this.store.message(channelId, root.requestMessageId)) : null;
-    if (request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
-    return task.parentTaskId === null ? ("owner" as const) : ("member" as const);
+    if (!root || request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
+    return {
+      part: task.parentTaskId === null ? ("owner" as const) : ("member" as const),
+      quiet: this.hooks.quietRoutineRequest?.(root.requestMessageId) === true,
+    };
   });
 
   readonly tool = Effect.fn("ChannelService.tool")(function* (
