@@ -19,6 +19,7 @@ import type {
   BrowserSnapshot,
   BrowserTab,
   BrowserTarget,
+  BrowserTeachStep,
   BrowserViewTarget,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
@@ -550,7 +551,8 @@ export interface BrowserUserBrowsing {
 /** Who controls a tab: the person at this computer, or one session of a team member. */
 export type BrowserUserControlHolder = { kind: "local" } | { kind: "member"; memberId: string; sessionId: string };
 /** One step of a task that a person shows: a page that loaded or a click on a control. No typed text. */
-export type BrowserTeachStep = Omit<UserBrowsingStep, "at">;
+export type { BrowserTeachStep };
+
 /** The most steps of one teach recording, as `browser-teach-v1` says. */
 const TEACH_MAX_STEPS = 200;
 /** A teach recording takes no step after this time. */

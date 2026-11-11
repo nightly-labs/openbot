@@ -689,11 +689,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
    * The teach view of the full browser. `ready`: the user can go to the page of the task, and nothing is
    * recorded. `recording`: the host records the steps on `tabId`, and `controlled` says whether the host
    * said that the user controls the tab. The host ends the recording when the control ends, so the teach
-   * view ends after that.
+   * view ends after that. `agentId` is the agent that learns: the steps must not go to another chat.
    */
   type BrowserTeachState =
     | { phase: "ready"; pending: boolean }
-    | { phase: "recording"; tabId: string; startedAt: number; controlled: boolean; pending: boolean };
+    | {
+        phase: "recording";
+        tabId: string;
+        agentId: string | undefined;
+        startedAt: number;
+        controlled: boolean;
+        pending: boolean;
+      };
   const [teach, setTeach] = createSignal<BrowserTeachState | null>(null);
   createEffect(
     () => {
@@ -701,14 +708,25 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (!current) return undefined;
       const controlled =
         current.phase === "recording" && allBrowserTabs().some((tab) => tab.id === current.tabId && tab.userControl);
-      return { current, controlled, open: browserExpandedOpen() };
+      const moved = current.phase === "recording" && deps.props.agent?.id !== current.agentId;
+      return { current, controlled, moved, open: browserExpandedOpen() };
     },
     (state) => {
       if (!state) return;
-      const { current, controlled, open } = state;
+      const { current, controlled, moved, open } = state;
       if (current.phase === "ready") {
         // Only the full view has the teach bar.
         if (!open) setTeach(null);
+        return;
+      }
+      if (moved) {
+        // The user went to another agent, for example with a tab of that agent. Save would send the
+        // steps to the wrong chat, so the recording is discarded and the tab goes back.
+        takenBrowserTabIds.delete(current.tabId);
+        setTeach(null);
+        void conversationRuntime(deps.props)
+          .browser.stopTeach({ tabId: current.tabId, save: false })
+          .catch(() => undefined);
         return;
       }
       if (controlled && !current.controlled) setTeach({ ...current, controlled: true });
@@ -757,7 +775,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     try {
       await conversationRuntime(deps.props).browser.startTeach(tab.id);
       takenBrowserTabIds.add(tab.id);
-      setTeach({ phase: "recording", tabId: tab.id, startedAt: Date.now(), controlled: false, pending: false });
+      setTeach({
+        phase: "recording",
+        tabId: tab.id,
+        agentId,
+        startedAt: Date.now(),
+        controlled: false,
+        pending: false,
+      });
     } catch (error) {
       setTeach({ phase: "ready", pending: false });
       const text = currentText();
