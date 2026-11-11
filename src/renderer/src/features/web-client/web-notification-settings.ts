@@ -39,6 +39,8 @@ export function createWebNotificationSettings(options: {
   /** Sets the level of this browser, and asks for the notification permission. */
   setLocalLevel: (hostId: string, level: ServerNotificationLevel) => void;
   setMuted: (hostId: string, muted: boolean, durationMs?: number) => void;
+  /** Gets the levels that a write here gave, for the agent menu and the sounds. */
+  onLevelsWritten: (hostId: string, levels: AgentNotificationLevelsSnapshot) => void;
 }) {
   const [entries, setEntries] = createStore<Record<string, HostLevelsEntry>>({});
   /** Bumped for each read of a host, so an answer of an earlier read is dropped. */
@@ -165,7 +167,9 @@ export function createWebNotificationSettings(options: {
   async function setAgentLevel(hostId: string, agentId: string, level: ServerNotificationLevel | null): Promise<void> {
     const write = options.runtime.setHostAgentNotificationLevel;
     if (!write) return;
-    rememberLevels(hostId, await write(hostId, { agentId, level }));
+    const levels = await write(hostId, { agentId, level });
+    rememberLevels(hostId, levels);
+    options.onLevelsWritten(hostId, levels);
     const agent = entries[hostId]?.agents.find((candidate) => candidate.id === agentId);
     if (level === null || !agent || agent.notifications || hostId !== options.openHostId()) return;
     await options.runtime.updateAgent({ agentId, notifications: true });

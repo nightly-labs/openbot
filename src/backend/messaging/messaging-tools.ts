@@ -123,7 +123,7 @@ export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: s
   {
     name: "messaging_list_places",
     description:
-      "List the Slack workspaces, Discord servers and Telegram chats connected to this OpenBot, with their connection ids. Give connection to list the channels and threads of one connection that OpenBot can post in. Works in any turn.",
+      "List the connected Slack workspaces, Discord servers, Telegram and WhatsApp chats, with their connection ids. Give connection to list the channels and threads of one connection that OpenBot can post in. Works in any turn.",
     shape: listPlacesShape,
   },
   {

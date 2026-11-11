@@ -644,12 +644,6 @@
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
 }
 
-/* Panel radius 24 = composer radius 12 + gap 12, so the corners are concentric. A focus halo would
-   make the gap 9 px at the corner; the border alone shows focus. */
-.agent-dock-composer.composer[data-compact]:focus-within {
-  box-shadow: none;
-}
-
 .agent-dock-composer.composer[data-compact] > .composer-input-label {
   grid-column: 1;
 }

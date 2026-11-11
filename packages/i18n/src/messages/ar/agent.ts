@@ -84,6 +84,7 @@ export const messages = {
   "agent.error.hideFailed": "تعذّر إخفاء الوكيل",
   "agent.error.restoreFailed": "تعذّرت استعادة الوكيل",
   "agent.error.hiddenFailed": "لم يُحفَظ التغيير. أعد المحاولة.",
+  "agent.error.muteFailed": "تعذّر تغيير الإشعارات",
   "agent.error.settingsFailed": "تعذّر حفظ إعدادات الوكيل",
   "agent.error.adminOnly": "لا يغيّر إعدادات الوكيل إلا مسؤول الخادم.",
   "agent.error.continueFailed": "تعذّر على الوكيل المتابعة. أعد المحاولة.",

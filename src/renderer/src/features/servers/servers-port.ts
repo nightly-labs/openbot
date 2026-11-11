@@ -12,6 +12,7 @@ export interface ServersPort {
     | "listAgents"
     | "listConversationReads"
     | "listHiddenAgents"
+    | "listAgentNotificationLevels"
     | "listMcpServers"
     | "listModels"
     | "removeMcpServer"

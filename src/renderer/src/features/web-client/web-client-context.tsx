@@ -70,6 +70,14 @@ import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
+import {
+  agentPictureMark,
+  deleteSavedAgentPictures,
+  deleteSavedServerPictures,
+  keepSavedAgentPictures,
+  readSavedAgentPicture,
+  saveAgentPicture,
+} from "./web-agent-pictures";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
 import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
@@ -762,29 +770,50 @@ export function createWebWorkspace(
   const [serverOrder, setServerOrder] = createSignal(readWebServerOrder(props.accountId));
   const orderedHosts = createMemo(() => orderWebHosts(state.hosts, serverOrder()));
   // The host sends an `openbot-avatar:` URL, which only the desktop app can open. The image comes
-  // through the host connection; until then, the agent keeps the host URL and its generated avatar.
+  // from this browser's saved copy (`web-agent-pictures`) or through the host connection; until
+  // then, the agent keeps the host URL and its generated avatar.
   const [avatars, setAvatars] = createSignal<ReadonlyMap<string, { source: string; url: string }>>(new Map());
+  // The images that loaded or are loading, and those that the saved copies did not have. The host
+  // is asked for the second group when it is online.
   const avatarLoads = new Set<string>();
+  const avatarMisses = new Set<string>();
   // The images share the host connection and its file slots with the user's downloads, so only a few
   // load at the same time.
   const avatarQueue: { hostId: string; id: string; source: string }[] = [];
   let avatarReads = 0;
   let avatarHost: string | null = null;
+  let avatarOnline = false;
+  let avatarAgents = "";
+  async function loadAvatar(hostId: string, id: string, source: string): Promise<string | null> {
+    const saved = await readSavedAgentPicture(props.accountId, hostId, id, source);
+    if (saved || !avatarOnline || avatarHost !== hostId) return saved;
+    const mark = agentPictureMark(props.accountId, hostId);
+    const url = await runtime.agentAvatar(id, source);
+    if (avatarHost === hostId) void saveAgentPicture(props.accountId, hostId, id, source, url, mark);
+    return url;
+  }
   function loadAvatars() {
     while (avatarReads < 2) {
       const next = avatarQueue.shift();
       if (!next) return;
       const { hostId, id, source } = next;
+      const key = `${id} ${source}`;
       avatarReads += 1;
-      void runtime
-        .agentAvatar(id, source)
+      void loadAvatar(hostId, id, source)
         .then(
           (url) => {
-            if (avatarHost === hostId) setAvatars((current) => new Map(current).set(id, { source, url }));
+            if (avatarHost !== hostId) return;
+            if (url) setAvatars((current) => new Map(current).set(id, { source, url }));
+            // The host came online after the check of the saved copies: ask it now.
+            else if (avatarOnline) avatarQueue.push(next);
+            else {
+              avatarLoads.delete(key);
+              avatarMisses.add(key);
+            }
           },
           // A failed image keeps the generated avatar, and the next agent list tries it again.
           () => {
-            if (avatarHost === hostId) avatarLoads.delete(`${id} ${source}`);
+            if (avatarHost === hostId) avatarLoads.delete(key);
           },
         )
         .finally(() => {
@@ -796,29 +825,41 @@ export function createWebWorkspace(
   createEffect(
     () => ({
       hostId: state.host?.hostId ?? null,
-      // A saved frame shows its agents before the host connects. Their images wait for the connection.
-      sources:
-        state.status === "online"
-          ? state.agents.flatMap((agent) =>
-              agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
-            )
-          : [],
+      // A saved frame shows its agents before the host connects. Their images come from the saved
+      // copies; an image with no copy waits for the connection.
+      online: state.status === "online",
+      listed: state.status === "online" && !state.agentsFromFrame && state.agents.length > 0,
+      sources: state.agents.flatMap((agent) =>
+        agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
+      ),
     }),
-    ({ hostId, sources }) => {
+    ({ hostId, online, listed, sources }) => {
       if (hostId !== avatarHost) {
         avatarHost = hostId;
+        avatarAgents = "";
         avatarLoads.clear();
+        avatarMisses.clear();
         avatarQueue.length = 0;
         setAvatars(new Map());
       }
+      avatarOnline = online;
       if (!hostId) return;
       for (const { id, source } of sources) {
         const key = `${id} ${source}`;
-        if (avatarLoads.has(key)) continue;
+        if (avatarLoads.has(key) || (!online && avatarMisses.has(key))) continue;
         avatarLoads.add(key);
         avatarQueue.push({ hostId, id, source });
       }
       loadAvatars();
+      // The host's list is complete: a copy of an agent that left it, or that lost its picture, goes.
+      const agents = sources.map(({ id }) => id).join(" ");
+      if (!listed || agents === avatarAgents) return;
+      avatarAgents = agents;
+      void keepSavedAgentPictures(
+        props.accountId,
+        hostId,
+        sources.map(({ id }) => id),
+      );
     },
   );
   const shownAgents = createMemo(() => {
@@ -958,6 +999,10 @@ export function createWebWorkspace(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
+        void deleteSavedAgentPictures(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
         const activeGeneration = refreshGeneration === generation && refreshHostId === hostId;
         if (!activeGeneration) return;
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
@@ -1087,7 +1132,10 @@ export function createWebWorkspace(
     // A revoked session must not leave private conversations visible while the directory
     // decides whether this membership still exists. Keep the host shell for a possible
     // authorized reconnect, but invalidate every private read and pending action now.
-    if (hostId) deleteRemoteWorkspaceFrame(props.accountId, hostId);
+    if (hostId) {
+      deleteRemoteWorkspaceFrame(props.accountId, hostId);
+      void deleteSavedServerPictures(props.accountId, hostId);
+    }
     generation += 1;
     selectedId = null;
     setState((draft) => {

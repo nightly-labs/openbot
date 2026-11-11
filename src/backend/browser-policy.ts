@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 import { app } from "electron";
-import { browserClientHints, browserRequestUserAgent } from "./browser-identity";
+import { browserClientHints, browserHighEntropyClientHints, browserRequestUserAgent } from "./browser-identity";
 import { isPersistableBrowserUrl } from "./browser-state";
 
 export function normalizeBrowserUrl(input: string): string {
@@ -20,19 +20,38 @@ export function browserLoadOptions(): { extraHeaders: string } {
   return { extraHeaders: "Cache-Control: no-cache\nPragma: no-cache" };
 }
 
-export function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
+export function browserRequestHeaders(
+  url: string,
+  requestHeaders: Record<string, string>,
+  /** The lower-case hint names that the origin asked for with `Accept-CH`. */
+  requestedHints?: ReadonlySet<string>,
+): Record<string, string> {
   const headers = { ...requestHeaders };
   const userAgent = Object.entries(headers).find(([name]) => name.toLowerCase() === "user-agent");
   if (userAgent) {
     setRequestHeader(headers, "User-Agent", browserRequestUserAgent(url, userAgent[1], process.versions.electron));
   }
-  // Send only low-entropy hints, on secure origins. Keep any hints Chromium supplies.
+  // Send the low-entropy hints, and the hints the origin asked for, on secure origins. Keep any
+  // hints Chromium supplies.
   const target = URL.parse(url);
   if (
     target?.protocol === "https:" ||
     (target?.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))
   ) {
-    for (const [name, value] of Object.entries(browserClientHints(process.versions.chrome, process.platform))) {
+    const requested = requestedHints
+      ? Object.entries(
+          browserHighEntropyClientHints({
+            chromeVersion: process.versions.chrome,
+            platform: process.platform,
+            arch: process.arch,
+            systemVersion: process.getSystemVersion(),
+          }),
+        ).filter(([name]) => requestedHints.has(name.toLowerCase()))
+      : [];
+    for (const [name, value] of [
+      ...Object.entries(browserClientHints(process.versions.chrome, process.platform)),
+      ...requested,
+    ]) {
       if (!Object.keys(headers).some((candidate) => candidate.toLowerCase() === name.toLowerCase())) {
         headers[name] = value;
       }
@@ -42,9 +61,22 @@ export function browserRequestHeaders(url: string, requestHeaders: Record<string
   return headers;
 }
 
+/**
+ * The `Accept-Language` value. As Chrome does, each language with a region also gives its base
+ * language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
+ * `navigator.languages` keeps the list without the added base languages, also as in Chrome.
+ */
 function preferredBrowserLanguages(): string {
-  return preferredBrowserLanguageCodes()
-    .split(",")
+  const codes = preferredBrowserLanguageCodes().split(",");
+  const base = (code: string) => code.split("-")[0] ?? code;
+  const expanded: string[] = [];
+  for (const [index, code] of codes.entries()) {
+    if (!expanded.includes(code)) expanded.push(code);
+    const next = codes[index + 1];
+    if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
+      expanded.push(base(code));
+  }
+  return expanded
     .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
     .join(",");
 }

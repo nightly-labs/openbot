@@ -70,7 +70,7 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
-import { agentMcpServers, codexDeferredMcpServers } from "../mcp-provider-shapes";
+import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
 import {
@@ -118,7 +118,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
-import { HistoryTools, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
+import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
@@ -175,6 +175,7 @@ import {
   discoverTools,
   givesBrowserSchemas,
   namesInSearch,
+  OPENCODE_DEFERRED_MCP_NOTE,
   resolveDeferredTool,
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
@@ -601,15 +602,26 @@ export class OpenBotToolRouter {
             // The agent's other conversations open only from its own chat and its side threads. A
             // messaging chat is neither: other people can write there, and must not read the owner's chats.
             const mainThreadId = this.#store.list().find((agent) => agent.id === scope.agentId)?.threadId ?? null;
-            const scopeTask = this.#tasks.taskForThread(scope.threadId);
-            const ownConversation =
-              scope.threadId === mainThreadId || (scopeTask !== null && this.#tasks.has(scope.agentId, scopeTask));
+            const ownsThread = (threadId: string) => {
+              const task = this.#tasks.taskForThread(threadId);
+              return threadId === mainThreadId || (task !== null && this.#tasks.has(scope.agentId, task));
+            };
+            const ownConversation = ownsThread(scope.threadId);
             // A taskId reads a side thread of the same agent, or "main" its own chat. A thread of another
             // agent reads as unknown.
             const taskId = isRecord(params.arguments) ? params.arguments.taskId : undefined;
+            // A cursor holds its conversation. A next page without the taskId of the first page reads
+            // that conversation when it is one that a taskId can read (#6995).
+            const cursorThreadId =
+              taskId === undefined && ownConversation && isRecord(params.arguments)
+                ? historyCursorThread(
+                    params.tool === "history_read" ? params.arguments.before : params.arguments.cursor,
+                  )
+                : null;
+            const cursorTarget = cursorThreadId !== null && ownsThread(cursorThreadId) ? cursorThreadId : null;
             const targetThreadId =
               taskId === undefined
-                ? scope.threadId
+                ? (cursorTarget ?? scope.threadId)
                 : !ownConversation
                   ? null
                   : taskId === MAIN_CHAT_TASK_ID
@@ -891,6 +903,8 @@ export class OpenBotToolRouter {
    */
   #deferredMcpNote(client: AgentClient, threadId: string): string | null {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
+    if (client.provider === "opencode")
+      return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
@@ -2232,7 +2246,11 @@ export class OpenBotToolRouter {
     if (!agentId || !servers || !isMcpServerTool(params.tool))
       return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
-    return yield* handleMcpServerTool(servers, {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const computerUse = agent ? agentComputerUseEnabled(agent) : false;
+    // The built-in servers that read_agent reports for this agent, so the two agree (#7088).
+    const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
+    return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
       arguments: params.arguments,
       approve: (reason, cwd) =>

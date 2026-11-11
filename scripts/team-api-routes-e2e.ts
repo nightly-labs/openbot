@@ -159,6 +159,11 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
+import {
   BROWSING_MEMORY_CAPABILITY,
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -1371,6 +1376,12 @@ const mailbox: TeamApiMailbox = {
     Effect.succeed(id === "att-1" ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" } : null),
 };
 
+// What a member did in the tab while the host recorded: a page, then a click. No step has typed text.
+const TEACH_STEPS: ReturnType<TeamApiBrowser["stopTeach"]> = [
+  { kind: "page", host: "shop.example", path: "/orders", title: "Orders" },
+  { kind: "click", host: "shop.example", path: "/orders", role: "button", name: "Export" },
+];
+
 // The holders whose browser control a route gave back, so a session end can be checked.
 const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0][] = [];
 const releasedSession = (sessionId: string | undefined) =>
@@ -1386,6 +1397,15 @@ const browser: TeamApiBrowser = {
   stop: unused("stop"),
   takeUserControl: unused("takeUserControl"),
   releaseUserControl: unused("releaseUserControl"),
+  // The holder of a recording is one session of a member.
+  startTeach: (tabId, holder) => {
+    record("startTeach", tabId, holder.kind, holder.kind === "member" && holder.sessionId.length > 0);
+    return Effect.void;
+  },
+  stopTeach: (tabId, holder, save) => {
+    record("stopTeach", tabId, holder, save);
+    return save ? TEACH_STEPS : [];
+  },
   releaseUserControlHeldBy: (holder) => {
     releasedHolders.push(holder);
   },
@@ -4716,6 +4736,81 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  // ---- Teach a task (browser-teach-v1) ----
+  {
+    const capabilities = [BROWSER_TEACH_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises browser-teach-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_TEACH_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_TEACH_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", BROWSER_TEACH_ROUTES.start, { token: bobToken, json: { tabId: "tab-1" } });
+    check(
+      "the teach routes without the capability get 400 browserTeachUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserTeachUnsupported")) &&
+        callsOf("startTeach").length === 0,
+      summary(unsupported),
+    );
+    const started = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-1" },
+      capabilities,
+    });
+    const startCall = callsOf("startTeach").at(-1);
+    check(
+      "a member starts a recording; the host gets the tab and the member's session as the holder",
+      started.status === 200 &&
+        isDeepStrictEqual(started.body, {}) &&
+        isDeepStrictEqual(startCall, ["tab-1", "member", true]),
+      [summary(started), startCall],
+    );
+    const hidden = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-private" },
+      capabilities,
+    });
+    check(
+      "a member cannot record in a private tab",
+      errorIs(hidden, 404, sourceText("error.backend.browserTabNotFound")) &&
+        !callsOf("startTeach").some((args) => args[0] === "tab-private"),
+      summary(hidden),
+    );
+    const noSave = await call("POST", BROWSER_TEACH_ROUTES.stop, {
+      token: bobToken,
+      json: { tabId: "tab-1" },
+      capabilities,
+    });
+    const saved = await call("POST", BROWSER_TEACH_ROUTES.stop, {
+      token: bobToken,
+      json: { tabId: "tab-1", save: true },
+      capabilities,
+    });
+    const discarded = await call("POST", BROWSER_TEACH_ROUTES.stop, {
+      token: bobToken,
+      json: { tabId: "tab-1", save: false },
+      capabilities,
+    });
+    check(
+      "stop needs `save`; a saved recording gives its steps, which the client decoder takes, and a discarded one gives none",
+      noSave.status === 400 &&
+        saved.status === 200 &&
+        isDeepStrictEqual(decodeBrowserTeachSteps(saved.body), TEACH_STEPS) &&
+        discarded.status === 200 &&
+        isDeepStrictEqual(discarded.body, { steps: [] }) &&
+        isDeepStrictEqual(
+          callsOf("stopTeach").map((args) => [args[0], args[2]]),
+          [
+            ["tab-1", true],
+            ["tab-1", false],
+          ],
+        ),
+      [summary(noSave), summary(saved), summary(discarded)],
     );
   }
 

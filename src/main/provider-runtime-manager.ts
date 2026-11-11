@@ -328,7 +328,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         concurrency: "unbounded",
         discard: true,
       });
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, VERSION_RETENTION_MS);
+      if (this.#target) {
+        const stale = Date.now() - VERSION_RETENTION_MS;
+        const paths = yield* this.#oldVersionPathsEffect(this.#target, stale, true);
+        // Forked, as in the update check: the removal can take gigabytes off a slow disk, and the
+        // window waits for this start. The stamps above are done, so a sibling keeps these versions.
+        yield* Effect.forkIn(this.#removeOldVersionPathsEffect(paths, stale), this.#scope);
+      }
       return this.getStatus();
     });
   }
@@ -1571,23 +1577,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #collectVersionsEffect(target: RuntimeTarget, retentionMs: number): Effect.Effect<void> {
     const stale = Date.now() - retentionMs;
     return this.#oldVersionPathsEffect(target, stale, true).pipe(
-      Effect.flatMap((paths) =>
-        Effect.forEach(
-          paths,
-          (path) =>
-            removeStaleRuntimeDirectory(path, stale).pipe(
-              Effect.andThen(pathExists(path)),
-              Effect.flatMap((kept) =>
-                kept
-                  ? Effect.void
-                  : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
-              ),
-            ),
-          { concurrency: "unbounded", discard: true },
-        ),
-      ),
-      Effect.catch(() => Effect.void),
+      Effect.flatMap((paths) => this.#removeOldVersionPathsEffect(paths, stale)),
     );
+  }
+
+  /** Removes each of `paths` that is still not stamped after `stale`, with its verification record. */
+
+  #removeOldVersionPathsEffect(paths: readonly string[], stale: number): Effect.Effect<void> {
+    return Effect.forEach(
+      paths,
+      (path) =>
+        removeStaleRuntimeDirectory(path, stale).pipe(
+          Effect.andThen(pathExists(path)),
+          Effect.flatMap((kept) =>
+            kept ? Effect.void : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    ).pipe(Effect.catch(() => Effect.void));
   }
 
   /**

@@ -80,6 +80,7 @@ export const messages = {
   "agent.error.hideFailed": "לא ניתן להסתיר את הסוכן",
   "agent.error.restoreFailed": "לא ניתן לשחזר את הסוכן",
   "agent.error.hiddenFailed": "השינוי לא נשמר. יש לנסות שוב.",
+  "agent.error.muteFailed": "לא ניתן לשנות את ההתראות",
   "agent.error.settingsFailed": "לא ניתן לשמור את הגדרות הסוכן",
   "agent.error.adminOnly": "רק מנהל של השרת יכול לשנות את הגדרות הסוכן.",
   "agent.error.continueFailed": "הסוכן לא הצליח להמשיך. יש לנסות שוב.",

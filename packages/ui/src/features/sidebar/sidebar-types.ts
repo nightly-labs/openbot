@@ -153,6 +153,16 @@ export interface SidebarProps {
   onMarkAgentRead?: ((agentId: string) => void) | undefined;
   /** Marks the newest reply of an agent unread. Without it, the agent menu shows no unread item. */
   onMarkAgentUnread?: ((agentId: string) => void) | undefined;
+  /**
+   * The agents that the user muted: their own notification level for the agent is "nothing"
+   * (`agent-notification-levels-v1`). Their menu offers Unmute.
+   */
+  mutedAgentIds?: ReadonlySet<string> | undefined;
+  /**
+   * Mutes an agent for the user on all of their devices, or gives the agent the server level again.
+   * Without it, such as on a host that keeps no levels, the agent menu shows no mute item.
+   */
+  onSetAgentMuted?: ((agentId: string, muted: boolean) => void) | undefined;
   /** Hides an agent. Without it, the agent menu shows no hide item. */
   onHideAgent?: ((agentId: string) => void) | undefined;
   /** Puts a hidden agent back in its section. Without it, a hidden agent's menu shows no restore item. */

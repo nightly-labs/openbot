@@ -535,6 +535,13 @@ browser tool calls on it wait until the release. The host refuses a take while a
 active on the tab, and releases the holds of a session when it ends. Each change sends
 `browser-user-control-changed { tabIds }`.
 
+`browser-teach-v1` (protocol 9 only) lets a member show a task in an agent's tab that they can see:
+`POST /v1/browser/teach/start` (`{ tabId }`, answers `{}`) takes the tab for the member and starts
+the recording, and `POST /v1/browser/teach/stop` (`{ tabId, save }`) gives the tab back and answers
+`{ steps }`, at most 200. Only the session that started the recording can end it; another session
+gets no step and changes nothing. A client shows the action only when the host also has
+`browser-user-control-v1`.
+
 `browser-page-state-v1` adds `POST /v1/browser/page-state` (empty body) and `POST /v1/browser/stop`
 (`{ tabId }`). Both answer with `{ tabs: [{ tabId, canGoBack, canGoForward }] }`, and each change
 sends `browser-page-state-changed` with the same list. A stop ends the load at once, before the queued
@@ -671,6 +678,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
+| `browser-teach-v1` | Start and stop the recording of a task that a member shows in an agent's browser tab. The steps go only to the session that started it. Protocol 9 only | none: each member, for a tab they can see |
 | `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
@@ -1538,7 +1546,18 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
   from the host, so no host request starts before the connection.
 - Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
   host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
-  agent avatars load only when the host is online. The web connect starts before the frame renders.
+  an agent avatar with no saved copy loads only when the host is online. The web connect starts
+  before the frame renders.
+- The frame names each picture by a host URL, which only the host can answer. Each client thus keeps
+  a copy of the pictures that it loaded, and shows the agent pictures while the host is offline. The
+  frame keeps no channel picture URL, so a channel copy only saves a download while the host is online. Desktop keeps agent
+  and channel pictures on disk in the main process (`src/main/remote-picture-cache.ts`, folder
+  `remote-pictures` in `userData`, one account, 400 pictures for each server). Web keeps agent
+  pictures in the browser's Cache storage
+  (`src/renderer/src/features/web-client/web-agent-pictures.ts`). A picture URL names a version, so
+  a new picture is a miss and replaces the copy. Sign-out, a change of account, server removal and
+  the end of access (`authentication_required`, a revoked session) delete the copies; a download
+  that started before the delete stores nothing.
 - A frame agent's row shows no preview: the last message is not known, so it does not say that
   there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
   and a channel row with no last message shows no preview and no time.

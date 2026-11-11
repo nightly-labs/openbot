@@ -521,6 +521,11 @@ export class DrainScheduler {
     return this.#hold(this.#settingsHolds, agentId);
   }
 
+  /** True while a read or a change of this agent's session settings runs. */
+  holdsSessionSettings(agentId: string): boolean {
+    return this.#settingsHolds.has(agentId);
+  }
+
   #hold(holds: Map<string, number>, agentId: string): () => void {
     holds.set(agentId, (holds.get(agentId) ?? 0) + 1);
     let released = false;
@@ -984,6 +989,7 @@ export class DrainScheduler {
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
                 approvalPolicy: "on-request",
+                approvalsReviewer: "user",
                 sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
                 ...(client.provider === "codex" || client.provider === "claude"
                   ? this.#serviceTier(agent, client.provider)

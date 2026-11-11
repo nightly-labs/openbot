@@ -69,6 +69,7 @@ import {
   type ModelDiscovery,
   validateCustomProvider,
 } from "./custom-provider-form";
+import { FoundModelPicker } from "./FoundModelPicker";
 import { type RepeatableColumn, RepeatableRows } from "./RepeatableRows";
 
 // Examples of identifiers and addresses. They are not words, so they are the same in each language.
@@ -422,7 +423,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     const state = discovery();
     return state.status === "found" ? state.models : undefined;
   };
-  const discoveryId = createUniqueId();
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
   /**
@@ -434,8 +434,11 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     if (list.status === "loading") return;
     const fill = fillNextList;
     fillNextList = false;
-    if (!fill || list.status !== "found" || !untrack(() => props.contextWindows)) return;
+    if (!fill || list.status !== "found") return;
     const models = list.models;
+    // The user asked for the list, so the list opens.
+    if (models.length > 0) setPicking(true);
+    if (!untrack(() => props.contextWindows)) return;
     setDraft((state) => {
       for (const row of state.models) {
         const found = models.find((model) => model.id === row.id.trim());
@@ -444,28 +447,52 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     });
   });
 
+  const [picking, setPicking] = createSignal(false);
+  /** The form holds as many models as one endpoint can have. */
+  const full = () => draft.models.filter((row) => !blankModel(row)).length >= CUSTOM_PROVIDER_LIMITS.models;
+
   /** A found model is a row in the same list the user types into, so submit has one source. */
+  function addRow(state: CustomProviderDraft, model: DiscoveredModel): void {
+    if (state.models.some((row) => row.id.trim() === model.id)) return;
+    const row = {
+      id: model.id,
+      name: model.name ?? model.id,
+      contextWindow: model.contextWindow?.toString() ?? "",
+      maxOutput: model.maxOutput?.toString() ?? "",
+      ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+      ...(model.inputs ? { inputs: [...model.inputs] } : {}),
+    };
+    // The blank row that a new form opens with is a placeholder, not a model the user added.
+    const blank = state.models.findIndex(blankModel);
+    if (blank >= 0) state.models[blank] = row;
+    else state.models.push(row);
+  }
+
+  function removeRow(state: CustomProviderDraft, model: DiscoveredModel): void {
+    const index = state.models.findIndex((row) => row.id.trim() === model.id);
+    if (index >= 0) state.models.splice(index, 1);
+    if (state.models.length === 0) state.models.push({ id: "", name: "" });
+  }
+
   function toggleModel(model: DiscoveredModel, checked: boolean): void {
     setDraft((state) => {
-      if (!checked) {
-        const index = state.models.findIndex((row) => row.id.trim() === model.id);
-        if (index >= 0) state.models.splice(index, 1);
-        if (state.models.length === 0) state.models.push({ id: "", name: "" });
-        return;
+      if (checked) addRow(state, model);
+      else removeRow(state, model);
+    });
+  }
+
+  /** Adds or removes each model that the search shows. An endpoint holds a limited number of models. */
+  function toggleModels(models: readonly DiscoveredModel[], checked: boolean): void {
+    setDraft((state) => {
+      for (const model of models) {
+        if (!checked) {
+          removeRow(state, model);
+          continue;
+        }
+        if (state.models.some((row) => row.id.trim() === model.id)) continue;
+        if (state.models.filter((row) => !blankModel(row)).length >= CUSTOM_PROVIDER_LIMITS.models) break;
+        addRow(state, model);
       }
-      if (state.models.some((row) => row.id.trim() === model.id)) return;
-      const row = {
-        id: model.id,
-        name: model.name ?? model.id,
-        contextWindow: model.contextWindow?.toString() ?? "",
-        maxOutput: model.maxOutput?.toString() ?? "",
-        ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
-        ...(model.inputs ? { inputs: [...model.inputs] } : {}),
-      };
-      // The blank row that a new form opens with is a placeholder, not a model the user added.
-      const blank = state.models.findIndex(blankModel);
-      if (blank >= 0) state.models[blank] = row;
-      else state.models.push(row);
     });
   }
 
@@ -795,25 +822,17 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                               {t("customProvider.model.foundValuesHint")}
                             </Text>
                           </Show>
-                          <ul class="custom-provider-discovered" aria-label={t("customProvider.discovery.label")}>
-                            <For each={models()}>
-                              {(model, index) => (
-                                <li>
-                                  <label class="custom-provider-discovered-row" for={`${discoveryId}-${index()}`}>
-                                    <Checkbox
-                                      id={`${discoveryId}-${index()}`}
-                                      checked={listed(model.id)}
-                                      disabled={busy()}
-                                      onChange={(event) => toggleModel(model, event.currentTarget.checked)}
-                                    />
-                                    <Text variant="body-sm" class="custom-provider-discovered-id">
-                                      {model.id}
-                                    </Text>
-                                  </label>
-                                </li>
-                              )}
-                            </For>
-                          </ul>
+                          <FoundModelPicker
+                            models={models()}
+                            listed={listed}
+                            full={full()}
+                            busy={busy()}
+                            open={picking()}
+                            mount={mount()}
+                            onOpenChange={setPicking}
+                            onToggle={toggleModel}
+                            onToggleAll={toggleModels}
+                          />
                         </Show>
                       )}
                     </Match>

@@ -190,6 +190,8 @@ function TasksPageStory(props: {
   approvals?: AgentApproval[];
   agents?: AgentProfile[];
   waitsForAnswer?: (task: AgentTask) => boolean;
+  /** The host refuses each new task, so the composer shows the start error. */
+  startFails?: boolean;
 }) {
   const previousApi = window.openbot;
   const tasks: Record<string, AgentTask[]> = {};
@@ -198,6 +200,11 @@ function TasksPageStory(props: {
     tasks,
     taskConversations: Object.fromEntries(props.tasks.map((task) => [task.id, conversationOf(task)])),
   });
+  if (props.startFails) {
+    mock.api.agent.startTask = async () => {
+      throw new Error("Chief has no provider. Connect one in Settings.");
+    };
+  }
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -238,6 +245,8 @@ export const Default: Story = { render: () => <TasksPageStory tasks={TASKS} /> }
 export const Empty: Story = { render: () => <TasksPageStory tasks={[]} /> };
 /** Thirty agents: the agent menu fits the window and scrolls to the last agent. */
 export const ManyAgents: Story = { render: () => <TasksPageStory tasks={[]} agents={MANY_AGENTS} /> };
+/** The host refuses the task. Write a task and start it: the error comes out from behind the input. */
+export const StartError: Story = { render: () => <TasksPageStory tasks={TASKS} startFails /> };
 
 /** A running task asks to write outside its workspace. Its row and panel say that it waits for you. */
 const WAITING_APPROVAL: AgentApproval = {

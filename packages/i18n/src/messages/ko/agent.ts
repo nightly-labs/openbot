@@ -79,6 +79,7 @@ export const messages = {
   "agent.error.hideFailed": "에이전트를 숨기지 못했어요",
   "agent.error.restoreFailed": "에이전트를 복원하지 못했어요",
   "agent.error.hiddenFailed": "변경 사항이 저장되지 않았어요. 다시 시도해 주세요.",
+  "agent.error.muteFailed": "알림을 변경할 수 없습니다",
   "agent.error.settingsFailed": "에이전트 설정을 저장하지 못했어요",
   "agent.error.adminOnly": "에이전트 설정은 서버 관리자만 변경할 수 있어요.",
   "agent.error.continueFailed": "에이전트가 계속 진행하지 못했어요. 다시 시도해 주세요.",

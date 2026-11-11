@@ -25,7 +25,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
-import { AGENT_PREVIEW_MAX_LENGTH, type AgentStore } from "../agent-store";
+import type { AgentStore } from "../agent-store";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
@@ -113,11 +113,6 @@ export interface RoutineHooks {
 
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
-/**
- * Enough for every routine run a busy host starts between restarts; each entry holds two previews of
- * at most `AGENT_PREVIEW_MAX_LENGTH` characters.
- */
-const PREVIEW_BEFORE_RUN_LIMIT = 10_000;
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -135,12 +130,6 @@ export interface RoutineSchedulerOptions {
   timezone?: () => string;
   /** Built after the service, so read when a tool call needs it. Omitted, the tool refuses. */
   webhookRoutines?: (() => WebhookRoutineWriter) | undefined;
-}
-
-/** The agent preview before a routine run, and the routine task the run showed in its place. */
-export interface RoutinePreviewBeforeRun {
-  previous: string;
-  shown: string;
 }
 
 /**
@@ -179,12 +168,6 @@ export class RoutineScheduler implements RoutineDueSource {
    * the oldest entry goes.
    */
   readonly #deliveryTimezones = new Map<string, string>();
-  /**
-   * The agent preview before a routine run showed its task there, by delivery. A run that ends
-   * quiet, or whose last answer is only the no-update marker, puts it back. Memory only: after a
-   * restart, the preview keeps the task. Past the cap, the oldest entry goes.
-   */
-  readonly #previewsBeforeRun = new Map<string, RoutinePreviewBeforeRun & { agentId: string }>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -264,29 +247,6 @@ export class RoutineScheduler implements RoutineDueSource {
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
     return run !== null && quietRoutineRun(run);
-  }
-
-  /**
-   * The preview before the routine run of this delivery, and the one the run showed, once: the
-   * entry goes with the call. Null after a restart, or for a run that saved none.
-   */
-  takePreviewBeforeRun(deliveryId: string): RoutinePreviewBeforeRun | null {
-    const entry = this.#previewsBeforeRun.get(deliveryId);
-    this.#previewsBeforeRun.delete(deliveryId);
-    return entry ? { previous: entry.previous, shown: entry.shown } : null;
-  }
-
-  #rememberPreviewBeforeRun(deliveryId: string, agentId: string, preview: string, shown: string): void {
-    // A run queued while an earlier run of the agent still shows its task keeps the preview from
-    // before that run, so the last quiet run puts that one back, not the earlier task.
-    let previous = preview;
-    for (const entry of this.#previewsBeforeRun.values()) {
-      if (entry.agentId === agentId && entry.shown === preview) previous = entry.previous;
-    }
-    this.#previewsBeforeRun.set(deliveryId, { agentId, previous, shown });
-    if (this.#previewsBeforeRun.size <= PREVIEW_BEFORE_RUN_LIMIT) return;
-    const [oldest] = this.#previewsBeforeRun.keys();
-    if (oldest !== undefined) this.#previewsBeforeRun.delete(oldest);
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -1079,18 +1039,9 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#hooks.syncMailboxMessages(current);
         return current;
       });
-      // A run that ends quiet, or answers only the no-update marker, puts the earlier preview back.
-      const previous = this.#store.list().find((entry) => entry.id === agent.id)?.preview;
-      if (previous !== undefined)
-        this.#rememberPreviewBeforeRun(
-          deliveryId,
-          agent.id,
-          previous,
-          run.instruction.slice(0, AGENT_PREVIEW_MAX_LENGTH),
-        );
-      yield* this.#store.updatePreview(agent.id, run.instruction).pipe(toRoutineOperationFailed);
+      // The preview keeps the chat's latest message: the routine task shows only as its run row,
+      // and the run's answer takes the preview when it ends (#6983).
       yield* routineStep(() => {
-        this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
         this.#conversation.emitConversation(snapshot, "routine.run-queued", {
           routineId: run.routineId,
           runId: run.id,

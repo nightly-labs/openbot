@@ -15,6 +15,8 @@ export const messages = {
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
     "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider}, {name} MCP sunucusunu başlatamadı, bu yüzden yanıt durdu. Bu sunucu OpenBot'ta değil, kendi {provider} ayarlarınızda. Sunucuyu orada kaldırın veya onarın, ardından yeni bir sohbet başlatın.",
   "error.provider.endpointsReadOnly":
     "Kayıtlı uç noktalar OpenBot'un daha yeni bir sürümü tarafından yazılmış veya dosya okunamıyor. Bunları değiştirmek için OpenBot'u güncelleyin.",
   "error.provider.endpointNoSecureStorage":
@@ -197,6 +199,8 @@ export const messages = {
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode bu ücretsiz modeli reddetti. Bazı ücretsiz modeller her ülkede kullanılamaz. Ücretsiz etiketli başka bir model seçin veya OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırıp bir OpenCode Go modeli seçin.",
   "error.provider.customEndpointKeyRefused":
     '"{provider}" uç noktası API anahtarını veya başlıklarını reddetti. Bunları Sunucu ayarları → Sağlayıcılar bölümünde yeniden girin, ardından tekrar deneyin.',
   "error.provider.customEndpointKeyMissing":

@@ -233,6 +233,7 @@ import {
   decodeBrowserPreviewFromMain,
   decodeBrowserTab,
   decodeBrowserTabs,
+  decodeBrowserTeachSteps,
 } from "./browser-decoding";
 import {
   decodeBrowserDockAction,
@@ -1470,6 +1471,8 @@ const openbotApi: OpenBotDesktopApi = {
       close: decodeVoid,
       takeControl: decodeVoid,
       releaseControl: decodeVoid,
+      startTeach: decodeVoid,
+      stopTeach: decodeBrowserTeachSteps,
       listTabs: decodeBrowserTabs,
       getDisplayState: decodeBrowserDisplayState,
       getControlState: decodeBrowserControlState,

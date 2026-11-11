@@ -6,7 +6,7 @@
   "category": "productivity",
   "creatorName": "MrGo2",
   "iconUrl": "https://www.apple.com/apple-touch-icon.png",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "prompts": [
     { "id": "prompt-unread", "text": "Summarize my unread email in Apple Mail from today." },
     { "id": "prompt-today", "text": "What is on my Apple Calendar today and tomorrow?" },
@@ -21,7 +21,7 @@
       "name": "Apple apps",
       "description": "Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari, over the local mcp-icloud server. Needs macOS and Automation access.",
       "iconUrl": "https://www.apple.com/apple-touch-icon.png",
-      "server": { "name": "apple-apps", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-icloud@2.1.3"] },
+      "server": { "name": "apple-apps", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-icloud@2.1.4"] },
       "macAutomation": ["calendar", "contacts", "mail", "notes", "reminders", "messages", "safari"]
     }
   ],

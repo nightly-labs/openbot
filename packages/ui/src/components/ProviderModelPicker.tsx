@@ -604,6 +604,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const value = triggerSpeed();
     return value === "standard" ? null : speedName(value, t);
   };
+  /**
+   * The model name in the trigger. Beside an account it has no provider word, because the mark
+   * shows the provider and the account needs the room. The tooltip and the label keep the full name.
+   * A form field has the room of its row and keeps the full name.
+   */
+  const triggerShownName = () => {
+    const name = triggerModelName();
+    const prefix = `${railName(activeProvider(), t)} `;
+    return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
+  };
   const triggerSummary = () =>
     [triggerModelName(), triggerEffort(), triggerSpeedName(), triggerAccount()].filter(Boolean).join(" · ");
 
@@ -654,7 +664,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 );
               }}
             </For>
-            <SwapLabel class="provider-model-trigger-name" text={triggerModelName()} motion={TRIGGER_SWAP} />
+            <SwapLabel class="provider-model-trigger-name" text={triggerShownName()} motion={TRIGGER_SWAP} />
             <Show when={triggerEffort()}>
               {(effort) => (
                 <span class="provider-model-trigger-effort">

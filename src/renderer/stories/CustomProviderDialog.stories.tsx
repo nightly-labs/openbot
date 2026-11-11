@@ -195,6 +195,20 @@ export const DiscoveryFound: Story = {
   },
 };
 
+/** An endpoint that lists more models than one endpoint can hold: the search narrows what Select all adds. */
+export const DiscoveryFoundMany: Story = {
+  args: {
+    draft: ollama,
+    onDiscoverModels: fn(),
+    discovery: {
+      status: "found",
+      models: ["qwen3-coder", "gpt-oss", "devstral", "llama3.3", "mistral-small", "gemma3"].flatMap((family) =>
+        Array.from({ length: 20 }, (_, index) => ({ id: `${family}:${index + 1}b` })),
+      ),
+    },
+  },
+};
+
 /**
  * After Find models, the list gives a window, a max output and input kinds (#3946): they fill the empty
  * fields of the rows that it names, and a line says where they come from.

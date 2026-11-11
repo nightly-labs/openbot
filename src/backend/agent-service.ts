@@ -1726,7 +1726,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
-        takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
         closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
@@ -1792,9 +1791,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }).pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
         cancelMemoryReview: (agentId) => this.#memoryReview.cancel(agentId),
         stopAgentProcess: (agentId) =>
-          this.#providers
-            .stopAgentProcess(agentId)
-            .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
+          Effect.gen({ self: this }, function* () {
+            yield* this.#providers
+              .stopAgentProcess(agentId)
+              .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+            if (process.platform !== "win32") return;
+            const release = yield* Effect.try({
+              try: () => this.#releasesSharedOpenCode(agentId),
+              catch: (cause) => new AgentRemovalFailed({ cause }),
+            });
+            if (release) yield* this.#providers.releaseSharedProcess("opencode");
+          }),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
         // Both moves run under this lock and check the deletion there.
@@ -3561,6 +3568,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         move: "return",
       };
     const limited = !this.#usageLimits.mayDrain(agentId);
+    // A message from the user tries the held model first: the limit can have ended outside OpenBot.
+    // A refused try holds the agent again, and the drain after it moves (#7068).
+    if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
     const taskWork = () =>
@@ -4257,7 +4267,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
-      this.#mcp.migrateCatalogBridgesToHttp();
+      this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
     });
@@ -4800,6 +4810,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #runsTurn(agentId: string): boolean {
     return this.#conversation.anyWorkingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId);
+  }
+
+  /**
+   * Whether the delete stops the shared OpenCode process, which can have worked in this agent's folder: the agent is set to it or
+   * has a session on it. False while another OpenCode agent's session settings are read: that read uses the process.
+   */
+  #releasesSharedOpenCode(agentId: string): boolean {
+    const agents = this.#store.list();
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    if (
+      agents.some(
+        (candidate) => providerForAgent(candidate) === "opencode" && this.#drain.holdsSessionSettings(candidate.id),
+      )
+    )
+      return false;
+    if (providerForAgent(agent) === "opencode") return true;
+    return agent.threadId
+      ? this.#store.database.listProviderSessions(agent.threadId).some((session) => session.provider === "opencode")
+      : false;
   }
 
   /** Whether this provider reports a CLI that is installed, current, and signed in. */

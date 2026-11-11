@@ -12,6 +12,14 @@
  */
 .composer-stack {
   --composer-stack-inset: var(--openbot-space-3);
+  --composer-stack-duration: var(--openbot-duration-overlay);
+
+  /* The frame fades in and out with its first and last card, so no line comes or goes in one frame. */
+  border: 0 solid transparent;
+  background: transparent;
+  transition:
+    border-color var(--composer-stack-duration) var(--openbot-ease-out),
+    background-color var(--composer-stack-duration) var(--openbot-ease-out);
 }
 
 /* A narrow pane gives the rows the width the side margins took. */
@@ -22,14 +30,16 @@
 }
 
 .composer-stack:has(> :not(.agent-queue-slot), > .agent-queue-slot > .agent-queue-slot-inner > *) {
-  --composer-stack-overlap: 14px;
+  /* To the middle line of the one-line pill, so its round ends cover the lower corners. */
+  --composer-stack-overlap: var(--composer-stack-pill-half, 24px);
 
   position: relative;
   z-index: 10;
   overflow: hidden;
   margin: 0 var(--composer-stack-inset) calc(-1 * var(--composer-stack-overlap));
-  border: 1px solid var(--openbot-queue-border);
-  border-radius: var(--openbot-radius-lg);
+  border-width: 1px;
+  border-color: var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-queue-surface);
   padding-bottom: var(--composer-stack-overlap);
 }
@@ -64,4 +74,265 @@
   ) {
     animation: context-compaction-notice-out var(--openbot-duration-toast-exit) var(--openbot-ease-in-out) forwards;
   }
+}
+
+/*
+ * One row rhythm for every card in the stack, taken from the queue row and the input: a 29px row,
+ * a 5px gutter, a 14px leading column that starts 13px from the edge, then the text 7px after it.
+ * The text column is the one that the text in the input has. The main text has the size of the
+ * text in the input; states and counts are one step smaller.
+ */
+.composer-stack {
+  --stack-row-height: 29px;
+  --stack-row-gutter: 5px;
+  --stack-row-inset: 13px;
+  --stack-row-glyph: var(--openbot-icon-sm);
+  --stack-row-gap: 7px;
+}
+
+.composer-stack .task-list .task-list-header {
+  min-height: calc(var(--stack-row-height) + var(--stack-row-gutter));
+  gap: var(--stack-row-gap);
+  padding-block: 0;
+  /* The button has a 1px border of its own. */
+  padding-inline: calc(var(--stack-row-inset) - 1px);
+}
+
+.composer-stack :is(.task-list-title, .awaiting-replies-text, .open-waits-row-note) {
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .task-list-count {
+  font-size: var(--openbot-text-sm);
+}
+
+.composer-stack .task-list-items {
+  padding-inline: var(--stack-row-inset);
+}
+
+.composer-stack .task-list[data-open] .task-list-items {
+  padding-bottom: var(--stack-row-gutter);
+}
+
+.composer-stack .task-list-item {
+  min-height: var(--stack-row-height);
+  gap: var(--stack-row-gap);
+  padding-block: 0;
+}
+
+/* A two-line row keeps its text clear of the row above and below. */
+.composer-stack .open-waits-row {
+  padding-block: var(--stack-row-gutter);
+}
+
+/* The avatar is 2px wider than the leading column, so it goes 1px over each side of it. */
+.composer-stack .awaiting-replies-avatar {
+  margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
+}
+
+.composer-stack .composer-notice {
+  gap: var(--stack-row-gap);
+  padding-inline-start: var(--stack-row-inset);
+}
+
+.composer-stack .composer-notice-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
+}
+
+/*
+ * A notice is one row, as a waiting row is: the title, then the body on the same line, in the text
+ * size of the input. A long body goes to more lines. The buttons are 24px, so a notice with a button
+ * and a notice with text only have the same height.
+ */
+.composer-stack .composer-notice,
+.composer-stack .composer-notice:not(:has(.ui-button)) {
+  --notice-inset: 6px;
+
+  min-height: calc(var(--openbot-control-xs) + 2 * var(--notice-inset) + 1px);
+}
+
+.composer-stack .composer-notice-copy {
+  display: block;
+  line-height: 20px;
+}
+
+.composer-stack .composer-notice-copy :is(strong, p) {
+  display: inline;
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .composer-notice-copy strong {
+  margin-inline-end: var(--openbot-space-1-5);
+}
+
+.composer-stack .composer-notice .ui-button {
+  height: var(--openbot-control-xs);
+  min-height: 0;
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.composer-stack .composer-notice .composer-notice-dismiss {
+  width: var(--openbot-control-xs);
+  padding: 0;
+}
+
+.composer-stack .context-compaction-notice-copy {
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .context-compaction-notice-percent {
+  line-height: 20px;
+}
+
+.composer-stack .composer-reply-preview {
+  padding-inline-start: var(--stack-row-inset);
+}
+
+/* Each card that is left goes down behind the input: the frame goes with the last one. */
+.composer-stack:not(
+  :has(
+    > .composer-stack-card[data-open="true"],
+    > .agent-queue-slot[data-open="true"],
+    > .composer-notice:not([data-leaving]),
+    > .composer-reply-preview
+  )
+) {
+  border-color: transparent;
+  background: transparent;
+}
+
+/*
+ * One card of the stack. Its row opens from 0 to the height of the card, so the cards above it move
+ * up with the frame while this one comes out from behind the input, and the reverse when it closes.
+ * `ComposerStackCard` keeps the card in the page until the row is closed.
+ *
+ * The card pulls up by 1px over its own top line, as the cards in the queue slot do. The pull opens
+ * and closes with the row, so a closed card takes no room.
+ */
+.composer-stack-card {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: -1px;
+  transition:
+    grid-template-rows var(--composer-stack-duration) var(--openbot-ease-out),
+    margin-top var(--composer-stack-duration) var(--openbot-ease-out);
+}
+
+.composer-stack-card[data-open="false"] {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+}
+
+@starting-style {
+  .composer-stack-card {
+    grid-template-rows: 0fr;
+    margin-top: 0;
+  }
+}
+
+.composer-stack-card-inner {
+  min-height: 0;
+  overflow: hidden;
+  transition: opacity var(--composer-stack-duration) var(--openbot-ease-out);
+}
+
+.composer-stack-card[data-open="false"] > .composer-stack-card-inner {
+  opacity: 0;
+}
+
+@starting-style {
+  .composer-stack-card-inner {
+    opacity: 0;
+  }
+}
+
+/* The row is the movement of a card in the stack, so the card does not also rise on its own. */
+.composer-stack-card-inner > :is(.awaiting-replies, .composer-notice, .composer-reply-preview) {
+  margin-top: 0;
+  animation: none;
+}
+
+/* The line between the cards above and the queue. The pull closes with the slot. */
+.composer-stack > .agent-queue-slot {
+  transition:
+    grid-template-rows var(--openbot-duration-overlay) var(--openbot-ease-out),
+    margin-top var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.composer-stack > .agent-queue-slot[data-open="true"] {
+  margin-top: -1px;
+}
+
+.composer-stack > .agent-queue-slot .agent-queue-panel {
+  margin-top: 0;
+}
+
+/* The transition still runs, so the card still tells `ComposerStackCard` that it is closed. */
+@media (prefers-reduced-motion: reduce) {
+  .composer-stack {
+    --composer-stack-duration: 1ms;
+  }
+
+  .composer-stack > .agent-queue-slot {
+    transition: none;
+  }
+}
+
+/*
+ * The last open card is a notice: its colour goes down into the part of the stack that is behind
+ * the input, so the round ends of the pill show the colour of the notice, not the colour of the
+ * frame. Only the last card does this, because the tint is not opaque and two layers make it darker.
+ * A card that closes keeps the colour there while it fades, so no line in the colour of the frame shows below it.
+ */
+.composer-stack
+> :is(.composer-stack-card, .composer-notice):not(
+  :has(
+    ~ .composer-stack-card[data-open="true"],
+    ~ .agent-queue-slot[data-open="true"],
+    ~ .composer-notice,
+    ~ .composer-reply-preview
+  )
+) {
+  --stack-notice-tuck: var(--composer-stack-overlap);
+}
+
+.composer-stack > .composer-notice,
+.composer-stack-card-inner > .composer-notice {
+  box-shadow: 0 var(--stack-notice-tuck, 0) 0 var(--notice-surface);
+}
+
+.composer-stack-card:not(
+    :has(
+      ~ .composer-stack-card[data-open="true"],
+      ~ .agent-queue-slot[data-open="true"],
+      ~ .composer-notice,
+      ~ .composer-reply-preview
+    )
+  )
+  > .composer-stack-card-inner:has(> .composer-notice) {
+  overflow: visible;
+  clip-path: inset(0 0 calc(-1 * var(--composer-stack-overlap)) 0);
+}
+
+/*
+ * The reference code of an error is on the line of the text, so an error with a code has the height
+ * of the other notices. The copy button is taller than the line; it must not make the line taller.
+ */
+.composer-stack .composer-notice-copy .ui-error-reference {
+  display: inline-flex;
+  height: 20px;
+  margin-top: 0;
+  margin-inline-start: var(--openbot-space-1-5);
+  vertical-align: top;
+}
+
+/* An empty ring is a full circle that the eye can find, not a mark that looks absent. */
+.composer-stack .task-list-donut-track {
+  stroke: var(--openbot-text-muted);
 }

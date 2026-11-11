@@ -116,7 +116,11 @@ export const messages = {
     other: "Uç nokta {count} model listeliyor. Eklenecek modelleri seçin.",
   },
   "customProvider.discovery.empty": "Uç nokta hiçbir model listelemiyor. Model kimliklerini kendiniz ekleyin.",
-  "customProvider.discovery.label": "Uç noktanın listelediği modeller",
+  "customProvider.discovery.choose": "Modelleri seç",
+  "customProvider.discovery.search": "Model ara",
+  "customProvider.discovery.selectAll": "Tümünü seç",
+  "customProvider.discovery.deselectAll": "Seçimi kaldır",
+  "customProvider.discovery.noMatch": "Aramanızla eşleşen model yok.",
 
   // Ekleme akışının ilk adımı: hazır bir ayar bir sonraki formu doldurur.
   "customProvider.preset.title": "Sağlayıcı veya ajan ekle",

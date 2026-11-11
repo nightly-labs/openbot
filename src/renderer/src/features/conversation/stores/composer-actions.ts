@@ -1017,6 +1017,24 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
+  /**
+   * A card message with a file that the app made, such as the steps of a shown task. The chat shows
+   * the short body and the file. False when the chat cannot send now or the host refuses the file.
+   */
+  async function sendCardFile(body: string, file: File): Promise<boolean> {
+    const target = deps.currentTarget();
+    if (!target || deps.submitting() || !deps.agentReady()) return false;
+    const runtime = conversationRuntime(deps.props);
+    const attachments = await importPastedFiles(
+      [file],
+      () => 0,
+      (data) => runtime.agent.importAttachmentData(data, target.serverId),
+    ).catch(() => []);
+    if (attachments.length === 0) return false;
+    queueSend(target, { text: body, attachments, replyToMessageId: null }, body);
+    return true;
+  }
+
   return {
     updateTeamTyping,
     stopTeamTyping,
@@ -1034,6 +1052,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     retryPendingSend,
     editPendingSend,
     dismissPendingSend,

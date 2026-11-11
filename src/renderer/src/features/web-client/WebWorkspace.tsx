@@ -35,6 +35,7 @@ import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/age
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
 import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -756,7 +757,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }
     if (workspace.state.host?.hostId === hostId) await channels.open(channelId);
   }
-  const { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels } = createWebNotificationRouting({
+  const {
+    setMuted,
+    setNotificationLevel,
+    notifyChannelReplies,
+    refreshLevels,
+    applyLevels: applyAgentLevels,
+    mutedAgentIds,
+  } = createWebNotificationRouting({
     workspace,
     notifications,
     t,
@@ -790,6 +798,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     notifications,
     setLocalLevel: setNotificationLevel,
     setMuted,
+    onLevelsWritten: applyAgentLevels,
     openHostId: () => server()?.id ?? null,
   });
   /** The host whose notification row the account settings show. Each nonce moves there once. */
@@ -1789,7 +1798,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.onHostEvent((event) => {
       if (event.type !== "agent-notification-levels-changed") return;
       const hostId = server()?.id;
-      if (hostId) notificationSettings.applyLevels(hostId, { server: event.server, agents: event.agents });
+      if (!hostId) return;
+      const levels = { server: event.server, agents: event.agents };
+      notificationSettings.applyLevels(hostId, levels);
+      applyAgentLevels(hostId, levels);
     }),
   );
   // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
@@ -2510,6 +2522,27 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     );
   }
+  // A host that keeps no levels has no mute item: the item must not fail.
+  const muteSupported = () =>
+    workspace.state.status === "online" && workspace.state.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
+  /** Mutes an agent for the user on all of their devices, or gives it the server level again. */
+  function setAgentMuted(agentId: string, muted: boolean): void {
+    const hostId = workspace.state.host?.hostId;
+    const write = workspace.runtime.setHostAgentNotificationLevel;
+    if (!hostId || !write) return;
+    void write(hostId, { agentId, level: muted ? "nothing" : null }).then(
+      (levels) => {
+        notificationSettings.applyLevels(hostId, levels);
+        applyAgentLevels(hostId, levels);
+      },
+      (error: unknown) => {
+        actionToast.error(t("agent.error.muteFailed"), {
+          description: text.errorMessage(error, t("agent.error.hiddenFailed")),
+          report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+        });
+      },
+    );
+  }
   // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
   const hideSupported = () =>
     workspace.state.status === "online" &&
@@ -2982,6 +3015,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     marketplaceSupported={workspace.state.status === "online"}
                     onDeleteAgent={workspace.deleteAgent}
                     userHiddenAgents={workspace.state.userHiddenAgents}
+                    mutedAgentIds={muteSupported() ? mutedAgentIds(workspace.state.host?.hostId) : undefined}
+                    onSetAgentMuted={muteSupported() ? setAgentMuted : undefined}
                     onHideAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, true) : undefined}
                     onRestoreAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, false) : undefined}
                     compact={compact()}

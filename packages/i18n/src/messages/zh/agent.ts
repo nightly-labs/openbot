@@ -74,6 +74,7 @@ export const messages = {
   "agent.error.hideFailed": "无法隐藏助手",
   "agent.error.restoreFailed": "无法恢复助手",
   "agent.error.hiddenFailed": "更改未保存，请重试。",
+  "agent.error.muteFailed": "无法更改通知",
   "agent.error.settingsFailed": "无法保存助手设置",
   "agent.error.adminOnly": "只有服务器管理员可以更改助手设置。",
   "agent.error.continueFailed": "助手无法继续，请重试。",

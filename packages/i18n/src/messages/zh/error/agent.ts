@@ -129,6 +129,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerBuiltIn":
+    "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
   "error.agent.screenCaptureWindowMissing": "该窗口当前未打开，请调用 list_capture_sources 获取当前窗口 ID。",
   "error.agent.screenCaptureDisplayMissing": "该显示器当前未连接，请调用 list_capture_sources 获取当前显示器 ID。",

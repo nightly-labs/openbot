@@ -82,6 +82,7 @@ export const messages = {
   "agent.error.hideFailed": "Agent konnte nicht ausgeblendet werden",
   "agent.error.restoreFailed": "Agent konnte nicht wiederhergestellt werden",
   "agent.error.hiddenFailed": "Die Änderung wurde nicht gespeichert. Versuche es erneut.",
+  "agent.error.muteFailed": "Benachrichtigungen konnten nicht geändert werden",
   "agent.error.settingsFailed": "Die Agenteneinstellungen konnten nicht gespeichert werden",
   "agent.error.adminOnly": "Nur ein Serveradministrator kann Agenteneinstellungen ändern.",
   "agent.error.continueFailed": "Der Agent konnte nicht fortfahren. Versuche es erneut.",

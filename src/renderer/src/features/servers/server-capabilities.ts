@@ -87,6 +87,7 @@ export function serverSupportsCapability(
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
       capability === "browsing-memory-v1" ||
+      capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
