@@ -113,7 +113,11 @@ export const messages = {
   },
   "customProvider.discovery.empty":
     "Le point de terminaison ne liste aucun modèle. Ajoutez vous-même les ID de modèle.",
-  "customProvider.discovery.label": "Modèles listés par le point de terminaison",
+  "customProvider.discovery.choose": "Choisir des modèles",
+  "customProvider.discovery.search": "Rechercher des modèles",
+  "customProvider.discovery.selectAll": "Tout sélectionner",
+  "customProvider.discovery.deselectAll": "Tout désélectionner",
+  "customProvider.discovery.noMatch": "Aucun modèle ne correspond à votre recherche.",
 
   "customProvider.preset.title": "Ajouter un fournisseur ou un agent",
   "customProvider.preset.description":
