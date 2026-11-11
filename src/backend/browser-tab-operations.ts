@@ -97,6 +97,7 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
   // Read in the caller's fiber: the queued work below runs in the tab scope.
   const heldByUser = yield* BrowserToolHold;
   const queueWaitMs = yield* BrowserToolQueueWait;
+  const dialogTurn = yield* BrowserDialogTurn;
   const previous = tab.queue;
   const drained = Deferred.makeUnsafe<void>();
   const started = Deferred.makeUnsafe<void>();
@@ -152,7 +153,7 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
       // The queue moves on without this operation, which does not run when its turn comes.
       if (Option.isNone(reached)) {
         cancel();
-        return yield* browserFailure(new Error(queueWaitError(tab)));
+        return yield* browserFailure(new Error(queueWaitError(tab, dialogTurn)));
       }
     }
     return yield* Deferred.await(response);
@@ -163,10 +164,10 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
  * An earlier operation on the tab did not finish, for example a command that a page dialog or a page that
  * does not answer holds. The agent gets an error that it can act on, not a tool call that never returns.
  */
-function queueWaitError(tab: BrowserHostTab) {
+function queueWaitError(tab: BrowserHostTab, turn: BrowserDialogOwner | undefined) {
   const dialog = tab.engine.dialog;
   // A call that was queued before the dialog opened. A later call gets this advice from the tab check.
-  if (dialog?.agent)
+  if (dialog && turn && tab.engine.dialogOwnedBy(turn))
     return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
   if (dialog)
     return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
