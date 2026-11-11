@@ -732,7 +732,8 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       websiteUrl: "https://openbot.run",
     });
     assert.deepEqual(resource.clients.at(-1), openbotClient("OpenBot"));
-    assert.ok(upstream.every((hit) => hit.userAgent === "OpenBot/9.9.9-e2e"));
+    // n8n answers each `User-Agent` with "bot" in it with an empty 204 (#6497).
+    assert.ok(upstream.every((hit) => !/bot/iu.test(hit.userAgent ?? "")));
     const titleOf = async (route: { url: string; bearer: string }) => {
       const before = resource.clients.length;
       const named = await connect(route.url, route.bearer);
@@ -763,7 +764,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       controlCharacters: "Ops Bot (OpenBot)",
       renamed: "Renamed Bot (OpenBot)",
       unknownAgent: "OpenBot",
-      userAgent: "OpenBot/9.9.9-e2e",
+      userAgentWithoutBot: true,
       crossAgentBearers: 403,
     };
 

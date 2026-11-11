@@ -55,7 +55,10 @@ export interface AcpFlavor {
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
    */
-  emptyAnswerFailure?(turn: { reasoned: boolean; answered: boolean }, label: string): string | null;
+  emptyAnswerFailure?(
+    turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
+    label: string,
+  ): string | null;
   /**
    * The failure text of a prompt that the agent failed because the model gave no answer. The turn
    * then ends as a turn with no answer does, not with the agent's own error text.
@@ -193,6 +196,13 @@ export interface AcpFlavor {
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
    */
   planUsedUpChunk?: RegExp;
+  /**
+   * The agent runs an approved edit under a second tool call id. At the end of the turn it reports
+   * the approved id as failed with this text, although the edit ran. OpenBot shows the approved call
+   * as completed when an edit of the same file, or the only approved edit, completed under another
+   * id in the turn. Without such an edit, the failure stays.
+   */
+  approvedEditSweep?: RegExp;
   /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
   sessionMeta?: NewSessionRequest["_meta"];
   /**
@@ -218,6 +228,17 @@ export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
 
 /**
+ * A turn that ended as done with no answer text and no tool call fails, also when it sent its
+ * reasoning. A plan or a compaction shows in the chat, so such a turn still succeeds.
+ */
+function noAnswerUnlessPlanOrCompaction(
+  { showedPlanOrCompaction }: { showedPlanOrCompaction: boolean },
+  label: string,
+): string | null {
+  return showedPlanOrCompaction ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
+}
+
+/**
  * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
  * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
  */
@@ -226,6 +247,9 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 fails the prompt when the model sends only its reasoning: `Internal error:
   // "empty response from model (reasoning_only)"` (#6073).
   emptyAnswerError: /\bempty response from model\b/u,
+  // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
+  // The chat then showed no answer and no error (#6529).
+  emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
 };
 
 /**
@@ -303,6 +327,10 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     error.data.details.includes("config.toml"),
   // Its `Agent` call is titled `Agent: <description>`, and its arguments come as content text.
   subagentTools: ["Agent"],
+  // Kimi CLI 1.52.0 stops reading a turn at `StepInterrupted`, so a model step that fails ends the
+  // prompt as `end_turn`, and the step's error is lost. The chat then showed no answer and no error
+  // (#6722). Kimi's thinking alone is not an answer.
+  emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
 };
 
 /**

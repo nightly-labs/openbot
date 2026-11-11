@@ -199,10 +199,14 @@ export const messages = {
     "מודלי OpenCode החינמיים הגיעו למגבלת השימוש. כל המודלים החינמיים חולקים את המגבלה הזו. כדי להמשיך, יש להדביק מפתח OpenCode Go בהגדרות OpenCode, או לבחור מודל מספק אחר.",
   "error.provider.opencodeProviderFailed":
     "ספק המודלים נכשל מצדו. החיבור שלך אינו הסיבה. יש לנסות שוב מאוחר יותר או לבחור מודל אחר.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "התשובה של המודל נקטעה או שלא הייתה תקינה. יש לשלוח את ההודעה שוב או לבחור מודל אחר.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT עדיין מכין את ההיסטוריה המקומית שלו אחרי הפעלה קודמת. יש להמתין כמה דקות ואז לנסות שוב.",
+  "error.provider.codexThreadInUse":
+    "אפליקציית Codex אחרת פתחה את הצ'אט הזה, למשל אפליקציית Codex למחשב, Codex CLI או תוסף IDE. רק אפליקציה אחת בכל פעם יכולה לכתוב לצ'אט של Codex. יש לסגור את הצ'אט באותה אפליקציה ואז לשלוח את ההודעה שוב.",
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.opencodeDatabaseNewer":
@@ -269,6 +273,8 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "לא ניתן לקרוא את הגרסה של Hermes Agent.",
   "error.provider.hermesSignIn": "יש להתחבר עם Nous Portal, או להריץ `hermes setup` בטרמינל, כדי להשתמש ב-Hermes.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
+  "error.provider.claudeContextFull":
+    "הצ'אט הזה נעשה ארוך מדי עבור Claude. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.claudeApiKeyNoCredit":
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
   "error.provider.foreignReasoning":
@@ -277,6 +283,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageCountLimit":
+    "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.museMcpStartupFault":
@@ -305,6 +313,10 @@ export const messages = {
     "{provider} דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז לנסות שוב.",
   "error.provider.keyProviderNoBalance":
     "בחשבון {provider} של מפתח ה-API השמור אין יתרה. יש להוסיף קרדיט לחשבון ואז לנסות שוב.",
+  "error.provider.modelServiceRefused":
+    "שירות המודל דחה את הבקשה. יש לבחור מודל אחר, או לבדוק את הגישה שלך למודל הזה בשירות.",
+  "error.provider.modelServiceRefusedReason":
+    "שירות המודל דחה את הבקשה: {reason}. יש לבחור מודל אחר, או לבדוק את הגישה שלך למודל הזה בשירות.",
   "error.provider.messageTooLarge": "OpenBot עצר את {provider} כי הוא שלח הודעה גדולה מ-{limit} MB.",
   "error.provider.customAgentIdInvalid":
     "מזהה סוכן חייב להכיל אותיות קטנות באנגלית, ספרות או `-`, ולא יכול להיות המזהה של ספק מובנה.",

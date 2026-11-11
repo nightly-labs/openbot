@@ -215,10 +215,14 @@ export const messages = {
     "De gratis OpenCode-modellen hebben hun gebruikslimiet bereikt. Alle gratis modellen delen deze limiet. Plak een OpenCode Go-sleutel in de OpenCode-instellingen om door te gaan, of kies een model van een andere aanbieder.",
   "error.provider.opencodeProviderFailed":
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT bereidt na een eerdere start nog de lokale geschiedenis voor. Wacht een paar minuten en probeer het opnieuw.",
+  "error.provider.codexThreadInUse":
+    "Een andere Codex-app heeft deze chat open, zoals de Codex-desktopapp, de Codex CLI of een IDE-extensie. Maar één app tegelijk kan naar een Codex-chat schrijven. Sluit de chat in die app en stuur je bericht dan opnieuw.",
   "error.provider.realtimeLimitZero":
     "Linux heeft de provider gestopt, omdat OpenBot een realtime-CPU-limiet van 0 heeft. De limiet komt van je systeem. Installeer en start rtkit (`rtkit-daemon`), voer `systemctl --user restart xdg-desktop-portal` uit en start OpenBot daarna opnieuw. Alleen xdg-desktop-portal opnieuw starten helpt niet zolang rtkit ontbreekt.",
   "error.provider.opencodeDatabaseNewer":
@@ -290,6 +294,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
+  "error.provider.claudeContextFull":
+    "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.claudeApiKeyNoCredit":
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.foreignReasoning":
@@ -298,6 +304,8 @@ export const messages = {
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageCountLimit":
+    "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.museMcpStartupFault":
@@ -326,6 +334,10 @@ export const messages = {
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":
     "Het {provider}-account van de opgeslagen API-sleutel heeft geen saldo. Voeg tegoed toe aan het account en probeer het opnieuw.",
+  "error.provider.modelServiceRefused":
+    "De modeldienst heeft het verzoek geweigerd. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
+  "error.provider.modelServiceRefusedReason":
+    "De modeldienst heeft het verzoek geweigerd: {reason}. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
   "error.provider.messageTooLarge":
     "OpenBot heeft {provider} gestopt, omdat het een bericht groter dan {limit} MB stuurde.",
   "error.provider.customAgentIdInvalid":

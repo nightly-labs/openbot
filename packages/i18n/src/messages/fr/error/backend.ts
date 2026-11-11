@@ -164,6 +164,10 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Le destinataire est en cours de suppression. Réessayez une fois la suppression terminée.",
   "error.backend.recipientHidden": "Cet agent est masqué. Restaurez-le pour envoyer des messages.",
+  "error.backend.agentIdUnknown":
+    "Aucun agent n’a l’identifiant {id}. Obtenez les identifiants avec openbot.list_agents, puis réessayez.",
+  "error.backend.agentIdNear":
+    "Aucun agent n’a l’identifiant {id}. L’agent {name} a l’identifiant {nearId}, presque identique. S’il s’agit de cet agent, réessayez avec son identifiant.",
   "error.backend.attachBetween": "Joignez entre 1 et {limit} fichiers.",
   "error.backend.attachmentNotFile": "La pièce jointe n’est pas un fichier : {path}",
   "error.backend.generatedImageTooLarge": "L’image générée dépasse la limite de 100 Mo.",

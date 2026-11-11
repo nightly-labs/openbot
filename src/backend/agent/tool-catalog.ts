@@ -391,10 +391,21 @@ function parseCall(params: DynamicToolCallParams) {
 }
 
 /**
- * The error for a `tool_call` that `resolveDeferredTool` refused because its `arguments` is not an
- * object, or null for another reason. A general error made the agent send the same text again.
+ * True when a `tool_call` names OpenBot's discovery tool, such as `openbot.tool_describe`. Only a qualified
+ * name counts: a bare `tool_search` can mean the provider's own search for MCP tools.
+ */
+function callsDiscoveryTool(envelope: unknown): boolean {
+  const named = bridgedName(envelope)?.trim();
+  return named !== undefined && /^(?:openbot\.|openbot__|mcp__openbot__)tool_(?:search|describe)$/.test(named);
+}
+
+/**
+ * The error for a `tool_call` that `resolveDeferredTool` refused because it names a discovery tool or
+ * its `arguments` is not an object, or null for another reason. A general error made the agent send
+ * the same text again: an agent that loaded a schema through tool_call never got it (#6754).
  */
 export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+  if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
   const parsed = parseCall(params);
   const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
   return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")

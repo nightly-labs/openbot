@@ -435,7 +435,7 @@ export function compactionContinuationPrompt(): string {
 
 /**
  * The provider input for a turn that starts with several deliveries: all the answers to one request,
- * or the answers that wait when the person writes. The texts become one text item, so a history
+ * or the person's messages that waited together. The texts become one text item, so a history
  * handoff goes in front of all of them. `unanswered` names the teammates whose request ended with no
  * answer, so the agent does not wait for them.
  */

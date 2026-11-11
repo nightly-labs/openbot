@@ -210,10 +210,14 @@ export const messages = {
     "Darmowe modele OpenCode osiągnęły limit użycia. Wszystkie darmowe modele mają wspólny limit. Aby kontynuować, wklej klucz OpenCode Go w ustawieniach OpenCode albo wybierz model innego dostawcy.",
   "error.provider.opencodeProviderFailed":
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT nadal przygotowuje swoją lokalną historię po wcześniejszym uruchomieniu. Poczekaj kilka minut, a potem spróbuj ponownie.",
+  "error.provider.codexThreadInUse":
+    "Inna aplikacja Codex ma otwarty ten czat, na przykład aplikacja Codex na komputer, Codex CLI lub rozszerzenie IDE. Tylko jedna aplikacja naraz może pisać do czatu Codex. Zamknij czat w tamtej aplikacji, a potem wyślij wiadomość ponownie.",
   "error.provider.realtimeLimitZero":
     "Linux zatrzymał dostawcę, ponieważ OpenBot ma limit czasu procesora w czasie rzeczywistym równy 0. Ten limit pochodzi z Twojego systemu. Zainstaluj i uruchom rtkit (`rtkit-daemon`), uruchom `systemctl --user restart xdg-desktop-portal`, a potem uruchom ponownie OpenBot. Sam restart xdg-desktop-portal nie pomoże, dopóki brakuje rtkit.",
   "error.provider.opencodeDatabaseNewer":
@@ -285,6 +289,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
+  "error.provider.claudeContextFull":
+    "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.claudeApiKeyNoCredit":
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
   "error.provider.foreignReasoning":
@@ -293,6 +299,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.imageCountLimit":
+    "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
   "error.provider.museMcpStartupFault":
@@ -321,6 +329,10 @@ export const messages = {
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":
     "Konto {provider} zapisanego klucza API nie ma środków. Doładuj konto, a następnie spróbuj ponownie.",
+  "error.provider.modelServiceRefused":
+    "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
+  "error.provider.modelServiceRefusedReason":
+    "Usługa modelu odrzuciła żądanie: {reason}. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.messageTooLarge":
     "OpenBot zatrzymał {provider}, ponieważ wysłał on wiadomość większą niż {limit} MB.",
   "error.provider.customAgentIdInvalid":

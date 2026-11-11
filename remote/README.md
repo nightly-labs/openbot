@@ -162,7 +162,9 @@ until the host sends `queued-delivery-ack`. While a host has kept events, Signal
 again once a minute, because a start can fail after the account service answered. A host that
 sent no key gets nothing kept. A restart of Signal loses the queue and the keys: until a sleeping
 host connects again, its events start it but are not kept. Signal remembers at most 100,000 keys
-and 100,000 route answers, and drops the oldest first. Signal names the
+and 100,000 route answers, and drops the oldest first. A generic webhook for a route with no socket
+starts a sleeping hosted server too, at most once in 30 minutes for each host, but Signal keeps
+nothing and answers 503: only the host can check the signature, and the sender sends again. Signal names the
 `ingress-queue` capability in `ready` only when the account service answered `/v2/remote/route-wake`
 when Signal started: only then does a hosted server with a live connection sleep. Deploy the account
 service before Signal.

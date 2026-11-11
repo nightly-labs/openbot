@@ -1,10 +1,9 @@
 {
-  "version": "0.67.0",
+  "version": "0.67.1",
   "highlights": [
-    "Fast mode is off for each Claude agent after this update: if you used it, turn it on again in the model picker.",
-    "Add a server on your own Linux computer or VPS with one command, or ask an agent to install it there over SSH.",
-    "Server settings → Transfer now moves the chat history, the channels and the workflows to the new server.",
-    "On a joined server, the desktop app and the browser app now have most of the features of this computer.",
-    "The Apps catalog has 207 new apps, such as monday.com, Miro, Dropbox and Zapier, with a browser sign-in."
+    "Gemini installs and updates on Windows again.",
+    "An agent that sends a message to a busy teammate now knows if the message went into the running task, and can tell you why it waits.",
+    "During Computer Use, agents no longer say that their cursor is not available.",
+    "Agents can now use an n8n MCP server that you signed in to through OpenBot."
   ]
 }

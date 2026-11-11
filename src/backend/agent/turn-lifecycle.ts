@@ -103,6 +103,8 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
  * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
+ * A model that gave only its reasoning and no answer can answer on another model (#6594). As for each
+ * cause, a turn that ran a tool step does not run again, so the tool does not run two times.
  */
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
@@ -112,6 +114,7 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "authentication",
   "network",
   "timeout",
+  "empty_answer",
 ]);
 
 /**
@@ -826,6 +829,21 @@ export class TurnLifecycle {
             yield* Deferred.done(association, exit);
             if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
           }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
+        } else {
+          // Claude answers a steer that came after the turn's last request in a turn of its own, named by
+          // the steered delivery. The message goes with that answer, not above the earlier one (#6673).
+          const moved = yield* this.#mailbox.moveSteerToTurn(agentId, turnId).pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId);
+                return false;
+              }),
+            ),
+          );
+          if (moved) {
+            this.#mailboxSync.syncDeliveryMessage(snapshot, turnId);
+            this.#mailboxSync.syncMailboxMessages(snapshot);
+          }
         }
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
@@ -1287,10 +1305,12 @@ export class TurnLifecycle {
   /**
    * Records a call to the failure tool; the latest reason wins. False when no routine run started the
    * turn. A flow handoff counts: its call fails that step only, because a handoff has no run of its own.
+   * `channelRun` is a turn that owns a main task of a channel routine's request: the channel reads
+   * the reason from the task's delivery and ends the run failed (#6667).
    */
-  reportRoutineFailure(agentId: string, turnId: string, reason: string): boolean {
+  reportRoutineFailure(agentId: string, turnId: string, reason: string, channelRun = false): boolean {
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return false;
+    if (!channelRun && !deliveries.some(({ delivery }) => delivery.sender.kind === "routine")) return false;
     this.#reportedFailures.set(turnId, reason);
     return true;
   }
@@ -1379,7 +1399,10 @@ export class TurnLifecycle {
         !mayContinue &&
         !routineSession &&
         this.#compaction.reserve(agentId, threadId, false, turnId);
-      this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
+      // Read before a refused session is dropped below: the drop unbinds the provider thread, and a
+      // channel turn would then end on the agent's own chat, so its task kept running (#6596).
+      const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
+      this.#browser.endControl(publicThreadId, turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
       // A routine run in its own session ends in the chat's snapshot, where a later turn can still
       // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
@@ -1426,11 +1449,15 @@ export class TurnLifecycle {
                 )?.plan ?? null,
             })
           : null;
-      // After work started, only a ready backup in the agent's order, or the ready model that the agent
-      // left, continues it. A turn refused before work still waits for the reset when no backup is
-      // ready. A continuation that a backup refused before work keeps the earlier provider's work.
+      // After work started, a ready backup in the agent's order, or the ready model that the agent left,
+      // continues it. With neither, the work of the agent's chat or a task waits in the queue, and the
+      // model continues it when its limit ends (#6660). A channel task goes back to its channel only
+      // for a backup. A turn refused before work waits for the reset too. A continuation that a backup
+      // refused before work keeps the earlier provider's work.
       const carriesWork = this.#carriesWork(agentId, turnId, running);
-      let continuing = limited && carriesWork && deliveries.length > 0 && this.#hooks.mayContinueOnBackup(agentId);
+      const waitsHere = !channelTurn && deliveries.every(({ channelId }) => channelId === undefined);
+      let continuing =
+        limited && carriesWork && deliveries.length > 0 && (waitsHere || this.#hooks.mayContinueOnBackup(agentId));
       if (continuing) {
         for (const { delivery, channelId } of deliveries) {
           if (channelId && !(yield* this.#hooks.requeueChannelDelivery(delivery.id, true))) {
@@ -1634,7 +1661,9 @@ export class TurnLifecycle {
           const reason =
             terminal === "failed" && failure
               ? this.#hooks.redactMcp(failure)
-              : terminal === "completed" && reportedFailure !== undefined && delivery.delivery.sender.kind === "routine"
+              : terminal === "completed" &&
+                  reportedFailure !== undefined &&
+                  (delivery.delivery.sender.kind === "routine" || delivery.channelId !== undefined)
                 ? this.#hooks.redactMcp(reportedFailure)
                 : null;
           yield* this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason).pipe(toTurnOperationFailed);
@@ -1714,7 +1743,7 @@ export class TurnLifecycle {
       this.#hooks.emit({
         type: "turn-completed",
         agentId,
-        threadId: this.#conversation.publicThreadId(agentId, threadId),
+        threadId: publicThreadId,
         turnId,
         status: outcome,
         origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
@@ -1898,6 +1927,12 @@ export class TurnLifecycle {
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
   ) {
+    // With no continuation, the next attempt runs with this turn ID and writes its text into this
+    // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
+    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does.
+    if (!resumeAfterUsageLimit)
+      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
+        if (isEmptyAttemptText(snapshot.messages[index], turnId)) snapshot.messages.splice(index, 1);
     for (const context of deliveries) {
       const { delivery } = context;
       const continuation = resumeAfterUsageLimit
@@ -2390,6 +2425,18 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
+}
+
+/** An answer or thinking row of the turn that holds nothing yet: no text, no file and no image. */
+function isEmptyAttemptText(message: ConversationMessage | undefined, turnId: string): boolean {
+  return (
+    message?.author === "assistant" &&
+    message.turnId === turnId &&
+    (message.itemType === "agentMessage" || message.itemType === "commentary") &&
+    !message.text.trim() &&
+    !message.attachments?.length &&
+    !message.imageGeneration
+  );
 }
 
 export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>()("TurnOperationFailed", {

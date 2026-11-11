@@ -160,6 +160,7 @@ import {
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
   decodeHostPersonality,
+  decodeHostProviderAccountModels,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -270,6 +271,7 @@ import {
   type VaultHostImportResult,
   type VaultSaveInput,
   type VaultState,
+  withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -318,6 +320,7 @@ import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -1343,6 +1346,27 @@ export function listProviderAccounts(
   request: TeamApiRequest,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_ACCOUNTS_ROUTES.list, decodeHostProviderAccounts, {}));
+}
+
+/**
+ * `listProviderAccounts` with, on a host with `provider-account-models-v1`, the models that each
+ * account after the first serves and the provider's own sign-in does not. When that read fails, the
+ * accounts come without them, as from an older host.
+ */
+export function listProviderAccountsWithModels(
+  request: TeamApiRequest,
+  withModels: boolean,
+): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
+  if (!withModels) return listProviderAccounts(request);
+  return Effect.all(
+    [
+      listProviderAccounts(request),
+      adminCall(() => request("POST", PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {})).pipe(
+        Effect.orElseSucceed(() => null),
+      ),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(Effect.map(([accounts, models]) => (models ? withHostProviderAccountModels(accounts, models) : accounts)));
 }
 
 /** The readings of the accounts after the first. */

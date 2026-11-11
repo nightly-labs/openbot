@@ -153,6 +153,9 @@ export const messages = {
     "Состояние почтового ящика повреждено или создано более новой версией OpenBot; перезапись отклонена.",
   "error.backend.recipientDeleting": "Получатель удаляется. Повторите попытку, когда удаление завершится.",
   "error.backend.recipientHidden": "Этот агент скрыт. Восстановите его, чтобы отправлять сообщения.",
+  "error.backend.agentIdUnknown": "Нет агента с ID {id}. Получите ID через openbot.list_agents и повторите попытку.",
+  "error.backend.agentIdNear":
+    "Нет агента с ID {id}. У агента {name} почти такой же ID: {nearId}. Если вы имели в виду этого агента, повторите попытку с его ID.",
   "error.backend.attachBetween": "Прикрепите от 1 до {limit} файлов.",
   "error.backend.attachmentNotFile": "Вложение не является файлом: {path}",
   "error.backend.generatedImageTooLarge": "Созданное изображение превышает лимит 100 МБ.",

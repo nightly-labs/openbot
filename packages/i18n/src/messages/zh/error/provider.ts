@@ -190,9 +190,12 @@ export const messages = {
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
+  "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
+  "error.provider.codexThreadInUse":
+    "另一个 Codex 应用（例如 Codex 桌面应用、Codex CLI 或 IDE 扩展）打开了此聊天。同一时间只有一个应用可以写入 Codex 聊天。请在该应用中关闭此聊天，然后重新发送消息。",
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.opencodeDatabaseNewer":
@@ -257,6 +260,8 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
+  "error.provider.claudeContextFull":
+    "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.claudeApiKeyNoCredit":
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
   "error.provider.foreignReasoning":
@@ -265,6 +270,8 @@ export const messages = {
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageCountLimit":
+    "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.museMcpStartupFault":
@@ -288,6 +295,9 @@ export const messages = {
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",
   "error.provider.keyProviderNoBalance": "已保存 API 密钥的 {provider} 账户没有余额。请为账户充值，然后重试。",
+  "error.provider.modelServiceRefused": "模型服务拒绝了该请求。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
+  "error.provider.modelServiceRefusedReason":
+    "模型服务拒绝了该请求：{reason}。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
   "error.provider.messageTooLarge": "由于 {provider} 发送了大于 {limit} MB 的消息，OpenBot 已将其停止。",
   "error.provider.customAgentIdInvalid": "助手 ID 只能包含小写字母、数字或 `-`，且不能与内置服务商的 ID 相同。",
   "error.provider.customAgentEnvInvalid":

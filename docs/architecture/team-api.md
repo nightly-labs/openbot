@@ -452,6 +452,14 @@ that start after it, and the host sends the provider status event, so open setti
 again. `src/main/team-api/route-claude-user-setup.ts` owns them. Without the capability a client hides
 the switch for that host.
 
+The optional `provider-account-models-v1` capability (protocol 9 only) adds
+`POST /v1/admin/providers/accounts/models` (empty request). It gives, for each provider, the accounts
+after the first that serve models the provider's own sign-in does not, with those models (at most 1,000
+for each account; no credential, usage or agent). `provider-accounts-v1` carries no model list, so a
+client reads both and puts the models on their account: the model picker of that account then shows
+them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
+keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are

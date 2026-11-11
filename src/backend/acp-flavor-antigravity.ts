@@ -128,6 +128,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // routines, and a workflow runs agents that OpenBot does not show. Antigravity keeps the filter with
   // the session; a load or resume sends it again, so a session from an earlier release gets it too.
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
+  // After an approval, Antigravity runs the edit as a new call (`<sessionId>:<n>`, "Running
+  // edit_file") and then fails the approved call with this text. The chat showed a failure beside
+  // each approved edit that worked (#6878).
+  approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
   // Antigravity 1.3.0 has three exact forms: a load or resume puts the ID in data.sessionId, a
   // configuration change uses the SDK's resource URI `session <id>`, and a prompt raises a plain
   // error that the SDK wraps as an internal error.

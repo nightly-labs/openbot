@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini s’installe et se met à jour à nouveau sous Windows. Dans la 0.67.0, il s’arrêtait avec une erreur liée à un lien ou à un fichier spécial.",
+          "Un agent qui envoie un message à un coéquipier occupé sait maintenant si le message est entré dans la tâche en cours de ce coéquipier. Quand le message attend, l’agent peut vous dire pourquoi.",
+          "Pendant Computer Use, les agents ne disent plus que leur curseur n’est pas disponible. OpenBot affiche le curseur à l’endroit où l’agent clique, fait défiler ou déplace."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.0",
     "date": "2026-11-10",
     "notices": [

@@ -9,6 +9,10 @@ export const messages = defineMessages("error.agent", {
     "Invalid tool discovery arguments. Use the declared schema and an original qualified tool name.",
   "error.agent.toolCallArgumentsNotObject":
     "The tool did not run. In tool_call, arguments must be a JSON object, not text. Send the call again with arguments as an object.",
+  "error.agent.toolCallDiscoveryTool":
+    "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",

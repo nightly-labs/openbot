@@ -25,6 +25,11 @@ export interface CodexPromptSettings {
   "features.tool_suggest"?: false;
   /** `[[skills.config]]` entries: Codex selects a skill by `name` or by the `path` of its `SKILL.md`. */
   "skills.config"?: DynamicRecord[];
+  /**
+   * Codex models default to no reasoning summary, and then the chat shows no thinking. Codex drops
+   * the value for a provider or model that has no summaries.
+   */
+  model_reasoning_summary?: "auto";
 }
 
 /**
@@ -45,6 +50,9 @@ export function codexPromptSettings(read: DynamicRecord | null): CodexPromptSett
   const userSets = (feature: string) =>
     layers.some((layer) => typeof getRecord(getRecord(layer, "config"), "features")?.[feature] === "boolean");
   if (!userSets("tool_suggest")) settings["features.tool_suggest"] = false;
+  // No default fills this value, so the merged one is null unless a file sets it.
+  if (getString(getRecord(read, "config"), "model_reasoning_summary") === null)
+    settings.model_reasoning_summary = "auto";
   const own = getArray(getRecord(getRecord(read, "config"), "skills"), "config").filter(isRecord);
   const named = new Set(own.map((entry) => getString(entry, "name")));
   const folders = new Set(

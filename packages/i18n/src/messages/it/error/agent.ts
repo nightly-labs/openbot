@@ -10,6 +10,10 @@ export const messages = {
     "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
   "error.agent.toolCallArgumentsNotObject":
     "Il tool non è stato eseguito. In tool_call, arguments deve essere un oggetto JSON, non testo. Invia di nuovo la chiamata con arguments come oggetto.",
+  "error.agent.toolCallDiscoveryTool":
+    "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La pianificazione della routine non è valida: {detail} Correggi la pianificazione e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",
   "error.agent.accessLocalOnly": "L'accesso dell'agente si può cambiare solo sul computer che lo esegue.",
   "error.agent.duplicateCleanupFailed":

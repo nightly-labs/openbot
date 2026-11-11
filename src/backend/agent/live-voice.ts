@@ -40,6 +40,12 @@ const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
  * `unexpected status 404 Not Found: …, url: https://chatgpt.com/backend-api/codex/realtime/calls?…`.
  */
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
+/**
+ * How Codex reports that OpenAI refused the live voice connection. Codex drops OpenAI's reason.
+ * Current Codex: `unexpected status 403 Forbidden: realtime websocket handshake failed`.
+ * Older Codex: `failed to connect realtime websocket: HTTP error: 403 Forbidden`.
+ */
+const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
 /**
@@ -68,11 +74,17 @@ const RELAY_INSTRUCTIONS =
   "End with one sentence that says that the full answer is in the chat. " +
   "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
   "do not shorten it, and do not change its form.";
-/** The first message in the voice conversation. The voice model reads it as the user's. */
+/**
+ * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
+ * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
+ */
 const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
+  "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
+  "Keep that language when a short or unclear phrase sounds like a different one. " +
+  "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
 
 const logger = createOpenBotLogger("live-voice");
@@ -390,23 +402,36 @@ export class LiveVoice {
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    if (UNAUTHORIZED.test(message)) return liveFailure(sourceText("error.voice.live.signIn"));
-    if (CALL_NOT_FOUND.test(message)) return liveFailure(this.#unavailable(message));
-    return failure;
+    const text = this.#plainText(message);
+    return text ? liveFailure(text) : failure;
   }
 
   #reason(message: string | null): string {
     if (!message) return sourceText("error.voice.live.disconnected");
-    // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
-    if (CALL_NOT_FOUND.test(message)) return this.#unavailable(message);
-    return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
+    return (
+      this.#plainText(message) ??
+      sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
+    );
   }
 
-  /** The user cannot fix this, so the screen gets plain text and the log keeps OpenAI's request details. */
-  #unavailable(message: string): string {
-    logger.warn("OpenAI refused the live voice call.", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
-    return sourceText("error.voice.live.unavailable");
+  /**
+   * Plain text for an OpenAI refusal that Codex reports, or null for another error. The log keeps
+   * OpenAI's request details.
+   */
+  #plainText(message: string): string | null {
+    // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
+    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+    const key = CALL_NOT_FOUND.test(message)
+      ? "error.voice.live.unavailable"
+      : FORBIDDEN.test(message)
+        ? "error.voice.live.refused"
+        : null;
+    if (!key) return null;
+    logger.warn("OpenAI refused the live voice call.", {
+      text: key,
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText(key);
   }
 
   readonly #stopSession = Effect.fn("LiveVoice.stopSession")(function* (this: LiveVoice, session: LiveSession) {

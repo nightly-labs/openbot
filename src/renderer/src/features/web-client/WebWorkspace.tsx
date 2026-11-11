@@ -195,6 +195,7 @@ import {
   RoutineFlowsCanvas,
   ScheduleView,
   ServerOnboarding,
+  ServerSettingsModal,
   TasksView,
   WorkflowsCanvas,
 } from "../../lazy-views";
@@ -1189,6 +1190,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setAccountSettingsLoaded(true);
     setAccountSettingsOpen(true);
   }
+  // The code of both settings pages loads after the server shows, so their first open does not show
+  // an empty page for a moment.
+  createEffect(
+    () => workspace.state.status === "online",
+    (online) => {
+      if (!online) return;
+      void WebAccountSettings.preload();
+      void ServerSettingsModal.preload();
+    },
+  );
   /** The elements of the settings page that the settings panel shows in. The page sets them. */
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
   /** The search of the server settings page, which filters its section list. It clears when the page closes. */
@@ -2566,6 +2577,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     frameFirstLoad() &&
     agentChatOpen() &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  // The saved frame and its history loader take the place of the full-window screen. The screen does
+  // not come back when the host answers: a new screen would rain the crew in again over the workspace.
+  createEffect(frameConnecting, (frame) => {
+    if (frame) setLoadingCover(false);
+  });
   const conversationLoading = () =>
     workspace.state.status === "online" &&
     !workspace.conversation()?.page &&
@@ -2677,6 +2693,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     <ConversationLoadNotice
                       name={workspace.selected()?.name ?? ""}
                       loading={frameConnecting() || conversationLoading()}
+                      immediate={frameConnecting()}
                       error={conversationError()}
                       onRetry={() => {
                         const id = workspace.state.selectedId;
