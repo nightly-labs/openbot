@@ -244,6 +244,16 @@ export const messages = defineMessages("provider", {
   "provider.account.resetUsageNoCredit": "{name} has no usage reset credits left.",
   "provider.account.resetUsageAlreadyRedeemed": "This reset credit of {name} was already used.",
   "provider.account.resetUsageFailed": "Could not reset the usage of {name}.",
+  "provider.account.pool": "Pool accounts",
+  "provider.account.poolDescription":
+    "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "provider.account.inUse": "In use",
+  "provider.account.notInPool": "Not in pool",
+  "provider.account.leaveOutOfPool": "Leave out of pool",
+  "provider.account.putBackInPool": "Put back in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool of {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in use",
 
   // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "Connected",
@@ -267,6 +277,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.defaultSubtitle": "Default for new agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} of {max}. Each agent uses one account.",
+  "provider.settings.accountsPooledDescription": "{count} of {max}. Agents share these accounts.",
   "provider.settings.accountBlocked": "{agents} cannot run until you sign in again.",
   "provider.settings.removeTitle": "Remove {name}?",
   "provider.settings.removeMoves": "{agents} will use {name}.",
