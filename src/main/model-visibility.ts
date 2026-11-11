@@ -10,7 +10,11 @@ import type {
   ProviderModelVisibility,
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
-import { isCustomProviderContextWindow, isCustomProviderMaxOutput } from "@openbot/contracts/ipc";
+import {
+  isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
+  OPENCODE_RECOMMENDED_FREE_MODELS,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -390,6 +394,15 @@ function defaultShownModelIds(models: readonly { id: string }[], lookup: Release
     .map(({ id }) => id);
 }
 
+/**
+ * The models that a provider's picker shows in the main list whatever their release date, because a new
+ * agent of that provider starts on the first of them. OpenCode lists more than 100 models, and the
+ * newest families can be other free models, so without this the default would fold under Older models.
+ */
+const RECOMMENDED_MODELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["opencode", OPENCODE_RECOMMENDED_FREE_MODELS],
+]);
+
 type ModelKey = `${string}\u0000${string}`;
 
 function modelKey(provider: string, model: string): ModelKey {
@@ -568,6 +581,8 @@ export class ModelVisibility {
 
   #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
     const byDefault = new Set(defaultShownModelIds(models, lookup));
+    const recommended = RECOMMENDED_MODELS.get(provider) ?? [];
+    for (const model of models) if (recommended.includes(model.id.toLowerCase())) byDefault.add(model.id);
     const released = new Map<string, string>();
     for (const model of models) {
       const date = matchCatalog(model.id, lookup).release?.date;
