@@ -332,6 +332,7 @@
     "test:agent-channel-manage": "bun scripts/agent-channel-manage-e2e.ts",
     "test:agent-channel-create": "bun scripts/agent-channel-create-e2e.ts",
     "test:agent-workflow-gate": "bun scripts/agent-workflow-gate-e2e.ts",
+    "test:messaging-owner-card": "bun scripts/messaging-owner-card-e2e.ts",
     "test:agent-profile-accounts": "bun scripts/agent-profile-accounts-e2e.ts",
     "test:claude-usage-resume": "bun scripts/claude-usage-resume-e2e.ts",
     "test:claude-background-hold": "bun scripts/claude-background-hold-e2e.ts",

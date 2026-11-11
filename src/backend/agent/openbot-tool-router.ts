@@ -2297,8 +2297,11 @@ export class OpenBotToolRouter {
    * refused too: the Team API checks that member's agent access. The agent's own chat counts, and so
    * does a side thread that the person opened, or branched, and that takes no routine runs. A channel
    * task and a Slack or Telegram message also arrive as `user`, so a thread linked to either does not.
+   * `threadId` can be the provider's id: the checks below need the public id, or an external chat
+   * passes as the agent's own chat.
    */
-  #requestedByPerson(agentId: string, turnId: string, executionThreadId: string): boolean {
+  #requestedByPerson(agentId: string, turnId: string, threadId: string): boolean {
+    const executionThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
     return (
       deliveries.length > 0 &&
