@@ -161,6 +161,13 @@ const server = createServer((request, response) => {
     </script>`);
     return;
   }
+  if (url.pathname === "/hints-away") {
+    // A redirect to a different origin, which has not asked for hints.
+    const host = request.headers.host ?? "127.0.0.1";
+    response.writeHead(302, { location: `http://${host.replace("127.0.0.1", "localhost")}/hints` });
+    response.end();
+    return;
+  }
   if (url.pathname === "/hints") {
     // The site asks for the hints that Chrome sends only on request.
     response.setHeader("content-type", "text/html; charset=utf-8");
@@ -4322,6 +4329,12 @@ async function runRequestedHintsProbe(browser: BrowserHost, origin: string) {
     throw new Error(
       `Requested hints differ from the page: sent ${JSON.stringify(sent)}, page ${JSON.stringify(expected)}`,
     );
+  // A redirect to a different origin must not carry the hints that the first origin asked for.
+  await runCauseEffect(browser.loadUrl(tab.id, `${origin}/hints-away`));
+  const away = await read();
+  const carried = REQUESTED_HINTS.filter(([header]) => away.requestHeaders[header] !== undefined);
+  if (!String(away.requestHeaders.host).startsWith("localhost") || carried.length > 0)
+    throw new Error(`A redirect carried hints to a different origin: ${JSON.stringify(carried)}`);
   await runCauseEffect(browser.close(tab.id));
   process.stdout.write("BrowserHost: requested client hints match the page.\n");
   return sent;

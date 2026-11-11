@@ -73,7 +73,7 @@ function preferredBrowserLanguages(): string {
   for (const [index, code] of codes.entries()) {
     if (!expanded.includes(code)) expanded.push(code);
     const next = codes[index + 1];
-    if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !codes.includes(base(code)))
+    if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
       expanded.push(base(code));
   }
   return expanded
