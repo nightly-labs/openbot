@@ -911,14 +911,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#lastUsed.set(provider, now);
         continue;
       }
-      if (
-        this.#hooks.isProviderBusy(provider) ||
-        this.#providerStarts.has(provider) ||
-        this.#providerConnectionCommands.has(provider) ||
-        this.isReplacingCli(provider) ||
-        this.#cliLogin.has(provider) ||
-        (provider === "codex" && this.#codexLogin.pending)
-      ) {
+      if (this.#providerInUse(provider)) {
         this.#lastUsed.set(provider, now);
         continue;
       }
@@ -931,14 +924,8 @@ export class ProviderRuntime implements ProviderPort {
         ? PROVIDER_IDLE_RELEASE_MS
         : PROVIDER_UNASSIGNED_RELEASE_MS;
       if (now - lastUsed < limit) continue;
-      // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
-      this.#clients.delete(provider);
-      this.#released.add(provider);
-      this.#startFailures.delete(provider);
-      this.#conversation.unloadClientThreads(client);
       logger.info("Stopped an idle provider CLI.", { provider });
-      yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
-      yield* this.#hooks.onClientStopped(client);
+      yield* this.#releaseClient(provider, client);
     }
     for (const [agentId, confined] of this.#confined) {
       if (confined.client.canReleaseProcess?.() === false) {
@@ -951,6 +938,50 @@ export class ProviderRuntime implements ProviderPort {
       yield* this.#stopConfined(agentId, confined);
     }
   }, Effect.uninterruptible);
+
+  /** True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's process. */
+  #providerInUse(provider: AgentProvider): boolean {
+    return (
+      this.#hooks.isProviderBusy(provider) ||
+      this.#providerStarts.has(provider) ||
+      this.#providerConnectionCommands.has(provider) ||
+      this.isReplacingCli(provider) ||
+      this.#cliLogin.has(provider) ||
+      (provider === "codex" && this.#codexLogin.pending)
+    );
+  }
+
+  /** Stops the provider's shared process as an idle one. The next turn starts it again and resumes its threads. */
+  readonly #releaseClient = Effect.fn("ProviderRuntime.releaseClient")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    client: AgentClient,
+  ) {
+    // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
+    this.#clients.delete(provider);
+    this.#released.add(provider);
+    this.#startFailures.delete(provider);
+    this.#conversation.unloadClientThreads(client);
+    yield* client.stop().pipe(toProviderOperationFailed).pipe(Effect.ignore);
+    yield* this.#hooks.onClientStopped(client);
+  });
+
+  /**
+   * Stops the provider's shared process now, when nothing uses it, as an idle release does. OpenCode
+   * keeps watchers in each folder that one of its sessions used until its process ends, also after
+   * `session/close`, and Windows refuses to remove a watched folder (`EBUSY`, #7029). A process that
+   * a turn of another agent uses stays: the delete fails, and a retry after that turn can succeed.
+   */
+  readonly releaseSharedProcess = Effect.fn("ProviderRuntime.releaseSharedProcess")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const client = this.#clients.get(provider);
+    if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) return;
+    logger.info("Stopped a provider CLI that holds a deleted agent's folder.", { provider });
+    yield* this.#releaseClient(provider, client);
+  }, Effect.uninterruptible).bind(this);
 
   /** Closes the idle threads of each client and each Workspace only process, when memory is low. */
   readonly releaseIdleThreads = Effect.fn("ProviderRuntime.releaseIdleThreads")(function* (this: ProviderRuntime) {
