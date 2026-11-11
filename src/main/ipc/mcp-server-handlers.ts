@@ -187,33 +187,49 @@ export function mcpServerIpcHandlers({
    */
   const signInRemotely = Effect.fn("Mcp.signInRemotely")(function* (serverId: string, input: TestMcpServerInput) {
     const key = remotePageKey(serverId, input.config.url);
-    // The user's own browser keeps their sessions and passkeys, so a host that can relay never shows
-    // its own tab. A relayed sign-in that fails does not fall back: the host already started it.
-    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY))
-      return yield* relay.run(key, relayRemote(serverId, input));
-    const body = { url: input.config.url };
-    yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.start, () => undefined, { method: "POST", body: input });
-    remotePages.set(key, null);
-    return yield* Effect.gen(function* () {
-      while (true) {
-        const status = yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.status, decodeMcpSignInStatus, {
-          method: "POST",
-          body,
-        });
-        if (status.result) return status.result;
-        remotePages.set(key, status.tabId);
-        yield* Effect.sleep(REMOTE_SIGN_IN_POLL);
-      }
-    }).pipe(
-      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
-      Effect.onError(() =>
-        remoteServers
-          .request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, { method: "POST", body })
-          .pipe(Effect.ignore),
-      ),
-      Effect.ensuring(Effect.sync(() => remotePages.delete(key))),
-    );
+    // The user's own browser keeps their sessions and passkeys, so a host that can relay shows its own
+    // tab only for a page that this computer cannot reach. A relayed sign-in that fails does not fall
+    // back: the host already started it.
+    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY)) {
+      const remote = relayRemote(serverId, input);
+      const hostTab = remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)
+        ? signInInHostTab(serverId, input, key)
+        : undefined;
+      return yield* relay.run(key, { ...remote, hostTab });
+    }
+    return yield* signInInHostTab(serverId, input, key);
   });
+
+  /** The sign-in in a private tab of the host's browser, which the panel shows through its live view. */
+  function signInInHostTab(serverId: string, input: TestMcpServerInput, key: string) {
+    const body = { url: input.config.url };
+    return Effect.gen(function* () {
+      yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.start, () => undefined, {
+        method: "POST",
+        body: input,
+      });
+      remotePages.set(key, null);
+      return yield* Effect.gen(function* () {
+        while (true) {
+          const status = yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.status, decodeMcpSignInStatus, {
+            method: "POST",
+            body,
+          });
+          if (status.result) return status.result;
+          remotePages.set(key, status.tabId);
+          yield* Effect.sleep(REMOTE_SIGN_IN_POLL);
+        }
+      }).pipe(
+        // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
+        Effect.onError(() =>
+          remoteServers
+            .request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, { method: "POST", body })
+            .pipe(Effect.ignore),
+        ),
+        Effect.ensuring(Effect.sync(() => remotePages.delete(key))),
+      );
+    });
+  }
 
   return {
     mcpServers: {

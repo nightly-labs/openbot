@@ -3,8 +3,10 @@
 
 import {
   decodeSignInRelayStatus,
+  hostOnlySignInPage,
   loopbackCallback,
   type McpSignInRelayPage,
+  type McpTestResult,
   relayCallbackQuery,
   type SignInRelayStatus,
 } from "@openbot/contracts/ipc";
@@ -28,6 +30,11 @@ export interface SignInRelayRemote<E> {
   status: (flowId: string) => Effect.Effect<SignInRelayStatus, E>;
   complete: (flowId: string, query: string) => Effect.Effect<SignInRelayStatus, E>;
   cancel: (flowId: string) => Effect.Effect<void, E>;
+  /**
+   * The same sign-in in a private tab of the host's browser, for a page that only the host can reach
+   * (`hostOnlySignInPage`). Without it, such a page ends the sign-in.
+   */
+  hostTab?: Effect.Effect<McpTestResult, E>;
 }
 
 /** A `POST` to one route of a joined server, decoded. */
@@ -162,6 +169,11 @@ export class SignInRelayClient {
       if (first.result) return first.result;
       const authorizeUrl = first.authorizeUrl ?? "";
       const page = safePage(authorizeUrl);
+      if (!page && remote.hostTab && hostOnlySignInPage(authorizeUrl)) {
+        // The relayed sign-in ends first, so the host's tab is the only sign-in of this server.
+        yield* remote.cancel(flowId);
+        return yield* remote.hostTab;
+      }
       if (!page) return { toolCount: 0, error: sourceText("error.backend.mcpSignInNotWebPage") };
       if (chosen !== null && page.toString() !== safePage(chosen.page)?.toString())
         return { toolCount: 0, error: sourceText("error.team.signInRelayLinkUnknown") };

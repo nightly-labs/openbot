@@ -4,6 +4,7 @@
 // at the end. Only its query goes to the host.
 
 import {
+  hostOnlySignInPage,
   type McpServerConfig,
   type McpSignInRelayPage,
   type McpTestResult,
@@ -36,8 +37,15 @@ interface RelayWait {
 }
 
 export interface WebMcpRelay {
-  /** Runs the sign-in of `config` on the host until it ends. */
-  signIn: (request: TeamApiRequest, config: McpServerConfig) => Promise<McpTestResult>;
+  /**
+   * Runs the sign-in of `config` on the host until it ends. `hostTab` runs it in a tab of the host's
+   * browser instead, for a page that only the host can reach.
+   */
+  signIn: (
+    request: TeamApiRequest,
+    config: McpServerConfig,
+    hostTab?: () => Promise<McpTestResult>,
+  ) => Promise<McpTestResult>;
   /**
    * Runs the sign-in of a link that the agent `agentId` printed until it ends. The host names the page,
    * so any page other than `url` ends the sign-in.
@@ -67,6 +75,7 @@ export function webMcpRelay(
     url: string,
     start: Effect.Effect<{ flowId: string }, TeamAdminRequestError>,
     chosen: string | null,
+    hostTab?: () => Promise<McpTestResult>,
   ): Promise<McpTestResult> {
     const { flowId } = await run(start);
     const status = () => run(signInRelayStatus(request, flowId));
@@ -83,6 +92,11 @@ export function webMcpRelay(
       }
       if (current.result) return current.result;
       const page = webPage(current.authorizeUrl ?? "");
+      if (!page && hostTab && hostOnlySignInPage(current.authorizeUrl ?? "")) {
+        // The relayed sign-in ends first, so the host's tab is the only sign-in of this server.
+        await run(cancelSignInRelay(request, flowId));
+        return await hostTab();
+      }
       if (!page) return { toolCount: 0, error: sourceText("error.backend.mcpSignInNotWebPage") };
       if (chosen !== null && page.toString() !== chosen) {
         void run(cancelSignInRelay(request, flowId)).catch(() => undefined);
@@ -123,7 +137,8 @@ export function webMcpRelay(
   }
 
   return {
-    signIn: (request, config) => follow(request, config.url, startMcpSignInRelay(request, { config }), null),
+    signIn: (request, config, hostTab) =>
+      follow(request, config.url, startMcpSignInRelay(request, { config }), null, hostTab),
     signInLink: (request, agentId, url) => follow(request, url, startLinkSignInRelay(request, { agentId, url }), url),
     page: (url) => waits.get(url)?.view ?? null,
     open: (url) => {
