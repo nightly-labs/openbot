@@ -278,7 +278,7 @@ function feedbackLimitedNext(limit: { readonly daily: boolean; readonly retryAft
         : "in about one minute"
       : minutes < 90
         ? `in about ${minutes === 1 ? "one minute" : `${minutes} minutes`}`
-        : `in about ${Math.round(minutes / 60)} hours`;
+        : `in about ${Math.ceil(minutes / 60)} hours`;
   const why = limit.daily
     ? "this account sent the most reports that OpenBot takes in one day"
     : "this account sent too many reports in the last minute";
