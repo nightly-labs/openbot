@@ -110,12 +110,12 @@ export interface DrainHooks {
    * start (null when it was already running). Before `turn/start`, so the turn's start can read it.
    */
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
-  /** Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start. */
-  startRequestedNewChat(agentId: string): Effect.Effect<void>;
   /**
-   * Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it.
-   * A routine run in its own session does not read the chat, and keeps the request.
+   * Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start,
+   * or only the `queuedRuns`: routine runs in their own session, which start in the new chat.
    */
+  startRequestedNewChat(agentId: string, queuedRuns?: readonly string[]): Effect.Effect<void>;
+  /** Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it. */
   dropRequestedNewChat(agentId: string): void;
 }
 
@@ -659,10 +659,22 @@ export class DrainScheduler {
         // Before the compaction: it holds the lane whose thread it compacts.
         if (assignment && publicThreadId)
           this.#conversation.registerChannelThread(agentId, publicThreadId, assignment.channelId);
-        // A routine run in its own session leaves the chat session as it is, so the new chat that the
-        // agent asked for waits for the end of the run and does not end (#7129).
+        // A routine run in its own session leaves the chat session as it is.
         const ownSession = this.#runsInOwnSession(context);
-        if (agent && publicThreadId === agent.threadId && !ownSession) this.#hooks.dropRequestedNewChat(agentId);
+        if (agent && publicThreadId === agent.threadId) {
+          // When only such runs wait, the new chat that the agent asked for starts before them, so their
+          // answers are in the new chat (#7129). Another message ends the request.
+          const queued = this.#mailbox.laneQueuedIds(agentId, null);
+          if (
+            ownSession &&
+            queued.every((id) => {
+              const queuedContext = this.#mailbox.getDelivery(id);
+              return queuedContext !== null && this.#runsInOwnSession(queuedContext);
+            })
+          )
+            yield* this.#hooks.startRequestedNewChat(agentId, queued);
+          this.#hooks.dropRequestedNewChat(agentId);
+        }
         const session =
           agent && publicThreadId && !ownSession
             ? this.#store.database.activeProviderSession(publicThreadId, agent.provider)

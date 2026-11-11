@@ -595,11 +595,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The last turn of each agent's chat that the user stopped. One per agent, so it needs no clean-up. */
   readonly #stoppedTurns = new Map<string, string>();
 
-  /**
-   * The agents that asked for a new chat with `start_new_chat`, with the turn that asked. A restart
-   * forgets the request.
-   */
-  readonly #requestedNewChats = new Map<string, string>();
+  /** The agents that asked for a new chat with `start_new_chat`. A restart forgets the request. */
+  readonly #requestedNewChats = new Set<string>();
   /** A turn that ends with open plan steps runs again, at most 3 times for one request. */
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
   #initialized = false;
@@ -1604,7 +1601,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
-        startRequestedNewChat: (agentId) => this.#startRequestedNewChat(agentId),
+        startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
         dropRequestedNewChat: (agentId) => {
           if (this.#requestedNewChats.delete(agentId))
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
@@ -1733,9 +1730,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
         turnStopped: (agentId, taskId, turnId) =>
-          // Only the turn that asked: a routine run in its own session can run while the request waits.
-          this.#stoppedTurn(agentId, taskId) === turnId ||
-          (taskId === null && this.#requestedNewChats.get(agentId) === turnId),
+          this.#stoppedTurn(agentId, taskId) === turnId || (taskId === null && this.#requestedNewChats.has(agentId)),
         hasOpenWait: (agentId, deliveryIds) =>
           this.#waits.list(agentId).waits.some((wait) => deliveryIds.includes(wait.requestMessageId)),
         routineAnswered: (agentId, deliveryId, answer) => {
@@ -1885,8 +1880,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
         reportRoutineFailure: (agentId, turnId, reason, channelRun) =>
           this.#turn.reportRoutineFailure(agentId, turnId, reason, channelRun),
-        requestNewChat: (agentId, turnId) => {
-          this.#requestedNewChats.set(agentId, turnId);
+        requestNewChat: (agentId) => {
+          this.#requestedNewChats.add(agentId);
         },
         steerAgentMessage: (recipientAgentId, deliveryId) =>
           this.#steerAgentMessage(recipientAgentId, deliveryId, true),
@@ -3853,6 +3848,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly clearAgentContext = Effect.fn("AgentService.clearAgentContext")(function* (
     this: AgentService,
     agentId: string,
+    /** Queued routine runs in their own session that start in the new chat, so they do not hold it. */
+    queuedRuns: readonly string[] = [],
   ) {
     // A new chat ends the automatic plan continuation of the agent's own chat.
     yield* this.#drain.endPlanContinuation(agentId, null);
@@ -3863,7 +3860,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null);
       if (
         activeTurn ||
-        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), queuedRuns) ||
         this.#threads.mainContextBusy(agent)
       ) {
         throw new ContextResetBusyError(sourceText("error.agent.waitBeforeClearContext"));
@@ -4107,18 +4104,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's
    * own chat has nothing to start. A turn of a task or a compaction can still run; the request then
-   * waits for the next drain, unless a turn in the agent's own chat starts first. A routine run in its
-   * own session does not read the chat, so the request waits for it too. The user can turn
-   * the setting off while the request waits.
+   * waits for the next drain, unless a turn in the agent's own chat starts first. Queued routine runs in
+   * their own session do not end it: it starts before them. The user can turn the setting off while the
+   * request waits.
    */
-  #startRequestedNewChat(agentId: string): Effect.Effect<void> {
+  #startRequestedNewChat(agentId: string, queuedRuns: readonly string[] = []): Effect.Effect<void> {
     if (!this.#requestedNewChats.has(agentId)) return Effect.void;
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent || !agentNewChatAllowed(agent, this.#store.agentDefaults())) {
       this.#requestedNewChats.delete(agentId);
       return Effect.void;
     }
-    return this.clearAgentContext(agentId).pipe(
+    return this.clearAgentContext(agentId, queuedRuns).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           this.#requestedNewChats.delete(agentId);

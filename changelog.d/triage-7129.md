@@ -1,4 +1,5 @@
 ### Fixed
 
-- When an agent asks for a new chat, a routine run in its own session no longer cancels the request. The new chat now starts when
-  the run ends. Before, an agent with frequent routines almost never got its new chat, and its chat kept growing.
+- When an agent asks for a new chat and only routine runs wait in its queue, the new chat now starts before those runs.
+  Before, the first routine run cancelled the request. An agent with frequent routines almost never got its new chat, and
+  its chat kept growing. A message from you or a teammate that waits still ends the request, as before.
