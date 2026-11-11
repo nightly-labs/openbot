@@ -1900,19 +1900,34 @@ export class MailboxStore {
   }
 
   /**
-   * Whether a turn of the agent works for an external conversation: on a message from it, or on a
-   * request that an agent sent from it. A steered request counts: its answer can go back there too.
+   * Whether a turn of the agent works for an external conversation: on a message from it, on a
+   * request that an agent sent from it, or on a request from a turn that works for it. A steered
+   * request counts: its answer can go back there too.
    */
   turnServesExternalChat(agentId: string, turnId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId &&
-        delivery.turnId === turnId &&
-        (delivery.status === "starting" || delivery.status === "running") &&
-        this.#state.messages.some(
-          (message) => message.id === delivery.messageId && (message.messaging || message.messagingReturn),
-        ),
-    );
+    const sourceTurnIds = this.#sourceTurnIds();
+    const messages = this.#messagesById();
+    const seen = new Set<string>();
+    const serves = (agent: string, turn: string, activeOnly: boolean): boolean => {
+      const key = `${agent}:${turn}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return this.#state.deliveries.some((delivery) => {
+        if (delivery.recipientAgentId !== agent || delivery.turnId !== turn) return false;
+        if (activeOnly && delivery.status !== "starting" && delivery.status !== "running") return false;
+        const message = messages.get(delivery.messageId);
+        if (!message) return false;
+        if (message.messaging || message.messagingReturn) return true;
+        // The turn that sent this request can be complete, so its deliveries count in any status.
+        const sourceTurn = sourceTurnIds.get(message.id);
+        return (
+          message.sender.kind === "agent" &&
+          sourceTurn !== undefined &&
+          serves(message.sender.agentId, sourceTurn, false)
+        );
+      });
+    };
+    return serves(agentId, turnId, true);
   }
 
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {

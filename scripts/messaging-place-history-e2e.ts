@@ -265,12 +265,19 @@ function record(value: unknown): DynamicRecord {
 
 /** One outbound tool call, as the tool router makes it. Returns the result and the new traffic. */
 const AGENT = "agent-place-history-e2e";
+const SECOND_AGENT = "agent-second-e2e";
 
 const ROUTINE_TURN = { threadId: "thread-routine-e2e", turnId: "turn-routine-e2e" };
 
-async function call(threads: MessagingThreads, tool: string, args: DynamicRecord, turn = ROUTINE_TURN) {
+async function call(
+  threads: MessagingThreads,
+  tool: string,
+  args: DynamicRecord,
+  turn = ROUTINE_TURN,
+  agentId = AGENT,
+) {
   const before = { requests: hostRequests.length, reads: reads.length };
-  const response = await runCauseEffect(threads.outboundTool(AGENT, turn, tool, args, () => Effect.succeed([])));
+  const response = await runCauseEffect(threads.outboundTool(agentId, turn, tool, args, () => Effect.succeed([])));
   return {
     success: response.success,
     result: record(JSON.parse(response.contentItems[0]?.text ?? "{}")),
@@ -400,6 +407,29 @@ try {
       const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, teammateTurn);
       assert.equal(read.success, false, "A teammate read a named place for an external chat.");
       assert.deepEqual(read.reads, [], "Discord was read for a request from an external chat.");
+      // The teammate gives the work to a second teammate from that turn. The router's idempotency key
+      // holds the sending turn.
+      const second = await runCauseEffect(
+        mailbox.enqueue({
+          sender: { kind: "agent", agentId: AGENT },
+          recipientAgentIds: [SECOND_AGENT],
+          text: "Read the other chat for me.",
+          idempotencyKey: "send-message:turn-teammate-e2e:call-1",
+        }),
+      );
+      const secondDelivery = second.deliveries[0];
+      assert.ok(secondDelivery, "The second request made no delivery.");
+      await runCauseEffect(mailbox.markStarting(secondDelivery.id));
+      await runCauseEffect(mailbox.markRunning(secondDelivery.id, "turn-second-e2e"));
+      const secondRead = await call(
+        threads,
+        "messaging_history",
+        { connection, place: CHANNEL },
+        { threadId: "thread-second-own-chat", turnId: "turn-second-e2e" },
+        SECOND_AGENT,
+      );
+      assert.equal(secondRead.success, false, "A teammate of a teammate read a named place for an external chat.");
+      assert.deepEqual(secondRead.reads, []);
       // A different turn of the same agent, such as a routine run, still reads.
       const routine = await call(threads, "messaging_history", { connection, place: CHANNEL, limit: 1 });
       assert.equal(routine.success, true, JSON.stringify(routine.result));
