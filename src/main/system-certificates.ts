@@ -22,7 +22,7 @@ export const AGENT_CERTIFICATES_FILE = "agent-certificates.pem";
 // `SSL_CERT_FILE` before `SSL_CERT_DIR`, so a file from OpenBot would hide the user's folder.
 const USER_CERTIFICATE_VARIABLES = ["SSL_CERT_FILE", "SSL_CERT_DIR"] as const;
 
-export class AgentCertificatesFailed extends Schema.TaggedError<AgentCertificatesFailed>()("AgentCertificatesFailed", {
+class AgentCertificatesFailed extends Schema.TaggedError<AgentCertificatesFailed>()("AgentCertificatesFailed", {
   cause: Schema.Defect(),
 }) {}
 
