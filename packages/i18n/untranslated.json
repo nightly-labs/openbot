@@ -3671,6 +3671,7 @@
   "vault.placeholder.contactLabel": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],
   "vault.placeholder.expiry": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],
   "vault.placeholder.saved": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],
+  "vault.expiryInvalid": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],
   "vault.placeholder.username": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],
   "vault.placeholder.variableName": ["de", "es", "fr", "it", "ja", "ko", "nl", "pt", "ru", "tr", "zh"],
   "vault.placeholder.website": ["de", "es", "fr", "it", "ja", "ko", "pt", "ru", "tr"],

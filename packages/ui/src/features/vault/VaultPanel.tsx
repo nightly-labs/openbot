@@ -159,9 +159,14 @@ const SECRET_TEXT = {
 
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
 
-/** `MM/YY` or `MM/YYYY`, or null when the text is not a date. */
+/**
+ * `MM/YY` or `MM/YYYY`, with `/`, `-`, `.` or a space between, or the digits alone (`0528`, `052028`).
+ * Null when the text is not a date.
+ */
 function parseExpiry(text: string): { month: number; year: number } | null {
-  const match = /^\s*(\d{1,2})\s*\/\s*(\d{2}|\d{4})\s*$/u.exec(text);
+  // NFKC turns the full-width digits and slash that East Asian keyboards can type into ASCII.
+  const plain = text.normalize("NFKC").trim();
+  const match = /^(\d{1,2})\s*[-./\s]\s*(\d{2}|\d{4})$/u.exec(plain) ?? /^(\d{2})(\d{2}|\d{4})$/u.exec(plain);
   if (!match?.[1] || !match[2]) return null;
   const month = Number(match[1]);
   const year = match[2].length === 2 ? 2000 + Number(match[2]) : Number(match[2]);
@@ -1119,6 +1124,10 @@ function ItemDialog(props: {
       .replace(/^https?:\/\//u, "")
       .split("/")[0] || t("vault.twoStep.theSite");
   const keyInvalid = (login: LoginDraft) => login.twoStepKey.trim() !== "" && !typedKey.valid();
+  /** After the user leaves the expiry field once, a wrong expiry says why Save stays off. */
+  const [expiryLeft, setExpiryLeft] = createSignal(false);
+  const expiryInvalid = (card: CardDraft) =>
+    expiryLeft() && card.expiry.trim() !== "" && parseExpiry(card.expiry) === null;
   const startSetup = () => {
     const login = loginDraft();
     if (login) set(login, { twoStepKey: "" });
@@ -1272,13 +1281,14 @@ function ItemDialog(props: {
                 onChange={(number) => set(card(), { number })}
               />
             </Field>
-            <Field label={t("vault.field.expiry")}>
+            <Field label={t("vault.field.expiry")} error={expiryInvalid(card()) ? t("vault.expiryInvalid") : undefined}>
               <Input
                 inputmode="numeric"
                 maxlength={7}
                 placeholder={t("vault.placeholder.expiry")}
                 value={card().expiry}
                 onValueChange={(expiry) => set(card(), { expiry })}
+                onBlur={() => setExpiryLeft(true)}
               />
             </Field>
             <Field label={t("vault.field.securityCode")}>

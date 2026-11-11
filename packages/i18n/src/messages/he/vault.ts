@@ -80,6 +80,7 @@ export const messages = {
   "vault.placeholder.variableName": "OPENAI_API_KEY",
   "vault.placeholder.expiry": "MM/YY",
   "vault.placeholder.saved": "נשמר. אפשר להקליד כדי להחליף.",
+  "vault.expiryInvalid": "יש להזין את החודש והשנה בפורמט MM/YY.",
   "vault.billingNone": "ללא",
   "vault.chooseCountry": "בחירת מדינה",
   "vault.showPassword": "הצגת הסיסמה",

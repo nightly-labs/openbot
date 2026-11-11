@@ -70,6 +70,7 @@ export const messages = {
   "vault.placeholder.contactLabel": "家",
   "vault.placeholder.expiry": "MM/YY",
   "vault.placeholder.saved": "已保存。输入内容可替换。",
+  "vault.expiryInvalid": "请按 MM/YY 格式输入月份和年份。",
   "vault.billingNone": "无",
   "vault.chooseCountry": "选择国家或地区",
   "vault.showPassword": "显示密码",

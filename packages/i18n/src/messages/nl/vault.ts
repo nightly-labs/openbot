@@ -70,6 +70,7 @@ export const messages = {
   "vault.placeholder.contactLabel": "Thuis",
   "vault.placeholder.expiry": "MM/JJ",
   "vault.placeholder.saved": "Opgeslagen. Typ om te vervangen.",
+  "vault.expiryInvalid": "Vul de maand en het jaar in als MM/JJ.",
   "vault.billingNone": "Geen",
   "vault.chooseCountry": "Kies een land",
   "vault.showPassword": "Wachtwoord tonen",
