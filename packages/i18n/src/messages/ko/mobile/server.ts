@@ -967,6 +967,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.pool": "계정 풀 사용",
+  "mobile.server.providers.poolHint":
+    "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "mobile.server.providers.accountsPooledHint":
+    "에이전트가 이 계정들을 함께 써요. 새 계정은 이 휴대폰에서 계정 페이지로 로그인해요.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "에이전트가 이 계정들을 함께 써요. 계정은 컴퓨터의 OpenBot에서 추가하세요.",
+  "mobile.server.providers.inUse": "사용 중",
+  "mobile.server.providers.notInPool": "풀 제외",
+  "mobile.server.providers.leaveOutOfPool": "풀에서 제외",
+  "mobile.server.providers.putBackInPool": "풀에 다시 추가",
   "mobile.server.providers.models": "모델",
   "mobile.server.providers.modelsCount": "{shown}/{total}",
   "mobile.server.providers.modelsTitle": "{name} 모델",

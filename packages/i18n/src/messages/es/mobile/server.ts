@@ -1030,6 +1030,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Sin instalar",
   "mobile.server.providers.status.checking": "Comprobando",
+  "mobile.server.providers.pool": "Agrupar cuentas",
+  "mobile.server.providers.poolHint":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "mobile.server.providers.accountsPooledHint":
+    "Los agentes comparten estas cuentas. Una cuenta nueva inicia sesión en su página en este teléfono.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Los agentes comparten estas cuentas. Añade una cuenta en OpenBot en un ordenador.",
+  "mobile.server.providers.inUse": "En uso",
+  "mobile.server.providers.notInPool": "Fuera del grupo",
+  "mobile.server.providers.leaveOutOfPool": "Sacar del grupo",
+  "mobile.server.providers.putBackInPool": "Volver al grupo",
   "mobile.server.providers.models": "Modelos",
   "mobile.server.providers.modelsCount": "{shown} de {total}",
   "mobile.server.providers.modelsTitle": "Modelos de {name}",

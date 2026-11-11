@@ -985,6 +985,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.pool": "Accounts bundelen",
+  "mobile.server.providers.poolHint":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agents delen deze accounts. Een nieuw account meldt zich aan op zijn pagina op deze telefoon.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agents delen deze accounts. Voeg een account toe in OpenBot op een computer.",
+  "mobile.server.providers.inUse": "In gebruik",
+  "mobile.server.providers.notInPool": "Niet in pool",
+  "mobile.server.providers.leaveOutOfPool": "Uit pool halen",
+  "mobile.server.providers.putBackInPool": "Terug in pool",
   "mobile.server.providers.models": "Modellen",
   "mobile.server.providers.modelsCount": "{shown} van {total}",
   "mobile.server.providers.modelsTitle": "Modellen van {name}",

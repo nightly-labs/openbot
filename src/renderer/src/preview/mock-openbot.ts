@@ -1550,6 +1550,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         changeProviderAccounts(provider, (accounts) => accounts.filter((account) => account.id !== accountId)),
       );
     },
+    // The preview uses the first account in the pool: it has no usage readings to compare.
+    setProviderAccountPool: async ({ provider, enabled, leftOut }) => {
+      agentStatus = {
+        ...agentStatus,
+        providers: agentStatus.providers?.map((row) => {
+          if (row.id !== provider) return row;
+          const { accountPool: _old, ...rest } = row;
+          if (!enabled) return rest;
+          const inUse = row.accounts?.find((account) => !leftOut.includes(account.id))?.id ?? null;
+          return { ...rest, accountPool: { leftOut: [...leftOut], inUse } };
+        }),
+      };
+      return clone(agentStatus);
+    },
     signOutProvider: async (provider) => {
       agentStatus = {
         ...agentStatus,
@@ -1826,6 +1840,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         providers: (agentStatus.providers ?? []).flatMap((row) =>
           row.accounts ? [{ provider: row.id, accounts: clone(row.accounts) }] : [],
         ),
+        pools: (agentStatus.providers ?? []).flatMap((row) =>
+          row.accounts && row.accountPool ? [{ provider: row.id, pool: clone(row.accountPool) }] : [],
+        ),
         agents: [],
       }),
       accountUsage: async () => ({ limits: [] }),
@@ -1837,6 +1854,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       removeAccount: async (input) => {
         await api.removeProviderAccount(input);
+      },
+      setAccountPool: async (input) => {
+        await api.setProviderAccountPool(input);
       },
       // The preview host's default is the one of this computer.
       hostDefaultProvider: async () => ({

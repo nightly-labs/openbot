@@ -1014,6 +1014,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.pool": "Hesapları havuzla",
+  "mobile.server.providers.poolHint":
+    "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "mobile.server.providers.accountsPooledHint":
+    "Ajanlar bu hesapları paylaşır. Yeni bir hesap bu telefonda kendi sayfasından oturum açar.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Ajanlar bu hesapları paylaşır. Hesap eklemek için bir bilgisayarda OpenBot'u kullanın.",
+  "mobile.server.providers.inUse": "Kullanımda",
+  "mobile.server.providers.notInPool": "Havuz dışı",
+  "mobile.server.providers.leaveOutOfPool": "Havuzdan çıkar",
+  "mobile.server.providers.putBackInPool": "Havuza geri koy",
   "mobile.server.providers.models": "Modeller",
   "mobile.server.providers.modelsCount": "{shown} / {total}",
   "mobile.server.providers.modelsTitle": "{name} modelleri",

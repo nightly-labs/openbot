@@ -1273,6 +1273,16 @@ export const messages = {
   "mobile.server.providers.removeAccount": "إزالة الحساب",
   "mobile.server.providers.removeAccountTitle": "هل تريد إزالة {name}؟",
   "mobile.server.providers.removeAccountBody": "يزيل الخادم هذا الحساب وتسجيل الدخول الخاص به.",
+  "mobile.server.providers.pool": "تجميع الحسابات",
+  "mobile.server.providers.poolHint":
+    "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "mobile.server.providers.accountsPooledHint":
+    "يتشارك الوكلاء هذه الحسابات. يسجّل الحساب الجديد الدخول في صفحته على هذا الهاتف.",
+  "mobile.server.providers.accountsPooledOnComputer": "يتشارك الوكلاء هذه الحسابات. أضف حسابًا في OpenBot على حاسوب.",
+  "mobile.server.providers.inUse": "قيد الاستخدام",
+  "mobile.server.providers.notInPool": "خارج المجموعة",
+  "mobile.server.providers.leaveOutOfPool": "استبعاد من المجموعة",
+  "mobile.server.providers.putBackInPool": "إعادة إلى المجموعة",
   "mobile.server.providers.models": "النماذج",
   "mobile.server.providers.modelsCount": "{shown} من {total}",
   "mobile.server.providers.modelsTitle": "نماذج {name}",

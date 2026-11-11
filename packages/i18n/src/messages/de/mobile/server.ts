@@ -1041,6 +1041,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installiert",
   "mobile.server.providers.status.notInstalled": "Nicht installiert",
   "mobile.server.providers.status.checking": "Wird geprüft",
+  "mobile.server.providers.pool": "Konten bündeln",
+  "mobile.server.providers.poolHint":
+    "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agenten teilen sich diese Konten. Ein neues Konto meldet sich auf seiner Seite auf diesem Telefon an.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agenten teilen sich diese Konten. Füge ein Konto in OpenBot auf einem Computer hinzu.",
+  "mobile.server.providers.inUse": "Aktiv",
+  "mobile.server.providers.notInPool": "Nicht im Pool",
+  "mobile.server.providers.leaveOutOfPool": "Aus Pool nehmen",
+  "mobile.server.providers.putBackInPool": "Zurück in Pool",
   "mobile.server.providers.models": "Modelle",
   "mobile.server.providers.modelsCount": "{shown} von {total}",
   "mobile.server.providers.modelsTitle": "Modelle von {name}",

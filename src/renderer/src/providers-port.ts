@@ -19,6 +19,7 @@ export interface ProvidersPort {
   cancelProviderAccountSignIn: OpenBotDesktopApi["cancelProviderAccountSignIn"];
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];
+  setProviderAccountPool: OpenBotDesktopApi["setProviderAccountPool"];
   signOutProvider: OpenBotDesktopApi["signOutProvider"];
   providerUsageResets: OpenBotDesktopApi["providerUsageResets"];
   resetProviderUsage: OpenBotDesktopApi["resetProviderUsage"];

@@ -34,6 +34,7 @@ import {
   Button,
   Input,
   KeyRound,
+  Layers,
   Listbox,
   Plus,
   Popover,
@@ -212,9 +213,30 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const visibleProviders = createMemo(() =>
     PROVIDERS.filter((provider) => provider === CUSTOM_RAIL || !providerTurnedOff(props.agentStatus, provider)),
   );
-  /** The accounts that get rail entries: only a provider's with more than one, and only on request. */
+  /**
+   * The pool of a provider's accounts, while it is on: the provider then has one rail entry, and its
+   * agents use the account that the pool picks.
+   */
+  const railPool = (rail: RailId) => {
+    if (rail === CUSTOM_RAIL) return null;
+    const status = props.agentStatus?.providers?.find((row) => row.id === rail);
+    const pool = status?.accountPool;
+    if (!pool) return null;
+    const accounts = status?.accounts ?? [];
+    const members = accounts.filter((account) => !isApiKeyAccount(account.id) && !pool.leftOut.includes(account.id));
+    const accountsText = t("provider.account.count", { count: members.length });
+    const summary = t("provider.account.poolCount", { accounts: accountsText });
+    return {
+      inUse: pool.inUse,
+      summary:
+        pool.inUse && accounts.some((account) => account.id === pool.inUse)
+          ? t("provider.account.poolInUse", { pool: summary, name: providerAccountName(t, accounts, pool.inUse) })
+          : summary,
+    };
+  };
+  /** The accounts that get rail entries: only a provider's with more than one, only on request, and not a pool's. */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
-    if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
+    if (!props.accountChoice || rail === CUSTOM_RAIL || railPool(rail)) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
     return accounts.length > 1 ? accounts : [];
   };
@@ -382,10 +404,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
+  /** The pool's line, in the place of the account's email, while the provider is available. */
+  const poolSummary = (rail: RailId, status: AgentProviderStatus): string | undefined =>
+    status.state === "available" ? railPool(rail)?.summary : undefined;
   const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
+    rail === CUSTOM_RAIL ? customSummary() : (poolSummary(rail, status) ?? providerSummary(rail, status, text));
   const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
-    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status, text);
+    if (rail !== CUSTOM_RAIL) return poolSummary(rail, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
@@ -411,7 +436,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {
     const rail = railOf(key);
     if (rail === CUSTOM_RAIL || !props.accountUsage) return [];
-    const accountId = key === rail ? null : key.slice(rail.length + 1);
+    // A pool is spent only when the account that it uses is: it uses another one before a limit.
+    const accountId = key === rail ? (railPool(rail)?.inUse ?? null) : key.slice(rail.length + 1);
     return entryModelOptions(key).map((model) => spentWindow(rail, accountId, model.id));
   };
   /**
@@ -614,8 +640,18 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const prefix = `${railName(activeProvider(), t)} `;
     return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
   };
+  /** True while the agent's provider pools its accounts. */
+  const triggerPool = () => props.foreignProvider === undefined && railPool(props.provider) !== null;
   const triggerSummary = () =>
-    [triggerModelName(), triggerEffort(), triggerSpeedName(), triggerAccount()].filter(Boolean).join(" · ");
+    [
+      triggerModelName(),
+      triggerEffort(),
+      triggerSpeedName(),
+      triggerAccount(),
+      triggerPool() ? t("provider.account.poolChip") : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   return (
     <div
@@ -686,6 +722,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   <SwapLabel text={account()} motion={TRIGGER_SWAP} />
                 </span>
               )}
+            </Show>
+            <Show when={triggerPool()}>
+              <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                <Layers aria-hidden="true" />
+                {t("provider.account.poolChip")}
+              </span>
             </Show>
           </span>
           <ChevronDownIcon />
@@ -774,6 +816,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                   </Show>
                                 </span>
                               )}
+                            </Show>
+                            <Show when={railPool(provider)}>
+                              <span class="provider-model-rail-account" aria-hidden="true">
+                                <Layers />
+                              </span>
                             </Show>
                           </Tabs.Trigger>
                         </Tooltip.Trigger>

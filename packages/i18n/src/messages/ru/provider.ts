@@ -248,6 +248,17 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "У {name} не осталось кредитов сброса использования.",
   "provider.account.resetUsageAlreadyRedeemed": "Этот кредит сброса {name} уже использован.",
   "provider.account.resetUsageFailed": "Не удалось сбросить использование {name}.",
+  "provider.account.pool": "Объединить аккаунты",
+  "provider.account.poolDescription":
+    "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "provider.account.inUse": "Используется",
+  "provider.account.notInPool": "Вне пула",
+  "provider.account.leaveOutOfPool": "Исключить из пула",
+  "provider.account.putBackInPool": "Вернуть в пул",
+  "provider.account.poolChip": "Пул",
+  "provider.account.poolCount": "Пул: {accounts}",
+  "provider.account.poolInUse": "{pool} · используется {name}",
+  "provider.settings.accountsPooledDescription": "{count} из {max}. Агенты используют эти аккаунты вместе.",
   "provider.settings.disconnectTitle": "Отключить {name}?",
   "provider.settings.disconnectOthers": "Другие аккаунты {provider} ждут, пока вы снова не подключите {provider}.",
   "provider.settings.disconnectLocal":

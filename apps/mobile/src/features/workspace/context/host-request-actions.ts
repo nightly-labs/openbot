@@ -132,6 +132,7 @@ import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contr
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -1265,7 +1266,11 @@ export function createHostRequestActions({
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
         ? runTeamRequest(
-            listProviderAccountsWithModels(teamApi(serverId), has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)),
+            listProviderAccountsWithModels(
+              teamApi(serverId),
+              has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY),
+              has(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY),
+            ),
           )
         : null,
     loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),

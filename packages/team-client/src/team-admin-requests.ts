@@ -161,6 +161,7 @@ import {
   decodeHostPasswordManagerStatus,
   decodeHostPersonality,
   decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -254,6 +255,7 @@ import {
   type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
   type SetMcpServerEnabledInput,
+  type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
   type SetRoutineResultDestinationInput,
   type SharedTable,
@@ -272,6 +274,7 @@ import {
   type VaultSaveInput,
   type VaultState,
   withHostProviderAccountModels,
+  withHostProviderAccountPools,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -321,6 +324,7 @@ import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -1350,23 +1354,45 @@ export function listProviderAccounts(
 
 /**
  * `listProviderAccounts` with, on a host with `provider-account-models-v1`, the models that each
- * account after the first serves and the provider's own sign-in does not. When that read fails, the
- * accounts come without them, as from an older host.
+ * account after the first serves and the provider's own sign-in does not, and on a host with
+ * `provider-account-pool-v1`, the pools that are on. When one of these reads fails, the accounts come
+ * without it, as from an older host.
  */
 export function listProviderAccountsWithModels(
   request: TeamApiRequest,
   withModels: boolean,
+  withPools: boolean,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
-  if (!withModels) return listProviderAccounts(request);
+  if (!withModels && !withPools) return listProviderAccounts(request);
   return Effect.all(
     [
       listProviderAccounts(request),
-      adminCall(() => request("POST", PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {})).pipe(
-        Effect.orElseSucceed(() => null),
-      ),
+      withModels
+        ? adminCall(() =>
+            request("POST", PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {}),
+          ).pipe(Effect.orElseSucceed(() => null))
+        : Effect.succeed(null),
+      withPools
+        ? adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {})).pipe(
+            Effect.orElseSucceed(() => null),
+          )
+        : Effect.succeed(null),
     ],
     { concurrency: "unbounded" },
-  ).pipe(Effect.map(([accounts, models]) => (models ? withHostProviderAccountModels(accounts, models) : accounts)));
+  ).pipe(
+    Effect.map(([accounts, models, pools]) => {
+      const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
+      return pools ? withHostProviderAccountPools(withAccountModels, pools) : withAccountModels;
+    }),
+  );
+}
+
+/** `provider-account-pool-v1`: turns the pool of a provider's accounts on the host on or off. */
+export function setProviderAccountPool(
+  request: TeamApiRequest,
+  input: SetProviderAccountPoolInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, ignoreResponse, { ...input }));
 }
 
 /** The readings of the accounts after the first. */
