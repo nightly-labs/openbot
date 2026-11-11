@@ -987,6 +987,7 @@ function registerIpcHandlers({
     }),
     ...teamIpcHandlers({
       host,
+      localServers,
       remoteDesktop,
       remoteServers,
       takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
