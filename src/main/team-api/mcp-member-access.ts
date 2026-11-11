@@ -8,8 +8,9 @@
 //
 // With `mcp-access-v1` on the host, the level of the member decides instead: `none` hides the server
 // and refuses it, `use` gives the rights on a server of another person, and `manage` gives the rights
-// on a server that the member added. `none` also refuses a test and the sign-in state of the server,
-// so the member cannot spend its stored sign-in or learn that it has one.
+// on a server that the member added. `none` also refuses a test, a saved row on the same address,
+// and the sign-in state of the server, so the member cannot spend its stored sign-in or learn that it
+// has one.
 
 import {
   canAdministerServer,
@@ -68,6 +69,26 @@ export function requireVisibleMcpAddress(
   const key = signInKey(url);
   const rows = servers.filter((server) => server.transport === "http" && signInKey(server.url) === key);
   if (rows.length > 0 && rows.every((row) => memberLevel(access, row.id) === "none")) throw notYours();
+}
+
+/**
+ * Refuses a member a saved row on the address of another row at `none`. The saved row would use the
+ * stored sign-in of the address, and the member would manage it, so the checks that need each row at
+ * `none` would then pass. One row at `none` is enough to refuse.
+ */
+export function requireOpenMcpAddress(
+  access: McpMemberAccess,
+  servers: readonly McpServerConfig[],
+  config: McpServerConfig,
+): void {
+  if (!access || config.transport !== "http") return;
+  const key = signInKey(config.url);
+  const hidden = (server: McpServerConfig) =>
+    server.id !== config.id &&
+    server.transport === "http" &&
+    signInKey(server.url) === key &&
+    memberLevel(access, server.id) === "none";
+  if (servers.some(hidden)) throw notYours();
 }
 
 /**

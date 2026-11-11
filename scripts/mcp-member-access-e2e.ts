@@ -616,6 +616,21 @@ try {
       NOT_YOURS,
       "test of a new row on the address",
     );
+    // A saved row on the address would use its stored sign-in too: a new row and a moved row are refused.
+    refused(
+      await call("POST", MCP_ROUTES.save, { token: member, body: { config: httpServer("trello-copy", OWNER_URL) } }),
+      NOT_YOURS,
+      "save of a new row on the address",
+    );
+    const own = await save(member, httpServer("notion-again", MEMBER_URL));
+    refused(
+      await call("POST", MCP_ROUTES.save, { token: member, body: { config: { ...own, url: OWNER_URL } } }),
+      NOT_YOURS,
+      "move of an own row to the address",
+    );
+    const removed = await call("POST", MCP_ROUTES.remove, { token: member, body: { mcpServerId: own.id } });
+    assert.equal(removed.status, 200, `Removing the member's own row returned ${removed.status}.`);
+    assert.deepEqual(await listedNames(member), []);
     // The sign-in state of the server stays with the people who can see it.
     signedIn = [{ mcpServerId: ownerRow.id, signedIn: true }];
     const states = await call("POST", MCP_SIGN_IN_ROUTES.list, { token: member, body: {} });
@@ -627,7 +642,7 @@ try {
       "sign-in status",
     );
     signedIn = [];
-    return { memberList: [], test: 403, signIns: 0 };
+    return { memberList: [], test: 403, save: 403, signIns: 0 };
   });
 
   const roleId = "role-ops";

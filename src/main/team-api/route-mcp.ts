@@ -15,7 +15,13 @@ import {
 import { type McpToolRuntimePreparation, prepareToolRuntimeForTest } from "../ipc/mcp-server-handlers";
 import type { TeamApiMcpServerOwners, TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
-import { requireMcpAccess, requireOwnMcpServer, requireVisibleMcpTest, visibleMcpServers } from "./mcp-member-access";
+import {
+  requireMcpAccess,
+  requireOpenMcpAddress,
+  requireOwnMcpServer,
+  requireVisibleMcpTest,
+  visibleMcpServers,
+} from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
 
@@ -70,8 +76,10 @@ export async function routeMcpServers(
   const body = mcpRequest(url.pathname, await readJson(request));
   if (save) {
     const input = parseSaveMcpServer(body);
-    const before = new Set(mcpServers.listMcpServers().map((server) => server.id));
+    const rows = mcpServers.listMcpServers();
+    const before = new Set(rows.map((server) => server.id));
     if (before.has(input.config.id)) requireOwnMcpServer(access, input.config.id);
+    requireOpenMcpAddress(access, rows, input.config);
     requireMcpListFits(capabilities, before.size + (before.has(input.config.id) ? 0 : 1));
     // The local save starts the runtime download; the host route shares it, or a first server
     // added remotely never gets the runtime its test and its spawn need.
