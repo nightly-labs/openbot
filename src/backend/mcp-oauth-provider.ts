@@ -868,6 +868,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #exchangingCode = false;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
   #activeIssuer: string | undefined;
+  /** Set once this attempt saved a token set. See `tokens`. */
+  #tokensSaved = false;
   /** Full discovery for this attempt, including custom protected-resource metadata. */
   #discoveryState: OAuthDiscoveryState | undefined;
   /**
@@ -1146,7 +1148,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   tokens(): OAuthTokens | undefined {
     const tokens = this.#credential(this.#record().tokens);
     this.#recordTokens(tokens);
-    return tokens;
+    // A sign-in that the user asked for (it has a `state`) gets a new grant from the browser. The
+    // SDK refreshes when it sees a refresh token, and a server that refuses the sign-in on file
+    // also refuses the refreshed token: the press then opened no page (#6975). The stored access
+    // token is still sent, so a sign-in that the server accepts connects at once. The record on
+    // disk is not changed: a cancel or a timeout keeps it.
+    if (!tokens?.refresh_token || this.#options.state === null || this.#tokensSaved) return tokens;
+    const { refresh_token: _refreshToken, ...withoutRefresh } = tokens;
+    return withoutRefresh;
   }
 
   saveTokens(tokens: OAuthTokens): Promise<void> {
@@ -1154,6 +1163,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
         yield* this.#save({ tokens, obtainedAt: Date.now(), lostAt: undefined });
+        this.#tokensSaved = true;
       }),
     );
   }
