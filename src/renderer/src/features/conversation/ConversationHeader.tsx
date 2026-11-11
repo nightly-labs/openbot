@@ -67,15 +67,18 @@ export function ConversationHeader() {
   /**
    * Opens a pin in its chat: in place in the agent's own chat, else in the tab of its thread, which
    * reads the part around it. A pin whose message or thread is gone shows a toast, and the list reads again.
+   * A later click replaces an earlier one that is still loading, so the earlier one shows no toast.
    */
+  let pinOpens = 0;
   async function openPin(key: string): Promise<void> {
     const pin = messagePins.pin(key);
     if (!pin) return;
+    const open = ++pinOpens;
     const opened =
       pin.taskId === null && !sideThreadOpen()
         ? await replyJump.jumpTo(pin.messageId)
         : ((await props.threads?.onOpenMessage(pin.taskId, pin.messageId)) ?? false);
-    if (opened) return;
+    if (opened || open !== pinOpens) return;
     actionToast.error(t("chat.pins.missing"));
     messagePins.load();
   }

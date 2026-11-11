@@ -865,6 +865,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * thread does not have the message. A store write shows in `state` only after the next flush, so the
    * answer after a write comes from the messages that were read.
    */
+  /** The newest read around a message for each thread. */
+  const aroundRequests = new Map<string, number>();
   async function loadMessage(agentId: string, taskId: string, messageId: string): Promise<boolean> {
     const has = (messages: readonly { id: string }[]) => messages.some((message) => message.id === messageId);
     const loaded = () => has(state.conversations[taskId]?.messages ?? []);
@@ -880,8 +882,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
       }
       return loaded();
     }
+    // Two fast jumps in one thread: the part of the later jump stays, though its read can end first.
+    const request = (aroundRequests.get(taskId) ?? 0) + 1;
+    aroundRequests.set(taskId, request);
     const part = await read({ agentId, taskId, messageId, limit: AROUND_LIMIT });
-    if (!scopeIsCurrent() || part.conversation.messages.length === 0) return false;
+    if (!scopeIsCurrent() || aroundRequests.get(taskId) !== request || part.conversation.messages.length === 0)
+      return false;
     // The tab's read of the newest messages can have come in meanwhile, with the message in it.
     if (loaded()) return true;
     let replaced = false;

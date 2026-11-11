@@ -910,9 +910,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     await workspace.run(async () => {
       await select(agentId);
       if (workspace.state.selectedId !== agentId) return;
-      await workspace.openSearchMessage(messageId);
-      setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
+      await openSelectedMessage(agentId, messageId);
     });
+  }
+  /** Loads a message in the open agent's chat and scrolls to it. Resolves false when the chat does not have it. */
+  async function openSelectedMessage(agentId: string, messageId: string): Promise<boolean> {
+    if (workspace.state.selectedId !== agentId) return false;
+    const found = await workspace.openSearchMessage(messageId);
+    if (found) setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
+    return found;
   }
   /** The admin requests of the connected host. A call for another server is refused, not redirected. */
   function hostAdmin(serverId?: string): WebAdminRuntime {
@@ -2408,6 +2414,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         reportedFailure(() => workspace.approve({ requestId: item.requestId, decision }), options),
       contextStates: () => workspace.state.threadContextStates,
       onCompactContext: compactSelectedTaskContext(),
+      onOpenMainMessage: (messageId) => openSelectedMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
@@ -3776,14 +3783,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   canDeleteMessage={canDeleteAgentMessage}
                   messagePins={agentMessagePins()}
                   onLoadOlder={() => void workspace.older()}
-                  onLoadLatest={workspace.refresh}
+                  discontinuous={workspace.conversation()?.around === true}
+                  onLoadLatest={workspace.loadLatest}
                   onSearchMessages={async (query) => {
                     const id = workspace.state.selectedId;
                     if (!id) return { messageIds: [], total: 0 };
                     const result = await workspace.runtime.search(id, query);
                     return { messageIds: result.results.map((item) => item.message.id), total: result.total };
                   }}
-                  onOpenSearchMessage={workspace.openSearchMessage}
+                  onOpenSearchMessage={async (messageId) => {
+                    await workspace.openSearchMessage(messageId);
+                  }}
                   onTypingChange={setTyping}
                   onAnswerPrompt={view.answerPrompt}
                   onPromptResolutionPresented={(_agentId, turnId, requestId) =>
