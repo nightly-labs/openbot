@@ -168,8 +168,9 @@ const userDataPath = join(root, "user-data");
 const homePath = join(root, "home");
 await mkdir(userDataPath);
 await mkdir(homePath);
-// The app that runs now, so that a failure can stop it.
-const current: { app: RunningApp | null } = { app: null };
+// The process and the app that run now, so that a failure can stop them. `process` is set at the
+// spawn and `app` when the window is connected.
+const current: { process: LaunchedProcess | null; app: RunningApp | null } = { process: null, app: null };
 
 function check(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -366,12 +367,15 @@ async function installNew(artifact: string): Promise<void> {
 
 // --- Launch and quit -----------------------------------------------------------------------------
 
-interface RunningApp {
+interface LaunchedProcess {
   child: ChildProcess;
-  browser: Browser;
-  page: Page;
   exited: Promise<number | null>;
   stderr: () => string;
+}
+
+interface RunningApp extends LaunchedProcess {
+  browser: Browser;
+  page: Page;
 }
 
 function launchEnvironment(): NodeJS.ProcessEnv {
@@ -439,24 +443,33 @@ async function launch(): Promise<RunningApp> {
     child.once("exit", (code) => resolvePromise(code));
     child.once("error", () => resolvePromise(null));
   });
+  current.process = { child, exited, stderr: () => stderr };
 
   const port = await waitFor("the DevTools port", LAUNCH_LIMIT_MS, readDevToolsPort, exited);
   // Playwright shows only the pages of the browser contexts that exist when it connects, and the
   // main window has its own session. So it connects only after the window's target is listed.
+  let targets: string[] = [];
   await waitFor(
     "the main window target",
     LAUNCH_LIMIT_MS,
     async () => {
       try {
         const response = await fetch(`http://127.0.0.1:${port}/json/list`);
-        const targets = z.array(z.object({ url: z.string() })).parse(await response.json());
-        return targets.some((entry) => entry.url.startsWith(MAIN_PAGE_URL)) ? true : null;
-      } catch {
+        const entries = z.array(z.object({ type: z.string(), url: z.string() })).parse(await response.json());
+        targets = entries.map((entry) => `${entry.type} ${entry.url}`);
+        return entries.some((entry) => entry.url.startsWith(MAIN_PAGE_URL)) ? true : null;
+      } catch (error) {
+        targets = [`no answer from port ${port}: ${error instanceof Error ? error.message : String(error)}`];
         return null;
       }
     },
     exited,
-  );
+  ).catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${message} DevTools targets: ${targets.join("; ") || "none"}. The window called main: ${await rendererCalledMain()}.`,
+    );
+  });
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const page = await waitFor(
     "the main window",
@@ -491,6 +504,18 @@ async function launch(): Promise<RunningApp> {
 }
 
 /**
+ * Whether the window has called main. The renderer asks main for `getAppInfo` when it mounts, and
+ * main records each trusted call in `logs/trace.ndjson`, as `scripts/verify-windows-package.ts` reads.
+ */
+async function rendererCalledMain(): Promise<boolean> {
+  try {
+    return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Asks the app to quit as a user's quit, a log-out or `kill` does, and waits for the exit. POSIX
  * sends SIGTERM, which main handles as a quit (`quitFor("signal")`). Windows sends WM_CLOSE with
  * `taskkill` without `/F`, which closes the main window and so quits the app.
@@ -509,6 +534,7 @@ async function quit(app: RunningApp): Promise<QuitResult> {
   const limit = sleep(QUIT_LIMIT_MS).then(() => "limit" as const);
   const outcome = await Promise.race([app.exited, limit]);
   current.app = null;
+  current.process = null;
   if (outcome !== "limit") {
     // Chromium deletes its profile lock when it ends, after the database host has stopped. On
     // Windows the lock is `lockfile`, which Chromium opens with delete-on-close; it has no
@@ -544,7 +570,7 @@ function forceKill(child: ChildProcess): void {
 }
 
 /** Stops each process that is left in the app's process group, and closes the stderr pipe. */
-function stopLeftovers(app: RunningApp): void {
+function stopLeftovers(app: LaunchedProcess): void {
   const pid = app.child.pid;
   if (process.platform !== "win32" && pid) {
     try {
@@ -868,7 +894,10 @@ async function printLogs(): Promise<void> {
   const logs = join(userDataPath, "logs");
   if (!existsSync(logs)) return;
   for (const name of (await readdir(logs)).filter((entry) => entry.endsWith(".log"))) {
-    const text = await readFile(join(logs, name), "utf8");
+    // The app can still hold a file open; one unreadable file must not hide the others.
+    const text = await readFile(join(logs, name), "utf8").catch(
+      (error: unknown) => `(not readable: ${error instanceof Error ? error.message : String(error)})`,
+    );
     logger.info(`--- ${name} (last lines) ---\n${text.split("\n").slice(-80).join("\n")}`);
   }
 }
@@ -940,16 +969,17 @@ try {
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);
   logger.error(`Release upgrade check failed: ${report.error}`);
-  if (current.app) logger.error(`OpenBot stderr (last lines):\n${current.app.stderr()}`);
+  const running = current.app ?? current.process;
+  if (running) logger.error(`OpenBot stderr (last lines):\n${running.stderr()}`);
   await printLogs().catch(() => undefined);
   process.exitCode = 1;
 } finally {
-  const app = current.app;
-  if (app) {
-    await app.browser.close().catch(() => undefined);
-    forceKill(app.child);
-    await app.exited;
-    stopLeftovers(app);
+  await current.app?.browser.close().catch(() => undefined);
+  const running = current.process;
+  if (running) {
+    forceKill(running.child);
+    await running.exited;
+    stopLeftovers(running);
   }
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
