@@ -56,7 +56,7 @@ async function reviseFrom(context: Context, expectedRevision: number, sourcePath
   return failure(context.tools.revise({ agentId: AGENT_ID, skillId: context.skillId, expectedRevision, sourcePath }));
 }
 
-const report: Array<{ name: string; result: Record<string, string | null> }> = [];
+const report: Array<{ name: string; passed: boolean; result?: Record<string, string | null>; error?: string }> = [];
 
 async function scenario(name: string, run: (context: Context) => Promise<Record<string, string | null>>) {
   const root = await mkdtemp(join(tmpdir(), "openbot-skill-7072-"));
@@ -95,7 +95,9 @@ async function scenario(name: string, run: (context: Context) => Promise<Record<
     await writeFile(join(workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 1."));
     const created = await Effect.runPromise(tools.create({ agentId: AGENT_ID, sourcePath: "source" }));
     const result = await run({ workspace, library, service, tools, skillId: created.id, slug: created.slug });
-    report.push({ name, result });
+    report.push({ name, passed: true, result });
+  } catch (error) {
+    report.push({ name, passed: false, error: error instanceof Error ? error.message : String(error) });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -173,3 +175,4 @@ await scenario("F A quoted frontmatter with another unsaved edit still refuses",
 
 await mkdir(".openbot-build", { recursive: true });
 await writeFile(".openbot-build/skill-install-local-changes-e2e.json", `${JSON.stringify(report, null, 2)}\n`);
+if (report.some((entry) => !entry.passed)) process.exitCode = 1;
