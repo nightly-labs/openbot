@@ -35,6 +35,7 @@ import {
   outsideDestination,
   type SideThreadDestination,
   sideThreadDestination,
+  waitTaskCapability,
 } from "@/features/workspace/model/outside-target";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { AdaptiveSplit, useSplitLayout } from "@/shared/components/adaptive-split";

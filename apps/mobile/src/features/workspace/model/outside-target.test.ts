@@ -14,7 +14,9 @@ function drivenClock() {
 
 describe("sideThreadDestination", () => {
   const target = { agentId: "agent-1", serverId: "server-1", threadId: "openbot-thread-1" };
-  const sources = (loadThreads: () => Promise<unknown>) => ({ loadThreads });
+  const sources = (loadThreads: () => Promise<readonly { id: string; threadId: string }[]>) => ({
+    loadThreads,
+  });
 
   it("opens the thread when the list answers within the window", async () => {
     const destination = await sideThreadDestination(
@@ -59,7 +61,9 @@ describe("waitTaskCapability", () => {
       () => false,
       () => "online",
       8_000,
-      async () => waited.push(250),
+      async () => {
+        waited.push(250);
+      },
     );
     expect(supported).toBe(false);
     expect(waited).toEqual([]);
@@ -71,7 +75,9 @@ describe("waitTaskCapability", () => {
       () => false,
       () => "offline",
       8_000,
-      async () => waited.push(250),
+      async () => {
+        waited.push(250);
+      },
     );
     expect(supported).toBe(false);
     expect(waited).toEqual([]);
@@ -83,7 +89,9 @@ describe("waitTaskCapability", () => {
       () => true,
       () => "connecting",
       8_000,
-      async () => waited.push(250),
+      async () => {
+        waited.push(250);
+      },
     );
     expect(supported).toBe(true);
     expect(waited).toEqual([]);
