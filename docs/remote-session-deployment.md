@@ -260,13 +260,65 @@ What moves when a machine stops:
 
 Failover drill (after approval): stop `remote-api` on `signal2`, check that a host with home `b` and
 its clients connect on `signal1` within 1 minute, then start it again. Hosts stay on their new home
-until it fails. Then do the same for `sui-alexandria` in a quiet hour, which also moves the entry:
+until it fails, or until it is no longer near (see "Regional Signal machines"). Then do the same for `sui-alexandria` in a quiet hour, which also moves the entry:
 check that `dig signal.openbot.run` gives `65.109.88.58` within 3 minutes and that
 `openbot_remote_signal_entry` is 1 on `signal2`. To move the entry back, set the A record by hand.
 
 Known limits: the host status shows the home URL from its first ticket and does not change after a
 move. A host that goes back to a released desktop sends no `signalHome`; its ticket request removes the
 stored home, so its clients go to the entry with it.
+
+## Regional Signal machines
+
+Two Leaseweb VPS machines give hosts far from Helsinki a nearer Signal and TURN relay. Each is a
+home like `a` and `b`, but it never holds the entry while `a` or `b` answers.
+
+| Home | Machine | Address | Names | Place |
+| --- | --- | --- | --- | --- |
+| `us` | `openbot-signal-us` (Leaseweb VPS 12728289, SFO-12, same reference) | `23.106.44.143` | `signal-us`, `turn-us` | San Jose |
+| `au` | `openbot-signal-au` (Leaseweb VPS 12728295, SYD-12, same reference) | `23.106.243.56` | `signal-au`, `turn-au` | Sydney |
+
+The AU plan has a 5 TB monthly traffic pack. TURN relay traffic counts against it.
+
+Setup of each machine (Ubuntu 26.04):
+
+1. Key-only SSH, security-only unattended upgrades with no automatic reboot, `ufw` (22, 443/tcp,
+   3478 TCP and UDP, 5349/tcp, 16384-65535/udp), the TURN socket buffers and the Nginx limits of
+   [remote/README.md](../remote/README.md). The Leaseweb 26.04 image has no GRUB package, so a new
+   kernel never starts until `grub-pc` is installed.
+2. DNS only, TTL 300: `signal-<home>` and `turn-<home>` → the machine address.
+3. `/opt/openbot/remote/.env.production` is a copy of the `signal2` file with these plain values
+   changed: `SIGNAL_ID=<home>`, `SIGNAL_PUBLIC_IPV4`, `TURN_PUBLIC_IP`,
+   `TURN_DOMAIN=turn-<home>.openbot.run`, `ACME_EXTRA_DOMAINS=signal-<home>.openbot.run`,
+   `REMOTE_SIGNAL_PUBLIC_PORT=8081` and an empty `TURN_EXTRA_HOSTS`, so each machine gives only its
+   own relay. `SIGNAL_DOMAIN` and `SIGNAL_ENTRY_HOST` stay `signal.openbot.run`: the certificate also
+   names the entry, so the machine can take the entry after a failover.
+4. Stage the same Signal commit as on `signal1` and `signal2`, build `remote-api`, `capacity-report`
+   and `coturn`, and start the project. Before the start, set `{"dns": ["1.1.1.1", "1.0.0.1"]}` in
+   `/etc/docker/daemon.json` and restart Docker. The Leaseweb resolver keeps the NXDOMAIN answer for
+   the challenge name for 30 minutes, so each certificate attempt fails, and after 5 failures Let's
+   Encrypt blocks the name for an hour. Cloudflare serves the `openbot.run` zone, so `1.1.1.1` sees the
+   record at once. This is also necessary for each renewal.
+5. Nginx: the `signal2` vhost with `server_name signal.openbot.run signal-<home>.openbot.run` and
+   `proxy_pass http://127.0.0.1:8081`, plus the `openbot-remote-nginx-reload` path and service units.
+6. Check `/health/ready`, `/health/live` (the commit) and `/health/turn` on `signal-<home>`, and
+   `openbot_remote_signal_entry` 0.
+7. Worker variables: add the home to `REMOTE_SIGNAL_HOMES` after `a` and `b`, its webhook URL to
+   `REMOTE_AUTH_WEBHOOK_URLS`, and its place to `REMOTE_SIGNAL_HOME_LOCATIONS`, in one deploy.
+
+Placement: `REMOTE_SIGNAL_HOME_LOCATIONS` gives each home a place as `id=latitude:longitude`. The
+ticket route reads the host place from the Cloudflare request (`request.cf`). The Worker keeps the
+available homes that are at most 1000 km farther from the host than the nearest one, and picks one of
+them with the same rendezvous hash as before. A host keeps its stored home while that home is one of
+them; otherwise it moves at its next ticket. A host leaves a stored home that did not fail for it
+only when the new home answers `/health/ready` within 2 seconds, so a host that moved away from a
+failed near home stays on the far one until the near one is back. A host with no known place, or a Worker with no places,
+uses all homes. The value must be empty or name each home one time; an invalid value makes each ticket
+request fail with `503 remote_not_configured`. The entry failover tries the homes in list order, so
+keep `a` and `b` first.
+
+To roll back one machine, remove it from the three Worker variables in one deploy. Its hosts move at
+their next ticket, or after 20 seconds without Signal when the machine is stopped.
 
 ## Required device validation — pending
 
