@@ -263,7 +263,10 @@ export class LocalServers {
   readonly #spawn: SpawnChild;
   readonly #scope = Scope.makeUnsafe("parallel");
   readonly #running = new Map<string, RunningChild>();
-  /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
+  /**
+   * The times each server stopped on its own or failed a start that nobody waits for, in the last
+   * `RESTART_WINDOW_MS`. A restart or a Retry from the user clears them.
+   */
   readonly #exits = new Map<string, number[]>();
   /** The registry ids that wait for a start after a stop. */
   readonly #restartPending = new Set<string>();
