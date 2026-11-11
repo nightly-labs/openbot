@@ -121,6 +121,7 @@ import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
+import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
@@ -398,6 +399,8 @@ export interface OpenBotToolRouterOptions {
   drain: DrainScheduler;
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
+  /** The Library folders of this host; null where the host keeps none. */
+  libraryFolders: AgentLibraryFolders | null;
   localSkillTools?: (() => LocalSkillTools) | undefined;
   routineFlowTools?: (() => RoutineFlowTools) | undefined;
   workflowTools?: (() => WorkflowTools) | undefined;
@@ -455,6 +458,7 @@ export class OpenBotToolRouter {
   readonly #drain: DrainScheduler;
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
@@ -505,6 +509,7 @@ export class OpenBotToolRouter {
     this.#drain = options.drain;
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
+    this.#libraryFolders = options.libraryFolders;
     this.#localSkillTools = options.localSkillTools;
     this.#routineFlowTools = options.routineFlowTools;
     this.#workflowTools = options.workflowTools;
@@ -860,6 +865,7 @@ export class OpenBotToolRouter {
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
+              tool === "list_library_folders" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
@@ -1739,9 +1745,21 @@ export class OpenBotToolRouter {
       ) {
         throw new Error(`paths must contain between 1 and ${INPUT_LIMITS.attachments} valid local file paths.`);
       }
+      // Only a folder that is not text fails the call. For a path that cannot be used, the gateway
+      // attaches the files and the result says why they are in no folder.
+      if (args.folder !== undefined && !isString(args.folder)) throw new Error("folder must be a string.");
 
       const messageId = responseAttachmentMessageId(params.threadId, params.turnId, params.callId);
-      return yield* this.#attachments.attachFiles(senderAgentId, params, args.paths, messageId);
+      return yield* this.#attachments.attachFiles(senderAgentId, params, args.paths, messageId, args.folder);
+    }
+
+    if (params.tool === "list_library_folders") {
+      const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const store = this.#libraryFolders;
+      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+      );
     }
 
     if (params.tool === "list_agents") {

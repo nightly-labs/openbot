@@ -151,6 +151,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
+import type { LibraryFoldersService } from "../library-folders-service";
 import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
 import { runMessagePin } from "../message-pin-refusal";
@@ -291,6 +292,8 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
 export interface AgentIpcDependencies {
   service: AgentService;
   sidebarLayout: SidebarLayoutStore;
+  /** The Library folders of this computer: a deleted agent takes its folders with it. */
+  libraryFolders: Pick<LibraryFoldersService, "removeAgent">;
   sidebarPins: SidebarPinStore;
   host: HostService;
   remoteServers: RemoteServerManager;
@@ -304,6 +307,7 @@ export interface AgentIpcDependencies {
 export function agentIpcHandlers({
   service,
   sidebarLayout,
+  libraryFolders,
   sidebarPins,
   host,
   remoteServers,
@@ -962,6 +966,7 @@ export function agentIpcHandlers({
         local: async (agentId) => {
           await runCauseEffect(service.deleteAgent(agentId));
           await runCauseEffect(sidebarLayout.removeAgent(agentId));
+          await runCauseEffect(libraryFolders.removeAgent(agentId));
         },
         remote: async (agentId, serverId) => {
           await runCauseEffect(

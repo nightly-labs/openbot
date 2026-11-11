@@ -78,6 +78,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
+  "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "error.team.sidebarPinsUnsupported": "此服务器无法为你的所有设备保存已置顶的聊天。请在运行它的电脑上更新 OpenBot。",

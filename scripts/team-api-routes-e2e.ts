@@ -65,6 +65,7 @@ import {
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
   isWhatsAppWorkingMessageList,
+  type LibraryFolderAction,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type PinnedMessagesSnapshot,
@@ -75,6 +76,9 @@ import {
   type Routine,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
+  STORAGE_CAPABILITY,
+  type StorageUsage,
+  type StoredFileRow,
   type UpdateChannelRoutineInput,
   type UpdateRoutineInput,
   type VoiceLiveEvent,
@@ -232,6 +236,10 @@ import {
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import {
+  LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/library-folders-v1";
+import {
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_ROUTES,
   type LiveVoiceEvent,
@@ -300,6 +308,7 @@ import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
@@ -339,6 +348,7 @@ import type { BrowserTabSession } from "../src/backend/browser-state";
 import { ChannelImages } from "../src/backend/channel-images";
 import { ChannelService } from "../src/backend/channel-service";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } from "../src/backend/library-folders-store";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { MessagePinRefused } from "../src/backend/message-pins";
@@ -371,6 +381,7 @@ import {
   INSTANCE_TRANSFER_MANIFEST,
   INSTANCE_TRANSFER_VERSION,
 } from "../src/main/instance-transfer-manifest";
+import { LibraryFoldersService, type LibraryFoldersSources } from "../src/main/library-folders-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
@@ -723,6 +734,67 @@ const agentAccess: TeamApiAgentAccess = {
   set: unused("agentAccess.set"),
   copyAgent: unused("agentAccess.copyAgent"),
 };
+
+// The Library folders of this host (`library-folders-v1`): the real store on a file in the temporary
+// folder, and the real service. Only the host scan is a stand-in. `libraryHostFiles` holds each file
+// that the host has, with its agent. `libraryScannedFiles` holds what the kept scan result knows:
+// `invalidate` makes the next scan read the host again, as the cache of the real service does.
+const libraryHostFiles = new Map<string, string | null>([
+  ["file-ada-1", "agent-ada"],
+  ["file-ada-2", "agent-ada"],
+  ["file-oc-1", "agent-oc"],
+]);
+let libraryScannedFiles = new Map(libraryHostFiles);
+const libraryStorePath = join(root, LIBRARY_FOLDERS_FILE);
+const libraryStore = new LibraryFoldersStore(libraryStorePath);
+function libraryScan(): StorageUsage {
+  const scannedAt = new Date(0).toISOString();
+  return {
+    scope: "host",
+    agentId: null,
+    conversationId: null,
+    scannedAt,
+    freeBytes: null,
+    breakdown: [],
+    agents: [],
+    conversations: [],
+    files: [...libraryScannedFiles].map(
+      ([id, agentId]): StoredFileRow => ({
+        id,
+        name: `${id}.txt`,
+        size: 1,
+        kind: "file",
+        mimeType: "text/plain",
+        previewKind: "none",
+        previewUrl: null,
+        source: "attachment",
+        agentId,
+        conversation: null,
+        messageId: null,
+        createdAt: scannedAt,
+        status: "available",
+        deletable: true,
+      }),
+    ),
+    truncated: false,
+  };
+}
+const libraryStorage: LibraryFoldersSources["storage"] = {
+  usage: (input) =>
+    Effect.sync(() => {
+      record("libraryScan", input);
+      return libraryScan();
+    }),
+  invalidate: () => {
+    record("libraryInvalidate");
+    libraryScannedFiles = new Map(libraryHostFiles);
+  },
+};
+const libraryFolders = new LibraryFoldersService({
+  store: libraryStore,
+  storage: libraryStorage,
+  agents: () => agents,
+});
 
 // The routine records of `agent-ada` for `routine-run-place-v1`: a schedule routine, a webhook routine
 // and a `once` routine, all in the agent's chat. A save records its input and keeps the new place.
@@ -1968,9 +2040,11 @@ try {
     () => Effect.sync(() => importFreeBytes),
   );
 
+  await Effect.runPromise(libraryStore.initialize());
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
+    libraryFolders,
     store,
     agents: fakeAgents,
     agentTasks: fakeAgentTasks,
@@ -2316,10 +2390,20 @@ try {
       stop: (id) => Effect.sync(() => record("stopBackgroundProcess", id)),
     },
     liveVoice,
-    // Only the disk of the host answers here; the storage-v1 routes are not part of this run.
+    // The disk of the host answers here, and the host scan and a file delete for the Library folders
+    // check; clearing a cache is not part of this run.
     storage: {
-      usage: unused("storage.usage"),
-      deleteFile: unused("storage.deleteFile"),
+      usage: (input) =>
+        Effect.sync(() => {
+          record("storageUsage", input);
+          return libraryScan();
+        }),
+      deleteFile: (fileId) =>
+        Effect.sync(() => {
+          record("deleteStoredFile", fileId);
+          libraryHostFiles.delete(fileId);
+          return undefined;
+        }),
       clear: unused("storage.clear"),
       disk: () =>
         Effect.sync(() => {
@@ -10639,6 +10723,444 @@ try {
         newLines.every((line) => !line.includes(FAKE_SECRET)) &&
         newLines.some((line) => line.includes("[redacted]")),
       { lines: newLines.length },
+    );
+  }
+
+  // ---- Library folders (library-folders-v1) ----
+  {
+    const use = { protocol: TEAM_PROTOCOL_V9, capabilities: [LIBRARY_FOLDERS_CAPABILITY] };
+    const read = (token: string) => call("POST", LIBRARY_FOLDERS_ROUTES.read, { ...use, token, json: {} });
+    const act = (token: string, json: Json | LibraryFolderAction) =>
+      call("POST", LIBRARY_FOLDERS_ROUTES.actions, { ...use, token, json });
+    const folderIds = (reply: Reply) => list(field(reply.body, "folders")).map((folder) => field(folder, "id"));
+    const scans = () => callsOf("libraryScan").length;
+    const invalidations = () => callsOf("libraryInvalidate").length;
+    const stored = () => libraryStore.getSnapshot();
+
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises library-folders-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(LIBRARY_FOLDERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIBRARY_FOLDERS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+
+    // The channel host has no Library folders service.
+    assert.ok(channelHost?.port, "The channel host of the Library folders check does not run.");
+    const without = { base: `http://127.0.0.1:${channelHost.port}` };
+    const withoutCompatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      ...without,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const withoutRead = await call("POST", LIBRARY_FOLDERS_ROUTES.read, {
+      ...without,
+      ...use,
+      token: adaToken,
+      json: {},
+    });
+    const noCapability = await call("POST", LIBRARY_FOLDERS_ROUTES.read, { token: bobToken, json: {} });
+    const noCapabilityAction = await call("POST", LIBRARY_FOLDERS_ROUTES.actions, {
+      token: bobToken,
+      json: { type: "create", id: "folder-refused", agentId: "agent-ada", name: "Refused" },
+    });
+    check(
+      "a host without the Library folders service does not advertise them, and it and a client without the capability get 400 libraryFoldersUnsupported",
+      withoutCompatibility.status === 200 &&
+        !list(field(withoutCompatibility.body, "capabilities")).includes(LIBRARY_FOLDERS_CAPABILITY) &&
+        errorIs(withoutRead, 400, sourceText("error.team.libraryFoldersUnsupported")) &&
+        errorIs(noCapability, 400, sourceText("error.team.libraryFoldersUnsupported")) &&
+        errorIs(noCapabilityAction, 400, sourceText("error.team.libraryFoldersUnsupported")) &&
+        stored().revision === 0,
+      [summary(withoutCompatibility), summary(withoutRead), summary(noCapability), summary(noCapabilityAction)],
+    );
+
+    const empty = await read(bobToken);
+    const wrongMethod = await call("GET", LIBRARY_FOLDERS_ROUTES.read, { ...use, token: bobToken });
+    check(
+      "a member reads the empty Library folders, and only POST reads them",
+      empty.status === 200 &&
+        isDeepStrictEqual(empty.body, { revision: 0, folders: [], placement: {} }) &&
+        wrongMethod.status === 404,
+      [summary(empty), summary(wrongMethod)],
+    );
+
+    // Each member changes the folders, as the frozen contract says.
+    const created = await act(bobToken, {
+      type: "create",
+      id: "folder-campaign",
+      agentId: "agent-ada",
+      name: "Campaign",
+      fileIds: ["file-ada-1"],
+    });
+    check(
+      "a member makes a folder with a file in it, and the host reads the agent of the file from one scan",
+      created.status === 200 &&
+        isDeepStrictEqual(created.body, {
+          revision: 1,
+          folders: [{ id: "folder-campaign", agentId: "agent-ada", name: "Campaign" }],
+          placement: { "file-ada-1": "folder-campaign" },
+        }) &&
+        scans() === 1 &&
+        isDeepStrictEqual(callsOf("libraryScan")[0], [{ scope: "host" }]) &&
+        invalidations() === 0,
+      summary(created),
+    );
+
+    const nested = await act(bobToken, {
+      type: "create",
+      id: "folder-images",
+      agentId: "agent-ada",
+      name: "Images",
+      parentId: "folder-campaign",
+    });
+    const renamed = await act(adaToken, { type: "rename", folderId: "folder-images", name: "Pictures" });
+    check(
+      "a folder in a folder and a new name need no scan",
+      nested.status === 200 &&
+        isDeepStrictEqual(field(nested.body, "folders", 1), {
+          id: "folder-images",
+          agentId: "agent-ada",
+          name: "Images",
+          parentId: "folder-campaign",
+        }) &&
+        renamed.status === 200 &&
+        field(renamed.body, "folders", 1, "name") === "Pictures" &&
+        field(renamed.body, "revision") === 3 &&
+        scans() === 1,
+      [summary(nested), summary(renamed)],
+    );
+
+    await act(bobToken, { type: "create", id: "folder-drafts", agentId: "agent-ada", name: "Drafts" });
+    const first = await act(bobToken, {
+      type: "move",
+      folderId: "folder-drafts",
+      parentId: null,
+      beforeFolderId: "folder-campaign",
+    });
+    const into = await act(bobToken, {
+      type: "move",
+      folderId: "folder-drafts",
+      parentId: "folder-campaign",
+      beforeFolderId: null,
+    });
+    const intoItself = await act(bobToken, {
+      type: "move",
+      folderId: "folder-campaign",
+      parentId: "folder-drafts",
+      beforeFolderId: null,
+    });
+    check(
+      "a move puts a folder before a sibling and into a parent; a move into its own folder gets 400 libraryFolderMoveInvalid",
+      first.status === 200 &&
+        isDeepStrictEqual(folderIds(first), ["folder-drafts", "folder-campaign", "folder-images"]) &&
+        into.status === 200 &&
+        isDeepStrictEqual(
+          list(field(into.body, "folders")).find((folder) => field(folder, "id") === "folder-drafts"),
+          { id: "folder-drafts", agentId: "agent-ada", name: "Drafts", parentId: "folder-campaign" },
+        ) &&
+        errorIs(intoItself, 400, sourceText("error.backend.libraryFolderMoveInvalid")) &&
+        stored().revision === field(into.body, "revision"),
+      [summary(first), summary(into), summary(intoItself)],
+    );
+
+    const placed = await act(bobToken, { type: "place", fileIds: ["file-ada-2"], folderId: "folder-images" });
+    const scansAfterPlace = scans();
+    const takenOut = await act(bobToken, { type: "place", fileIds: ["file-ada-1"], folderId: null });
+    check(
+      "a place puts a file into a folder with one scan, and takes a file out of its folder with none",
+      placed.status === 200 &&
+        isDeepStrictEqual(field(placed.body, "placement"), {
+          "file-ada-1": "folder-campaign",
+          "file-ada-2": "folder-images",
+        }) &&
+        scansAfterPlace === 2 &&
+        takenOut.status === 200 &&
+        isDeepStrictEqual(field(takenOut.body, "placement"), { "file-ada-2": "folder-images" }) &&
+        scans() === 2,
+      [summary(placed), summary(takenOut)],
+    );
+
+    const beforeRefusals = stored();
+    const otherAgent = await act(bobToken, { type: "place", fileIds: ["file-oc-1"], folderId: "folder-campaign" });
+    const unknownFolder = await act(bobToken, { type: "place", fileIds: ["file-ada-1"], folderId: "folder-missing" });
+    const scansBeforeUnknown = scans();
+    const unknownFile = await act(bobToken, { type: "place", fileIds: ["file-missing"], folderId: "folder-campaign" });
+    const unknownAgent = await act(bobToken, {
+      type: "create",
+      id: "folder-nobody",
+      agentId: "agent-missing",
+      name: "Nobody",
+    });
+    const longName = await act(bobToken, { type: "rename", folderId: "folder-campaign", name: "n".repeat(81) });
+    const extraKey = await act(bobToken, { type: "delete", folderId: "folder-campaign", files: true });
+    const unknownType = await act(bobToken, { type: "copy", folderId: "folder-campaign" });
+    check(
+      "the host refuses a file of a different agent (400), an unknown folder, file or agent (404) and a request that the contract does not permit (400), and changes nothing",
+      errorIs(otherAgent, 400, sourceText("error.backend.libraryFolderOtherAgent")) &&
+        errorIs(unknownFolder, 404, sourceText("error.backend.libraryFolderGone")) &&
+        errorIs(unknownFile, 404, sourceText("error.backend.fileGone")) &&
+        errorIs(unknownAgent, 404, sourceText("error.team.agentNotFound")) &&
+        longName.status === 400 &&
+        extraKey.status === 400 &&
+        unknownType.status === 400 &&
+        isDeepStrictEqual(stored(), beforeRefusals),
+      [
+        summary(otherAgent),
+        summary(unknownFolder),
+        summary(unknownFile),
+        summary(unknownAgent),
+        summary(longName),
+        summary(extraKey),
+        summary(unknownType),
+      ],
+    );
+    check(
+      "a file that the kept scan result does not have makes the host scan one more time before it refuses the file",
+      scans() === scansBeforeUnknown + 2 && invalidations() === 1,
+      { scans: scans() - scansBeforeUnknown, invalidations: invalidations() },
+    );
+
+    // An agent attached this file after the last scan.
+    libraryHostFiles.set("file-ada-3", "agent-ada");
+    const scansBeforeNew = scans();
+    const newFile = await act(bobToken, { type: "place", fileIds: ["file-ada-3"], folderId: "folder-campaign" });
+    check(
+      "a file that is newer than the kept scan result goes into a folder after one new scan",
+      newFile.status === 200 &&
+        field(newFile.body, "placement", "file-ada-3") === "folder-campaign" &&
+        scans() === scansBeforeNew + 2 &&
+        invalidations() === 2,
+      summary(newFile),
+    );
+
+    const beforeDelete = stored();
+    const deleted = await act(bobToken, { type: "delete", folderId: "folder-campaign" });
+    const restored = await act(bobToken, {
+      type: "restore",
+      folders: beforeDelete.folders.map((folder, index) => ({ index, folder })),
+      placement: beforeDelete.placement,
+    });
+    check(
+      "a delete removes the folder and the folders in it and leaves the files with the agent; a restore puts the folders and the files back",
+      deleted.status === 200 &&
+        isDeepStrictEqual(field(deleted.body, "folders"), []) &&
+        isDeepStrictEqual(field(deleted.body, "placement"), {}) &&
+        libraryHostFiles.size === 4 &&
+        callsOf("deleteStoredFile").length === 0 &&
+        restored.status === 200 &&
+        isDeepStrictEqual(field(restored.body, "folders"), beforeDelete.folders) &&
+        isDeepStrictEqual(field(restored.body, "placement"), beforeDelete.placement) &&
+        field(restored.body, "revision") === beforeDelete.revision + 2,
+      [summary(deleted), summary(restored)],
+    );
+
+    // A stored file that an admin deletes (`storage-v1`) leaves its folder.
+    const fileDelete = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_CAPABILITY] };
+    const memberDelete = await call("POST", STORAGE_ROUTES.deleteFile, {
+      ...fileDelete,
+      token: bobToken,
+      json: { fileId: "file-ada-2" },
+    });
+    const keptPlacement = stored().placement["file-ada-2"];
+    const adminDelete = await call("POST", STORAGE_ROUTES.deleteFile, {
+      ...fileDelete,
+      token: adaToken,
+      json: { fileId: "file-ada-2" },
+    });
+    const afterFileDelete = await read(bobToken);
+    check(
+      "a file that an admin deletes leaves its folder, and the refused delete of a member changes nothing",
+      memberDelete.status === 403 &&
+        keptPlacement === "folder-images" &&
+        adminDelete.status === 200 &&
+        isDeepStrictEqual(callsOf("deleteStoredFile"), [["file-ada-2"]]) &&
+        afterFileDelete.status === 200 &&
+        isDeepStrictEqual(field(afterFileDelete.body, "placement"), { "file-ada-3": "folder-campaign" }),
+      [summary(memberDelete), summary(adminDelete), summary(afterFileDelete)],
+    );
+
+    // A member gets no folder of an agent that they cannot see and no file that is in one.
+    const oscar = await act(adaToken, {
+      type: "create",
+      id: "folder-oscar",
+      agentId: "agent-oc",
+      name: "Oscar files",
+      fileIds: ["file-oc-1"],
+    });
+    const beforeHidden = stored();
+    accessLevels = { revision: 33, everyone: { "agent-ada": "none" }, roles: [] };
+    const hiddenRead = await read(bobToken);
+    const hiddenCreate = await act(bobToken, {
+      type: "create",
+      id: "folder-hidden",
+      agentId: "agent-ada",
+      name: "Hidden",
+    });
+    const hiddenRename = await act(bobToken, { type: "rename", folderId: "folder-campaign", name: "Seen" });
+    const hiddenDelete = await act(bobToken, { type: "delete", folderId: "folder-images" });
+    const hiddenMove = await act(bobToken, {
+      type: "move",
+      folderId: "folder-oscar",
+      parentId: "folder-campaign",
+      beforeFolderId: null,
+    });
+    const hiddenTakeOut = await act(bobToken, { type: "place", fileIds: ["file-ada-3"], folderId: null });
+    const hiddenRestore = await act(bobToken, {
+      type: "restore",
+      folders: [{ index: 0, folder: { id: "folder-back", agentId: "agent-ada", name: "Back" } }],
+      placement: {},
+    });
+    const visibleRename = await act(bobToken, { type: "rename", folderId: "folder-oscar", name: "Oscar" });
+    const ownerRead = await read(adaToken);
+    accessLevels = { revision: 34, everyone: {}, roles: [] };
+    const openRead = await read(bobToken);
+    const hiddenReplies = [hiddenCreate, hiddenRename, hiddenDelete, hiddenMove, hiddenTakeOut, hiddenRestore];
+    check(
+      "a member without access to an agent reads no folder and no file of it, and gets 404 agentNotFound for each action that names it, a folder of it or a file in one",
+      oscar.status === 200 &&
+        hiddenRead.status === 200 &&
+        isDeepStrictEqual(hiddenRead.body, {
+          revision: beforeHidden.revision,
+          folders: [{ id: "folder-oscar", agentId: "agent-oc", name: "Oscar files" }],
+          placement: { "file-oc-1": "folder-oscar" },
+        }) &&
+        hiddenReplies.every((reply) => errorIs(reply, 404, sourceText("error.team.agentNotFound"))) &&
+        visibleRename.status === 200 &&
+        isDeepStrictEqual(visibleRename.body, {
+          revision: beforeHidden.revision + 1,
+          folders: [{ id: "folder-oscar", agentId: "agent-oc", name: "Oscar" }],
+          placement: { "file-oc-1": "folder-oscar" },
+        }) &&
+        ownerRead.status === 200 &&
+        isDeepStrictEqual(ownerRead.body, stored()) &&
+        isDeepStrictEqual(
+          stored().folders.filter((folder) => folder.agentId === "agent-ada"),
+          beforeHidden.folders.filter((folder) => folder.agentId === "agent-ada"),
+        ) &&
+        stored().placement["file-ada-3"] === "folder-campaign" &&
+        isDeepStrictEqual(openRead.body, stored()),
+      [summary(oscar), summary(hiddenRead), ...hiddenReplies.map(summary), summary(visibleRename), summary(ownerRead)],
+    );
+
+    // A member with `view` access reads the folders of the agent, and changes none of them.
+    const beforeViewOnly = stored();
+    accessLevels = { revision: 35, everyone: { "agent-oc": "view" }, roles: [] };
+    const viewRead = await read(bobToken);
+    const viewRename = await act(bobToken, { type: "rename", folderId: "folder-oscar", name: "Seen" });
+    const viewCreate = await act(bobToken, {
+      type: "create",
+      id: "folder-viewer",
+      agentId: "agent-oc",
+      name: "Viewer",
+    });
+    const viewTakeOut = await act(bobToken, { type: "place", fileIds: ["file-oc-1"], folderId: null });
+    const viewDelete = await act(bobToken, { type: "delete", folderId: "folder-oscar" });
+    const unchangedByViewer = stored();
+    const adminRename = await act(adaToken, { type: "rename", folderId: "folder-oscar", name: "Oscar files" });
+    accessLevels = { revision: 36, everyone: {}, roles: [] };
+    const viewReplies = [viewRename, viewCreate, viewTakeOut, viewDelete];
+    check(
+      "a member with view access reads the folders of the agent, gets 403 agentViewOnly for each change of them, and an admin still changes them",
+      viewRead.status === 200 &&
+        isDeepStrictEqual(viewRead.body, beforeViewOnly) &&
+        viewReplies.every((reply) => errorIs(reply, 403, sourceText("error.team.agentViewOnly"))) &&
+        isDeepStrictEqual(unchangedByViewer, beforeViewOnly) &&
+        adminRename.status === 200 &&
+        field(adminRename.body, "revision") === beforeViewOnly.revision + 1,
+      [summary(viewRead), ...viewReplies.map(summary), summary(adminRename)],
+    );
+
+    // The host keeps some files of a deleted agent, and some files have no agent.
+    libraryHostFiles.set("file-gone-1", "agent-deleted");
+    libraryHostFiles.set("file-loose-1", null);
+    const beforeOrphans = stored();
+    const memberOrphan = await act(bobToken, { type: "place", fileIds: ["file-gone-1"], folderId: "folder-oscar" });
+    const adminOrphan = await act(adaToken, { type: "place", fileIds: ["file-gone-1"], folderId: "folder-oscar" });
+    const looseFile = await act(adaToken, {
+      type: "create",
+      id: "folder-loose",
+      agentId: "agent-oc",
+      name: "Loose",
+      fileIds: ["file-loose-1"],
+    });
+    const orphanReplies = [memberOrphan, adminOrphan, looseFile];
+    check(
+      "a file of a deleted agent or of no agent goes into no folder: each member and each admin gets 404 fileGone",
+      orphanReplies.every((reply) => errorIs(reply, 404, sourceText("error.backend.fileGone"))) &&
+        isDeepStrictEqual(stored(), beforeOrphans),
+      orphanReplies.map(summary),
+    );
+
+    // Some agent deletes do not remove the folders of the agent; the next start does. Until then, only
+    // an owner or an admin reads them, as for the stored files of a deleted agent.
+    await Effect.runPromise(
+      libraryStore.mutate(
+        { type: "create", id: "folder-gone", agentId: "agent-deleted", name: "Gone", fileIds: ["file-gone-1"] },
+        { agentIds: new Set(["agent-deleted"]), fileAgent: (fileId) => libraryHostFiles.get(fileId) ?? undefined },
+      ),
+    );
+    const memberGoneRead = await read(bobToken);
+    const adminGoneRead = await read(adaToken);
+    check(
+      "a member reads no folder of a deleted agent and no file in one; an admin reads them",
+      memberGoneRead.status === 200 &&
+        isDeepStrictEqual(memberGoneRead.body, {
+          ...stored(),
+          folders: stored().folders.filter((folder) => folder.agentId !== "agent-deleted"),
+          placement: Object.fromEntries(
+            Object.entries(stored().placement).filter(([fileId]) => fileId !== "file-gone-1"),
+          ),
+        }) &&
+        adminGoneRead.status === 200 &&
+        isDeepStrictEqual(adminGoneRead.body, stored()) &&
+        stored().placement["file-gone-1"] === "folder-gone",
+      [summary(memberGoneRead), summary(adminGoneRead)],
+    );
+    await Effect.runPromise(libraryStore.removeAgent("agent-deleted"));
+
+    // The host scan lists the files of a deleted agent; only an owner or an admin gets them.
+    const storageUse = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_CAPABILITY] };
+    const fileIdsOf = (reply: Reply) => list(field(reply.body, "files")).map((file) => field(file, "id"));
+    const memberUsage = await call("POST", STORAGE_ROUTES.usage, {
+      ...storageUse,
+      token: bobToken,
+      json: { scope: "host" },
+    });
+    const adminUsage = await call("POST", STORAGE_ROUTES.usage, {
+      ...storageUse,
+      token: adaToken,
+      json: { scope: "host" },
+    });
+    check(
+      "a member gets no stored file of a deleted agent and no file without an agent; an admin gets them",
+      memberUsage.status === 200 &&
+        isDeepStrictEqual(fileIdsOf(memberUsage), ["file-ada-1", "file-oc-1", "file-ada-3"]) &&
+        adminUsage.status === 200 &&
+        isDeepStrictEqual(fileIdsOf(adminUsage), [
+          "file-ada-1",
+          "file-oc-1",
+          "file-ada-3",
+          "file-gone-1",
+          "file-loose-1",
+        ]),
+      [summary(memberUsage), summary(adminUsage)],
+    );
+    libraryHostFiles.delete("file-gone-1");
+    libraryHostFiles.delete("file-loose-1");
+
+    // The folders are in one file of the host: a host that starts again has them.
+    const onDisk: Json = JSON.parse(readFileSync(libraryStorePath, "utf8"));
+    const reopened = new LibraryFoldersStore(libraryStorePath);
+    await Effect.runPromise(reopened.initialize());
+    check(
+      "the host keeps the folders in its file with version 1, and a new start reads the same folders",
+      field(onDisk, "version") === 1 &&
+        isDeepStrictEqual(field(onDisk, "folders"), stored().folders) &&
+        isDeepStrictEqual(field(onDisk, "placement"), stored().placement) &&
+        isDeepStrictEqual(reopened.getSnapshot(), stored()) &&
+        stored().folders.length === 4,
+      { revision: stored().revision, folders: stored().folders.length },
     );
   }
 

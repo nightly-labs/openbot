@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
+  "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.sidebarPinsUnsupported":
