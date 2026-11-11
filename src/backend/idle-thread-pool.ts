@@ -131,9 +131,9 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
   }
 
   /**
-   * Holds a thread with no turn whose provider starts a turn of its own soon. Only the timeout closes
-   * it: the idle limit and a low-memory release do not, because they would end that turn before it
-   * starts. Its turn holds it, and the end of that turn marks it idle.
+   * Holds a thread with no turn whose provider starts a turn of its own soon. The idle limit and the
+   * release of idle threads at low memory do not close it, because they would end that turn before
+   * it starts; its timeout still does. Its turn holds it, and the end of that turn marks it idle.
    */
   awaitOwnTurn(thread: Thread): void {
     thread.idleSince = 0;
