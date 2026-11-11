@@ -434,6 +434,7 @@ export function createSidebarDataStore(deps: {
     assignedSectionId,
     agentById,
     channelById,
+    chatIsUnread,
     chatKind,
     chatName,
     chatPinnedItems,
