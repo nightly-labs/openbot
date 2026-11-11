@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.67.0",
+  "version": "0.67.1",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -300,6 +300,7 @@
     "test:antigravity-accounts": "bun scripts/antigravity-accounts-e2e.ts",
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",
     "test:antigravity-quota-failover": "bun scripts/antigravity-quota-failover-e2e.ts",
+    "test:antigravity-windows-zip": "bun scripts/antigravity-windows-zip-e2e.ts",
     "test:opencode-usage-metering": "bun scripts/opencode-usage-metering-e2e.ts",
     "test:opencode-anthropic-cache": "bun scripts/opencode-anthropic-cache-e2e.ts",
     "test:opencode-custom-model": "bun scripts/opencode-custom-model-e2e.ts",
@@ -573,7 +574,8 @@
     "react-native-reanimated@4.7.1": "patches/react-native-reanimated@4.7.1.patch",
     "expo-widgets@58.0.22": "patches/expo-widgets@58.0.22.patch",
     "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
-    "@norbert_bodziony/bloub@0.6.4": "patches/@norbert_bodziony%2Fbloub@0.6.4.patch"
+    "@norbert_bodziony/bloub@0.6.4": "patches/@norbert_bodziony%2Fbloub@0.6.4.patch",
+    "@modelcontextprotocol/sdk@1.32.1": "patches/@modelcontextprotocol%2Fsdk@1.32.1.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

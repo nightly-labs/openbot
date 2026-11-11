@@ -471,6 +471,23 @@ the person asks for another member or for help, or when a part clearly needs ano
   channel facts with a rule line, and a line when a person turns it off. A save without the field
   keeps the stored value, so a client from before it does not turn it off. The agent import archive
   (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
+- The Browser setting of a channel (`Channel.browser`, in `channel_json`, so no migration) says which
+  members can use the browser there (#4135): every member (absent, or `{ kind: "members" }`), one
+  member (`{ kind: "member", agentId }`), or no member (`{ kind: "none" }`). `OpenBotToolRouter`
+  refuses an `openbot_browser` call of a channel thread that the setting forbids, and the answer tells
+  the agent to give the browser step to the browser member with `channel_assign`. The packet gives
+  `browser` in the channel facts with a rule line for each member, and a line when a person gives the
+  browser to every member again. A save without the field keeps the stored value. A value that this
+  version cannot read, or that names an agent that is not a member, reads as no member: the setting
+  limits access, so it fails closed. A save that removes the browser member also sets no member
+  (`withBrowserMember`), and no other member gets the browser in its place.
+- The channel side panel has the Settings, Browser and Files panes. The Browser pane shows the tabs
+  that the members' channel threads own (`ChannelSummary.threads`). A new tab opens for the browser
+  member's channel thread (else the lead's, else the first member's), so that member can use it under
+  the host's thread rule for tabs. When no member can use the browser, or the member has no channel
+  thread yet, the pane shows only the tabs that exist. The Files pane reads the `channel` storage
+  scope: the files of the channel's messages, as the chat Files pane reads one conversation. Voice and
+  the side question stay in agent chats.
 - After a turn, a channel starts one background summary. `prepare` waits for it only when its own
   budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
   messages again. A deleted channel stops the summary. It does not start when it would take the
@@ -544,6 +561,13 @@ On a host with `channel-isolation-v1`, each channel record and the draft of a `s
 the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
 server or the browser client shows the switch only when the host advertises the capability (#5380).
 A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
+On a host with `channel-browser-v1`, each channel record and the draft of a `save` carry `browser`, in
+the same way. A joined server or the browser client shows the Browser select only when the host
+advertises the capability. The phone does not show the setting, and its saves do not change it. On a
+host with `storage-channel-v1`, `POST /v1/storage/channel-files` answers the file rows of one channel
+for the Files pane. Every member who sees the channel can read them; a hidden channel gets 404, as
+`POST /v1/channels/read` does.
 
 On a host with `channel-picture-v1`, each channel record carries its picture: `icon` and the
 `openbot-avatar://channel/` `imageUrl`, which names only the image version. A `save` draft can carry

@@ -91,6 +91,7 @@ export const messages = {
   "browser.secret.takeOver": "操作を引き継ぐ",
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
   "browser.error.openAddress": "このタブでアドレスを開けませんでした。",
+  "browser.error.channelNoBrowserMember": "このチャンネルでは、新しいタブを開けるメンバーがいません。",
   "browser.error.closeTab": "ブラウザーのタブを閉じられませんでした。",
   "browser.error.reloadTab": "ブラウザーのタブを再読み込みできませんでした。",
   "browser.error.stopLoading": "ページの読み込みを停止できませんでした。",

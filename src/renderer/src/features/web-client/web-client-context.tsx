@@ -63,6 +63,7 @@ import {
   deleteRemoteWorkspaceFrame,
   deleteRemoteWorkspaceFrames,
   readRemoteWorkspaceFrame,
+  saveRemoteFrameUnreadCounts,
   saveRemoteWorkspaceFrame,
 } from "../servers/remote-workspace-frame";
 import { followsServerUpdate } from "../servers/server-update-flow";
@@ -730,6 +731,23 @@ export function createWebWorkspace(
         });
     },
   );
+  // The unread counts go to the frame when the reads of the load have come, and then on each change.
+  createEffect(
+    () =>
+      state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
+        ? {
+            hostId: state.host.hostId,
+            unreadCounts: Object.fromEntries(
+              Object.entries(state.reads).flatMap(([agentId, read]) =>
+                read.unreadCount > 0 ? [[agentId, read.unreadCount]] : [],
+              ),
+            ),
+          }
+        : null,
+    (frame) => {
+      if (frame) saveRemoteFrameUnreadCounts(props.accountId, frame.hostId, frame.unreadCounts);
+    },
+  );
   // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
   const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pageFocused, setPageFocused] = createSignal(!document.hidden && document.hasFocus());
@@ -1268,6 +1286,13 @@ export function createWebWorkspace(
           };
           draft.userHiddenAgents = frame.hiddenAgents;
           draft.frameChannels = frame.channels;
+          // The sidebar sorts the unread chats into their group, so the rows keep their place when the host answers.
+          draft.reads = Object.fromEntries(
+            Object.entries(frame.unreadCounts).map(([agentId, unreadCount]) => [
+              agentId,
+              { unreadCount, firstUnreadMessageId: null, throughMessageId: null },
+            ]),
+          );
           if (frameSelected) {
             draft.selectedId = frameSelected.id;
             draft.conversations[frameSelected.id] ??= { page: null, draft: "", attachments: [], loading: true };

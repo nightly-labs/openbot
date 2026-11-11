@@ -249,7 +249,7 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "billing";
   if (
-    /\b(?:usage limit|hit your (?:weekly |session )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
       message,
     )
   )

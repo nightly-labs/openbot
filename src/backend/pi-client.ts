@@ -256,12 +256,24 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #redact = (text: string): string => redactMcpValues(redactText(text), this.#secretValues());
 
-  /** Pi starts an API error with its HTTP status. A key provider's 401 and 402 point at the saved key. */
+  /**
+   * Pi starts an API error with its HTTP status. A key provider's 401 and 402 point at the saved key.
+   * A 403 is the model service's refusal, not an OpenBot permission: the text keeps the service's
+   * reason, which the generic permission sentence dropped (#6649).
+   */
   #failureText(message: string | null): string {
     if (message && this.provider !== "pi") {
       const provider = agentProviderName(this.provider);
       if (/^401\b/u.test(message)) return sourceText("error.provider.keyProviderRefused", { provider });
       if (/^402\b/u.test(message)) return sourceText("error.provider.keyProviderNoBalance", { provider });
+    }
+    const refused = message === null ? null : /^403\b:?\s*([\s\S]*)$/u.exec(message);
+    if (refused) {
+      // Redact before the reason is cut: a cut through a secret leaves a part that no longer matches.
+      const reason = piRefusalReason(this.#redact(refused[1] ?? ""));
+      return reason
+        ? sourceText("error.provider.modelServiceRefusedReason", { reason })
+        : sourceText("error.provider.modelServiceRefused");
     }
     return this.#redact(message ?? "Pi model request failed.");
   }
@@ -488,6 +500,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             const id = getString(model, "id");
             // A key provider's client lists only its own models. Pi also lists the models of other signed-in providers.
             if (!provider || !id || (keyProvider && provider !== keyProvider.id)) continue;
+            // OpenRouter's `:batch` models work only through its batch API: a chat turn fails with 404.
+            if (provider === "openrouter" && id.endsWith(":batch")) continue;
             const reasoning = isRecord(model) && model.reasoning === true;
             let levels: string[] = [];
             if (reasoning) {
@@ -1335,6 +1349,49 @@ function isToolResult(value: unknown): value is DynamicToolResult {
  */
 const PI_PROVIDER_STOP =
   /^(?:Provider finish_reason: error\b|Stream ended without finish_reason\b|Provider returned (?:an? )?error\b)/u;
+
+/**
+ * The JSON body of an API error: OpenAI's and Anthropic's `{ error: { message } }`, a proxy's
+ * `{ error }` or `{ detail }`, or a flat `{ message }`.
+ */
+const PiErrorBody = Schema.fromJsonString(
+  Schema.Union([
+    Schema.Struct({ error: Schema.Union([Schema.String, Schema.Struct({ message: Schema.String })]) }),
+    Schema.Struct({ message: Schema.String }),
+    Schema.Struct({ detail: Schema.String }),
+  ]),
+);
+
+/** The chat shows at most 300 characters, and the translated sentence around the reason needs room. */
+const PI_REFUSAL_REASON_LIMIT = 120;
+
+/**
+ * The model service's own reason in the text after a 403 status: the message of a JSON body, or the
+ * text that the OpenAI SDK puts after the status. Null for no body, or a body with no message.
+ */
+function piRefusalReason(body: string): string | null {
+  const decoded = Schema.decodeUnknownOption(PiErrorBody)(body.trim());
+  const text = Option.isSome(decoded)
+    ? "error" in decoded.value
+      ? typeof decoded.value.error === "string"
+        ? decoded.value.error
+        : decoded.value.error.message
+      : "message" in decoded.value
+        ? decoded.value.message
+        : decoded.value.detail
+    : /^\s*[{[]/u.test(body)
+      ? ""
+      : body;
+  const reason = text
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[.\s]+$/u, "");
+  // The OpenAI SDK's text for a response with no body.
+  if (!reason || /^status code \(no body\)$/iu.test(reason)) return null;
+  return reason.length <= PI_REFUSAL_REASON_LIMIT
+    ? reason
+    : `${reason.slice(0, PI_REFUSAL_REASON_LIMIT - 1).trimEnd()}…`;
+}
 
 /**
  * The cause of a Pi model request that failed. Pi 1.5.0 starts an HTTP error with its status:

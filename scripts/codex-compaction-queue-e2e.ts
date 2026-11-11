@@ -10,7 +10,8 @@
 // deleted while it compacts does not hold the agent's own chat. Then a chat whose compactions fail
 // and whose turns grow it each time: OpenBot stops after 2 failures in a row and says so, and the
 // messages still run. One such chat compacted every 19 seconds for 7 hours and used up the plan
-// limit. Last, a usage
+// limit. Then a chat that each compaction leaves full, while Codex reports a small estimate during each
+// compaction: OpenBot stops after 2 such compactions and says so (#6845). Last, a usage
 // report that Codex sends while the stop ends it does not reach the closed database (#3808).
 // `bun scripts/codex-compaction-queue-e2e.ts`. Writes .openbot-build/codex-compaction-queue-e2e/report.json.
 import assert from "node:assert/strict";
@@ -140,7 +141,7 @@ const answer = (message) => {
       return;
     }
     case "thread/compact/start": {
-      const { compactionMs, ignoreInterrupt, compactionStatus, editMemory } = control();
+      const { compactionMs, ignoreInterrupt, compactionStatus, editMemory, estimate } = control();
       const turnId = "compact-turn-" + (++turns);
       const item = { type: "contextCompaction", id: "compact-item-" + turnId };
       write({ id: message.id, result: {} });
@@ -153,6 +154,12 @@ const answer = (message) => {
         log({ compactionEnded: turnId, threadId: params.threadId, status });
         if (status === "completed" && editMemory) {
           const last = { totalTokens: 16000, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 };
+          const tokenUsage = { total: { totalTokens: 90000 }, last, modelContextWindow: 100000 };
+          write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
+        }
+        // Like Codex 0.167.0: an estimate of the compacted session, with no request behind it (#6845).
+        if (status === "completed" && estimate) {
+          const last = { totalTokens: 6000, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0 };
           const tokenUsage = { total: { totalTokens: 90000 }, last, modelContextWindow: 100000 };
           write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
         }
@@ -613,6 +620,55 @@ try {
   assert.equal(failedCompactions.compactStarts, 2, "failed compactions: OpenBot did not stop after 2 failures");
   assert.equal(failedCompactions.failedEnds, 2, "failed compactions: the compactions did not fail");
   assert.equal(failedCompactions.stoppedNotices, 1, "failed compactions: one notice");
+
+  // Each compaction completes, but the chat stays full: each turn grows it by 6% of its window. Codex
+  // reports a small estimate before the compaction ends. The estimate reset the count of compactions
+  // that left the chat almost full, so each turn compacted again, without a notice (#6845).
+  await writeFile(
+    controlPath,
+    JSON.stringify({ compactionMs: 200, ignoreInterrupt: false, growUsage: true, estimate: true }),
+  );
+  const full = await runCauseEffect(
+    agents.createAgent({
+      name: "Full after compaction",
+      description: "Checks that compactions that free no space stop.",
+      avatarSeed: "compaction-full",
+      avatarHue: null,
+      initialMessage: "First message.",
+    }),
+  );
+  const fullIdle = () =>
+    !agents
+      .listQueue(full.id)
+      .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+  const fullSession = await waitFor("the first turn of the full chat", () => {
+    const session = store.activeProviderSession(full.id)?.externalSessionId;
+    return session && fullIdle() ? session : null;
+  });
+  for (const text of ["Second message.", "Third message.", "Fourth message."]) {
+    await waitFor(
+      "the full chat to settle",
+      () =>
+        fullIdle() &&
+        !agents
+          .getRuntimeSnapshot()
+          .contextStates?.some((state) => state.agentId === full.id && state.compaction?.status === "running"),
+    );
+    await runCauseEffect(agents.sendMessage({ agentId: full.id, text }));
+    await waitFor("the message to end", fullIdle);
+  }
+  const ineffectiveCompactions = {
+    compactStarts: protocol().filter((line) => line.method === "thread/compact/start" && line.threadId === fullSession)
+      .length,
+    turns: protocol().filter((line) => line.method === "turn/start" && line.threadId === fullSession).length,
+    notices: errors.filter((error) => error.code === "context_compaction_ineffective" && error.agentId === full.id)
+      .length,
+    deliveries: agents.listQueue(full.id).deliveries.map((delivery) => delivery.status),
+  };
+  Object.assign(report, { ineffectiveCompactions });
+  assert.equal(ineffectiveCompactions.turns, 4, "ineffective compactions: not every message ran");
+  assert.equal(ineffectiveCompactions.compactStarts, 2, "ineffective compactions: OpenBot did not stop after 2");
+  assert.equal(ineffectiveCompactions.notices, 1, "ineffective compactions: one notice");
 
   // Codex reports usage while the stop ends it. The quit closes the database next, and a late
   // usage snapshot then failed with "OpenBot database is not initialized." (#3808).

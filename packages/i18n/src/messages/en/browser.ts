@@ -97,6 +97,7 @@ export const messages = defineMessages("browser", {
   "browser.secret.takeOver": "Take over",
   "browser.secret.failed": "The request could not be completed. Check the connection and try again.",
   "browser.error.openAddress": "Could not open the address in this tab.",
+  "browser.error.channelNoBrowserMember": "No member can open a new tab in this channel.",
   "browser.error.closeTab": "Could not close the browser tab.",
   "browser.error.reloadTab": "Could not reload the browser tab.",
   "browser.error.stopLoading": "Could not stop loading the page.",

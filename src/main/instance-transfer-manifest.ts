@@ -193,6 +193,11 @@ const Channel = Schema.Struct({
   members: Schema.Array(Key).check(Schema.isMaxLength(INPUT_LIMITS.agents)),
   lead: Schema.NullOr(Key),
   isolated: Schema.optionalKey(Schema.Boolean),
+  /**
+   * Who can use the browser in the channel. A named member is an agent key. The import checks the value,
+   * as for the icon. An older app ignores it.
+   */
+  browser: Schema.optionalKey(Schema.Unknown),
   /** The import drops an icon that this app does not draw, as for an agent's colour. */
   icon: Schema.optionalKey(Schema.Unknown),
   /** An archive path inside `channels/<key>/`, checked below. */

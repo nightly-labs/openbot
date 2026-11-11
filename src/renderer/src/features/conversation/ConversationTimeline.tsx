@@ -1427,7 +1427,11 @@ export function ConversationTimeline() {
                         <article
                           data-chat-search-message={message()?.id}
                           aria-label={(message() ?? initialMessage).body}
-                          class={{ "message-entry-animated": animateEntrance }}
+                          class={{
+                            "message-entry-animated": animateEntrance,
+                            // A channel shows agent faces, so the page starts after their column.
+                            "chat-visual-with-author": Boolean(channel) && author().kind === "agent",
+                          }}
                         >
                           <ChatVisual
                             src={pageUrl()}

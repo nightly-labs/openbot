@@ -224,10 +224,14 @@ export const messages = {
     "Die kostenlosen OpenCode-Modelle haben ihr Nutzungslimit erreicht. Alle kostenlosen Modelle teilen sich dieses Limit. Um weiterzumachen, füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein oder wähle ein Modell eines anderen Anbieters.",
   "error.provider.opencodeProviderFailed":
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT bereitet nach einem früheren Start noch seinen lokalen Verlauf vor. Warte ein paar Minuten und versuche es dann erneut.",
+  "error.provider.codexThreadInUse":
+    "Eine andere Codex-App hat diesen Chat geöffnet, zum Beispiel die Codex-Desktop-App, die Codex CLI oder eine IDE-Erweiterung. Nur eine App kann gleichzeitig in einen Codex-Chat schreiben. Schließe den Chat in dieser App und sende deine Nachricht dann erneut.",
   "error.provider.realtimeLimitZero":
     "Linux hat den Anbieter beendet, weil OpenBot ein Echtzeit-CPU-Limit von 0 hat. Das Limit kommt von deinem System. Installiere und starte rtkit (`rtkit-daemon`), führe `systemctl --user restart xdg-desktop-portal` aus und starte OpenBot dann neu. Ein Neustart von xdg-desktop-portal allein hilft nicht, solange rtkit fehlt.",
   "error.provider.opencodeDatabaseNewer":
@@ -305,6 +309,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
+  "error.provider.claudeContextFull":
+    "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
   "error.provider.foreignReasoning":
@@ -313,6 +319,8 @@ export const messages = {
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooLarge":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu groß ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.imageCountLimit":
+    "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
   "error.provider.museMcpStartupFault":
@@ -341,6 +349,10 @@ export const messages = {
     "{provider} hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und versuche es dann erneut.",
   "error.provider.keyProviderNoBalance":
     "Das {provider}-Konto des gespeicherten API-Schlüssels hat kein Guthaben. Lade Guthaben auf das Konto und versuche es dann erneut.",
+  "error.provider.modelServiceRefused":
+    "Der Modelldienst hat die Anfrage abgelehnt. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
+  "error.provider.modelServiceRefusedReason":
+    "Der Modelldienst hat die Anfrage abgelehnt: {reason}. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
   "error.provider.messageTooLarge":
     "OpenBot hat {provider} gestoppt, da eine Nachricht mit mehr als {limit} MB gesendet wurde.",
   "error.provider.customAgentIdInvalid":

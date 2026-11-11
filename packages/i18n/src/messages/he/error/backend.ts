@@ -143,6 +143,9 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "מצב תיבת הדואר פגום או שייך לגרסה חדשה יותר של OpenBot; הוא לא יידרס.",
   "error.backend.recipientDeleting": "הנמען נמחק. יש לנסות שוב אחרי שהמחיקה תסתיים.",
   "error.backend.recipientHidden": "הסוכן הזה מוסתר. יש לשחזר אותו כדי לשלוח הודעות.",
+  "error.backend.agentIdUnknown": "לאף סוכן אין את המזהה {id}. יש לקבל את המזהים מ-openbot.list_agents ולנסות שוב.",
+  "error.backend.agentIdNear":
+    "לאף סוכן אין את המזהה {id}. לסוכן {name} יש את המזהה {nearId}, שהוא כמעט זהה. אם הכוונה לסוכן הזה, יש לנסות שוב עם המזהה שלו.",
   "error.backend.replyReferenceUnknown":
     "replyToMessageId {id} אינו מציין אף הודעה. יש להשתמש ב-Message ID של ההודעה שעונים עליה, או להשמיט את replyToMessageId.",
   "error.backend.replyReferenceRequests": "הודעות מהנמענים האלה בתור הזה: {ids}.",

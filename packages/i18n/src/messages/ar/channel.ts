@@ -23,6 +23,9 @@ export const messages = {
   "channel.settings.memories": "الذكريات",
   "channel.settings.isolated": "الاحتفاظ بالذكريات في هذه القناة",
   "channel.settings.isolatedDescription": "يحفظ الوكلاء ما يتعلمونه هنا كذكريات للقناة. لا تراها دردشاتهم الأخرى.",
+  "channel.settings.browser": "المتصفح",
+  "channel.settings.browserEveryone": "كل الأعضاء",
+  "channel.settings.browserNone": "لا أحد",
   "channel.settings.memoryCount": {
     zero: "لا شيء محفوظ",
     one: "عنصر واحد محفوظ",

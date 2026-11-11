@@ -19,6 +19,7 @@ import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
+import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("agent-dock-window");
@@ -56,6 +57,8 @@ export interface AgentDockWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
+  /** Windows: forwards the pointer moves to a dock window only near the dock. */
+  pointerForwarding?: PointerForwardingGate | null;
   logger?: Logger;
 }
 
@@ -64,7 +67,7 @@ interface DockWindow {
   window: BrowserWindow;
   rendererId: number;
   displayId: number;
-  /** X11: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
+  /** X11 and Windows: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
   shape?: AgentDockInputRect[];
 }
 
@@ -195,15 +198,18 @@ export class AgentDockWindowController {
     const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
     if (!window) return;
     // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
-    if (this.#options.windowKind !== "x11") window.setIgnoreMouseEvents(!input.interactive, { forward: true });
+    if (this.#options.windowKind !== "x11")
+      letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !window.isFocused()) window.focus();
   }
 
-  /** X11: only these parts of the window take the pointer, and only they show. */
+  /**
+   * X11: only these parts of the window take the pointer, and only they show. Windows: the pointer moves
+   * go to the window only in these parts.
+   */
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
-    if (this.#options.windowKind !== "x11") return;
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     entry.shape = rects;
@@ -212,7 +218,10 @@ export class AgentDockWindowController {
 
   /** The renderer measures in CSS px. The shape is in window px, which the page zoom makes larger or smaller. */
   #applyShape(entry: DockWindow): void {
-    if (entry.shape) entry.window.setShape(entry.shape.map((rect) => zoomedRect(rect, this.#zoom())));
+    if (!entry.shape) return;
+    const rects = entry.shape.map((rect) => zoomedRect(rect, this.#zoom()));
+    if (this.#options.windowKind === "x11") entry.window.setShape(rects);
+    else this.#options.pointerForwarding?.setZone(entry.window, rects);
   }
 
   /**
@@ -278,7 +287,7 @@ export class AgentDockWindowController {
     if (entry.window.webContents.getZoomFactor() === zoom) return;
     entry.window.webContents.setZoomFactor(zoom);
     // The renderer does not send a shape again when it is the same in CSS px.
-    if (this.#options.windowKind === "x11") this.#applyShape(entry);
+    this.#applyShape(entry);
   }
 
   /** `rendererId` is the dock window that sends the action. */
@@ -407,7 +416,7 @@ export class AgentDockWindowController {
           // Until the dock renderer reports its shape, no part of the window takes the pointer or shows.
           window.setShape([]);
         } else {
-          window.setIgnoreMouseEvents(true, { forward: true });
+          letPointerThrough(this.#options.pointerForwarding, window, true);
         }
         window.setFocusable(false);
         // A navigation can reset the zoom, so it is set on each one, as for the main window.

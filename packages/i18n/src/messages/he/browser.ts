@@ -99,6 +99,7 @@ export const messages = {
   "browser.secret.takeOver": "השתלטות",
   "browser.secret.failed": "לא ניתן להשלים את הבקשה. יש לבדוק את החיבור ולנסות שוב.",
   "browser.error.openAddress": "לא ניתן לפתוח את הכתובת בלשונית הזו.",
+  "browser.error.channelNoBrowserMember": "אף חבר לא יכול לפתוח לשונית חדשה בערוץ הזה.",
   "browser.error.closeTab": "לא ניתן לסגור את לשונית הדפדפן.",
   "browser.error.reloadTab": "לא ניתן לטעון מחדש את לשונית הדפדפן.",
   "browser.error.stopLoading": "לא ניתן לעצור את טעינת הדף.",

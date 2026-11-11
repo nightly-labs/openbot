@@ -158,6 +158,10 @@ export const messages = {
     "De status van de postbus is beschadigd of komt van een nieuwere versie van OpenBot; OpenBot overschrijft deze niet.",
   "error.backend.recipientDeleting": "De ontvanger wordt verwijderd. Probeer het opnieuw als dit klaar is.",
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
+  "error.backend.agentIdUnknown":
+    "Geen agent heeft de id {id}. Haal de id's op met openbot.list_agents en probeer het opnieuw.",
+  "error.backend.agentIdNear":
+    "Geen agent heeft de id {id}. Agent {name} heeft de id {nearId}, die bijna gelijk is. Bedoel je die agent, probeer het dan opnieuw met die id.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",

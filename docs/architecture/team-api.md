@@ -452,6 +452,14 @@ that start after it, and the host sends the provider status event, so open setti
 again. `src/main/team-api/route-claude-user-setup.ts` owns them. Without the capability a client hides
 the switch for that host.
 
+The optional `provider-account-models-v1` capability (protocol 9 only) adds
+`POST /v1/admin/providers/accounts/models` (empty request). It gives, for each provider, the accounts
+after the first that serve models the provider's own sign-in does not, with those models (at most 1,000
+for each account; no credential, usage or agent). `provider-accounts-v1` carries no model list, so a
+client reads both and puts the models on their account: the model picker of that account then shows
+them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
+keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are
@@ -530,6 +538,14 @@ not change; the main process reads that URL with `GET /v1/channels/image`. The w
 bytes into a data URL. Over WebRTC, a `PUT` body and a `GET` answer go as file transfers, as for agent
 avatars. Without the capability a client hides the picture control for that host, and the channel
 shows its member faces.
+
+The optional `channel-browser-v1` capability (protocol 9 only) adds `browser` to the channel side
+routes and to a `save` draft (#4135): `{ kind: "members" }`, `{ kind: "none" }` or
+`{ kind: "member", agentId }`. Absent on a draft keeps the stored value; absent on a record is every
+member. A present value that a client cannot read reads as `none`. The host adds and reads the key only
+for a request that advertises the capability, so released peers see the same `channels-v1` wire, and a
+save from such a peer keeps the setting. Without the capability a client hides the Browser select for
+that host.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

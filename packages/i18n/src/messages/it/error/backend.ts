@@ -159,6 +159,9 @@ export const messages = {
     "Lo stato della casella è danneggiato o proviene da una versione più recente di OpenBot; non viene sovrascritto.",
   "error.backend.recipientDeleting": "Il destinatario è in fase di eliminazione. Riprova al termine dell'eliminazione.",
   "error.backend.recipientHidden": "Questo agente è nascosto. Ripristinalo per inviare messaggi.",
+  "error.backend.agentIdUnknown": "Nessun agente ha l'ID {id}. Ottieni gli ID con openbot.list_agents, poi riprova.",
+  "error.backend.agentIdNear":
+    "Nessun agente ha l'ID {id}. L'agente {name} ha l'ID {nearId}, quasi uguale. Se intendi quell'agente, riprova con il suo ID.",
   "error.backend.attachBetween": "Allega da 1 a {limit} file.",
   "error.backend.attachmentNotFile": "L'allegato non è un file: {path}",
   "error.backend.generatedImageTooLarge": "L'immagine generata supera il limite di 100 MB.",

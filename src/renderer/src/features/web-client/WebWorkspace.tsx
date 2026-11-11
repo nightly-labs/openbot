@@ -43,6 +43,7 @@ import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/a
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -76,6 +77,7 @@ import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routi
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -193,6 +195,7 @@ import {
   RoutineFlowsCanvas,
   ScheduleView,
   ServerOnboarding,
+  ServerSettingsModal,
   TasksView,
   WorkflowsCanvas,
 } from "../../lazy-views";
@@ -1187,6 +1190,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setAccountSettingsLoaded(true);
     setAccountSettingsOpen(true);
   }
+  // The code of both settings pages loads after the server shows, so their first open does not show
+  // an empty page for a moment.
+  createEffect(
+    () => workspace.state.status === "online",
+    (online) => {
+      if (!online) return;
+      void WebAccountSettings.preload();
+      void ServerSettingsModal.preload();
+    },
+  );
   /** The elements of the settings page that the settings panel shows in. The page sets them. */
   const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
   /** The search of the server settings page, which filters its section list. It clears when the page closes. */
@@ -1410,6 +1423,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       getMachineMetrics: machineCalls.storage.getMachineMetrics,
       // The host names previews with the desktop `openbot-attachment:` scheme, as it does in chat.
       getUsage: async (input, serverId) => {
+        if (input.scope === "channel" && !workspace.state.capabilities.includes(STORAGE_CHANNEL_CAPABILITY))
+          return null;
         const usage = await runTeamEffect(
           getStorageUsage(hostRequest(serverId), input).pipe(Effect.mapError((error) => error.cause)),
         );
@@ -1746,6 +1761,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
     taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
     isolationSupported: () => workspace.state.capabilities.includes(CHANNEL_ISOLATION_CAPABILITY),
+    browserSupported: () => workspace.state.capabilities.includes(CHANNEL_BROWSER_CAPABILITY),
     messageDeletionSupported: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => canAdministerServer(workspace.state.host?.role),
     pictureSupported: () => workspace.state.capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
@@ -2561,6 +2577,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     frameFirstLoad() &&
     agentChatOpen() &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting");
+  // The saved frame and its history loader take the place of the full-window screen. The screen does
+  // not come back when the host answers: a new screen would rain the crew in again over the workspace.
+  createEffect(frameConnecting, (frame) => {
+    if (frame) setLoadingCover(false);
+  });
   const conversationLoading = () =>
     workspace.state.status === "online" &&
     !workspace.conversation()?.page &&
@@ -2672,6 +2693,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     <ConversationLoadNotice
                       name={workspace.selected()?.name ?? ""}
                       loading={frameConnecting() || conversationLoading()}
+                      immediate={frameConnecting()}
                       error={conversationError()}
                       onRetry={() => {
                         const id = workspace.state.selectedId;

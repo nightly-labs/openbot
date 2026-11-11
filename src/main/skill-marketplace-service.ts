@@ -30,7 +30,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
-import { writeFileAtomically } from "../backend/atomic-json-file";
+import { isHeldTargetError, writeFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
@@ -781,6 +781,24 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
   return files;
 });
 
+/**
+ * The waits before each new rename of a skill folder when Windows answers `EPERM`, `EACCES` or `EBUSY`.
+ * Antivirus and the search indexer open the files just written to the stage for a moment, and Windows
+ * does not rename a folder that has an open file. One try failed the install (#6750). About 3 s in all,
+ * as for an attachment transfer, because the agent waits for the install.
+ */
+const HELD_SKILL_FOLDER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
+
+const renameSkillFolder = Effect.fn("SkillMarketplace.renameFolder")(function* (from: string, to: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    const renamed = yield* Effect.result(skillIO(() => rename(from, to)));
+    if (Result.isSuccess(renamed)) return;
+    const wait = HELD_SKILL_FOLDER_WAITS_MS[attempt];
+    if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+    yield* Effect.sleep(wait);
+  }
+});
+
 /** Writes every target, or on a failure puts back each one it already replaced. */
 const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
   writes: ReadonlyArray<{ target: string; files: Record<string, Uint8Array> }>,
@@ -792,13 +810,20 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
         yield* skillIO(() => mkdir(dirname(target), { recursive: true, mode: 0o700 }));
         const stage = `${target}.openbot-stage-${randomUUID()}`;
         const backup = (yield* pathExists(target)) ? `${target}.openbot-backup-${randomUUID()}` : null;
-        yield* writeFiles(stage, files);
-        if (backup) yield* skillIO(() => rename(target, backup));
-        const moved = yield* Effect.result(skillIO(() => rename(stage, target)));
-        if (Result.isFailure(moved)) {
-          if (backup) yield* skillIO(() => rename(backup, target));
-          return yield* moved.failure;
-        }
+        yield* Effect.gen(function* () {
+          yield* writeFiles(stage, files);
+          if (backup) yield* renameSkillFolder(target, backup);
+          const moved = yield* Effect.result(renameSkillFolder(stage, target));
+          if (Result.isFailure(moved)) {
+            if (backup) yield* renameSkillFolder(backup, target);
+            return yield* moved.failure;
+          }
+        }).pipe(
+          // A stage left beside the skill folder holds a SKILL.md, and a provider can load it as a skill.
+          Effect.onError(() =>
+            skillIO(() => rm(stage, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore),
+          ),
+        );
         completed.push({ target, backup });
       }
     }),
@@ -807,7 +832,7 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
     for (const item of completed.reverse()) {
       yield* skillIO(() => rm(item.target, { recursive: true, force: true }));
       const backup = item.backup;
-      if (backup) yield* skillIO(() => rename(backup, item.target)).pipe(Effect.catch(() => Effect.void));
+      if (backup) yield* renameSkillFolder(backup, item.target).pipe(Effect.catch(() => Effect.void));
     }
     return yield* outcome.failure;
   }

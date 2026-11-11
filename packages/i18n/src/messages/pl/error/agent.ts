@@ -10,6 +10,10 @@ export const messages = {
     "Nieprawidłowe argumenty wyszukiwania narzędzi. Użyj zadeklarowanego schematu i oryginalnej kwalifikowanej nazwy narzędzia.",
   "error.agent.toolCallArgumentsNotObject":
     "Narzędzie nie zostało uruchomione. W tool_call pole arguments musi być obiektem JSON, a nie tekstem. Wyślij wywołanie ponownie z arguments jako obiektem.",
+  "error.agent.toolCallDiscoveryTool":
+    "Narzędzie nie zostało uruchomione. tool_call nie może uruchomić openbot.tool_search ani openbot.tool_describe. Wywołaj je bezpośrednio z tymi samymi argumentami.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Harmonogram rutyny jest nieprawidłowy: {detail} Popraw harmonogram i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",
   "error.agent.accessLocalOnly": "Dostęp agenta można zmienić tylko na komputerze, na którym działa agent.",
   "error.agent.duplicateCleanupFailed": "Duplikowanie agenta nie powiodło się i nie udało się usunąć niepełnej kopii.",

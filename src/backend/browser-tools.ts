@@ -49,7 +49,8 @@ const nth = z
   .exactOptional();
 
 const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+  // The advertised schema merges the target kinds and keeps only `kind` as required, so name this rule.
+  z.object({ kind: z.literal("ref"), ref: identifier, revision: revision.describe("Required for kind=ref.") }),
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
@@ -555,7 +556,11 @@ export const BROWSER_TOOL_DEFINITIONS = [
       "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object; .nth(i), from 0, picks one of several matches, as in text('Delete').nth(1). A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
-      script: requiredString(BROWSER_SCRIPT_MAX_CHARS),
+      // OpenCode Code Mode shows a cut tool description but the full field descriptions. Without
+      // this, a model called navigate(...) in its own execute code, where no helper exists (#6565).
+      script: requiredString(BROWSER_SCRIPT_MAX_CHARS).describe(
+        "JavaScript source text. It runs in the browser sandbox, not in your own code: navigate, click, evaluate, and the other helpers exist only in this text.",
+      ),
       finalSnapshot: z.boolean().optional(),
       timeoutMs: z.number().int().min(1_000).max(BROWSER_SCRIPT_MAX_TIMEOUT_MS).optional(),
     },

@@ -23,6 +23,9 @@ export const messages = {
   "channel.settings.isolated": "שמירת הזיכרונות בערוץ הזה",
   "channel.settings.isolatedDescription":
     "הסוכנים שומרים כאן את מה שלמדו כזיכרונות של הערוץ. הצ'אטים האחרים שלהם לא רואים אותם.",
+  "channel.settings.browser": "דפדפן",
+  "channel.settings.browserEveryone": "כל החברים",
+  "channel.settings.browserNone": "אף אחד",
   "channel.settings.memoryCount": {
     one: "זיכרון אחד שמור",
     two: "שני זיכרונות שמורים",

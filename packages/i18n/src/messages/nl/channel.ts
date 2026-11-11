@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Herinneringen in dit kanaal houden",
   "channel.settings.isolatedDescription":
     "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle leden",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "channel.settings.newConversation.title": "Nieuw gesprek",
   "channel.settings.newConversation.description":

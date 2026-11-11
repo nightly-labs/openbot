@@ -18,7 +18,8 @@ import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-tem
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
-import { canManageStorage, serverHasStorage } from "../files/storage-usage";
+import type { ChatFilesSource } from "../files/ChatFilesPanel";
+import { canManageStorage, serverHasChannelStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
@@ -209,6 +210,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     closePanelThread,
     movePanelThreadToChat,
     channel,
+    replyJump,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   /** The web client asks the host. Desktop asks main, which asks a joined server's host. */
@@ -381,14 +383,37 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   /** Desktop reads storage through preload. The web client needs the storage calls of its runtime. */
   const storageReachable = () => !props.runtime || props.runtime.storageCalls !== undefined;
   let browserPreviewTrigger: HTMLButtonElement | undefined;
+  /** The files of the chat, or of the channel. A chat without a thread has no files. */
+  const filesSource = (): ChatFilesSource | undefined => {
+    if (channel) return { scope: "channel", channelId: channel.id };
+    const threadId = props.agent?.threadId;
+    return threadId ? { scope: "conversation", conversationId: threadId } : undefined;
+  };
+  /** A joined server lists the files of a channel only with `storage-channel-v1`. */
+  const filesServer = () => {
+    const server = props.server;
+    if (!storageReachable()) return undefined;
+    if (channel) return serverHasChannelStorage(server) ? server : undefined;
+    return serverHasStorage(server) ? server : undefined;
+  };
+  const filesTitle = () => channel?.name() ?? props.agent?.name ?? "this chat";
+  /** A channel message shows in this view. An agent chat opens it as a search result does. */
+  function showFileMessage(messageId: string) {
+    if (channel) void replyJump.reveal(messageId, undefined, undefined);
+    else void props.onOpenSearchMessage?.(messageId);
+  }
+  /**
+   * A channel has a Browser pane while a member can open a tab there, or while its members' threads
+   * have tabs. A member with no thread in the channel yet has no tab there.
+   */
+  const channelBrowserPane = () => !channel || channel.browserOwner() !== null || browserTabs().length > 0;
   /**
    * The panes this chat can open. The web client has a Files pane only when its runtime has the storage
    * calls, and a chat without a thread has no files.
    */
   const sidePanelPanes = createMemo((): SidePanelPane[] => [
-    // A channel turn's takeover still shows as a card; the pane belongs to one agent's browser.
-    ...(props.browserEnabled !== false && !channel ? (["browser"] as const) : []),
-    ...(storageReachable() && props.agent?.threadId && serverHasStorage(props.server) ? (["files"] as const) : []),
+    ...(props.browserEnabled !== false && channelBrowserPane() ? (["browser"] as const) : []),
+    ...(filesServer() && filesSource() ? (["files"] as const) : []),
     ...(props.agent || channel ? (["settings"] as const) : []),
     ...(props.agent && voiceConversationAvailable() ? (["voice"] as const) : []),
   ]);
@@ -586,19 +611,19 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         }}
       </Show>
 
-      <Show when={filesOpen() && storageReachable() && serverHasStorage(props.server) && props.server}>
+      <Show when={filesOpen() && filesServer()}>
         {(server) => (
-          <Show when={props.agent?.threadId}>
-            {(threadId) => (
+          <Show when={filesSource()}>
+            {(source) => (
               <Loading>
                 <ChatFilesPanel
                   serverId={server().id}
-                  conversationId={threadId()}
-                  conversationTitle={props.agent?.name ?? "this chat"}
+                  source={source()}
+                  conversationTitle={filesTitle()}
                   canManage={canManageStorage(server())}
                   onClose={() => closeSidePanelPane("files")}
                   onPreviewFile={(file) => void previewAttachment(file)}
-                  onShowMessage={(messageId) => void props.onOpenSearchMessage?.(messageId)}
+                  onShowMessage={showFileMessage}
                   calls={props.runtime?.storageCalls}
                 />
               </Loading>

@@ -200,7 +200,7 @@ function pageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMess
  * author of that message, and the channel codec refuses a message without an author, so the whole
  * page failed for the peer.
  */
-function hiddenAuthor(message: ChannelMessage, hiddenAgentIds: ReadonlySet<string>): boolean {
+export function hiddenAuthor(message: ChannelMessage, hiddenAgentIds: ReadonlySet<string>): boolean {
   return message.author.kind === "agent" && hiddenAgentIds.has(message.author.id);
 }
 

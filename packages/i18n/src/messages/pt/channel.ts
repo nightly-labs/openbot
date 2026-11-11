@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Manter as memórias neste canal",
   "channel.settings.isolatedDescription":
     "Os agentes guardam o que aprendem aqui como memórias do canal. As outras conversas deles não as veem.",
+  "channel.settings.browser": "Navegador",
+  "channel.settings.browserEveryone": "Todos os membros",
+  "channel.settings.browserNone": "Ninguém",
   "channel.settings.memoryCount": { one: "{count} salva", other: "{count} salvas" },
   "channel.settings.newConversation.title": "Nova conversa",
   "channel.settings.newConversation.description":

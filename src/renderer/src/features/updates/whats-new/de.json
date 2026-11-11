@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini installiert und aktualisiert sich unter Windows wieder. In 0.67.0 brach es mit einem Fehler über einen Link oder eine Spezialdatei ab.",
+          "Ein Agent, der eine Nachricht an ein beschäftigtes Teammitglied sendet, erkennt jetzt, ob die Nachricht in die laufende Aufgabe des Teammitglieds gelangt ist. Wartet die Nachricht, kann der Agent dir sagen, warum.",
+          "Bei der Computersteuerung sagen Agenten nicht mehr, dass ihr Cursor nicht verfügbar ist. OpenBot zeichnet den Cursor dorthin, wo der Agent klickt, scrollt oder sich bewegt."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.0",
     "date": "2026-11-10",
     "notices": [

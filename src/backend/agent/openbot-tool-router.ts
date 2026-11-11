@@ -43,6 +43,9 @@ import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
+  COMPUTER_USE_MCP_SERVER_ID,
+  channelAllowsBrowser,
+  channelBrowserAgent,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -175,6 +178,7 @@ import {
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
+import { unknownAgentMessage } from "./unknown-agent";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
 import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
 
@@ -209,7 +213,10 @@ const LISTED_DESCRIPTION_LENGTH = 300;
 /** GitHub and browsers refuse much longer addresses; the agent's text is most of it. */
 const FEEDBACK_URL_LIMIT = 8000;
 
-/** The result of sent feedback, or "signedOut" when no account can send it. */
+/**
+ * The result of sent feedback, "signedOut" when no account can send it, or "limited" when the account
+ * sent too many reports, today or in the last minute.
+ */
 export type FeedbackSendResult =
   | {
       readonly status: "sent";
@@ -218,7 +225,8 @@ export type FeedbackSendResult =
       /** True when the report is a comment on an open issue of the same problem. */
       readonly comment: boolean;
     }
-  | { readonly status: "signedOut" };
+  | { readonly status: "signedOut" }
+  | { readonly status: "limited"; readonly daily: boolean; readonly retryAfterSeconds: number | null };
 
 /**
  * What became of a message from another agent while its recipient's chat turn runs: `steered` into
@@ -258,6 +266,26 @@ export interface AgentServerClaims {
 
 const FEEDBACK_SIGNED_OUT_NEXT =
   "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
+
+/**
+ * The account service takes a few reports from an account in a minute, and more in a UTC day. A send
+ * before the limit starts again fails the same way, so the agent tells the user when, and gives the link.
+ */
+function feedbackLimitedNext(limit: { readonly daily: boolean; readonly retryAfterSeconds: number | null }): string {
+  const minutes = limit.retryAfterSeconds === null ? null : Math.max(1, Math.ceil(limit.retryAfterSeconds / 60));
+  const wait =
+    minutes === null
+      ? limit.daily
+        ? "tomorrow (UTC)"
+        : "in about one minute"
+      : minutes < 90
+        ? `in about ${minutes === 1 ? "one minute" : `${minutes} minutes`}`
+        : `in about ${Math.ceil(minutes / 60)} hours`;
+  const why = limit.daily
+    ? "this account sent the most reports that OpenBot takes in one day"
+    : "this account sent too many reports in the last minute";
+  return `OpenBot did not send it, because ${why}. It can send reports again ${wait}. Tell the user this in one sentence, and give them this link to the same text on GitHub, to check and submit. Do not call send_feedback again before then, and do not send it another way.`;
+}
 
 /** The prefilled issue form, which the user submits in the browser. */
 function feedbackForm(url: string, next: string): OpenBotToolResponse {
@@ -316,8 +344,11 @@ export interface OpenBotToolRouterHooks {
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   /** Records a no-update tool call for the turn; null when no routine run started the turn. */
   requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
-  /** Records the reason a routine run failed for the turn; false when no routine run started the turn. */
-  reportRoutineFailure(agentId: string, turnId: string, reason: string): boolean;
+  /**
+   * Records the reason a routine run failed for the turn; false when no routine run started the turn.
+   * `channelRun` is a turn that owns a main task of a channel routine's request.
+   */
+  reportRoutineFailure(agentId: string, turnId: string, reason: string, channelRun: boolean): boolean;
   /** Starts a new chat with the agent when its turn ends and its queue is empty. */
   requestNewChat(agentId: string): void;
   /**
@@ -651,6 +682,16 @@ export class OpenBotToolRouter {
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
+            // A channel can give the browser to one member, or to none (#4135).
+            // The provider names its own thread. The channel knows the OpenBot thread.
+            const channelRefusal = this.#channelBrowserRefusal(
+              this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              agentId,
+            );
+            if (channelRefusal) {
+              client.respond(toolRequest.id, channelRefusal);
+              return;
+            }
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               // A takeover of a stopped client ends with a cancel, and that process has nothing to answer.
@@ -1125,7 +1166,7 @@ export class OpenBotToolRouter {
     // A routine, a channel task, an external chat or another agent must not wait on the owner's card.
     if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead.",
+        "Only a person's message, in your OpenBot chat or a thread they opened, can send feedback. Describe the problem in your reply instead. Do not open an OpenBot issue with GitHub tools, gh, or a browser: the repository closes issues that do not use its forms. A person can report it at https://github.com/nightly-labs/openbot/issues/new/choose.",
       );
     // The card offers a send, so a user who is not signed in gets the form link at once.
     if (!sender.signedIn()) return form(FEEDBACK_SIGNED_OUT_NEXT);
@@ -1186,6 +1227,13 @@ export class OpenBotToolRouter {
       );
     }
     if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
+    if (sent.success.status === "limited") {
+      logger.warn("The account service limits feedback for this account.", {
+        daily: sent.success.daily,
+        retryAfterSeconds: sent.success.retryAfterSeconds,
+      });
+      return form(feedbackLimitedNext(sent.success));
+    }
     const issue = sent.success;
     // The thank-you card in the chat links the issue. The issue is open also when the card fails.
     const card = yield* Effect.result(
@@ -1374,6 +1422,7 @@ export class OpenBotToolRouter {
   readonly #readAgent = Effect.fn("OpenBotToolRouter.readAgent")(function* (this: OpenBotToolRouter, agentId: string) {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
+    const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(), computerUse);
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
@@ -1414,6 +1463,10 @@ export class OpenBotToolRouter {
       ...agentAccountSetup(agent),
       access: workspaceAccessEnforced(agent) ? "workspace" : "full",
       computerUse,
+      // The setting can be on while the driver is not ready, and then the agent has no driver tools (#6612).
+      ...(computerUse
+        ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
+        : {}),
       notifications: agent.notifications,
       autoApprove: this.#approvalAutomation.autoApproves(agent.id),
       ...(skills ? { skills } : { skillsError }),
@@ -1424,7 +1477,7 @@ export class OpenBotToolRouter {
         schedule: routine.trigger.schedule,
         nextRunAt: routine.trigger.nextRunAt,
       })),
-      mcpServers: agentMcpServers(this.#hooks.enabledMcpServers(), computerUse).map((server) => ({
+      mcpServers: mcpServers.map((server) => ({
         name: server.name,
         transport: server.transport,
       })),
@@ -1741,7 +1794,19 @@ export class OpenBotToolRouter {
 
     if (params.tool === ROUTINE_REPORT_FAILURE_TOOL) {
       const { reason } = routineReportFailureToolSchema.parse(params.arguments ?? {});
-      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason))
+      // A channel routine runs as a request in the channel. The owner of its main task ends the run;
+      // a member that works on a part of it reports to that owner (#6667).
+      const channelRun = channelId
+        ? // A turn with no active assignment, such as one that the provider started itself, has no run.
+          yield* this.#channels
+            .routineRunPart(channelId, senderAgentId, params.turnId)
+            .pipe(Effect.catch(() => Effect.succeed(null)))
+        : null;
+      if (channelRun === "member")
+        return openBotToolFailure(
+          "In a channel routine run, only the owner of the request can end the run as failed. Say in your result that the task could not be done, and why.",
+        );
+      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
     }
@@ -2257,6 +2322,24 @@ export class OpenBotToolRouter {
     );
   }
 
+  /**
+   * The answer to a browser call of `agentId` in the channel thread `threadId`, when the channel's
+   * Browser setting gives the browser to another member or to none. `null` outside a channel and
+   * for a member that can use it.
+   */
+  #channelBrowserRefusal(threadId: string, agentId: string): DynamicToolResult | null {
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId || !this.#channels.store.exists(channelId)) return null;
+    const channel = this.#channels.store.get(channelId);
+    if (channelAllowsBrowser(channel, agentId)) return null;
+    const browserAgent = channelBrowserAgent(channel);
+    const text =
+      typeof browserAgent === "string"
+        ? `In this channel, only ${this.#channels.hooks.agents().find((agent) => agent.id === browserAgent)?.name ?? browserAgent} (agentId ${browserAgent}) can use the browser. Give the browser step to that member with channel_assign, and use its result.`
+        : "No member can use the browser in this channel. Do the work without it, or tell the person that the browser is off in this channel.";
+    return { success: false, contentItems: [{ type: "inputText", text }] };
+  }
+
   /** Whether a team member on another computer sent this message. */
   #remoteMember(messageId: string): boolean {
     const member = this.#mailbox.senderMember(messageId);
@@ -2415,8 +2498,8 @@ export class OpenBotToolRouter {
       // An effort alone applies to the model the new agent starts on, known only once it exists.
       const lateEffort = requested === null ? args.reasoningEffort : undefined;
       const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
-      // A new agent starts with Full access and Computer Use. A caller without them passes its limits
-      // on, so it cannot get around them through an agent it creates.
+      // A new agent starts with Full access, Computer Use and the auto-approve grant. A caller without
+      // them passes its limits on, so it cannot get around them through an agent it creates (#6769).
       const limits: Pick<UpdateAgentInput, "access" | "computerUse"> = {
         ...(workspaceAccessEnforced(caller) ? { access: "workspace" } : {}),
         ...(agentComputerUseEnabled(caller) ? {} : { computerUse: false }),
@@ -2440,6 +2523,11 @@ export class OpenBotToolRouter {
           (agent) =>
             Effect.gen({ self: this }, function* () {
               if (assign) yield* assign(agent.id).pipe(toToolOperationFailed);
+              // Saved before the first message starts a turn. A failed write removes the new agent.
+              if (!this.#approvalAutomation.autoApproves(caller.id) && this.#approvalAutomation.autoApproves(agent.id))
+                yield* this.#approvalAutomation
+                  .set({ agentId: agent.id, autoApprove: false })
+                  .pipe(toToolOperationFailed);
               if (lateEffort !== undefined) {
                 const models = this.#hooks.listModels();
                 const model = models.find(
@@ -2658,10 +2746,18 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
-      const known = new Map(this.#hooks.listAgents().map((agent) => [agent.id, agent]));
+      const agents = this.#hooks.listAgents();
+      const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        if (!agent) throw new Error(`Unknown OpenBot agent: ${recipient}`);
+        // Suggest only an agent that this tool takes: not the sender, and not a hidden agent.
+        if (!agent)
+          throw new Error(
+            unknownAgentMessage(
+              recipient,
+              agents.filter((candidate) => candidate.hiddenAt === undefined && candidate.id !== senderAgentId),
+            ),
+          );
         // A hidden agent receives no new messages until the user restores it.
         if (agent.hiddenAt !== undefined)
           throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);

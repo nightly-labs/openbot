@@ -160,6 +160,10 @@ export const messages = {
     "メールボックスの状態が破損しているか、新しいバージョンの OpenBot のものです。上書きしません。",
   "error.backend.recipientDeleting": "受信者を削除中です。削除が終わってから再試行してください。",
   "error.backend.recipientHidden": "このエージェントは非表示です。メッセージを送るには元に戻してください。",
+  "error.backend.agentIdUnknown":
+    "ID {id} のエージェントはありません。openbot.list_agents で ID を取得してから、もう一度お試しください。",
+  "error.backend.agentIdNear":
+    "ID {id} のエージェントはありません。エージェント {name} の ID {nearId} がほぼ同じです。このエージェントのことなら、その ID でもう一度お試しください。",
   "error.backend.attachBetween": "1 〜 {limit} 個のファイルを添付してください。",
   "error.backend.attachmentNotFile": "添付ファイルがファイルではありません: {path}",
   "error.backend.generatedImageTooLarge": "生成された画像が 100 MB の上限を超えています。",

@@ -91,6 +91,9 @@ function channelRunStatusForTasks(
   // A person cancelled the run from its stopped task: it did not succeed.
   if (tasks.some((task) => task.parentTaskId === null && task.state === "cancelled"))
     return { status: "cancelled", error: null };
+  // A completed task has an error only when its owner reported that the run failed (#6667).
+  const reported = tasks.find((task) => task.state === "completed" && task.error);
+  if (reported) return { status: "failed", error: reported.error };
   // Every task is completed or cancelled. This includes the lead judging that no work was needed.
   return { status: "succeeded", error: null };
 }

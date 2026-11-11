@@ -199,9 +199,13 @@ export const messages = {
     "بلغت نماذج OpenCode المجانية حد الاستخدام. تشترك جميع النماذج المجانية في هذا الحد. للمتابعة، الصق مفتاح OpenCode Go في إعدادات OpenCode، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.opencodeProviderFailed":
     "فشل مزوّد النموذج من جهته. اتصالك ليس السبب. أعد المحاولة لاحقًا أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.opencodeNetwork":
     "تعذّر على OpenCode الاتصال بمزوّد النموذج. تحقق من اتصال الشبكة للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.\n{detail}",
   "error.provider.codexStateBusy": "لا يزال ChatGPT يجهّز سجله المحلي بعد تشغيل سابق. انتظر بضع دقائق، ثم أعد المحاولة.",
+  "error.provider.codexThreadInUse":
+    "تطبيق Codex آخر يفتح هذه الدردشة، مثل تطبيق Codex لسطح المكتب أو Codex CLI أو إضافة IDE. يمكن لتطبيق واحد فقط في كل مرة أن يكتب في دردشة Codex. أغلق الدردشة في ذلك التطبيق، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.opencodeDatabaseNewer":
@@ -269,6 +273,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
+  "error.provider.claudeContextFull":
+    "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":
@@ -277,6 +283,8 @@ export const messages = {
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة كبيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageCountLimit":
+    "لم يقبل النموذج هذه الدردشة لأن فيها صورًا كثيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.opencodeSessionRejected":
     "رفض OpenCode الطلب ولم يذكر السبب. قد يحدث هذا في دردشة طويلة أو بعد تغيير النموذج. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا مختلفًا أو مستوى جهد أقل.",
   "error.provider.museMcpStartupFault":
@@ -305,6 +313,10 @@ export const messages = {
     "رفض {provider} مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم أعد المحاولة.",
   "error.provider.keyProviderNoBalance":
     "لا يوجد رصيد في حساب {provider} الخاص بمفتاح API المحفوظ. أضف رصيدًا إلى الحساب، ثم أعد المحاولة.",
+  "error.provider.modelServiceRefused":
+    "رفضت خدمة النموذج الطلب. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
+  "error.provider.modelServiceRefusedReason":
+    "رفضت خدمة النموذج الطلب: {reason}. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
   "error.provider.messageTooLarge": "أوقف OpenBot {provider} لأنه أرسل رسالة أكبر من {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "يجب أن يتكوّن معرّف الوكيل من أحرف صغيرة أو أرقام أو `-`، ولا يمكن أن يكون معرّف مزوّد مدمج.",

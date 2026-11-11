@@ -1755,15 +1755,23 @@ export class MessagingService {
         }),
       ),
     );
-    if (!("posted" in posted) || !files.length) return posted;
+    if (!("posted" in posted)) return posted;
     // The text is in the place already, so a failed upload names the files and does not fail the post.
-    const skippedFiles = yield* live.adapter.upload(target, files).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          this.#warn(failure.cause);
-          return files.map((file) => file.name);
-        }),
-      ),
+    const skippedFiles = files.length
+      ? yield* live.adapter.upload(target, files).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#warn(failure.cause);
+              return files.map((file) => file.name);
+            }),
+          ),
+        )
+      : [];
+    const sentFiles = files.map((file) => file.name).filter((name) => !skippedFiles.includes(name));
+    live.adapter.rememberPost?.(
+      target,
+      posted.messageId,
+      sentFiles.length ? `${text}\nFiles: ${sentFiles.join(", ")}` : text,
     );
     return skippedFiles.length ? { ...posted, skippedFiles } : posted;
   });
