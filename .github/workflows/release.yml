@@ -984,6 +984,17 @@ jobs:
         env:
           SUFFIX: ${{ matrix.suffix }}
 
+      - name: Diagnose DNS (temporary)
+        shell: bash
+        run: |
+          set +e
+          cat /etc/resolv.conf; resolvectl status | head -30
+          for h in archive.ubuntu.com security.ubuntu.com ports.ubuntu.com azure.archive.ubuntu.com github.com; do echo "== $h"; getent hosts "$h"; done
+          for s in 168.63.129.16 8.8.8.8 1.1.1.1; do echo "== @$s"; dig +time=3 +tries=1 +short @"$s" archive.ubuntu.com; echo "rc=$?"; done
+          echo "== bridge"; docker run --rm ubuntu:24.04 sh -c 'cat /etc/resolv.conf; getent hosts archive.ubuntu.com; echo rc=$?; getent hosts github.com'
+          echo "== host"; docker run --rm --network=host ubuntu:24.04 sh -c 'cat /etc/resolv.conf; getent hosts archive.ubuntu.com; echo rc=$?; getent hosts github.com'
+          true
+
       - name: Build the image
         run: |
           # `--network=host` gives the build steps the DNS resolver of the runner. On the default
