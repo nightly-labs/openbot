@@ -11,6 +11,7 @@ import {
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
+  usageQuotaForModel,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -25,7 +26,7 @@ import { type ProviderAccountSupport, requireProviderDriver } from "./../provide
 import type { ProviderTempOptions } from "./../provider-temp";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
-import { keptUsageForModel, usageWindowResetSince } from "./account-usage";
+import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
@@ -516,8 +517,8 @@ export class ProviderAccounts {
   }).bind(this);
 
   /**
-   * The reading of one account for the usage limit check: its agent's process, or the kept one. The
-   * account's gate paces the reads, as for the views: they share one usage quota (#7043).
+   * The reading of one account for the usage limit check: its agent's process, or the kept one. While
+   * the account's gate waits after a failed read, the process is not asked, and there is no reading.
    */
   readonly usageFor = Effect.fn("ProviderAccounts.usageFor")(function* (
     this: ProviderAccounts,
@@ -525,17 +526,18 @@ export class ProviderAccounts {
     accountId: string,
     model: string,
   ) {
-    const kept = () => this.#usage.get(accountId)?.limit;
     const client = this.#host.agentClient(provider, accountId);
-    if (!client) return keptUsageForModel(kept(), model);
-    return yield* this.#usageGate(accountId).run({
-      read: this.#host.readUsage(client, model),
-      kept: () => keptUsageForModel(kept(), model),
-      stale: (readAt) => {
-        const reading = kept();
-        return reading !== undefined && usageWindowResetSince(reading, readAt);
-      },
-    });
+    if (client)
+      return yield* this.#usageGate(accountId).unlessWaiting({
+        read: this.#host.readUsage(client, model),
+        waiting: (): AccountUsage => ({ limits: [] }),
+      });
+    // The kept reading has no model: take the windows of the model's quota group from it.
+    const kept = this.#usage.get(accountId)?.limit;
+    const quota = kept && usageQuotaForModel(kept, model);
+    return {
+      limits: kept && quota ? [{ ...kept, primary: quota.primary, secondary: quota.secondary }] : [],
+    } satisfies AccountUsage;
   }).bind(this);
 
   /**

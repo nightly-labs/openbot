@@ -83,7 +83,7 @@ import { startProviderTerminalLogin } from "../provider-terminal-login";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
-import { keptUsageForModel, normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
+import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
@@ -1159,15 +1159,10 @@ export class ProviderRuntime implements ProviderPort {
         .pipe(toProviderOperationFailed);
     const client = this.#clients.get(scope.provider);
     if (!client) return { limits: [] };
-    // The sign-in's gate paces the reads, as for the views: they share one usage quota (#7043).
-    const kept = () => (this.#usageUnreported.has(scope.provider) ? undefined : this.#lastUsage.get(scope.provider));
-    return yield* this.#usageGate(scope.provider).run({
+    // While the sign-in's gate waits after a failed read, the provider is not asked, and there is no reading.
+    return yield* this.#usageGate(scope.provider).unlessWaiting({
       read: this.#refreshUsage(client, scope.model, false),
-      kept: () => keptUsageForModel(kept(), scope.model),
-      stale: (readAt) => {
-        const reading = kept();
-        return reading !== undefined && usageWindowResetSince(reading, readAt);
-      },
+      waiting: (): AccountUsage => ({ limits: [] }),
     });
   }).bind(this);
 
