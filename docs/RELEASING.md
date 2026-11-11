@@ -714,10 +714,13 @@ An install gets the release only when its ID is in the first `stagingPercentage`
 do not change, so the same installs are first in each release, and an install that is in a 10% stage
 is also in the 50% stage. A manifest with no `stagingPercentage` goes to all installs.
 
-An install outside the stage gets the same result as an install with no new release: the sidebar
-shows nothing, and Settings > Updates shows that OpenBot is up to date, also after
-**Check for updates**. It shows no error. Each check of `UpdateService`, also the manual check,
-goes through the staging check of electron-updater. OpenBot does not replace that check.
+At an automatic check, an install outside the stage gets the same result as an install with no new
+release: the sidebar shows nothing, and Settings > Updates shows that OpenBot is up to date, with no
+error. A check that a person asks for skips the stage and gets the release. These checks are
+**Check for updates** in Settings > Updates or in the app menu, an update that a member of a joined
+server asks for, and the recovery when an older app opens newer data. After such a check, the other
+checks and download retries of that session also skip the stage. No check gets a paused release
+(0%). `UpdateService` does this through the `isUserWithinRollout` test of electron-updater.
 
 The publish job writes the percentage into the four manifests before it uploads them, with
 `scripts/update-rollout.ts`. The default is 10. To use a different first percentage, set the
@@ -760,8 +763,8 @@ Installs read the new percentage at their next check, which is at most four minu
 gh workflow run release-rollout.yml --ref main -f tag=vX.Y.Z -f percentage=0
 ```
 
-Installs that do not have the release yet stop getting it at their next check. A pause does not
-stop these:
+Installs that do not have the release yet stop getting it at their next check, also when a person
+asks for the check. A pause does not stop these:
 
 - An install that already downloaded the release keeps it ready. It installs the release at its
   next restart: by the user, by an idle restart that the user asked for, or by an update that the

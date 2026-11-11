@@ -63,6 +63,11 @@ export type UpdateAdapter = {
   on(event: "update-downloaded", listener: (info: UpdateInfo) => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
+  /**
+   * electron-updater's staged rollout test (docs/RELEASING.md#staged-rollout). An adapter with no
+   * staged rollout, such as the hosted server adapter, does not have it.
+   */
+  isUserWithinRollout?: (info: UpdateInfo) => boolean | Promise<boolean>;
 };
 
 export function createDisabledUpdateAdapter(): UpdateAdapter {
@@ -252,6 +257,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkRequest: Deferred.Deferred<UpdateCheckOutcome | null, UpdateOperationFailure> | null = null;
   #downloadInFlight = false;
   #teardownCommitted = false;
+  /** True after a person asked for a check in this session. Then the staged rollout does not apply. */
+  #skipStagedRollout = false;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -293,6 +300,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#updater.autoDownload = false;
     this.#updater.autoInstallOnAppQuit = false;
     this.#updater.allowPrerelease = false;
+    // A check that a person asks for gets a release that is still in its staged rollout. A paused
+    // release (0%) stays paused for everyone, because a pause stops a release that is bad.
+    const stagedRollout = this.#updater.isUserWithinRollout;
+    if (stagedRollout) {
+      this.#updater.isUserWithinRollout = (info) =>
+        (this.#skipStagedRollout && info.stagingPercentage !== 0) || stagedRollout(info);
+    }
 
     // The check lifecycle is driven entirely by checkForUpdates(), whose result is generation
     // guarded, so there are deliberately no checking-for-update / update-available /
@@ -443,8 +457,12 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
    * The user-facing check. Unlike the periodic loop this one always reports: it moves into
    * "checking" and settles on a real outcome even when an earlier call is still unsettled, because
    * an action that answers a press by leaving the same error on screen reads as a dead button.
+   * Each caller is a person: the Settings button, the app menu, a member's request from a joined
+   * server, and the recovery when an older app opens newer data. So from now on in this session, a
+   * release in its staged rollout is offered here, and also to the later checks and download retries.
    */
   checkForUpdates(): Effect.Effect<UpdateStatus, UpdateOperationFailure> {
+    this.#skipStagedRollout = true;
     return this.#check(true);
   }
 

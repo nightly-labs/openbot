@@ -8,7 +8,9 @@
 // - merges the macOS manifest from its two halves, as the publish job does, and sets the percentage;
 // - runs `scripts/verify-update-artifacts.ts` on a small dist folder with each kind of value;
 // - runs the update check of the installed electron-updater, against a local HTTP server that serves
-//   the changed manifests, for 2,000 installs, each with its own `.updaterId`.
+//   the changed manifests, for 2,000 installs, each with its own `.updaterId`;
+// - runs the app's `UpdateService` on that updater: an automatic check keeps the stage, a check that a
+//   person asks for skips it, and a paused release (0%) stays paused for both.
 // `bun run test:update-rollout [-- --manifests <dir>]`. Writes .openbot-build/update-rollout-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -16,11 +18,14 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { RequestOptions } from "node:http";
 import { join, resolve } from "node:path";
+import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
+import { Effect } from "effect";
 import { AppUpdater } from "electron-updater/out/AppUpdater";
 import { parseUpdateInfo } from "electron-updater/out/providers/Provider";
 import { parse, stringify } from "yaml";
 import { z } from "zod";
+import { UpdateService } from "../src/main/update-service";
 import { mergeMacUpdateManifests } from "./merge-mac-update-manifests";
 import { readScriptArguments } from "./script-arguments";
 import {
@@ -272,6 +277,7 @@ const feeds: Array<{ name: ManifestName; platform: NodeJS.Platform; arch: string
 ];
 const installsRoot = join(OUT, "installs");
 const updaterResults: Record<string, { installs: number; offered: Record<string, number> }> = {};
+const serviceResults: Record<string, { automatic: UpdateStatus["phase"]; requested: UpdateStatus["phase"] }> = {};
 try {
   for (const feed of feeds) {
     process.env.TEST_UPDATER_ARCH = feed.arch;
@@ -325,6 +331,29 @@ try {
       offered: Object.fromEntries(Object.keys(scenarios).map((scenario) => [scenario, count(scenario)])),
     };
   }
+
+  // 6. The app's UpdateService on the same updater and feed. Its timer runs the automatic check; its
+  // `checkForUpdates()` is the check that a person asks for in Settings > Updates.
+  process.env.TEST_UPDATER_ARCH = "x64";
+  const feedUrl = (scenario: string) => `http://127.0.0.1:${server.port}/latest-linux.yml/${scenario}/`;
+  const placed: { inside?: string; outside?: string } = {};
+  for (let install = 0; !(placed.inside && placed.outside); install += 1) {
+    const userData = join(installsRoot, "service", String(install));
+    const inside = await new ProbeUpdater(userData, "0.66.0", "linux").check(feedUrl("10"));
+    placed[inside ? "inside" : "outside"] ??= userData;
+  }
+  const { inside, outside } = placed;
+  assert.ok(inside && outside);
+  serviceResults.outsideAt10 = await serviceChecks(outside, "0.66.0", feedUrl("10"));
+  serviceResults.insideAt10 = await serviceChecks(inside, "0.66.0", feedUrl("10"));
+  serviceResults.outsideAt0 = await serviceChecks(outside, "0.66.0", feedUrl("0"));
+  serviceResults.insideAt0 = await serviceChecks(inside, "0.66.0", feedUrl("0"));
+  serviceResults.currentAt10 = await serviceChecks(outside, VERSION, feedUrl("10"));
+  assert.deepEqual(serviceResults.outsideAt10, { automatic: "up-to-date", requested: "available" });
+  assert.deepEqual(serviceResults.insideAt10, { automatic: "available", requested: "available" });
+  assert.deepEqual(serviceResults.outsideAt0, { automatic: "up-to-date", requested: "up-to-date" });
+  assert.deepEqual(serviceResults.insideAt0, { automatic: "up-to-date", requested: "up-to-date" });
+  assert.deepEqual(serviceResults.currentAt10, { automatic: "up-to-date", requested: "up-to-date" });
 } finally {
   server.stop(true);
   delete process.env.TEST_UPDATER_ARCH;
@@ -342,10 +371,44 @@ const report = {
   macMerge,
   verify: verifyResults,
   electronUpdaterChecks: updaterResults,
+  updateServiceChecks: serviceResults,
   ok: true,
 };
 await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 logger.info(`The staged rollout checks passed. Report: ${join(OUT, "report.json")}`);
+
+/**
+ * Starts an UpdateService for the install in `userData`, waits for its first automatic check, then
+ * asks for a check as the Settings button does. Returns the phase after each check.
+ */
+async function serviceChecks(userData: string, version: string, feedUrl: string) {
+  const updater = new ProbeUpdater(userData, version, "linux");
+  updater.setFeedURL({ provider: "generic", url: feedUrl });
+  const service = new UpdateService(updater, {
+    currentVersion: version,
+    enabled: true,
+    autoDownload: false,
+    beforeInstall: async () => undefined,
+    platform: "linux",
+    initialCheckDelayMs: 0,
+    checkIntervalMs: 3_600_000,
+  });
+  const automatic = new Promise<UpdateStatus>((resolvePhase) => {
+    service.on("status", (status) => {
+      if (status.phase !== "idle" && status.phase !== "checking") resolvePhase(status);
+    });
+  });
+  try {
+    service.start();
+    const first = await automatic;
+    assert.equal(first.errorCode, null, `the automatic check has no error: ${first.message}`);
+    const requested = await Effect.runPromise(service.checkForUpdates());
+    assert.equal(requested.errorCode, null, `the requested check has no error: ${requested.message}`);
+    return { automatic: first.phase, requested: requested.phase };
+  } finally {
+    await Effect.runPromise(service.stop());
+  }
+}
 
 /** The values that electron-updater reads, with js-yaml, are those of the release, with the new percentage. */
 function assertSameUpdaterValues(before: string, after: string, percentage: number): void {
