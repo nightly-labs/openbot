@@ -60,7 +60,7 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "revise_skill",
     description:
-      "Publish a new local skill revision from a workspace folder when the user asks to revise it. Read first and supply expectedRevision. Installs it for you; other agents keep their copy.",
+      "Publish a new local skill revision from a workspace folder when the user asks to revise it. Read first and supply expectedRevision. Installs it for you; other agents keep their copy. Never edit the installed copies in .agents/skills or .claude/skills: an edited copy blocks later updates.",
     shape: reviseSkillSchema.shape,
   },
   {

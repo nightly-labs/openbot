@@ -113,12 +113,13 @@ export function startsDay(previous: AgentMessage, current: AgentMessage): boolea
 }
 
 /**
- * The ids of the messages in a group row of agent messages or routine runs, separated by spaces, so
- * a search or focus request finds the row.
+ * The ids of the messages in a group row of agent messages, routine runs or skill installs, separated
+ * by spaces, so a search or focus request finds the row.
  */
 export function groupedMessageIds(message: AgentMessage | undefined): string | undefined {
   const marker = message?.actionMarker;
   if (marker?.kind === "agent-message-group") return marker.messages.map((entry) => entry.id).join(" ");
   if (marker?.kind === "routine-run-group") return marker.runs.map((entry) => entry.id).join(" ");
+  if (marker?.kind === "skill-lifecycle") return marker.installMessageIds?.join(" ");
   return undefined;
 }
