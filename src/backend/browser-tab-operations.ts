@@ -160,8 +160,8 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
 });
 
 /**
- * An earlier operation on the tab did not finish, often because a page dialog holds a command. The
- * agent gets an error that it can act on, not a tool call that never returns.
+ * An earlier operation on the tab did not finish, for example a command that a page dialog or a page that
+ * does not answer holds. The agent gets an error that it can act on, not a tool call that never returns.
  */
 function queueWaitError(tab: BrowserHostTab) {
   const dialog = tab.engine.dialog;
