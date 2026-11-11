@@ -265,14 +265,17 @@ export class McpOAuthProxy {
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
     if (!(upstream instanceof Response)) {
-      const ended = this.#options.signInEnded(target.url);
+      // Only a renewed token that the server refused proves a good sign-in. A renewal that could not
+      // reach the authorization server leaves an expired token, and that sign-in has ended for now.
+      const active = upstream.renewed && !this.#options.signInEnded(target.url);
       logger.warn("The MCP server refused a request with the sign-in of this computer.", {
         challengeError: upstream.challengeError,
-        signInEnded: ended,
+        renewed: upstream.renewed,
+        signInActive: active,
       });
-      const message = ended
-        ? sourceText("error.backend.mcpOAuthSignInNeeded")
-        : sourceText("error.backend.mcpOAuthRequestRefused");
+      const message = active
+        ? sourceText("error.backend.mcpOAuthRequestRefused")
+        : sourceText("error.backend.mcpOAuthSignInNeeded");
       return refuseRequests(response, method, body, message);
     }
     const headers: Record<string, string> = {};
@@ -303,11 +306,11 @@ export class McpOAuthProxy {
     if (first.status !== 401) return first;
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
-    if (!renewed) return { challengeError: challengeError(first) };
+    if (!renewed) return { challengeError: challengeError(first), renewed: false };
     const second = yield* send(target, renewed, request, method, body, controller);
     if (second.status !== 401) return second;
     yield* discard(second);
-    return { challengeError: challengeError(second) };
+    return { challengeError: challengeError(second), renewed: true };
   });
 }
 
@@ -515,6 +518,8 @@ async function pipeBody(body: ReadableStream<Uint8Array>, response: ServerRespon
 interface UpstreamRefusal {
   /** The `error` of the server's Bearer challenge, such as `invalid_token`, for the log only. */
   challengeError: string | null;
+  /** Whether the refused request had a token that was renewed after the first refusal. */
+  renewed: boolean;
 }
 
 /** The `error` value of the `WWW-Authenticate` header. It is a short code, never a credential. */

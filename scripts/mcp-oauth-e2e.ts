@@ -839,20 +839,35 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(!resource.hits.some((hit) => hit.path.includes("account")), "The account fragment went upstream.");
     const accountRefresh = { ownSignInRefreshed: true, fragmentUpstream: false };
 
-    // The server refuses a call with a sign-in that is still good (#6914). The agent reads that the
-    // sign-in is active, not that it ended, and the row keeps its sign-in.
+    // The server refuses a call with a sign-in that is still good (#6914): it refuses the renewed
+    // token too. The agent reads that the sign-in is active, not that it ended, and the row keeps it.
+    const staleToken = () => {
+      const current = records.get(direct.url);
+      assert.ok(current?.tokens);
+      records.set(direct.url, { ...current, tokens: { ...current.tokens, access_token: "access-stale" } });
+    };
+    const refusedCall = (text: string) =>
+      client.callTool({ name: "echo", arguments: { text } }).then(
+        () => null,
+        (error: unknown) => error,
+      );
     resource.setRefusing(true);
-    const refusal = await client.callTool({ name: "echo", arguments: { text: "refused" } }).then(
-      () => null,
-      (error: unknown) => error,
-    );
-    resource.setRefusing(false);
+    staleToken();
+    const refusal = await refusedCall("refused");
     assert.ok(refusal instanceof McpError, "The refused call did not fail with a JSON-RPC error.");
     assert.equal(refusal.code, -32001);
     assert.ok(refusal.message.includes(sourceText("error.backend.mcpOAuthRequestRefused")), refusal.message);
     assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated", "The refusal ended the sign-in.");
+    // A renewal that does not reach the authorization server proves nothing: the sign-in has ended for now.
+    staleToken();
+    auth.setTokenMode("drop");
+    const unrenewed = await refusedCall("unrenewed");
+    auth.setTokenMode("rotate");
+    resource.setRefusing(false);
+    assert.ok(unrenewed instanceof McpError, "The unrenewed call did not fail with a JSON-RPC error.");
+    assert.ok(unrenewed.message.includes(sourceText("error.backend.mcpOAuthSignInNeeded")), unrenewed.message);
     assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "again" } })), "again");
-    const refusedWithSignIn = { code: refusal.code, signInKept: true };
+    const refusedWithSignIn = { code: refusal.code, signInKept: true, unrenewedSaysEnded: true };
 
     // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
