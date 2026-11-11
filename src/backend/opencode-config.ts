@@ -36,9 +36,19 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
   return () => source().filter((provider) => (provider.harness ?? "opencode") === harness);
 }
 
+/**
+ * How long a custom endpoint may send nothing before its turn fails. A local model can read a long
+ * prompt for more than OpenCode's 5 minutes before its first token, and more so while the computer
+ * does other work (#3823, #7330). Two limits get this value: OpenCode's wait for the response
+ * headers (`headerTimeout`, 300,000 ms by default in OpenCode 2.2.7) and OpenBot's own stall limit.
+ */
+export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
+
 /** The options block OpenCode hands to its bundled OpenAI-compatible, OpenAI or Anthropic adapter. */
 interface OpenCodeProviderOptions {
   readonly baseURL: string;
+  readonly headerTimeout: number;
+  readonly chunkTimeout: number;
   readonly apiKey?: string;
   readonly headers?: Readonly<Record<string, string>>;
 }
@@ -188,6 +198,8 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
     name: provider.name,
     options: {
       baseURL: anthropic ?? provider.baseUrl,
+      headerTimeout: CUSTOM_ENDPOINT_SILENCE_MS,
+      chunkTimeout: CUSTOM_ENDPOINT_SILENCE_MS,
       // An absent key and an empty key are different things to an HTTP client: an empty `apiKey`
       // would be sent as a blank Authorization header, which a keyless local endpoint may reject
       // outright. The spread keeps the key out of the object rather than setting it to undefined.
