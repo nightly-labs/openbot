@@ -1051,14 +1051,18 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         cleanup();
         reject(cause);
       };
+      // Signal said ready: both ends are on Signal, and the direct path comes next.
+      let signalReady = false;
       const timeOut = () => {
         cleanup();
-        // With no data channel open, the network path did not come up: a firewall, VPN or proxy can
-        // block it while the host is online on Signal (#6873).
+        // The code names the step that did not finish (#6873). Only after Signal said ready and before
+        // a data channel opened is it the direct path, which a firewall, VPN or proxy can block.
+        const stage = active.authentication?.started ? "auth" : signalReady ? "ice" : "signal";
         reject(
-          active.authentication?.started
-            ? new Error(sourceText("error.remote.hostDidNotConnect"))
-            : new TeamWebRtcConnectError("connect_timeout", sourceText("error.remote.iceFailed")),
+          new TeamWebRtcConnectError(
+            `connect_timeout_${stage}`,
+            sourceText(stage === "ice" ? "error.remote.iceFailed" : "error.remote.hostDidNotConnect"),
+          ),
         );
       };
       let timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
@@ -1076,7 +1080,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       // The host connected to Signal. The connection has the usual time from now.
       const onSignalReady = (readyHostId: string) => {
-        if (readyHostId !== hostId || !hostWaited) return;
+        if (readyHostId !== hostId) return;
+        signalReady = true;
+        if (!hostWaited) return;
         hostWaited = false;
         clearTimeout(timer);
         timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
@@ -1093,10 +1099,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       this.on("connected", onConnected);
       this.on("error", onError);
-      if (waitForHost) {
-        bridge.on("hostWaiting", onHostWaiting);
-        bridge.on("signalReady", onSignalReady);
-      }
+      bridge.on("signalReady", onSignalReady);
+      if (waitForHost) bridge.on("hostWaiting", onHostWaiting);
     }
     active.authentication = {
       ticket: bootstrap.ticket,
@@ -1558,7 +1562,7 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
 
 /**
  * The connection failed before the host answered. The code is the Signal or the bridge code, or
- * `connect_timeout` when no data channel opened in time.
+ * `connect_timeout_<step>` for the step that did not finish in time: `signal`, `ice` or `auth`.
  */
 class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
   code: Schema.String,
