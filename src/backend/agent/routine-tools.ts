@@ -11,8 +11,10 @@ import {
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { isRecord } from "../protocol";
+import { routineScheduleZodSchema } from "../routine-tool-schema";
 
 export function routineToolArguments(value: unknown, allowedKeys: readonly string[]): DynamicRecord {
   if (!isRecord(value)) throw new RoutineInputError("Routine tool arguments are required.");
@@ -68,7 +70,17 @@ export function siteToolString(value: unknown, field: string, limit: number): st
 }
 
 export function routineToolSchedule(value: unknown): RoutineSchedule {
-  if (!isRoutineSchedule(value)) throw new RoutineInputError("The routine schedule is invalid.");
+  if (!isRoutineSchedule(value)) {
+    // A model that guesses the shape, such as { type: "daily" }, needs to know which field to change;
+    // with "invalid" only, agents tried a dozen shapes and gave up (#6754). The schema only explains
+    // the refusal: `isRoutineSchedule` still decides what is accepted.
+    const parsed = routineScheduleZodSchema.safeParse(value);
+    if (parsed.success) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
+    const detail = parsed.error.issues
+      .map((issue) => `${["schedule", ...issue.path.map(String)].join(".")}: ${issue.message}`)
+      .join(" ");
+    throw new RoutineInputError(sourceText("error.agent.routineScheduleArgumentsInvalid", { detail }));
+  }
   // Validate the polling floor before the store runs so the provider gets a clear,
   // actionable error instead of a raw failure after the request. Custom cron schedules
   // still need a timezone and are checked by the routine store.

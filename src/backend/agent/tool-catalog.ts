@@ -390,11 +390,23 @@ function parseCall(params: DynamicToolCallParams) {
   return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(envelope.arguments) });
 }
 
+const DISCOVERY_TOOL_NAMES: ReadonlySet<string> = new Set(["tool_search", "tool_describe"]);
+
+/** True when a `tool_call` names a discovery tool, such as `openbot.tool_describe`. */
+function callsDiscoveryTool(envelope: unknown): boolean {
+  if (!isRecord(envelope)) return false;
+  const named = typeof envelope.name === "string" ? envelope.name : envelope.tool;
+  if (typeof named !== "string") return false;
+  return DISCOVERY_TOOL_NAMES.has(named.trim().replace(/^(?:openbot\.|mcp__openbot__)/, ""));
+}
+
 /**
- * The error for a `tool_call` that `resolveDeferredTool` refused because its `arguments` is not an
- * object, or null for another reason. A general error made the agent send the same text again.
+ * The error for a `tool_call` that `resolveDeferredTool` refused because it names a discovery tool or
+ * its `arguments` is not an object, or null for another reason. A general error made the agent send
+ * the same text again: an agent that loaded a schema through tool_call never got it (#6754).
  */
 export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+  if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
   const parsed = parseCall(params);
   const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
   return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")
