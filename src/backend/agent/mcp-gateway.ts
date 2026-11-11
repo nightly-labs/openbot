@@ -572,12 +572,24 @@ export class McpGateway {
    */
   enabled(): McpServerConfig[] {
     const configured = this.#servers.listEnabled();
+    return this.#handoff.record([...configured, ...this.#builtIn(configured)]);
+  }
+
+  /**
+   * The entries that `enabled` adds and no row holds. The agent's MCP tools list them, so the
+   * names they report are the names the agents get (#7088).
+   */
+  builtIn(): McpServerConfig[] {
+    return this.#builtIn(this.#servers.listEnabled());
+  }
+
+  #builtIn(configured: readonly McpServerConfig[]): McpServerConfig[] {
     const builtIn: McpServerConfig[] = [];
     const computerUse = this.#computerUseMcpServer();
     if (computerUse) builtIn.push(computerUse);
     const github = this.#githubConnector?.mcpServer() ?? null;
     if (github && !configured.some((config) => config.name === github.name)) builtIn.push(github);
-    return this.#handoff.record([...configured, ...builtIn]);
+    return builtIn;
   }
 
   /**

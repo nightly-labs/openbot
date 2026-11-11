@@ -2243,7 +2243,11 @@ export class OpenBotToolRouter {
     if (!agentId || !servers || !isMcpServerTool(params.tool))
       return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
     const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
-    return yield* handleMcpServerTool(servers, {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const computerUse = agent ? agentComputerUseEnabled(agent) : false;
+    // The built-in servers that read_agent reports for this agent, so the two agree (#7088).
+    const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
+    return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
       arguments: params.arguments,
       approve: (reason, cwd) =>
