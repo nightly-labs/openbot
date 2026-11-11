@@ -103,6 +103,8 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
  * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
+ * A model that gave only its reasoning and no answer can answer on another model (#6594). As for each
+ * cause, a turn that ran a tool step does not run again, so the tool does not run two times.
  */
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
@@ -112,6 +114,7 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "authentication",
   "network",
   "timeout",
+  "empty_answer",
 ]);
 
 /**
