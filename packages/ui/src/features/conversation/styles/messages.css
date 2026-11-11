@@ -18,7 +18,8 @@
 /* Keep the face beside the bubble, independent of the author name and footer height. The face is a
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
-.message-author-gutter {
+.message-author-gutter,
+.chat-visual-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
