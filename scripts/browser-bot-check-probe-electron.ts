@@ -170,8 +170,8 @@ async function main(): Promise<void> {
           note(pageSchema.parse(await call("snapshot", { tabId, image: "never" })));
         }
         result.url = page.url;
-        result.title = page.title;
-        result.elements = page.elements?.length;
+        if (page.title !== undefined) result.title = page.title;
+        if (page.elements) result.elements = page.elements.length;
       };
       let timer: NodeJS.Timeout | undefined;
       try {
@@ -188,7 +188,8 @@ async function main(): Promise<void> {
       }
       const contents = latestContents();
       if (contents && !contents.isDestroyed()) {
-        result.httpStatus = httpStatus.get(contents.id);
+        const status = httpStatus.get(contents.id);
+        if (status !== undefined) result.httpStatus = status;
         try {
           const text = z
             .string()

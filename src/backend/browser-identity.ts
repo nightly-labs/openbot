@@ -74,9 +74,10 @@ export function browserHighEntropyClientHints(system: BrowserHintSystem): Record
     hints["Sec-CH-UA-Arch"] = `"${arch}"`;
     hints["Sec-CH-UA-Bitness"] = '"64"';
   }
-  // Chromium prints three numbers of the OS version on macOS and of the kernel release on Linux.
+  // Chromium prints three numbers of the OS version on macOS. On Linux the page reads an empty text.
   const numbers = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?/u.exec(system.systemVersion);
-  if (numbers && system.platform !== "win32") {
+  if (system.platform === "linux") hints["Sec-CH-UA-Platform-Version"] = '""';
+  else if (numbers && system.platform === "darwin") {
     hints["Sec-CH-UA-Platform-Version"] = `"${numbers[1]}.${numbers[2] ?? 0}.${numbers[3] ?? 0}"`;
   }
   return hints;
