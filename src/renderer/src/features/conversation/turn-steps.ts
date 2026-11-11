@@ -1,4 +1,4 @@
-import type { ConversationTurnTrace } from "@openbot/contracts/ipc";
+import { analyticsTokens, type ConversationTurnTrace } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AgentStep, AgentStepsFacts } from "@openbot/ui/features/conversation/AgentSteps";
 import { silentAgentAnswer } from "@openbot/ui/features/conversation/new-message-tally";
@@ -379,13 +379,14 @@ export function createTurnSteps(deps: {
           icon: "agent",
           start: turnStart,
           end: turnEnd,
-          // The trace shows the tokens without cache reads, as the Usage tab does. Each model call reads
-          // the cached conversation again, so cache reads can be many times larger than the new tokens.
+          // The trace shows the tokens without cache reads, as the Usage tab does. A trace from before
+          // `cachedInput` has no cache reads to subtract, and shows its total as it is.
           ...(stored?.tokens === undefined
             ? {}
-            : stored.cachedInput === undefined
-              ? { tokens: stored.tokens }
-              : { tokens: Math.max(0, stored.tokens - stored.cachedInput), cachedInput: stored.cachedInput }),
+            : {
+                tokens: analyticsTokens({ processedTokens: stored.tokens, cachedInput: stored.cachedInput }),
+                ...(stored.cachedInput === undefined ? {} : { cachedInput: stored.cachedInput }),
+              }),
           ...(typeof stored?.costUsd === "number" ? { costUsd: stored.costUsd } : {}),
         },
       ];

@@ -812,8 +812,9 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
         <Show when={totals().cost}>
           {(cost) => <TraceTotal label={t("chat.trace.cost")} value={cost()} format={formatShownCost} />}
         </Show>
-        <Show when={totals().tokens}>
-          {(tokens) => <TraceTotal label={t("chat.trace.tokens")} value={tokens()} format={format.compact} />}
+        {/* A turn of only cache reads has 0 new tokens: it still shows Tokens beside Cached input. */}
+        <Show when={totals().tokens || totals().cachedInput}>
+          <TraceTotal label={t("chat.trace.tokens")} value={totals().tokens ?? 0} format={format.compact} />
         </Show>
         <Show when={totals().cachedInput}>
           {(cached) => <TraceTotal label={t("chat.trace.cachedInput")} value={cached()} format={format.compact} />}
