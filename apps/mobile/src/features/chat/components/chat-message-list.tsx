@@ -102,6 +102,7 @@ import { ChatFileActionsContext, type OpenMessageFile, useMessageFileOpener } fr
 import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatImageViewerProvider, isStackImage, isViewableImage } from "./chat-image-viewer";
+import { ChatMarketplaceSuggestion } from "./chat-marketplace-suggestion";
 import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
@@ -799,6 +800,8 @@ const MessageRow = memo(function MessageRow({
       <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "marketplace-suggestion" ? (
+      <ChatMarketplaceSuggestion key={message.id} appId={message.appId} serverId={serverId} muted={muted} />
     ) : message.kind === "exchange-group" ? (
       <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
