@@ -2918,7 +2918,10 @@ export class ChannelService {
       const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
         (item) => item.turnId === turnId,
       );
-      if (!assignment || !activeAssignment(assignment)) return;
+      // A turn with no active assignment, such as one that the provider started itself after a
+      // background job ended, still made its agent busy. A task that waits for that agent has no
+      // other trigger, so it waited until a restart (#6654).
+      if (!assignment || !activeAssignment(assignment)) return yield* this.wake();
       if (assignment.pendingRevision !== null) {
         yield* channelSync(() =>
           this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, pendingOutcome: status }] }),
