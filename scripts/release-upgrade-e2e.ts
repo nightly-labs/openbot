@@ -381,9 +381,11 @@ interface RunningApp extends LaunchedProcess {
 function launchEnvironment(): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    // Agent workspaces go to ~/OpenBot, so the home folder is the test's own.
+    // Agent workspaces go to ~/OpenBot, so the home folder is the test's own. Windows keeps the real
+    // USERPROFILE: with an empty one, Windows cannot find the AppData known folder and the start
+    // fails ("Failed to get 'appData' path"). The runner is discarded after the job.
     HOME: homePath,
-    USERPROFILE: homePath,
+    ...(target === "windows" ? {} : { USERPROFILE: homePath }),
     CODEX_HOME: join(userDataPath, "codex-home"),
     CLAUDE_CONFIG_DIR: join(userDataPath, "claude-home"),
     OPENBOT_CODEX_PATH: join(userDataPath, target === "windows" ? "missing-codex.exe" : "missing-codex"),
