@@ -57,6 +57,7 @@ import {
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
   decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
   disconnectedPasswordManager,
@@ -66,6 +67,7 @@ import {
   isWhatsAppWorkingMessageList,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
+  type ProviderAccountPool,
   type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
@@ -252,6 +254,10 @@ import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_DEFAULT_ROUTES,
@@ -667,6 +673,8 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
+let antigravityPool: ProviderAccountPool | undefined;
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -685,6 +693,7 @@ function accountModelsStatus(): AgentStatus {
         version: null,
         message: null,
         accounts: [account("default"), account(ULTRA_ACCOUNT, [ARGON_MODEL]), account(FREE_ACCOUNT, [])],
+        ...(antigravityPool ? { accountPool: antigravityPool } : {}),
       },
     ],
   };
@@ -2261,10 +2270,21 @@ try {
           return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 };
         }),
     },
-    // The real host service over a fake status: only the models route runs in this run.
+    // The real host service over a fake status: only the models and pool routes run in this run.
     providerAccounts: new ProviderAccountsHost({
       service: {
         getStatus: accountModelsStatus,
+        // As the backend: an unknown account is dropped, and the pool uses its first account that is not left out.
+        setProviderAccountPool: (provider, enabled, leftOut) =>
+          Effect.sync(() => {
+            record("setProviderAccountPool", { provider, enabled, leftOut });
+            const known = ["default", ULTRA_ACCOUNT, FREE_ACCOUNT];
+            const out = leftOut.filter((id) => known.includes(id));
+            antigravityPool = enabled
+              ? { leftOut: out, inUse: known.find((id) => !out.includes(id)) ?? null }
+              : undefined;
+            return accountModelsStatus();
+          }),
         getProviderAccountUsage: unused("providerAccounts.getProviderAccountUsage"),
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
@@ -3434,6 +3454,96 @@ try {
         ],
       ),
       merged,
+    );
+  }
+
+  // ---- Account pool (provider-account-pool-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_POOL_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-pool-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, {
+      token: adaToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the pool route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setProviderAccountPool").length;
+    const memberRead = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberUpdate = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, {
+      token: bobToken,
+      json: { provider: "antigravity", enabled: true, leftOut: [] },
+      ...v9,
+    });
+    check(
+      "a member cannot read or change the pool, and the host writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setProviderAccountPool").length === writes,
+      [summary(memberRead), summary(memberUpdate)],
+    );
+    const off = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "with the pool off, the list has no pool",
+      off.status === 200 && isDeepStrictEqual(off.body, { pools: [] }),
+      summary(off),
+    );
+    const badAccount = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: ["not-an-account"] },
+      ...v9,
+    });
+    check(
+      "an account id that is not one gets 400, and the host writes nothing",
+      badAccount.status === 400 && callsOf("setProviderAccountPool").length === writes,
+      summary(badAccount),
+    );
+    const on = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: true, leftOut: ["default"] },
+      ...v9,
+    });
+    const pooled = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const expected = { leftOut: ["default"], inUse: ULTRA_ACCOUNT };
+    check(
+      "an admin turns the pool on with one account left out, and the list gives the pool",
+      on.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderAccountPool").at(-1), [
+          { provider: "antigravity", enabled: true, leftOut: ["default"] },
+        ]) &&
+        pooled.status === 200 &&
+        isDeepStrictEqual(pooled.body, { pools: [{ provider: "antigravity", ...expected }] }),
+      [summary(on), summary(pooled)],
+    );
+    // The client decodes the list and puts the pool on the accounts, as the web client, a joined
+    // desktop and mobile do before the settings and the model picker read it.
+    const decoded = { providers: [], agents: [], pools: decodeHostProviderAccountPools(pooled.body) };
+    check(
+      "the client decodes the pool",
+      isDeepStrictEqual(decoded.pools, [{ provider: "antigravity", pool: expected }]),
+      decoded,
+    );
+    const offAgain = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "antigravity", enabled: false, leftOut: [] },
+      ...v9,
+    });
+    const cleared = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin turns the pool off again",
+      offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
+      [summary(offAgain), summary(cleared)],
     );
   }
 

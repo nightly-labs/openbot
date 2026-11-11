@@ -4,6 +4,7 @@ import { statSync } from "node:fs";
 import { basename } from "node:path";
 import type {
   AccountUsage,
+  AccountUsageLimit,
   AgentEvent,
   AgentModelId,
   AgentModelOption,
@@ -14,6 +15,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountPool,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
@@ -30,6 +32,7 @@ import {
   GITHUB_CONNECTOR_MCP_SERVER_ID,
   isAgentProvider,
   isCustomProviderHarness,
+  usageQuotaForModel,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -97,6 +100,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { FailureContext } from "./failure-signal";
 import { ModelCatalog } from "./model-catalog";
 import { startMuseDeviceLogin } from "./muse-login";
+import type { PoolCandidate } from "./provider-account-pool";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
 import {
@@ -486,6 +490,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
+  /** The account that each pool uses now, as the service last picked it. */
+  readonly #poolInUse = new Map<AgentProvider, string | null>();
   /**
    * The usage reset credits that the last usage reading of each client counted, null when the
    * provider could not count them. A provider that has no credits never sets one.
@@ -741,7 +747,10 @@ export class ProviderRuntime implements ProviderPort {
                 ?.rows(row.id, row.email ?? null)
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
-        const withAccounts = accounts ? { ...withSource, accounts } : withSource;
+        const pool = accounts ? this.accountPool(row.id) : null;
+        const withAccounts = accounts
+          ? { ...withSource, accounts, ...(pool ? { accountPool: pool } : {}) }
+          : withSource;
         const endpointsPending =
           isCustomProviderHarness(row.id) && this.#hooks.endpointsPending
             ? { endpointsPending: this.#hooks.endpointsPending(row.id) }
@@ -1070,6 +1079,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly usage = Effect.fn("ProviderRuntime.usage")(function* (
     this: ProviderRuntime,
     scope?: { provider: AgentProvider; model: string; accountId?: string },
+    /** Reads only this provider, and sends no `usage-changed`: a view replaces its rows with each one. */
+    only?: AgentProvider,
   ) {
     const deadline = Effect.timeoutOrElse({
       duration: ACCOUNT_USAGE_READ_TIMEOUT_MS,
@@ -1085,7 +1096,11 @@ export class ProviderRuntime implements ProviderPort {
       const providers = statuses
         .map((item) => item.id)
         .filter(isAgentProvider)
-        .filter((provider) => available.has(provider) || ProviderAccounts.support(provider))
+        .filter(
+          (provider) =>
+            (only === undefined || provider === only) &&
+            (available.has(provider) || ProviderAccounts.support(provider)),
+        )
         .sort((left, right) => agentProviderDescriptor(left).pickerOrder - agentProviderDescriptor(right).pickerOrder);
       // By provider, then by provider and account: the provider's own sign-in comes first.
       const collected = new Map<string, AccountUsage["limits"][number]>();
@@ -1176,10 +1191,11 @@ export class ProviderRuntime implements ProviderPort {
             );
           if (!limit) return;
           collected.set(provider, limit);
-          this.#emit({
-            type: "usage-changed",
-            usage: { limits: [...collected.values()] },
-          });
+          if (only === undefined)
+            this.#emit({
+              type: "usage-changed",
+              usage: { limits: [...collected.values()] },
+            });
         });
       const readAccounts = (provider: AgentProvider) =>
         Effect.gen({ self: this }, function* () {
@@ -1187,7 +1203,7 @@ export class ProviderRuntime implements ProviderPort {
           if (accountLimits.length === 0) return;
           for (const accountLimit of accountLimits)
             collected.set(`${provider}:${accountLimit.accountId ?? ""}`, accountLimit);
-          this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
+          if (only === undefined) this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
         });
       yield* Effect.forEach(
         providers,
@@ -1879,6 +1895,70 @@ export class ProviderRuntime implements ProviderPort {
     yield* accounts.rename(provider, accountId, label).pipe(toProviderOperationFailed);
     return this.status();
   }).bind(this);
+
+  /** Turns the pool of the provider's accounts on or off. The service moves the agents before their next turn. */
+  readonly setProviderAccountPool = Effect.fn("ProviderRuntime.setProviderAccountPool")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    enabled: boolean,
+    leftOut: readonly string[],
+  ) {
+    const accounts = yield* this.#requireAccounts(provider);
+    yield* accounts.setPool(provider, enabled, leftOut).pipe(toProviderOperationFailed);
+    if (!enabled) this.#poolInUse.delete(provider);
+    return this.status();
+  }).bind(this);
+
+  /** The pool of the provider's accounts, or null while it is off. */
+  accountPool(provider: AgentProvider): ProviderAccountPool | null {
+    const pool = this.#providerAccounts?.pool(provider);
+    if (!pool) return null;
+    return { leftOut: [...pool.leftOut], inUse: this.#poolInUse.get(provider) ?? null };
+  }
+
+  /**
+   * The accounts of the provider's pool, in the order of the account list, with the last reading of
+   * each for the model. Only connected accounts with a plan: a key has no plan limit to pool.
+   */
+  poolMembers(provider: AgentProvider, model: string): PoolCandidate[] {
+    const pool = this.#providerAccounts?.pool(provider);
+    if (!pool || !this.#providerAccounts) return [];
+    const quota = (limit: AccountUsageLimit | null | undefined) => {
+      const windows = limit ? usageQuotaForModel(limit, model) : undefined;
+      return windows ? { primary: windows.primary, secondary: windows.secondary } : null;
+    };
+    const ownSignIn =
+      this.#clients.has(provider) || this.#released.has(provider)
+        ? this.status().providers?.find((row) => row.id === provider)?.state === "available" &&
+          !this.ownSignInUsesKey(provider)
+        : false;
+    const members: PoolCandidate[] = [
+      ...(ownSignIn
+        ? [
+            {
+              accountId: DEFAULT_PROVIDER_ACCOUNT_ID,
+              reading: this.#usageUnreported.has(provider) ? null : quota(this.#lastUsage.get(provider)),
+            },
+          ]
+        : []),
+      ...this.#providerAccounts
+        .planAccounts(provider)
+        .map((accountId) => ({ accountId, reading: quota(this.#providerAccounts?.keptUsage(accountId)) })),
+    ];
+    return members.filter((member) => !pool.leftOut.includes(member.accountId));
+  }
+
+  /** Shows the account that the pool uses now in the provider's row. */
+  setPoolInUse(provider: AgentProvider, accountId: string | null): void {
+    if ((this.#poolInUse.get(provider) ?? null) === accountId) return;
+    this.#poolInUse.set(provider, accountId);
+    this.#setStatus({});
+  }
+
+  /** Reads the usage of the provider's accounts again, as the gates of the rail allow. */
+  readPoolUsage(provider: AgentProvider): Effect.Effect<void> {
+    return this.usage(undefined, provider).pipe(Effect.ignore);
+  }
 
   /** The service moves the account's agents to the provider's own sign-in before it calls this. */
   readonly removeProviderAccount = Effect.fn("ProviderRuntime.removeProviderAccount")(function* (

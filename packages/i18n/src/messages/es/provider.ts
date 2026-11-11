@@ -228,6 +228,17 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} no tiene más créditos de restablecimiento de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de restablecimiento de {name} ya se usó.",
   "provider.account.resetUsageFailed": "No se pudo restablecer el uso de {name}.",
+  "provider.account.pool": "Agrupar cuentas",
+  "provider.account.poolDescription":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "provider.account.inUse": "En uso",
+  "provider.account.notInPool": "Fuera del grupo",
+  "provider.account.leaveOutOfPool": "Sacar del grupo",
+  "provider.account.putBackInPool": "Volver al grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} en uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Los agentes comparten estas cuentas.",
   "provider.settings.disconnectTitle": "¿Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "Las otras cuentas de {provider} esperan hasta que vuelvas a conectar {provider}.",

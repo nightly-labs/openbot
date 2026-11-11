@@ -89,6 +89,19 @@ export interface AgentProviderStatus {
    * released Team API adapters omit it.
    */
   accounts?: ProviderAccountStatus[];
+  /** The pool of `accounts`. Absent while the pool is off. Local only, like `accounts`. */
+  accountPool?: ProviderAccountPool;
+}
+
+/**
+ * Agents of a pooled provider use one account until it nears a limit, then the next one: the
+ * account whose limit refreshes first.
+ */
+export interface ProviderAccountPool {
+  /** The accounts that the user left out of the pool. */
+  leftOut: string[];
+  /** The account that the pool uses now. Null before the pool has a usable account. */
+  inUse: string | null;
 }
 
 /** The account a provider signed in first, in the CLI's own folder. An agent with no account uses it. */
@@ -161,7 +174,18 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.accounts === undefined ||
       (Array.isArray(value.accounts) &&
         value.accounts.length <= MAX_PROVIDER_ACCOUNTS &&
-        value.accounts.every(isProviderAccountStatus)))
+        value.accounts.every(isProviderAccountStatus))) &&
+    (value.accountPool === undefined || isProviderAccountPool(value.accountPool))
+  );
+}
+
+export function isProviderAccountPool(value: unknown): value is ProviderAccountPool {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.leftOut) &&
+    value.leftOut.length <= MAX_PROVIDER_ACCOUNTS &&
+    value.leftOut.every(isProviderAccountId) &&
+    (value.inUse === null || isProviderAccountId(value.inUse))
   );
 }
 
@@ -336,6 +360,13 @@ export interface RenameProviderAccountInput {
   label: string | null;
 }
 
+/** Turns the pool of a provider's accounts on or off, and sets the accounts that it leaves out. */
+export interface SetProviderAccountPoolInput {
+  provider: AgentProviderId;
+  enabled: boolean;
+  leftOut: string[];
+}
+
 /** Removes an account and its credentials. Its agents move to the provider's own sign-in. */
 export interface RemoveProviderAccountInput {
   provider: AgentProviderId;
@@ -372,6 +403,8 @@ export type ProviderUsageResetOutcome = (typeof PROVIDER_USAGE_RESET_OUTCOMES)[n
  */
 export interface HostProviderAccounts {
   providers: { provider: AgentProviderId; accounts: ProviderAccountStatus[] }[];
+  /** The pools that are on (`provider-account-pool-v1`). Absent when the host does not have it. */
+  pools?: { provider: AgentProviderId; pool: ProviderAccountPool }[];
   /** The agents on an account after the first. Every other agent uses the provider's own sign-in. */
   agents: { agentId: string; accountId: string }[];
 }

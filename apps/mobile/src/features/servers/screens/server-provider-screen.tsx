@@ -7,9 +7,11 @@ import {
   isKeyOnlyProvider,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
+  type ProviderAccountPool,
   type ProviderAccountStatus,
   type ProviderApiKeyStatus,
 } from "@openbot/contracts/ipc";
+import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Chip, Typography } from "heroui-native";
@@ -29,6 +31,7 @@ import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Star from "lucide-react-native/icons/star";
 import UserPlus from "lucide-react-native/icons/user-plus";
 import UserRound from "lucide-react-native/icons/user-round";
+import Users from "lucide-react-native/icons/users";
 import X from "lucide-react-native/icons/x";
 import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
@@ -200,6 +203,9 @@ export function ServerProviderScreen() {
   // The host lists only a provider that can hold more than one account.
   const providerAccounts = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts;
   const hasAccounts = Boolean(providerAccounts && providerAccounts.length > 0);
+  // The pool shows only where the host has it (`provider-account-pool-v1`). The host lists a pool only while it is on.
+  const setPool = admin.accounts?.setPool ?? null;
+  const pool = setPool ? accounts.list.data?.pools?.find((entry) => entry.provider === provider)?.pool : undefined;
   const message = row.status?.message ?? row.status?.checkError ?? null;
   const signOut = admin.signOut;
   // As on desktop, a saved key keeps the provider connected, and with an accounts list the provider's
@@ -352,6 +358,17 @@ export function ServerProviderScreen() {
           canAdd={connectable && admin.accounts?.canSignIn(provider) === true}
           busy={busy}
           onAdd={() => openSignIn("relay", { add: "1" })}
+          pool={pool}
+          onPoolChange={
+            setPool
+              ? (enabled) =>
+                  void run("pool", async () => {
+                    // The host forgets the accounts left out when the pool is off, as on desktop.
+                    await setPool(provider, enabled, pool?.leftOut ?? []);
+                    await accounts.refresh();
+                  })
+              : null
+          }
         />
       ) : null}
       {!off && (modelsShown || admin.defaultProvider) ? (
@@ -678,7 +695,10 @@ function CompactWindowSection({
   );
 }
 
-/** The accounts of the provider on the host. Each agent uses one; its settings choose which. */
+/**
+ * The accounts of the provider on the host. Each agent uses one; its settings choose which. With the
+ * pool on, the agents share the accounts that are in the pool.
+ */
 function ProviderAccountsSection({
   serverId,
   provider,
@@ -686,6 +706,8 @@ function ProviderAccountsSection({
   canAdd,
   busy,
   onAdd,
+  pool,
+  onPoolChange,
 }: {
   serverId: string;
   provider: AgentProviderId;
@@ -693,16 +715,46 @@ function ProviderAccountsSection({
   canAdd: boolean;
   busy: boolean;
   onAdd: () => void;
+  /** The pool of the accounts, while it is on. */
+  pool: ProviderAccountPool | undefined;
+  /** Null when the host does not have the pool. */
+  onPoolChange: ((enabled: boolean) => void) | null;
 }) {
   const { t } = useText();
+  const { theme } = useUniwind();
   const accountName = useProviderAccountName();
+  // As on desktop: a saved key has no plan limit, so it is not a pool member. The switch shows when
+  // the provider has a second plan account to use, or the pool is on.
+  const planAccounts = accounts.filter((account) => account.id !== CLAUDE_API_KEY_ACCOUNT_ID);
+  const poolOffered = onPoolChange !== null && (planAccounts.length > 1 || Boolean(pool));
   return (
     <SettingsSection
       title={t("mobile.server.providers.accounts")}
-      footer={t(canAdd ? "mobile.server.providers.accountsHint" : "mobile.server.providers.accountsOnComputer")}
+      footer={t(
+        pool
+          ? canAdd
+            ? "mobile.server.providers.accountsPooledHint"
+            : "mobile.server.providers.accountsPooledOnComputer"
+          : canAdd
+            ? "mobile.server.providers.accountsHint"
+            : "mobile.server.providers.accountsOnComputer",
+      )}
     >
+      {poolOffered ? (
+        <SettingsRow leading={<RowIcon icon={Users} />} supportingText={t("mobile.server.providers.poolHint")}>
+          <SettingsSwitch
+            value={Boolean(pool)}
+            disabled={busy}
+            label={t("mobile.server.providers.pool")}
+            dark={theme === "dark"}
+            onValueChange={(enabled) => onPoolChange?.(enabled)}
+          />
+        </SettingsRow>
+      ) : null}
       {accounts.map((account, index) => {
         const name = accountName(account, index);
+        const leftOut = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && pool?.leftOut.includes(account.id) === true;
+        const inUse = !leftOut && pool?.inUse === account.id;
         return (
           <SettingsRow
             key={account.id}
@@ -716,7 +768,24 @@ function ProviderAccountsSection({
               })
             }
           >
-            <Typography.Paragraph numberOfLines={1}>{name}</Typography.Paragraph>
+            <View className="shrink flex-row items-center gap-2">
+              <Typography.Paragraph numberOfLines={1} className="shrink">
+                {name}
+              </Typography.Paragraph>
+              {leftOut || inUse ? (
+                <Chip
+                  size="sm"
+                  variant="soft"
+                  color={inUse ? "success" : "default"}
+                  className="self-center"
+                  accessibilityRole="text"
+                >
+                  <Chip.Label>
+                    {t(inUse ? "mobile.server.providers.inUse" : "mobile.server.providers.notInPool")}
+                  </Chip.Label>
+                </Chip>
+              ) : null}
+            </View>
           </SettingsRow>
         );
       })}

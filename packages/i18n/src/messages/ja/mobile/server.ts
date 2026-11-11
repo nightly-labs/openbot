@@ -992,6 +992,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.pool": "アカウントをプール",
+  "mobile.server.providers.poolHint":
+    "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",
+  "mobile.server.providers.accountsPooledHint":
+    "エージェントはこれらのアカウントを共有します。新しいアカウントは、このスマートフォンでそのページからサインインします。",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "エージェントはこれらのアカウントを共有します。アカウントはコンピュータの OpenBot で追加してください。",
+  "mobile.server.providers.inUse": "使用中",
+  "mobile.server.providers.notInPool": "プール外",
+  "mobile.server.providers.leaveOutOfPool": "プールから外す",
+  "mobile.server.providers.putBackInPool": "プールに戻す",
   "mobile.server.providers.models": "モデル",
   "mobile.server.providers.modelsCount": "{shown} / {total}",
   "mobile.server.providers.modelsTitle": "{name} のモデル",
