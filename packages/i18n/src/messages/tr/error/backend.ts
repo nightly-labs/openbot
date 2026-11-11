@@ -151,6 +151,10 @@ export const messages = {
     "Posta kutusu durumu bozuk veya daha yeni bir OpenBot sürümünden; üzerine yazılması reddedildi.",
   "error.backend.recipientDeleting": "Alıcı siliniyor. Silme işlemi tamamlandıktan sonra tekrar deneyin.",
   "error.backend.recipientHidden": "Bu ajan gizli. Mesaj göndermek için onu geri yükleyin.",
+  "error.backend.agentIdUnknown":
+    "{id} kimliğine sahip bir ajan yok. Kimlikleri openbot.list_agents ile alın ve tekrar deneyin.",
+  "error.backend.agentIdNear":
+    "{id} kimliğine sahip bir ajan yok. {name} ajanının kimliği {nearId} ve neredeyse aynı. Bu ajanı kastediyorsanız onun kimliğiyle tekrar deneyin.",
   "error.backend.attachBetween": "1 ila {limit} dosya ekleyin.",
   "error.backend.attachmentNotFile": "Ek bir dosya değil: {path}",
   "error.backend.generatedImageTooLarge": "Oluşturulan görsel 100 MB sınırını aşıyor.",
