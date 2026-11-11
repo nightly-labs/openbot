@@ -59,6 +59,7 @@ import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "@openbot/contracts/team-pro
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   AGENT_HIDDEN_CAPABILITY,
+  AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -87,6 +88,7 @@ import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -758,6 +760,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }
     if (workspace.state.host?.hostId === hostId) await channels.open(channelId);
   }
+  const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
+  const noAgentIds: ReadonlySet<string> = new Set();
+  /** The host keeps a hidden agent at work. A host without `agent-hidden-work` stops it. */
+  const hiddenAgentsWork = () => workspace.state.capabilities.includes(AGENT_HIDDEN_WORK_CAPABILITY);
   const {
     setMuted,
     setNotificationLevel,
@@ -780,6 +786,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           )
         : null,
     readAgentLevels: workspace.runtime.listAgentNotificationLevels,
+    // Only the open host has a list of hidden agents. A host that stops a hidden agent keeps its level.
+    hiddenAgentIds: (hostId) =>
+      hostId === workspace.state.host?.hostId && hiddenAgentsWork() ? hiddenAgentIds() : noAgentIds,
   });
   // A host keeps the level of the user for all devices, so the rail reads it when the host comes online.
   const onlineHostIds = createMemo(() =>
@@ -818,7 +827,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     openAccountSettings();
   }
   const [searchOpen, setSearchOpen] = createSignal(false);
-  const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
+  /** The hidden agents that the host stops: they get no mention and no channel work. */
+  const pausedAgentIds = createMemo(() => (hiddenAgentsWork() ? noAgentIds : hiddenAgentIds()));
   // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
   const searchAgents = createMemo(() =>
     sidebarAgentOrder(workspace.profiles(), {
@@ -1272,7 +1282,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
-  const webWhatsApp = webHostWhatsApp(hostRequest);
+  const webWhatsApp = webHostWhatsApp(hostRequest, () =>
+    workspace.state.capabilities.includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY),
+  );
   const whatsappPort = hostWhatsAppPort(
     () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
     () => webWhatsApp,
@@ -1982,17 +1994,48 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (channelOpenInRoutines) layout.setSidebarView("agents");
     },
   );
+  /**
+   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
+   * again until it opens again, as on the desktop.
+   */
+  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   const readState = () => workspace.conversation()?.page?.readState;
+  const readsOpenChat = () =>
+    workspace.state.status === "online" &&
+    !agentFormOpen() &&
+    !channelOpen() &&
+    canMarkRead() &&
+    heldUnreadAgentId() !== workspace.state.selectedId;
+  /*
+   * The read state that the chat shows. The host counts a reply as unread until this tab marks it
+   * read, so each reply would move the unread line to it and the chat would jump. A reply that comes
+   * while the reader can read the loaded chat is read at once, as on the desktop: the chat keeps the
+   * line of its opening. The messages of the opening, of a time away and of Mark unread keep theirs.
+   */
+  const shownReadState = createMemo<{ visit: string; seen: boolean; unreadCount: number; firstUnread: string | null }>(
+    (previous) => {
+      const conversation = workspace.conversation();
+      const page = conversation?.page;
+      const visit = `${workspace.state.host?.hostId ?? ""}:${workspace.state.selectedId ?? ""}:${page?.threadId ?? ""}`;
+      const readable = readsOpenChat();
+      const seenBefore = previous?.visit === visit && previous.seen;
+      // A time away ends the visit's read: what comes next keeps its unread line.
+      const seen = readable && (seenBefore || (Boolean(page) && conversation?.loading === false));
+      if (seenBefore && readable) return { visit, seen, unreadCount: 0, firstUnread: null };
+      return {
+        visit,
+        seen,
+        unreadCount: page?.readState?.unreadCount ?? 0,
+        firstUnread: page?.readState?.firstUnreadMessageId ?? null,
+      };
+    },
+  );
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
   // coming back reads the page again.
   createEffect(
     () =>
-      (readState()?.unreadCount ?? 0) > 0 &&
-      !agentFormOpen() &&
-      !channelOpen() &&
-      canMarkRead() &&
-      heldUnreadAgentId() !== workspace.state.selectedId
+      (readState()?.unreadCount ?? 0) > 0 && readsOpenChat()
         ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
         : null,
     (unread) => {
@@ -2147,8 +2190,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       await workspace.refresh();
     };
   });
-  /** The agents that a mention can name: a hidden agent stays out, as on the desktop. */
-  const mentionAgents = createMemo(() => workspace.profiles().filter((agent) => !hiddenAgentIds().has(agent.id)));
+  /** The agents that a mention can name: an agent that the host stops stays out, as on the desktop. */
+  const mentionAgents = createMemo(() => workspace.profiles().filter((agent) => !pausedAgentIds().has(agent.id)));
   /** The open channels, for "Send to channel" on a message. The text waits in the channel's composer. */
   const sendToChannel = () => {
     const hostId = server()?.id;
@@ -2163,11 +2206,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     };
   };
-  /**
-   * The agent whose chat the user marked unread from one message. Its chat does not mark itself read
-   * again until it opens again, as on the desktop.
-   */
-  const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   /**
    * Marks a chat unread. The open chat stays unread until it opens again; another chat marks itself
    * read only when it opens. A failure releases the hold.
@@ -2557,7 +2595,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     );
   }
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  // The host refuses a member: an agent is hidden for every member.
   const hideSupported = () =>
     workspace.state.status === "online" &&
     workspace.state.capabilities.includes(AGENT_HIDDEN_CAPABILITY) &&
@@ -2841,6 +2879,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             if (kind === "server" && serverSettingsQuery()) setServerSettingsQuery("");
                             else showAgents();
                           }}
+                          onClose={showAgents}
                         >
                           <Show when={kind === "server"}>
                             <SettingsSearchField
@@ -2953,7 +2992,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     hasUnread={
                       workspace.state.agents.some(
                         (agent) =>
-                          !hiddenAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
+                          !pausedAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
                       ) || channels.hasUnread()
                     }
                     view={layout.sidebarView()}
@@ -3029,6 +3068,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     marketplaceSupported={workspace.state.status === "online"}
                     onDeleteAgent={workspace.deleteAgent}
                     userHiddenAgents={workspace.state.userHiddenAgents}
+                    userHiddenAgentsWork={hiddenAgentsWork()}
                     mutedAgentIds={muteSupported() ? mutedAgentIds(workspace.state.host?.hostId) : undefined}
                     onSetAgentMuted={muteSupported() ? setAgentMuted : undefined}
                     onHideAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, true) : undefined}
@@ -3475,7 +3515,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
-                      hiddenAgentIds,
+                      pausedAgentIds,
                     });
                     return (
                       <Conversation
@@ -3656,8 +3696,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   messages={view.messages}
                   messageReferences={view.messageReferences()}
                   missingMessageReferences={view.missingMessageReferences()}
-                  unreadCount={readState()?.unreadCount ?? 0}
-                  firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
+                  unreadCount={shownReadState().unreadCount}
+                  firstUnreadMessageId={shownReadState().firstUnread}
                   loaded={Boolean(workspace.conversation()?.page)}
                   hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
                   unloadedHistory={unloadedHistory(workspace.conversation()?.page?.pageInfo)}

@@ -840,6 +840,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Número pessoal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Desative para um número só para o OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Desative para enviar só a resposta.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestrador do WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recebe as mensagens para o OpenBot de todos os seus números vinculados. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e responde no WhatsApp.",
@@ -1023,6 +1026,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Não instalado",
   "mobile.server.providers.status.checking": "Verificando",
+  "mobile.server.providers.pool": "Agrupar contas",
+  "mobile.server.providers.poolHint":
+    "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "mobile.server.providers.accountsPooledHint":
+    "Os agentes compartilham estas contas. Uma conta nova entra pela página dela neste celular.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Os agentes compartilham estas contas. Adicione uma conta no OpenBot em um computador.",
+  "mobile.server.providers.inUse": "Em uso",
+  "mobile.server.providers.notInPool": "Fora do grupo",
+  "mobile.server.providers.leaveOutOfPool": "Tirar do grupo",
+  "mobile.server.providers.putBackInPool": "Voltar ao grupo",
   "mobile.server.providers.models": "Modelos",
   "mobile.server.providers.modelsCount": "{shown} de {total}",
   "mobile.server.providers.modelsTitle": "Modelos de {name}",

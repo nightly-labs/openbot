@@ -929,6 +929,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
@@ -1114,6 +1117,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Установлено",
   "mobile.server.providers.status.notInstalled": "Не установлено",
   "mobile.server.providers.status.checking": "Проверка",
+  "mobile.server.providers.pool": "Объединить аккаунты",
+  "mobile.server.providers.poolHint":
+    "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "mobile.server.providers.accountsPooledHint":
+    "Агенты используют эти аккаунты вместе. Новый аккаунт входит на своей странице на этом телефоне.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Агенты используют эти аккаунты вместе. Добавьте аккаунт в OpenBot на компьютере.",
+  "mobile.server.providers.inUse": "Используется",
+  "mobile.server.providers.notInPool": "Вне пула",
+  "mobile.server.providers.leaveOutOfPool": "Исключить из пула",
+  "mobile.server.providers.putBackInPool": "Вернуть в пул",
   "mobile.server.providers.models": "Модели",
   "mobile.server.providers.modelsCount": "{shown} из {total}",
   "mobile.server.providers.modelsTitle": "Модели {name}",

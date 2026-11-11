@@ -792,6 +792,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+  "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -967,6 +970,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.pool": "계정 풀 사용",
+  "mobile.server.providers.poolHint":
+    "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "mobile.server.providers.accountsPooledHint":
+    "에이전트가 이 계정들을 함께 써요. 새 계정은 이 휴대폰에서 계정 페이지로 로그인해요.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "에이전트가 이 계정들을 함께 써요. 계정은 컴퓨터의 OpenBot에서 추가하세요.",
+  "mobile.server.providers.inUse": "사용 중",
+  "mobile.server.providers.notInPool": "풀 제외",
+  "mobile.server.providers.leaveOutOfPool": "풀에서 제외",
+  "mobile.server.providers.putBackInPool": "풀에 다시 추가",
   "mobile.server.providers.models": "모델",
   "mobile.server.providers.modelsCount": "{shown}/{total}",
   "mobile.server.providers.modelsTitle": "{name} 모델",

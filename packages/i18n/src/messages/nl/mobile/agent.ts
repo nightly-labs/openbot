@@ -579,6 +579,8 @@ export const messages = {
   "mobile.agent.hidden.body": "Verborgen chats blijven werken. Ze worden alleen niet op het beginscherm getoond.",
   "mobile.agent.hidden.bodySynced":
     "Een verborgen chat behoudt zijn geschiedenis. De agent voert geen routines uit en krijgt geen nieuwe berichten. Elk apparaat op deze server verbergt de chat.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Een verborgen chat blijft werken. Elk apparaat op deze server verbergt de chat.",
   "mobile.agent.hidden.showNamed": "{name} tonen",
   "mobile.agent.hidden.show": "Tonen",
   "mobile.agent.hidden.showFailed": "Kan agent niet tonen",

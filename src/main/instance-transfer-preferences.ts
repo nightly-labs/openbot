@@ -29,6 +29,11 @@ interface TransferPreferences {
   ultrafast?: boolean;
   backupModels?: AgentBackupModels;
   hidden?: boolean;
+  /**
+   * The app that wrote the file keeps a hidden agent at work. A file with `hidden` and without this
+   * comes from an app that stopped a hidden agent, so its routines did not run there.
+   */
+  hiddenWorks?: boolean;
   notificationLevel?: ServerNotificationLevel;
   pinned?: boolean;
   autoApprove?: boolean;
@@ -69,7 +74,7 @@ export const readPreferences = Effect.fn("InstanceTransfer.readPreferences")(fun
     ...(agent.fastMode === undefined ? {} : { fastMode: agent.fastMode }),
     ...(agent.ultrafast ? { ultrafast: true } : {}),
     ...(agent.backupModels ? { backupModels: agent.backupModels } : {}),
-    ...(agent.hiddenAt ? { hidden: true } : {}),
+    ...(agent.hiddenAt ? { hidden: true, hiddenWorks: true } : {}),
     ...(level ? { notificationLevel: level } : {}),
     ...(port.pinned(agent.id) ? { pinned: true } : {}),
     autoApprove: port.autoApproves(agent.id),
@@ -78,6 +83,14 @@ export const readPreferences = Effect.fn("InstanceTransfer.readPreferences")(fun
   };
   return preferences;
 });
+
+/**
+ * True for a hidden agent from an app that stopped a hidden agent. The import then adds its routines
+ * turned off, so that this app, which keeps a hidden agent at work, starts none of them.
+ */
+export function hiddenAgentWasStopped(value: unknown): boolean {
+  return isDynamicRecord(value) && value.hidden === true && value.hiddenWorks !== true;
+}
 
 /**
  * Applies the settings to an agent the import made. Each step that fails is a warning: the agent

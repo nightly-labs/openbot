@@ -84,7 +84,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
-    userHiddenAgentIds,
+    userPausedAgentIds,
+    userHiddenAgentsWork,
     mutedAgentIds,
   } = useAgents();
   const {
@@ -98,7 +99,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   } = useAgentActions();
   // A server that keeps no levels has no mute item: the item must not fail.
   const muteSupported = () => activeServerSupportsCapability(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  // The host refuses a member: an agent is hidden for every member.
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { pendingPrompts, approvals } = useTurns();
@@ -217,7 +218,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         }}
         hasUnread={
           agentList().some(
-            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
         view={layout.sidebarView()}
@@ -296,6 +297,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        userHiddenAgentsWork={userHiddenAgentsWork()}
         unreadAgentIds={unreadAgentIds()}
         onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
         onMarkAgentUnread={

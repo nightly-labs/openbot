@@ -250,6 +250,7 @@ try {
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
+      setProviderAccountPool: unused("setProviderAccountPool"),
     },
     browser: { openPrivate: unused("openPrivate"), privateTab: unused("privateTab"), close: unused("close") },
   });

@@ -48,6 +48,8 @@ export function createWebNotificationRouting(options: {
   channelForThread: (hostId: string, threadId: string) => AgentNotificationChannel | null;
   /** The user's own level for each agent of a host. Absent, the server level applies to each agent. */
   readAgentLevels?: ((hostId: string) => Promise<AgentNotificationLevelsSnapshot>) | undefined;
+  /** The agents of a host that the user hid. Such an agent notifies only when it waits for the user. */
+  hiddenAgentIds: (hostId: string) => ReadonlySet<string>;
 }) {
   const { workspace, notifications } = options;
   /**
@@ -119,7 +121,8 @@ export function createWebNotificationRouting(options: {
       // the server level that the host keeps for the user.
       const current = untrack(() => notifications.state(hostId));
       if (current.muted) return;
-      show(hostId, event, agents, agentNotificationLevel(current.level, levels, agentId));
+      const hidden = untrack(() => options.hiddenAgentIds(hostId)).has(agentId);
+      show(hostId, event, agents, agentNotificationLevel(current.level, levels, agentId, hidden));
     });
   }
   function show(hostId: string, event: AgentEvent, agents: ClientAgentSummary[], level: ServerNotificationLevel) {

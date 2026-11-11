@@ -200,6 +200,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
         if (query()) setQuery("");
         else windowPage.showAgents();
       }}
+      onClose={windowPage.showAgents}
     >
       <SettingsSearchField
         value={query()}

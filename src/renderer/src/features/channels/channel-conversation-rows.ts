@@ -165,14 +165,15 @@ export function firstUnreadChannelMessageId(
  * The lead's routing turn moves no task out of `queued` and writes no message of its own. Without
  * it the transcript stands still while the coordinator thinks, which reads as a dropped request.
  * Only `queued` and `waiting`: routing that ends without an owner leaves the task `paused` with the
- * coordinator's reason above the composer, and that notice is the indicator from then on. A lead that
- * the user hid routes nothing until the restore, so it is not shown as working.
+ * coordinator's reason above the composer, and that notice is the indicator from then on. A hidden
+ * lead on a host without `agent-hidden-work` routes nothing until the restore, so it is not shown as
+ * working.
  */
 export function channelWorkers(
   page: ChannelPage,
   agents: readonly AgentProfile[],
   fallbackName: string,
-  hiddenAgentIds: ReadonlySet<string>,
+  pausedAgentIds: ReadonlySet<string>,
 ): ChannelWorker[] {
   const ids = new Set<string>();
   const active = new Set<string>();
@@ -193,7 +194,7 @@ export function channelWorkers(
   const lead = page.channel.leadAgentId;
   if (
     lead &&
-    !hiddenAgentIds.has(lead) &&
+    !pausedAgentIds.has(lead) &&
     page.tasks.some((task) => !task.ownerAgentId && (task.state === "queued" || task.state === "waiting"))
   )
     ids.add(lead);

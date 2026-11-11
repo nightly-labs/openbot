@@ -9,6 +9,8 @@ export const messages = {
   "startup.archiveChangedBody":
     "다른 프로그램이 OpenBot 파일 app.asar를 변경했습니다. OpenBot은 지금 실행 중이지만 종료하면 다시 열리지 않습니다.\n\n복구하려면 OpenBot을 다시 설치하세요. 로컬 데이터는 그대로 유지됩니다.",
   "startup.archiveChangedDownload": "OpenBot 다운로드",
+  "startup.filesDamagedBody":
+    "일부 OpenBot 파일이 손상되었거나 없습니다.\n\n복구하려면 OpenBot을 다시 설치하세요. 로컬 데이터는 그대로 유지됩니다.",
   "startup.newerDataUpdatingTitle": "OpenBot 업데이트 중",
   "startup.newerDataUpdatingBody":
     "더 새로운 버전의 OpenBot이 데이터를 저장했습니다. OpenBot이 최신 버전을 설치한 후 다시 열립니다.\n\n로컬 데이터는 초기화되거나 덮어쓰이지 않았습니다.",

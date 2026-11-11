@@ -354,8 +354,11 @@ export interface OpenBotToolRouterHooks {
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
-  /** Records a no-update tool call for the turn; null when no routine run started the turn. */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
+  /**
+   * Records a no-update tool call for the turn; null when no routine run started the turn.
+   * `channelRun` is a turn that owns a main task of a channel routine's request.
+   */
+  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -1745,38 +1748,34 @@ export class OpenBotToolRouter {
       // A delivery that is starting holds no turn yet, and a channel turn runs on a thread of its own.
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
-      // A hidden agent takes no new messages, so the list leaves it out.
-      const agents = this.#hooks
-        .listAgents()
-        .filter((agent) => agent.hiddenAt === undefined)
-        .map((agent) => {
-          const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
-          const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
-          const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
-          // A channel turn runs beside the agent's own chat, so it counts when the chat is idle.
-          const activeTurnId =
-            this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
-            this.#conversation.workingChannelSnapshots(agent.id).find((snapshot) => snapshot.activeTurnId)
-              ?.activeTurnId ??
-            null;
-          const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
-          // A restart loses the provider clock, so the newest message for the agent stands in for it.
-          const lastActivity = deliveries.reduce(
-            (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
-            Math.max(lastEventAt ?? 0, startedAt ?? 0),
-          );
-          return {
-            id: agent.id,
-            name: agent.name,
-            title: agent.title,
-            description: listedDescription(agent.description),
-            status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
-            queuedMessages,
-            ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
-            ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
-            ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
-          };
-        });
+      const agents = this.#hooks.listAgents().map((agent) => {
+        const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
+        const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
+        const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
+        // A channel turn runs beside the agent's own chat, so it counts when the chat is idle.
+        const activeTurnId =
+          this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
+          this.#conversation.workingChannelSnapshots(agent.id).find((snapshot) => snapshot.activeTurnId)
+            ?.activeTurnId ??
+          null;
+        const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
+        // A restart loses the provider clock, so the newest message for the agent stands in for it.
+        const lastActivity = deliveries.reduce(
+          (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
+          Math.max(lastEventAt ?? 0, startedAt ?? 0),
+        );
+        return {
+          id: agent.id,
+          name: agent.name,
+          title: agent.title,
+          description: listedDescription(agent.description),
+          status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
+          queuedMessages,
+          ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
+          ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
+          ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
+        };
+      });
       return openBotToolResult({ agents });
     }
 
@@ -1826,12 +1825,27 @@ export class OpenBotToolRouter {
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. Finish your answer now.",
+        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
       });
     }
 
     if (params.tool === ROUTINE_NO_UPDATE_TOOL) {
-      const outcome = this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId);
+      // As for the failure tool below: the owner of a channel routine's request ends the run quiet, and
+      // a member reports to that owner (#7166).
+      const channelRun = channelId
+        ? yield* this.#channels
+            .routineRunPart(channelId, senderAgentId, params.turnId)
+            .pipe(Effect.catch(() => Effect.succeed(null)))
+        : null;
+      if (channelRun?.part === "member")
+        return openBotToolFailure(
+          "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
+        );
+      // A person who started a Test run waits for its answer, as in an agent's own routine.
+      const outcome =
+        channelRun?.part === "owner" && !channelRun.quiet
+          ? "shown"
+          : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
           "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
@@ -1853,11 +1867,11 @@ export class OpenBotToolRouter {
             .routineRunPart(channelId, senderAgentId, params.turnId)
             .pipe(Effect.catch(() => Effect.succeed(null)))
         : null;
-      if (channelRun === "member")
+      if (channelRun?.part === "member")
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run as failed. Say in your result that the task could not be done, and why.",
         );
-      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun === "owner"))
+      if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
     }
@@ -2000,11 +2014,12 @@ export class OpenBotToolRouter {
         });
       }
       // A card that asks for a connection the user already made is a dead end: they see "Connected".
+      // A refusal while connected is the app's installation, which only the user can change (#7182).
       if (args.app === "github" && this.#githubConnected())
         return openBotToolResult({
           status: "connected",
           app: args.app,
-          next: "GitHub is already connected for every agent of this server. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When none of them works, tell the user in one sentence and call openbot.send_feedback.",
+          next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
@@ -2856,17 +2871,14 @@ export class OpenBotToolRouter {
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        // Suggest only an agent that this tool takes: not the sender, and not a hidden agent.
+        // Suggest only an agent that this tool takes: not the sender.
         if (!agent)
           throw new Error(
             unknownAgentMessage(
               recipient,
-              agents.filter((candidate) => candidate.hiddenAt === undefined && candidate.id !== senderAgentId),
+              agents.filter((candidate) => candidate.id !== senderAgentId),
             ),
           );
-        // A hidden agent receives no new messages until the user restores it.
-        if (agent.hiddenAt !== undefined)
-          throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);
       }
       const paths = params.arguments.paths ?? [];
       if (!Array.isArray(paths) || !paths.every((item) => isString(item))) {

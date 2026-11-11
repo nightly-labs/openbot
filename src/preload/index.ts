@@ -812,6 +812,7 @@ const openbotApi: OpenBotDesktopApi = {
     cancelProviderAccountSignIn: decodeAgentStatusFromMain,
     renameProviderAccount: decodeAgentStatusFromMain,
     removeProviderAccount: decodeAgentStatusFromMain,
+    setProviderAccountPool: decodeAgentStatusFromMain,
     signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
@@ -1162,6 +1163,7 @@ const openbotApi: OpenBotDesktopApi = {
     cancelAccountSignIn: decodeVoid,
     renameAccount: decodeVoid,
     removeAccount: decodeVoid,
+    setAccountPool: decodeVoid,
     hostDefaultProvider: decodeHostDefaultProviderFromMain,
     setHostDefaultProvider: decodeHostDefaultProviderFromMain,
     usageResets: decodeProviderUsageResetsFromMain,
@@ -1222,6 +1224,7 @@ const openbotApi: OpenBotDesktopApi = {
     removeWhatsAppSender: decodeVoid,
     answerWhatsAppRequest: decodeVoid,
     setWhatsAppOwnNumber: decodeVoid,
+    setWhatsAppWorkingMessage: decodeVoid,
     // A joined server can list up to the Telegram limit; main has already read its states.
     hostOverview: decodeTelegramOverviewReply,
     hostConnect: decodeVoid,
@@ -1245,6 +1248,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostRemoveWhatsAppSender: decodeVoid,
     hostAnswerWhatsAppRequest: decodeVoid,
     hostSetWhatsAppOwnNumber: decodeVoid,
+    hostSetWhatsAppWorkingMessage: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,

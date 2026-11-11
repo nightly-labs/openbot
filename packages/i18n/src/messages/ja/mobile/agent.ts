@@ -575,6 +575,8 @@ export const messages = {
   "mobile.agent.hidden.body": "非表示のチャットも動作を続けます。ホーム画面に表示されないだけです。",
   "mobile.agent.hidden.bodySynced":
     "非表示のチャットは履歴を保持します。そのエージェントはルーティンを実行せず、新しいメッセージを受け取りません。このサーバーのすべてのデバイスで非表示になります。",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "非表示のチャットも動作を続けます。このサーバーのすべてのデバイスで非表示になります。",
   "mobile.agent.hidden.showNamed": "{name} を表示",
   "mobile.agent.hidden.show": "表示",
   "mobile.agent.hidden.showFailed": "エージェントを表示できませんでした",

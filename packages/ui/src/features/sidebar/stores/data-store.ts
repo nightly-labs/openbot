@@ -117,6 +117,9 @@ export function createSidebarDataStore(deps: {
   });
   const waitingIds = createMemo(() => new Set(waitingKey() ? waitingKey().split("\n") : []));
   const chatWaits = (chatId: string) => waitingIds().has(chatId);
+  /** A hidden agent at work that waits for the user. It shows in "Needs you", not in the "Hidden" group. */
+  const hiddenAgentWaits = (agentId: string) =>
+    props.userHiddenAgentsWork === true && agentIsUserHidden(agentId) && chatWaits(agentId);
   const chatOrder = () => props.chatOrder ?? "manual";
   const activeChatId = () => props.activeChannelId || props.activeAgentId || "";
   /**
@@ -159,10 +162,13 @@ export function createSidebarDataStore(deps: {
   const filteredAgents = createMemo(() =>
     listedAgents().filter((agent) => !chatWaits(agent.id) && !chatInUnreadGroup(agent.id)),
   );
-  /** The hidden agents, pinned ones included, in their layout order. They are not drag sources. */
+  /**
+   * The hidden agents, pinned ones included, in their layout order. They are not drag sources. One
+   * that waits for the user is in "Needs you" until the wait ends.
+   */
   const userHiddenAgentList = createMemo(() =>
     sortByLayoutOrder(
-      props.agents.filter((agent) => agentIsUserHidden(agent.id)),
+      props.agents.filter((agent) => agentIsUserHidden(agent.id) && !hiddenAgentWaits(agent.id)),
       props.layout.agentOrder,
     ),
   );
@@ -260,7 +266,11 @@ export function createSidebarDataStore(deps: {
   /** The "Needs you" group, in the order the chats have in the layout. */
   const waitingChats = createChatItems(() => ({
     channels: listedChannels().filter((channel) => chatWaits(channel.id)),
-    agents: listedAgents().filter((agent) => chatWaits(agent.id)),
+    agents: props.agents.filter((agent) =>
+      agentIsUserHidden(agent.id)
+        ? hiddenAgentWaits(agent.id)
+        : chatWaits(agent.id) && !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })),
+    ),
   }));
   /** The "Unread" group of the "unread in a group" order, by last activity. */
   const unreadChats = createChatItems(

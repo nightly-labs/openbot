@@ -807,6 +807,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
@@ -985,6 +988,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.pool": "Accounts bundelen",
+  "mobile.server.providers.poolHint":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agents delen deze accounts. Een nieuw account meldt zich aan op zijn pagina op deze telefoon.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agents delen deze accounts. Voeg een account toe in OpenBot op een computer.",
+  "mobile.server.providers.inUse": "In gebruik",
+  "mobile.server.providers.notInPool": "Niet in pool",
+  "mobile.server.providers.leaveOutOfPool": "Uit pool halen",
+  "mobile.server.providers.putBackInPool": "Terug in pool",
   "mobile.server.providers.models": "Modellen",
   "mobile.server.providers.modelsCount": "{shown} van {total}",
   "mobile.server.providers.modelsTitle": "Modellen van {name}",

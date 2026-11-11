@@ -1061,6 +1061,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -1252,6 +1255,18 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.removeAccount": "Remove account",
   "mobile.server.providers.removeAccountTitle": "Remove {name}?",
   "mobile.server.providers.removeAccountBody": "The server removes this account and its sign-in.",
+  // The pool of a provider's accounts (`provider-account-pool-v1`), as the desktop Accounts section.
+  "mobile.server.providers.pool": "Pool accounts",
+  "mobile.server.providers.poolHint":
+    "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agents share these accounts. A new account signs in on its page on this phone.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agents share these accounts. Add an account in OpenBot on a computer.",
+  "mobile.server.providers.inUse": "In use",
+  "mobile.server.providers.notInPool": "Not in pool",
+  "mobile.server.providers.leaveOutOfPool": "Leave out of pool",
+  "mobile.server.providers.putBackInPool": "Put back in pool",
   "mobile.server.providers.models": "Models",
   "mobile.server.providers.modelsCount": "{shown} of {total}",
   "mobile.server.providers.modelsTitle": "{name} models",

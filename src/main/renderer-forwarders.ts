@@ -22,6 +22,7 @@ import {
   type ChannelSummary,
   type ClientAgentSummary,
   decodeChannelSummaries,
+  type HiddenAgentsSnapshot,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   latestTurnAnswer,
@@ -33,8 +34,12 @@ import {
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
-import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
+  TEAM_CHANNEL_ATTENTION_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
@@ -42,6 +47,7 @@ import {
   type AgentNotificationChannel,
   agentEventAgentId,
   agentEventCanNotify,
+  agentEventNeedsUser,
   agentEventRequestThread,
   notificationForAgentEvent,
   notificationForUsageLimit,
@@ -66,15 +72,21 @@ import {
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentSummaries } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeHiddenAgentsFromHost } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
+
+/** The level at which an event notifies, from the levels of the agents and the agents that the user hid. */
+type NotifyLevel = (
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  hiddenAgentIds?: ReadonlySet<string> | null,
+) => ServerNotificationLevel | null;
 
 export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
   /** Each chat window shows a live chat, so it gets the chat, server and provider events too. */
   getChatWindows: () => BrowserWindow[];
-  getAgentService: () => Pick<AgentService, "listAgents"> | null;
+  getAgentService: () => Pick<AgentService, "listAgents" | "listHiddenAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<
@@ -86,6 +98,7 @@ export interface RendererForwarderDependencies {
     | "notificationLevels"
     | "cachedNotificationLevels"
     | "knownNotificationLevels"
+    | "supportsCapability"
   > | null;
   /** The level that the user chose for each agent of this computer's server. */
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
@@ -322,6 +335,24 @@ export function createRendererForwarders({
   }
 
   /**
+   * The agents of a server that the user hid. Only a host with `agent-hidden-work` keeps them at work,
+   * so only that host gets a request. A failed read gives none: the event then notifies at its level.
+   */
+  function userHiddenAgentIds(serverId: string): ReadonlySet<string> | Promise<ReadonlySet<string>> {
+    const ids = (snapshot: HiddenAgentsSnapshot | undefined) =>
+      new Set(snapshot?.agents.map((agent) => agent.agentId) ?? []);
+    if (serverId === LOCAL_SERVER_ID) return ids(getAgentService()?.listHiddenAgents());
+    const remoteManager = getRemoteServerManager();
+    if (!remoteManager?.supportsCapability(serverId, AGENT_HIDDEN_WORK_CAPABILITY)) return ids(undefined);
+    return runCauseEffect(
+      remoteManager.request(serverId, AGENT_HIDDEN_ROUTES.read, decodeHiddenAgentsFromHost, {
+        method: "POST",
+        body: {},
+      }),
+    ).then(ids, () => ids(undefined));
+  }
+
+  /**
    * The notifications that wait for an answer, by request. An answer on any device withdraws its
    * notification. A request whose notification is still being built has no notification yet, and an
    * answer that arrives then removes the entry, so the notification is not shown.
@@ -349,13 +380,13 @@ export function createRendererForwarders({
     if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached" && event.type !== "subagent-failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
-    const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {
+    const notifyLevel: NotifyLevel = (agentLevels, hiddenAgentIds = null) => {
       const window = getMainWindow();
       const server = getRemoteServerManager()
         ?.list()
         .find((candidate) => candidate.id === serverId);
       if (!window || window.isDestroyed() || appFocused(window) || !server) return null;
-      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels);
+      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels, hiddenAgentIds);
     };
     // The level also rules out an event before the remote lookups. The level of an agent can let more
     // through than the server level, so this first check uses the most open one.
@@ -377,7 +408,7 @@ export function createRendererForwarders({
   async function showAgentNotification(
     serverId: string,
     event: AgentEvent,
-    notifyLevel: (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => ServerNotificationLevel | null,
+    notifyLevel: NotifyLevel,
     requestKey: string | null,
     routineTaskId: string | null,
   ): Promise<void> {
@@ -394,7 +425,18 @@ export function createRendererForwarders({
     const lookup = eventChannel(serverId, event);
     const channel = lookup instanceof Promise ? await lookup : lookup;
     const levelLookup = agentNotificationLevels(serverId);
-    const level = notifyLevel(levelLookup instanceof Promise ? await levelLookup : levelLookup);
+    const levels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
+    const open = notifyLevel(levels);
+    // A hidden agent changes only the level "all" of an event that does not wait for the user (see
+    // `agentNotificationLevel`), so only that event reads the hidden agents of a remote server.
+    const hiddenLookup =
+      open === "all" && event.type !== "usage-limit-reached" && !agentEventNeedsUser(event)
+        ? userHiddenAgentIds(serverId)
+        : null;
+    const level =
+      hiddenLookup === null
+        ? open
+        : notifyLevel(levels, hiddenLookup instanceof Promise ? await hiddenLookup : hiddenLookup);
     const content = !level
       ? null
       : event.type === "usage-limit-reached"

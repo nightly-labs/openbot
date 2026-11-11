@@ -197,10 +197,6 @@ export class RoutineScheduler implements RoutineDueSource {
     return undefined;
   }
 
-  #isHidden(agentId: string): boolean {
-    return this.#hooks.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined);
-  }
-
   /** The scheduler's clause in the drain mute registry. */
   mayDrain(agentId: string): boolean {
     return !this.#deletionAgents.has(agentId) && !this.#hooks.excludedAgents().has(agentId);
@@ -257,10 +253,15 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#routines.skipMissed(now, held);
   }
 
-  /** Skips the occurrences that came due while the agent was hidden. The caller arms the timer. */
-  skipMissedFor(agentId: string, now: Date): void {
-    this.#routines.skipMissedFor(agentId, now);
-    this.stateChanged(agentId);
+  /**
+   * Turns off, one time, the routines of each agent that a user hid before a hidden agent could work.
+   * Then a hide stopped the agent, so the update must not start its routines. Call it before the timer
+   * reads the due routines.
+   */
+  pauseForAgentsHiddenBeforeWork(): number {
+    return this.#routines.pauseForAgentsHiddenBeforeWork(
+      this.#hooks.listAgents().flatMap((agent) => (agent.hiddenAt === undefined ? [] : [agent.id])),
+    ).length;
   }
 
   create(input: CreateRoutineInput, options: RoutineMutationOptions = {}): Routine {
@@ -465,7 +466,6 @@ export class RoutineScheduler implements RoutineDueSource {
     input: TestRoutineInput & { payload: string; source: "test" | "script"; waitId?: string },
   ) {
     const run = yield* routineStep(() => {
-      if (this.#isHidden(input.agentId)) throw new RoutineInputError(sourceText("error.backend.recipientHidden"));
       if (!this.mayDrain(input.agentId)) throw new RoutineInputError(sourceText("error.backend.routineWaitForAgent"));
       this.#conversation.requireKnownAgent(input.agentId);
       const routine = this.#routines.getRecord(input.agentId, input.routineId);
@@ -931,8 +931,6 @@ export class RoutineScheduler implements RoutineDueSource {
     const agent = yield* routineStep(() => {
       const found = this.#hooks.listAgents().find((candidate) => candidate.id === input.agentId);
       if (!found) throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
-      // The next agent of the flow is hidden. It receives no new work until the user restores it.
-      if (found.hiddenAt !== undefined) throw new Error(sourceText("error.backend.recipientHidden"));
       return found;
     });
     const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([agent.id]));

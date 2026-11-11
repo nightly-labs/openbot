@@ -841,6 +841,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Numéro personnel",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Seules votre discussion « Message à vous-même » et les personnes que vous autorisez peuvent écrire. Désactivez pour un numéro réservé à OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Message « En cours… »",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Désactivez pour n’envoyer que la réponse.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Cet agent reçoit les messages destinés à OpenBot depuis tous vos numéros associés. Il répond lui-même aux messages courts, confie les autres tâches au bon agent et répond dans WhatsApp.",
@@ -1024,6 +1027,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installé",
   "mobile.server.providers.status.notInstalled": "Non installé",
   "mobile.server.providers.status.checking": "Vérification",
+  "mobile.server.providers.pool": "Regrouper les comptes",
+  "mobile.server.providers.poolHint":
+    "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
+  "mobile.server.providers.accountsPooledHint":
+    "Les agents partagent ces comptes. Un nouveau compte se connecte sur sa page, sur ce téléphone.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Les agents partagent ces comptes. Ajoutez un compte dans OpenBot sur un ordinateur.",
+  "mobile.server.providers.inUse": "Utilisé",
+  "mobile.server.providers.notInPool": "Hors du groupe",
+  "mobile.server.providers.leaveOutOfPool": "Retirer du groupe",
+  "mobile.server.providers.putBackInPool": "Remettre dans le groupe",
   "mobile.server.providers.models": "Modèles",
   "mobile.server.providers.modelsCount": "{shown} sur {total}",
   "mobile.server.providers.modelsTitle": "Modèles de {name}",

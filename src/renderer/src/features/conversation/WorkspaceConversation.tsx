@@ -128,7 +128,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     agentList,
     agentListConnecting,
     activeAgent,
-    userHiddenAgentIds,
+    userPausedAgentIds,
     modelOptions,
     settingsRequest,
     updateAgent,
@@ -575,7 +575,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onOpenNotificationSettings={openNotificationLevels}
         agent={conversationAgent()}
         agents={agentList()}
-        mentionAgents={agentList().filter((agent) => !userHiddenAgentIds().has(agent.id))}
+        mentionAgents={agentList().filter((agent) => !userPausedAgentIds().has(agent.id))}
         availableRoutineIds={activeRoutineIds()}
         routines={activeRoutines()}
         modelOptions={modelOptions()}

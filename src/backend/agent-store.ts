@@ -2175,7 +2175,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       ? value.pendingRuntime
       : reset("pendingRuntime", undefined);
   // A time this build cannot read keeps the agent hidden, at the time of the read: a user hid it,
-  // and showing it again would run its routines without a decision of the user.
+  // and only the user puts it back in the list.
   const hiddenAt =
     value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)
       ? value.hiddenAt

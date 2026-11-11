@@ -69,7 +69,7 @@ export interface AutomationServerOptions {
   root: string;
   listAgents: () => readonly Pick<
     AgentSummary,
-    "id" | "name" | "allowAutomation" | "hiddenAt" | "provider" | "model" | "reasoningEffort"
+    "id" | "name" | "allowAutomation" | "provider" | "model" | "reasoningEffort"
   >[];
   /** The account defaults; an agent with no automation setting of its own follows them. */
   agentDefaults: () => AgentDefaults;
@@ -315,7 +315,6 @@ export class AutomationServer {
     if (route === "messages") {
       const text = requiredString(value, "text", INPUT_LIMITS.messageText);
       const clientMessageId = requiredString(value, "clientMessageId", INPUT_LIMITS.identifier);
-      this.#requireNotHidden(agentId);
       const now = this.#takeSlot(agentId);
       try {
         // Separate script retry keys from local UI retry keys without inventing a team member.
@@ -351,15 +350,6 @@ export class AutomationServer {
     };
   }
 
-  /**
-   * A hidden agent takes no new work: no message and no routine run. An answer to a prompt or an
-   * approval of a turn that already runs is still accepted.
-   */
-  #requireNotHidden(agentId: string): void {
-    if (this.#options.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined))
-      throw new HttpError(409, sourceText("error.backend.recipientHidden"));
-  }
-
   #requireAgent(agentId: string, routine = false) {
     const agent = this.#options.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new HttpError(404, "not found");
@@ -383,7 +373,6 @@ export class AutomationServer {
       return send(response, 413, { error });
     }
     this.#requireAgent(agentId, true);
-    this.#requireNotHidden(agentId);
     if (!this.#options.listRoutines(agentId).some((routine) => routine.id === routineId)) {
       return send(response, 404, { error: sourceText("error.backend.routineGone") });
     }
@@ -423,19 +412,16 @@ export class AutomationServer {
   }
 
   #listAgents() {
-    return (
-      this.#options
-        .listAgents()
-        // A hidden agent takes no new work, so a script does not see it until it is restored.
-        .filter((agent) => agentAutomationAllowed(agent, this.#options.agentDefaults()) && agent.hiddenAt === undefined)
-        .map((agent) => ({
-          id: agent.id,
-          name: agent.name,
-          routines: this.#options
-            .listRoutines(agent.id)
-            .map((routine) => ({ id: routine.id, name: routine.name, active: routine.active })),
-        }))
-    );
+    return this.#options
+      .listAgents()
+      .filter((agent) => agentAutomationAllowed(agent, this.#options.agentDefaults()))
+      .map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        routines: this.#options
+          .listRoutines(agent.id)
+          .map((routine) => ({ id: routine.id, name: routine.name, active: routine.active })),
+      }));
   }
 
   #releaseSlot(agentId: string, time: number): void {
