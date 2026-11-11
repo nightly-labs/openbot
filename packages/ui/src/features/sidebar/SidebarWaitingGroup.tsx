@@ -50,9 +50,9 @@ export function SidebarUnreadGroup() {
       label={t("sidebar.unread.label", { count: count() })}
       class="sidebar-unread-group"
       heading={(heading) => (
-        <Show when={props.onChatOrderChange} fallback={<header>{heading}</header>}>
+        <Show when={props.onChatOrderChange} fallback={<header>{heading()}</header>}>
           <ContextMenu.Root modal={false}>
-            <ContextMenu.Trigger as="header">{heading}</ContextMenu.Trigger>
+            <ContextMenu.Trigger as="header">{heading()}</ContextMenu.Trigger>
             <ContextMenu.Portal>
               <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.unread.actions")}>
                 <Show when={props.onMarkAllRead}>
@@ -81,10 +81,13 @@ function SidebarChatGroup(props: {
   title: string;
   label: string;
   class?: string;
-  /** Wraps the `header` element, for a group whose heading has a menu. */
-  heading?: (heading: JSX.Element) => JSX.Element;
+  /**
+   * Wraps the `header` element, for a group whose heading has a menu. `heading` makes a new node at
+   * each call, so each branch of the wrapper has its own.
+   */
+  heading?: (heading: () => JSX.Element) => JSX.Element;
 }) {
-  const heading = (
+  const heading = () => (
     <h2 class="sidebar-waiting-group-name">
       {props.title}
       <Show when={props.count > 0}>
@@ -97,7 +100,7 @@ function SidebarChatGroup(props: {
   return (
     <Show when={props.chats.length > 0}>
       <section class={["sidebar-chat-group sidebar-waiting-group", props.class]} aria-label={props.label}>
-        {props.heading ? props.heading(heading) : <header>{heading}</header>}
+        {props.heading ? props.heading(heading) : <header>{heading()}</header>}
         <For each={props.chats}>
           {(chat) => (
             <Switch>

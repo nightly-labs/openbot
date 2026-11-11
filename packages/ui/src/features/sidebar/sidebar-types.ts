@@ -8,6 +8,7 @@ import type {
   SidebarLayoutSnapshot,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
@@ -50,6 +51,13 @@ export const SIDEBAR_CHAT_ORDERS = [
   "unread-group",
   "unread-first",
 ] as const satisfies readonly SidebarChatOrder[];
+
+/** The name of each order, in the sidebar menu and in Settings. */
+export const SIDEBAR_CHAT_ORDER_LABEL = {
+  manual: "sidebar.order.manual",
+  "unread-group": "sidebar.order.unreadGroup",
+  "unread-first": "sidebar.order.unreadFirst",
+} as const satisfies Record<SidebarChatOrder, AppTextKey>;
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */

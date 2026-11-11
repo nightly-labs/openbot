@@ -1,17 +1,10 @@
 /** "Sort chats" in the list menu: the order of the chats in the sections. See `SidebarChatOrder`. */
 
-import type { AppTextKey } from "@openbot/i18n";
 import { ArrowDownWideNarrow, Check, ChevronRight, ContextMenu } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { useSidebarScope } from "./sidebar-scope";
-import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "./sidebar-types";
-
-export const SIDEBAR_CHAT_ORDER_LABEL = {
-  manual: "sidebar.order.manual",
-  "unread-group": "sidebar.order.unreadGroup",
-  "unread-first": "sidebar.order.unreadFirst",
-} as const satisfies Record<SidebarChatOrder, AppTextKey>;
+import { SIDEBAR_CHAT_ORDER_LABEL, SIDEBAR_CHAT_ORDERS } from "./sidebar-types";
 
 export function SidebarChatOrderSubmenu() {
   const { props } = useSidebarScope();

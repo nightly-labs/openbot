@@ -149,25 +149,31 @@ export function createSidebarScope(props: SidebarProps) {
   });
 
   // `pointerover` also fires when a menu closes and the pointer moves on, which a `pointerleave` on
-  // the list does not report.
+  // the list does not report. An overlay (a menu, a tooltip, a popover) keeps the current state: one
+  // opened from the list holds the row, and one opened elsewhere does not start a hold.
   const trackListPointer = (event: PointerEvent) => {
     const target = event.target instanceof Element ? event.target : null;
-    setPointerInList(
-      event.pointerType !== "touch" &&
-        target !== null &&
-        (agentList?.contains(target) === true || target.closest(".agent-context-menu") !== null),
-    );
+    if (event.pointerType === "touch" || target === null) {
+      setPointerInList(false);
+      return;
+    }
+    if (agentList?.contains(target) === true) setPointerInList(true);
+    else if (target.closest("[data-popper-positioner], .agent-context-menu") === null) setPointerInList(false);
   };
   // The pointer left the window.
   const releaseListPointer = (event: PointerEvent) => {
     if (event.relatedTarget === null) setPointerInList(false);
   };
+  // Another app or a keyboard shortcut took the focus while the pointer did not move.
+  const releaseOnBlur = () => setPointerInList(false);
   document.addEventListener("pointerover", trackListPointer);
   document.addEventListener("pointerout", releaseListPointer);
+  window.addEventListener("blur", releaseOnBlur);
 
   onCleanup(() => {
     document.removeEventListener("pointerover", trackListPointer);
     document.removeEventListener("pointerout", releaseListPointer);
+    window.removeEventListener("blur", releaseOnBlur);
     stopSidebarDragging();
     scrollFades.stop();
   });

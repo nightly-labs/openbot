@@ -1,8 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { useText } from "../../text";
-import { SIDEBAR_CHAT_ORDER_LABEL } from "../sidebar/SidebarChatOrderSubmenu";
-import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "../sidebar/sidebar-types";
+import { SIDEBAR_CHAT_ORDER_LABEL, SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "../sidebar/sidebar-types";
 
 const options = [...SIDEBAR_CHAT_ORDERS];
 
