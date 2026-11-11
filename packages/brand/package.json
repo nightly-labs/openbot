@@ -17,7 +17,8 @@
     "./app-logo-shape": "./src/app-logo-shape.ts",
     "./wordmark-shape": "./src/wordmark-shape.ts",
     "./provider-logo-shape": "./src/provider-logo-shape.ts",
-    "./connector-mark-shape": "./src/connector-mark-shape.ts"
+    "./connector-mark-shape": "./src/connector-mark-shape.ts",
+    "./assets/server-plush/*": "./assets/server-plush/*"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

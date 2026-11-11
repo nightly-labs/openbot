@@ -148,6 +148,18 @@ export function avatarHeadColor(seed: string, hue: AvatarHue | null, color: Avat
   return bloubAvatarProfile(seed, hue, color).color;
 }
 
+/**
+ * The colour of a server's plush logo, which shows when the server has no logo of its own. It is
+ * the automatic colour of an agent with the same seed. Each colour has a picture in
+ * `assets/server-plush/<colour>.webp`: the grey Bloub squircle body, tinted with `tintRamp` of
+ * `@norbert_bodziony/bloub/plush` in this colour and cropped to the fur.
+ */
+export type ServerPlushColor = (typeof AUTOMATIC_COLORS)[number];
+
+export function serverPlushColor(serverId: string): ServerPlushColor {
+  return requiredItem(AUTOMATIC_COLORS, stableIndex(`${serverId}:color`, AUTOMATIC_COLORS.length));
+}
+
 export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch: number): string[] {
   const candidates = [currentSeed];
   const firstProfile = bloubAvatarProfile(currentSeed, null);
