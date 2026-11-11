@@ -114,7 +114,11 @@ export const messages = defineMessages("customProvider", {
     other: "The endpoint lists {count} models. Select the models to add.",
   },
   "customProvider.discovery.empty": "The endpoint lists no models. Add the model IDs yourself.",
-  "customProvider.discovery.label": "Models that the endpoint lists",
+  "customProvider.discovery.choose": "Choose models",
+  "customProvider.discovery.search": "Search models",
+  "customProvider.discovery.selectAll": "Select all",
+  "customProvider.discovery.deselectAll": "Deselect all",
+  "customProvider.discovery.noMatch": "No models match your search.",
 
   // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "Add a provider or an agent",

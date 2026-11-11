@@ -110,7 +110,11 @@ export const messages = {
     other: "该端点列出了 {count} 个模型，请选择要添加的模型。",
   },
   "customProvider.discovery.empty": "该端点没有列出模型，请手动填写模型 ID。",
-  "customProvider.discovery.label": "该端点列出的模型",
+  "customProvider.discovery.choose": "选择模型",
+  "customProvider.discovery.search": "搜索模型",
+  "customProvider.discovery.selectAll": "全选",
+  "customProvider.discovery.deselectAll": "取消全选",
+  "customProvider.discovery.noMatch": "没有与搜索匹配的模型。",
 
   // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "添加服务商或助手",

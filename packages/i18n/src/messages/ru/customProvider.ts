@@ -113,7 +113,11 @@ export const messages = {
     other: "Эндпоинт сообщает о {count} модели. Выберите модели для добавления.",
   },
   "customProvider.discovery.empty": "Эндпоинт не сообщает о моделях. Добавьте ID моделей самостоятельно.",
-  "customProvider.discovery.label": "Модели, о которых сообщает эндпоинт",
+  "customProvider.discovery.choose": "Выбрать модели",
+  "customProvider.discovery.search": "Поиск моделей",
+  "customProvider.discovery.selectAll": "Выбрать все",
+  "customProvider.discovery.deselectAll": "Снять выбор",
+  "customProvider.discovery.noMatch": "Нет моделей по вашему запросу.",
 
   "customProvider.preset.title": "Добавить провайдера или агента",
   "customProvider.preset.description": "Выберите локальный сервер моделей, эндпоинт или агента ACP.",

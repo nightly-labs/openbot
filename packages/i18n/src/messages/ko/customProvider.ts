@@ -114,7 +114,11 @@ export const messages = {
     other: "엔드포인트에 모델이 {count}개 있어요. 추가할 모델을 선택하세요.",
   },
   "customProvider.discovery.empty": "엔드포인트에 모델이 없어요. 모델 ID를 직접 추가해 주세요.",
-  "customProvider.discovery.label": "엔드포인트에 있는 모델",
+  "customProvider.discovery.choose": "모델 선택",
+  "customProvider.discovery.search": "모델 검색",
+  "customProvider.discovery.selectAll": "모두 선택",
+  "customProvider.discovery.deselectAll": "선택 해제",
+  "customProvider.discovery.noMatch": "검색과 일치하는 모델이 없어요.",
 
   // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "제공자 또는 에이전트 추가",
