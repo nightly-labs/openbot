@@ -384,7 +384,7 @@ export function createTurnSteps(deps: {
           ...(stored?.tokens === undefined
             ? {}
             : {
-                tokens: analyticsTokens({ processedTokens: stored.tokens, cachedInput: stored.cachedInput }),
+                tokens: analyticsTokens({ processedTokens: stored.tokens, cachedInput: stored.cachedInput ?? null }),
                 ...(stored.cachedInput === undefined ? {} : { cachedInput: stored.cachedInput }),
               }),
           ...(typeof stored?.costUsd === "number" ? { costUsd: stored.costUsd } : {}),
