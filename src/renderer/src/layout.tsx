@@ -22,6 +22,7 @@ import {
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
   SIDEBAR_CHAT_ORDER_STORAGE_KEY,
+  SIDEBAR_UNREAD_EXCLUDED_STORAGE_KEY,
   SIDEBAR_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
@@ -87,6 +88,28 @@ function readSidebarChatOrder(): SidebarChatOrder {
   }
 }
 
+// A record per server, so that a server that this window does not show keeps its choices when this window saves.
+const unreadExclusionsSchema = z.record(z.string(), z.array(z.string()).catch([]));
+
+type UnreadExclusions = z.infer<typeof unreadExclusionsSchema>;
+
+const NO_AGENTS: ReadonlySet<string> = new Set();
+
+/**
+ * The agents, per server, that the user keeps out of the unread order of the sidebar. Blocked storage
+ * or a damaged value reads as no choice: every agent shows in the unread order.
+ */
+function readUnreadExclusions(): UnreadExclusions {
+  try {
+    const parsed = unreadExclusionsSchema.safeParse(
+      JSON.parse(window.localStorage.getItem(SIDEBAR_UNREAD_EXCLUDED_STORAGE_KEY) ?? "{}"),
+    );
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * The width of the workspace sidebar, and the two independent reasons it can be
  * narrow: the user collapsed it, or the window is too small to keep it open.
@@ -105,6 +128,9 @@ function readSidebarChatOrder(): SidebarChatOrder {
  *
  * The user also pins pages to the page rail. Pages that are not pinned are in its More menu. The
  * choice is saved on this computer.
+ *
+ * The user can also keep an agent out of the unread order of the sidebar, for example an agent that
+ * only gets work from another agent. The choice is saved on this computer, for each server.
  *
  * The geometry itself is in `layout-constants.ts`; the view imports it directly
  * rather than reading constants through a context.
@@ -129,6 +155,11 @@ const Layout = createSimpleContext({
     );
     const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
+    const [unreadExclusions, setUnreadExclusions] = createSignal<UnreadExclusions>(readUnreadExclusions());
+    // One set per server, so that the sidebar gets the same set until the choices change.
+    const unreadExcludedSets = createMemo(
+      () => new Map(Object.entries(unreadExclusions()).map(([serverId, agentIds]) => [serverId, new Set(agentIds)])),
+    );
     const railPinned = createMemo(() => {
       const choices = railPinChoices();
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
@@ -161,11 +192,13 @@ const Layout = createSimpleContext({
       return () => window.removeEventListener("resize", updateResponsiveSidebar);
     });
 
-    // Another window or browser tab can change the pins or the chat order.
+    // Another window or browser tab can change the pins, the chat order, or the unread exclusions.
     function readRailPinsFromStorage(event: StorageEvent): void {
       if (event.key === null || event.key === RAIL_PINS_STORAGE_KEY) setRailPinChoices(readRailPinChoices());
       if (event.key === null || event.key === SIDEBAR_CHAT_ORDER_STORAGE_KEY)
         setSidebarChatOrderSignal(readSidebarChatOrder());
+      if (event.key === null || event.key === SIDEBAR_UNREAD_EXCLUDED_STORAGE_KEY)
+        setUnreadExclusions(readUnreadExclusions());
     }
 
     onSettled(() => {
@@ -208,6 +241,25 @@ const Layout = createSimpleContext({
       }
     }
 
+    function unreadExcludedAgentIds(serverId: string | null | undefined): ReadonlySet<string> {
+      return (serverId ? unreadExcludedSets().get(serverId) : undefined) ?? NO_AGENTS;
+    }
+
+    function setAgentShownInUnread(serverId: string, agentId: string, shown: boolean): void {
+      // Start from the saved value, so the choices of another window stay. Blocked storage reads as no choice.
+      const exclusions = { ...unreadExclusions(), ...readUnreadExclusions() };
+      const others = (exclusions[serverId] ?? []).filter((id) => id !== agentId);
+      const agentIds = shown ? others : [...others, agentId];
+      const next: UnreadExclusions = { ...exclusions, [serverId]: agentIds };
+      if (agentIds.length === 0) delete next[serverId];
+      setUnreadExclusions(next);
+      try {
+        window.localStorage.setItem(SIDEBAR_UNREAD_EXCLUDED_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Blocked or full storage keeps the choice for this window only.
+      }
+    }
+
     function expandSidebar(): void {
       setSidebarCollapsed(false);
       setLeftPanelAutoCompact(false);
@@ -226,6 +278,8 @@ const Layout = createSimpleContext({
       setSidebarView,
       sidebarChatOrder,
       setSidebarChatOrder,
+      unreadExcludedAgentIds,
+      setAgentShownInUnread,
       railPinned,
       setRailPinned,
     };

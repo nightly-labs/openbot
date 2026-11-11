@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.duplicating": "Çoğaltılıyor…",
   "sidebar.agentMenu.markRead": "Okundu olarak işaretle",
   "sidebar.agentMenu.markUnread": "Okunmadı olarak işaretle",
+  "sidebar.agentMenu.showInUnread": "Okunmamış listesinde göster",
   "sidebar.agentMenu.delete": "Ajanı sil",
   "sidebar.agentMenu.hide": "Ajanı gizle",
   "sidebar.agentMenu.restore": "Geri yükle",

@@ -11,6 +11,11 @@ export const SERVER_VIEW_STORAGE_KEY = "openbot:server-view";
 export const SIDEBAR_VIEW_STORAGE_KEY = "openbot:sidebar-view";
 /** How the sidebar orders its chats: a `SidebarChatOrder`. */
 export const SIDEBAR_CHAT_ORDER_STORAGE_KEY = "openbot:sidebar-chat-order";
+/**
+ * The agents that the unread order of the sidebar does not move: a JSON record from a server id to a
+ * list of agent ids.
+ */
+export const SIDEBAR_UNREAD_EXCLUDED_STORAGE_KEY = "openbot:sidebar-unread-excluded";
 /** The pages that the user pinned to the page rail or took off it: a JSON record of booleans. */
 export const RAIL_PINS_STORAGE_KEY = "openbot:rail-pins";
 export const LEFT_PANEL_DEFAULT = 280;

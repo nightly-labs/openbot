@@ -68,6 +68,7 @@ export const messages = {
   "sidebar.agentMenu.duplicating": "正在复制…",
   "sidebar.agentMenu.markRead": "标为已读",
   "sidebar.agentMenu.markUnread": "标为未读",
+  "sidebar.agentMenu.showInUnread": "在未读中显示",
   "sidebar.agentMenu.delete": "删除助手",
   "sidebar.agentMenu.hide": "隐藏助手",
   "sidebar.agentMenu.restore": "恢复",
