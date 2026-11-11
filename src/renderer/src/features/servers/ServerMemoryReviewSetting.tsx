@@ -45,7 +45,7 @@ export function ServerMemoryReviewSetting(
   const calls = (): HostMemoryReviewCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostMemoryReview | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
+  /** Bumped for each server and each change, so an earlier answer is dropped. */
   let generation = 0;
 
   createEffect(
@@ -58,12 +58,13 @@ export function ServerMemoryReviewSetting(
         .getMemoryReview(serverId)
         .then(
           (next) => {
+            if (current !== generation) return;
             lastSettings.set(serverId, next);
-            if (current === generation) setSettings(next);
+            setSettings(next);
           },
           (error: unknown) => {
-            lastSettings.delete(serverId);
             if (current === generation) {
+              lastSettings.delete(serverId);
               setSettings(null);
               setLoadError(errorMessage(error, t("server.settings.memoryReviewLoadFailed")));
             }
@@ -83,7 +84,7 @@ export function ServerMemoryReviewSetting(
     const current = settings();
     if (interval === null || !current || interval === current.interval) return;
     const serverId = props.serverId;
-    const request = generation;
+    const request = ++generation;
     void props.run("memoryReview", async () => {
       const next = await calls().setMemoryReview(interval, serverId);
       lastSettings.set(serverId, next);
