@@ -175,6 +175,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "אף סוכן בשרת הזה לא הציג את קישור ההתחברות הזה.",
   "error.team.hostPersonalityUnsupported": "אישיות השרת אינה נתמכת בחיבור הזה.",
   "error.team.agentWaitsUnsupported": "החיבור הזה לא תומך בהמתנות פתוחות.",
+  "error.team.messagePinsUnsupported": "החיבור הזה אינו תומך בהודעות מוצמדות.",
   "error.team.queuedMessageThreadUnsupported": "החיבור הזה לא תומך בהרצת הודעה מהתור כשרשור חדש.",
   "error.team.backgroundProcessesUnsupported": "החיבור הזה לא תומך בתהליכי רקע.",
   "error.team.providerUseUnsupported": "החיבור הזה לא תומך בהפעלה ובכיבוי של ספקים.",

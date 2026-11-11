@@ -242,6 +242,9 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Diese Nachricht gehört zu einem laufenden Durchlauf. Lösche sie, wenn der Durchlauf endet.",
   "error.backend.messageDeleteForbidden": "Du kannst nur die Nachrichten löschen, die du gesendet hast.",
+  "error.backend.messagePinNotFound": "Diese Nachricht ist nicht im Chat.",
+  "error.backend.messagePinLimit":
+    "Dieser Chat hat 50 angeheftete Nachrichten. Löse eine, bevor du eine weitere anheftest.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",

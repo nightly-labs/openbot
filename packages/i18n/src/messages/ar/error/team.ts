@@ -177,6 +177,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "لم يعرض أي وكيل على هذا الخادم رابط تسجيل الدخول هذا.",
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
+  "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",
   "error.team.backgroundProcessesUnsupported": "هذا الاتصال لا يدعم العمليات في الخلفية.",
   "error.team.providerUseUnsupported": "هذا الاتصال لا يدعم تشغيل المزوّدين وإيقافهم.",

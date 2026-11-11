@@ -217,6 +217,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Bu mesaj sohbette yok.",
   "error.backend.messageDeleteBusy": "Bu mesaj devam eden bir turun parçası. Tur bitince silin.",
   "error.backend.messageDeleteForbidden": "Yalnızca gönderdiğiniz mesajları silebilirsiniz.",
+  "error.backend.messagePinNotFound": "Bu mesaj sohbette değil.",
+  "error.backend.messagePinLimit":
+    "Bu sohbette 50 sabitlenmiş mesaj var. Başka bir mesaj sabitlemeden önce birini kaldırın.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",

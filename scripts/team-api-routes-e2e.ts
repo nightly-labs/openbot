@@ -68,6 +68,7 @@ import {
   type LibraryFolderAction,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
+  type PinnedMessagesSnapshot,
   type ProviderAccountPool,
   type ProviderDetectionSettings,
   type QueueDelivery,
@@ -87,7 +88,7 @@ import {
   withHostProviderAccountModels,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
@@ -253,6 +254,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -349,6 +351,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { LIBRARY_FOLDERS_FILE, LibraryFoldersStore } from "../src/backend/library-folders-store";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
+import { MessagePinRefused } from "../src/backend/message-pins";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
@@ -924,6 +927,25 @@ const fakeRoutineRunPlaces: TeamApiRoutineRunPlaces = {
   },
 };
 
+/** The pins that the fake host answers: one pin by default, or the given messages. */
+function pinnedSnapshot(agentId: string, messageIds: string[] = ["message-pinned"]): PinnedMessagesSnapshot {
+  return {
+    agentId,
+    pins: messageIds.map((messageId) => ({
+      messageId,
+      taskId: "task-1",
+      threadTitle: "Release checklist",
+      pinnedAt: "2026-11-11T08:00:00.000Z",
+      pinnedBy: { kind: "agent", agentId },
+      author: "agent",
+      sender: null,
+      senderAgentId: null,
+      createdAt: "2026-11-10T08:00:00.000Z",
+      text: "Staging is ready for review.",
+    })),
+  };
+}
+
 const fakeAgents: TeamApiAgents = {
   on: (_event, listener) => {
     agentEventListeners.add(listener);
@@ -960,6 +982,16 @@ const fakeAgents: TeamApiAgents = {
   cancelWait: (agentId, waitId) => {
     record("cancelWait", agentId, waitId);
     if (waitId !== "wait-open") throw new AgentWaitError(sourceText("error.backend.agentWaitGone"));
+  },
+  listPinnedMessages: (agentId) => {
+    record("listPinnedMessages", agentId);
+    return pinnedSnapshot(agentId);
+  },
+  setMessagePinned: (input, pinner) => {
+    record("setMessagePinned", input, pinner);
+    if (input.messageId === "message-gone") return Effect.fail(new MessagePinRefused({ reason: "not-found" }));
+    if (input.messageId === "message-over-limit") return Effect.fail(new MessagePinRefused({ reason: "limit" }));
+    return Effect.succeed(pinnedSnapshot(input.agentId, input.pinned ? [input.messageId] : []));
   },
   listQueue: (agentId) => {
     record("listQueue", agentId);
@@ -1413,6 +1445,31 @@ const fakeAgentTasks: TeamApiAgentTasks = {
             : [],
       },
       hasOlder: false,
+    };
+  },
+  readTaskAround: (input) => {
+    record("readTaskAround", input);
+    const held = input.messageId === "message-old";
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId: `thread-${input.taskId}`,
+        activeTurnId: null,
+        revision: 3,
+        messages: held
+          ? [
+              {
+                id: "message-old",
+                author: "user",
+                text: "Old pinned question",
+                createdAt: "2026-10-01T07:00:00.000Z",
+                status: "completed",
+              },
+            ]
+          : [],
+      },
+      hasOlder: held,
+      hasNewer: held,
     };
   },
   startTask: unused("startTask"),
@@ -9743,6 +9800,254 @@ try {
           ["agent-ada", "wait-closed"],
         ]),
       [summary(cancelled), summary(closed)],
+    );
+  }
+
+  // ---- Pinned messages of a chat (message-pins-v1) ----
+  {
+    const capabilities = [MESSAGE_PINS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const pinCalls = () => callsOf("listPinnedMessages").length + callsOf("setMessagePinned").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises message-pins-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MESSAGE_PINS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MESSAGE_PINS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", MESSAGE_PINS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    const hiddenAgent = await call("POST", MESSAGE_PINS_ROUTES.list, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi" },
+    });
+    const missingAgent = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-gone", taskId: null, messageId: "message-1", pinned: true },
+    });
+    accessLevels = { revision: 22, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: null, messageId: "message-1", pinned: true },
+    });
+    accessLevels = { revision: 23, everyone: {}, roles: [] };
+    check(
+      "the pins without the capability, of a hidden or missing agent, or a pin by a member who can only view are refused",
+      errorIs(unsupported, 400, sourceText("error.team.messagePinsUnsupported")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        pinCalls() === 0,
+      [summary(unsupported), summary(hiddenAgent), summary(missingAgent), summary(viewer)],
+    );
+    const listed = await call("POST", MESSAGE_PINS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada" },
+    });
+    const threadBody = await call("POST", MESSAGE_PINS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: "task-1" },
+    });
+    const listedPin = list(field(listed.body, "pins"))[0];
+    check(
+      "a member lists the pins of all chats of an agent, each with its thread and its pinner, and the host ignores a thread in the list body",
+      listed.status === 200 &&
+        field(listedPin, "messageId") === "message-pinned" &&
+        field(listedPin, "taskId") === "task-1" &&
+        field(listedPin, "threadTitle") === "Release checklist" &&
+        isDeepStrictEqual(field(listedPin, "pinnedBy"), { kind: "agent", agentId: "agent-ada" }) &&
+        threadBody.status === 200 &&
+        isDeepStrictEqual(threadBody.body, listed.body) &&
+        isDeepStrictEqual(callsOf("listPinnedMessages"), [["agent-ada"], ["agent-ada"]]),
+      [summary(listed), summary(threadBody)],
+    );
+    const pinned = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: null, messageId: "message-2", pinned: true },
+    });
+    const unpinned = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-2", pinned: false },
+    });
+    check(
+      "a member pins and unpins a message as the pinner, and the host answers the pins after the change",
+      pinned.status === 200 &&
+        field(list(field(pinned.body, "pins"))[0], "messageId") === "message-2" &&
+        unpinned.status === 200 &&
+        list(field(unpinned.body, "pins")).length === 0 &&
+        isDeepStrictEqual(
+          callsOf("setMessagePinned").map(([input]) => input),
+          [
+            { agentId: "agent-ada", messageId: "message-2", pinned: true },
+            { agentId: "agent-ada", taskId: "task-1", messageId: "message-2", pinned: false },
+          ],
+        ) &&
+        callsOf("setMessagePinned").every(
+          ([, pinner]) =>
+            isDynamicRecord(pinner) &&
+            pinner.kind === "person" &&
+            isDynamicRecord(pinner.sender) &&
+            pinner.sender.id === bobId,
+        ),
+      [summary(pinned), summary(unpinned)],
+    );
+    const gone = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: null, messageId: "message-gone", pinned: true },
+    });
+    const overLimit = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: null, messageId: "message-over-limit", pinned: true },
+    });
+    const noFlag = await call("POST", MESSAGE_PINS_ROUTES.set, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: null, messageId: "message-2" },
+    });
+    check(
+      "a message that is not in the chat is refused with 404, a pin over the limit with 409, and a body with no pinned flag with 400",
+      errorIs(gone, 404, sourceText("error.backend.messagePinNotFound")) &&
+        errorIs(overLimit, 409, sourceText("error.backend.messagePinLimit")) &&
+        noFlag.status === 400 &&
+        callsOf("setMessagePinned").length === 4,
+      [summary(gone), summary(overLimit), summary(noFlag)],
+    );
+
+    // A pin of a side thread opens at its message: the host reads the part of the thread around it.
+    const around = await call("POST", MESSAGE_PINS_ROUTES.readThread, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-old", limit: 50 },
+    });
+    const notHeld = await call("POST", MESSAGE_PINS_ROUTES.readThread, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-gone", limit: 50 },
+    });
+    check(
+      "a member reads a side thread around a message, with whether it has more before and after, and a message that the thread does not hold gives no messages",
+      around.status === 200 &&
+        list(field(field(around.body, "conversation"), "messages")).length === 1 &&
+        field(around.body, "hasOlder") === true &&
+        field(around.body, "hasNewer") === true &&
+        notHeld.status === 200 &&
+        list(field(field(notHeld.body, "conversation"), "messages")).length === 0 &&
+        field(notHeld.body, "hasNewer") === false &&
+        isDeepStrictEqual(callsOf("readTaskAround"), [
+          [{ agentId: "agent-ada", taskId: "task-1", messageId: "message-old", limit: 50 }],
+          [{ agentId: "agent-ada", taskId: "task-1", messageId: "message-gone", limit: 50 }],
+        ]),
+      [summary(around), summary(notHeld), callsOf("readTaskAround")],
+    );
+    const noLimit = await call("POST", MESSAGE_PINS_ROUTES.readThread, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-old", limit: 101 },
+    });
+    const noCapability = await call("POST", MESSAGE_PINS_ROUTES.readThread, {
+      token: bobToken,
+      json: { agentId: "agent-ada", taskId: "task-1", messageId: "message-old", limit: 50 },
+    });
+    const hiddenRead = await call("POST", MESSAGE_PINS_ROUTES.readThread, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi", taskId: "task-1", messageId: "message-old", limit: 50 },
+    });
+    check(
+      "a thread read with a limit over 100, without the capability, or of a hidden agent is refused before the host reads",
+      noLimit.status === 400 &&
+        errorIs(noCapability, 400, sourceText("error.team.messagePinsUnsupported")) &&
+        errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("readTaskAround").length === 2,
+      [summary(noLimit), summary(noCapability), summary(hiddenRead)],
+    );
+
+    // A pin change reaches a client with the capability, and no client without it.
+    const openEventSocket = async (scope: readonly string[] | null) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${bobToken}`,
+      ]);
+      const events: DynamicRecord[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value)) {
+          events.push(value);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      if (scope)
+        socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
+      /** Whether an event that matches arrives before the deadline. */
+      const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (events.some(matches)) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, deadlineMs);
+          const wake = () => {
+            if (!events.some(matches)) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, events, arrived };
+    };
+    const isPinsChanged = (event: DynamicRecord) => event.type === "message-pins-changed";
+    const emitPins = () => {
+      for (const listener of agentEventListeners) listener({ type: "message-pins-changed", agentId: "agent-ada" });
+    };
+    const withCapability = await openEventSocket(capabilities);
+    const withoutCapability = await openEventSocket(null);
+    // The host reads the capabilities of a socket from its first message, and no answer says that it did.
+    let pinsArrived = false;
+    for (let attempt = 0; attempt < 20 && !pinsArrived; attempt += 1) {
+      emitPins();
+      pinsArrived = await withCapability.arrived(isPinsChanged, 250);
+    }
+    // An invalidation after a last pin change: the socket without the capability would have the pin change first.
+    emitPins();
+    for (const listener of agentEventListeners)
+      listener({ type: "conversation-invalidated", agentId: "agent-ada", revision: 91_000 });
+    const barrier = await withoutCapability.arrived(
+      (event) => event.type === "conversation-invalidated" && event.revision === 91_000,
+      5_000,
+    );
+    withCapability.socket.close();
+    withoutCapability.socket.close();
+    check(
+      "a pin change reaches a client with message-pins-v1 with the agent id, and no client without it",
+      pinsArrived &&
+        withCapability.events.filter(isPinsChanged).every((event) => event.agentId === "agent-ada") &&
+        barrier &&
+        !withoutCapability.events.some(isPinsChanged),
+      {
+        with: withCapability.events.filter(isPinsChanged).length,
+        without: withoutCapability.events.map((event) => event.type),
+      },
     );
   }
 

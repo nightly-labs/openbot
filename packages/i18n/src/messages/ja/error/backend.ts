@@ -232,6 +232,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
   "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
   "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
+  "error.backend.messagePinNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messagePinLimit":
+    "このチャットにはピン留めしたメッセージが50件あります。別のメッセージをピン留めする前に、1件解除してください。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",

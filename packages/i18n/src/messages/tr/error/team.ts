@@ -173,6 +173,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Bu sunucudaki hiçbir ajan bu oturum açma bağlantısını göstermedi.",
   "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
   "error.team.agentWaitsUnsupported": "Bu bağlantı açık beklemeleri desteklemiyor.",
+  "error.team.messagePinsUnsupported": "Bu bağlantı sabitlenen mesajları desteklemiyor.",
   "error.team.queuedMessageThreadUnsupported":
     "Bu bağlantı kuyruktaki bir mesajı yeni bir ileti dizisi olarak çalıştırmayı desteklemiyor.",
   "error.team.backgroundProcessesUnsupported": "Bu bağlantı arka plan işlemlerini desteklemiyor.",

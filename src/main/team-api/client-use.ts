@@ -39,6 +39,7 @@ import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -127,6 +128,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   MACHINE_RESOURCES_ROUTES.alerts,
   BACKGROUND_PROCESSES_ROUTES.list,
   AGENT_WAITS_ROUTES.list,
+  MESSAGE_PINS_ROUTES.list,
   AGENT_ADMIN_ROUTES.settings,
   AGENT_HOST_SETTINGS_ROUTES.settings,
   AGENT_BACKUP_MODELS_ROUTES.settings,

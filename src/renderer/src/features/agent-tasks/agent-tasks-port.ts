@@ -32,6 +32,8 @@ export interface AgentTasksPort
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
   /** The older messages of a thread, page by page. Missing where the server cannot read them. */
   readTaskPage?: OpenBotDesktopApi["agent"]["readTaskPage"];
+  /** The messages of a thread around one message, so a jump to it reads one part. Missing where the server cannot read it. */
+  readTaskAround?: OpenBotDesktopApi["agent"]["readTaskAround"];
   /** Missing where the server cannot branch a conversation. The branch actions then do not show. */
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
   /** Deletes one message of a thread. Missing where the server cannot delete messages. */
@@ -54,6 +56,7 @@ export function agentTasksPort(): AgentTasksPort {
     listTasks: (agentId) => agent.listTasks(agentId),
     readTask: (input) => agent.readTask(input),
     readTaskPage: (input) => agent.readTaskPage(input),
+    readTaskAround: (input) => agent.readTaskAround(input),
     startTask: (input) => agent.startTask(input),
     sendToTask: (input) => agent.sendMessage(input),
     runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),

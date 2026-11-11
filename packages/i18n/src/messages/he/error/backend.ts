@@ -207,6 +207,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "ההודעה הזו אינה בצ'אט.",
   "error.backend.messageDeleteBusy": "ההודעה הזו היא חלק מתור שרץ. יש למחוק אותה כשהתור יסתיים.",
   "error.backend.messageDeleteForbidden": "אפשר למחוק רק הודעות ששלחת.",
+  "error.backend.messagePinNotFound": "ההודעה הזו אינה בצ׳אט.",
+  "error.backend.messagePinLimit": "בצ׳אט הזה יש 50 הודעות מוצמדות. בטלו הצמדה של אחת לפני הצמדת הודעה נוספת.",
   "error.backend.routineFlowHandoffFailed": "השגרה לא הצליחה להעביר את העבודה לסוכן הזה.",
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",

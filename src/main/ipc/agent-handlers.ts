@@ -129,6 +129,11 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
+  decodeMessagePinsResponse,
+  MESSAGE_PINS_CAPABILITY,
+  MESSAGE_PINS_ROUTES,
+} from "@openbot/contracts/team-protocol/message-pins-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -149,6 +154,7 @@ import type { HostService } from "../host-service";
 import type { LibraryFoldersService } from "../library-folders-service";
 import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
+import { runMessagePin } from "../message-pin-refusal";
 import type { ModelVisibility } from "../model-visibility";
 import {
   decodeAccountUsageFromHost,
@@ -171,6 +177,7 @@ import {
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
   decodeRemoteTaskReadStates,
+  decodeRemoteTaskWindow,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
@@ -203,6 +210,7 @@ import {
   parsePasteMessageLink,
   parsePromptResponse,
   parseQueueEdit,
+  parseReadAgentTaskAround,
   parseReadAgentTaskPage,
   parseReadConversationPage,
   parseRenameAgentTask,
@@ -213,6 +221,7 @@ import {
   parseSendMessage,
   parseSetAgentAvatar,
   parseSetChannelImage,
+  parseSetMessagePinned,
   parseSidebarFolderAction,
   parseStartAgentTask,
   parseSteerQueuedMessage,
@@ -1139,6 +1148,39 @@ export function agentIpcHandlers({
           );
         },
       }),
+      // A joined server has pinned messages through `message-pins-v1`. An older host has no route for
+      // them, so the chat shows none there and the renderer hides Pin.
+      listPinnedMessages: scopedHandler(parseAgentId, {
+        local: (agentId) => service.listPinnedMessages(agentId),
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY)) return { agentId, pins: [] };
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.list, decodeMessagePinsResponse, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
+        },
+      }),
+      // The user of this computer pins as the person with no sender, as the messages they send have none.
+      setMessagePinned: scopedHandler(parseSetMessagePinned, {
+        local: (input) => runMessagePin(service.setMessagePinned(input, { kind: "person", sender: null })),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY))
+            throw new Error(sourceText("error.team.messagePinsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.set, decodeMessagePinsResponse, {
+              method: "POST",
+              body: {
+                agentId: input.agentId,
+                taskId: input.taskId ?? null,
+                messageId: input.messageId,
+                pinned: input.pinned,
+              },
+            }),
+          );
+        },
+      }),
       // The agent-waits-v1 codec has already checked the empty reply. The host says why it refuses.
       cancelWait: scopedHandler(parseCancelAgentWait, {
         local: (parsed) => service.cancelWait(parsed.agentId, parsed.waitId),
@@ -1210,6 +1252,24 @@ export function agentIpcHandlers({
                 agentId: parsed.agentId,
                 taskId: parsed.taskId,
                 beforeMessageId: parsed.beforeMessageId,
+                limit: parsed.limit,
+              },
+            }),
+          );
+        },
+      }),
+      readTaskAround: scopedHandler(parseReadAgentTaskAround, {
+        local: (parsed) => service.readTaskAround(parsed),
+        remote: (parsed, serverId) => {
+          // The client opens a pin of a side thread only on a host with pins, which reads around a message.
+          if (!remoteServers.supportsCapability(serverId, MESSAGE_PINS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, MESSAGE_PINS_ROUTES.readThread, decodeRemoteTaskWindow, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                messageId: parsed.messageId,
                 limit: parsed.limit,
               },
             }),

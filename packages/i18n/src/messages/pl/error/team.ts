@@ -174,6 +174,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
   "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
+  "error.team.messagePinsUnsupported": "To połączenie nie obsługuje przypiętych wiadomości.",
   "error.team.queuedMessageThreadUnsupported":
     "To połączenie nie obsługuje uruchamiania wiadomości z kolejki jako nowego wątku.",
   "error.team.backgroundProcessesUnsupported": "To połączenie nie obsługuje procesów w tle.",

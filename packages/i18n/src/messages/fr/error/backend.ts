@@ -236,6 +236,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Ce message n’est pas dans le chat.",
   "error.backend.messageDeleteBusy": "Ce message fait partie d’un tour en cours. Supprimez-le à la fin du tour.",
   "error.backend.messageDeleteForbidden": "Vous ne pouvez supprimer que les messages que vous avez envoyés.",
+  "error.backend.messagePinNotFound": "Ce message n’est pas dans la discussion.",
+  "error.backend.messagePinLimit":
+    "Cette discussion contient 50 messages épinglés. Désépinglez-en un avant d’en épingler un autre.",
   "error.backend.routineFlowHandoffFailed": "La routine n’a pas pu transmettre le travail à cet agent.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",

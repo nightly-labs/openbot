@@ -517,6 +517,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-workflow-gate
 
+      - name: Run the pinned message agent tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:pinned-message-agent-tool
+
       - name: Run the messaging owner card E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-owner-card
@@ -744,6 +748,7 @@ jobs:
             .openbot-build/agent-channel-create-e2e/
             .openbot-build/library-folders-e2e/
             .openbot-build/agent-workflow-gate-e2e/
+            .openbot-build/pinned-message-agent-tool-e2e/
             .openbot-build/messaging-owner-card-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/

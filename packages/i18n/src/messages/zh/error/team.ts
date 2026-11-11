@@ -172,6 +172,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "该服务器上没有任何助手展示过该登录链接。",
   "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
   "error.team.agentWaitsUnsupported": "此连接不支持未关闭的等待。",
+  "error.team.messagePinsUnsupported": "此连接不支持置顶消息。",
   "error.team.queuedMessageThreadUnsupported": "此连接不支持将排队的消息作为新线程运行。",
   "error.team.backgroundProcessesUnsupported": "此连接不支持后台进程。",
   "error.team.providerUseUnsupported": "当前连接不支持开启和关闭服务商。",

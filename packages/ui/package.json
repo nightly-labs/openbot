@@ -161,6 +161,7 @@
     "./features/conversation/MessageNavigation": "./src/features/conversation/MessageNavigation.tsx",
     "./features/conversation/MessageRendering": "./src/features/conversation/MessageRendering.tsx",
     "./features/conversation/PendingSendStatus": "./src/features/conversation/PendingSendStatus.tsx",
+    "./features/conversation/PinnedMessages": "./src/features/conversation/PinnedMessages.tsx",
     "./features/conversation/QueuePanel": "./src/features/conversation/QueuePanel.tsx",
     "./features/conversation/ReplyQuote": "./src/features/conversation/ReplyQuote.tsx",
     "./features/conversation/RichMessageText": "./src/features/conversation/RichMessageText.tsx",

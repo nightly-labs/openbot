@@ -185,6 +185,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Kein Agent auf diesem Server hat diesen Anmeldelink angezeigt.",
   "error.team.hostPersonalityUnsupported": "Diese Verbindung unterstützt die Server-Persönlichkeit nicht.",
   "error.team.agentWaitsUnsupported": "Offene Wartevorgänge werden von dieser Verbindung nicht unterstützt.",
+  "error.team.messagePinsUnsupported": "Diese Verbindung unterstützt angeheftete Nachrichten nicht.",
   "error.team.queuedMessageThreadUnsupported":
     "Das Ausführen einer wartenden Nachricht als neuer Thread wird von dieser Verbindung nicht unterstützt.",
   "error.team.backgroundProcessesUnsupported": "Hintergrundprozesse werden von dieser Verbindung nicht unterstützt.",

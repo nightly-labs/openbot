@@ -178,6 +178,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
+  "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",
   "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",

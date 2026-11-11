@@ -170,6 +170,23 @@ export function isAgentTaskPage(value: unknown): value is AgentTaskPage {
   return isDynamicRecord(value) && isConversationSnapshot(value.conversation) && typeof value.hasOlder === "boolean";
 }
 
+/** The messages of a side thread around one of its messages: the thread opens at that message. */
+export interface ReadAgentTaskAroundInput extends AgentTaskInput {
+  messageId: string;
+  /** 1 to 100: a target, as for a page. About half of the messages come before the message. */
+  limit: number;
+}
+
+/** A part of a side thread around one message, oldest first. It has no messages when the thread does not hold the message. */
+export interface AgentTaskWindow extends AgentTaskPage {
+  /** The thread has messages after this part: it does not reach the latest message. */
+  hasNewer: boolean;
+}
+
+export function isAgentTaskWindow(value: unknown): value is AgentTaskWindow {
+  return isAgentTaskPage(value) && isDynamicRecord(value) && typeof value.hasNewer === "boolean";
+}
+
 /**
  * Makes a side thread with a copy of a conversation of the agent through the turn of `messageId`, the
  * last agent message of a finished turn. The source must have no running turn.

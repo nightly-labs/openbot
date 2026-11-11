@@ -763,6 +763,22 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: { emoji: z.string().min(1).max(64).describe("Exactly one complete Unicode emoji.") },
   },
   {
+    name: "pin_message",
+    description:
+      "Pin or unpin one finished message of this chat in the pin list of the chat header. You cannot unpin a person's pin.",
+    shape: {
+      quote: z
+        .string()
+        .min(1)
+        .max(500)
+        .describe(
+          "Exact part of the message text; the newest message that contains it is the target. Omit for the current user message.",
+        )
+        .optional(),
+      pinned: z.boolean().describe("False to unpin. Default true.").optional(),
+    },
+  },
+  {
     name: "send_message",
     description:
       "Queue an asynchronous message and optional local files for one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId.",
