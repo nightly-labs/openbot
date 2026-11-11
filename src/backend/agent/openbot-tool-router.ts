@@ -1071,7 +1071,7 @@ export class OpenBotToolRouter {
       name,
       path,
       apps,
-      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to open Marketplace, open the app, and click Change key.`,
+      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Server settings, MCP servers, edit the server, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
     });
   });
 
