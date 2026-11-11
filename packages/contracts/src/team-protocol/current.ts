@@ -106,6 +106,7 @@ import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
+import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
@@ -551,6 +552,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
   CLAUDE_COMPACT_WINDOW_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -751,7 +753,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HERMES_IMPORT_CAPABILITY &&
     capability !== PROVIDER_DETECTION_CAPABILITY &&
     capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY &&
-    capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY,
+    capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -828,6 +831,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_DETECTION_CAPABILITY,
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
   CLAUDE_COMPACT_WINDOW_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -987,6 +991,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HERMES_IMPORT_CAPABILITY &&
       capability !== PROVIDER_DETECTION_CAPABILITY &&
       capability !== PUSH_NOTIFICATION_THREADS_CAPABILITY &&
-      capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY,
+      capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   );
 }

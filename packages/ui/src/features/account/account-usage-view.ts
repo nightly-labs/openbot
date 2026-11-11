@@ -146,16 +146,17 @@ function usageRow(
     ),
   );
   // Antigravity limits each group of models apart, such as Gemini 4 Argon: one line per group, by
-  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group.
+  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group. One group
+  // alone also shows its name: on a plan with no Gemini group, it is "Claude and GPT models".
   const groups = limit?.groups ?? [];
   const windows =
-    groups.length > 1
+    groups.length > 0
       ? groups.flatMap((group) => {
           const groupWindows = reportedUsageWindows(group);
           return groupWindows.map((window) =>
             windowRow(
               window,
-              groupWindows.length > 1
+              groupWindows.length > 1 || groups.length === 1
                 ? text.t("account.usage.window.group", {
                     group: group.name,
                     window: usageWindowLabel(window.windowDurationMins, text),

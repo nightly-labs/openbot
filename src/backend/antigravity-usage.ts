@@ -143,23 +143,37 @@ function antigravityUserAgent(version: string): string {
 /**
  * The windows of the group that limits `model` in a `retrieveUserQuotaSummary` answer. A five-hour
  * bucket is the first window and a weekly one the second, as for Codex. Without a model, the dock's
- * reading, it is the "Gemini Models" group. A model that no group lists has no reading: another
- * group's room does not say that it can run. When Google lists no models at all, the Gemini group
- * covers every model. `groups` holds every group that has a window.
+ * reading, it is the "Gemini Models" group. Some plans have no Gemini group, only "Claude and GPT
+ * models": the dock then shows the group with the least room left, which the usage popover names, so
+ * that the account still shows its plan. A model that no group lists has no reading: another group's
+ * room does not say that it can run. When Google lists no models at all, the Gemini group covers
+ * every model. `groups` holds every group that has a window.
  */
 function antigravityRateLimits(
   summary: AntigravityQuotaSummary,
   model: string | null = null,
 ): AccountRateLimitsReadResult {
-  const groups = quotaGroups(summary);
+  const groups = quotaGroups(summary).filter((group) => group.primary || group.secondary);
   const listed = groups.some((group) => group.models.length > 0);
-  const group = model && listed ? usageGroupForModel(groups, model) : geminiGroup(groups);
-  if (!group || (!group.primary && !group.secondary)) return NO_USAGE;
+  const group =
+    model && listed
+      ? usageGroupForModel(groups, model)
+      : (geminiGroup(groups) ?? (model ? undefined : leastRoom(groups)));
+  if (!group) return NO_USAGE;
   return {
     rateLimits: { limitId: "antigravity", primary: group.primary, secondary: group.secondary },
     rateLimitsByLimitId: null,
-    groups: groups.filter((candidate) => candidate.primary || candidate.secondary),
+    groups,
   };
+}
+
+/** The group whose most used window has the least room left. */
+function leastRoom(groups: readonly QuotaGroup[]): QuotaGroup | undefined {
+  const used = (group: QuotaGroup) => Math.max(group.primary?.usedPercent ?? 0, group.secondary?.usedPercent ?? 0);
+  return groups.reduce<QuotaGroup | undefined>(
+    (most, group) => (most && used(most) >= used(group) ? most : group),
+    undefined,
+  );
 }
 
 function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
