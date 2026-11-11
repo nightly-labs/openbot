@@ -53,6 +53,7 @@ import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { runIdOrigins } from "./message-run-ids";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
@@ -1848,23 +1849,26 @@ export class MailboxStore {
   }
 
   /**
-   * Provider history can name a continuation turn instead of the original delivery, or the new turn
-   * of a message that ran again in a Claude process that already took it (#6676). The delivery with
-   * the ID comes first, so a batch's own message is not given to a message that ran with it.
+   * Provider history can name a continuation turn instead of the original delivery, or a run of the
+   * delivery in a Claude process that already took its id (#6676).
    */
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
-    const delivery =
-      this.#state.deliveries.find(
-        (candidate) => candidate.recipientAgentId === agentId && candidate.id === messageId,
-      ) ??
-      this.#state.deliveries.find(
-        (candidate) =>
-          candidate.recipientAgentId === agentId &&
-          (candidate.turnId === messageId ||
-            candidate.resumeAfterUsageLimit?.previousTurnIds.includes(messageId) === true ||
-            candidate.planContinuation?.turnIds.includes(messageId) === true),
+    const delivery = this.#state.deliveries.find(
+      (candidate) =>
+        candidate.recipientAgentId === agentId &&
+        (candidate.id === messageId ||
+          (candidate.resumeAfterUsageLimit !== undefined &&
+            (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
+          candidate.planContinuation?.turnIds.includes(messageId) === true),
+    );
+    if (delivery) return this.#context(delivery);
+    for (const origin of runIdOrigins(messageId).slice(1)) {
+      const run = this.#state.deliveries.find(
+        (candidate) => candidate.recipientAgentId === agentId && candidate.id === origin,
       );
-    return delivery ? this.#context(delivery) : null;
+      if (run) return this.#context(run);
+    }
+    return null;
   }
 
   /** The delivery of one message to one recipient. A message reaches each recipient once. */
