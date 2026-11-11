@@ -47,6 +47,7 @@ import {
   type AgentNotificationChannel,
   agentEventAgentId,
   agentEventCanNotify,
+  agentEventNeedsUser,
   agentEventRequestThread,
   notificationForAgentEvent,
   notificationForUsageLimit,
@@ -424,11 +425,18 @@ export function createRendererForwarders({
     const lookup = eventChannel(serverId, event);
     const channel = lookup instanceof Promise ? await lookup : lookup;
     const levelLookup = agentNotificationLevels(serverId);
-    const hiddenLookup = userHiddenAgentIds(serverId);
-    const level = notifyLevel(
-      levelLookup instanceof Promise ? await levelLookup : levelLookup,
-      hiddenLookup instanceof Promise ? await hiddenLookup : hiddenLookup,
-    );
+    const levels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
+    const open = notifyLevel(levels);
+    // A hidden agent changes only the level "all" of an event that does not wait for the user (see
+    // `agentNotificationLevel`), so only that event reads the hidden agents of a remote server.
+    const hiddenLookup =
+      open === "all" && event.type !== "usage-limit-reached" && !agentEventNeedsUser(event)
+        ? userHiddenAgentIds(serverId)
+        : null;
+    const level =
+      hiddenLookup === null
+        ? open
+        : notifyLevel(levels, hiddenLookup instanceof Promise ? await hiddenLookup : hiddenLookup);
     const content = !level
       ? null
       : event.type === "usage-limit-reached"
