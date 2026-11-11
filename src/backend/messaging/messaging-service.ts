@@ -1938,7 +1938,13 @@ export class MessagingService {
       if (!live) return;
       // The owner turned the post off for this WhatsApp number: the reaction shows that OpenBot read
       // the message, the answer is the only post, and a reply of "stop" still stops the request.
-      if (!post?.messageId && this.#withoutStatusPost(live)) return;
+      if (!post?.messageId && this.#withoutStatusPost(live)) {
+        // The request is recorded without a post, so a request that a restart ends still gets its end.
+        this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
+        this.#status.restored.delete(key);
+        yield* this.#status.save();
+        return;
+      }
       const stopToken = token();
       this.#stops.set(stopToken, {
         linkId: activity.link.linkId,

@@ -531,8 +531,10 @@ host route [`route-whatsapp-working-message.ts`](../../src/main/team-api/route-w
 reads and sets, for each WhatsApp number, whether OpenBot posts “Working on it…” while the agent
 works. The setting is on by default and is kept with the number's connection values, so it needs no
 migration. With the setting off, `MessagingService` posts no “Waiting” and no “Working on it…” line
-and edits no progress into one: the reaction shows that OpenBot read the message, the answer is the
-only post, and a reply of `stop` still stops the request. The released `whatsapp-connector-v1`
+and edits no progress into one: the reaction shows that OpenBot read the message, and the end of the
+request (the answer, or a line such as “Stopped”) is the only post. A reply of `stop` still stops the
+request; in a group, the person replies to their own request, because there is no status post to
+reply to. The released `whatsapp-connector-v1`
 overview cannot carry the value, so a client reads this list and merges it
 (`withWhatsAppWorkingMessages`). A client hides the switch while the host does not have the
 capability. Only protocol 9 peers get it.
