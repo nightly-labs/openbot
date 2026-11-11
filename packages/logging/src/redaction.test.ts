@@ -42,6 +42,8 @@ describe("redactText", () => {
       `ASIA${"A1".repeat(8)}`,
       `rk_live_${run(24)}`,
       `whsec_${run(32)}`,
+      // A Standard Webhooks secret in base64 has `+`, `/` and `=`.
+      `whsec_${run(10)}+${run(10)}/${run(10)}=`,
     ]) {
       expect(redactText(`key ${key} leaked`)).toBe("key [redacted] leaked");
     }
