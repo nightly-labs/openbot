@@ -116,6 +116,22 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     return previous ? count > STATIC_CHAT_LIMIT - STATIC_CHAT_RETURN : count > STATIC_CHAT_LIMIT;
   });
   let refreshQueued = false;
+  // A smooth jump measures only the rows near its target. A row far from it that mounts or grows
+  // during the jump keeps its old size, and the rows after it cover it. The browser reports a size
+  // only when it changes, so the rendered rows are measured again once when the jump ends.
+  let smoothJumpPending = false;
+  let wasScrolling = false;
+  const measureRowsAfterSmoothJump = (instance: Virtualizer<TScrollElement, TItemElement>): void => {
+    const ended = wasScrolling && !instance.isScrolling;
+    wasScrolling = instance.isScrolling;
+    if (!smoothJumpPending || !ended) return;
+    smoothJumpPending = false;
+    syncScrollEndThreshold(instance);
+    for (const element of [...instance.elementsCache.values()]) {
+      if (!element.isConnected) continue;
+      instance.resizeItem(instance.indexFromElement(element), Math.round(element.getBoundingClientRect().height));
+    }
+  };
 
   const refresh = (): void => {
     const measured = [...virtualizer.getVirtualItems()];
@@ -180,6 +196,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
           getItemKey: options.getItemKey,
           scrollMargin,
           onChange: (instance) => {
+            measureRowsAfterSmoothJump(instance);
             scheduleRefresh();
             untrack(() => options.onChange?.(instance));
           },
@@ -215,8 +232,10 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
-    scrollToIndex: (index, scroll) =>
-      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+    scrollToIndex: (index, scroll) => {
+      if (scroll?.smooth) smoothJumpPending = true;
+      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" });
+    },
     scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
   };
 }
