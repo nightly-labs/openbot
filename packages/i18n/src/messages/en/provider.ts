@@ -297,6 +297,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.keyOptional": "Optional. A key adds paid models.",
   "provider.settings.keyAlternative": "Or paste a {name} API key.",
   "provider.settings.geminiKeyInUse": "Gemini uses this key, not your Google AI plan. The plan's usage is not shown.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "A saved Gemini API key is used instead of a Google sign-in. To use a Google plan and its models, remove the key.",
   "provider.settings.claudeKeyInUse":
     "Anthropic bills the key's API credit, not your Claude plan. Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.settings.codexKeyInUse":
@@ -361,4 +363,6 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
 });

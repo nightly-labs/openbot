@@ -264,6 +264,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.cache": "Кэш",
@@ -306,4 +308,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -236,6 +236,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.cache": "Cache",
@@ -277,4 +279,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
+  "provider.settings.disconnectLocalOnly":
+    "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
 } as const satisfies PartialTranslation<typeof source>;

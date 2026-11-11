@@ -243,6 +243,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.cache": "キャッシュ",
@@ -281,4 +283,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot が {name} 用にダウンロードした CLI（{size}）を削除します。アカウント、サインイン、エージェントは残ります。",
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
 } as const satisfies PartialTranslation<typeof source>;

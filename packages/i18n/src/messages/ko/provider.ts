@@ -277,6 +277,8 @@ export const messages = {
   "provider.settings.keyAlternative": "또는 {name} API 키를 붙여넣으세요.",
   "provider.settings.geminiKeyInUse":
     "Gemini가 Google AI 요금제가 아닌 이 키를 사용해요. 요금제의 사용량은 표시되지 않아요.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "저장된 Gemini API 키가 Google 로그인 대신 사용돼요. Google 요금제와 그 모델을 사용하려면 키를 삭제하세요.",
   "provider.settings.claudeKeyInUse":
     "Anthropic은 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.settings.addKey": "키 추가",
@@ -327,4 +329,6 @@ export const messages = {
   "provider.settings.endpoints": "엔드포인트",
   "provider.settings.noEndpoints": "엔드포인트가 없어요.",
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
 } as const satisfies PartialTranslation<typeof source>;

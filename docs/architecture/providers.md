@@ -782,9 +782,14 @@ The CLI lists the plan's models best first, and the catalog keeps that order (`o
 plan on 1.5.5 lists Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS
 120B, a free plan Gemini 3.8 Flash first. The provider has no `defaultProviderModel`, so a new agent
 runs the first one. A version sort puts Claude Opus 5.5 ahead of Gemini 4 Argon, and before
-`modelVersion` skipped parameter counts, "GPT-OSS 120B" read as version 120 and came first. Gemini 4
-Carbon is offered only with an Application Default Credentials sign-in (`AGY_ADC_AUTH`), which
-OpenBot does not use.
+`modelVersion` skipped parameter counts, "GPT-OSS 120B" read as version 120 and came first. Google
+lists Gemini 4 Carbon for a Google sign-in on a plan that has it (seen in #7913); CLI 1.5.5 also
+added it for an Application Default Credentials sign-in (`AGY_ADC_AUTH`), which OpenBot does not use.
+A saved Gemini API key lists the key's models: Gemini 4 Argon, the Flash models and Gemini 3.1 Pro,
+with no Carbon, Claude or GPT. The key comes before the own Google sign-in, so an agent on Carbon
+moves to another model (`moveAgentsOffUnlistedModels`), and the own account's row says that the key
+is used in its place. Its Reconnect and Disconnect are hidden then, because the key would still serve
+the turns.
 
 The CLI ignores `GEMINI_HOME`. It takes its folders as flags: `--gemini-dir` as an absolute path
 and `--app-data-dir` relative to the Gemini home (`antigravityArgv`). A relative `--gemini-dir` logs
@@ -871,8 +876,10 @@ of the agent's account. A failed list keeps the last one. `provider-accounts-v1`
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
-first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server relays the account's sign-in to the
+first account: an account process never gets `GEMINI_API_KEY`. The ACP server reports no email. The driver's `readAccount`
+(`readAntigravityEmail`) reads `id_token_email` from the account's token file instead, so each row names its Google
+account, and a second account with the same email is refused as already added. A token that OpenBot copied from the
+1.4 server has an empty email, and the row then shows its label. With a saved key, the first account names no email. A joined server relays the account's sign-in to the
 client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
 names Codex and Claude only, signs the account in through the live view.
 
@@ -886,7 +893,10 @@ to the desktop app's version, not to the CLI's, so the User-Agent names the desk
 that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
 "spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
 does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
-reading. `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
+reading. Only a new CLI session refreshes the token, so an idle sign-in loses it after an hour. The
+driver sets `usageLeavesSession`: an account after the first and the own sign-in keep their last
+reading when a read gives none, so the account stays in the usage popover. A sign-out, a sign-in or a
+key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
 (`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
 Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
@@ -1432,17 +1442,20 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor, Devin, GitHub Copilot, Mistral and Gemini (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse, Cursor, Devin, GitHub Copilot and Mistral have a driver `signOut` (`grok logout`, `muse logout`,
-`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp`, and the
-`_auth/signOut` extension method of `vibe-acp`)
-for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
-(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+Grok, Muse, Cursor, Devin, GitHub Copilot, Mistral and Gemini have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp` and of
+`antigravity acp`, and the `_auth/signOut` extension method of `vibe-acp`)
+for the own sign-in only. Gemini's `logout` deletes the token file of the default Gemini home, as a
+Reconnect does; it does not revoke the token at Google. A Gemini account after the first has no
+sign-out: **Remove account** deletes its folder. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
-the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+the confirmation says so. Gemini is the exception: OpenBot keeps its sign-in in a token file of
+its own (`ANTIGRAVITY_ENV`), so a terminal Gemini CLI keeps its sign-in, and the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
 Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
 sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
 need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`

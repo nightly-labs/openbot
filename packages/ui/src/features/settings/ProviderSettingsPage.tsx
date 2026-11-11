@@ -679,19 +679,34 @@ const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "devin",
   "copilot",
   "mistral",
+  "antigravity",
 ]);
+
+/**
+ * OpenBot keeps the Gemini sign-in in a token file of its own (`ANTIGRAVITY_ENV`), not in the macOS
+ * keychain item of a terminal CLI, so a Disconnect does not sign that CLI out.
+ */
+const SIGN_OUT_KEEPS_TERMINAL: ReadonlySet<AgentProviderId> = new Set(["antigravity"]);
 
 /** The confirmation text of a Disconnect of the provider's own sign-in. */
 function disconnectDescription(
   t: AppTranslate,
   format: AppFormat,
-  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+  options: {
+    id: AgentProviderId;
+    provider: string;
+    local: boolean;
+    usedBy: readonly string[];
+    otherAccounts: boolean;
+  },
 ): string {
   const { provider, usedBy } = options;
   return [
-    options.local
-      ? t("provider.settings.disconnectLocal", { provider })
-      : t("provider.settings.disconnectHost", { provider }),
+    !options.local
+      ? t("provider.settings.disconnectHost", { provider })
+      : SIGN_OUT_KEEPS_TERMINAL.has(options.id)
+        ? t("provider.settings.disconnectLocalOnly", { provider })
+        : t("provider.settings.disconnectLocal", { provider }),
     usedBy.length > 0
       ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
       : t("provider.settings.removeUnused"),
@@ -902,6 +917,7 @@ function AccountsSection(props: SectionProps) {
         description={
           disconnecting()
             ? disconnectDescription(t, format, {
+                id: props.option.id,
                 provider: props.option.name,
                 local: Boolean(props.accountActions?.local),
                 usedBy: disconnecting()?.usedBy ?? [],
@@ -979,6 +995,11 @@ function AccountRow(
   const own = () => props.account.id === DEFAULT_PROVIDER_ACCOUNT_ID;
   /** The saved key's account: the key dialog changes or removes it, and it has no sign-in or plan usage. */
   const apiKey = () => isApiKeyAccount(props.account.id);
+  /**
+   * A saved Gemini key serves the turns in place of the own Google sign-in, with the key's models. A
+   * Reconnect or a Disconnect of the Google sign-in then changes nothing that the user sees (#7913).
+   */
+  const keyReplacesOwn = () => own() && props.option.id === "antigravity" && props.option.keyStatus === "saved";
   // A state that a newer host added shows as a failure.
   const state = (): ProviderAccountState =>
     Object.hasOwn(ACCOUNT_STATE_TEXT, props.account.state) ? props.account.state : "error";
@@ -1009,7 +1030,9 @@ function AccountRow(
       : undefined;
   /** A provider with no runtime on this computer reconnects in the browser, as its sign-in card does. */
   const reconnect = (): "reconnect" | null =>
-    own() && (props.row.runtimeAction() === "reconnect" || (!props.row.runtimeStatus() && props.row.browserConnect()))
+    own() &&
+    !keyReplacesOwn() &&
+    (props.row.runtimeAction() === "reconnect" || (!props.row.runtimeStatus() && props.row.browserConnect()))
       ? "reconnect"
       : null;
   return (
@@ -1030,6 +1053,9 @@ function AccountRow(
         <Show when={detail()}>{(text) => <ItemDescription>{text()}</ItemDescription>}</Show>
         <Show when={ownSigningIn()}>
           <ItemDescription>{t("provider.connecting.browserHint")}</ItemDescription>
+        </Show>
+        <Show when={keyReplacesOwn()}>
+          <ItemDescription>{t("provider.settings.geminiKeyReplacesAccount")}</ItemDescription>
         </Show>
         <Show when={state() !== "connected"}>
           <ItemDescription class={{ "provider-settings-warning": needsSignIn() }}>
@@ -1136,7 +1162,7 @@ function AccountRow(
                   {t("provider.account.remove")}
                 </DropdownMenu.Item>
               </Show>
-              <Show when={own() && state() === "connected" && props.onDisconnect}>
+              <Show when={own() && !keyReplacesOwn() && state() === "connected" && props.onDisconnect}>
                 {(disconnect) => (
                   <>
                     <DropdownMenu.Separator />
@@ -1436,6 +1462,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean; runtimeMissing
         tone="destructive"
         title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
         description={disconnectDescription(t, format, {
+          id: props.option.id,
           provider: props.option.name,
           local: Boolean(props.accountActions?.local),
           usedBy: props.option.usedBy ?? [],

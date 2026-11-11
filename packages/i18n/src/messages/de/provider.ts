@@ -247,6 +247,8 @@ export const messages = {
   "provider.settings.disconnectLocal":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Ein gespeicherter Gemini-API-Schlüssel wird statt einer Google-Anmeldung verwendet. Entferne den Schlüssel, um einen Google-Plan und seine Modelle zu nutzen.",
   "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
   "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.cache": "Cache",
@@ -288,4 +290,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Löscht die CLI, die OpenBot für {name} heruntergeladen hat ({size}). Konten, Anmeldungen und Agenten bleiben.",
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal bleibt angemeldet.",
 } as const satisfies PartialTranslation<typeof source>;

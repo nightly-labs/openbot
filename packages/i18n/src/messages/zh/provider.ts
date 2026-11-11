@@ -278,6 +278,8 @@ export const messages = {
   "provider.settings.keyOptional": "可选。添加密钥后可使用付费模型。",
   "provider.settings.keyAlternative": "或粘贴 {name} API 密钥。",
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -334,4 +336,6 @@ export const messages = {
   "provider.settings.endpoints": "端点",
   "provider.settings.noEndpoints": "没有端点。",
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
 } as const satisfies PartialTranslation<typeof source>;
