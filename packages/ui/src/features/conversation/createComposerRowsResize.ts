@@ -5,10 +5,10 @@ import { onCleanup } from "solid-js";
 const ONE_ROW_MAX_PX = 40;
 
 /**
- * The small one-row input of a panel (dock chat, diagram chat, side question). A draft with more
- * than one line gets card corners (`data-multiline`), as the main message input does, and the input
- * moves to its new height on the curve of the main input (`data-resizing`). A different `key` shows
- * its draft at once.
+ * A one-row input outside the main chat (dock chat, diagram chat, side question, side thread, Tasks).
+ * A draft with more than one line gets card corners (`data-multiline`), as the main message input
+ * does, and the input moves to its new height on the curve of the main input
+ * (`data-rows-resizing`). A different `key` shows its draft at once.
  */
 export function createComposerRowsResize(key?: () => string) {
   let form: HTMLElement | undefined;
@@ -22,7 +22,7 @@ export function createComposerRowsResize(key?: () => string) {
     const from = animation ? element.getBoundingClientRect().height : paintedHeight;
     animation?.cancel();
     animation = undefined;
-    element.removeAttribute("data-resizing");
+    element.removeAttribute("data-rows-resizing");
     element.toggleAttribute("data-multiline", entry.contentRect.height > ONE_ROW_MAX_PX);
     const to = element.getBoundingClientRect().height;
     const nextKey = key?.();
@@ -37,11 +37,11 @@ export function createComposerRowsResize(key?: () => string) {
       easing: style.getPropertyValue("--composer-resize-ease").trim() || "ease-out",
     });
     animation = current;
-    element.setAttribute("data-resizing", "");
+    element.setAttribute("data-rows-resizing", "");
     current.addEventListener("finish", () => {
       if (animation !== current) return;
       animation = undefined;
-      element.removeAttribute("data-resizing");
+      element.removeAttribute("data-rows-resizing");
     });
   });
 
@@ -57,6 +57,7 @@ export function createComposerRowsResize(key?: () => string) {
     },
     /** The `.composer-input-label` that holds the editor. */
     label(element: HTMLElement) {
+      rows.disconnect();
       rows.observe(element);
     },
   };

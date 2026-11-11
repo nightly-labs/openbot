@@ -20,8 +20,9 @@
   chat is a pill too.
 - The input of the dock chat, the diagram chat and the side question panel is 40 px high. Before, it
   was 48 px in some panels.
-- The input of the dock chat, the diagram chat and the side question panel gets card corners when
-  the draft has more than one line, and moves to its new height. Before, it changed height in one step.
+- The input of the dock chat, the diagram chat, the side question panel, a side thread and the Tasks
+  page gets card corners when the draft has more than one line, and moves to its new height. Before,
+  it changed height in one step.
 - The input of the Tasks page is one row: the agent, the text of the task, then Start. With attached
   files it has card corners, as the message input has.
 

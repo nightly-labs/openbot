@@ -1274,19 +1274,20 @@
   stroke: none;
 }
 
-/* A small input with more than one line: card corners, as the main input has with a long draft. */
-.composer[data-compact][data-small][data-multiline] {
+/* A one-row input with more than one line of text (`createComposerRowsResize`): card corners, as the
+   main input has with a long draft. */
+.composer[data-compact][data-multiline] {
   border-radius: var(--openbot-radius-card);
 }
 
-/* While the height of a small input moves, the text stays at the top edge and moves with it, so no
+/* While the height of such an input moves, the text stays at the top edge and moves with it, so no
    line jumps. A new line comes into view with the lower edge, not over it. */
-.composer[data-small][data-resizing] {
+.composer[data-rows-resizing] {
   overflow: clip;
   /* The row has the height of the input, so the text is at its top and the button at its middle. */
   align-content: stretch;
 }
 
-.composer[data-small][data-resizing] > .composer-input-label {
+.composer[data-rows-resizing] > .composer-input-label {
   align-self: start;
 }

@@ -68,6 +68,7 @@ import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/con
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createComposerRowsResize } from "../createComposerRowsResize";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 import { MAIN_THREAD_ID } from "./thread-types";
 
@@ -668,6 +669,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   });
   const queuePanelOwner = () => (queueRows().deliveries.length > 0 ? queueRows().taskId : undefined);
   const queueOpen = () => (props.queue?.deliveries.length ?? 0) > 0 && queueRows().taskId === props.task?.id;
+  const draftRows = createComposerRowsResize(() => props.task?.id ?? "");
   const hasRow = () =>
     Boolean(props.onRemoveAttachment) &&
     ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
@@ -929,6 +931,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </ComposerStackCard>
         </div>
         <form
+          ref={draftRows.form}
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
           data-has-attachments={hasRow() ? "" : undefined}
@@ -948,7 +951,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               />
             )}
           </Show>
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}

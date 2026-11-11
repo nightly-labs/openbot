@@ -63,6 +63,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
 /** The microphone of the Tasks composer. The page shows it; the app records and transcribes. */
@@ -440,6 +441,7 @@ function TasksComposer(props: TasksPageProps) {
   const { t } = useText();
   const phase = (): VoicePhase => props.voice?.phase ?? "idle";
   const busy = () => phase() === "requesting" || phase() === "preparing" || phase() === "transcribing";
+  const draftRows = createComposerRowsResize();
   const hasRow = () => (props.rowFiles?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0;
   // A start of files only names them, so it has a title too.
   const canStart = () =>
@@ -474,6 +476,7 @@ function TasksComposer(props: TasksPageProps) {
         </ComposerStackCard>
       </div>
       <form
+        ref={draftRows.form}
         class="composer"
         // One row, as the chat input. With files, the file row is above the text and the agent is under it.
         data-compact={hasRow() ? undefined : ""}
@@ -490,7 +493,7 @@ function TasksComposer(props: TasksPageProps) {
           onRemove={(attachment) => props.onRemoveFile?.(attachment)}
           macWindowControls={props.macWindowControls}
         />
-        <div class="composer-input-label">
+        <div class="composer-input-label" ref={draftRows.label}>
           <ComposerEditor
             agentId={undefined}
             agents={props.agents}
