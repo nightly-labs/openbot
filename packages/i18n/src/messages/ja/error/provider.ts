@@ -301,6 +301,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
+  "error.provider.claudeContextFull":
+    "このチャットは Claude には長すぎます。新しいチャットをクリックして新しいチャットを始めてください。チャンネルでは、チャンネル設定を開き、新しい会話の横にある開始をクリックしてください。",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.foreignReasoning":

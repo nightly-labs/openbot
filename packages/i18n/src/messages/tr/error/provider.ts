@@ -295,6 +295,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
+  "error.provider.claudeContextFull":
+    "Bu sohbet Claude için çok uzun. Yeni bir sohbet başlatmak için Yeni sohbet'e tıklayın. Bir kanalda Kanal ayarları'nı açın, ardından Yeni konuşma'nın yanındaki Başlat'a tıklayın.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
   "error.provider.foreignReasoning":

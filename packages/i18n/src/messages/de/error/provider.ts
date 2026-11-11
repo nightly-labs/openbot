@@ -305,6 +305,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
+  "error.provider.claudeContextFull":
+    "Dieser Chat ist für Claude zu lang. Klicke auf Neuer Chat, um einen neuen Chat zu beginnen. Öffne in einem Kanal die Kanaleinstellungen und klicke dann neben Neue Unterhaltung auf Starten.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
   "error.provider.foreignReasoning":

@@ -269,6 +269,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
+  "error.provider.claudeContextFull":
+    "هذه الدردشة طويلة جدًا على Claude. انقر على دردشة جديدة لبدء دردشة جديدة. في القناة، افتح إعدادات القناة، ثم انقر على ابدأ بجوار محادثة جديدة.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":

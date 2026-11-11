@@ -284,6 +284,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",
+  "error.provider.claudeContextFull":
+    "Этот чат слишком длинный для Claude. Нажмите «Новый чат», чтобы начать новый чат. В канале откройте «Настройки канала» и нажмите «Начать» рядом с «Новый разговор».",
   "error.provider.claudeApiKeyNoCredit":
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
   "error.provider.foreignReasoning":

@@ -371,6 +371,13 @@ interface ActiveTurn {
   retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
+  /** The text that OpenBot sent to start the turn. Null for a turn of the CLI's own. */
+  prompt: string | null;
+  /**
+   * The recovery of a turn that the session was too full to start (#6596). `compacting`: OpenBot sent
+   * `/compact`; `compacted`: the compaction ended; `retried`: OpenBot sent the prompt again.
+   */
+  overflowRecovery: "compacting" | "compacted" | "retried" | null;
 }
 
 interface ThreadRuntime {
@@ -1516,11 +1523,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     // Only now: a model or effort change that fails above leaves the idle timer armed, so the
     // pool can still release the thread.
-    this.#beginTurn(runtime, turnId, false);
+    this.#beginTurn(runtime, turnId, false).prompt = text;
+    this.#pushPrompt(runtime, text, turnId);
+    return { turn: { id: turnId, status: "inProgress" } };
+  });
+
+  #pushPrompt(runtime: ThreadRuntime, text: string, uuid: ReturnType<typeof randomUUID>): void {
     // Blocks of their own, so that history readers can tell them from the text of the turn. A slash
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
-    const context = this.#turnContext.take(threadId, text.startsWith("/"));
+    const context = this.#turnContext.take(runtime.id, text.startsWith("/"));
     runtime.input.push({
       type: "user",
       message: {
@@ -1531,11 +1543,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             : text,
       },
       parent_tool_use_id: null,
-      uuid: turnId,
-      session_id: threadId,
+      uuid,
+      session_id: runtime.id,
     });
-    return { turn: { id: turnId, status: "inProgress" } };
-  });
+  }
 
   /** A turn of the CLI's own ends with its own result, so the message waits for it rather than joining it. */
   #turnActiveError(turn: ActiveTurn): Error {
@@ -1565,6 +1576,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       usageLimit: null,
       retrying: false,
       unprompted,
+      prompt: null,
+      overflowRecovery: null,
     };
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
@@ -1749,6 +1762,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     if (message.type === "system" && message.subtype === "compact_boundary") {
       runtime.compacting = false;
+      if (runtime.activeTurn?.overflowRecovery === "compacting") runtime.activeTurn.overflowRecovery = "compacted";
       // The summary can leave the context blocks out, so the next turn sends the full blocks again.
       this.#turnContext.resend(runtime.id);
       // Claude's post_tokens counts messages only, not the full context.
@@ -1969,6 +1983,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // "success" with `is_error` is a turn that ended on an API error, and `result` holds its text.
     const apiError = message.subtype === "success" && message.is_error === true;
     const turn = runtime.activeTurn;
+    let contextFull = false;
     if (turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
@@ -1995,11 +2010,55 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         );
         return;
       }
+      // A session past its window fails each turn with "Prompt is too long", also after a restart, as
+      // the CLI resumes it (#6596). Without rate-limit evidence, `blocking_limit` is that refusal too.
+      const overflow =
+        message.terminal_reason === "prompt_too_long" || (message.terminal_reason === "blocking_limit" && !limit);
+      const recovering = turn.overflowRecovery === "compacting" || turn.overflowRecovery === "compacted";
+      if (!interrupted && (overflow || recovering)) {
+        // This result ends the `/compact` that OpenBot sent; its boundary showed that it compacted.
+        if (turn.overflowRecovery === "compacted" && turn.prompt !== null) {
+          turn.overflowRecovery = "retried";
+          this.#pushPrompt(runtime, turn.prompt, randomUUID());
+          return;
+        }
+        // Only a turn with no output yet runs again: a second run would repeat its tool calls.
+        if (
+          turn.overflowRecovery === null &&
+          turn.prompt !== null &&
+          !turn.prompt.startsWith("/") &&
+          !turn.seenText &&
+          !turn.thinkingStarted &&
+          turn.thinkingSnapshots.size === 0
+        ) {
+          queryLogger.warn("A Claude session is too long for its next turn; compacting it once.");
+          turn.overflowRecovery = "compacting";
+          this.#pushPrompt(runtime, "/compact", randomUUID());
+          return;
+        }
+        contextFull = true;
+      }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
-      if (!turn.seenText && fallback && !apiError) this.#bufferText(runtime, fallback);
+      if (!contextFull && !turn.seenText && fallback && !apiError) this.#bufferText(runtime, fallback);
     }
-    const status = interrupted ? "interrupted" : message.subtype === "success" && !apiError ? "completed" : "failed";
-    yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : apiError ? fallback : null);
+    const status = contextFull
+      ? "failed"
+      : interrupted
+        ? "interrupted"
+        : message.subtype === "success" && !apiError
+          ? "completed"
+          : "failed";
+    yield* this.#completeTurn(
+      runtime,
+      status,
+      contextFull
+        ? sourceText("error.provider.claudeContextFull")
+        : errors.length > 0
+          ? errors.join("\n")
+          : apiError
+            ? fallback
+            : null,
+    );
     // A local SDK control request reads context; it does not send a user turn or call a model.
     // Run outside the stream consumer so the result cannot block the queue or the SDK reader.
     const contextRequest = ++runtime.contextRequest;
