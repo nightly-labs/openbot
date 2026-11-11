@@ -289,6 +289,14 @@ export interface RemoteSignalPlan {
   entryUrl: string;
   /** The Signal machines that a host can have as its home, by ID. Empty = no host has a home. */
   homes: ReadonlyMap<string, string>;
+  /** The place of each home, by ID. Empty = the hash alone chooses a home, wherever the host is. */
+  locations: ReadonlyMap<string, SignalLocation>;
+}
+
+/** A place in degrees: a home machine's, or the one that Cloudflare gives for a host request. */
+export interface SignalLocation {
+  latitude: number;
+  longitude: number;
 }
 
 /** One configured Signal machine: the `signal` ticket claim and the URL that the ticket answer names. */
@@ -298,6 +306,11 @@ interface RemoteSignalHome {
 }
 
 const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
+/** Homes this much farther than the nearest home are near too, so the hash spreads hosts over one region. */
+const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
+const EARTH_RADIUS_KM = 6_371;
+/** A host ticket waits this long for a nearer home to answer before the host keeps its stored home. */
+const SIGNAL_HOME_MOVE_TIMEOUT_MS = 2_000;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -536,6 +549,7 @@ export class RemoteControlPlane {
       | "REMOTE_TICKET_KEY_ID"
       | "REMOTE_SIGNAL_URL"
       | "REMOTE_SIGNAL_HOMES"
+      | "REMOTE_SIGNAL_HOME_LOCATIONS"
       | "REMOTE_AUTH_WEBHOOK_URL"
       | "REMOTE_AUTH_WEBHOOK_URLS"
       | "REMOTE_AUTH_WEBHOOK_SECRET"
@@ -2162,13 +2176,18 @@ export class RemoteControlPlane {
    * home, because the members of the host still connect to it. A released host build sends no
    * `signalHome` (`null`) and connects only to the entry Signal, so its request removes the stored
    * home: else the members of a host that went back to a released build wait on the old home.
+   * `location` is where Cloudflare puts the host request, or null when it does not know.
    */
   readonly issueHostTicket = Effect.fn("RemoteControlPlane.issueHostTicket")(
     function* (
       this: RemoteControlPlane,
       hostId: string,
       machineToken: string,
-      placement: { signalHome: boolean | null; failedSignalUrl: string | null } = {
+      placement: {
+        signalHome: boolean | null;
+        failedSignalUrl: string | null;
+        location?: SignalLocation | null;
+      } = {
         signalHome: null,
         failedSignalUrl: null,
       },
@@ -2184,7 +2203,9 @@ export class RemoteControlPlane {
             .bind(hostId)
             .run(),
         );
-      const home = placement.signalHome ? yield* this.#placeHost(host, signal, placement.failedSignalUrl) : null;
+      const home = placement.signalHome
+        ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, placement.location ?? null)
+        : null;
       const issued = yield* dependencies.signer.issue({
         sessionId: `host-${hostId}`,
         hostId,
@@ -3198,21 +3219,32 @@ export class RemoteControlPlane {
   });
 
   /**
-   * The home of a host that asks for one. The stored home stays while its URL is not the one that
-   * failed for the host. Else the rendezvous choice replaces it, so a removed or failed machine moves
-   * only its own hosts. When two requests race, both use the home that the first one stored.
+   * The home of a host that asks for one. The stored home stays while it is one of the homes near the
+   * host and its URL is not the one that failed for the host. Else the rendezvous choice over those
+   * homes replaces it, so a removed or failed machine moves only its own hosts, and a new machine near
+   * a host takes it from a far one. A stored home that did not fail is left only for a home that answers
+   * `/health/ready`: a host that moved away from a failed near home does not go back while it is down.
+   * When two requests race, both use the home that the first one stored.
    */
   readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
     this: RemoteControlPlane,
     host: RemoteHostRow,
     signal: RemoteSignalPlan,
     failedSignalUrl: string | null,
+    location: SignalLocation | null,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
+    const candidates = nearSignalHomes(signal, failedSignalUrl, location);
     const current = configuredSignalHome(signal, host.signal_home);
-    if (current && current.url !== failedSignalUrl) return current;
-    const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, signal, failedSignalUrl));
+    if (current && candidates.includes(current.id)) return current;
+    const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
+    if (
+      current &&
+      current.url !== failedSignalUrl &&
+      !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
+    )
+      return current;
     const stored = yield* remoteCall(() =>
       dependencies.database
         .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
@@ -3402,10 +3434,11 @@ function remoteSignalNotConfigured(): RemoteControlPlaneError {
 
 /**
  * The Signal URLs of the tickets, or null when `REMOTE_SIGNAL_URL` is not a ws or wss URL or
- * `REMOTE_SIGNAL_HOMES` is invalid. A ticket request then fails with 503 and does not send a host to a wrong machine.
+ * `REMOTE_SIGNAL_HOMES` or `REMOTE_SIGNAL_HOME_LOCATIONS` is invalid. A ticket request then fails with
+ * 503 and does not send a host to a wrong machine.
  */
 export function remoteSignalPlan(
-  bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES">,
+  bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "REMOTE_SIGNAL_HOME_LOCATIONS">,
 ): RemoteSignalPlan | null {
   const entryUrl = bindings.REMOTE_SIGNAL_URL?.trim();
   if (!entryUrl) return null;
@@ -3425,7 +3458,40 @@ export function remoteSignalPlan(
     if (protocol !== "wss:" && !(permitsWs && protocol === "ws:")) return null;
     homes.set(id, url);
   }
-  return { entryUrl, homes };
+  // An empty home list is the rollback, so it must work without a change to the locations.
+  if (homes.size === 0) return { entryUrl, homes, locations: new Map() };
+  const locations = signalHomeLocations(bindings.REMOTE_SIGNAL_HOME_LOCATIONS ?? "", homes);
+  return locations ? { entryUrl, homes, locations } : null;
+}
+
+/**
+ * `REMOTE_SIGNAL_HOME_LOCATIONS` as `id=latitude:longitude,...`: empty, or one place for each home and
+ * no other ID. Null when the value is invalid.
+ */
+function signalHomeLocations(
+  value: string,
+  homes: ReadonlyMap<string, string>,
+): ReadonlyMap<string, SignalLocation> | null {
+  const locations = new Map<string, SignalLocation>();
+  for (const entry of value.split(",")) {
+    if (!entry.trim()) continue;
+    const separator = entry.indexOf("=");
+    if (separator < 0) return null;
+    const id = entry.slice(0, separator).trim();
+    const [latitude, longitude, ...rest] = entry.slice(separator + 1).split(":");
+    const location = signalLocation(latitude, longitude);
+    if (!homes.has(id) || locations.has(id) || rest.length > 0 || !location) return null;
+    locations.set(id, location);
+  }
+  return locations.size === 0 || locations.size === homes.size ? locations : null;
+}
+
+/** A place from two decimal degree texts, or null when either is not a number in its range. */
+export function signalLocation(latitude: unknown, longitude: unknown): SignalLocation | null {
+  if (typeof latitude !== "string" || typeof longitude !== "string") return null;
+  if (!latitude.trim() || !longitude.trim()) return null;
+  const location = { latitude: Number(latitude), longitude: Number(longitude) };
+  return Math.abs(location.latitude) <= 90 && Math.abs(location.longitude) <= 180 ? location : null;
 }
 
 function urlProtocol(value: string): string | null {
@@ -3443,19 +3509,75 @@ function configuredSignalHome(signal: RemoteSignalPlan, id: string | null): Remo
 }
 
 /**
+ * The IDs of the homes that a host can get: the homes whose URL is not `failedSignalUrl`, or each home
+ * when that excludes each one. With a host location and home locations, only those of them at most
+ * `NEAR_SIGNAL_HOME_MARGIN_KM` farther than the nearest one.
+ */
+function nearSignalHomes(
+  signal: RemoteSignalPlan,
+  failedSignalUrl: string | null,
+  location: SignalLocation | null,
+): string[] {
+  const homes = [...signal.homes];
+  const available = homes.filter(([, url]) => url !== failedSignalUrl);
+  const ids = (available.length > 0 ? available : homes).map(([id]) => id);
+  if (!location || signal.locations.size === 0) return ids;
+  const distances = new Map(
+    ids.map((id) => {
+      const home = signal.locations.get(id);
+      return [id, home ? distanceKm(location, home) : Number.POSITIVE_INFINITY];
+    }),
+  );
+  const nearest = Math.min(...distances.values());
+  return ids.filter((id) => (distances.get(id) ?? Number.POSITIVE_INFINITY) <= nearest + NEAR_SIGNAL_HOME_MARGIN_KM);
+}
+
+/** The `/health/ready` URL of the machine of a Signal WebSocket URL. */
+function signalHealthUrl(signalUrl: string): string {
+  const parsed = new URL(signalUrl);
+  return `${parsed.protocol === "ws:" ? "http:" : "https:"}//${parsed.host}/health/ready`;
+}
+
+/** Whether the machine of a Signal URL answers `/health/ready`. A failed request is a false answer, not an error. */
+export function signalAnswers(
+  fetcher: (input: string, init: RequestInit) => Promise<Response>,
+  signalUrl: string,
+  timeoutMs: number,
+): Effect.Effect<boolean> {
+  return Effect.tryPromise({
+    try: (signal) =>
+      fetcher(signalHealthUrl(signalUrl), {
+        method: "GET",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
+      }),
+    catch: () => null,
+  }).pipe(
+    Effect.map((response) => response.ok),
+    Effect.orElseSucceed(() => false),
+  );
+}
+
+/** The great-circle distance between two places, in kilometres (haversine). */
+function distanceKm(from: SignalLocation, to: SignalLocation): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitude = radians(to.latitude - from.latitude);
+  const longitude = radians(to.longitude - from.longitude);
+  const a =
+    Math.sin(latitude / 2) ** 2 +
+    Math.cos(radians(from.latitude)) * Math.cos(radians(to.latitude)) * Math.sin(longitude / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
  * The rendezvous choice of a home for the host: the highest first 8 bytes (big-endian) of
- * sha256(`${id}\n${hostId}`), over the machines whose URL is not `failedSignalUrl`, or over all
- * machines when that excludes each one. Null only when no home is configured.
+ * sha256(`${id}\n${hostId}`) over `candidates`. Null only when there is no candidate.
  */
 const rendezvousSignalHome = Effect.fn("RemoteControlPlane.rendezvousSignalHome")(function* (
   hostId: string,
-  signal: RemoteSignalPlan,
-  failedSignalUrl: string | null,
+  candidates: readonly string[],
 ) {
-  const homes = [...signal.homes];
-  const available = homes.filter(([, url]) => url !== failedSignalUrl);
   let chosen: { id: string; score: bigint } | null = null;
-  for (const [id] of available.length > 0 ? available : homes) {
+  for (const id of candidates) {
     const digest = yield* remoteCall(() =>
       crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${id}\n${hostId}`)),
     );

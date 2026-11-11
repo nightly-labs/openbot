@@ -3174,6 +3174,15 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /** The content digest of a staged or saved generated attachment, or null for any other file. */
+  generatedAttachmentSha256(attachmentId: string): string | null {
+    return (
+      this.#stagedGeneratedAttachments.get(attachmentId)?.sha256 ??
+      this.#state.generatedAttachments.find((candidate) => candidate.id === attachmentId)?.sha256 ??
+      null
+    );
+  }
+
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
     this: MailboxStore,
     input: {

@@ -3,7 +3,7 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentEvent, AttachmentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Result } from "effect";
 import {
   type AttachmentOperationError,
@@ -155,9 +155,11 @@ export class AttachmentGateway {
     }
     if (sources.length === 0) return;
     yield* Effect.gen({ self: this }, function* () {
-      const attachments = yield* this.#mailbox
+      const staged = yield* this.#mailbox
         .stageGeneratedAttachments({ sources, ownerAgentId: agentId, ownerThreadId: snapshot.threadId })
         .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
+      const { attachments } = yield* this.#withoutTurnCopies(snapshot, answer.turnId, staged);
+      if (attachments.length === 0) return;
       const previous = answer.attachments;
       answer.attachments = [...(previous ?? []), ...attachments];
       try {
@@ -184,6 +186,44 @@ export class AttachmentGateway {
     );
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * Discards each staged file whose bytes match a file that a message of this turn already shows, and
+   * returns the files to keep and the shown files that they copy. An agent often copies a generated
+   * image and attaches it again, and the chat then showed the same image two times (#7178).
+   */
+  readonly #withoutTurnCopies = Effect.fn("AttachmentGateway.withoutTurnCopies")(function* (
+    this: AttachmentGateway,
+    snapshot: ConversationSnapshot,
+    turnId: string | undefined,
+    staged: AttachmentSummary[],
+  ) {
+    // A message with no turn has nothing to compare with: older history is not this answer.
+    if (turnId === undefined) return { attachments: staged, shown: [] };
+    const shownByDigest = new Map<string, AttachmentSummary>();
+    for (const message of snapshot.messages) {
+      if (message.turnId !== turnId) continue;
+      for (const attachment of message.attachments ?? []) {
+        const digest = this.#mailbox.generatedAttachmentSha256(attachment.id);
+        if (digest && !shownByDigest.has(digest)) shownByDigest.set(digest, attachment);
+      }
+    }
+    const attachments: AttachmentSummary[] = [];
+    const shown: AttachmentSummary[] = [];
+    const copies: string[] = [];
+    for (const attachment of staged) {
+      const digest = this.#mailbox.generatedAttachmentSha256(attachment.id);
+      const original = digest ? shownByDigest.get(digest) : undefined;
+      if (original) {
+        shown.push(original);
+        copies.push(attachment.id);
+      } else attachments.push(attachment);
+    }
+    // The store forgets the copies before it removes their files, so a failed removal leaves only a
+    // file on disk. It must not fail the attachment of the other files.
+    if (copies.length > 0) yield* this.#mailbox.discardStagedGeneratedAttachments(copies).pipe(Effect.ignore);
+    return { attachments, shown };
+  });
+
   pendingCommands(): Effect.Effect<OpenBotToolResponse, AttachmentOperationError>[] {
     return [...this.#inFlight.values()].map(Deferred.await);
   }
@@ -205,19 +245,25 @@ export class AttachmentGateway {
     const existing = snapshot.messages.find((message) => message.id === messageId);
     // A repeated call finds its message. It puts the files into the folder again, which changes
     // nothing when the first attempt did it, and completes an attempt that stopped before it.
-    if (existing) return yield* this.#attachedResult(senderAgentId, messageId, existing.attachments ?? [], folder);
+    if (existing) return yield* this.#attachedResult(senderAgentId, messageId, existing.attachments ?? [], [], folder);
 
     return yield* Effect.acquireUseRelease(
       this.#openSources(senderAgentId, paths, WORKSPACE_OR_SHARED),
       (sources) =>
         Effect.gen({ self: this }, function* () {
-          const attachments = yield* this.#mailbox
+          const staged = yield* this.#mailbox
             .stageGeneratedAttachments({
               sources,
               ownerAgentId: senderAgentId,
               ownerThreadId: publicThreadId,
             })
             .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
+          const { attachments, shown } = yield* this.#withoutTurnCopies(snapshot, params.turnId, staged);
+          const alreadyShown = shown.map((attachment) => ({ id: attachment.id, name: attachment.name }));
+          // The user already sees each file, so no message is added and the answer must not show them again.
+          if (attachments.length === 0) {
+            return yield* this.#attachedResult(senderAgentId, null, [], alreadyShown, folder);
+          }
           const message: ConversationSnapshot["messages"][number] = {
             id: messageId,
             turnId: params.turnId,
@@ -261,7 +307,7 @@ export class AttachmentGateway {
               // A committed attachment remains successful even if event listeners fail.
             }
           }
-          return yield* this.#attachedResult(senderAgentId, messageId, attachments, folder);
+          return yield* this.#attachedResult(senderAgentId, messageId, attachments, alreadyShown, folder);
         }),
       (sources) =>
         attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close()))).pipe(Effect.orDie),
@@ -275,10 +321,12 @@ export class AttachmentGateway {
   readonly #attachedResult = Effect.fn("AttachmentGateway.attachedResult")(function* (
     this: AttachmentGateway,
     senderAgentId: string,
-    messageId: string,
+    messageId: string | null,
     attachments: readonly { id: string; name: string }[],
+    alreadyShown: readonly { id: string; name: string }[],
     folder: string | undefined,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
+    // A file that the answer already shows goes into the folder also: the agent asked for it there.
     const placed =
       folder === undefined
         ? null
@@ -286,13 +334,14 @@ export class AttachmentGateway {
             this.#libraryFolders,
             senderAgentId,
             folder,
-            attachments.map((attachment) => attachment.id),
+            [...attachments, ...alreadyShown].map((attachment) => attachment.id),
           );
     return yield* attachmentCall(() =>
       openBotToolResult({
         status: "attached",
-        messageId,
+        ...(messageId === null ? {} : { messageId }),
         attachments: attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })),
+        ...(alreadyShown.length > 0 ? { alreadyShown } : {}),
         ...(placed === null ? {} : { folder: placed }),
       }),
     );

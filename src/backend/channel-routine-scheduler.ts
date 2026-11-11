@@ -13,6 +13,7 @@ import type {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import { quietRoutineRun } from "./agent/routine-quiet-runs";
 import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
@@ -250,6 +251,15 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     if (!run || this.#routines.getRecord(channelId, run.routineId)?.limitPolicy !== "skip") return false;
     this.#settle(run, { status: "cancelled", error: null });
     return true;
+  }
+
+  /**
+   * Whether nobody waits for the answer of the run that posted this request: a scheduled, script or
+   * webhook run, not a Test run (`quietRoutineRun`).
+   */
+  quietRun(requestMessageId: string): boolean {
+    const run = this.#routines.runForRequest(requestMessageId);
+    return run !== null && quietRoutineRun(run);
   }
 
   skipMissed(now: Date, held?: RoutineHoldWindow): void {
