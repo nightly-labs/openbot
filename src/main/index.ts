@@ -31,6 +31,7 @@ import {
   protocol,
   screen,
   shell,
+  systemPreferences,
 } from "electron";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -155,6 +156,8 @@ import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
+import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
 import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
@@ -175,6 +178,8 @@ let crashTrace: TraceFile | null = null;
 let runMarker: RunMarker | null = null;
 /** How the previous run ended when it did not quit cleanly. Host analytics sends it once. */
 let previousUncleanExit: UncleanExitProperties | null = null;
+/** The failed starts of this version in a row (`start-attempts.ts`). Only the process with the lock has one. */
+let startAttempts: StartAttempts | null = null;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
@@ -210,6 +215,8 @@ let exitRecorded = false;
 function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
   exitRecorded = true;
+  // First: a quit during the start must never count as a failed start.
+  startAttempts?.quitting();
   logger.info(`Quitting: ${reason}.`);
   runMarker?.quitting(reason);
   if (!crashTrace) return;
@@ -224,6 +231,8 @@ function quitFor(reason: ExitReason): void {
 
 function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
   logger.error(`Main process ${origin}:`, toLogValue(error));
+  // Only before the start finished. A rejection is often a lost background task, not a broken start.
+  if (origin === "uncaughtException") startAttempts?.failed("exception");
   if (!crashTrace) return;
   crashTrace.record({ kind: "crash", name: origin, durationMs: 0, outcome: "reported" });
   Effect.runFork(crashTrace.flush());
@@ -255,6 +264,8 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 // Always taken, so the owner password leaves the environment also when the flag is refused.
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
+// Development builds only: `scripts/start-recovery-e2e.ts` makes the start fail.
+const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
 const localServerControl = localServerChild
   ? openLocalServerControl(process.platform, (cause) =>
       logger.error("The local server has no control pipe from the desktop app:", toLogValue(cause)),
@@ -335,6 +346,27 @@ if (hasSingleInstanceLock) {
     logger.warn(
       `The previous run did not quit cleanly (${previousUncleanExit.phase}, ${previousUncleanExit.uptime_class}, ${previousUncleanExit.crash_dump_count} crash dumps).`,
     );
+  // Before the database opens: a start that fails in a migration must count too.
+  if (!localServerChild) {
+    startAttempts = StartAttempts.begin({
+      userDataPath: app.getPath("userData"),
+      crashDumpsPath: app.getPath("crashDumps"),
+      appVersion: app.getVersion(),
+      now: Date.now(),
+      bootedAt: Date.now() - uptime() * 1_000,
+    });
+    const attempts = startAttempts.summary();
+    if (attempts.consecutiveFailures > 0)
+      logger.warn(
+        `OpenBot ${attempts.appVersion} did not finish its start ${attempts.consecutiveFailures} times in a row (previous start: ${attempts.previousOutcome}, last failure: ${attempts.lastFailure ?? "none"}).`,
+      );
+    // After crashes at launch, AppKit asks before `ready` whether to reopen the windows, and its
+    // modal alert stops the start until someone answers. OpenBot restores no macOS window state.
+    // A registered default is in memory for this process only, and a value the user set wins. The
+    // forced failure also needs it: all development builds share the crash history of Electron.app.
+    if (process.platform === "darwin" && (attempts.consecutiveFailures > 0 || forcedStartFailure !== null))
+      systemPreferences.registerDefaults({ ApplePersistenceIgnoreState: true });
+  }
   // Linux AppImage: the handler must stop before the AppImage unmounts (#3066).
   stopAppImageCrashpadHandlerAtExit();
   // A file request that never finishes must not keep the process and its lock after an exit.
@@ -1084,6 +1116,29 @@ function requestDesktopNotificationPermission(
 
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
 /** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
+/**
+ * Shows the recovery window when this version did not finish its start several times in a row.
+ * Resolves with the window to close after "Try again", with "quit", or with null when no loop is
+ * found. A server has no window and nobody to read it: it logs the loop and starts as before.
+ */
+async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
+  if (!startAttempts?.loopDetected) return null;
+  const summary = startAttempts.summary();
+  if (serverMode || hostedServer) {
+    logger.warn(
+      `OpenBot ${summary.appVersion} is in a start loop. A server shows no recovery window and starts again.`,
+    );
+    return null;
+  }
+  logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
+  // The saved language is in the database, which this window must not need.
+  const locale = resolveLocale("system", app.getLocale());
+  const recovery = openStartRecoveryWindow({ summary, locale, translate: translateFor(locale), iconPath: appIconPath });
+  const choice = await recovery.choice;
+  logger.info(`Recovery window choice: ${choice}.`);
+  return choice === "quit" ? "quit" : recovery;
+}
+
 async function presentApplication(): Promise<void> {
   await ensureMacApplicationPresence(
     process.platform,
@@ -1390,7 +1445,10 @@ if (!hasSingleInstanceLock) {
       // A run that ends in sleep, or in an OS shutdown that Electron reports, is told apart at the next start.
       powerMonitor.on("suspend", () => runMarker?.suspend());
       powerMonitor.on("resume", () => runMarker?.resume());
-      powerMonitor.on("shutdown", () => runMarker?.osShutdown());
+      powerMonitor.on("shutdown", () => {
+        runMarker?.osShutdown();
+        startAttempts?.osShutdown();
+      });
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
       if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon) app.dock?.setIcon(appIconPath);
@@ -1399,6 +1457,13 @@ if (!hasSingleInstanceLock) {
         return;
       }
       if (!localServerChild) await presentApplication();
+      const recovery = await recoverFromStartLoop();
+      if (recovery === "quit") {
+        quitFor("quit");
+        return;
+      }
+      if (forcedStartFailure === "crash") process.crash();
+      if (forcedStartFailure === "hang") await new Promise<never>(() => {});
       configureContentSecurityPolicy();
       configureRendererPermissions();
       // A local server keeps a window that never loads: the agent browser and the services attach to it.
@@ -1409,6 +1474,8 @@ if (!hasSingleInstanceLock) {
           await runCauseEffect(readSavedTransparentWindow(join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE))),
         );
       const mainWindow = windows.openMainWindow();
+      // After the main window exists: on Windows and Linux, the last closed window quits the app.
+      recovery?.close();
 
       const built = await createApplicationServices({
         mainWindow,
@@ -1745,6 +1812,8 @@ if (!hasSingleInstanceLock) {
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
+      // The start is finished: the database is open and the main window loaded.
+      startAttempts?.finished();
       built.startup?.rendererLoaded();
       // After the first window, so the new process does not compete with the start for the CPU.
       Effect.runFork(built.prewarmAgentDatabase);
@@ -1862,6 +1931,8 @@ if (!hasSingleInstanceLock) {
       // The Windows error box ends the text at a NUL character, so control characters are replaced.
       const message = (error instanceof Error ? error.message : String(error)).replace(/[^\P{Cc}\n\t]/gu, "�");
       logger.error("OpenBot failed to start:", toLogValue(error));
+      // Data that a newer version saved has its own recovery, and a new release ends that loop.
+      if (!(error instanceof NewerDatabaseError)) startAttempts?.failed("error");
       // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
       // server on this computer has no window: the app that started it reports the failed start.
       if (!serverMode && !hostedServer && !localServerChild) {

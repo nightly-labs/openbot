@@ -18,4 +18,19 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot 다운로드",
   "startup.newerDataGuide": "가이드 열기",
   "startup.newerDataQuit": "종료",
+  "startup.recoveryWindowTitle": "OpenBot 복구",
+  "startup.recoveryTitle": "OpenBot이 열리지 않았습니다",
+  "startup.recoveryBody": {
+    other:
+      "OpenBot {version}이(가) 열리기 전에 {count}번 연속으로 멈췄습니다. 로컬 데이터는 초기화되거나 덮어쓰이지 않았습니다.",
+  },
+  "startup.recoveryHint":
+    "다시 시도하거나 마지막으로 열린 버전을 설치하세요. 도움이 필요하면 진단 정보를 내보내고 보고서와 함께 파일을 보내세요.",
+  "startup.recoveryRetry": "다시 시도",
+  "startup.recoveryPreviousVersion": "이전 버전 다운로드",
+  "startup.recoveryExportDiagnostics": "진단 정보 내보내기",
+  "startup.recoveryOpenDataFolder": "데이터 폴더 열기",
+  "startup.recoveryQuit": "종료",
+  "startup.recoveryDiagnosticsSaved": "진단 파일을 저장했습니다.",
+  "startup.recoveryActionFailed": "OpenBot이 이 작업을 하지 못했습니다.",
 } as const satisfies PartialTranslation<typeof source>;

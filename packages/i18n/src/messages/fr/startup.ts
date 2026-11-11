@@ -19,4 +19,20 @@ export const messages = {
   "startup.newerDataDownload": "Télécharger OpenBot",
   "startup.newerDataGuide": "Ouvrir le guide",
   "startup.newerDataQuit": "Quitter",
+  "startup.recoveryWindowTitle": "Récupération d’OpenBot",
+  "startup.recoveryTitle": "OpenBot ne s’est pas ouvert",
+  "startup.recoveryBody": {
+    one: "OpenBot {version} s’est arrêté avant de s’ouvrir, {count} fois de suite. Vos données locales n’ont pas été réinitialisées ni écrasées.",
+    other:
+      "OpenBot {version} s’est arrêté avant de s’ouvrir, {count} fois de suite. Vos données locales n’ont pas été réinitialisées ni écrasées.",
+  },
+  "startup.recoveryHint":
+    "Réessayez, ou installez la dernière version qui s’est ouverte. Pour obtenir de l’aide, exportez le diagnostic et envoyez le fichier avec votre rapport.",
+  "startup.recoveryRetry": "Réessayer",
+  "startup.recoveryPreviousVersion": "Télécharger la version précédente",
+  "startup.recoveryExportDiagnostics": "Exporter le diagnostic",
+  "startup.recoveryOpenDataFolder": "Ouvrir le dossier des données",
+  "startup.recoveryQuit": "Quitter",
+  "startup.recoveryDiagnosticsSaved": "Le fichier de diagnostic est enregistré.",
+  "startup.recoveryActionFailed": "OpenBot n’a pas pu effectuer cette action.",
 } as const satisfies PartialTranslation<typeof source>;
