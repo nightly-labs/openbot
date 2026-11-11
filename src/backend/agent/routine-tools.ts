@@ -74,11 +74,8 @@ export function routineToolSchedule(value: unknown): RoutineSchedule {
     // A model that guesses the shape, such as { type: "daily" }, needs to know which field to change;
     // with "invalid" only, agents tried a dozen shapes and gave up (#6754). The schema only explains
     // the refusal: `isRoutineSchedule` still decides what is accepted.
-    const parsed = routineScheduleZodSchema.safeParse(value);
-    if (parsed.success) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
-    const detail = parsed.error.issues
-      .map((issue) => `${["schedule", ...issue.path.map(String)].join(".")}: ${issue.message}`)
-      .join(" ");
+    const detail = routineScheduleProblem(value);
+    if (detail === null) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
     throw new RoutineInputError(sourceText("error.agent.routineScheduleArgumentsInvalid", { detail }));
   }
   // Validate the polling floor before the store runs so the provider gets a clear,
@@ -99,6 +96,22 @@ export function routineToolSchedule(value: unknown): RoutineSchedule {
     );
   }
   return structuredClone(value);
+}
+
+/** Why `isRoutineSchedule` refused `value`, for the agent, or null when the reason is not known. */
+function routineScheduleProblem(value: unknown): string | null {
+  const parsed = routineScheduleZodSchema.safeParse(value);
+  const problems = parsed.success
+    ? // The schema checks the format of these values; `isRoutineSchedule` also checks that they exist.
+      parsed.data.kind === "interval"
+      ? ["schedule.anchorAt: Invalid date-time"]
+      : parsed.data.kind === "once"
+        ? ["schedule.date: Not a calendar date"]
+        : []
+    : parsed.error.issues.map((issue) => `${["schedule", ...issue.path.map(String)].join(".")}: ${issue.message}`);
+  if (problems.length === 0) return null;
+  const detail = `${problems.join("; ")}.`;
+  return detail.length > 600 ? `${detail.slice(0, 597)}...` : detail;
 }
 
 function intervalMinutes(amount: number, unit: "minutes" | "hours" | "days"): number {

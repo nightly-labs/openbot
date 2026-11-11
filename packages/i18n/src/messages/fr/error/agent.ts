@@ -13,7 +13,7 @@ export const messages = {
   "error.agent.toolCallDiscoveryTool":
     "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
   "error.agent.routineScheduleArgumentsInvalid":
-    "La planification de la routine n’est pas valide : {detail} Corrige la planification et réessaie. openbot.tool_describe donne le schéma.",
+    "La planification de la routine n’est pas valide : {detail} Corrigez la planification et réessayez. openbot.tool_describe donne le schéma.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
   "error.agent.accessLocalOnly": "L’accès à l’agent ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.duplicateCleanupFailed":

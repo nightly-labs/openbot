@@ -390,14 +390,13 @@ function parseCall(params: DynamicToolCallParams) {
   return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(envelope.arguments) });
 }
 
-const DISCOVERY_TOOL_NAMES: ReadonlySet<string> = new Set(["tool_search", "tool_describe"]);
-
-/** True when a `tool_call` names a discovery tool, such as `openbot.tool_describe`. */
+/**
+ * True when a `tool_call` names OpenBot's discovery tool, such as `openbot.tool_describe`. Only a qualified
+ * name counts: a bare `tool_search` can mean the provider's own search for MCP tools.
+ */
 function callsDiscoveryTool(envelope: unknown): boolean {
-  if (!isRecord(envelope)) return false;
-  const named = typeof envelope.name === "string" ? envelope.name : envelope.tool;
-  if (typeof named !== "string") return false;
-  return DISCOVERY_TOOL_NAMES.has(named.trim().replace(/^(?:openbot\.|mcp__openbot__)/, ""));
+  const named = bridgedName(envelope)?.trim();
+  return named !== undefined && /^(?:openbot\.|openbot__|mcp__openbot__)tool_(?:search|describe)$/.test(named);
 }
 
 /**

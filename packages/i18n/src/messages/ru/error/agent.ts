@@ -13,7 +13,7 @@ export const messages = {
   "error.agent.toolCallDiscoveryTool":
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
   "error.agent.routineScheduleArgumentsInvalid":
-    "Расписание регулярной задачи некорректно: {detail} Исправь расписание и повтори попытку. openbot.tool_describe возвращает схему.",
+    "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
   "error.agent.accessLocalOnly": "Доступ агента можно изменить только на компьютере, где он работает.",
   "error.agent.duplicateCleanupFailed": "Не удалось дублировать агента, а неполную копию удалить не получилось.",
