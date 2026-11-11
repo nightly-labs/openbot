@@ -295,6 +295,7 @@ export function AgentDockSurface() {
       {(server) => (
         <>
           <AgentDock
+            onScreen
             seats={seats()}
             available={presentation()?.available ?? []}
             availableChannels={availableChannels()}
