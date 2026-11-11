@@ -209,8 +209,6 @@ export function ConversationComposer() {
   const editorLocked = () =>
     !agentReady() &&
     !((props.agent || channel) && (props.agentStatus.phase === "starting" || props.agentStatus.phase === "restarting"));
-  // The mention picker opens over the cards. A card that closed for it moved the chat.
-  const queueVisible = () => queuePanelVisible();
   // Each chat gets its own queue panel. One shared panel animated the rows and the height of the
   // previous chat's queue into this one, and the chat jumped while it resized (#3770). The keyed
   // <Show> builds its child again only when the child function takes the key as a parameter.
@@ -221,10 +219,9 @@ export function ConversationComposer() {
   const awaitingVisible = () => awaitingReplies().length > 0;
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
   const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait);
-  const slotOpen = () => queueOpen();
   // A slot that closes keeps the last rows in place, so the whole panel goes down behind the input in
   // one move, the way it came up. In a slot that stays open, a row that goes leaves on its own.
-  const queueRows = () => (slotOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
+  const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
   /** The reply of this agent that is read aloud. The voice pane shows its own. */
@@ -530,12 +527,12 @@ export function ConversationComposer() {
           </ComposerStackCard>
           <div
             class="agent-queue-slot"
-            data-open={slotOpen() ? "true" : "false"}
-            aria-hidden={slotOpen() ? undefined : "true"}
-            inert={slotOpen() ? undefined : true}
+            data-open={queueOpen() ? "true" : "false"}
+            aria-hidden={queueOpen() ? undefined : "true"}
+            inert={queueOpen() ? undefined : true}
           >
             <div class="agent-queue-slot-inner">
-              <Show when={queueVisible() ? queueOwner() : undefined} keyed>
+              <Show when={queuePanelVisible() ? queueOwner() : undefined} keyed>
                 {(_owner) => (
                   <Loading>
                     <QueuePanel
