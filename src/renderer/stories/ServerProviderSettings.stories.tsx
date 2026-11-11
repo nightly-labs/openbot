@@ -71,6 +71,13 @@ const providerUpdateAgentStatus: AgentStatus = {
     message: null,
   })),
 };
+/** The same, before Codex has a CLI. */
+const firstDownloadAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "not-installed", version: null } : provider,
+  ),
+};
 /** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
 const openCodeInstalledAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -203,6 +210,8 @@ function ServerProvidersStory(props: {
   providerDownloads?: boolean;
   providerUpdate?: boolean;
   providerUpdateFailure?: boolean;
+  /** Codex has no CLI yet. Needs `providerUpdate`, which gives the real runtime store. */
+  providerFirstDownload?: boolean;
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   codeSignIn?: boolean;
@@ -255,7 +264,14 @@ function ServerProvidersStory(props: {
       ? {
           providerRuntimeSnapshot: {
             revision: 0,
-            providers: providerUpdateRuntimeStatuses,
+            providers: props.providerFirstDownload
+              ? {
+                  ...providerUpdateRuntimeStatuses,
+                  codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+                  // No update offer here: its notification would cover the one for the download.
+                  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
+                }
+              : providerUpdateRuntimeStatuses,
             toolRuntimes: { bun: { phase: "ready", progress: 100, message: null, version: "1.4.2" } },
           },
         }
@@ -362,11 +378,13 @@ function ServerProvidersStory(props: {
           ? usageResetAgentStatus
           : props.codeSignIn
             ? codeSignInAgentStatus
-            : props.providerUpdate
-              ? providerUpdateAgentStatus
-              : props.openCodeInstalled
-                ? openCodeInstalledAgentStatus
-                : providerAgentStatus;
+            : props.providerFirstDownload
+              ? firstDownloadAgentStatus
+              : props.providerUpdate
+                ? providerUpdateAgentStatus
+                : props.openCodeInstalled
+                  ? openCodeInstalledAgentStatus
+                  : providerAgentStatus;
       },
       connection:
         props.codeSignIn || hermes !== undefined
@@ -616,6 +634,14 @@ export const ProviderUpdateAvailable: Story = {
 
 export const ProviderUpdateRetry: Story = {
   render: () => <ServerProvidersStory providerUpdate providerUpdateFailure />,
+};
+
+/**
+ * Open ChatGPT: the page shows only the download. Press Download: the notification and the card show
+ * the progress, and the other sections come when the download ends.
+ */
+export const ProviderFirstDownload: Story = {
+  render: () => <ServerProvidersStory providerUpdate providerFirstDownload />,
 };
 
 /**
