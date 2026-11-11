@@ -2866,7 +2866,8 @@ function claudeFastModeWarning(reason: string): string | null {
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
-  if (CLAUDE_NOT_LOGGED_IN.test(text))
+  // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
+  if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
   return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
