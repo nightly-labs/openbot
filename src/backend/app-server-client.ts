@@ -206,6 +206,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#stopping = true;
     this.#cancelToolRequests();
     this.#process = null;
+    this.#resendOpenTurns();
     for (const pending of this.#pending.values()) pending.reject(new Error("Codex App Server stopped."));
     this.#pending.clear();
     child.stdin.end();
@@ -481,6 +482,12 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (failed || compacted) this.#turnContext.resend(params.threadId);
   }
 
+  /** The process ended: a turn that did not complete may not be saved, so its thread sends its blocks again. */
+  #resendOpenTurns(): void {
+    for (const threadId of this.#openTurns) this.#turnContext.resend(threadId);
+    this.#openTurns.clear();
+  }
+
   #takeServerRequestId(id: RequestId): RequestId | undefined {
     this.#toolRequests.delete(id);
     if (!isString(id)) return undefined;
@@ -602,8 +609,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (this.#process !== child) return;
     this.#cancelToolRequests();
     this.#process = null;
-    for (const threadId of this.#openTurns) this.#turnContext.resend(threadId);
-    this.#openTurns.clear();
+    this.#resendOpenTurns();
 
     for (const pending of this.#pending.values()) {
       pending.reject(error);
