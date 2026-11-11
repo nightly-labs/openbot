@@ -5,7 +5,12 @@
  */
 
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
-import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import {
+  type AgentApproval,
+  type AgentEvent,
+  type BrowserTakeoverRequest,
+  channelHandoffAgentId,
+} from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { useText } from "@openbot/ui/text";
@@ -69,7 +74,10 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const readOnly = () => page()?.channel.archived === true;
   const agentName = (agentId: string | null | undefined) => {
     const agent = channels.agents().find((candidate) => candidate.id === agentId);
-    const authored = page()?.messages.find((entry) => entry.author.id === agentId);
+    // A request that the agent posted from another conversation keeps its name after the agent is gone.
+    const authored = agentId
+      ? page()?.messages.find((entry) => entry.author.id === agentId || channelHandoffAgentId(entry.author) === agentId)
+      : undefined;
     return agent?.name ?? authored?.author.name ?? t("chat.message.agentFallback");
   };
 

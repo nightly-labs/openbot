@@ -138,6 +138,23 @@ export interface ChannelMessage {
   message: ConversationMessage;
 }
 
+const CHANNEL_HANDOFF_AUTHOR_PREFIX = "agent:";
+
+/**
+ * The author id of a request that an agent posts into a channel from another conversation
+ * (`send_to_channel`). The request is stored as a member message, as a routine request is, so that
+ * it starts a task; this id tells it from a person's message.
+ */
+export function channelHandoffAuthorId(agentId: string): string {
+  return `${CHANNEL_HANDOFF_AUTHOR_PREFIX}${agentId}`;
+}
+
+/** The agent that posted a channel message with `send_to_channel`, or null for another author. */
+export function channelHandoffAgentId(author: ChannelMessage["author"]): string | null {
+  if (author.kind !== "member" || !author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)) return null;
+  return author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null;
+}
+
 /** Deletes one message of a channel from its history and view. Agents can still remember it. */
 export interface DeleteChannelMessageInput {
   channelId: string;

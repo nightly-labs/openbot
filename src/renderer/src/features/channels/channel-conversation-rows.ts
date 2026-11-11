@@ -12,6 +12,7 @@ import {
   type ChannelTask,
   type ChannelThread,
   type ConversationQuestionPrompt,
+  channelHandoffAgentId,
   channelRoutingConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
@@ -26,11 +27,14 @@ export function channelMessageHasContent(entry: ChannelMessage): boolean {
 /**
  * One channel message as a row of the conversation view. A person's message is a `you` row with its
  * sender, so the view puts the reader's own on the right and names the other people. An agent's or
- * the coordinator's message names its author by `senderAgentId`. A routing receipt is an activity
- * row, like the "Messaged" marker of an agent chat: it has no bubble and does not count as new.
+ * the coordinator's message names its author by `senderAgentId`. So does a request that an agent
+ * posted from another conversation: it is stored as a member message, but an agent wrote it. A
+ * routing receipt is an activity row, like the "Messaged" marker of an agent chat: it has no bubble
+ * and does not count as new.
  */
 function channelConversationMessage(entry: ChannelMessage): AgentMessage {
   const member = entry.author.kind === "member";
+  const handoffAgentId = channelHandoffAgentId(entry.author);
   const row = toAgentMessage(entry.message, member ? undefined : entry.author.id);
   const routing = channelRoutingConversationEvent(entry.message);
   if (routing)
@@ -45,6 +49,7 @@ function channelConversationMessage(entry: ChannelMessage): AgentMessage {
         timestamp: entry.message.createdAt,
       },
     };
+  if (handoffAgentId) return { ...row, id: entry.id, author: "agent", senderAgentId: handoffAgentId };
   if (member)
     return { ...row, id: entry.id, author: "you", senderMember: { id: entry.author.id, name: entry.author.name } };
   return { ...row, id: entry.id, author: "agent", senderAgentId: entry.author.id };
