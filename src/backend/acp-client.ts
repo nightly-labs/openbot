@@ -2602,7 +2602,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
   #ownMcpServerNames(cwd: string): readonly string[] {
-    return this.#flavor.ownMcpServerNames?.(cwd, this.options.env) ?? [];
+    return this.#flavor.ownMcpServerNames?.(cwd, this.options.argv) ?? [];
   }
 
   /**

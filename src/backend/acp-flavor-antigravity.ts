@@ -142,11 +142,13 @@ export function antigravityGeminiHome(env: Readonly<Record<string, string | unde
  * user's, in the Gemini home, and the workspace's. A file that is missing or is not JSON gives no
  * names: the CLI starts no server from it.
  */
-function antigravityOwnMcpServerNames(cwd: string, env: Readonly<Record<string, string | undefined>>): string[] {
-  const files = [
-    join(antigravityGeminiHome(env), "config", "mcp_config.json"),
-    join(cwd, ".agents", "mcp_config.json"),
-  ];
+/** The flag that gives the CLI its Gemini home. */
+export const GEMINI_DIR_FLAG = "--gemini-dir=";
+
+function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): string[] {
+  // The account's folder travels in the flag, not in the environment of the process.
+  const home = argv.find((arg) => arg.startsWith(GEMINI_DIR_FLAG))?.slice(GEMINI_DIR_FLAG.length);
+  const files = [...(home ? [join(home, "config", "mcp_config.json")] : []), join(cwd, ".agents", "mcp_config.json")];
   return files.flatMap((file) => {
     try {
       const servers = getRecord(JSON.parse(readFileSync(file, "utf8")), "mcpServers");
@@ -159,8 +161,9 @@ function antigravityOwnMcpServerNames(cwd: string, env: Readonly<Record<string, 
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Antigravity 1.5.6 starts the entry of its own `mcp_config.json` in place of a session server with
-  // the same name, and does not start the session server. With an `enabledTools` list, that entry
-  // refused each other tool: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio" (#7785).
+  // the same name, and does not start the session server. The user's entry and its tool limits then
+  // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"
+  // is the CLI's answer for a tool that an own entry does not turn on (#7785).
   ownMcpServerNames: antigravityOwnMcpServerNames,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.

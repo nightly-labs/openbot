@@ -9,6 +9,8 @@
 // out the same way, and a failed server that OpenBot did not give
 // (the user's own `mcp_config.json`) stays the turn's error. A last case sends the failure message
 // before the stderr line: the turn still goes on, and the message is not shown as an answer.
+// From #7785: the user's own `mcp_config.json` has a server with the name of one that OpenBot gives.
+// The CLI then starts only its own entry, so OpenBot's server travels as `openbot_<name>`.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -38,6 +40,7 @@ interface Report {
   requests?: LogEntry[];
   drops?: McpServerDrop[];
   stdoutFirstDeltas?: string[];
+  ownNames?: string[] | undefined;
   error?: string;
 }
 
@@ -185,6 +188,41 @@ try {
   assert.equal(lateTurn.error, null, "The turn has no error when the message comes first.");
   assert.equal(lateTurn.reply, "OK", "The turn answers when the message comes first.");
   assert.deepEqual(deltas, ["OK"], "The failure message is not shown as an answer.");
+
+  // 5. The CLI's own files name `docs` (user file) and `notes` (workspace file).
+  await mkdir(join(root, "gemini", "config"), { recursive: true });
+  await writeFile(join(root, "gemini", "config", "mcp_config.json"), JSON.stringify({ mcpServers: { docs: {} } }));
+  const ownWorkspace = join(root, "own-workspace");
+  await mkdir(join(ownWorkspace, ".agents"), { recursive: true });
+  await writeFile(join(ownWorkspace, ".agents", "mcp_config.json"), JSON.stringify({ mcpServers: { notes: {} } }));
+  const ownLog = join(root, "own.jsonl");
+  const ownExecutable = join(root, "agy-own", "bin", "antigravity");
+  await installFakeAgent(ownExecutable, "antigravity-mcp-load-failure", { FAKE_LOG: ownLog, FAKE_RELEASE: release });
+  const own = requireProviderDriver("antigravity").createClient(
+    { executable: ownExecutable, version: "1.5.4", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("docs", "docs", "https://docs.example/mcp"),
+        httpServer("notes", "notes", "https://notes.example/mcp"),
+        httpServer("wiki", "wiki", "https://wiki.example/mcp"),
+      ],
+    },
+  );
+  clients.push(own);
+  own.start();
+  const ownThread = await startThread(own, { cwd: ownWorkspace });
+  const ownTurn = await runTurn(own, ownThread, { text: "Reply with OK only.", timeoutMs: 30_000 });
+  report.turns.ownNames = ownTurn;
+  assert.equal(ownTurn.reply, "OK", "The turn answers.");
+  const ownNames = (await readJsonl<LogEntry>(ownLog)).find((request) => request.names?.includes("wiki"))?.names;
+  report.ownNames = ownNames;
+  for (const name of ["openbot_docs", "openbot_notes", "wiki"]) {
+    assert.ok(ownNames?.includes(name), `The session gets ${name}.`);
+  }
+  assert.ok(!ownNames?.includes("docs") && !ownNames?.includes("notes"), "No server has a name from the CLI's files.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
