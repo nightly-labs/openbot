@@ -2743,7 +2743,7 @@ export class BrowserHost {
       undefined,
       (tab, deadline) =>
         Effect.gen({ self: this }, function* () {
-          const operationTimeout = remainingTime(deadline, "Browser navigate timed out.");
+          const operationTimeout = yield* browserSync(() => remainingTime(deadline, "Browser navigate timed out."));
           if (url) {
             const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
             tab.requestedUrl = normalizedUrl;
@@ -2796,7 +2796,7 @@ export class BrowserHost {
         const deadline = Date.now() + timeoutMs;
         // The engine checks this deadline between commands, which a frame that answers none of
         // them never reaches.
-        const waitTimeout = remainingTime(deadline, timeoutMessage);
+        const waitTimeout = yield* browserSync(() => remainingTime(deadline, timeoutMessage));
         yield* boundEngineOperation(
           tab,
           tab.engine.waitFor(condition, waitTimeout),
@@ -2804,7 +2804,8 @@ export class BrowserHost {
           timeoutMessage,
           keepQueueBlocked,
         );
-        return yield* readResult(tab, keepQueueBlocked, remainingTime(deadline, timeoutMessage), timeoutMessage);
+        const readTimeout = yield* browserSync(() => remainingTime(deadline, timeoutMessage));
+        return yield* readResult(tab, keepQueueBlocked, readTimeout, timeoutMessage);
       }),
     );
   });
@@ -2890,17 +2891,23 @@ export class BrowserHost {
         }
       }
     });
+    const outcome = (cause: unknown): BrowserStepOutcome =>
+      cause instanceof BrowserUserControlHeld
+        ? { status: "user_control" }
+        : {
+            status: "error",
+            // run_script raises the message as a script Error, which adds its own "Error: " prefix.
+            error: redactText(cause instanceof Error ? cause.message : String(cause)),
+          };
     return yield* run.pipe(
-      Effect.catch((failure) =>
-        Effect.succeed<BrowserStepOutcome>(
-          failure.cause instanceof BrowserUserControlHeld
-            ? { status: "user_control" }
-            : {
-                status: "error",
-                // run_script raises the message as a script Error, which adds its own "Error: " prefix.
-                error: redactText(failure.cause instanceof Error ? failure.cause.message : String(failure.cause)),
-              },
-        ),
+      Effect.catch((failure) => Effect.succeed(outcome(failure.cause))),
+      // A plain throw in a step is a defect. As a failed tool request, Codex showed only "dynamic tool request
+      // failed", and the agent lost the steps that had run and could repeat them (#6712).
+      Effect.catchDefect((defect) =>
+        Effect.sync(() => {
+          logger.warn("A browser script step failed unexpectedly.", { action: step.action, error: toLogValue(defect) });
+          return outcome(defect);
+        }),
       ),
     );
   });
