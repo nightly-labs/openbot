@@ -1,5 +1,5 @@
 import type { BrowserDiagnosticEntry, BrowserSiteMemory, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
-import { Context, Deferred, Effect, Fiber, Result } from "effect";
+import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import {
   CHALLENGE_CLICK_WAIT_MS,
@@ -31,6 +31,14 @@ const OPERATION_DEADLINE_BACKSTOP_MS = 250;
  */
 export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("openbot/BrowserToolHold", {
   defaultValue: () => () => false,
+});
+
+/**
+ * How long an agent tool waits for the earlier operations of a tab. Only the agent tool paths provide
+ * it: a person's actions and the host's own work wait as before.
+ */
+export const BrowserToolQueueWait = Context.Reference<number | undefined>("openbot/BrowserToolQueueWait", {
+  defaultValue: () => undefined,
 });
 
 /**
@@ -88,8 +96,11 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
 ) {
   // Read in the caller's fiber: the queued work below runs in the tab scope.
   const heldByUser = yield* BrowserToolHold;
+  const queueWaitMs = yield* BrowserToolQueueWait;
+  const dialogTurn = yield* BrowserDialogTurn;
   const previous = tab.queue;
   const drained = Deferred.makeUnsafe<void>();
+  const started = Deferred.makeUnsafe<void>();
   const response = Deferred.makeUnsafe<A, BrowserOperationError>();
   const drains: Effect.Effect<unknown, BrowserOperationError>[] = [];
   let cancelled = false;
@@ -101,6 +112,7 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
       const result = yield* Effect.exit(
         Effect.gen(function* () {
           yield* Deferred.await(previous);
+          yield* Deferred.succeed(started, undefined);
           if (cancelled) return yield* Effect.interrupt;
           // An operation that was queued before the person took the tab must not act on it.
           if (heldByUser(tab.id)) return yield* browserFailure(new BrowserUserControlHeld(tab.id));
@@ -131,15 +143,36 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
     tab.scope,
     { startImmediately: true, uninterruptible: true },
   );
-  return yield* Deferred.await(response).pipe(
-    Effect.onInterrupt(() =>
-      Effect.sync(() => {
-        cancelled = true;
-        if (active) active.interruptUnsafe();
-      }),
-    ),
-  );
+  const cancel = () => {
+    cancelled = true;
+    if (active) active.interruptUnsafe();
+  };
+  return yield* Effect.gen(function* () {
+    if (queueWaitMs !== undefined) {
+      const reached = yield* Deferred.await(started).pipe(Effect.timeoutOption(queueWaitMs));
+      // The queue moves on without this operation, which does not run when its turn comes.
+      if (Option.isNone(reached)) {
+        cancel();
+        return yield* browserFailure(new Error(queueWaitError(tab, dialogTurn)));
+      }
+    }
+    return yield* Deferred.await(response);
+  }).pipe(Effect.onInterrupt(() => Effect.sync(cancel)));
 });
+
+/**
+ * An earlier operation on the tab did not finish, for example a command that a page dialog or a page that
+ * does not answer holds. The agent gets an error that it can act on, not a tool call that never returns.
+ */
+function queueWaitError(tab: BrowserHostTab, turn: BrowserDialogOwner | undefined) {
+  const dialog = tab.engine.dialog;
+  // A call that was queued before the dialog opened. A later call gets this advice from the tab check.
+  if (dialog && turn && tab.engine.dialogOwnedBy(turn))
+    return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
+  if (dialog)
+    return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
+  return "An earlier action on this tab did not finish, so this call did not run. Open the page in a new tab, or try again later.";
+}
 
 /**
  * A page also changes with no tool action: live data, timers and late content. An image older than
