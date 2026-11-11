@@ -3568,6 +3568,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         move: "return",
       };
     const limited = !this.#usageLimits.mayDrain(agentId);
+    // A message from the user tries the held model first: the limit can have ended outside OpenBot.
+    // A refused try holds the agent again, and the drain after it moves (#7068).
+    if (limited && this.#usageLimits.mayTry(agentId)) return null;
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
     const taskWork = () =>
