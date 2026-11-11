@@ -1602,11 +1602,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // 1.0.108 answers "Session <id> is already loaded" to each load (#6962). `session/close` also
     // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
     // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
-    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0)
+    // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
+    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
+      this.#stopThreadSubagents(requestedThreadId);
       yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
         this.#backgroundTimeout("session/close"),
         Effect.ignore,
       );
+    }
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
     // Keep its bridge until the replacement succeeds, so a failure can be retried in this session.
