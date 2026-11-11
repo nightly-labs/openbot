@@ -3434,6 +3434,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         : ["edit", "delete", "move"].includes(params.toolCall.kind ?? "")
           ? "file-change"
           : "permissions";
+    // A confined process is a Workspace only agent: the sandbox limits its writes, so a call to OpenBot's
+    // own tools is not a step outside that limit. The tools ask the user themselves where they must,
+    // and a Claude agent at Workspace only runs them without a card, too (#7086). Only once: an "always"
+    // answer stays in the agent's own state, also after the user chooses Ask first.
+    if (
+      this.options.confine &&
+      kind === "permissions" &&
+      thread &&
+      turn &&
+      !turn.stopped &&
+      !turn.completing &&
+      callsBridgeTool(thread, params.toolCall.title)
+    ) {
+      const option = params.options.find((candidate) => candidate.kind === "allow_once");
+      if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
+    }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const result = yield* this.#waitForUser(
       turn,
@@ -3682,6 +3698,18 @@ function toolOutputText(rawOutput: unknown): string {
 function bestPermissionOption(options: PermissionOption[], accepted: boolean): PermissionOption | null {
   const kinds = accepted ? ["allow_once", "allow_always"] : ["reject_once", "reject_always"];
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
+}
+
+/**
+ * Whether a permission request names a tool that the session's OpenBot bridge servers give. Grok names
+ * an MCP tool `<server>__<tool>`, such as `openbot__tool_call`. Only the exact name of a bridge tool
+ * matches: a user's server cannot take a bridge server's name (`isReservedMcpServerName`), and a name
+ * such as `openbot__files` gives tools named `openbot__files__<tool>`.
+ */
+function callsBridgeTool(thread: AcpThread, title: string | null | undefined): boolean {
+  return thread.dynamicTools.some((namespace) =>
+    namespace.tools.some((tool) => title === `${namespace.name}__${tool.name}`),
+  );
 }
 
 function isDynamicToolResult(value: unknown): value is DynamicToolResult {
