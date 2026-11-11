@@ -72,7 +72,7 @@ import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
-import { MESSAGING_OUTBOUND_TOOLS } from "../messaging/messaging-tools";
+import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
   acknowledgeRequestToolSchema,
@@ -1567,8 +1567,9 @@ export class OpenBotToolRouter {
     }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel.
-    if (MESSAGING_OUTBOUND_TOOLS.has(params.tool))
+    // Any agent can post on its own initiative, such as a routine that reports to a Discord channel,
+    // and read a place that it names, such as a routine that summarizes a WhatsApp chat.
+    if (isMessagingOutboundCall(params.tool, params.arguments))
       return yield* this.#messaging.outboundTool(senderAgentId, params.tool, params.arguments, (paths) =>
         // The attachment path rules: the agent's workspace, its folders, or the OpenBot shared directory,
         // which holds the files the user attached. The adapters read each file again by its path.

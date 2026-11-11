@@ -275,9 +275,12 @@ whole list, with the ID of each fact. The prompt marks the facts as data, not in
 - OpenBot has no screen for these facts yet. Ask the agent in the workspace to forget a fact.
 
 `openbot.messaging_history` reads the newest messages of the conversation's own channel or thread:
-30 by default, 100 at most. It reads no other place. Slack can limit it to one read a minute; it
+30 by default, 100 at most. With `connection` and `place` from `openbot.messaging_list_places`, it
+reads that place in any turn, for example in a routine that summarizes a chat each morning. It
+reads only a place that the list shows. Slack can limit it to one read a minute; it
 then fails at once, and the agent can try again. Discord gives the text only of messages that
-mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this computer saw since it started.
+mention OpenBot, and of bot posts. Discord messages name their files. Telegram and WhatsApp give
+what this computer saw since it started; WhatsApp keeps the newest 200 messages of all its chats.
 
 ## Posts that an agent sends
 
