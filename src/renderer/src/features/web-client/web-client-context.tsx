@@ -787,7 +787,7 @@ export function createWebWorkspace(
   async function loadAvatar(hostId: string, id: string, source: string): Promise<string | null> {
     const saved = await readSavedAgentPicture(props.accountId, hostId, id, source);
     if (saved || !avatarOnline || avatarHost !== hostId) return saved;
-    const mark = agentPictureMark();
+    const mark = agentPictureMark(props.accountId, hostId);
     const url = await runtime.agentAvatar(id, source);
     if (avatarHost === hostId) void saveAgentPicture(props.accountId, hostId, id, source, url, mark);
     return url;

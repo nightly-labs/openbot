@@ -2790,6 +2790,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#webrtcTransport?.hasActiveTransfers() ?? false;
   }
 
+  /** Deletes the picture copies of every server. A signed-out app keeps none. */
+  forgetSavedPictures(): Effect.Effect<void> {
+    return this.#pictures.clear();
+  }
+
   readonly disconnectRemoteSessions = Effect.fn("RemoteManager.disconnectRemoteSessions")(
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;

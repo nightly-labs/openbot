@@ -1549,7 +1549,8 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
   an agent avatar with no saved copy loads only when the host is online. The web connect starts
   before the frame renders.
 - The frame names each picture by a host URL, which only the host can answer. Each client thus keeps
-  a copy of the pictures that it loaded, and shows it while the host is offline. Desktop keeps agent
+  a copy of the pictures that it loaded, and shows the agent pictures while the host is offline. The
+  frame keeps no channel picture URL, so a channel copy only saves a download while the host is online. Desktop keeps agent
   and channel pictures on disk in the main process (`src/main/remote-picture-cache.ts`, folder
   `remote-pictures` in `userData`, one account, 400 pictures for each server). Web keeps agent
   pictures in the browser's Cache storage

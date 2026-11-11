@@ -14,8 +14,19 @@ const PICTURE_PATH = "/openbot-agent-pictures/";
 /** The host's URL of the saved picture. A different URL is a different picture. */
 const SOURCE_HEADER = "X-OpenBot-Picture-Source";
 
-// A delete changes this, so a picture that was read from the host before it is not saved after it.
-let deletes = 0;
+// A delete changes the mark of each server that loses its pictures, so a picture that was read from
+// the host before the delete is not saved after it. A server that keeps its pictures keeps its
+// mark: the refresh of the server list must not drop the saves that are in progress.
+let signOuts = 0;
+const serverDeletes = new Map<string, number>();
+
+function mark(accountId: string, serverId: string): string {
+  return `${signOuts}:${serverDeletes.get(serverPrefix(accountId, serverId)) ?? 0}`;
+}
+
+function changeMark(prefix: string): void {
+  serverDeletes.set(prefix, (serverDeletes.get(prefix) ?? 0) + 1);
+}
 
 function accountPrefix(accountId: string): string {
   return `${PICTURE_PATH}${encodeURIComponent(accountId)}/`;
@@ -48,8 +59,10 @@ async function deleteWhere(remove: (path: string) => boolean): Promise<void> {
 }
 
 /** The state before a read from the host. `saveAgentPicture` saves only while it is the same. */
-export function agentPictureMark() {
-  return deletes;
+export function agentPictureMark(accountId: string, serverId: string) {
+  const prefix = serverPrefix(accountId, serverId);
+  if (!serverDeletes.has(prefix)) serverDeletes.set(prefix, 0);
+  return mark(accountId, serverId);
 }
 
 /** The saved picture of `source` as a data URL, or null. */
@@ -75,17 +88,17 @@ export async function saveAgentPicture(
   agentId: string,
   source: string,
   url: string,
-  mark: number,
+  savedMark: string,
 ): Promise<void> {
   try {
     const cache = await open();
-    if (!cache || mark !== deletes) return;
+    if (!cache || savedMark !== mark(accountId, serverId)) return;
     await cache.put(
       pictureKey(accountId, serverId, agentId),
       new Response(url, { headers: { [SOURCE_HEADER]: encodeURIComponent(source) } }),
     );
     // A delete that started during the write did not see this picture.
-    if (mark !== deletes) await cache.delete(pictureKey(accountId, serverId, agentId));
+    if (savedMark !== mark(accountId, serverId)) await cache.delete(pictureKey(accountId, serverId, agentId));
   } catch {
     // A full or blocked storage keeps no copy; the host has the picture.
   }
@@ -99,9 +112,13 @@ export async function deleteSavedAgentPictures(
   accountId: string | null,
   keepServerIds: readonly string[] = [],
 ): Promise<void> {
-  deletes += 1;
-  if (accountId === null) return deleteWhere((path) => path.startsWith(PICTURE_PATH));
+  if (accountId === null) {
+    signOuts += 1;
+    return deleteWhere((path) => path.startsWith(PICTURE_PATH));
+  }
   const kept = keepServerIds.map((serverId) => serverPrefix(accountId, serverId));
+  for (const prefix of serverDeletes.keys())
+    if (prefix.startsWith(accountPrefix(accountId)) && !kept.includes(prefix)) changeMark(prefix);
   return deleteWhere(
     (path) => path.startsWith(accountPrefix(accountId)) && !kept.some((prefix) => path.startsWith(prefix)),
   );
@@ -109,7 +126,7 @@ export async function deleteSavedAgentPictures(
 
 /** Deletes the pictures of one server, as when the host ends access. */
 export async function deleteSavedServerPictures(accountId: string, serverId: string): Promise<void> {
-  deletes += 1;
+  changeMark(serverPrefix(accountId, serverId));
   return deleteWhere((path) => path.startsWith(serverPrefix(accountId, serverId)));
 }
 

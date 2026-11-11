@@ -475,7 +475,7 @@ sessions that are open at that time. The setting is on by default and is stored
 in `openbot-remote-session-reuse-preference-v1.json`.
 
 The desktop app and the web client keep a copy of the agent and channel pictures that they loaded
-from a joined server, so that the pictures show while the server is offline, for example during its
+from a joined server, so that the agent pictures show while the server is offline, for example during its
 restart for an update. The desktop app keeps the copies in the `remote-pictures` folder of its data
 folder; the web client keeps the agent pictures in the Cache storage of openbot.run in your browser.
 The copies stay on that computer or in that browser. They are deleted when you sign out, when
