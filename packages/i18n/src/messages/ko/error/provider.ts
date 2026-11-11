@@ -217,6 +217,8 @@ export const messages = {
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT가 이전 시작 후 아직 로컬 기록을 준비하고 있어요. 몇 분 기다린 후 다시 시도해 주세요.",
+  "error.provider.codexThreadInUse":
+    "다른 Codex 앱(Codex 데스크톱 앱, Codex CLI, IDE 확장 프로그램 등)이 이 채팅을 열어 두었어요. Codex 채팅에는 한 번에 하나의 앱만 쓸 수 있어요. 그 앱에서 채팅을 닫은 후 메시지를 다시 보내 주세요.",
   "error.provider.realtimeLimitZero":
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.opencodeDatabaseNewer":

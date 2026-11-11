@@ -203,6 +203,8 @@ export const messages = {
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT עדיין מכין את ההיסטוריה המקומית שלו אחרי הפעלה קודמת. יש להמתין כמה דקות ואז לנסות שוב.",
+  "error.provider.codexThreadInUse":
+    "אפליקציית Codex אחרת פתחה את הצ'אט הזה, למשל אפליקציית Codex למחשב, Codex CLI או תוסף IDE. רק אפליקציה אחת בכל פעם יכולה לכתוב לצ'אט של Codex. יש לסגור את הצ'אט באותה אפליקציה ואז לשלוח את ההודעה שוב.",
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.opencodeDatabaseNewer":

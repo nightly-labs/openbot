@@ -193,6 +193,8 @@ export const messages = {
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
+  "error.provider.codexThreadInUse":
+    "另一个 Codex 应用（例如 Codex 桌面应用、Codex CLI 或 IDE 扩展）打开了此聊天。同一时间只有一个应用可以写入 Codex 聊天。请在该应用中关闭此聊天，然后重新发送消息。",
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.opencodeDatabaseNewer":
