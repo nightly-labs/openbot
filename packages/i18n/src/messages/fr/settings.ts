@@ -104,6 +104,8 @@ export const messages = {
   "settings.sendShortcut.title": "Raccourci d’envoi",
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
+  "settings.chatOrder.description":
+    "Choisissez où la barre latérale affiche les discussions non lues sur cet appareil. Manuel désactive le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",
@@ -270,6 +272,9 @@ export const messages = {
     "Faites glisser le dock vers le haut ou le bas pour le déplacer le long du bord.",
   "settings.agentDock.edge.right": "Droite",
   "settings.agentDock.edge.left": "Gauche",
+  "settings.agentDock.size.title": "Taille du dock",
+  "settings.agentDock.size.description":
+    "Faites glisser pour changer la taille du dock au-dessus des autres apps. Dans la fenêtre principale, le dock suit la taille de l’interface.",
   "settings.agentDock.autoHide.title": "Masquer quand inutilisé",
   "settings.agentDock.autoHide.description": "Le dock glisse dans le bord. Amenez le pointeur au bord pour l’afficher.",
   "settings.agentDock.edgeStrip.title": "Afficher une bande au bord",
@@ -533,6 +538,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} est prête. Redémarrez pour l’appliquer.",
   "settings.updates.status.installing": "Redémarrage pour appliquer {target}…",
   "settings.updates.status.upToDate": "OpenBot est à jour sur le canal Stable.",
+  "settings.updates.status.staged":
+    "{target} est déployé progressivement. Recherchez les mises à jour pour l'obtenir maintenant.",
   "settings.updates.status.checkFailed": "OpenBot n’a pas pu rechercher les mises à jour. Réessayez.",
   "settings.updates.status.unsupported": "Les mises à jour ne sont pas disponibles dans cette version.",
   "settings.updates.actionFailed": "Impossible de mettre à jour OpenBot.",

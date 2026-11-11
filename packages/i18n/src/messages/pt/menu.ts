@@ -18,6 +18,7 @@ export const messages = {
   "menu.trayOpen": "Abrir o OpenBot",
   "menu.trayQuit": "Sair do OpenBot",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "Ocultar Dynamic Island",
   "menu.undo": "Desfazer",
   "menu.redo": "Refazer",
   "menu.cut": "Recortar",

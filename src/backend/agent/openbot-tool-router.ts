@@ -44,6 +44,8 @@ import {
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
+  channelAllowsBrowser,
+  channelBrowserAgent,
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
@@ -103,6 +105,7 @@ import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approva
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
@@ -680,6 +683,16 @@ export class OpenBotToolRouter {
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
+            // A channel can give the browser to one member, or to none (#4135).
+            // The provider names its own thread. The channel knows the OpenBot thread.
+            const channelRefusal = this.#channelBrowserRefusal(
+              this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              agentId,
+            );
+            if (channelRefusal) {
+              client.respond(toolRequest.id, channelRefusal);
+              return;
+            }
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               // A takeover of a stopped client ends with a cancel, and that process has nothing to answer.
@@ -733,10 +746,14 @@ export class OpenBotToolRouter {
                   // A Link card is read from Link before the fill; a saved card comes from the Vault.
                   const linkVault = yield* this.#attention.linkCardVault(client, toolRequest, params);
                   if (linkVault && !("secret" in linkVault)) return linkVault;
-                  return yield* this.#browser.handleDynamicTool(params, {
+                  const result = yield* this.#browser.handleDynamicTool(params, {
                     onUserControl: userControl,
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                  if (params.tool !== "screenshot") return result;
+                  // The attachment gateway resolves the same workspace when the agent attaches the file.
+                  const workspacePath = () => this.#conversation.requireKnownAgent(agentId).workspacePath;
+                  return yield* saveBrowserScreenshot(workspacePath, params.arguments, result);
                 }
               }
             });
@@ -2297,8 +2314,11 @@ export class OpenBotToolRouter {
    * refused too: the Team API checks that member's agent access. The agent's own chat counts, and so
    * does a side thread that the person opened, or branched, and that takes no routine runs. A channel
    * task and a Slack or Telegram message also arrive as `user`, so a thread linked to either does not.
+   * `threadId` can be the provider's id: the checks below need the public id, or an external chat
+   * passes as the agent's own chat.
    */
-  #requestedByPerson(agentId: string, turnId: string, executionThreadId: string): boolean {
+  #requestedByPerson(agentId: string, turnId: string, threadId: string): boolean {
+    const executionThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
     return (
       deliveries.length > 0 &&
@@ -2308,6 +2328,24 @@ export class OpenBotToolRouter {
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  /**
+   * The answer to a browser call of `agentId` in the channel thread `threadId`, when the channel's
+   * Browser setting gives the browser to another member or to none. `null` outside a channel and
+   * for a member that can use it.
+   */
+  #channelBrowserRefusal(threadId: string, agentId: string): DynamicToolResult | null {
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId || !this.#channels.store.exists(channelId)) return null;
+    const channel = this.#channels.store.get(channelId);
+    if (channelAllowsBrowser(channel, agentId)) return null;
+    const browserAgent = channelBrowserAgent(channel);
+    const text =
+      typeof browserAgent === "string"
+        ? `In this channel, only ${this.#channels.hooks.agents().find((agent) => agent.id === browserAgent)?.name ?? browserAgent} (agentId ${browserAgent}) can use the browser. Give the browser step to that member with channel_assign, and use its result.`
+        : "No member can use the browser in this channel. Do the work without it, or tell the person that the browser is off in this channel.";
+    return { success: false, contentItems: [{ type: "inputText", text }] };
   }
 
   /** Whether a team member on another computer sent this message. */

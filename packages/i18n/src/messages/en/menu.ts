@@ -20,6 +20,7 @@ export const messages = defineMessages("menu", {
   "menu.trayOpen": "Open OpenBot",
   "menu.trayQuit": "Quit OpenBot",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "Hide Dynamic Island",
   "menu.undo": "Undo",
   "menu.redo": "Redo",
   "menu.cut": "Cut",

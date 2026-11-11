@@ -97,6 +97,8 @@ export const messages = {
   "sidebar.waiting.label": { other: "확인 필요, 채팅 {count}개" },
   "sidebar.unread.title": "읽지 않음",
   "sidebar.unread.label": { other: "읽지 않음, 채팅 {count}개" },
+  "sidebar.unread.actions": "읽지 않음 작업",
+  "sidebar.unread.turnOff": "읽지 않음 그룹 끄기",
   "sidebar.waiting.action.question": "답변",
   "sidebar.waiting.action.approval": "검토",
   "sidebar.waiting.action.takeover": "직접 처리",

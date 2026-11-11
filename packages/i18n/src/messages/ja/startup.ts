@@ -18,4 +18,19 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot をダウンロード",
   "startup.newerDataGuide": "ガイドを開く",
   "startup.newerDataQuit": "終了",
+  "startup.recoveryWindowTitle": "OpenBot の復旧",
+  "startup.recoveryTitle": "OpenBot を開けませんでした",
+  "startup.recoveryBody": {
+    other:
+      "OpenBot {version} は開く前に {count} 回続けて停止しました。ローカルデータはリセットも上書きもされていません。",
+  },
+  "startup.recoveryHint":
+    "もう一度試すか、最後に開けたバージョンをインストールしてください。サポートが必要な場合は、診断情報を書き出し、そのファイルをレポートと一緒に送ってください。",
+  "startup.recoveryRetry": "再試行",
+  "startup.recoveryPreviousVersion": "前のバージョンをダウンロード",
+  "startup.recoveryExportDiagnostics": "診断情報を書き出す",
+  "startup.recoveryOpenDataFolder": "データフォルダを開く",
+  "startup.recoveryQuit": "終了",
+  "startup.recoveryDiagnosticsSaved": "診断ファイルを保存しました。",
+  "startup.recoveryActionFailed": "OpenBot はこの操作を実行できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

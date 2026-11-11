@@ -94,6 +94,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "فُتح الرابط في المتصفح الافتراضي.",
   "settings.sendShortcut.title": "اختصار الإرسال",
   "settings.sendShortcut.description": "اختر المفاتيح التي ترسل رسالة على هذا الجهاز والمتصفح.",
+  "settings.chatOrder.description":
+    "اختر مكان عرض الدردشات غير المقروءة في الشريط الجانبي على هذا الجهاز. الخيار يدوي يوقف مجموعة غير المقروءة.",
   "settings.sendShortcut.enter": "Enter للإرسال",
   "settings.sendShortcut.modEnterMac": "⌘Enter للإرسال",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter للإرسال",
@@ -259,6 +261,9 @@ export const messages = {
   "settings.agentDock.edge.description": "اسحب الشريط لأعلى أو لأسفل لتحريكه على طول الحافة.",
   "settings.agentDock.edge.right": "اليمين",
   "settings.agentDock.edge.left": "اليسار",
+  "settings.agentDock.size.title": "حجم الشريط",
+  "settings.agentDock.size.description":
+    "اسحب لتغيير حجم الشريط فوق التطبيقات الأخرى. في النافذة الرئيسية، يتبع الشريط حجم الواجهة.",
   "settings.agentDock.autoHide.title": "إخفاء عند عدم الاستخدام",
   "settings.agentDock.autoHide.description": "ينزلق الشريط داخل الحافة. حرّك المؤشر إلى الحافة لإظهاره.",
   "settings.agentDock.edgeStrip.title": "إظهار شريط رفيع عند الحافة",
@@ -526,6 +531,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} جاهز. أعد التشغيل للتطبيق.",
   "settings.updates.status.installing": "جارٍ إعادة التشغيل لتطبيق {target}…",
   "settings.updates.status.upToDate": "OpenBot محدّث على المسار المستقر.",
+  "settings.updates.status.staged": "يُطرح {target} لبعض الأجهزة أولًا. تحقق من وجود تحديثات للحصول عليه الآن.",
   "settings.updates.status.checkFailed": "تعذّر على OpenBot التحقق من وجود تحديثات. حاول مرة أخرى.",
   "settings.updates.status.unsupported": "التحديثات غير متاحة في هذا الإصدار.",
   "settings.updates.actionFailed": "تعذّر تحديث OpenBot.",

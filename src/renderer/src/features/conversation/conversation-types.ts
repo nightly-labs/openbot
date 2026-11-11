@@ -113,6 +113,14 @@ export interface ConversationChannelSource {
   ownMessage: (message: AgentMessage) => boolean;
   /** The agents that work now. */
   workers: () => ChannelWorker[];
+  /** The threads of the members in this channel. The Browser pane shows the tabs that they own. */
+  memberThreadIds: () => ReadonlySet<string>;
+  /**
+   * The member thread that a new tab of the Browser pane goes to: the browser member of the Browser
+   * setting, else the lead, else the first member. Null when no member can use the browser here, or
+   * when that member has no thread in the channel yet.
+   */
+  browserOwner: () => { agentId: string; threadId: string } | null;
   /** The turns of the workers that run now, whose steps show under the activity line. */
   workingTurns: () => readonly string[];
   /** The agent that the prompt, approval or takeover on screen comes from. */

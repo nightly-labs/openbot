@@ -18,6 +18,12 @@ import { bridgedToolName, getString, type ThreadItem } from "../protocol";
 const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
 
 /**
+ * The quiet token of Hermes Agent cron jobs. The Hermes import copies job prompts as they are, and a
+ * model trained on Hermes writes it, so the whole answer `[SILENT]` is also the marker (#6909).
+ */
+const HERMES_SILENT_MARKER = "[silent]";
+
+/**
  * The OpenBot tool that a quiet routine run calls when it has nothing to report. A model often
  * writes a short sentence instead of the exact marker; a tool call does not depend on the wording or
  * the language. It has no arguments, so the provider history shows the decision by the tool name.
@@ -70,7 +76,8 @@ export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
 
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
-  return text.trim() === ROUTINE_NO_UPDATE_MARKER;
+  const answer = text.trim();
+  return answer === ROUTINE_NO_UPDATE_MARKER || answer.toLowerCase() === HERMES_SILENT_MARKER;
 }
 
 /**

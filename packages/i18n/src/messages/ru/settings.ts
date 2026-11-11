@@ -97,6 +97,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Ссылка открылась в основном браузере.",
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description": "Выберите клавиши для отправки сообщения на этом устройстве и в этом браузере.",
+  "settings.chatOrder.description":
+    "Выберите, где боковая панель показывает непрочитанные чаты на этом устройстве. «Вручную» отключает группу «Непрочитанные».",
   "settings.sendShortcut.enter": "Отправка по Enter",
   "settings.sendShortcut.modEnterMac": "Отправка по ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Отправка по Ctrl+Enter",
@@ -262,6 +264,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Перетащите док вверх или вниз, чтобы сдвинуть его вдоль края.",
   "settings.agentDock.edge.right": "Справа",
   "settings.agentDock.edge.left": "Слева",
+  "settings.agentDock.size.title": "Размер дока",
+  "settings.agentDock.size.description":
+    "Перетащите, чтобы изменить размер дока поверх других приложений. В главном окне док следует размеру интерфейса.",
   "settings.agentDock.autoHide.title": "Скрывать, когда не используется",
   "settings.agentDock.autoHide.description": "Док уходит за край. Подведите указатель к краю, чтобы показать его.",
   "settings.agentDock.edgeStrip.title": "Показывать полоску у края",
@@ -529,6 +534,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} готово. Перезапустите, чтобы применить.",
   "settings.updates.status.installing": "Перезапуск для применения {target}…",
   "settings.updates.status.upToDate": "OpenBot обновлён до последней версии канала Stable.",
+  "settings.updates.status.staged": "{target} выпускается поэтапно. Проверьте обновления, чтобы получить его сейчас.",
   "settings.updates.status.checkFailed": "OpenBot не удалось проверить обновления. Повторите попытку.",
   "settings.updates.status.unsupported": "В этой сборке обновления недоступны.",
   "settings.updates.actionFailed": "Не удалось обновить OpenBot.",

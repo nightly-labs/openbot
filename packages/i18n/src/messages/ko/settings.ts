@@ -95,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "링크를 기본 브라우저에서 열었어요.",
   "settings.sendShortcut.title": "전송 단축키",
   "settings.sendShortcut.description": "이 기기와 브라우저에서 메시지를 보낼 키를 선택해요.",
+  "settings.chatOrder.description":
+    "이 기기의 사이드바에서 읽지 않은 채팅을 표시할 위치를 선택합니다. 수동을 선택하면 읽지 않음 그룹이 꺼집니다.",
   "settings.sendShortcut.enter": "Enter로 전송",
   "settings.sendShortcut.modEnterMac": "⌘Enter로 전송",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter로 전송",
@@ -255,6 +257,9 @@ export const messages = {
   "settings.agentDock.edge.description": "독을 위아래로 드래그하면 가장자리를 따라 이동합니다.",
   "settings.agentDock.edge.right": "오른쪽",
   "settings.agentDock.edge.left": "왼쪽",
+  "settings.agentDock.size.title": "독 크기",
+  "settings.agentDock.size.description":
+    "드래그하여 다른 앱 위에 표시되는 독의 크기를 바꿉니다. 기본 창에서는 독이 인터페이스 크기를 따릅니다.",
   "settings.agentDock.autoHide.title": "사용하지 않을 때 숨기기",
   "settings.agentDock.autoHide.description": "독이 가장자리 안으로 들어갑니다. 포인터를 가장자리로 옮기면 나타납니다.",
   "settings.agentDock.edgeStrip.title": "가장자리에 띠 표시",
@@ -503,6 +508,8 @@ export const messages = {
   "settings.updates.status.ready": "{target}이(가) 준비되었어요. 다시 시작하면 적용돼요.",
   "settings.updates.status.installing": "{target}을(를) 적용하려고 다시 시작하는 중…",
   "settings.updates.status.upToDate": "OpenBot이 안정 채널의 최신 상태예요.",
+  "settings.updates.status.staged":
+    "{target}이(가) 일부 컴퓨터부터 배포되고 있어요. 지금 받으려면 업데이트를 확인하세요.",
   "settings.updates.status.checkFailed": "OpenBot이 업데이트를 확인할 수 없어요. 다시 시도해 주세요.",
   "settings.updates.status.unsupported": "이 빌드에서는 업데이트를 사용할 수 없어요.",
   "settings.updates.actionFailed": "OpenBot을 업데이트할 수 없어요.",

@@ -80,6 +80,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
+  CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
@@ -194,6 +195,7 @@ import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes
 import { SIDEBAR_FOLDERS_CAPABILITY, sidebarFoldersEvent } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -1128,7 +1130,7 @@ export class TeamApiServer {
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeProviderSignOut(context, this.#options.providerSignOut)) === "handled") return;
-      if ((await routeStorage(context, this.#options.storage)) === "handled") return;
+      if ((await routeStorage(context, this.#options.storage, this.#options.channels, hidden)) === "handled") return;
       if ((await routeMachineResources(context, this.#options.machine)) === "handled") return;
       if ((await routeBackgroundProcesses(context, this.#options.backgroundProcesses, hidden)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
@@ -2226,6 +2228,7 @@ export class TeamApiServer {
       channelAttention: route.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
       channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
       channelPicture: route.capabilities.has(CHANNEL_PICTURE_CAPABILITY),
+      channelBrowser: route.capabilities.has(CHANNEL_BROWSER_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
@@ -2409,7 +2412,8 @@ export class TeamApiServer {
             capability === CHANNEL_DELETE_CAPABILITY ||
             capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
             capability === CHANNEL_ISOLATION_CAPABILITY ||
-            capability === CHANNEL_PICTURE_CAPABILITY
+            capability === CHANNEL_PICTURE_CAPABILITY ||
+            capability === CHANNEL_BROWSER_CAPABILITY
           )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
@@ -2456,6 +2460,8 @@ export class TeamApiServer {
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === STORAGE_CHANNEL_CAPABILITY)
+            return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
           if (capability === BACKGROUND_PROCESSES_CAPABILITY) return this.#options.backgroundProcesses !== undefined;
           // The routes use the agent operations, which every host has. A channel owner also needs `channel-chats-v1`.

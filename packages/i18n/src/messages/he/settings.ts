@@ -94,6 +94,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "הקישור נפתח בדפדפן ברירת המחדל.",
   "settings.sendShortcut.title": "קיצור שליחה",
   "settings.sendShortcut.description": "בחירת המקשים ששולחים הודעה במכשיר ובדפדפן הזה.",
+  "settings.chatOrder.description":
+    "בחרו היכן סרגל הצד מציג צ'אטים שלא נקראו במכשיר הזה. ידני מכבה את הקבוצה לא נקראו.",
   "settings.sendShortcut.enter": "Enter לשליחה",
   "settings.sendShortcut.modEnterMac": "⌘Enter לשליחה",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter לשליחה",
@@ -249,6 +251,9 @@ export const messages = {
   "settings.agentDock.edge.description": "גרירת המעגן למעלה או למטה מזיזה אותו לאורך הקצה.",
   "settings.agentDock.edge.right": "ימין",
   "settings.agentDock.edge.left": "שמאל",
+  "settings.agentDock.size.title": "גודל המעגן",
+  "settings.agentDock.size.description":
+    "גררו כדי לשנות את גודל המעגן מעל אפליקציות אחרות. בחלון הראשי, המעגן עוקב אחר גודל הממשק.",
   "settings.agentDock.autoHide.title": "הסתרה כשלא בשימוש",
   "settings.agentDock.autoHide.description": "המעגן נכנס לקצה. הזזת המצביע לקצה מציגה אותו.",
   "settings.agentDock.edgeStrip.title": "הצגת פס בקצה",
@@ -498,6 +503,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} מוכן. יש להפעיל מחדש כדי להחיל.",
   "settings.updates.status.installing": "מופעל מחדש כדי להחיל את {target}…",
   "settings.updates.status.upToDate": "OpenBot מעודכן במסלול היציב.",
+  "settings.updates.status.staged": "{target} מופץ בהדרגה. יש לבדוק אם יש עדכונים כדי לקבל אותו עכשיו.",
   "settings.updates.status.checkFailed": "OpenBot לא הצליח לבדוק עדכונים. יש לנסות שוב.",
   "settings.updates.status.unsupported": "עדכונים אינם זמינים בגרסה הזו.",
   "settings.updates.actionFailed": "לא ניתן לעדכן את OpenBot.",

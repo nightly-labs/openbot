@@ -96,6 +96,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Bağlantı varsayılan tarayıcıda açıldı.",
   "settings.sendShortcut.title": "Gönderme kısayolu",
   "settings.sendShortcut.description": "Bu cihazda ve tarayıcıda mesaj gönderen tuşları seçin.",
+  "settings.chatOrder.description":
+    "Kenar çubuğunun okunmamış sohbetleri bu cihazda nerede göstereceğini seçin. Elle, Okunmamış grubunu kapatır.",
   "settings.sendShortcut.enter": "Göndermek için Enter",
   "settings.sendShortcut.modEnterMac": "Göndermek için ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Göndermek için Ctrl+Enter",
@@ -256,6 +258,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Yuvayı kenar boyunca taşımak için yukarı veya aşağı sürükleyin.",
   "settings.agentDock.edge.right": "Sağ",
   "settings.agentDock.edge.left": "Sol",
+  "settings.agentDock.size.title": "Yuva boyutu",
+  "settings.agentDock.size.description":
+    "Diğer uygulamaların üstündeki yuvanın boyutunu değiştirmek için sürükleyin. Ana pencerede yuva arayüz boyutunu izler.",
   "settings.agentDock.autoHide.title": "Kullanılmadığında gizle",
   "settings.agentDock.autoHide.description": "Yuva kenarın içine kayar. Göstermek için işaretçiyi kenara getirin.",
   "settings.agentDock.edgeStrip.title": "Kenarda bir şerit göster",
@@ -511,6 +516,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} hazır. Uygulamak için yeniden başlatın.",
   "settings.updates.status.installing": "{target} uygulamak için yeniden başlatılıyor…",
   "settings.updates.status.upToDate": "OpenBot Kararlı kanalında güncel.",
+  "settings.updates.status.staged": "{target} aşamalı olarak dağıtılıyor. Hemen almak için güncellemeleri denetleyin.",
   "settings.updates.status.checkFailed": "OpenBot güncellemeleri denetleyemedi. Tekrar deneyin.",
   "settings.updates.status.unsupported": "Bu derlemede güncellemeler kullanılamıyor.",
   "settings.updates.actionFailed": "OpenBot güncellenemedi.",

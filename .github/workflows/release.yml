@@ -46,6 +46,7 @@ jobs:
     outputs:
       release_version: ${{ steps.release.outputs.version }}
       release_tag: ${{ steps.release.outputs.tag }}
+      staging_percentage: ${{ steps.rollout.outputs.percentage }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +92,24 @@ jobs:
           bun scripts/whats-new-translations.ts "$package_version"
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
+
+      # The share of installs that electron-updater offers the new release to at first. The
+      # `RELEASE_STAGING_PERCENTAGE` repository variable overrides the default; 100 releases to all.
+      # Checked here, so that a wrong value stops the run before the builds.
+      # docs/RELEASING.md#staged-rollout
+      - name: Read the rollout percentage
+        id: rollout
+        shell: bash
+        env:
+          RELEASE_STAGING_PERCENTAGE: ${{ vars.RELEASE_STAGING_PERCENTAGE }}
+        run: |
+          percentage="${RELEASE_STAGING_PERCENTAGE:-10}"
+          if [[ ! "$percentage" =~ ^(0|[1-9][0-9]?|100)$ ]]; then
+            echo "RELEASE_STAGING_PERCENTAGE must be a whole number from 0 to 100." >&2
+            exit 1
+          fi
+          echo "The release goes to $percentage% of installs at first."
+          echo "percentage=$percentage" >> "$GITHUB_OUTPUT"
 
       - name: Require deployed Universal Links support
         shell: bash
@@ -1045,6 +1064,23 @@ jobs:
         with:
           name: release-linux-arm64
           path: release-assets/linux-arm64
+
+      # electron-updater offers the release only to this share of installs. `release-rollout.yml`
+      # changes it later. The manifests are not in a SHA256SUMS file or an attestation, so the edit
+      # changes no checksum; the script stops if any value other than the percentage changes.
+      - name: Set the rollout percentage
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          STAGING_PERCENTAGE: ${{ needs.validate.outputs.staging_percentage }}
+        run: |
+          bun scripts/update-rollout.ts \
+            --version "$RELEASE_VERSION" \
+            --percentage "$STAGING_PERCENTAGE" \
+            release-assets/latest-mac.yml \
+            release-assets/windows/latest.yml \
+            release-assets/linux/latest-linux.yml \
+            release-assets/linux-arm64/latest-linux-arm64.yml
 
       - name: Generate combined checksums
         shell: bash

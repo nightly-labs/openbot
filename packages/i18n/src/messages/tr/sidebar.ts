@@ -97,6 +97,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "Size ihtiyacı var, {count} sohbet", other: "Size ihtiyacı var, {count} sohbet" },
   "sidebar.unread.title": "Okunmamış",
   "sidebar.unread.label": { one: "Okunmamış, {count} sohbet", other: "Okunmamış, {count} sohbet" },
+  "sidebar.unread.actions": "Okunmamış işlemleri",
+  "sidebar.unread.turnOff": "Okunmamış grubunu kapat",
   "sidebar.waiting.action.question": "Yanıtla",
   "sidebar.waiting.action.approval": "İncele",
   "sidebar.waiting.action.takeover": "Devral",

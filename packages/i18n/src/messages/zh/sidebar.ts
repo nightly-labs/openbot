@@ -97,6 +97,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "需要你，{count} 个聊天", other: "需要你，{count} 个聊天" },
   "sidebar.unread.title": "未读",
   "sidebar.unread.label": { one: "未读，{count} 个聊天", other: "未读，{count} 个聊天" },
+  "sidebar.unread.actions": "未读操作",
+  "sidebar.unread.turnOff": "关闭未读分组",
   "sidebar.waiting.action.question": "回答",
   "sidebar.waiting.action.approval": "审核",
   "sidebar.waiting.action.takeover": "接管",

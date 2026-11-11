@@ -578,7 +578,8 @@ export function FileRowMenu(props: {
               {t("common.tryAgain")}
             </DropdownMenu.Item>
           </Show>
-          <Show when={props.file.conversation && props.file.messageId}>
+          {/* A chat file has its conversation and its message. A channel file has only the channel message. */}
+          <Show when={props.file.messageId}>
             <DropdownMenu.Item onSelect={() => props.onAction("show-in-chat")}>
               <MessageCircle aria-hidden="true" />
               {t("files.action.showInChat")}

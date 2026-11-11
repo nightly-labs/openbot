@@ -32,12 +32,14 @@ import { FontSelect } from "@openbot/ui/features/settings/FontSelect";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
+import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { useText } from "@openbot/ui/text";
 import { createUniqueId, Show } from "solid-js";
 import { useInstalledFonts } from "../../app-fonts";
 import { useAppearanceChoice } from "../../appearance-choice";
 import { useI18n } from "../../i18n-context";
 import { useInterfaceSizeChoice } from "../../interface-size";
+import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
@@ -69,6 +71,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const appearance = useAppearanceChoice();
   const logoColor = useLogoColorChoice();
   const interfaceSize = useInterfaceSizeChoice();
+  const layout = useLayout();
   const installedFonts = useInstalledFonts();
   const interfaceFontTitleId = `settings-interface-font-${createUniqueId()}`;
   const codeFontTitleId = `settings-code-font-${createUniqueId()}`;
@@ -230,6 +233,19 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                 value={props.value.sendShortcut}
                 onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
                 devicePlatform={props.platform ?? "darwin"}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="sidebar.order.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("sidebar.order.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatOrder.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SidebarChatOrderSelect
+                value={layout.sidebarChatOrder()}
+                onChange={layout.setSidebarChatOrder}
                 mount={props.selectMount}
               />
             </ItemActions>

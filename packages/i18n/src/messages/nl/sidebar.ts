@@ -100,6 +100,8 @@ export const messages = {
   "sidebar.waiting.label": { one: "Heeft je nodig, {count} chat", other: "Heeft je nodig, {count} chats" },
   "sidebar.unread.title": "Ongelezen",
   "sidebar.unread.label": { one: "Ongelezen, {count} chat", other: "Ongelezen, {count} chats" },
+  "sidebar.unread.actions": "Acties voor Ongelezen",
+  "sidebar.unread.turnOff": "Groep Ongelezen uitzetten",
   "sidebar.waiting.action.question": "Antwoorden",
   "sidebar.waiting.action.approval": "Bekijken",
   "sidebar.waiting.action.takeover": "Overnemen",

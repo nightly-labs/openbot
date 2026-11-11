@@ -56,6 +56,7 @@ import {
   agentDockSeats,
   sameAgentDockSeats,
   saveAgentDockOffset,
+  setAgentDockPreference,
   setAgentDockSeats,
   useAgentDockPreference,
 } from "./agent-dock-preference";
@@ -418,6 +419,15 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     remove(seat: AgentDockSeatRef) {
       saveSeats(seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id));
     },
+    /* The saved list also keeps seats that the dock does not show now, so the seat goes before its
+       neighbour and not to an index. */
+    move(seat: AgentDockSeatRef, before: AgentDockSeatRef | null) {
+      if (!seated(seat)) return;
+      const others = seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id);
+      const index = before ? others.findIndex((item) => item.kind === before.kind && item.id === before.id) : -1;
+      const moved = { kind: seat.kind, id: seat.id };
+      saveSeats(index < 0 ? [...others, moved] : [...others.slice(0, index), moved, ...others.slice(index)]);
+    },
     /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
     async sendToChannel(channelId: string, text: string): Promise<AgentDockSendResult> {
       const sequenceBefore = channelPage(channelId)?.throughSequence ?? 0;
@@ -468,6 +478,7 @@ function WindowAgentDock(props: { serverId: string }) {
       onOpenChange={dock.openChat}
       onAdd={dock.add}
       onRemove={dock.remove}
+      onMove={dock.move}
       onSend={(seat, text) =>
         seat.kind === "channel"
           ? dock.sendToChannel(seat.id, text)
@@ -480,6 +491,7 @@ function WindowAgentDock(props: { serverId: string }) {
       onSelectAgent={(agentId) => selectAgent(agentId)}
       onOpenLink={(url) => void appPort().openUrl(url)}
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
+      onHide={() => setAgentDockPreference({ shown: false })}
       results={dock.results()}
     />
   );
@@ -504,6 +516,7 @@ function ScreenAgentDock(props: { serverId: string }) {
       edge: preference().edge,
       autoHide: preference().autoHide,
       edgeStrip: preference().edgeStrip,
+      sizePercent: preference().sizePercent,
       offsets: preference().offsets.map((item) => ({ ...item })),
       seats: dock
         .seats()
@@ -559,6 +572,10 @@ function ScreenAgentDock(props: { serverId: string }) {
         openAppSettings(null, "agent-dock");
         return;
       }
+      if (action.type === "hide") {
+        setAgentDockPreference({ shown: false });
+        return;
+      }
       if (action.serverId !== props.serverId) return;
       switch (action.type) {
         case "open-chat":
@@ -569,6 +586,9 @@ function ScreenAgentDock(props: { serverId: string }) {
           return;
         case "remove":
           dock.remove(action.seat);
+          return;
+        case "move":
+          dock.move(action.seat, action.before);
           return;
         case "open-agent":
           selectAgent(action.agentId);

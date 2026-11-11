@@ -97,6 +97,8 @@ export const messages = {
   "sidebar.waiting.label": { other: "対応が必要なチャット {count} 件" },
   "sidebar.unread.title": "未読",
   "sidebar.unread.label": { other: "未読のチャット {count} 件" },
+  "sidebar.unread.actions": "未読の操作",
+  "sidebar.unread.turnOff": "未読グループをオフにする",
   "sidebar.waiting.action.question": "回答",
   "sidebar.waiting.action.approval": "確認",
   "sidebar.waiting.action.takeover": "操作する",

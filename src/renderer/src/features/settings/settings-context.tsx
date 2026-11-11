@@ -3,6 +3,7 @@ import {
   type ApprovalAutomationPreference,
   agentAutoApprovalEnabled,
   type DynamicIslandGeometry,
+  type DynamicIslandPreference,
   type ExternalLinkTarget,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
@@ -29,6 +30,20 @@ import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
+
+/** The general settings that show the island preference of main. */
+function islandSettings(preference: DynamicIslandPreference) {
+  return {
+    macBookNotch: preference.enabled,
+    macBookNotchHaptics: preference.hapticsEnabled,
+    macBookNotchIdle: preference.idleVisible,
+    macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
+    macBookNotchWidthPercent: preference.widthPercent,
+    macBookNotchHeightPercent: preference.heightPercent,
+    macBookNotchServers: preference.serverVisibility,
+    macBookNotchNewServers: preference.newServersVisible,
+  } satisfies Partial<GeneralSettingsValue>;
+}
 
 function sameExternalLinkTarget(left: ExternalLinkTarget, right: ExternalLinkTarget): boolean {
   return left.kind === right.kind && (left.kind !== "app" || right.kind !== "app" || left.path === right.path);
@@ -437,14 +452,7 @@ const Settings = createSimpleContext({
             if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
-              macBookNotch: preference.enabled,
-              macBookNotchHaptics: preference.hapticsEnabled,
-              macBookNotchIdle: preference.idleVisible,
-              macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-              macBookNotchWidthPercent: preference.widthPercent,
-              macBookNotchHeightPercent: preference.heightPercent,
-              macBookNotchServers: preference.serverVisibility,
-              macBookNotchNewServers: preference.newServersVisible,
+              ...islandSettings(preference),
             }));
           })
           .catch((error: unknown) => {
@@ -532,6 +540,15 @@ const Settings = createSimpleContext({
           autoInstallUpdates: preference.autoInstall,
         }));
       });
+      // The right-click menu of the island turns it off in main. A save reply that is still on its way
+      // must not show the island as on again.
+      const unsubscribeIsland = settingsPort().dynamicIsland.onPreference((preference) => {
+        ++dynamicIslandSaveCount;
+        setGeneralSettings((current) => ({
+          ...current,
+          ...islandSettings(preference),
+        }));
+      });
       // A page can open from main with no click here, such as a sign-in page, so main sends the notice.
       const unsubscribeLinkFallback = settingsPort().onExternalLinkFallback(({ name }) => {
         const { t } = currentText();
@@ -549,6 +566,7 @@ const Settings = createSimpleContext({
         unsubscribeAnalytics();
         unsubscribeMemoryLimit();
         unsubscribeUpdates();
+        unsubscribeIsland();
       };
     });
 
@@ -654,14 +672,7 @@ const Settings = createSimpleContext({
               .then((preference) =>
                 setGeneralSettings((current) => ({
                   ...current,
-                  macBookNotch: preference.enabled,
-                  macBookNotchHaptics: preference.hapticsEnabled,
-                  macBookNotchIdle: preference.idleVisible,
-                  macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-                  macBookNotchWidthPercent: preference.widthPercent,
-                  macBookNotchHeightPercent: preference.heightPercent,
-                  macBookNotchServers: preference.serverVisibility,
-                  macBookNotchNewServers: preference.newServersVisible,
+                  ...islandSettings(preference),
                 })),
               ),
       ]).then((results) => {

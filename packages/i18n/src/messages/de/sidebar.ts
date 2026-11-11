@@ -109,6 +109,8 @@ export const messages = {
   },
   "sidebar.unread.title": "Ungelesen",
   "sidebar.unread.label": { one: "Ungelesen, {count} Chat", other: "Ungelesen, {count} Chats" },
+  "sidebar.unread.actions": "Aktionen für Ungelesen",
+  "sidebar.unread.turnOff": "Gruppe „Ungelesen“ ausschalten",
   "sidebar.waiting.action.question": "Antworten",
   "sidebar.waiting.action.approval": "Prüfen",
   "sidebar.waiting.action.takeover": "Übernehmen",
