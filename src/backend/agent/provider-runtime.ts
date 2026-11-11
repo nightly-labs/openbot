@@ -39,7 +39,12 @@ import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
-import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
+import {
+  type AgentClient,
+  AgentProcessExitError,
+  type AgentProvider,
+  PROCESSOR_FEATURE_MISSING,
+} from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
@@ -202,6 +207,8 @@ const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session tabl
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 /** An ACP provider CLI that the system stopped, not one that ended by itself. */
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
+/** A CLI that a processor stopped; `PROCESSOR_FEATURE_MISSING` tells whether a missing feature is the cause. */
+const ILLEGAL_INSTRUCTION = /\(signal SIGILL\)/u;
 /**
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
@@ -3088,6 +3095,8 @@ export class ProviderRuntime implements ProviderPort {
     // counts: the stderr line can quote another process.
     if (KILLED_BY_SYSTEM.test(error.message) && hasZeroRealtimeLimit())
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
+    if (ILLEGAL_INSTRUCTION.test(error.message) && PROCESSOR_FEATURE_MISSING.test(detailed.message))
+      return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
     return detailed;
   }
 
@@ -4147,6 +4156,8 @@ export class ProviderRuntime implements ProviderPort {
     // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     if (reason === realtimeLimitZero) return realtimeLimitZero;
+    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
+    if (reason === cpuUnsupported) return cpuUnsupported;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 

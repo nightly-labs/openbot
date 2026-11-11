@@ -231,6 +231,8 @@ export const messages = {
     "Bu sohbet başka bir Codex uygulamasında açık; örneğin Codex masaüstü uygulaması, Codex CLI veya bir IDE uzantısı. Bir Codex sohbetine aynı anda yalnızca bir uygulama yazabilir. Sohbeti o uygulamada kapatın, sonra mesajınızı yeniden gönderin.",
   "error.provider.realtimeLimitZero":
     "OpenBot'un gerçek zamanlı CPU sınırı 0 olduğu için Linux sağlayıcıyı durdurdu. Bu sınır sisteminizden geliyor. rtkit'i kurup başlatın (`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal` komutunu çalıştırın, ardından OpenBot'u yeniden başlatın. rtkit eksikken yalnızca xdg-desktop-portal'ı yeniden başlatmak işe yaramaz.",
+  "error.provider.cpuUnsupported":
+    "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
   "error.provider.opencodeNoAnswer":
