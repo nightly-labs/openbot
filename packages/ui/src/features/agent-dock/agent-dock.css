@@ -644,12 +644,6 @@
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
 }
 
-/* The one-line input is a pill, 12 px from the panel edge. A focus halo would make that gap 9 px at
-   the round ends; the border alone shows focus. */
-.agent-dock-composer.composer[data-compact]:focus-within {
-  box-shadow: none;
-}
-
 .agent-dock-composer.composer[data-compact] > .composer-input-label {
   grid-column: 1;
 }

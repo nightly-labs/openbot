@@ -71,10 +71,6 @@
   padding: var(--openbot-space-1) 0 0;
 }
 
-.tasks-page-composer .composer-notice {
-  margin-bottom: var(--openbot-space-2);
-}
-
 .tasks-page-composer-agent {
   display: flex;
   min-width: 0;
