@@ -2459,7 +2459,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return Result.fail(
           providerFailure(
             sourceText("error.agent.turnStalled", {
-              provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
+              provider: this.#providerName(thread),
             }),
           ),
         );
@@ -2939,7 +2939,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn,
         "failed",
         sourceText("error.agent.turnStalled", {
-          provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
+          provider: this.#providerName(thread),
         }),
       );
     }
@@ -3215,7 +3215,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (retry) {
       const thread = this.#threads.get(retry.sessionId);
       const turn = thread?.activeTurn;
-      if (!thread || !turn || turn.completing) return;
+      // A stopped turn ends by its stop. The agent can ignore the cancel and keep sending notices.
+      if (!thread || !turn || turn.completing || turn.stopped) return;
       turn.lastActivityAt = Date.now();
       turn.retrying = true;
       this.#emitTurnProgress(
