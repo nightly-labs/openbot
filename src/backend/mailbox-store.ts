@@ -168,6 +168,16 @@ interface StoredDelivery {
   planContinuation?: PlanContinuationMarker;
 }
 
+/** The work of one task, as `MailboxStore.taskWork` reads it for the task list. */
+export interface TaskWork {
+  /** The messages that wait to start, in queue order. */
+  queuedMessages: Array<{ deliveryId: string; text: string; createdAt: string }>;
+  /** The same deliveries, with their files, state and position in the task's queue. */
+  queue: QueueDelivery[];
+  /** A delivery of the task is starting or running. */
+  active: boolean;
+}
+
 /** A delivery that waits for its automatic plan continuation. It is queued, but not in the queue the user sees. */
 function waitsForPlanContinuation(delivery: StoredDelivery): boolean {
   return delivery.status === "queued" && delivery.planContinuation?.queued === true;
@@ -990,19 +1000,50 @@ export class MailboxStore {
   }
 
   /**
-   * The queued deliveries of one task, in queue order, as the agent's own chat lists its queue. The
-   * same deliveries as `queuedTaskMessages`, with their files and state, for the queue of the thread.
+   * The work of each task of this agent, read in one pass for a whole task list. A task without queued,
+   * starting or running work is not in the map. Each task has what `queuedTaskMessages` and
+   * `laneActive` give for it, and its queued deliveries, in queue order, with their files and state.
+   * The task list is built again on each progress step of a task turn, and the mailbox keeps all its
+   * completed deliveries, so the reads of each task must not scan the mailbox again.
    */
-  taskQueue(agentId: string, taskId: string): QueueDelivery[] {
-    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
-    if (queued.length === 0) return [];
+  taskWork(agentId: string): Map<string, TaskWork> {
     const messages = this.#messagesById();
-    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
-    // The position is in the queue of the thread, as the panel of the thread shows it.
-    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
-    return deliveries.map((delivery) =>
-      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
-    );
+    const works = new Map<string, TaskWork>();
+    const workOf = (taskId: string): TaskWork => {
+      const existing = works.get(taskId);
+      if (existing) return existing;
+      const work: TaskWork = { queuedMessages: [], queue: [], active: false };
+      works.set(taskId, work);
+      return work;
+    };
+    const queued: StoredDelivery[] = [];
+    for (const delivery of this.#state.deliveries) {
+      if (delivery.recipientAgentId !== agentId) continue;
+      if (delivery.status === "queued") {
+        if (!waitsForPlanContinuation(delivery)) queued.push(delivery);
+      } else if (delivery.status === "starting" || delivery.status === "running") {
+        const taskId = this.#taskIdOf(delivery, messages);
+        if (taskId) workOf(taskId).active = true;
+      }
+    }
+    const queuedByTask = new Map<string, Array<{ delivery: StoredDelivery; message: StoredMessage }>>();
+    for (const delivery of queued.sort(compareQueueOrder)) {
+      const message = messages.get(delivery.messageId);
+      if (!message?.taskId) continue;
+      const items = queuedByTask.get(message.taskId) ?? [];
+      items.push({ delivery, message });
+      queuedByTask.set(message.taskId, items);
+    }
+    for (const [taskId, items] of queuedByTask) {
+      const work = workOf(taskId);
+      // The position is in the queue of the thread, as the panel of the thread shows it.
+      const positions = new Map(items.map(({ delivery }, index) => [delivery.id, index + 1]));
+      for (const { delivery, message } of items) {
+        work.queuedMessages.push({ deliveryId: delivery.id, text: message.text, createdAt: message.createdAt });
+        work.queue.push(this.#publicDelivery(delivery, positions, message));
+      }
+    }
+    return works;
   }
 
   /** Whether a delivery of this lane is starting or running: the agent's own chat when `taskId` is null. */
