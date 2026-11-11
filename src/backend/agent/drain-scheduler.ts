@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
 import { type AgentProvider, ProviderTurnActiveError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -42,6 +43,7 @@ import {
   isMissingProviderSessionError,
   isRequestTimeout,
   providerForAgent,
+  providerLabel,
 } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 import type { DeliveryStart } from "./turn-lifecycle";
@@ -1157,8 +1159,18 @@ export class DrainScheduler {
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           // The agent that asked gets the failure as its answer; the drain of the sender below starts it.
           yield* this.#answerFailedRequest(delivery.id, delivery.recipientAgentId);
-          if (this.#channels)
-            yield* this.#channels.deliveryFailed(delivery.id, CHANNEL_START_FAILED).pipe(toDeliveryStartFailed);
+          if (this.#channels) {
+            // A signed-out provider is the one start failure that the reader can fix, so the stopped
+            // task says what to do instead of the general reason (#6684). The provider can report an
+            // expired sign-in before its account check marks it, so the error counts too.
+            const provider = recipient ? providerForAgent(recipient) : null;
+            const signedOut =
+              provider !== null && (this.#providers.signInRequired(provider) || classifyUserError(error) === "auth");
+            const channelReason = signedOut
+              ? sourceText("error.provider.signInExpired", { provider: providerLabel(provider) })
+              : CHANNEL_START_FAILED;
+            yield* this.#channels.deliveryFailed(delivery.id, channelReason).pipe(toDeliveryStartFailed);
+          }
           this.#messaging?.deliveryFailed(delivery.id);
           // The provider refused the session or the turn, so no turn line records the failure.
           logger.warn("A message did not start.", {
