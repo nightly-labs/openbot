@@ -112,7 +112,10 @@ export interface DrainHooks {
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   /** Starts the new chat that the agent asked for, if it did. The agent's own chat has nothing to start. */
   startRequestedNewChat(agentId: string): Effect.Effect<void>;
-  /** Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it. */
+  /**
+   * Drops that request: a turn in the agent's own chat starts first, so the agent's notes do not cover it.
+   * A routine run in its own session does not read the chat, and keeps the request.
+   */
   dropRequestedNewChat(agentId: string): void;
 }
 
@@ -656,10 +659,12 @@ export class DrainScheduler {
         // Before the compaction: it holds the lane whose thread it compacts.
         if (assignment && publicThreadId)
           this.#conversation.registerChannelThread(agentId, publicThreadId, assignment.channelId);
-        if (agent && publicThreadId === agent.threadId) this.#hooks.dropRequestedNewChat(agentId);
-        // A routine run in its own session leaves the chat session as it is.
+        // A routine run in its own session leaves the chat session as it is, so the new chat that the
+        // agent asked for waits for the end of the run and does not end (#7129).
+        const ownSession = this.#runsInOwnSession(context);
+        if (agent && publicThreadId === agent.threadId && !ownSession) this.#hooks.dropRequestedNewChat(agentId);
         const session =
-          agent && publicThreadId && !this.#runsInOwnSession(context)
+          agent && publicThreadId && !ownSession
             ? this.#store.database.activeProviderSession(publicThreadId, agent.provider)
             : null;
         if (session) this.#compaction.expectInput(session.externalSessionId, context.delivery.text.length);

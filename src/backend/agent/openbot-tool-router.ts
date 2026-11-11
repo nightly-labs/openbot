@@ -352,7 +352,7 @@ export interface OpenBotToolRouterHooks {
    */
   reportRoutineFailure(agentId: string, turnId: string, reason: string, channelRun: boolean): boolean;
   /** Starts a new chat with the agent when its turn ends and its queue is empty. */
-  requestNewChat(agentId: string): void;
+  requestNewChat(agentId: string, turnId: string): void;
   /**
    * Takes a message from another agent into the recipient's running chat turn when the recipient's
    * busy-message mode is "steer". Otherwise the message waits in the queue. The result says which.
@@ -1797,10 +1797,10 @@ export class OpenBotToolRouter {
         );
       if (agent.threadId !== this.#conversation.publicThreadId(senderAgentId, params.threadId))
         return openBotToolFailure("You can start a new chat only from your own chat, not from a task or a channel.");
-      this.#hooks.requestNewChat(senderAgentId);
+      this.#hooks.requestNewChat(senderAgentId, params.turnId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. Finish your answer now.",
+        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs in this chat first ends the request; a routine run in its own session does not. Finish your answer now.",
       });
     }
 
