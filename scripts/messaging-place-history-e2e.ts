@@ -211,7 +211,7 @@ const credentials: MessagingCredentials = {
   retain: () => Effect.void,
 };
 
-async function boot<T>(use: (threads: MessagingThreads) => Promise<T>): Promise<T> {
+async function boot<T>(use: (threads: MessagingThreads, mailbox: MailboxStore) => Promise<T>): Promise<T> {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
   const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -250,7 +250,7 @@ async function boot<T>(use: (threads: MessagingThreads) => Promise<T>): Promise<
   });
   await runCauseEffect(messaging.start());
   try {
-    return await use(threads);
+    return await use(threads, mailbox);
   } finally {
     await runCauseEffect(messaging.stop());
     await runCauseEffect(agents.stop());
@@ -266,9 +266,11 @@ function record(value: unknown): DynamicRecord {
 /** One outbound tool call, as the tool router makes it. Returns the result and the new traffic. */
 const AGENT = "agent-place-history-e2e";
 
-async function call(threads: MessagingThreads, tool: string, args: DynamicRecord, threadId = "thread-routine-e2e") {
+const ROUTINE_TURN = { threadId: "thread-routine-e2e", turnId: "turn-routine-e2e" };
+
+async function call(threads: MessagingThreads, tool: string, args: DynamicRecord, turn = ROUTINE_TURN) {
   const before = { requests: hostRequests.length, reads: reads.length };
-  const response = await runCauseEffect(threads.outboundTool(AGENT, threadId, tool, args, () => Effect.succeed([])));
+  const response = await runCauseEffect(threads.outboundTool(AGENT, turn, tool, args, () => Effect.succeed([])));
   return {
     success: response.success,
     result: record(JSON.parse(response.contentItems[0]?.text ?? "{}")),
@@ -286,7 +288,7 @@ try {
     );
   });
 
-  await boot(async (threads) => {
+  await boot(async (threads, mailbox) => {
     const connection = threads.store.connections()[0]?.connectionId ?? "";
     assert.ok(connection, "The Discord connection is missing.");
 
@@ -366,14 +368,41 @@ try {
         isDirect: false,
         title: "general",
       });
-      const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, link.threadId);
+      const externalTurn = { threadId: link.threadId, turnId: "turn-external-e2e" };
+      const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, externalTurn);
       assert.equal(read.success, false, "An external chat turn read a named place.");
-      assert.match(String(read.result.error), /reads only that chat/u);
+      assert.match(String(read.result.error), /cannot read a place by name/u);
       assert.deepEqual(read.reads, [], "Discord was read for an external chat turn.");
       assert.equal(read.requests.length, 0, "The refused call reached Signal.");
       // The same thread still posts and lists: only the read of another place is closed.
-      const places = await call(threads, "messaging_list_places", { connection }, link.threadId);
+      const places = await call(threads, "messaging_list_places", { connection }, externalTurn);
       assert.equal(places.success, true);
+      return read.result;
+    });
+
+    await step("a teammate's turn on a request from an external chat cannot read a named place", async () => {
+      const link = threads.store.linkByKey(connection, CHANNEL, "external-conversation");
+      assert.ok(link, "The external conversation has no link.");
+      // The orchestrator's send_message from the external chat turn: the answer goes back to that chat.
+      const receipt = await runCauseEffect(
+        mailbox.enqueue({
+          sender: { kind: "agent", agentId: "agent-orchestrator-e2e" },
+          recipientAgentIds: [AGENT],
+          text: "Summarize the other chat.",
+          messagingReturn: { linkId: link.linkId, authorId: "U1", authorName: "Guest", platformMessageId: "m1" },
+        }),
+      );
+      const delivery = receipt.deliveries[0];
+      assert.ok(delivery, "The request made no delivery.");
+      await runCauseEffect(mailbox.markStarting(delivery.id));
+      await runCauseEffect(mailbox.markRunning(delivery.id, "turn-teammate-e2e"));
+      const teammateTurn = { threadId: "thread-teammate-own-chat", turnId: "turn-teammate-e2e" };
+      const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, teammateTurn);
+      assert.equal(read.success, false, "A teammate read a named place for an external chat.");
+      assert.deepEqual(read.reads, [], "Discord was read for a request from an external chat.");
+      // A different turn of the same agent, such as a routine run, still reads.
+      const routine = await call(threads, "messaging_history", { connection, place: CHANNEL, limit: 1 });
+      assert.equal(routine.success, true, JSON.stringify(routine.result));
       return read.result;
     });
 

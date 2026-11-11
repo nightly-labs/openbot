@@ -227,7 +227,7 @@ async function post(threads: MessagingThreads, connection: string, args: Dynamic
     // The router passes the calling agent; a Discord post records no pings, so any id does.
     threads.outboundTool(
       "agent-embeds-e2e",
-      "thread-embeds-e2e",
+      { threadId: "thread-embeds-e2e", turnId: "turn-embeds-e2e" },
       "messaging_post",
       { connection, place: CHANNEL, ...args },
       () => Effect.succeed([]),

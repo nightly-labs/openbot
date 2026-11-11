@@ -249,7 +249,7 @@ async function post(agentId: string, text: string): Promise<{ messageId: string 
   const response = await runCauseEffect(
     agents.messaging.outboundTool(
       agentId,
-      `thread-${agentId}`,
+      { threadId: `thread-${agentId}`, turnId: `turn-${agentId}` },
       "messaging_post",
       { connection: record.connectionId, place: CHANNEL, text },
       () => Effect.succeed([]),

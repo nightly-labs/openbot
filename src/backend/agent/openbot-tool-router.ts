@@ -1572,7 +1572,7 @@ export class OpenBotToolRouter {
     if (isMessagingOutboundCall(params.tool, params.arguments))
       return yield* this.#messaging.outboundTool(
         senderAgentId,
-        executionThreadId,
+        { threadId: executionThreadId, turnId: params.turnId },
         params.tool,
         params.arguments,
         (paths) =>

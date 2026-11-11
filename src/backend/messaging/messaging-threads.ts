@@ -483,18 +483,21 @@ export class MessagingThreads {
   readonly outboundTool = Effect.fn("MessagingThreads.outboundTool")(function* (
     this: MessagingThreads,
     agentId: string,
-    threadId: string,
+    turn: { threadId: string; turnId: string },
     tool: string,
     args: unknown,
     openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const call = parseMessagingOutboundTool(tool, args);
     if ("error" in call) return openBotToolFailure(call.error);
-    // A person in an external chat is not the OpenBot user. That turn must not read a different place
-    // and put the text in its answer.
-    if (call.tool === "messaging_history" && this.store.linkForThread(threadId))
+    // A person in an external chat is not the OpenBot user. A turn that answers that chat, or a
+    // teammate's turn on a request from it, must not read a different place and put the text in its answer.
+    if (
+      call.tool === "messaging_history" &&
+      (this.store.linkForThread(turn.threadId) || this.#mailbox.turnServesExternalChat(agentId, turn.turnId))
+    )
       return openBotToolFailure(
-        "A turn that answers an external chat reads only that chat. Call messaging_history without connection and place.",
+        "A turn that works for an external chat cannot read a place by name. In the turn that answers the chat, call messaging_history without connection and place.",
       );
     const enabled = this.store.connections().filter((record) => record.enabled);
     if (call.tool === "messaging_list_places" && !call.connection)

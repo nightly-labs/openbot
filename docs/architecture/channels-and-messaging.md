@@ -721,8 +721,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
-  `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, so a
-  person in an external chat cannot make the agent read a different place.
+  `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
+  turn with a delivery that has a `messaging` origin or a `messagingReturn`
+  (`MailboxStore.turnServesExternalChat`), so a person in an external chat cannot make an agent or
+  its teammate read a different place.
   A Slack post with live user mentions (`slackPingedUsers`) stores one `projection_messaging_pings`
   row for each person, with the calling agent and the redacted post, unless a person's mention opened
   the thread. In a thread with pings, a reply without a mention counts only from a pinged person,

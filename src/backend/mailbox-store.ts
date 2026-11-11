@@ -1899,6 +1899,22 @@ export class MailboxStore {
     );
   }
 
+  /**
+   * Whether a turn of the agent works for an external conversation: on a message from it, or on a
+   * request that an agent sent from it. A steered request counts: its answer can go back there too.
+   */
+  turnServesExternalChat(agentId: string, turnId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.recipientAgentId === agentId &&
+        delivery.turnId === turnId &&
+        (delivery.status === "starting" || delivery.status === "running") &&
+        this.#state.messages.some(
+          (message) => message.id === delivery.messageId && (message.messaging || message.messagingReturn),
+        ),
+    );
+  }
+
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {
     return this.#contexts(
       this.#state.deliveries.filter(
