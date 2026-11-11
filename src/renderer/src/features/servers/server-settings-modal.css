@@ -612,3 +612,9 @@
     clip-path: none;
   }
 }
+
+/* The width of the zone list, which shows the long "Automatic (zone)" label of most hosts. */
+.server-settings-timezone-pending {
+  width: 200px;
+  min-height: var(--openbot-control-sm);
+}
