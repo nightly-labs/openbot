@@ -189,18 +189,33 @@ export function libraryFolderOfFile(
 export function normalizeLibraryFolders(snapshot: LibraryFoldersSnapshot): LibraryFoldersSnapshot {
   const byId = new Map<string, LibraryFolder>();
   for (const folder of snapshot.folders) if (!byId.has(folder.id)) byId.set(folder.id, folder);
-  const parents = new Map<string, string>();
+  const children = new Map<string, LibraryFolder[]>();
+  const tops: string[] = [];
   for (const folder of byId.values()) {
     const parent = folder.parentId === undefined ? undefined : byId.get(folder.parentId);
-    if (!parent || parent.id === folder.id || parent.agentId !== folder.agentId) continue;
-    let ancestor: string | undefined = parent.id;
-    let levels = 2;
-    while (ancestor !== undefined && ancestor !== folder.id) {
-      ancestor = parents.get(ancestor);
-      if (ancestor !== undefined) levels += 1;
-    }
-    if (ancestor === undefined && levels <= LIBRARY_FOLDER_LIMITS.levels) parents.set(folder.id, parent.id);
+    if (!parent || parent.id === folder.id || parent.agentId !== folder.agentId) tops.push(folder.id);
+    else children.set(parent.id, [...(children.get(parent.id) ?? []), folder]);
   }
+  // From the top level down, so the level of a folder does not depend on the sequence of the array.
+  // A folder that this does not reach is in a loop or too deep: it goes to the top level, with its folders.
+  const levels = new Map<string, number>();
+  const parents = new Map<string, string>();
+  const descend = (top: string) => {
+    levels.set(top, 1);
+    const queue = [top];
+    for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+      const level = levels.get(id) ?? 1;
+      if (level >= LIBRARY_FOLDER_LIMITS.levels) continue;
+      for (const child of children.get(id) ?? []) {
+        if (levels.has(child.id)) continue;
+        levels.set(child.id, level + 1);
+        parents.set(child.id, id);
+        queue.push(child.id);
+      }
+    }
+  };
+  for (const top of tops) descend(top);
+  for (const id of byId.keys()) if (!levels.has(id)) descend(id);
   const folders = [...byId.values()].map(({ id, agentId, name }) => {
     const parentId = parents.get(id);
     return parentId === undefined ? { id, agentId, name } : { id, agentId, name, parentId };

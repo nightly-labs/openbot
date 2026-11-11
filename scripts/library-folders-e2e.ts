@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -687,6 +687,51 @@ try {
       !(goneFileId in placementAfter) &&
       keptBefore.every((fileId) => placementAfter[fileId] !== undefined),
     JSON.stringify({ keptBefore: keptBefore.length, after: Object.keys(placementAfter).length }),
+  );
+
+  // 10c. The level limit does not depend on the sequence of the folders: Undo of a folder delete puts
+  // the folder back before its parent, and a parent that went to level 5 meanwhile makes it level 6.
+  const fills = host.stored().folders.filter((folder) => folder.name.startsWith("Fill "));
+  for (const fill of fills.slice(0, 6))
+    await runCauseEffect(store.mutate({ type: "delete", folderId: fill.id }, context));
+  const make = async (name: string, parentId?: string) => {
+    const id = randomUUID();
+    await runCauseEffect(
+      store.mutate({ type: "create", id, agentId: maker.id, name, ...(parentId ? { parentId } : {}) }, context),
+    );
+    return id;
+  };
+  const parent = await make("Undo parent");
+  const child = await make("Undo child", parent);
+  let chain = await make("Level 1");
+  for (let level = 2; level < LIBRARY_FOLDER_LIMITS.levels; level += 1) chain = await make(`Level ${level}`, chain);
+  const childEntry = {
+    folder: host.stored().folders.find((folder) => folder.id === child),
+    index: host.stored().folders.findIndex((folder) => folder.id === child),
+  };
+  if (!childEntry.folder) throw new Error("The child folder is missing.");
+  await runCauseEffect(store.mutate({ type: "delete", folderId: child }, context));
+  await runCauseEffect(
+    store.mutate({ type: "move", folderId: parent, parentId: chain, beforeFolderId: null }, context),
+  );
+  await runCauseEffect(
+    store.mutate(
+      { type: "restore", folders: [{ folder: childEntry.folder, index: childEntry.index }], placement: {} },
+      context,
+    ),
+  );
+  const restoredFolders = host.stored().folders;
+  const restoredChild = restoredFolders.find((folder) => folder.id === child);
+  const depthOf = (id: string): number => libraryFolderPath(restoredFolders, id).length;
+  pass(
+    "Undo never puts a folder deeper than the level limit",
+    restoredChild !== undefined &&
+      restoredFolders.findIndex((folder) => folder.id === child) <
+        restoredFolders.findIndex((folder) => folder.id === parent) &&
+      depthOf(parent) === LIBRARY_FOLDER_LIMITS.levels &&
+      restoredChild.parentId === undefined &&
+      restoredFolders.every((folder) => depthOf(folder.id) <= LIBRARY_FOLDER_LIMITS.levels),
+    JSON.stringify({ parent: depthOf(parent), child: depthOf(child), childParent: restoredChild?.parentId ?? null }),
   );
 
   // 11. A host with no Library folders store: the file is attached, and the result says so.
