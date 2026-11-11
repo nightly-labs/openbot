@@ -531,6 +531,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} جاهز. أعد التشغيل للتطبيق.",
   "settings.updates.status.installing": "جارٍ إعادة التشغيل لتطبيق {target}…",
   "settings.updates.status.upToDate": "OpenBot محدّث على المسار المستقر.",
+  "settings.updates.status.staged": "يُطرح {target} لبعض الأجهزة أولًا. تحقق من وجود تحديثات للحصول عليه الآن.",
   "settings.updates.status.checkFailed": "تعذّر على OpenBot التحقق من وجود تحديثات. حاول مرة أخرى.",
   "settings.updates.status.unsupported": "التحديثات غير متاحة في هذا الإصدار.",
   "settings.updates.actionFailed": "تعذّر تحديث OpenBot.",

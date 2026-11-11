@@ -530,6 +530,7 @@ export const messages = defineMessages("settings", {
   "settings.updates.status.ready": "{target} is ready. Restart to apply.",
   "settings.updates.status.installing": "Restarting to apply {target}…",
   "settings.updates.status.upToDate": "OpenBot is up to date on the Stable track.",
+  "settings.updates.status.staged": "{target} is rolling out to some computers. Check for updates to get it now.",
   "settings.updates.status.checkFailed": "OpenBot could not check for updates. Try again.",
   "settings.updates.status.unsupported": "Updates are unavailable in this build.",
   "settings.updates.actionFailed": "Could not update OpenBot.",

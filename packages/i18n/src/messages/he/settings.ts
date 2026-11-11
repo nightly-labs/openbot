@@ -503,6 +503,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} מוכן. יש להפעיל מחדש כדי להחיל.",
   "settings.updates.status.installing": "מופעל מחדש כדי להחיל את {target}…",
   "settings.updates.status.upToDate": "OpenBot מעודכן במסלול היציב.",
+  "settings.updates.status.staged": "{target} מופץ בהדרגה. יש לבדוק אם יש עדכונים כדי לקבל אותו עכשיו.",
   "settings.updates.status.checkFailed": "OpenBot לא הצליח לבדוק עדכונים. יש לנסות שוב.",
   "settings.updates.status.unsupported": "עדכונים אינם זמינים בגרסה הזו.",
   "settings.updates.actionFailed": "לא ניתן לעדכן את OpenBot.",

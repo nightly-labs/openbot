@@ -516,6 +516,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} hazır. Uygulamak için yeniden başlatın.",
   "settings.updates.status.installing": "{target} uygulamak için yeniden başlatılıyor…",
   "settings.updates.status.upToDate": "OpenBot Kararlı kanalında güncel.",
+  "settings.updates.status.staged": "{target} aşamalı olarak dağıtılıyor. Hemen almak için güncellemeleri denetleyin.",
   "settings.updates.status.checkFailed": "OpenBot güncellemeleri denetleyemedi. Tekrar deneyin.",
   "settings.updates.status.unsupported": "Bu derlemede güncellemeler kullanılamıyor.",
   "settings.updates.actionFailed": "OpenBot güncellenemedi.",

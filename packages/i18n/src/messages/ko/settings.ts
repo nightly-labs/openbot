@@ -508,6 +508,8 @@ export const messages = {
   "settings.updates.status.ready": "{target}이(가) 준비되었어요. 다시 시작하면 적용돼요.",
   "settings.updates.status.installing": "{target}을(를) 적용하려고 다시 시작하는 중…",
   "settings.updates.status.upToDate": "OpenBot이 안정 채널의 최신 상태예요.",
+  "settings.updates.status.staged":
+    "{target}이(가) 일부 컴퓨터부터 배포되고 있어요. 지금 받으려면 업데이트를 확인하세요.",
   "settings.updates.status.checkFailed": "OpenBot이 업데이트를 확인할 수 없어요. 다시 시도해 주세요.",
   "settings.updates.status.unsupported": "이 빌드에서는 업데이트를 사용할 수 없어요.",
   "settings.updates.actionFailed": "OpenBot을 업데이트할 수 없어요.",

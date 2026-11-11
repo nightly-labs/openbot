@@ -519,6 +519,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} is klaar. Start opnieuw om toe te passen.",
   "settings.updates.status.installing": "Opnieuw starten om {target} toe te passen…",
   "settings.updates.status.upToDate": "OpenBot is up-to-date op het kanaal Stabiel.",
+  "settings.updates.status.staged": "{target} wordt gefaseerd uitgerold. Zoek naar updates om het nu te krijgen.",
   "settings.updates.status.checkFailed": "OpenBot kan niet controleren op updates. Probeer het opnieuw.",
   "settings.updates.status.unsupported": "Updates zijn niet beschikbaar in deze build.",
   "settings.updates.actionFailed": "Kan OpenBot niet bijwerken.",
