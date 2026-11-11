@@ -45,7 +45,7 @@ interface ModelRelease {
 }
 
 /** The token limits of a model in the catalog. */
-export interface ModelLimits {
+interface ModelLimits {
   contextWindow: number;
   /** Left out when the catalog has none, or has one that leaves no room for the prompt. */
   maxOutput?: number;
