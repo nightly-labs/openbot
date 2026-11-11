@@ -706,8 +706,8 @@ try {
   let chain = await make("Level 1");
   for (let level = 2; level < LIBRARY_FOLDER_LIMITS.levels; level += 1) chain = await make(`Level ${level}`, chain);
   const childEntry = {
-    folder: host.stored().folders.find((folder) => folder.id === child),
-    index: host.stored().folders.findIndex((folder) => folder.id === child),
+    folder: store.getSnapshot().folders.find((folder) => folder.id === child),
+    index: store.getSnapshot().folders.findIndex((folder) => folder.id === child),
   };
   if (!childEntry.folder) throw new Error("The child folder is missing.");
   await runCauseEffect(store.mutate({ type: "delete", folderId: child }, context));
@@ -720,7 +720,7 @@ try {
       context,
     ),
   );
-  const restoredFolders = host.stored().folders;
+  const restoredFolders = store.getSnapshot().folders;
   const restoredChild = restoredFolders.find((folder) => folder.id === child);
   const depthOf = (id: string): number => libraryFolderPath(restoredFolders, id).length;
   pass(
