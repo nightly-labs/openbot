@@ -285,6 +285,8 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
+  "error.provider.claudeContextFull":
+    "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.claudeApiKeyNoCredit":
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
   "error.provider.foreignReasoning":
