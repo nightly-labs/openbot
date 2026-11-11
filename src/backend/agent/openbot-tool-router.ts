@@ -1733,38 +1733,34 @@ export class OpenBotToolRouter {
       // A delivery that is starting holds no turn yet, and a channel turn runs on a thread of its own.
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
-      // A hidden agent takes no new messages, so the list leaves it out.
-      const agents = this.#hooks
-        .listAgents()
-        .filter((agent) => agent.hiddenAt === undefined)
-        .map((agent) => {
-          const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
-          const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
-          const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
-          // A channel turn runs beside the agent's own chat, so it counts when the chat is idle.
-          const activeTurnId =
-            this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
-            this.#conversation.workingChannelSnapshots(agent.id).find((snapshot) => snapshot.activeTurnId)
-              ?.activeTurnId ??
-            null;
-          const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
-          // A restart loses the provider clock, so the newest message for the agent stands in for it.
-          const lastActivity = deliveries.reduce(
-            (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
-            Math.max(lastEventAt ?? 0, startedAt ?? 0),
-          );
-          return {
-            id: agent.id,
-            name: agent.name,
-            title: agent.title,
-            description: listedDescription(agent.description),
-            status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
-            queuedMessages,
-            ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
-            ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
-            ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
-          };
-        });
+      const agents = this.#hooks.listAgents().map((agent) => {
+        const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
+        const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
+        const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
+        // A channel turn runs beside the agent's own chat, so it counts when the chat is idle.
+        const activeTurnId =
+          this.#conversation.workingSnapshot(agent.id)?.activeTurnId ??
+          this.#conversation.workingChannelSnapshots(agent.id).find((snapshot) => snapshot.activeTurnId)
+            ?.activeTurnId ??
+          null;
+        const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
+        // A restart loses the provider clock, so the newest message for the agent stands in for it.
+        const lastActivity = deliveries.reduce(
+          (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
+          Math.max(lastEventAt ?? 0, startedAt ?? 0),
+        );
+        return {
+          id: agent.id,
+          name: agent.name,
+          title: agent.title,
+          description: listedDescription(agent.description),
+          status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
+          queuedMessages,
+          ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
+          ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
+          ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
+        };
+      });
       return openBotToolResult({ agents });
     }
 
@@ -2796,17 +2792,14 @@ export class OpenBotToolRouter {
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        // Suggest only an agent that this tool takes: not the sender, and not a hidden agent.
+        // Suggest only an agent that this tool takes: not the sender.
         if (!agent)
           throw new Error(
             unknownAgentMessage(
               recipient,
-              agents.filter((candidate) => candidate.hiddenAt === undefined && candidate.id !== senderAgentId),
+              agents.filter((candidate) => candidate.id !== senderAgentId),
             ),
           );
-        // A hidden agent receives no new messages until the user restores it.
-        if (agent.hiddenAt !== undefined)
-          throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);
       }
       const paths = params.arguments.paths ?? [];
       if (!Array.isArray(paths) || !paths.every((item) => isString(item))) {

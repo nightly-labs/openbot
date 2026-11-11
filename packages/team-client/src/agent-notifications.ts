@@ -160,14 +160,20 @@ export function agentEventAgentId(event: AgentEvent): string | null {
  * The level for the events of one agent. The level that the user chose for the agent replaces the
  * server level, in both directions. A server set to "nothing" stays quiet for every agent: on a phone
  * it then has no registration that the host could send to, so the desktop and the web do the same.
+ *
+ * `hidden` is for an agent that the user hid. The user took it out of the list, so with no level of
+ * its own it notifies only when it waits for the user: the server level "all" becomes "needs-me".
  */
 export function agentNotificationLevel(
   serverLevel: ServerNotificationLevel,
   agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
   agentId: string | null,
+  hidden = false,
 ): ServerNotificationLevel {
   if (serverLevel === "nothing" || agentId === null) return serverLevel;
-  return agentLevels?.get(agentId) ?? serverLevel;
+  const own = agentLevels?.get(agentId);
+  if (own !== undefined) return own;
+  return hidden && serverLevel === "all" ? "needs-me" : serverLevel;
 }
 
 /**

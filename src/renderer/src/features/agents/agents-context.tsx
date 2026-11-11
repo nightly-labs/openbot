@@ -10,6 +10,7 @@ import {
   type ServerNotificationLevel,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import type { AgentProfile } from "@openbot/ui/data";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -76,7 +77,7 @@ import {
 const Agents = createSimpleContext({
   name: "Agents",
   init: () => {
-    const { activeServer, activeServerId } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { activeDirectMember, setDirectTyping } = useDirectMessages();
     const windowPage = useWindowPage();
     const { uiErrors, setUiErrors, appendUiError } = useUiErrors();
@@ -175,6 +176,11 @@ const Agents = createSimpleContext({
      */
     const [userHiddenAgents, setUserHiddenAgents] = createSignal<HiddenAgent[]>([]);
     const userHiddenAgentIds = createMemo(() => new Set(userHiddenAgents().map((agent) => agent.agentId)));
+    /** The host keeps a hidden agent at work. A host without `agent-hidden-work` stops it. */
+    const userHiddenAgentsWork = () => activeServerSupportsCapability(AGENT_HIDDEN_WORK_CAPABILITY);
+    const noAgentIds: ReadonlySet<string> = new Set();
+    /** The hidden agents that the host stops: they get no mention and no channel work. */
+    const userPausedAgentIds = createMemo(() => (userHiddenAgentsWork() ? noAgentIds : userHiddenAgentIds()));
 
     /** Applies the whole hidden list of this server, from a read, an event or a write. */
     function applyUserHiddenAgents(agents: HiddenAgent[]): void {
@@ -446,6 +452,8 @@ const Agents = createSimpleContext({
       forgetHiddenAgent,
       userHiddenAgents,
       userHiddenAgentIds,
+      userHiddenAgentsWork,
+      userPausedAgentIds,
       applyUserHiddenAgents,
       ownAgentLevels,
       mutedAgentIds,

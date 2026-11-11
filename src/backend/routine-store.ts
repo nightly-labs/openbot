@@ -746,32 +746,8 @@ export class RoutineStore {
    * routines stays due as well, so it runs once now.
    */
   skipMissed(now = new Date(), held?: RoutineHoldWindow): void {
-    this.#skipMissedIn(this.#allActive(), now, held, false);
-  }
-
-  /**
-   * `skipMissed` for the routines of one owner, when the user restores a hidden agent. The hide was a
-   * pause that the user chose, so every missed occurrence is skipped, also for a routine set to run
-   * once, as a paused routine does when it is resumed.
-   */
-  skipMissedFor(ownerId: string, now = new Date()): void {
-    this.#skipMissedIn(
-      this.#allActive().filter((routine) => routine.ownerId === ownerId),
-      now,
-      undefined,
-      true,
-    );
-  }
-
-  #skipMissedIn(
-    routines: readonly OwnedRoutine[],
-    now: Date,
-    held: RoutineHoldWindow | undefined,
-    skipAll: boolean,
-  ): void {
-    for (const routine of routines) {
-      const missedPolicy = skipAll ? "skip" : routine.missedPolicy;
-      const { trigger } = routine;
+    for (const routine of this.#allActive()) {
+      const { missedPolicy, trigger } = routine;
       const due = Date.parse(trigger.nextRunAt);
       if (held && due >= held.since.getTime() && due <= held.until.getTime()) continue;
       if (trigger.schedule.kind === "once") {

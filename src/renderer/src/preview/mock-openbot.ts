@@ -2959,8 +2959,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       listWorkspaceDirectory: async (input: OpenWorkspaceFileInput) => mockWorkspaceDirectory(input.path),
       sendMessage: async (input: SendMessageInput) => {
-        if (agents.some((agent) => agent.id === input.agentId && agent.hiddenAt !== undefined))
-          throw new Error(sourceText("error.backend.recipientHidden"));
         if (input.taskId)
           return runTaskTurn(findTask(input.agentId, input.taskId), input.text, input.replyToMessageId ?? null);
         // As on a host, a repeated client id answers with the first receipt and stores nothing.

@@ -625,6 +625,7 @@ export const messages = {
   "mobile.agent.hidden.body": "Ukryte czaty nadal działają. Po prostu nie są widoczne na ekranie głównym.",
   "mobile.agent.hidden.bodySynced":
     "Ukryty czat zachowuje swoją historię. Jego agent nie uruchamia rutyn i nie otrzymuje nowych wiadomości. Każde urządzenie na tym serwerze go ukrywa.",
+  "mobile.agent.hidden.bodySyncedWorking": "Ukryty czat nadal działa. Każde urządzenie na tym serwerze go ukrywa.",
   "mobile.agent.hidden.showNamed": "Pokaż: {name}",
   "mobile.agent.hidden.show": "Pokaż",
   "mobile.agent.hidden.showFailed": "Nie udało się pokazać agenta",

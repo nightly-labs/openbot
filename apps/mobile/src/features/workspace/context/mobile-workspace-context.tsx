@@ -29,6 +29,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -2437,6 +2438,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       hiddenChannelIds,
       hidesAgentsOnServer: (serverId) =>
         hostOwnsHide(serverCapabilities.current.get(serverId), servers.find((server) => server.id === serverId)?.role),
+      hiddenAgentsWorkOnServer: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, AGENT_HIDDEN_WORK_CAPABILITY),
       canUnhideAgent: (agentId) =>
         !hostHiddenIds.includes(agentId) ||
         hostOwnsHide(serverCapabilities.current.get(activeServer.id), activeServer.role),

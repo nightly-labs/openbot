@@ -575,6 +575,8 @@ export const messages = {
     "Los chats ocultos siguen funcionando. Simplemente no se muestran en la pantalla de inicio.",
   "mobile.agent.hidden.bodySynced":
     "Un chat oculto conserva su historial. Su agente no ejecuta rutinas ni recibe mensajes nuevos. Todos los dispositivos de este servidor lo ocultan.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Un chat oculto sigue funcionando. Todos los dispositivos de este servidor lo ocultan.",
   "mobile.agent.hidden.showNamed": "Mostrar {name}",
   "mobile.agent.hidden.show": "Mostrar",
   "mobile.agent.hidden.showFailed": "No se pudo mostrar el agente",

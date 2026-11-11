@@ -4,10 +4,10 @@
 // model does, and logs the tool result that it gets.
 // The check asserts the stored channel after each call: the members, lead, icon and image of a new
 // channel; a rename, member changes, a new lead and an image that replaces the icon; an icon that
-// removes the image; archive and restore; and the refusals: a hidden agent, a lead that is not a
-// member, an unusable image file, a routine run and a team member. A channel task that this
-// computer's user started creates a channel and changes another one, but not its own channel; a team
-// member's request in the channel is refused. A repeated tool call makes one channel.
+// removes the image; archive and restore; and the refusals: a lead that is not a member, an unusable
+// image file, a routine run and a team member. A channel task that this computer's user started
+// creates a channel and changes another one, but not its own channel; a team member's request in the
+// channel is refused. A repeated tool call makes one channel. A hidden agent becomes a member.
 // `bun scripts/agent-channel-create-e2e.ts`. Writes .openbot-build/agent-channel-create-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -318,15 +318,6 @@ try {
 
   // 1. Refusals change nothing.
   const channelCount = () => channels().store.ids().length;
-  const hiddenMember = await callFromChat("create with a hidden agent", lead.id, "create_channel", {
-    name: "launch",
-    memberAgentIds: [lead.id, hidden.id],
-  });
-  pass(
-    "A hidden agent cannot become a member",
-    !hiddenMember.success && hiddenMember.text.includes("Hidden is hidden") && channelCount() === 0,
-    hiddenMember.text,
-  );
   const outsideLead = await callFromChat("create with an outside lead", lead.id, "create_channel", {
     name: "launch",
     memberAgentIds: [lead.id],
@@ -624,6 +615,17 @@ try {
       channelCount() === count &&
       resultChannelId(firstText) === resultChannelId(secondText),
     secondText,
+  );
+
+  // 9. A hidden agent keeps working, so it becomes a member as a visible agent does.
+  const hiddenMember = await callFromChat("create with a hidden agent", lead.id, "create_channel", {
+    name: "night",
+    memberAgentIds: [lead.id, hidden.id],
+  });
+  pass(
+    "A hidden agent becomes a member",
+    hiddenMember.success && memberIds(resultChannelId(hiddenMember.text)).includes(hidden.id),
+    hiddenMember.text,
   );
 
   report.passed = true;

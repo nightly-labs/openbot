@@ -70,11 +70,6 @@ const logger = createOpenBotLogger("channel-service");
 
 export interface ChannelHooks {
   agents(): AgentSummary[];
-  /**
-   * Whether the user hid this agent. A hidden member keeps its membership, but the channel gives it
-   * no new work until the user restores it. A turn that already runs is not affected.
-   */
-  hidden?(agentId: string): boolean;
   generate: ChannelTextModel;
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
@@ -769,7 +764,7 @@ export class ChannelService {
       );
       const tasks = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => removed.has(task.id));
       // A request that stopped only because the channel had no lead goes to the lead the save sets,
-      // as a hidden or limited lead's request waits and starts by itself. Without this it stayed
+      // as a limited lead's request waits and starts by itself. Without this it stayed
       // stopped until the reader pressed Continue, which a reader who had just picked a lead missed.
       // An archived channel keeps its work stopped: unarchiving starts nothing.
       const lead = command.draft.leadAgentId;
@@ -853,7 +848,7 @@ export class ChannelService {
     if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
     if (command.type === "send") {
       const recipientAgentId = command.recipientAgentId;
-      if (recipientAgentId) yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
+      if (recipientAgentId) yield* channelSync(() => this.requireMember(channel, recipientAgentId));
       const id = randomUUID();
       // The files are committed here, not at the dispatch: a channel dispatches when a member is
       // free, which can be after a restart, and a restart clears every draft with its files. The
@@ -1065,7 +1060,7 @@ export class ChannelService {
     }
     if (command.type === "request") {
       const recipientAgentId = command.recipientAgentId;
-      if (recipientAgentId) yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
+      if (recipientAgentId) yield* channelSync(() => this.requireMember(channel, recipientAgentId));
       // Always new root tasks, one for each member that the text addresses. A routine must never
       // take `send`'s continuation branch above: that heuristic would let a schedule hijack and
       // supersede a human's in-flight task, because the text of a routine is fixed and can start
@@ -1104,7 +1099,7 @@ export class ChannelService {
       if (!command.recipientAgentId)
         return yield* channelFailure(new Error(sourceText("error.backend.channelSelectAgent")));
       const recipientAgentId = command.recipientAgentId;
-      yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
+      yield* channelSync(() => this.requireMember(channel, recipientAgentId));
     }
     // `stop` and `resume` hold the whole run below the selected task. `reassign` gives one task
     // another owner, but it must start the rest of the stopped run with it: a parent waits for each
@@ -1145,8 +1140,7 @@ export class ChannelService {
     actor: { id: string; name: string },
     operationId: string,
   ) {
-    for (const agentId of command.recipientAgentIds)
-      yield* channelSync(() => this.requireAvailableMember(channel, agentId));
+    for (const agentId of command.recipientAgentIds) yield* channelSync(() => this.requireMember(channel, agentId));
     // Checked in the queue: a save that removes the lead can run first. The agent then gets the
     // refusal, not a "posted" result for a task that no member can take.
     if (
@@ -1278,8 +1272,7 @@ export class ChannelService {
     return (
       !channel.archived &&
       channel.members.some((member) => member.agentId === ownerAgentId) &&
-      this.hooks.agents().some((agent) => agent.id === ownerAgentId) &&
-      !this.hooks.hidden?.(ownerAgentId)
+      this.hooks.agents().some((agent) => agent.id === ownerAgentId)
     );
   }
 
@@ -1396,7 +1389,7 @@ export class ChannelService {
 
   /**
    * The members a task could actually be given to: a member row alone is not enough, because an
-   * agent can be deleted, unavailable or hidden while its membership stays. This is the same
+   * agent can be deleted or unavailable while its membership stays. This is the same
    * intersection the routing prompt sends as `agents`.
    */
   /**
@@ -1447,7 +1440,7 @@ export class ChannelService {
     const live = this.hooks.agents();
     return channel.members
       .map((member) => member.agentId)
-      .filter((agentId) => live.some((agent) => agent.id === agentId) && !this.hooks.hidden?.(agentId));
+      .filter((agentId) => live.some((agent) => agent.id === agentId));
   }
 
   /** The other members that answer the same request in tasks of their own, by name. */
@@ -1526,12 +1519,6 @@ export class ChannelService {
       if (!task.ownerAgentId) {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
-        // A hidden lead routes nothing. The task waits queued until the user restores the lead; the
-        // queue event of the restore wakes the channel again.
-        if (lead && this.hooks.hidden?.(lead.id)) {
-          this.#waitingForAgents.add(channelId);
-          continue;
-        }
         // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
         if (lead && this.hooks.usageLimited?.(lead.id)) {
           yield* channelSync(() => this.#heldByLimit(channelId, task, lead.id));
@@ -1548,10 +1535,7 @@ export class ChannelService {
           );
           const agents = this.hooks
             .agents()
-            .filter(
-              (agent) =>
-                channel.members.some((member) => member.agentId === agent.id) && !this.hooks.hidden?.(agent.id),
-            );
+            .filter((agent) => channel.members.some((member) => member.agentId === agent.id));
           const recent = channelResult(
             yield* Effect.result(
               channelSync(() => this.store.messages(channelId, undefined, ROUTING_RECENT_MESSAGES + 1)),
@@ -1585,7 +1569,7 @@ export class ChannelService {
                 title: channel.title,
                 instructions: channel.instructions,
                 lead: lead.id,
-                members: channel.members.filter((member) => !this.hooks.hidden?.(member.agentId)),
+                members: channel.members,
                 agents: agents.map(({ id, name, title, description }) => ({
                   id,
                   name,
@@ -1664,7 +1648,7 @@ export class ChannelService {
             if (!existing?.ownerAgentId)
               throw new ChannelRoutingError(sourceText("error.backend.channelRequestMemberRequired"));
             const ownerAgentId = existing.ownerAgentId;
-            channelResult(yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, ownerAgentId))));
+            channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, ownerAgentId))));
             const source = task
               ? channelResult(
                   yield* Effect.result(channelSync(() => this.store.message(channelId, task.requestMessageId))),
@@ -1758,7 +1742,7 @@ export class ChannelService {
           const [owner, ...rest] = picked.filter((agentId) => eligible.includes(agentId));
           if (!owner) {
             const first = picked[0] ?? lead.id;
-            channelResult(yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, first))));
+            channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, first))));
             throw new ChannelRoutingError(sourceText("error.backend.channelTaskMemberRequired"));
           }
           task = { ...task, ownerAgentId: owner };
@@ -1840,8 +1824,7 @@ export class ChannelService {
         continue;
       }
       if (!task.ownerAgentId) continue;
-      // A hidden owner keeps the task. It waits, as for a busy owner, until the user restores the agent.
-      if (this.hooks.busy(task.ownerAgentId) || this.hooks.hidden?.(task.ownerAgentId)) {
+      if (this.hooks.busy(task.ownerAgentId)) {
         this.#waitingForAgents.add(channelId);
         continue;
       }
@@ -2203,47 +2186,6 @@ export class ChannelService {
     // The drain that calls this must not wait for the release.
     yield* this.#forkEvent(this.#releaseHeldAgents([assignment.agentId]));
     return true;
-  });
-
-  /**
-   * The user hid this agent. Each assignment of its own whose delivery still waits in its queue goes
-   * back to the channel queue with a new revision, so it holds no resource and no other request of
-   * the agent while the agent is hidden. The task keeps its owner and waits for the restore. A turn
-   * that already runs finishes.
-   */
-  readonly releaseAgent = Effect.fn("ChannelService.releaseAgent")(function* (
-    this: ChannelService,
-    agentId: string,
-  ): Effect.fn.Return<void, ChannelOperationError> {
-    let released = false;
-    for (const channelId of yield* channelSync(() => this.store.ids())) {
-      for (const assignment of yield* channelSync(() => this.store.assignments(channelId))) {
-        if (
-          assignment.agentId !== agentId ||
-          !activeAssignment(assignment) ||
-          assignment.turnId ||
-          !assignment.deliveryId ||
-          assignment.pendingRevision !== null
-        )
-          continue;
-        const deliveryId = assignment.deliveryId;
-        if (this.mailbox.getDelivery(deliveryId)?.delivery.status !== "queued") continue;
-        yield* this.mailbox.cancel(agentId, deliveryId).pipe(Effect.mapError(channelFailure));
-        yield* channelSync(() => {
-          const task = this.store.tasks(channelId).find((item) => item.id === assignment.taskId);
-          const current =
-            task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
-          this.store.update(this.store.get(channelId), {
-            assignments: [{ ...assignment, state: "interrupted" }],
-            tasks: task && current ? [{ ...task, state: "queued", revision: task.revision + 1, error: null }] : [],
-          });
-        });
-        this.resolveAssignmentTerminal(assignment.id);
-        this.publish(channelId);
-        released = true;
-      }
-    }
-    if (released) yield* this.#releaseHeldAgents([agentId]);
   });
 
   /**
@@ -2695,17 +2637,12 @@ export class ChannelService {
     if (this.#stopped || this.#summaries.has(channelId) || this.#deletedChannels.has(channelId)) return;
     const channel = this.store.exists(channelId) ? this.store.get(channelId) : null;
     const lead = channel ? this.hooks.agents().find((agent) => agent.id === channel.leadAgentId) : undefined;
-    if (!channel || channel.archived || !lead || this.hooks.hidden?.(lead.id)) return;
+    if (!channel || channel.archived || !lead) return;
     // With no spare generation, the next packet makes the summary when it needs one.
     if (this.hooks.spareGeneration?.() === false) return;
     const fallbacks = this.hooks
       .agents()
-      .filter(
-        (agent) =>
-          agent.id !== lead.id &&
-          channel.members.some((member) => member.agentId === agent.id) &&
-          !this.hooks.hidden?.(agent.id),
-      );
+      .filter((agent) => agent.id !== lead.id && channel.members.some((member) => member.agentId === agent.id));
     const fiber = Effect.runSync(
       Effect.forkIn(
         this.#history.summarizeAhead(channelId, lead, fallbacks).pipe(
@@ -3061,10 +2998,7 @@ export class ChannelService {
             args,
             agentId,
             this.hooks.agents(),
-            {
-              hidden: (id) => this.hooks.hidden?.(id) ?? false,
-              level: (id) => this.hooks.personAgentLevel?.(person.id, id) ?? "manage",
-            },
+            { level: (id) => this.hooks.personAgentLevel?.(person.id, id) ?? "manage" },
             task ? channelWorkOwners(task, tasks) : new Set([agentId]),
           ),
         );
@@ -3526,10 +3460,8 @@ export class ChannelService {
         "A handoff needs recipientAgentId, task, expectedResult, and sourceMessageIds: the ids of one or more shared channel messages that the task comes from.",
       );
     const recipientAgentId = args.recipientAgentId;
-    const recipient = yield* Effect.result(channelSync(() => this.requireAvailableMember(channel, recipientAgentId)));
+    const recipient = yield* Effect.result(channelSync(() => this.requireMember(channel, recipientAgentId)));
     if (Result.isFailure(recipient)) {
-      if (this.hooks.hidden?.(recipientAgentId))
-        return refuse("This member is hidden and takes no new work. Choose another channel member.");
       if (!this.hooks.agents().some((agent) => agent.id === recipientAgentId))
         return refuse("Set recipientAgentId to the agent id of an available channel member.");
       // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
@@ -3837,12 +3769,6 @@ export class ChannelService {
       !this.hooks.agents().some((agent) => agent.id === agentId)
     )
       throw new Error(sourceText("error.backend.channelMemberRequired"));
-  }
-
-  /** `requireMember` for new work: a hidden member keeps its membership but takes no new work. */
-  private requireAvailableMember(channel: Channel, agentId: string): void {
-    this.requireMember(channel, agentId);
-    if (this.hooks.hidden?.(agentId)) throw new Error(sourceText("error.backend.recipientHidden"));
   }
 
   private waitForAssignmentTerminal(

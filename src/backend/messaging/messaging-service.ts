@@ -1505,13 +1505,6 @@ export class MessagingService {
       yield* adapter.post(message.target, { text: sourceText(noAgent) }).pipe(toMessagingOperationFailed);
       return;
     }
-    // A hidden agent receives no new messages. The sender learns why, and nothing is queued.
-    if (this.#agents.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined)) {
-      yield* adapter
-        .post(message.target, { text: sourceText("error.backend.recipientHidden") })
-        .pipe(toMessagingOperationFailed);
-      return;
-    }
     const staging = join(this.#downloadsRoot, randomUUID());
     yield* Effect.acquireUseRelease(
       Effect.succeed(staging),

@@ -574,6 +574,7 @@ export const messages = {
   "mobile.agent.hidden.body": "צ'אטים מוסתרים ממשיכים לעבוד. הם פשוט לא מוצגים במסך הבית.",
   "mobile.agent.hidden.bodySynced":
     "צ'אט מוסתר שומר את ההיסטוריה שלו. הסוכן שלו לא מריץ שגרות ולא מקבל הודעות חדשות. כל התקן בשרת הזה מסתיר אותו.",
+  "mobile.agent.hidden.bodySyncedWorking": "צ'אט מוסתר ממשיך לעבוד. כל התקן בשרת הזה מסתיר אותו.",
   "mobile.agent.hidden.showNamed": "הצגת {name}",
   "mobile.agent.hidden.show": "הצגה",
   "mobile.agent.hidden.showFailed": "לא ניתן להציג את הסוכן",

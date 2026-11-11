@@ -547,6 +547,7 @@ export const messages = {
   "mobile.agent.hidden.body": "隐藏的对话仍会继续工作，只是不在首页显示。",
   "mobile.agent.hidden.bodySynced":
     "隐藏的对话会保留历史，但其助手不运行自动化任务，也收不到新消息。该服务器的所有设备都会隐藏它。",
+  "mobile.agent.hidden.bodySyncedWorking": "隐藏的对话仍会继续工作。该服务器的所有设备都会隐藏它。",
   "mobile.agent.hidden.showNamed": "显示 {name}",
   "mobile.agent.hidden.show": "显示",
   "mobile.agent.hidden.showFailed": "无法显示助手",

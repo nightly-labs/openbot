@@ -590,6 +590,7 @@ export const messages = {
   "mobile.agent.hidden.body": "Gizli sohbetler çalışmaya devam eder. Yalnızca ana ekranda gösterilmezler.",
   "mobile.agent.hidden.bodySynced":
     "Gizli bir sohbet geçmişini korur. Ajanı rutin çalıştırmaz ve yeni mesaj almaz. Bu sunucudaki her cihaz onu gizler.",
+  "mobile.agent.hidden.bodySyncedWorking": "Gizli bir sohbet çalışmaya devam eder. Bu sunucudaki her cihaz onu gizler.",
   "mobile.agent.hidden.showNamed": "{name} sohbetini göster",
   "mobile.agent.hidden.show": "Göster",
   "mobile.agent.hidden.showFailed": "Ajan gösterilemedi",

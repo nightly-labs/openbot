@@ -183,6 +183,12 @@ export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
 export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
 /**
+ * A host on which a hidden agent works as each other agent does: its routines run and it gets
+ * messages. A host with `agent-hidden-v1` and without this stops a hidden agent, so a client shows
+ * such an agent as paused only when the host does not advertise this.
+ */
+export const AGENT_HIDDEN_WORK_CAPABILITY = "agent-hidden-work";
+/**
  * A host that accepts a file with any name. A file with no known type is stored as an opaque `file`
  * attachment, and the agent gets its path. An older host refuses a name outside the known types.
  */
@@ -502,6 +508,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  AGENT_HIDDEN_WORK_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -707,6 +714,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
     capability !== WORKFLOWS_GITHUB_CAPABILITY &&
     capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+    capability !== AGENT_HIDDEN_WORK_CAPABILITY &&
     capability !== MCP_ACCOUNTS_CAPABILITY &&
     capability !== SIDEBAR_PINS_CAPABILITY &&
     capability !== SIDEBAR_FOLDERS_CAPABILITY &&
@@ -787,6 +795,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
+  AGENT_HIDDEN_WORK_CAPABILITY,
   MCP_ACCOUNTS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -951,6 +960,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
       capability !== WORKFLOWS_GITHUB_CAPABILITY &&
       capability !== TEAM_SVG_ATTACHMENTS_CAPABILITY &&
+      capability !== AGENT_HIDDEN_WORK_CAPABILITY &&
       capability !== MCP_ACCOUNTS_CAPABILITY &&
       capability !== SIDEBAR_PINS_CAPABILITY &&
       capability !== SIDEBAR_FOLDERS_CAPABILITY &&

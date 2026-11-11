@@ -108,6 +108,7 @@ export function serverSupportsCapability(
       capability === "instance-transfer-v1" ||
       capability === "instance-transfer-chunks-v1" ||
       capability === "agent-hidden-v1" ||
+      capability === "agent-hidden-work" ||
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||

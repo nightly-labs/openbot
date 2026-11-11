@@ -56,7 +56,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
   const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
-  const { agentStatus, agentList, updateAgent, setAgentAvatar, userHiddenAgentIds } = useAgents();
+  const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
     browserTabs,
@@ -96,7 +96,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     },
     approvals,
     takeovers,
-    hiddenAgentIds: userHiddenAgentIds,
+    pausedAgentIds: userPausedAgentIds,
   });
   // A usage limit that holds the member whose turn a queued request waits for, the lead while no member
   // owns it, asks where that member's work goes, as the agent's own chat does. Before, the channel only
