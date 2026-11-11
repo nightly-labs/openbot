@@ -213,6 +213,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.0 sends updates only for the execution that a prompt starts. The turn that a
   // finished background subagent starts reaches only its store, so the chat never showed it (#3406).
   unsentBackgroundTurns: true,
+  // OpenCode 2.2.7 sends `usage_update` and has no ACP method that compacts. It compacts by itself
+  // only when the context is full, so a long chat sent an almost full context with each request (#7171).
+  contextCompaction: "handoff",
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
