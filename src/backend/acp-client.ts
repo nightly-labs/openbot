@@ -2380,7 +2380,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
             turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
-            turn.providerError = this.#mcpLoadFailureMessage(detail) ?? sdkHarness.turnFailure(detail);
+            turn.providerError = this.#mcpLoadFailureMessage(thread, detail) ?? sdkHarness.turnFailure(detail);
             turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
@@ -2603,11 +2603,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /**
    * The message of a turn that an MCP server's failed start ended, or `null` for another failure.
    * The server's own reason is runtime output, often a traceback with a Windows path, which the chat
-   * replaced with a message that names no cause (#7046). It goes to the diagnostics instead.
+   * replaced with a message that names no cause (#7046). It goes to the diagnostics instead. A
+   * bridge server of OpenBot's own tools is in no settings that the user can change, so its failure
+   * keeps the server's text.
    */
-  #mcpLoadFailureMessage(detail: string): string | null {
+  #mcpLoadFailureMessage(thread: AcpThread, detail: string): string | null {
     const failure = this.#flavor.sdkHarness?.mcpLoadFailure(detail);
-    if (!failure) return null;
+    if (!failure || thread.mcp.servers.some((bridge) => bridge.name === failure.name)) return null;
     this.emit("diagnostic", this.#redact(detail));
     const configured = this.options
       .mcpServers?.()
