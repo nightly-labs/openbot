@@ -45,7 +45,12 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // Codex sends this on each session start when its config asks for a tier, such as `priority`,
     // that the model does not list (`codex-rs/core/src/session/mod.rs`). Codex leaves the tier out
     // and the turn continues at the standard speed, so the banner showed a false error (#6827).
-    message.startsWith("Configured service tier ")
+    message.startsWith("Configured service tier ") ||
+    // Codex sends this once at start when it cannot update a marketplace from `config.toml`, such as
+    // a Git source on a computer without Git (`codex-rs/core-plugins/src/manager.rs`). It has no
+    // thread, the chat works, and the plugins stay at their version, so it showed a false
+    // "Provider error" toast (#6976). The text covers `marketplace `name`:` and `marketplaces:`.
+    message.startsWith("Codex could not update marketplace")
   );
 }
 
