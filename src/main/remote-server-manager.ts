@@ -1333,6 +1333,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!current) return;
       this.#clearServerConnectionState(serverId);
       if (forget) {
+        this.#forgetPictures(serverId);
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
@@ -1571,6 +1572,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.request(serverId, path, decodeVoid, { method: "POST" }).pipe(Effect.catch(() => Effect.void));
       }
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
       yield* this.#store.remove(serverId);
       this.#emitChanged();
     },
@@ -1794,6 +1796,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#client.forget(serverId);
     this.#presence.forget(serverId);
     this.#attachments.forget(serverId);
+  }
+
+  /**
+   * Deletes the picture copies of a server that leaves the list. A server that stops or changes its
+   * transport keeps them: they show its agents while it is offline.
+   */
+  #forgetPictures(serverId: string): void {
     this.#background(this.#owned(this.#pictures.forget(serverId)));
   }
 
@@ -2860,6 +2869,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
     }
     // Before the store changes, because after it `ensure` answers for the new entry: it branches on
     // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,
