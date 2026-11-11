@@ -1190,7 +1190,15 @@ export class TeamApiServer {
         return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
         return;
-      if ((await routeLibraryFolders(context, this.#options.libraryFolders, hidden)) === "handled") return;
+      if (
+        (await routeLibraryFolders(
+          context,
+          this.#options.libraryFolders,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+        )) === "handled"
+      )
+        return;
       if (
         (await routeAgentNotificationLevels(
           context,

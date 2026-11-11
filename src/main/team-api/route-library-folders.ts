@@ -1,4 +1,5 @@
 import {
+  canAdministerServer,
   type LibraryFolderRefusalReason,
   type LibraryFoldersSnapshot,
   parseLibraryFolderAction,
@@ -19,13 +20,20 @@ import { readJson, requireAgentLevel } from "./request-helpers";
 /** A refusal for something that the host does not have. Each other refusal is a request that the rules do not permit. */
 const NOT_FOUND: ReadonlySet<LibraryFolderRefusalReason> = new Set(["unknown-agent", "unknown-folder", "unknown-file"]);
 
-/** The snapshot with no folder of a hidden agent and no file that is in one. */
+/**
+ * The snapshot with no folder of a hidden agent and no file that is in one. `livingAgentIds` is null
+ * for an owner or an admin. As in `storage-v1`, a member also gets no folder of an agent that the host
+ * no longer has: a file id is enough to download the file.
+ */
 function visibleLibraryFolders(
   snapshot: LibraryFoldersSnapshot,
   hiddenAgentIds: ReadonlySet<string>,
+  livingAgentIds: ReadonlySet<string> | null,
 ): LibraryFoldersSnapshot {
-  if (hiddenAgentIds.size === 0) return snapshot;
-  const folders = snapshot.folders.filter((folder) => !hiddenAgentIds.has(folder.agentId));
+  if (hiddenAgentIds.size === 0 && livingAgentIds === null) return snapshot;
+  const folders = snapshot.folders.filter(
+    (folder) => !hiddenAgentIds.has(folder.agentId) && (livingAgentIds === null || livingAgentIds.has(folder.agentId)),
+  );
   const shown = new Set(folders.map((folder) => folder.id));
   return {
     revision: snapshot.revision,
@@ -60,22 +68,25 @@ export async function routeLibraryFolders(
   context: TeamApiRequestContext,
   libraryFolders: TeamApiLibraryFolders | undefined,
   hiddenAgentIds: ReadonlySet<string>,
+  /** The agents that the host has. A member gets no folder of a deleted agent. */
+  agentIds: () => ReadonlySet<string>,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, request, json } = context;
+  const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !Object.values(LIBRARY_FOLDERS_ROUTES).some((path) => path === url.pathname))
     return "unmatched";
   if (!libraryFolders || !capabilities.has(LIBRARY_FOLDERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.libraryFoldersUnsupported"));
   // `readJson` has already run the body through the library-folders-v1 codec.
   const body = await readJson(request);
-  if (url.pathname === LIBRARY_FOLDERS_ROUTES.read)
-    return json(200, visibleLibraryFolders(libraryFolders.snapshot(), hiddenAgentIds));
+  const visible = (snapshot: LibraryFoldersSnapshot) =>
+    visibleLibraryFolders(snapshot, hiddenAgentIds, canAdministerServer(member.role) ? null : agentIds());
+  if (url.pathname === LIBRARY_FOLDERS_ROUTES.read) return json(200, visible(libraryFolders.snapshot()));
   const action = parseLibraryFolderAction(body);
   try {
     const snapshot = await runCauseEffect(
       libraryFolders.change(action, (agents) => requireFolderAccess(context, agents, hiddenAgentIds)),
     );
-    return json(200, visibleLibraryFolders(snapshot, hiddenAgentIds));
+    return json(200, visible(snapshot));
   } catch (error) {
     // A refusal is the fault of the request, and its message is for the person who made the change.
     if (error instanceof LibraryFolderChangeRefused)

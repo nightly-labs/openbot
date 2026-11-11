@@ -6,8 +6,9 @@
 // folders of an agent only with `chat` access to it, and gets 403 without it; an owner or an admin
 // changes all folders. The folders are a layout over the stored files: a folder change moves, copies
 // and deletes no file, and it changes no chat. A member gets no
-// folder of an agent that they cannot see and no file that is in one, and the host answers 404 to an
-// action that names such an agent or folder. The actions are `create` (the client makes the id, and
+// folder of an agent that they cannot see or that the host no longer has, and no file that is in one;
+// the host answers 404 to an action that names an agent or folder that the member cannot see. The
+// actions are `create` (the client makes the id, and
 // `fileIds` puts files into the new folder), `rename`, `delete` (the folder and the folders in it;
 // their files stay with the agent), `move` (into a parent or to the top level, before a sibling),
 // `place` (files into a folder, or null: out of their folder) and `restore` (deleted folders back at

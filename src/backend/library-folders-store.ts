@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { EventEmitter } from "node:events";
 import { mkdir, readFile, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
@@ -26,10 +25,6 @@ import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects
 export const LIBRARY_FOLDERS_FILE = "openbot-library-folders-v1.json";
 
 const STORED_VERSION = 1;
-
-interface LibraryFoldersStoreEvents {
-  changed: [snapshot: LibraryFoldersSnapshot];
-}
 
 /** The folders that a path named, from the top level down, and whether the store made one of them. */
 export interface PlacedInLibraryPath {
@@ -95,13 +90,12 @@ function apply(
  * The Library folders of one host, in one JSON file beside the sidebar layout. The folders are a
  * layout over the stored files, so the file holds only folder records and file ids.
  */
-export class LibraryFoldersStore extends EventEmitter<LibraryFoldersStoreEvents> {
+export class LibraryFoldersStore {
   readonly #path: string;
   #snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
 
   constructor(path: string) {
-    super();
     this.#path = path;
   }
 
@@ -274,7 +268,6 @@ export class LibraryFoldersStore extends EventEmitter<LibraryFoldersStoreEvents>
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#snapshot = next;
-    this.emit("changed", this.getSnapshot());
   });
 }
 

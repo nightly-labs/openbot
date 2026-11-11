@@ -10787,6 +10787,33 @@ try {
       orphanReplies.map(summary),
     );
 
+    // Some agent deletes do not remove the folders of the agent; the next start does. Until then, only
+    // an owner or an admin reads them, as for the stored files of a deleted agent.
+    await Effect.runPromise(
+      libraryStore.mutate(
+        { type: "create", id: "folder-gone", agentId: "agent-deleted", name: "Gone", fileIds: ["file-gone-1"] },
+        { agentIds: new Set(["agent-deleted"]), fileAgent: (fileId) => libraryHostFiles.get(fileId) ?? undefined },
+      ),
+    );
+    const memberGoneRead = await read(bobToken);
+    const adminGoneRead = await read(adaToken);
+    check(
+      "a member reads no folder of a deleted agent and no file in one; an admin reads them",
+      memberGoneRead.status === 200 &&
+        isDeepStrictEqual(memberGoneRead.body, {
+          ...stored(),
+          folders: stored().folders.filter((folder) => folder.agentId !== "agent-deleted"),
+          placement: Object.fromEntries(
+            Object.entries(stored().placement).filter(([fileId]) => fileId !== "file-gone-1"),
+          ),
+        }) &&
+        adminGoneRead.status === 200 &&
+        isDeepStrictEqual(adminGoneRead.body, stored()) &&
+        stored().placement["file-gone-1"] === "folder-gone",
+      [summary(memberGoneRead), summary(adminGoneRead)],
+    );
+    await Effect.runPromise(libraryStore.removeAgent("agent-deleted"));
+
     // The host scan lists the files of a deleted agent; only an owner or an admin gets them.
     const storageUse = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_CAPABILITY] };
     const fileIdsOf = (reply: Reply) => list(field(reply.body, "files")).map((file) => field(file, "id"));

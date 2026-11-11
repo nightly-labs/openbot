@@ -61,8 +61,9 @@ for the `storage:getLibraryFolders` and `storage:changeLibraryFolders` IPC of th
 route, so a joined server uses the same rules. The service reads the agent of a file from the `host`
 scan, and scans one more time when the kept scan result does not have the file. Every member reads
 the folders of each agent that they can see. A member changes the folders of an agent only with `chat`
-access to it, and gets 403 without it; an owner or an admin changes all folders. A member gets no folder of an agent that they cannot see and no file that is
-in one, and an action that names such an agent, folder or file gets 404. A refused change is 404 for
+access to it, and gets 403 without it; an owner or an admin changes all folders. A member gets no folder of an agent that they cannot see or that the host no longer
+has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
+one gets 404. A refused change is 404 for
 an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
 answers the full snapshot that the member can see. There is no event: a client reads the snapshot
 again. The read is a passive route. A deleted agent loses its folders, and a file that an owner or
