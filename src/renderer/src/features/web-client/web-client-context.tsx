@@ -63,6 +63,7 @@ import {
   deleteRemoteWorkspaceFrame,
   deleteRemoteWorkspaceFrames,
   readRemoteWorkspaceFrame,
+  saveRemoteFrameUnreadCounts,
   saveRemoteWorkspaceFrame,
 } from "../servers/remote-workspace-frame";
 import { followsServerUpdate } from "../servers/server-update-flow";
@@ -744,7 +745,7 @@ export function createWebWorkspace(
           }
         : null,
     (frame) => {
-      if (frame) saveRemoteWorkspaceFrame(props.accountId, frame.hostId, { unreadCounts: frame.unreadCounts });
+      if (frame) saveRemoteFrameUnreadCounts(props.accountId, frame.hostId, frame.unreadCounts);
     },
   );
   // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
