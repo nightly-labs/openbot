@@ -4257,7 +4257,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
-      this.#mcp.migrateCatalogBridgesToHttp();
+      this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
     });
