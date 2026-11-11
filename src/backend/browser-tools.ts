@@ -48,23 +48,29 @@ const nth = z
   .max(MAX_TARGET_NTH - 1)
   .exactOptional();
 
-const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
-  z.object({
-    kind: z.literal("role"),
-    role: nonBlankString(64),
-    name: nonBlankString(500).exactOptional(),
-    exact: z.boolean().exactOptional(),
-    nth,
-  }),
-  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional(), nth }),
-  z.object({ kind: z.literal("css"), selector: nonBlankString(2_000), nth }),
-  z.object({
-    kind: z.literal("point"),
-    x: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
-    y: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
-  }),
-]);
+// The advertised schema merges the target kinds into one object, which keeps only `kind` as required.
+const BROWSER_TARGET_FIELDS =
+  "kind=ref needs ref and revision from one snapshot; role needs role; text needs text; css needs selector; point needs x and y.";
+
+const browserTargetSchema = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+    z.object({
+      kind: z.literal("role"),
+      role: nonBlankString(64),
+      name: nonBlankString(500).exactOptional(),
+      exact: z.boolean().exactOptional(),
+      nth,
+    }),
+    z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional(), nth }),
+    z.object({ kind: z.literal("css"), selector: nonBlankString(2_000), nth }),
+    z.object({
+      kind: z.literal("point"),
+      x: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
+      y: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
+    }),
+  ])
+  .describe(BROWSER_TARGET_FIELDS);
 
 const vaultText = z.string().max(VAULT_TEXT_LIMIT).optional();
 
@@ -270,7 +276,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
       submitTarget: browserTargetSchema
         .optional()
         .describe(
-          "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
+          `Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry. ${BROWSER_TARGET_FIELDS}`,
         ),
       loginId: z
         .string()
@@ -364,7 +370,9 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .strictObject({
           number: browserTargetSchema,
           securityCode: browserTargetSchema.optional(),
-          expiry: browserTargetSchema.optional().describe("One field for month and year, such as MM/YY."),
+          expiry: browserTargetSchema
+            .optional()
+            .describe(`One field for month and year, such as MM/YY. ${BROWSER_TARGET_FIELDS}`),
           expMonth: browserTargetSchema.optional(),
           expYear: browserTargetSchema.optional(),
           nameOnCard: browserTargetSchema.optional(),
