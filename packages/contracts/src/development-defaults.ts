@@ -17,7 +17,8 @@ export interface DevelopmentDefault {
  * and `scripts/seed-dev-state.ts`: the seeded showcase agents and an agent created by hand have to
  * agree, or a dev profile shows two different answers to the same question.
  *
- * Claude Haiku first, for a signed-in Claude. OpenCode's free DeepSeek after it, and in place of
+ * Claude Haiku first, for a signed-in Claude. OpenCode's first recommended free model after it,
+ * `OPENCODE_RECOMMENDED_FREE_MODELS` in `src/backend/agent/provider-models.ts`, and in place of
  * Codex: the free tier needs no key and no account, so a developer with no Claude sign-in still
  * gets an agent that answers.
  *
@@ -31,7 +32,7 @@ export const DEVELOPMENT_CLAUDE_DEFAULT: DevelopmentDefault = {
 };
 export const DEVELOPMENT_FREE_DEFAULT: DevelopmentDefault = {
   provider: "opencode",
-  model: "opencode/deepseek-v4.1-flash-free",
+  model: "opencode/beam-free",
   reasoningEffort: "medium",
 };
 export const DEVELOPMENT_DEFAULTS: readonly DevelopmentDefault[] = [
