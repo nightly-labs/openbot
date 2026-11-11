@@ -161,6 +161,12 @@ export interface McpOAuthOptions {
    * link when it could not bind a port. `describeUnusableRedirectUrl` refuses anything else.
    */
   redirectUrl: string;
+  /**
+   * The `openbot://mcp-auth` deep link, which a sign-in in this computer's browser registers after
+   * the browser did not come back on `127.0.0.1` or on `localhost`. TradingView's firewall blocks a
+   * sign-in page that names either one (#7230). Unset, the retry uses only the two loopback names.
+   */
+  deepLinkRedirectUrl?: string;
   /** How long a sign-in may stay open before the wait is abandoned. */
   signInTimeoutMs?: number;
   /** How long a token exchange may hold a thread start or a test before the stored token answers. */
@@ -306,6 +312,7 @@ export class McpOAuth implements McpOAuthAuthority {
    * For each server, the redirect address its last sign-in opened the browser with and got no grant
    * back on. The next sign-in registers the other name of the same listener: a firewall can refuse
    * a request that names `127.0.0.1` on the authorization page, where OpenBot cannot see it (#6149).
+   * After `localhost`, a sign-in in this computer's browser registers the deep link (#7230).
    */
   readonly #unanswered = new Map<string, string>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
@@ -814,6 +821,8 @@ export class McpOAuth implements McpOAuthAuthority {
       state,
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
+      // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
+      deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
@@ -831,6 +840,8 @@ interface ClientProviderOptions {
   state: string | null;
   storage: McpOAuthStorage;
   redirectUrl: string;
+  /** The deep link to register after `localhost` got no grant back, or unset. See `McpOAuthOptions`. */
+  deepLinkRedirectUrl?: string | undefined;
   openExternal: (url: string) => Promise<void>;
   /** Whether the sign-in that built this provider has been abandoned since. */
   isAbandoned: () => boolean;
@@ -886,16 +897,27 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   constructor(options: ClientProviderOptions) {
     this.#options = options;
     this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
-    this.#retryRedirectUrl = this.#otherRedirectName(options.unansweredRedirectUrl);
+    this.#retryRedirectUrl = this.#nextRedirectName(options.unansweredRedirectUrl);
   }
 
   /** The `localhost` form of this run's loopback address, for a server that refuses `127.0.0.1`. */
   readonly #localhostRedirectUrl: string | null;
   /**
-   * The other name of this run's listener, when the last sign-in of this server opened the browser
-   * on one name and no grant came back. This attempt registers that name instead (#6149).
+   * The address to register instead, when the last sign-in of this server opened the browser on
+   * another one and no grant came back (#6149). See `#nextRedirectName`.
    */
   readonly #retryRedirectUrl: string | null;
+
+  /**
+   * `127.0.0.1`, then `localhost`, then the deep link, and then `127.0.0.1` again. TradingView's
+   * firewall blocks a sign-in page that names either loopback name, and lets the deep link through
+   * (#7230). With no deep link, the two loopback names alternate.
+   */
+  #nextRedirectName(unanswered: string | undefined): string | null {
+    const deepLink = this.#options.deepLinkRedirectUrl;
+    if (deepLink && this.#localhostRedirectUrl && unanswered === this.#localhostRedirectUrl) return deepLink;
+    return this.#otherRedirectName(unanswered);
+  }
   /** The `redirect_uri` of the authorization page this attempt opened, or `null` before it opens one. */
   #openedRedirectUrl: string | null = null;
 
@@ -911,9 +933,15 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * This run's address, or its `localhost` form when the registration on file names that form. A
    * server that refused `127.0.0.1` registered that form (#5584), and the authorization request and
    * the token request must send the address that was registered.
+   *
+   * The deep link only in the attempt that registered it: a build from before the loopback listener
+   * registered it too, and Canva refuses it at `/authorize`.
    */
   get redirectUrl(): string {
     const { app, client } = this.#record();
+    const retry = this.#retryRedirectUrl;
+    if (!app && retry && retry === this.#options.deepLinkRedirectUrl && client?.redirect_uris.includes(retry))
+      return retry;
     const localhost = this.#localhostRedirectUrl;
     return localhost && !app && client?.redirect_uris.includes(localhost) ? localhost : this.#options.redirectUrl;
   }
@@ -1008,7 +1036,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     }
     if (!this.#options.state || this.#exchangingCode) return client;
     // The last browser trip on the address of this registration got no grant back: register the
-    // other name of the same listener. A client metadata document lists only one address.
+    // next address (see `#nextRedirectName`). A client metadata document lists only one address.
     const retry = this.#retryRedirectUrl;
     if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !client.redirect_uris.includes(retry))
       return this.#register();
@@ -1069,11 +1097,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     };
   }
 
-  /** The registration body with the other name of this run's address, or `null` when it sends neither name. */
+  /**
+   * The registration body with the other name of this run's address, or `null` when it sends neither
+   * name. A refused deep link gets this run's address, so that attempt opens the page as before #7230.
+   */
   #withOtherRedirectName(init: RequestInit): RequestInit | null {
     if (!this.#localhostRedirectUrl || typeof init.body !== "string") return null;
     const body = registrationBodySchema.parse(JSON.parse(init.body));
-    const other = body.redirect_uris?.length === 1 ? this.#otherRedirectName(body.redirect_uris[0]) : null;
+    const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
+    const deepLink = this.#options.deepLinkRedirectUrl;
+    const other = deepLink && sent === deepLink ? this.#options.redirectUrl : this.#otherRedirectName(sent);
     return other ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [other] }) } : null;
   }
 

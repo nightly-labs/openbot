@@ -1815,6 +1815,7 @@ export async function createApplicationServices({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
+    deepLinkRedirectUrl: MCP_OAUTH_REDIRECT_URL,
     logger: createOpenBotLogger("mcp-oauth"),
   });
   mcpOAuthAuthority = mcpOAuth;
