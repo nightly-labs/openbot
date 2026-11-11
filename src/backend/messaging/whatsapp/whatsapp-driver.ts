@@ -35,6 +35,7 @@ import {
   whatsAppQuoteId,
   whatsAppThreadKey,
 } from "./whatsapp-events";
+import { imageSize } from "./whatsapp-image-size";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
 import { allowsContact } from "./whatsapp-senders";
@@ -236,7 +237,6 @@ class WhatsAppAdapter implements MessagingAdapter {
           .pipe(Effect.catch(() => Effect.void));
     }
     for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
-    this.#rememberPost(target, firstId, markdown);
     return firstId;
   });
 
@@ -256,14 +256,16 @@ class WhatsAppAdapter implements MessagingAdapter {
           });
           if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return false;
           const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
+          // Without its size, WhatsApp crops the image in the chat. An unreadable header sends it as before.
+          const dimensions = image ? yield* Effect.promise(() => imageSize(file.path).catch(() => null)) : null;
           const content: AnyMessageContent = image
-            ? { image: { url: file.path }, mimetype: image, ...this.#runtime.imagePreview(file.path) }
+            ? { image: { url: file.path }, mimetype: image, ...dimensions }
             : {
                 document: { url: file.path },
                 fileName: file.name.slice(0, 255) || "file",
                 mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
-          this.#rememberPost(target, yield* this.#send(target, content), file.name);
+          yield* this.#send(target, content);
           return true;
         }),
       );
@@ -407,11 +409,10 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   /**
-   * Keeps an answer or a file of OpenBot as a message of its chat. WhatsApp sends no history to this
-   * device, so without it the next turn and `messaging_history` do not see a post that another chat,
-   * a teammate or a routine sent here.
+   * WhatsApp sends no history to this device, so a post that an agent or a routine sent on its own is
+   * kept here, for the context of the chat's next message and for `messaging_history`.
    */
-  #rememberPost(target: MessageTarget, postId: string, text: string): void {
+  rememberPost(target: MessageTarget, postId: string, text: string): void {
     this.#handle.chats.rememberMessage({
       id: postId,
       chatJid: target.platformChannelId,

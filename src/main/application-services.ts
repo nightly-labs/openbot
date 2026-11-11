@@ -74,7 +74,7 @@ import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-eff
  * when - see `teardown-registry.ts` for why shutdown here is not the reverse of construction.
  */
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -145,7 +145,7 @@ import { MessagingOperationFailed, MessagingService } from "../backend/messaging
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
 import { whatsAppDriver } from "../backend/messaging/whatsapp/whatsapp-driver";
-import { type WhatsAppImagePreview, WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
+import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
@@ -804,24 +804,6 @@ function safeStorageCipher(
   return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
-/** The image decodes on this process, so a larger file goes without a preview, as before. */
-const WHATSAPP_PREVIEW_BYTES_LIMIT = 16 * 1024 * 1024;
-/** The longest side of the preview that WhatsApp shows before the image downloads, as Baileys makes it. */
-const WHATSAPP_THUMBNAIL_SIDE = 32;
-
-/** The size and the small preview of an image that OpenBot sends to WhatsApp, or null for a file it cannot read. */
-function whatsAppImagePreview(path: string): WhatsAppImagePreview | null {
-  const size = statSync(path, { throwIfNoEntry: false })?.size;
-  if (size === undefined || size > WHATSAPP_PREVIEW_BYTES_LIMIT) return null;
-  const image = nativeImage.createFromPath(path);
-  if (image.isEmpty()) return null;
-  const { width, height } = image.getSize();
-  const thumbnail = image.resize(
-    width >= height ? { width: WHATSAPP_THUMBNAIL_SIDE } : { height: WHATSAPP_THUMBNAIL_SIDE },
-  );
-  return { width, height, jpegThumbnail: thumbnail.toJPEG(50).toString("base64") };
-}
-
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
@@ -900,7 +882,6 @@ async function createMessagingServices({
     root: join(app.getPath("userData"), "whatsapp"),
     createSocket: (config) => makeWASocket(config),
     makeSignalRepository: makeOpenBotSignalRepository,
-    imagePreview: whatsAppImagePreview,
   });
   const messaging = new MessagingService({
     threads: service.messaging,

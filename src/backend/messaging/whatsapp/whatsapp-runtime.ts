@@ -21,13 +21,6 @@ export interface WhatsAppConnectionHandle {
   chats: WhatsAppChatState;
 }
 
-/** What WhatsApp shows of an image before it downloads it: its size, and a small JPEG in base64. */
-export interface WhatsAppImagePreview {
-  width: number;
-  height: number;
-  jpegThumbnail: string;
-}
-
 export interface WhatsAppRuntimeOptions {
   /** `<userData>/whatsapp`, a folder only this user can read. */
   root: string;
@@ -36,11 +29,6 @@ export interface WhatsAppRuntimeOptions {
   /** WhatsApp Web's current version, or null. Without it, the session asks WhatsApp's server. */
   fetchVersion?: () => Promise<WAVersion | null>;
   now?: () => number;
-  /**
-   * The preview of an image file, or null when it cannot be read. Baileys makes it only with an image
-   * library that OpenBot does not ship; without the size, WhatsApp crops the image in the chat.
-   */
-  imagePreview?: (path: string) => WhatsAppImagePreview | null;
 }
 
 const NO_RULES: WhatsAppSenderRules = { ownNumber: true, contacts: new Set(), groups: new Set() };
@@ -66,10 +54,6 @@ export class WhatsAppRuntime {
 
   setPolicy(policy: WhatsAppPolicy): void {
     this.#policy = policy;
-  }
-
-  imagePreview(path: string): WhatsAppImagePreview | null {
-    return this.#options.imagePreview?.(path) ?? null;
   }
 
   storePath(storeId: string): string {

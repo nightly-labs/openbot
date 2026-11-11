@@ -172,6 +172,11 @@ export interface MessagingAdapter {
     markdown: string,
     embeds: DiscordEmbed[],
   ): Effect.Effect<string, MessagingAdapterError>;
+  /**
+   * Keeps a post that OpenBot sent on its own, with `messaging_post` or as a routine's answer, as a
+   * message of its place, for a platform whose history this device cannot read (WhatsApp).
+   */
+  rememberPost?(target: MessageTarget, postId: string, text: string): void;
   /** Uploads files to the conversation, and returns the names it did not send. */
   upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
