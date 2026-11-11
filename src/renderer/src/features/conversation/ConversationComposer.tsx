@@ -55,6 +55,9 @@ import { currentConversationTarget } from "./stores/composer-store";
 const [dismissedCompactions, setDismissedCompactions] = createSignal<Record<string, string>>({});
 // Keyed by provider account, then by chat: a recovered window clears every chat of that account.
 const [dismissedUsageLimits, setDismissedUsageLimits] = createStore<Record<string, Record<string, string>>>({});
+// The sub-task card of each channel opens as the user last left it. The card reads it only when it
+// mounts, so a plain map is enough. Keyed like `queueOwner`.
+const channelSubtasksOpen = new Map<string, boolean>();
 
 /** @internal Stable HMR boundary for conversation composer. */
 export function ConversationComposer() {
@@ -218,6 +221,16 @@ export function ConversationComposer() {
   const queueOwner = () => {
     const target = currentConversationTarget(props);
     return target && `${target.serverId}:${target.agentId}`;
+  };
+  // The card mounts again on each visit to the channel, so a collapsed card stayed collapsed only
+  // until the user went to another chat (#6793).
+  const channelSubtasksDefaultOpen = () => {
+    const owner = channel ? queueOwner() : undefined;
+    return owner === undefined ? undefined : channelSubtasksOpen.get(owner);
+  };
+  const rememberChannelSubtasksOpen = (open: boolean) => {
+    const owner = queueOwner();
+    if (owner !== undefined) channelSubtasksOpen.set(owner, open);
   };
   const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
@@ -486,6 +499,8 @@ export function ConversationComposer() {
                 <AwaitingReplies
                   items={awaitingReplies()}
                   title={channel ? t("chat.awaiting.subtasks") : undefined}
+                  defaultOpen={channelSubtasksDefaultOpen()}
+                  onOpenChange={channel ? rememberChannelSubtasksOpen : undefined}
                   onDismiss={dismissAwaitingReplies}
                   onOpenAgent={props.onSelectAgent}
                   // A channel's rows are its sub-tasks, not queued replies.
