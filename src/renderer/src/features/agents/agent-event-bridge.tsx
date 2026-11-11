@@ -1,6 +1,7 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
@@ -63,8 +64,15 @@ export function AgentEventBridge() {
   const { openServerSettings } = useServerSettings();
   const { applyAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
-    useAgents();
+  const {
+    agentList,
+    setModelOptions,
+    explicitlyOpenedAgentChatId,
+    applyStoredAgents,
+    applyUserHiddenAgents,
+    ownAgentLevels,
+    applyOwnAgentLevels,
+  } = useAgents();
   const { setConversationErrors, setConversationErrorRuns } = useConversationController();
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
@@ -110,15 +118,19 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout, receiveServerPins } = useSidebar();
-  // As on web, mute and the notification level of the server decide the sounds too. Before the
-  // server list arrives, the sounds play as they did.
-  const soundLevel = () => {
+  // As on web, mute and the notification level of the server decide the sounds too, and the user's
+  // own level of the agent replaces the server level, as for the notifications. Before the server
+  // list arrives, the sounds play as they did.
+  const soundLevel = (agentId: string | null) => {
     const server = activeServer();
     if (!server) return "all";
-    return server.notificationsMuted ? "nothing" : server.notificationLevel;
+    if (server.notificationsMuted) return "nothing";
+    if (agentId === null) return server.notificationLevel;
+    return agentNotificationLevel(server.notificationLevel, ownAgentLevels(), agentId);
   };
   const playAgentEventSound = createAgentEventSounds(
-    (agentId) => soundLevel() !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
+    (agentId) =>
+      soundLevel(agentId) !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
   let readRefresh = 0;
   let modelRefresh = 0;
@@ -160,6 +172,9 @@ export function AgentEventBridge() {
         return;
       case "hidden-agents-changed":
         applyUserHiddenAgents(event.agents);
+        return;
+      case "agent-notification-levels-changed":
+        applyOwnAgentLevels(event);
         return;
       case "conversation":
         scheduleConversation(event.snapshot);
@@ -248,7 +263,7 @@ export function AgentEventBridge() {
           ...current,
           [event.agentId]: event.turnId,
         }));
-        if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
+        if (soundLevel(event.agentId) === "all" && !platform.chatWindow) prepareCompletionSound();
         return;
       case "turn-completed":
         completedTurnByAgent.set(event.agentId, event.turnId);
@@ -294,7 +309,8 @@ export function AgentEventBridge() {
         );
         if (event.status === "completed") {
           markReplyCompleted(event.agentId);
-          if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event, agentList());
+          if (soundLevel(event.agentId) === "all" && !platform.chatWindow)
+            playCompletionSoundForAgentEvent(event, agentList());
           // A finished reply is a good moment to ask for a post. A chat window has no toasts.
           if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
@@ -302,7 +318,7 @@ export function AgentEventBridge() {
       case "thread-turn-completed":
         // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
         // routine thread plays the sound, as before: a routine run played it in the agent's chat.
-        if (event.routine && soundLevel() === "all" && !platform.chatWindow)
+        if (event.routine && soundLevel(event.turn.agentId) === "all" && !platform.chatWindow)
           playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
@@ -349,7 +365,7 @@ export function AgentEventBridge() {
         // another chat; the desktop notification tells the user who is not in the app. A failure does
         // not need the user, so it shows only at the "all" level, as the completion sound does.
         const agent = agentList().find((candidate) => candidate.id === event.agentId);
-        if (!agent?.notifications || soundLevel() !== "all" || platform.chatWindow) return;
+        if (!agent?.notifications || soundLevel(event.agentId) !== "all" || platform.chatWindow) return;
         if (!platform.appFocused() || isAgentChatOpen(event.agentId)) return;
         const { t } = currentText();
         toast.error(agent.name, {
@@ -470,7 +486,7 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
-    if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
+    if (soundLevel(null) === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
         void channels.changed(event.channelId);

@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "这会从该服务器上移除该助手。",
   "mobile.agent.menu.markRead": "标为已读",
   "mobile.agent.menu.markUnread": "标为未读",
+  "mobile.agent.menu.mute": "静音",
+  "mobile.agent.menu.unmute": "取消静音",
   "mobile.agent.menu.hide": "隐藏",
   "mobile.agent.menu.info": "信息",
   "mobile.agent.menu.more": "更多",

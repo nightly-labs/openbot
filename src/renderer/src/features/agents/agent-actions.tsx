@@ -69,6 +69,8 @@ const AgentActions = createSimpleContext({
       userHiddenAgents,
       userHiddenAgentIds,
       applyUserHiddenAgents,
+      ownAgentLevels,
+      applyOwnAgentLevels,
     } = useAgents();
     const { initializeConversation, removeConversation } = useConversation();
     const threads = useAgentThreads();
@@ -415,6 +417,36 @@ const AgentActions = createSimpleContext({
       }
     }
 
+    /**
+     * Mutes an agent for the user, or gives it the server level again. The menu shows the change at
+     * once, and the server's answer then replaces the levels. If the server refuses, the level of
+     * this agent goes back. The server keeps the level for all devices of the user.
+     */
+    async function setAgentMuted(agentId: string, muted: boolean): Promise<void> {
+      const previous = ownAgentLevels().get(agentId) ?? null;
+      const level = muted ? "nothing" : null;
+      if (previous === level) return;
+      const serverId = activeServerId();
+      const withLevel = (next: typeof previous) => ({
+        agents: [
+          ...[...ownAgentLevels()].flatMap(([id, own]) => (id === agentId ? [] : [{ agentId: id, level: own }])),
+          ...(next ? [{ agentId, level: next }] : []),
+        ],
+      });
+      applyOwnAgentLevels(withLevel(level));
+      try {
+        applyOwnAgentLevels(await agentsPort().agent.setAgentNotificationLevel({ agentId, level }, serverId));
+      } catch (error) {
+        if (!scopeIsCurrent()) return;
+        applyOwnAgentLevels(withLevel(previous));
+        const { t, errorMessage } = currentText();
+        actionToast.error(t("agent.error.muteFailed"), {
+          description: errorMessage(error, t("agent.error.hiddenFailed")),
+          report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+        });
+      }
+    }
+
     return {
       createAgent,
       createAgentInPlace,
@@ -424,6 +456,7 @@ const AgentActions = createSimpleContext({
       duplicatingSectionIds,
       deleteAgent,
       setAgentHiddenByUser,
+      setAgentMuted,
     };
   },
 });

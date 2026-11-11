@@ -79,6 +79,7 @@ export const messages = defineMessages("agent", {
   "agent.error.hideFailed": "Could not hide agent",
   "agent.error.restoreFailed": "Could not restore agent",
   "agent.error.hiddenFailed": "The change was not saved. Try again.",
+  "agent.error.muteFailed": "Could not change notifications",
   "agent.error.settingsFailed": "Could not save agent settings",
   "agent.error.adminOnly": "Agent settings can only be changed by a server administrator.",
   "agent.error.continueFailed": "The agent could not continue. Try again.",

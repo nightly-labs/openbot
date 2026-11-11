@@ -75,6 +75,8 @@ export const messages = {
   "sidebar.agentMenu.duplicating": "جارٍ التكرار…",
   "sidebar.agentMenu.markRead": "تعليم كمقروء",
   "sidebar.agentMenu.markUnread": "تعليم كغير مقروء",
+  "sidebar.agentMenu.mute": "كتم الوكيل",
+  "sidebar.agentMenu.unmute": "إلغاء كتم الوكيل",
   "sidebar.agentMenu.delete": "حذف الوكيل",
   "sidebar.agentMenu.hide": "إخفاء الوكيل",
   "sidebar.agentMenu.restore": "استعادة",

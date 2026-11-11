@@ -15,7 +15,7 @@ import {
 } from "@openbot/team-client/agent-notifications";
 import { channelReplyNotifications } from "@openbot/team-client/channel-notifications";
 import type { TextValue } from "@openbot/ui/text";
-import { onCleanup, untrack } from "solid-js";
+import { createSignal, onCleanup, untrack } from "solid-js";
 import { startActionSounds } from "../../action-sounds";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { createAgentEventSounds } from "../agents/agent-event-sounds";
@@ -50,8 +50,31 @@ export function createWebNotificationRouting(options: {
   readAgentLevels?: ((hostId: string) => Promise<AgentNotificationLevelsSnapshot>) | undefined;
 }) {
   const { workspace, notifications } = options;
-  /** The last levels that each host gave, for a read that fails. */
-  const agentLevels = new Map<string, ReadonlyMap<string, ServerNotificationLevel>>();
+  /**
+   * The last levels that each host gave, for a read that fails. The agent menu and the sounds read
+   * them too, so a change shows at once.
+   */
+  const [agentLevels, setAgentLevels] = createSignal<
+    Readonly<Record<string, ReadonlyMap<string, ServerNotificationLevel>>>
+  >({});
+  const NO_MUTED_AGENTS: ReadonlySet<string> = new Set();
+
+  /** Applies all levels of the user on a host, from a read, an event or a write. */
+  function applyLevels(
+    hostId: string,
+    snapshot: AgentNotificationLevelsSnapshot,
+  ): ReadonlyMap<string, ServerNotificationLevel> {
+    const levels = agentNotificationLevelMap(snapshot);
+    setAgentLevels((current) => ({ ...current, [hostId]: levels }));
+    notifications.setSyncedLevel(hostId, snapshot.server);
+    return levels;
+  }
+  /** The agents of a host that the user muted: their own level is "nothing". */
+  function mutedAgentIds(hostId: string | null | undefined): ReadonlySet<string> {
+    const levels = hostId ? agentLevels()[hostId] : undefined;
+    if (!levels) return NO_MUTED_AGENTS;
+    return new Set([...levels].flatMap(([agentId, level]) => (level === "nothing" ? [agentId] : [])));
+  }
   /** The requests whose notification waits for the levels. An answer on any device removes its key. */
   const waitingRequests = new Set<string>();
 
@@ -59,13 +82,9 @@ export function createWebNotificationRouting(options: {
     const read = options.readAgentLevels;
     if (!read) return null;
     try {
-      const snapshot = await read(hostId);
-      const levels = agentNotificationLevelMap(snapshot);
-      agentLevels.set(hostId, levels);
-      notifications.setSyncedLevel(hostId, snapshot.server);
-      return levels;
+      return applyLevels(hostId, await read(hostId));
     } catch {
-      return agentLevels.get(hostId) ?? null;
+      return untrack(agentLevels)[hostId] ?? null;
     }
   }
   /** Reads the levels of a host again, such as after it comes online. Another device can have changed them. */
@@ -148,7 +167,7 @@ export function createWebNotificationRouting(options: {
     const { muted, level } = untrack(() => notifications.state(hostId));
     return (
       !muted &&
-      level !== "nothing" &&
+      agentNotificationLevel(level, untrack(agentLevels)[hostId] ?? null, agentId) !== "nothing" &&
       untrack(() => workspace.state.agents).some((agent) => agent.id === agentId && agent.notifications)
     );
   });
@@ -161,5 +180,5 @@ export function createWebNotificationRouting(options: {
       playAgentEventSound(event);
     }),
   );
-  return { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels };
+  return { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels, applyLevels, mutedAgentIds };
 }
