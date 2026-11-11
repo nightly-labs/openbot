@@ -101,12 +101,12 @@ function isOwn(message: AgentMessage): boolean {
  * The list holds only the newest messages, so the host's copy leaves it again as new messages come. A
  * message that the host stored and whose mark left the list is delivered: its copy is newer than the
  * mark, so it was in the list or left it with the mark. Without this, the pending row came back below
- * the newest messages (#6773).
+ * the newest messages (#6773). An empty list is not loaded yet, so it tells nothing.
  */
 export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const mark = pending.after === null ? -1 : messages.findIndex((message) => message.id === pending.after);
-  if (pending.messageId !== null && pending.after !== null && mark < 0) return true;
+  if (pending.messageId !== null && pending.after !== null && mark < 0 && messages.length > 0) return true;
   return messages.slice(mark + 1).some((message) => isOwn(message) && message.body.trim() === pending.text);
 }
 

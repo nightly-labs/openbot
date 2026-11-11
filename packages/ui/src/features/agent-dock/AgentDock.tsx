@@ -989,9 +989,10 @@ export function AgentDock(props: AgentDockProps) {
   createEffect(
     () => {
       const id = state.shown;
-      if (!id) return null;
+      const pending = id ? state.pending[id] : undefined;
+      if (!id || !pending?.length) return null;
       const messages = props.chat(refOfKey(id)).messages;
-      const delivered = (state.pending[id] ?? []).filter((message) => pendingMessageDelivered(message, messages));
+      const delivered = pending.filter((message) => pendingMessageDelivered(message, messages));
       return delivered.length > 0 ? { id, keys: delivered.map((message) => message.key) } : null;
     },
     (found) => {
