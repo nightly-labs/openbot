@@ -238,6 +238,12 @@ interface AcpTurn {
   toolKinds: Map<string, string>;
   /** The latest durable shape of each tool call until ACP reports its terminal status. */
   toolItems: Map<string, ThreadItem>;
+  /** Approved edits that no call under another id ran yet, with their files (`approvedEditSweep`). */
+  approvedEdits: { id: string; paths: readonly string[] }[];
+  /** The approved edit that each call under another id runs. */
+  approvedEditRuns: Map<string, string>;
+  /** Approved edits whose call under another id completed. */
+  approvedEditsRan: Set<string>;
   /** The user stopped the turn. */
   stopped: boolean;
   /** Aborts when the user stops the turn: a permission request that waits gets its answer then. */
@@ -2253,6 +2259,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolNames: new Map(),
       toolKinds: new Map(),
       toolItems: new Map(),
+      approvedEdits: [],
+      approvedEditRuns: new Map(),
+      approvedEditsRan: new Set(),
       stopped: false,
       stop: new AbortController(),
       completing: false,
@@ -2747,7 +2756,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.toolNames.set(update.toolCallId, name);
       const toolKind = update.kind ?? turn.toolKinds.get(update.toolCallId) ?? "other";
       turn.toolKinds.set(update.toolCallId, toolKind);
-      const status = update.status ?? turn.toolItems.get(update.toolCallId)?.status;
+      // The approved edit ran under another id, so its failure is not true: the call completed.
+      const swept = this.#isApprovedEditSweep(turn, update, toolKind);
+      const reported = swept ? "completed" : update.status;
+      const status = reported ?? turn.toolItems.get(update.toolCallId)?.status;
       const item: ThreadItem = {
         ...(turn.toolItems.get(update.toolCallId) ?? {}),
         id: update.toolCallId,
@@ -2756,14 +2768,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         toolKind,
         ...(status === undefined ? {} : { status }),
         arguments: update.rawInput ?? turn.toolItems.get(update.toolCallId)?.arguments,
-        result: update.rawOutput ?? turn.toolItems.get(update.toolCallId)?.result,
+        result: (swept ? undefined : update.rawOutput) ?? turn.toolItems.get(update.toolCallId)?.result,
         // Gemini and others put the error of a failed tool only in the content, not in rawOutput.
-        ...(update.status === "failed" && update.content ? { error: update.content } : {}),
+        ...(reported === "failed" && update.content ? { error: update.content } : {}),
       };
       turn.toolItems.set(update.toolCallId, item);
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
       this.emit("notification", {
-        method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",
+        method: reported === "completed" || reported === "failed" ? "item/completed" : "item/started",
         params: {
           threadId: thread.id,
           turnId: turn.id,
@@ -2771,7 +2783,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           item,
         },
       });
-      if (update.status === "completed" || update.status === "failed") {
+      if (reported === "completed" || reported === "failed") {
         turn.messages.push(item);
         turn.toolItems.delete(update.toolCallId);
       }
@@ -3340,6 +3352,34 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
   }, Effect.uninterruptible);
 
+  /**
+   * Follows the edits that the user approved (`AcpFlavor.approvedEditSweep`). Tells whether this
+   * update is the failure that the agent sends for an approved edit that completed under another id.
+   */
+  #isApprovedEditSweep(turn: AcpTurn, update: AcpToolCallUpdate, toolKind: string): boolean {
+    const sweep = this.#flavor.approvedEditSweep;
+    if (!sweep) return false;
+    const id = update.toolCallId;
+    // The agent asks with a pending call. A call that it starts or ends at once runs an edit.
+    if (
+      update.sessionUpdate === "tool_call" &&
+      toolKind === "edit" &&
+      update.status !== "pending" &&
+      !turn.approvedEditRuns.has(id) &&
+      !turn.approvedEdits.some((edit) => edit.id === id)
+    ) {
+      const approved = claimApprovedEdit(turn.approvedEdits, toolCallPaths(update));
+      if (approved) turn.approvedEditRuns.set(id, approved);
+    }
+    if (update.status === "completed") {
+      const approved = turn.approvedEditRuns.get(id);
+      if (approved) turn.approvedEditsRan.add(approved);
+      // An approved edit that completed under its own id needs no other call.
+      turn.approvedEdits = turn.approvedEdits.filter((edit) => edit.id !== id);
+    }
+    return update.status === "failed" && turn.approvedEditsRan.has(id) && sweep.test(toolOutputText(update.rawOutput));
+  }
+
   readonly #requestPermission = Effect.fn("AcpAgentClient.requestPermission")(function* (
     this: AcpAgentClient,
     params: RequestPermissionRequest,
@@ -3388,6 +3428,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         result.decision === "approved" ||
         (isRecord(result.permissions) && Object.keys(result.permissions).length > 0));
     const option = bestPermissionOption(params.options, accepted);
+    if (turn && accepted && option && kind === "file-change" && this.#flavor.approvedEditSweep) {
+      const { toolCallId } = params.toolCall;
+      turn.approvedEdits.push({
+        id: toolCallId,
+        paths: toolCallPaths(params.toolCall, turn.toolItems.get(toolCallId)?.arguments),
+      });
+    }
     return option
       ? { outcome: { outcome: "selected", optionId: option.optionId } }
       : { outcome: { outcome: "cancelled" } };
@@ -3533,6 +3580,44 @@ function printableInput(value: unknown): string | null {
   } catch {
     return String(value);
   }
+}
+
+type AcpToolCallUpdate = Extract<SessionUpdate, { sessionUpdate: "tool_call" | "tool_call_update" }>;
+
+/** The files that a tool call names, with `/` and in lower case, as Windows paths can differ in both. */
+function toolCallPaths(
+  call: { readonly locations?: readonly { readonly path: string }[] | null; readonly rawInput?: unknown },
+  earlierInput?: unknown,
+): string[] {
+  const paths = (call.locations ?? []).map((location) => location.path);
+  for (const input of [call.rawInput, earlierInput]) {
+    if (!isRecord(input)) continue;
+    for (const key of ["TargetFile", "file_path", "path"]) {
+      const value = input[key];
+      if (isString(value)) paths.push(value);
+    }
+  }
+  return [...new Set(paths.map((path) => path.replace(/\\/g, "/").toLowerCase()))];
+}
+
+/**
+ * Takes the approved edit that a call under another id runs: one of the same file, else the only
+ * approved edit when one of the two names no file.
+ */
+function claimApprovedEdit(
+  approvedEdits: { id: string; paths: readonly string[] }[],
+  paths: readonly string[],
+): string | undefined {
+  let index = approvedEdits.findIndex((edit) => edit.paths.some((path) => paths.includes(path)));
+  if (index < 0 && approvedEdits.length === 1 && (paths.length === 0 || approvedEdits[0]?.paths.length === 0)) {
+    index = 0;
+  }
+  return index < 0 ? undefined : approvedEdits.splice(index, 1)[0]?.id;
+}
+
+function toolOutputText(rawOutput: unknown): string {
+  if (isString(rawOutput)) return rawOutput;
+  return isRecord(rawOutput) && isString(rawOutput.output) ? rawOutput.output : "";
 }
 
 function bestPermissionOption(options: PermissionOption[], accepted: boolean): PermissionOption | null {
