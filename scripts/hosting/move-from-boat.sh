@@ -233,7 +233,13 @@ import_data() {
 
   # From here, only `discard` makes a second import possible.
   echo importing >"$IMPORT_STATE"
-  tar --extract --file "$archive" --numeric-owner --same-owner --same-permissions --acls --xattrs --directory / ||
+  # The archive is from a machine where an agent of the customer can get root, and the service user
+  # has no root here. So the service user restores it, and only its two directories: the kernel
+  # then refuses a file outside them, an owner that is not the service user, a device, a hard link
+  # to a file of root, and a file capability. A file that root or another user owned in the sandbox
+  # gets the service user as its owner.
+  runuser -u "$SERVICE_USER" -- tar --extract --file - --no-same-owner --same-permissions --acls --xattrs \
+    --xattrs-include='user.*' --directory / "./${USER_HOME#/}" "./${KEYRING_HOME#/}" <"$archive" ||
     fail "The archive was not restored. Run \"$0 discard $(hostname)\", then run the import again."
   rm -f "$MANIFEST"
   sha256sum --check --quiet <<<"$sums" ||

@@ -1073,8 +1073,12 @@ the parts of a move that run on the two machines, as root. The steps:
    `~/.Xauthority*` and `~/.npm/_cacache`. The archive holds the account session and each provider
    sign-in of the customer: copy it only over SSH.
 6. On the VPS: `move-from-boat.sh import <archive>`. The command refuses an OpenBot that is older
-   than that of the sandbox, restores the archive, and compares the four SHA-256 values. Delete each
-   copy of the archive. When the import fails, run `move-from-boat.sh discard lsw-<VPS ID>` and then
+   than that of the sandbox, restores the archive, and compares the four SHA-256 values. An agent
+   of the customer can get root in the sandbox, and the service user has no root on the VPS. So the
+   service user restores the files, and only `/home/user` and `/srv/openbot-hosted`: the archive
+   cannot write a file of root, a setuid file of root or a device. A file that root or another user
+   owned in the sandbox gets the service user as its owner. When the archive has a member that the
+   service user cannot restore, the import fails. Delete each copy of the archive. When the import fails, run `move-from-boat.sh discard lsw-<VPS ID>` and then
    the import again: `discard` removes the restored data, and it refuses a machine on which OpenBot
    started.
 7. Stop the sandbox at boat. Do not start it again while the VPS runs: two hosts would have one ID.
