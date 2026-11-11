@@ -129,7 +129,8 @@ export function memoryReviewPrompt(
     "You keep the long-term memory of the agent in this profile. Read the chat below and decide which memories to add, update or forget, so that the agent knows them in later chats. You cannot use tools here.",
     ...(skillInput ? skillRules(skillInput.automatic) : []),
     skillInput ? "Then decide the memories. Memory rules:" : "Rules:",
-    "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, standing decisions, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
+    "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
+    "- A lasting rule that the user gives the agent (always, never) is not a memory: the agent keeps it in its Instructions.",
     "- Never keep task progress, logs of completed work (such as a skill that was saved, or its id), the steps of a task, or temporary to-do items.",
     ...(skillInput
       ? [
