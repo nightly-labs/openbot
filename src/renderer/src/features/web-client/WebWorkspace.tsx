@@ -364,6 +364,8 @@ const PHONE_QUERY = "(max-width: 720px)";
 const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 /** Global search reads one routine list per agent; this many requests go to the host at the same time. */
 const SEARCH_ROUTINE_REQUESTS = 4;
+/** After the host answers, the first page load waits at most this long for the sidebar before its cover goes. */
+const SIDEBAR_WAIT_MS = 5000;
 
 function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue" | "avatarColor"> {
   const { avatarSeed, avatarHue } = createFirstAgentDraft();
@@ -677,16 +679,27 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       loading: workspace.state.status === "connecting",
       hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
+  /**
+   * The first load of the page. Its cover stays over a saved frame too, and stays after the host answers
+   * until the sidebar is ready, so the user does not see the agents and channels load. It ends when the
+   * cover first goes.
+   */
+  const [pageLoad, setPageLoad] = createSignal(true);
   // As on desktop, the first load covers the whole window. A server that sleeps, updates or fails
   // shows its screen in the pane only.
   const fullWindowLoading = () =>
-    connectionShown() &&
-    // A saved frame stays on screen: the chat shows its history loader until the host answers.
-    !workspace.state.workspaceLoaded &&
-    !workspace.state.hostOffline &&
-    // The status is "offline" before the first attempt too; only a reported failure ends the cover.
-    !(workspace.state.status === "offline" && workspace.state.connectionError) &&
-    (connectionPhase() === "loading" || connectionPhase() === "connecting");
+    (connectionShown() &&
+      // After the page load, a saved frame stays on screen: the chat shows its history loader until the host answers.
+      (!workspace.state.workspaceLoaded || pageLoad()) &&
+      !workspace.state.hostOffline &&
+      // The status is "offline" before the first attempt too; only a reported failure ends the cover.
+      !(workspace.state.status === "offline" && workspace.state.connectionError) &&
+      (connectionPhase() === "loading" || connectionPhase() === "connecting")) ||
+    // The status check comes first: the sidebar state is defined after this point.
+    (pageLoad() && workspace.state.status === "online" && sidebarLoading());
+  createEffect(fullWindowLoading, (loading) => {
+    if (!loading) setPageLoad(false);
+  });
   // The full-window screen stays after the load ends, so its crew hop out before it goes. It mounts in
   // the first render, so the account screen in WebApp hands the pile to it and does not hop alone.
   const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
@@ -1798,6 +1811,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       : channelsListed()
         ? channels.state.channels
         : [];
+  // A host that does not answer a sidebar read does not keep the page load's cover.
+  const [sidebarWaitOver, setSidebarWaitOver] = createSignal(false);
+  createEffect(
+    () => pageLoad() && workspace.state.status === "online",
+    (waiting) => {
+      if (!waiting) return;
+      const timer = setTimeout(() => setSidebarWaitOver(true), SIDEBAR_WAIT_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /** The host answered, and the sidebar still reads its order, hidden agents, unread counts or channels. */
+  function sidebarLoading(): boolean {
+    return (
+      !sidebarWaitOver() &&
+      (workspace.state.panelsLoading ||
+        // A failed channel list shows its error in the sidebar, so the cover does not wait for it.
+        (channelsSupported() && !routinesView() && !channels.state.listed && !channels.state.error))
+    );
+  }
   const savedChannelId = () => {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
@@ -2686,6 +2718,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   /** The chat shows the loader of its history from the start, so the connect and the history load are one screen. */
   const frameConnecting = () =>
     connectionShown() &&
+    !fullWindowLoading() &&
     frameFirstLoad() &&
     agentChatOpen() &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting");
@@ -2700,31 +2733,36 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.conversation()?.loading === true;
   const conversationError = () =>
     workspace.state.status === "online" ? (workspace.conversation()?.error ?? null) : null;
-  const connectionNotice = (cover = false) => (
-    <ServerConnectionNotice
-      name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
-      initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
-      ready={cover ? !fullWindowLoading() : undefined}
-      onExited={cover ? () => setLoadingCover(false) : undefined}
-      fullWindow={fullWindowLoading()}
-      screen={!frameConnecting()}
-      issue={workspace.state.hostedIssue}
-      start={workspace.state.hostedStart}
-      updateVersion={workspace.state.hostRestart?.version ?? null}
-      detail={connectionDetail()?.message ?? null}
-      reference={connectionDetail()?.reference ?? null}
-      phase={connectionPhase()}
-      remainingSeconds={
-        workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
-          ? workspace.state.recovery.remainingSeconds
-          : 0
-      }
-      busy={workspace.state.status === "connecting" || !workspace.state.host}
-      onRetry={() => void workspace.run(workspace.reconnect)}
-      onManage={() => setBillingOpen(true)}
-      upsell={offlineUpsell()}
-    />
-  );
+  /** While the page load waits for the sidebar, the host answered: the cover still loads, it does not reconnect. */
+  const coverPhase = () => (workspace.state.status === "online" ? "loading" : connectionPhase());
+  const connectionNotice = (cover = false) => {
+    const phase = cover ? coverPhase : connectionPhase;
+    return (
+      <ServerConnectionNotice
+        name={workspace.state.host?.name ?? t("webClient.notice.findingHosts")}
+        initial={cover || !workspace.state.workspaceLoaded || frameFirstLoad()}
+        ready={cover ? !fullWindowLoading() : undefined}
+        onExited={cover ? () => setLoadingCover(false) : undefined}
+        fullWindow={fullWindowLoading()}
+        screen={!frameConnecting()}
+        issue={workspace.state.hostedIssue}
+        start={workspace.state.hostedStart}
+        updateVersion={workspace.state.hostRestart?.version ?? null}
+        detail={connectionDetail()?.message ?? null}
+        reference={connectionDetail()?.reference ?? null}
+        phase={phase()}
+        remainingSeconds={
+          workspace.state.recovery?.phase === "waiting" || workspace.state.recovery?.phase === "cooldown"
+            ? workspace.state.recovery.remainingSeconds
+            : 0
+        }
+        busy={workspace.state.status === "connecting" || !workspace.state.host}
+        onRetry={() => void workspace.run(workspace.reconnect)}
+        onManage={() => setBillingOpen(true)}
+        upsell={offlineUpsell()}
+      />
+    );
+  };
   return (
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
