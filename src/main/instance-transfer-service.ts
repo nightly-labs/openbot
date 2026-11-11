@@ -1194,9 +1194,14 @@ export class InstanceTransferService {
       members,
       leadAgentId,
       ...(source.isolated === undefined ? {} : { isolated: source.isolated }),
-      ...(isChannelBrowser(source.browser)
-        ? { browser: transferBrowser(source.browser, (key) => agentIds.get(key)) }
-        : {}),
+      // A value this version cannot read, such as a kind from a later version, gives the browser to no member.
+      ...(source.browser === undefined
+        ? {}
+        : {
+            browser: isChannelBrowser(source.browser)
+              ? transferBrowser(source.browser, (key) => agentIds.get(key))
+              : { kind: "none" as const },
+          }),
       ...(isChannelIcon(source.icon) ? { icon: source.icon } : {}),
     };
     if (!isChannelDraft(draft)) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
