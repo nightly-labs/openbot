@@ -13,6 +13,7 @@ import {
   AppWindow,
   ContextMenu,
   DropdownMenu,
+  EyeOff,
   Input,
   Maximize2,
   PanelRight,
@@ -212,6 +213,13 @@ export interface AgentDockProps {
   onOpenLink?: ((url: string) => void) | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
+  /** Turns the dock off. The right-click menus of the dock show the item only when it is set. */
+  onHide?: (() => void) | undefined;
+  /**
+   * Moves a seat before another seat, or to the end when `before` is null. When it is set, the user
+   * drags a seat to a new place.
+   */
+  onMove?: ((seat: AgentDockSeatRef, before: AgentDockSeatRef | null) => void) | undefined;
   /** A change closes the chat, for example when the dock window loses the focus. */
   closeRequest?: number | undefined;
   /** The window edge that holds the dock. The dock and the panel are mirrored on the left edge. */
@@ -262,6 +270,10 @@ const ADD_MORPH_MS = 200;
 const ADD_MORPH_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 /** The room around each part of the shape: the goo, the handle stroke and a hovered seat reach past the geometry. */
 const SHAPE_MARGIN = 14;
+/** The pointer moves this far, in px, before a press on a seat becomes a drag. A shorter move is a click. */
+const SEAT_DRAG_START = 4;
+/** The scroll of the seat view for each px that a dragged seat is in a faded edge, in px per frame. */
+const SEAT_DRAG_SCROLL = 0.25;
 
 export function AgentDock(props: AgentDockProps) {
   const { t } = useText();
@@ -913,6 +925,122 @@ export function AgentDock(props: AgentDockProps) {
     layout(seats, true);
   }
 
+  /** The seat that the user drags to a new place. */
+  const [draggedSeat, setDraggedSeat] = createSignal<string | null>(null);
+  /** A drag ended on this seat, so the click that the release makes does not open its chat. */
+  let draggedClick: string | null = null;
+  /** Ends the seat drag that runs. True keeps the new order. */
+  let endSeatDrag: ((keep: boolean) => void) | undefined;
+  onCleanup(() => endSeatDrag?.(false));
+
+  /**
+   * A press on a seat that moves becomes a drag. The seat follows the pointer and the other seats make
+   * room for it. The release keeps the new order, and Escape puts the seats back. In a faded edge of the
+   * view, the seats scroll.
+   */
+  function pressSeat(id: string, event: PointerEvent & { currentTarget: HTMLElement }) {
+    if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
+    const element = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startY = event.clientY;
+    const springs = seatSprings(id);
+    const initial = [...state.seats];
+    let order = initial;
+    let pointerY = startY;
+    let startScroll = 0;
+    let startSeatY = 0;
+    let frame = 0;
+    let started = false;
+
+    /** Puts the seat under the pointer, and the other seats around it. */
+    const follow = () => {
+      const count = order.length;
+      const first = seatCenterY(0, count);
+      const last = seatCenterY(count - 1, count);
+      const y = Math.min(last, Math.max(first, startSeatY + pointerY - startY + seatScroll.scrollTop - startScroll));
+      const index = Math.round((y - first) / SEAT_PITCH);
+      if (order[index] !== id) {
+        order = order.filter((seat) => seat !== id);
+        order.splice(index, 0, id);
+        layout(order);
+      }
+      springs.y.jump(y);
+      motion.kick();
+    };
+    const scroll = () => {
+      const view = seatScroll.getBoundingClientRect();
+      const above = view.top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - SEAT_FADE);
+      const step = above > 0 ? -above : below > 0 ? below : 0;
+      const before = seatScroll.scrollTop;
+      if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
+      if (seatScroll.scrollTop !== before) follow();
+      frame = requestAnimationFrame(scroll);
+    };
+    const start = () => {
+      started = true;
+      if (state.open) closeChat(false);
+      startScroll = seatScroll.scrollTop;
+      startSeatY = springs.y.value;
+      element.setPointerCapture(pointerId);
+      setDraggedSeat(id);
+      frame = requestAnimationFrame(scroll);
+    };
+    const move = (moved: PointerEvent) => {
+      if (moved.pointerId !== pointerId) return;
+      pointerY = moved.clientY;
+      if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
+      if (!started) start();
+      follow();
+    };
+    const finish = (keep: boolean) => {
+      endSeatDrag = undefined;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", cancelOnEscape, true);
+      cancelAnimationFrame(frame);
+      if (!started) return;
+      if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+      setDraggedSeat(null);
+      draggedClick = id;
+      window.setTimeout(() => {
+        if (draggedClick === id) draggedClick = null;
+      });
+      // Seats that came or went during the drag make the order of the drag out of date.
+      const sameSeats = order.length === state.seats.length && order.every((seat) => state.seats.includes(seat));
+      const changed = order.some((seat, index) => seat !== initial[index]);
+      if (keep && sameSeats && changed) {
+        const next = order;
+        setState((draft) => {
+          draft.seats = [...next];
+        });
+        const before = next[next.indexOf(id) + 1];
+        props.onMove?.(refOfKey(id), before ? refOfKey(before) : null);
+        layout(next);
+        return;
+      }
+      layout(state.seats);
+    };
+    const release = (released: PointerEvent) => {
+      if (released.pointerId === pointerId) finish(true);
+    };
+    const cancel = (cancelled: PointerEvent) => {
+      if (cancelled.pointerId === pointerId) finish(false);
+    };
+    const cancelOnEscape = (pressed: KeyboardEvent) => {
+      if (pressed.key !== "Escape" || !started) return;
+      pressed.preventDefault();
+      pressed.stopPropagation();
+      finish(false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", cancelOnEscape, true);
+    endSeatDrag = finish;
+  }
+
   /* The seats follow the props, in their order. One change moves: an added seat comes in at the
      bottom. More at once, such as the first load, or a new order, jump. */
   createEffect(
@@ -1068,12 +1196,37 @@ export function AgentDock(props: AgentDockProps) {
 
         {/* The dock body between and around the seats. It takes the pointer, so a click there does not go
           through to the app under the dock. */}
-        <div
-          class="agent-dock-hit"
-          aria-hidden="true"
-          ref={(element) => (hitArea = element)}
-          style={{ left: `${DOCK_LEFT}px`, width: `${DOCK_WIDTH}px` }}
-        />
+        {/* A right-click on the dock body opens the menu of the whole dock. The seats have their own menus. */}
+        <ContextMenu.Root modal={false}>
+          <ContextMenu.Trigger
+            as="div"
+            class="agent-dock-hit"
+            aria-hidden="true"
+            disabled={!props.onOpenSettings && !props.onHide}
+            ref={(element) => (hitArea = element)}
+            style={{ left: `${DOCK_LEFT}px`, width: `${DOCK_WIDTH}px` }}
+          />
+          <ContextMenu.Portal>
+            <ContextMenu.Content aria-label={t("agent.dock.label")}>
+              <Show when={props.onOpenSettings}>
+                {(open) => (
+                  <ContextMenu.Item onSelectAfterClose={() => open()()}>
+                    <Settings aria-hidden="true" />
+                    {t("agent.dock.settings")}
+                  </ContextMenu.Item>
+                )}
+              </Show>
+              <Show when={props.onHide}>
+                {(hide) => (
+                  <ContextMenu.Item onSelectAfterClose={() => hide()()}>
+                    <EyeOff aria-hidden="true" />
+                    {t("agent.dock.hide")}
+                  </ContextMenu.Item>
+                )}
+              </Show>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
 
         <nav class="agent-dock-seats" aria-label={t("agent.dock.label")}>
           {/* The seats scroll when more agents are on the dock than the screen holds. */}
@@ -1102,6 +1255,7 @@ export function AgentDock(props: AgentDockProps) {
                       placeSeat(element, seatSprings(id));
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
+                    data-dragging={draggedSeat() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
@@ -1113,7 +1267,16 @@ export function AgentDock(props: AgentDockProps) {
                             aria-label={t("agent.dock.chatWith", { name: seatName(seat()) })}
                             aria-pressed={state.open === id ? "true" : "false"}
                             data-open={state.open === id ? "" : undefined}
-                            onClick={() => toggleSeat(id)}
+                            onPointerDown={(event: PointerEvent & { currentTarget: HTMLElement }) =>
+                              pressSeat(id, event)
+                            }
+                            onClick={() => {
+                              if (draggedClick === id) {
+                                draggedClick = null;
+                                return;
+                              }
+                              toggleSeat(id);
+                            }}
                             onKeyDown={closeOnEscape}
                           >
                             <SeatAvatar seat={seat()} agents={props.agents} />
@@ -1147,6 +1310,19 @@ export function AgentDock(props: AgentDockProps) {
                                 <PanelRight aria-hidden="true" />
                                 {t("agent.dock.remove")}
                               </ContextMenu.Item>
+                              <Show when={props.onHide}>
+                                {(hide) => (
+                                  <ContextMenu.Item
+                                    onSelectAfterClose={() => {
+                                      if (state.open === id) closeChat(false);
+                                      hide()();
+                                    }}
+                                  >
+                                    <EyeOff aria-hidden="true" />
+                                    {t("agent.dock.hide")}
+                                  </ContextMenu.Item>
+                                )}
+                              </Show>
                             </ContextMenu.Content>
                           </ContextMenu.Portal>
                         </ContextMenu.Root>

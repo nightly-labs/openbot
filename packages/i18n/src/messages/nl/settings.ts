@@ -259,6 +259,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Sleep het dock omhoog of omlaag om het langs de rand te verplaatsen.",
   "settings.agentDock.edge.right": "Rechts",
   "settings.agentDock.edge.left": "Links",
+  "settings.agentDock.size.title": "Dockgrootte",
+  "settings.agentDock.size.description":
+    "Sleep om de grootte van de dock boven andere apps te wijzigen. In het hoofdvenster volgt de dock de interfacegrootte.",
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",

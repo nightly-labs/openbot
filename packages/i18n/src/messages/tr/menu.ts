@@ -18,6 +18,7 @@ export const messages = {
   "menu.trayOpen": "OpenBot'u aç",
   "menu.trayQuit": "OpenBot'tan çık",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "Dynamic Island'ı gizle",
   "menu.undo": "Geri al",
   "menu.redo": "Yinele",
   "menu.cut": "Kes",

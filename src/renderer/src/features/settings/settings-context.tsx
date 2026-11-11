@@ -532,6 +532,22 @@ const Settings = createSimpleContext({
           autoInstallUpdates: preference.autoInstall,
         }));
       });
+      // The right-click menu of the island turns it off in main. A save reply that is still on its way
+      // must not show the island as on again.
+      const unsubscribeIsland = settingsPort().dynamicIsland.onPreference((preference) => {
+        ++dynamicIslandSaveCount;
+        setGeneralSettings((current) => ({
+          ...current,
+          macBookNotch: preference.enabled,
+          macBookNotchHaptics: preference.hapticsEnabled,
+          macBookNotchIdle: preference.idleVisible,
+          macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
+          macBookNotchWidthPercent: preference.widthPercent,
+          macBookNotchHeightPercent: preference.heightPercent,
+          macBookNotchServers: preference.serverVisibility,
+          macBookNotchNewServers: preference.newServersVisible,
+        }));
+      });
       // A page can open from main with no click here, such as a sign-in page, so main sends the notice.
       const unsubscribeLinkFallback = settingsPort().onExternalLinkFallback(({ name }) => {
         const { t } = currentText();
@@ -549,6 +565,7 @@ const Settings = createSimpleContext({
         unsubscribeAnalytics();
         unsubscribeMemoryLimit();
         unsubscribeUpdates();
+        unsubscribeIsland();
       };
     });
 

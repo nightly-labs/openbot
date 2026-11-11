@@ -175,6 +175,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
       { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
       { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.size.title", descriptionKey: "settings.agentDock.size.description" },
       { titleKey: "settings.agentDock.agents.title" },
     ],
   },

@@ -259,6 +259,9 @@ export const messages = {
   "settings.agentDock.edge.description": "اسحب الشريط لأعلى أو لأسفل لتحريكه على طول الحافة.",
   "settings.agentDock.edge.right": "اليمين",
   "settings.agentDock.edge.left": "اليسار",
+  "settings.agentDock.size.title": "حجم الشريط",
+  "settings.agentDock.size.description":
+    "اسحب لتغيير حجم الشريط فوق التطبيقات الأخرى. في النافذة الرئيسية، يتبع الشريط حجم الواجهة.",
   "settings.agentDock.autoHide.title": "إخفاء عند عدم الاستخدام",
   "settings.agentDock.autoHide.description": "ينزلق الشريط داخل الحافة. حرّك المؤشر إلى الحافة لإظهاره.",
   "settings.agentDock.edgeStrip.title": "إظهار شريط رفيع عند الحافة",

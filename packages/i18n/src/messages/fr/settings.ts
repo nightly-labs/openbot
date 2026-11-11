@@ -270,6 +270,9 @@ export const messages = {
     "Faites glisser le dock vers le haut ou le bas pour le déplacer le long du bord.",
   "settings.agentDock.edge.right": "Droite",
   "settings.agentDock.edge.left": "Gauche",
+  "settings.agentDock.size.title": "Taille du dock",
+  "settings.agentDock.size.description":
+    "Faites glisser pour changer la taille du dock au-dessus des autres apps. Dans la fenêtre principale, le dock suit la taille de l’interface.",
   "settings.agentDock.autoHide.title": "Masquer quand inutilisé",
   "settings.agentDock.autoHide.description": "Le dock glisse dans le bord. Amenez le pointeur au bord pour l’afficher.",
   "settings.agentDock.edgeStrip.title": "Afficher une bande au bord",

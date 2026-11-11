@@ -256,6 +256,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Yuvayı kenar boyunca taşımak için yukarı veya aşağı sürükleyin.",
   "settings.agentDock.edge.right": "Sağ",
   "settings.agentDock.edge.left": "Sol",
+  "settings.agentDock.size.title": "Yuva boyutu",
+  "settings.agentDock.size.description":
+    "Diğer uygulamaların üstündeki yuvanın boyutunu değiştirmek için sürükleyin. Ana pencerede yuva arayüz boyutunu izler.",
   "settings.agentDock.autoHide.title": "Kullanılmadığında gizle",
   "settings.agentDock.autoHide.description": "Yuva kenarın içine kayar. Göstermek için işaretçiyi kenara getirin.",
   "settings.agentDock.edgeStrip.title": "Kenarda bir şerit göster",

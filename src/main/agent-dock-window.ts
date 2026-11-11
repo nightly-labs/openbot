@@ -13,7 +13,7 @@ import type {
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_DOCK_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { AGENT_DOCK_LIMITS, AGENT_DOCK_SIZE_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
@@ -126,6 +126,7 @@ export class AgentDockWindowController {
         (previous === null) !== (presentation === null) ||
         !isDeepStrictEqual(previous?.display, presentation?.display) ||
         previous?.edge !== presentation?.edge ||
+        previous?.sizePercent !== presentation?.sizePercent ||
         !isDeepStrictEqual(previous?.offsets, presentation?.offsets);
       return moved ? this.reconcileWindow() : Effect.void;
     });
@@ -202,7 +203,8 @@ export class AgentDockWindowController {
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
     if (this.#options.windowKind !== "x11") return;
     const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
-    window?.setShape(rects);
+    // The renderer measures in CSS px. The shape is in window px, which the page zoom makes larger or smaller.
+    window?.setShape(rects.map((rect) => zoomedRect(rect, this.#zoom())));
   }
 
   /**
@@ -222,7 +224,7 @@ export class AgentDockWindowController {
     const display = this.#displayOf(entry);
     if (display) {
       const area = display.workArea;
-      const room = area.height - agentDockWindowHeight(display);
+      const room = area.height - agentDockWindowHeight(display, this.#zoom());
       const y = drag.windowY + pointerY - drag.pointerY;
       const offset = room > 0 ? Math.min(1, Math.max(0, (y - area.y) / room)) : 0.5;
       this.#offsets.set(entry.displayId, offset);
@@ -249,7 +251,23 @@ export class AgentDockWindowController {
   }
 
   #boundsFor(display: Display): Rectangle {
-    return agentDockWindowBounds(display, this.#presentation?.edge ?? "right", this.#offsets.get(display.id) ?? 0.5);
+    return agentDockWindowBounds(
+      display,
+      this.#presentation?.edge ?? "right",
+      this.#offsets.get(display.id) ?? 0.5,
+      this.#zoom(),
+    );
+  }
+
+  /** The page zoom of the dock windows. The window grows with the zoom, so the dock has the same room. */
+  #zoom(): number {
+    return (this.#presentation?.sizePercent ?? AGENT_DOCK_SIZE_LIMITS.default) / 100;
+  }
+
+  /** The dock window has its own zoom (`setZoomMode("isolated")`), so the main window zoom does not change it. */
+  #applyZoom(window: BrowserWindow): void {
+    const zoom = this.#zoom();
+    if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
   }
 
   /** `rendererId` is the dock window that sends the action. */
@@ -337,6 +355,7 @@ export class AgentDockWindowController {
               continue;
             }
             current.displayId = display.id;
+            this.#applyZoom(current.window);
             const bounds = this.#boundsFor(display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
             if (!current.window.isVisible()) this.#show(current.window);
@@ -380,6 +399,10 @@ export class AgentDockWindowController {
           window.setIgnoreMouseEvents(true, { forward: true });
         }
         window.setFocusable(false);
+        // A navigation can reset the zoom, so it is set on each one, as for the main window.
+        window.webContents.on("did-navigate", () => {
+          if (owned()) this.#applyZoom(window);
+        });
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
           // A reloaded dock renderer has no open chat and no drag.
@@ -461,22 +484,43 @@ export class AgentDockWindowController {
   }
 }
 
-function agentDockWindowHeight(display: Pick<Display, "workArea">): number {
-  return Math.min(AGENT_DOCK_WINDOW_SIZE.height, display.workArea.height);
+function agentDockWindowHeight(display: Pick<Display, "workArea">, zoom: number): number {
+  return Math.min(Math.round(AGENT_DOCK_WINDOW_SIZE.height * zoom), display.workArea.height);
 }
 
 /**
  * At an edge of the work area, so the macOS Dock or the Windows taskbar at that edge does not cover it. `offset` is the place
  * in height: 0 is the top, 1 the bottom.
  */
-function agentDockWindowBounds(display: Pick<Display, "workArea">, edge: AgentDockEdge, offset: number): Rectangle {
+function agentDockWindowBounds(
+  display: Pick<Display, "workArea">,
+  edge: AgentDockEdge,
+  offset: number,
+  zoom: number,
+): Rectangle {
   const area = display.workArea;
-  const height = agentDockWindowHeight(display);
+  // The width of the largest dock at each size: a new width moves the window's inner edge, and macOS then
+  // shows the last frame at the moved edge, so the dock jumps while the user drags the size. The dock
+  // stays at the screen edge of the window, and the pointer goes through the empty part.
+  const width = Math.round((AGENT_DOCK_WINDOW_SIZE.width * AGENT_DOCK_SIZE_LIMITS.max) / 100);
+  const height = agentDockWindowHeight(display, zoom);
   return {
-    x: edge === "left" ? area.x : area.x + area.width - AGENT_DOCK_WINDOW_SIZE.width,
+    x: edge === "left" ? area.x : area.x + area.width - width,
     y: Math.round(area.y + (area.height - height) * offset),
-    width: AGENT_DOCK_WINDOW_SIZE.width,
+    width,
     height,
+  };
+}
+
+/** A rect in CSS px, in window px at a page zoom. It grows to whole px, so no part of the dock loses the pointer. */
+function zoomedRect(rect: AgentDockInputRect, zoom: number): AgentDockInputRect {
+  const x = Math.floor(rect.x * zoom);
+  const y = Math.floor(rect.y * zoom);
+  return {
+    x,
+    y,
+    width: Math.ceil((rect.x + rect.width) * zoom) - x,
+    height: Math.ceil((rect.y + rect.height) * zoom) - y,
   };
 }
 

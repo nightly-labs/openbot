@@ -229,6 +229,17 @@
   transform: scale(1.12);
 }
 
+/* A dragged seat is lifted above the other seats, which make room for it. */
+.agent-dock-seat[data-dragging] {
+  z-index: 1;
+}
+
+.agent-dock-seat[data-dragging] .agent-dock-seat-button {
+  color: var(--openbot-text-primary);
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
 .agent-dock-seat-button .agent-avatar {
   /* The plush art sits low in its box. Every app surface lifts it by 14% of the face size. */
   --agent-avatar-optical-offset: calc(40px * -0.14);

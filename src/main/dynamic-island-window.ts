@@ -71,6 +71,8 @@ export interface DynamicIslandWindowControllerOptions {
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
+  /** Shows the menu of a right-click on the island, outside a text field. */
+  showContextMenu?: (window: BrowserWindow) => void;
   logger?: Logger;
 }
 
@@ -141,6 +143,18 @@ export class DynamicIslandWindowController {
         this.publishPreference();
         return { ...savedPreference };
       }),
+    );
+  }
+
+  /**
+   * Turns the island off from its own menu, as the switch in Settings does. The main window gets the
+   * saved preference, so its Settings do not turn the island on again with the next change.
+   */
+  hide(): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return Effect.suspend(() => this.setPreference({ ...this.#preference, enabled: false })).pipe(
+      Effect.tap((saved) =>
+        Effect.sync(() => sendToRenderer(this.#options.getMainWindow(), IPC_ENDPOINTS.dynamicIsland.preference, saved)),
+      ),
     );
   }
 
@@ -428,6 +442,10 @@ export class DynamicIslandWindowController {
       this.#show(window);
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
+    window.webContents.on("context-menu", (_event, params) => {
+      if (params.isEditable || this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      this.#options.showContextMenu?.(window);
+    });
     // macOS moves a window off a display that goes away, for example when the displays sleep, and
     // can do it after the last display event. The island then stays on the wrong display, under the
     // island of that display (#4594). Put it back at the top of its own display.

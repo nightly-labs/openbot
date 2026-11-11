@@ -261,6 +261,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Przeciągnij dok w górę lub w dół, aby przesunąć go wzdłuż krawędzi.",
   "settings.agentDock.edge.right": "Prawa",
   "settings.agentDock.edge.left": "Lewa",
+  "settings.agentDock.size.title": "Rozmiar doku",
+  "settings.agentDock.size.description":
+    "Przeciągnij, aby zmienić rozmiar doku nad innymi aplikacjami. W oknie głównym dok ma rozmiar interfejsu.",
   "settings.agentDock.autoHide.title": "Ukrywaj, gdy nieużywany",
   "settings.agentDock.autoHide.description": "Dok chowa się w krawędzi. Przesuń wskaźnik do krawędzi, aby go pokazać.",
   "settings.agentDock.edgeStrip.title": "Pokazuj pasek przy krawędzi",

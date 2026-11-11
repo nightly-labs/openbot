@@ -250,6 +250,8 @@ export const messages = {
   "settings.agentDock.edge.description": "上下拖动停靠栏，可沿边缘移动它。",
   "settings.agentDock.edge.right": "右侧",
   "settings.agentDock.edge.left": "左侧",
+  "settings.agentDock.size.title": "停靠栏大小",
+  "settings.agentDock.size.description": "拖动以更改显示在其他应用上方的停靠栏大小。在主窗口中，停靠栏跟随界面大小。",
   "settings.agentDock.autoHide.title": "不使用时隐藏",
   "settings.agentDock.autoHide.description": "停靠栏会滑入边缘。将指针移到边缘即可显示。",
   "settings.agentDock.edgeStrip.title": "在边缘显示细条",
