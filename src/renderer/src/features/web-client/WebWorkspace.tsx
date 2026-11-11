@@ -760,6 +760,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   const hiddenAgentIds = createMemo(() => new Set(workspace.state.userHiddenAgents.map((entry) => entry.agentId)));
   const noAgentIds: ReadonlySet<string> = new Set();
+  /** The host keeps a hidden agent at work. A host without `agent-hidden-work` stops it. */
+  const hiddenAgentsWork = () => workspace.state.capabilities.includes(AGENT_HIDDEN_WORK_CAPABILITY);
   const {
     setMuted,
     setNotificationLevel,
@@ -782,8 +784,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           )
         : null,
     readAgentLevels: workspace.runtime.listAgentNotificationLevels,
-    // Only the open host has a list of hidden agents.
-    hiddenAgentIds: (hostId) => (hostId === workspace.state.host?.hostId ? hiddenAgentIds() : noAgentIds),
+    // Only the open host has a list of hidden agents. A host that stops a hidden agent keeps its level.
+    hiddenAgentIds: (hostId) =>
+      hostId === workspace.state.host?.hostId && hiddenAgentsWork() ? hiddenAgentIds() : noAgentIds,
   });
   // A host keeps the level of the user for all devices, so the rail reads it when the host comes online.
   const onlineHostIds = createMemo(() =>
@@ -822,8 +825,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     openAccountSettings();
   }
   const [searchOpen, setSearchOpen] = createSignal(false);
-  /** The host keeps a hidden agent at work. A host without `agent-hidden-work` stops it. */
-  const hiddenAgentsWork = () => workspace.state.capabilities.includes(AGENT_HIDDEN_WORK_CAPABILITY);
   /** The hidden agents that the host stops: they get no mention and no channel work. */
   const pausedAgentIds = createMemo(() => (hiddenAgentsWork() ? noAgentIds : hiddenAgentIds()));
   // In sidebar order, so that ⌘1-9 opens the agents the user put at the top.
