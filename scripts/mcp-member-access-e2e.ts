@@ -645,6 +645,27 @@ try {
     return { memberList: [], test: 403, save: 403, signIns: 0 };
   });
 
+  await step("access: `none` also covers a member row that was on the address before", async () => {
+    assert.equal((await setAccess(owner, ownerRow.id, OPEN)).status, 200);
+    const own = await save(member, httpServer("trello-mine", OWNER_URL));
+    assert.equal((await setAccess(owner, ownerRow.id, { ...OPEN, everyone: "none" })).status, 200);
+    // The member keeps their own row, but not the stored sign-in of its address.
+    assert.deepEqual(await listedNames(member), ["trello-mine"]);
+    refused(await call("POST", MCP_ROUTES.test, { token: member, body: { config: own } }), NOT_YOURS, "test");
+    refused(
+      await call("POST", MCP_SIGN_IN_ROUTES.status, { token: member, body: { url: OWNER_URL } }),
+      NOT_YOURS,
+      "sign-in status",
+    );
+    signedIn = [{ mcpServerId: own.id, signedIn: true }];
+    const states = await call("POST", MCP_SIGN_IN_ROUTES.list, { token: member, body: {} });
+    assert.deepEqual(states.body, [], "A member read the sign-in state of an address at `none`.");
+    signedIn = [];
+    const removed = await call("POST", MCP_ROUTES.remove, { token: member, body: { mcpServerId: own.id } });
+    assert.equal(removed.status, 200, `Removing the member's own row returned ${removed.status}.`);
+    return { test: 403, status: 403, signIns: 0 };
+  });
+
   const roleId = "role-ops";
   await step("access: a role at `manage` lets its member change the server", async () => {
     const { roles, team } = current();

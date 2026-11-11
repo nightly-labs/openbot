@@ -10,6 +10,7 @@ import {
   requireOwnMcpAddress,
   requireOwnMcpSignIn,
   requireVisibleMcpAddress,
+  seesMcpAddress,
   seesMcpServer,
 } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -39,7 +40,16 @@ export async function routeMcpSignIn(
     throw new HttpError(400, sourceText("error.team.mcpUnsupported"));
   const access = requireMcpAccess(member, capabilities, owners);
   const servers = () => mcpServers?.listMcpServers() ?? [];
-  const visible = (states: McpSignInState[]) => states.filter((state) => seesMcpServer(access, state.mcpServerId));
+  // A state shows when the member sees its row and the address of the row: the sign-in belongs to the
+  // address, so a row at `none` on it hides the state of each other row there too.
+  const visible = (states: McpSignInState[]) => {
+    const rows = servers();
+    const urls = new Map(rows.map((row) => [row.id, row.transport === "http" ? row.url : null]));
+    return states.filter((state) => {
+      const url = urls.get(state.mcpServerId);
+      return seesMcpServer(access, state.mcpServerId) && (!url || seesMcpAddress(access, rows, url));
+    });
+  };
   // `readJson` has already run the body through the `mcp-sign-in-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
