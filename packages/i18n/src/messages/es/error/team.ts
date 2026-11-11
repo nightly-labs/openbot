@@ -82,6 +82,7 @@ export const messages = {
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
+  "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.sidebarPinsUnsupported":
@@ -178,6 +179,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
+  "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",
   "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",

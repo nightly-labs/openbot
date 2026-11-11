@@ -158,6 +158,7 @@ import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -175,6 +176,7 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -182,8 +184,10 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
@@ -335,6 +339,7 @@ import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
+import { routeLibraryFolders } from "./team-api/route-library-folders";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./team-api/route-live-voice";
 import { routeLocalServers } from "./team-api/route-local-servers";
@@ -345,11 +350,16 @@ import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
 import { routeMemoryReview } from "./team-api/route-memory-review";
 import { routeMessageDelete } from "./team-api/route-message-delete";
+import { routeMessagePins } from "./team-api/route-message-pins";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
-import { routeProviderAccountModels, routeProviderAccounts } from "./team-api/route-provider-accounts";
+import {
+  routeProviderAccountModels,
+  routeProviderAccountPool,
+  routeProviderAccounts,
+} from "./team-api/route-provider-accounts";
 import { routeProviderDefault } from "./team-api/route-provider-default";
 import { routeProviderDetection } from "./team-api/route-provider-detection";
 import { routeProviderHostSignIn } from "./team-api/route-provider-host-sign-in";
@@ -379,6 +389,7 @@ import { routeThreadMessageSearch } from "./team-api/route-thread-message-search
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
+import { routeWhatsAppWorkingMessage } from "./team-api/route-whatsapp-working-message";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { TeamStoreError } from "./team-store";
@@ -1131,6 +1142,7 @@ export class TeamApiServer {
       if ((await routeConnectors(context, this.#options.connectors)) === "handled") return;
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
       if ((await routeWhatsAppConnector(context, this.#options.connectors)) === "handled") return;
+      if ((await routeWhatsAppWorkingMessage(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
       if ((await routePasswordManagers(context, this.#options.passwordManagers)) === "handled") return;
@@ -1139,9 +1151,20 @@ export class TeamApiServer {
       if ((await routeProviderHostSignIn(context, this.#options.providerHostSignIns)) === "handled") return;
       if ((await routeProviderAccounts(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeProviderSignOut(context, this.#options.providerSignOut)) === "handled") return;
-      if ((await routeStorage(context, this.#options.storage, this.#options.channels, hidden)) === "handled") return;
+      if (
+        (await routeStorage(
+          context,
+          this.#options.storage,
+          this.#options.channels,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+          this.#options.libraryFolders,
+        )) === "handled"
+      )
+        return;
       if ((await routeMachineResources(context, this.#options.machine)) === "handled") return;
       if ((await routeBackgroundProcesses(context, this.#options.backgroundProcesses, hidden)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
@@ -1178,6 +1201,15 @@ export class TeamApiServer {
       )
         return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
+      if (
+        (await routeLibraryFolders(
+          context,
+          this.#options.libraryFolders,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+        )) === "handled"
+      )
         return;
       if (
         (await routeAgentNotificationLevels(
@@ -1242,6 +1274,8 @@ export class TeamApiServer {
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
+        return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
@@ -1381,6 +1415,7 @@ export class TeamApiServer {
       agents: this.#options.agents,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
+      libraryFolders: this.#options.libraryFolders,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
       ...(this.#options.admin?.modelVisibility ? { visibleModels: this.#options.admin.modelVisibility } : {}),
     });
@@ -2486,6 +2521,7 @@ export class TeamApiServer {
           if (capability === CONNECTORS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === WHATSAPP_CONNECTOR_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === WHATSAPP_WORKING_MESSAGE_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
           if (capability === PASSWORD_MANAGERS_CAPABILITY) return this.#options.passwordManagers !== undefined;
@@ -2497,10 +2533,12 @@ export class TeamApiServer {
           if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
           if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
+          if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === LIBRARY_FOLDERS_CAPABILITY) return this.#options.libraryFolders !== undefined;
           if (capability === STORAGE_CHANNEL_CAPABILITY)
             return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
@@ -2769,6 +2807,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   )
     return "channel-chats-v1";
   if (event.type === "agent-session-settings-changed") return AGENT_SESSION_SETTINGS_CAPABILITY;
+  if (event.type === "message-pins-changed") return MESSAGE_PINS_CAPABILITY;
   if (event.type === "hidden-agents-changed") return AGENT_HIDDEN_CAPABILITY;
   if (event.type === "agent-colors-changed") return AGENT_COLORS_CAPABILITY;
   if (event.type === "chat-colors-changed") return CHAT_COLORS_CAPABILITY;

@@ -35,6 +35,7 @@ import type {
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  PinnedMessagesSnapshot,
   QueueSnapshot,
   ReorderQueueInput,
   RespondToApprovalInput,
@@ -46,6 +47,7 @@ import type {
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
   SetChannelImageInput,
+  SetMessagePinnedInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -143,6 +145,11 @@ import {
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import {
+  decodeMessagePinsResponse,
+  MESSAGE_PINS_CAPABILITY,
+  MESSAGE_PINS_ROUTES,
+} from "@openbot/contracts/team-protocol/message-pins-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -360,6 +367,10 @@ export interface WebWorkspaceRuntime {
   compactChannelContext?: (channelId: string) => Promise<void>;
   /** The open waits of an agent, with `agent-waits-v1`. A host without it refuses before a request goes out. */
   listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
+  /** The pinned messages of all chats of an agent, with `message-pins-v1`. A host without it refuses before a request goes out. */
+  listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Pin or Unpin on one message, with `message-pins-v1`. Resolves with the new list of the chat. */
+  setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
@@ -1435,6 +1446,23 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
       return decodeAgentWaitsResponse(await request("POST", AGENT_WAITS_ROUTES.list, { agentId }));
+    },
+    async listPinnedMessages(agentId) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(await request("POST", MESSAGE_PINS_ROUTES.list, { agentId }));
+    },
+    async setMessagePinned(input) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(
+        await request("POST", MESSAGE_PINS_ROUTES.set, {
+          agentId: input.agentId,
+          taskId: input.taskId ?? null,
+          messageId: input.messageId,
+          pinned: input.pinned,
+        }),
+      );
     },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))

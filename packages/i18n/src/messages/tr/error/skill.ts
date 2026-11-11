@@ -49,6 +49,8 @@ export const messages = {
   "error.skill.managedSlug": "OpenBot her ajana kendi {slug} becerisini verir. Bu beceriye başka bir ad verin.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md 64 KB'tan daha büyük. Yayımlamadan önce kısaltın.",
   "error.skill.localNoRevisions": "Yerel becerinin yayımlanmış revizyonu yok.",
+  "error.skill.localNotFound": "Bu yerel beceri yok. Kimliğini yerel beceriler listesinden kontrol edin.",
+  "error.skill.localRevisionNotFound": "Bu yerel becerinin {revision} revizyonu yok. En son revizyonu {latest}.",
   "error.skill.localNameTaken": "Bu ada sahip yerel bir beceri zaten mevcut. Bunun yerine revize edin.",
   "error.skill.localKeepName": "Revize ederken beceri adını değiştirmeden tutun.",
   "error.skill.localRelativeFolder": "Mevcut ajan çalışma alanı içinde göreli bir beceri klasörü kullanın.",

@@ -410,6 +410,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "מספר אישי",
   "connector.whatsapp.ownNumberDescription":
     "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר שמיועד רק ל-OpenBot.",
+  "connector.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
   "connector.whatsapp.orchestratorTitle": "מתזמר WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים ועונה ב-WhatsApp.",

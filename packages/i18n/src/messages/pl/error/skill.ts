@@ -49,6 +49,9 @@ export const messages = {
     "OpenBot daje każdemu agentowi własną umiejętność {slug}. Nadaj tej umiejętności inną nazwę.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md jest większy niż 64 KB. Skróć go przed publikacją.",
   "error.skill.localNoRevisions": "Lokalna umiejętność nie ma opublikowanych wersji.",
+  "error.skill.localNotFound": "Ta lokalna umiejętność nie istnieje. Sprawdź jej ID na liście lokalnych umiejętności.",
+  "error.skill.localRevisionNotFound":
+    "Ta lokalna umiejętność nie ma wersji {revision}. Jej najnowsza wersja to {latest}.",
   "error.skill.localNameTaken": "Lokalna umiejętność o tej nazwie już istnieje. Zamiast tego ją zmień.",
   "error.skill.localKeepName": "Nie zmieniaj nazwy umiejętności podczas jej poprawiania.",
   "error.skill.localRelativeFolder": "Użyj względnego folderu umiejętności w bieżącym obszarze roboczym agenta.",

@@ -682,13 +682,14 @@
   .app-frame-edge[data-window-page-kind="settings"]
     > .window-page
     > .settings-page
-    :is(.settings-page-nav, .settings-page-content, .settings-page-path) {
+    :is(.settings-page-nav, .settings-page-content, .settings-page-path, .settings-page-close) {
     pointer-events: auto;
     -webkit-app-region: no-drag;
   }
 
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
-    padding: 0;
+    padding-block: 0;
+    padding-inline-start: 0;
     -webkit-app-region: drag;
   }
 
@@ -778,11 +779,24 @@
   grid-column: 2;
   grid-row: 1;
   align-items: center;
-  padding: var(--openbot-space-4) 0 0;
+  padding-block: var(--openbot-space-4) 0;
+  /* The room of the Close button. */
+  padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4));
 }
 
 .settings-page-path-row:empty {
   display: none;
+}
+
+/* Close is at the end of the row of the path, above it, so a long path stops before the button. */
+.settings-page-close {
+  z-index: 1;
+  border-radius: var(--openbot-radius-pill);
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  margin-inline-end: var(--openbot-space-3);
 }
 
 /* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
@@ -1109,10 +1123,18 @@
   .settings-page-path-row {
     grid-column: 1;
     grid-row: 2;
+    padding-inline-end: 0;
   }
 
   .settings-page-path-row > .settings-page-path {
     padding-inline: var(--openbot-space-4);
+  }
+
+  /* Close is at the end of the heading. */
+  .settings-page-close {
+    grid-column: 1;
+    align-self: start;
+    margin-block-start: var(--openbot-space-3);
   }
 
   .settings-page-content {
@@ -1130,6 +1152,8 @@
 
   .settings-page-title {
     margin-bottom: var(--openbot-space-2);
+    /* The room of the Close button. */
+    padding-inline-end: calc(var(--openbot-space-8) + var(--openbot-space-2));
   }
 
   .settings-page-sections,

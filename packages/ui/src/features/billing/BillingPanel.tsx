@@ -1,10 +1,10 @@
 import {
-  BILLING_PLANS,
   type BillingInterval,
   type BillingPlanId,
   type BillingPortalRequest,
   type BillingServerPlan,
   type BillingSubscriptionStatus,
+  serverStorageGb,
 } from "@openbot/contracts/billing";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -273,7 +273,7 @@ function BillingError(props: { message: string; store: BillingStore }): JSX.Elem
 function BillingServerRow(props: { server: BillingServerPlan; store: BillingStore }): JSX.Element {
   const { t, format } = useText();
   const name = () => props.server.serverName ?? t("billing.server.unnamed");
-  const storageGb = () => BILLING_PLANS.find((plan) => plan.id === props.server.plan)?.storageGb ?? 0;
+  const storageGb = () => serverStorageGb(props.server);
   const badge = () => STATUS_BADGE[props.server.status];
   // The price of one period, or only the interval when Stripe gave no fixed amount.
   const price = () => {

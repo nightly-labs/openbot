@@ -55,7 +55,11 @@ import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
-import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
+import {
+  mergeConversationPage,
+  missingReplyOriginals,
+  windowedSnapshotMessages,
+} from "../conversation/conversation-merge";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
@@ -103,6 +107,11 @@ interface WebConversation {
   trimmed?: boolean;
   /** The last older page did not load. The chat shows it above its messages, and a scroll up tries again. */
   olderError?: string | null;
+  /**
+   * The page shows a part around an older message, not the newest messages. A latest read changes only
+   * the messages that it shows, and new messages wait until the user goes to the latest ones.
+   */
+  around?: boolean;
 }
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
@@ -119,6 +128,7 @@ function trimToLatestPage(conversation: WebConversation): void {
   const page = conversation.page;
   if (!page) return;
   conversation.trimmed = true;
+  conversation.around = false;
   if (page.messages.length <= LATEST_PAGE_SIZE) return;
   const kept = page.messages.slice(-LATEST_PAGE_SIZE);
   const removedById = new Map(page.messages.slice(0, -LATEST_PAGE_SIZE).map((message) => [message.id, message]));
@@ -329,6 +339,8 @@ export function createWebWorkspace(
   const readWrites = new Map<string, Promise<void>>();
   /** The conversation reads in flight by agent, and the deltas that wait for them to finish. */
   const conversationReads = new Map<string, number>();
+  /** The newest read around a message for each agent. A newer jump or a return to the latest messages wins. */
+  const aroundReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   let connectionPromise: { hostId: string; opened: boolean; promise: Promise<void> } | null = null;
@@ -1571,6 +1583,8 @@ export function createWebWorkspace(
         if (older && (item.trimmed || old?.pageInfo.olderCursor !== before)) return;
         // A trimmed conversation can be behind the host by more than one page, so its kept messages go.
         const merge = older ? "older" : old && !item.trimmed ? "latest" : "replace";
+        // A part around an older message keeps its place. The latest page changes only its shown messages.
+        const around = !older && merge === "latest" && item.around === true && page.pageInfo.hasOlder;
         const resolvedRequests = new Set(
           page.messages.flatMap((message) =>
             message.questionPrompt?.resolution ? [String(message.questionPrompt.requestId)] : [],
@@ -1584,7 +1598,9 @@ export function createWebWorkspace(
         );
         item.page = {
           ...page,
-          messages: mergeConversationPage(old?.messages ?? [], page.messages, merge),
+          messages: around
+            ? windowedSnapshotMessages(old?.messages ?? [], page.messages, { mode: "around", capped: true })
+            : mergeConversationPage(old?.messages ?? [], page.messages, merge),
           references: merge === "replace" ? page.references : { ...old?.references, ...page.references },
           pageInfo: merge === "latest" ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
           // An older page has the thread's current revision but not its newest messages. The loaded
@@ -1598,6 +1614,7 @@ export function createWebWorkspace(
         if (!older && page.readState) draft.reads[id] = page.readState;
         // A conversation that closed during this read stays trimmed: it gets no new messages until it opens.
         if (!older && draft.selectedId === id) item.trimmed = false;
+        if (!older && !around) item.around = false;
         item.loading = false;
         item.error = null;
         item.olderError = null;
@@ -1640,7 +1657,8 @@ export function createWebWorkspace(
     let otherThread = false;
     // The checks read the draft: a page that a read just wrote is not visible outside it until a flush.
     setState((draft) => {
-      const value = draft.conversations[event.agentId]?.page;
+      const item = draft.conversations[event.agentId];
+      const value = item?.page;
       if (!value) return;
       if (value.threadId !== event.threadId) {
         otherThread = true;
@@ -1648,11 +1666,12 @@ export function createWebWorkspace(
       }
       if (event.revision <= value.revision) return;
       // The streamed message is at the end of the page.
-      const message = value.messages.findLast((item) => item.id === event.messageId);
+      const message = value.messages.findLast((entry) => entry.id === event.messageId);
       if (message) {
         message.text += event.delta;
         message.status = "streaming";
-      } else
+      } else if (item.around) return;
+      else
         value.messages.push({
           id: event.messageId,
           turnId: event.turnId,
@@ -1874,8 +1893,10 @@ export function createWebWorkspace(
     const write = (readWrites.get(id) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
-        const page = state.conversations[id]?.page;
-        if (!page || disposed || current !== generation) return;
+        const conversation = state.conversations[id];
+        const page = conversation?.page;
+        // A part around an older message does not show the newest messages, so they stay unread.
+        if (!page || conversation.around || disposed || current !== generation) return;
         const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
         if (disposed || current !== generation) return;
         setState((draft) => {
@@ -2319,25 +2340,66 @@ export function createWebWorkspace(
         });
     },
     /**
-     * Loads older pages until the message is loaded. It does not go through `run`: another action
-     * would make `run` skip the load, and a jump would then report a message that exists as missing.
+     * Loads the message in the open chat and resolves whether the chat has it. A host with
+     * `conversation-pagination` gives the part around it in one read, however old it is; another host
+     * gives older pages until the message is loaded. It does not go through `run`: another action would
+     * make `run` skip the load, and a jump would then report a message that exists as missing.
      */
-    async openSearchMessage(messageId: string) {
+    async openSearchMessage(messageId: string): Promise<boolean> {
       const id = selectedId;
       const current = generation;
-      if (!id) return;
+      if (!id) return false;
+      const loaded = () => state.conversations[id]?.page?.messages.some((message) => message.id === messageId) === true;
+      if (loaded()) return true;
+      const readAround = runtime.conversationAround;
       try {
+        if (readAround && state.capabilities.includes("conversation-pagination")) {
+          const request = (aroundReads.get(id) ?? 0) + 1;
+          aroundReads.set(id, request);
+          const page = await readAround(id, messageId);
+          if (disposed || current !== generation || selectedId !== id || aroundReads.get(id) !== request) return false;
+          if (loaded()) return true;
+          if (page.agentId !== id || !page.messages.some((message) => message.id === messageId)) return false;
+          setState((draft) => {
+            const item = draft.conversations[id];
+            if (!item) return;
+            item.page = { ...page, messages: [...page.messages] };
+            item.missingReferences = missingReplyOriginals(page);
+            item.around = true;
+            item.trimmed = false;
+            item.loading = false;
+            item.error = null;
+            item.olderError = null;
+          });
+          return true;
+        }
         while (!state.conversations[id]?.page?.messages.some((message) => message.id === messageId)) {
           const page = state.conversations[id]?.page;
           if (!page?.pageInfo.hasOlder || !page.pageInfo.olderCursor) break;
           const cursor = page.pageInfo.olderCursor;
           await load(id, true);
-          if (disposed || current !== generation || selectedId !== id) return;
+          if (disposed || current !== generation || selectedId !== id) return false;
           if (state.conversations[id]?.page?.pageInfo.olderCursor === cursor) break;
         }
       } catch (error) {
         if (current === generation) report(error);
+        return false;
       }
+      return !disposed && current === generation && loaded();
+    },
+    /** Leaves a part around an older message and shows the newest messages again. */
+    loadLatest() {
+      const id = selectedId;
+      if (!id) return Promise.resolve();
+      aroundReads.set(id, (aroundReads.get(id) ?? 0) + 1);
+      setState((draft) => {
+        const item = draft.conversations[id];
+        if (!item?.around) return;
+        // A trimmed conversation takes the host's latest page and cursor at the next read, with no gap.
+        item.around = false;
+        item.trimmed = true;
+      });
+      return refresh();
     },
     async approve(input: RespondToApprovalInput) {
       const current = generation;

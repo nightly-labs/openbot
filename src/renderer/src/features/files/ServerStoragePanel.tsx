@@ -136,7 +136,7 @@ export function ServerStoragePanel(
       scannedAt={usage()?.scannedAt ?? null}
       breakdown={usage()?.breakdown ?? []}
       freeBytes={freeBytes()}
-      agents={agents()}
+      agents={agents() ?? []}
       agentUsage={usage()?.agents ?? []}
       conversations={usage()?.conversations ?? []}
       files={usage()?.files ?? []}

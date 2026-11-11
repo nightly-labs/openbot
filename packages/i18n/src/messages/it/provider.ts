@@ -226,6 +226,17 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} non ha più crediti di azzeramento dell'utilizzo.",
   "provider.account.resetUsageAlreadyRedeemed": "Questo credito di azzeramento di {name} è già stato usato.",
   "provider.account.resetUsageFailed": "Impossibile azzerare l'utilizzo di {name}.",
+  "provider.account.pool": "Raggruppa account",
+  "provider.account.poolDescription":
+    "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
+  "provider.account.inUse": "In uso",
+  "provider.account.notInPool": "Fuori dal pool",
+  "provider.account.leaveOutOfPool": "Escludi dal pool",
+  "provider.account.putBackInPool": "Rimetti nel pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool di {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in uso",
+  "provider.settings.accountsPooledDescription": "{count} di {max}. Gli agenti condividono questi account.",
   "provider.settings.disconnectTitle": "Disconnettere {name}?",
   "provider.settings.disconnectOthers": "Gli altri account {provider} attendono finché non ricolleghi {provider}.",
   "provider.settings.disconnectLocal":

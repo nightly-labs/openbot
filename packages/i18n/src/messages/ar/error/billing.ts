@@ -5,6 +5,7 @@ export const messages = {
   "error.billing.lifecycleFailed": "تعذّر تغيير خطة الخادم. حدّث صفحة الفوترة وأعد المحاولة.",
   "error.billing.confirmMismatch": "اكتب اسم الخادم لحذفه.",
   "error.billing.restartBusy": "لا يمكن إعادة تشغيل الخادم الآن. أعد المحاولة بعد دقيقة.",
+  "error.billing.restartUnavailable": "لا يمكن إعادة تشغيل هذا الخادم من هنا. تواصل مع الدعم.",
   "error.billing.planRequired": "انتهت خطة هذا الخادم. جدّدها لتشغيل الخادم.",
   "error.billing.planSoldOut": "نفدت هذه الخطة. اختر خطة أخرى.",
   "error.billing.licenseExists": "لهذا الحساب ترخيص بالفعل. غيّر مستخدميه بدلًا من ذلك.",

@@ -51,6 +51,25 @@ says "Storage almost full" and can be closed until the next level; under 2% free
 is red and cannot be closed. "Free up space" opens Server settings › Storage. A host without the
 capability shows no card.
 
+The optional `library-folders-v1` capability (`team-protocol/library-folders-v1.ts`, protocol 9 only)
+adds `POST /v1/library-folders` and `POST /v1/library-folders/actions` for the folders of the Library
+page. Each agent has folders for its files, five levels in all, and a file is in one folder of its
+agent or in none. The folders are a layout over the stored files: a change moves, copies and deletes
+no file. The host keeps them in `openbot-library-folders-v1.json` in its user data
+(`src/backend/library-folders-store.ts`), and `src/main/library-folders-service.ts` applies each change
+for the `storage:getLibraryFolders` and `storage:changeLibraryFolders` IPC of this computer and for the
+route, so a joined server uses the same rules. The service reads the agent of a file from the `host`
+scan, and scans one more time when the kept scan result does not have the file. Every member reads
+the folders of each agent that they can see. A member changes the folders of an agent only with `chat`
+access to it, and gets 403 without it; an owner or an admin changes all folders. A member gets no folder of an agent that they cannot see or that the host no longer
+has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
+one gets 404. A refused change is 404 for
+an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. There is no event: a client reads the snapshot
+again. The read is a passive route. A deleted agent loses its folders, and a file that an owner or
+admin deletes leaves its folder. A host without the capability reads as null, and a change is refused
+before any request. The instance transfer does not carry the folders.
+
 The optional `machine-resources-v1` capability (`team-protocol/machine-resources-v1.ts`) adds the
 machine part at the top of Server settings › Storage, for an owner or admin only. `POST
 /v1/admin/host/machine/metrics` answers the disk, memory and CPU use of the machine that runs the
@@ -634,7 +653,7 @@ An owner or admin of a joined server manages its host through optional `POST /v1
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
 except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
-`storage-channel-v1` and `agent-fast-mode-v1`. The
+`storage-channel-v1`, `library-folders-v1` and `agent-fast-mode-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |

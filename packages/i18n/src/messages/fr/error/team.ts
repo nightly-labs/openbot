@@ -90,6 +90,8 @@ export const messages = {
     "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
+  "error.team.libraryFoldersUnsupported":
+    "Les dossiers de la Bibliothèque ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour chaque agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.sidebarPinsUnsupported":
@@ -198,6 +200,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Aucun agent de ce serveur n’a affiché ce lien de connexion.",
   "error.team.hostPersonalityUnsupported": "Cette connexion ne prend pas en charge la personnalité du serveur.",
   "error.team.agentWaitsUnsupported": "Cette connexion ne prend pas en charge les attentes ouvertes.",
+  "error.team.messagePinsUnsupported": "Cette connexion ne prend pas en charge les messages épinglés.",
   "error.team.queuedMessageThreadUnsupported":
     "Cette connexion ne prend pas en charge l’exécution d’un message en file d’attente dans un nouveau fil.",
   "error.team.backgroundProcessesUnsupported": "Cette connexion ne prend pas en charge les processus en arrière-plan.",

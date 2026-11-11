@@ -847,6 +847,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Número personal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Desactívalo para un número solo para OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",
@@ -1030,6 +1033,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Sin instalar",
   "mobile.server.providers.status.checking": "Comprobando",
+  "mobile.server.providers.pool": "Agrupar cuentas",
+  "mobile.server.providers.poolHint":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "mobile.server.providers.accountsPooledHint":
+    "Los agentes comparten estas cuentas. Una cuenta nueva inicia sesión en su página en este teléfono.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Los agentes comparten estas cuentas. Añade una cuenta en OpenBot en un ordenador.",
+  "mobile.server.providers.inUse": "En uso",
+  "mobile.server.providers.notInPool": "Fuera del grupo",
+  "mobile.server.providers.leaveOutOfPool": "Sacar del grupo",
+  "mobile.server.providers.putBackInPool": "Volver al grupo",
   "mobile.server.providers.models": "Modelos",
   "mobile.server.providers.modelsCount": "{shown} de {total}",
   "mobile.server.providers.modelsTitle": "Modelos de {name}",

@@ -774,6 +774,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "个人号码",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。如果是 OpenBot 专用号码，请关闭该选项。",
+  "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 调度助手",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "该助手接收你所有已关联号码中发给 OpenBot 的消息。简单的问题它自己回答，其余的交给合适的助手处理，并在 WhatsApp 中回答。",
@@ -940,6 +943,14 @@ export const messages = {
   "mobile.server.providers.status.ready": "已安装",
   "mobile.server.providers.status.notInstalled": "未安装",
   "mobile.server.providers.status.checking": "检查中",
+  "mobile.server.providers.pool": "账号池",
+  "mobile.server.providers.poolHint": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "mobile.server.providers.accountsPooledHint": "助手共用这些账号。新账号在本手机上它的页面中登录。",
+  "mobile.server.providers.accountsPooledOnComputer": "助手共用这些账号。请在电脑上的 OpenBot 中添加账号。",
+  "mobile.server.providers.inUse": "使用中",
+  "mobile.server.providers.notInPool": "不在池中",
+  "mobile.server.providers.leaveOutOfPool": "移出账号池",
+  "mobile.server.providers.putBackInPool": "放回账号池",
   "mobile.server.providers.models": "模型",
   "mobile.server.providers.modelsCount": "{shown}/{total}",
   "mobile.server.providers.modelsTitle": "{name} 模型",

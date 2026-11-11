@@ -34,13 +34,16 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { LIBRARY_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
+import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
 import { PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -64,6 +67,7 @@ import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 
 /**
  * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
@@ -96,12 +100,14 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
+  PROVIDER_ACCOUNT_POOL_ROUTES.list,
   PROVIDER_DEFAULT_ROUTES.settings,
   PROVIDER_USE_ROUTES.list,
   LOCAL_SERVERS_ROUTES.list,
   DISCORD_ACCESS_ROUTES.access,
   WHATSAPP_CONNECTOR_ROUTES.overview,
   WHATSAPP_CONNECTOR_ROUTES.linkState,
+  WHATSAPP_WORKING_MESSAGE_ROUTES.list,
   LIVE_ACTIVITY_PUSH_ROUTES.register,
   LIVE_ACTIVITY_PUSH_ROUTES.remove,
   AGENT_NOTIFICATION_LEVELS_ROUTES.read,
@@ -116,11 +122,13 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PUSH_NOTIFICATION_THREADS_ROUTES.set,
   STORAGE_ROUTES.usage,
   STORAGE_DISK_ROUTES.disk,
+  LIBRARY_FOLDERS_ROUTES.read,
   STORAGE_CHANNEL_ROUTES.files,
   MACHINE_RESOURCES_ROUTES.metrics,
   MACHINE_RESOURCES_ROUTES.alerts,
   BACKGROUND_PROCESSES_ROUTES.list,
   AGENT_WAITS_ROUTES.list,
+  MESSAGE_PINS_ROUTES.list,
   AGENT_ADMIN_ROUTES.settings,
   AGENT_HOST_SETTINGS_ROUTES.settings,
   AGENT_BACKUP_MODELS_ROUTES.settings,

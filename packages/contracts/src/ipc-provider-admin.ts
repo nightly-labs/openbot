@@ -13,6 +13,7 @@ import {
   type HostProviderAccounts,
   isAccountUsage,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_USAGE_RESET_OUTCOMES,
@@ -125,6 +126,21 @@ export function decodeHostProviderAccountModels(value: unknown): HostProviderAcc
     return [{ provider, accounts }];
   });
   return { providers };
+}
+
+/**
+ * The pools of a `provider-account-pool-v1` list. The route codec has checked the fields. A provider
+ * this client does not know is left out.
+ */
+export function decodeHostProviderAccountPools(value: unknown): NonNullable<HostProviderAccounts["pools"]> {
+  const invalid = () => new Error("Invalid provider account pools.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.pools)) throw invalid();
+  return value.pools.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row)) throw invalid();
+    const pool = { leftOut: row.leftOut, inUse: row.inUse };
+    if (!isProviderAccountPool(pool)) throw invalid();
+    return isAgentProvider(row.provider) ? [{ provider: row.provider, pool }] : [];
+  });
 }
 
 /** The accounts with the models that `models` gives for each. An account it does not name keeps its own. */

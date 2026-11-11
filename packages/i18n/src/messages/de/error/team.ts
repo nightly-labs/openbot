@@ -85,6 +85,7 @@ export const messages = {
   "error.team.providerDetectionUnsupported":
     "Diese Verbindung kann die Modellserver und Agenten des Servers nicht finden.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
+  "error.team.libraryFoldersUnsupported": "Diese Verbindung unterstützt keine Bibliotheksordner.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.sidebarPinsUnsupported":
@@ -186,6 +187,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Kein Agent auf diesem Server hat diesen Anmeldelink angezeigt.",
   "error.team.hostPersonalityUnsupported": "Diese Verbindung unterstützt die Server-Persönlichkeit nicht.",
   "error.team.agentWaitsUnsupported": "Offene Wartevorgänge werden von dieser Verbindung nicht unterstützt.",
+  "error.team.messagePinsUnsupported": "Diese Verbindung unterstützt angeheftete Nachrichten nicht.",
   "error.team.queuedMessageThreadUnsupported":
     "Das Ausführen einer wartenden Nachricht als neuer Thread wird von dieser Verbindung nicht unterstützt.",
   "error.team.backgroundProcessesUnsupported": "Hintergrundprozesse werden von dieser Verbindung nicht unterstützt.",

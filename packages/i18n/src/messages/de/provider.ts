@@ -231,6 +231,17 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hat kein Guthaben zum Zurücksetzen der Nutzung mehr.",
   "provider.account.resetUsageAlreadyRedeemed": "Dieses Guthaben von {name} wurde bereits verwendet.",
   "provider.account.resetUsageFailed": "Die Nutzung von {name} konnte nicht zurückgesetzt werden.",
+  "provider.account.pool": "Konten bündeln",
+  "provider.account.poolDescription":
+    "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "provider.account.inUse": "Aktiv",
+  "provider.account.notInPool": "Nicht im Pool",
+  "provider.account.leaveOutOfPool": "Aus Pool nehmen",
+  "provider.account.putBackInPool": "Zurück in Pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool aus {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} aktiv",
+  "provider.settings.accountsPooledDescription": "{count} von {max}. Agenten teilen sich diese Konten.",
   "provider.settings.disconnectTitle": "{name} trennen?",
   "provider.settings.disconnectOthers": "Die anderen {provider}-Konten warten, bis du {provider} wieder verbindest.",
   "provider.settings.disconnectLocal":

@@ -5,6 +5,7 @@ import {
   type CustomProviderRestart,
   type CustomProviderSummary,
   isManagedRuntimeProvider,
+  type ProviderAccountPool,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
   type ServerSummary,
@@ -124,6 +125,33 @@ function createUsageResetAccounts(): ProviderAccountActions {
   };
 }
 
+/**
+ * Codex accounts that the pool can share. The switch turns the pool on, and the ⋯ menu of an account
+ * leaves it out or puts it back. The first account in the pool is in use.
+ */
+function createPoolAccounts() {
+  const [pool, setPool] = createSignal<ProviderAccountPool | undefined>(undefined);
+  const accounts = usageResetAgentStatus.providers?.find((provider) => provider.id === "codex")?.accounts ?? [];
+  const actions: ProviderAccountActions = {
+    connect: fn(async () => undefined),
+    cancel: fn(async () => undefined),
+    rename: fn(async () => undefined),
+    remove: fn(async () => undefined),
+    setPool: fn(async (_provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => {
+      const inUse = accounts.find((account) => !leftOut.includes(account.id))?.id ?? null;
+      setPool(enabled ? { leftOut: [...leftOut], inUse } : undefined);
+    }),
+  };
+  const agentStatus = (): AgentStatus => ({
+    ...usageResetAgentStatus,
+    providers: (usageResetAgentStatus.providers ?? []).map((provider) => {
+      const current = pool();
+      return provider.id === "codex" && current ? { ...provider, accountPool: current } : provider;
+    }),
+  });
+  return { actions, agentStatus };
+}
+
 /** ChatGPT installed and signed out, so its row offers both ways in. The rest are connected. */
 const codeSignInAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -228,6 +256,8 @@ function ServerProvidersStory(props: {
   providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
   /** Codex accounts with usage reset credits: the account ⋯ menu offers Reset usage. */
   usageReset?: boolean;
+  /** Codex accounts that the pool can share. */
+  accountPool?: boolean;
   /**
    * The Hermes row: `null` is a host that sends no installer status, so the row opens the install
    * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
@@ -242,6 +272,7 @@ function ServerProvidersStory(props: {
   hostCustomProviders?: "edit" | "remove-only";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
+  const poolAccounts = props.accountPool ? createPoolAccounts() : undefined;
   const hermes = props.hermes;
   const hermesAgentStatus: AgentStatus | undefined =
     hermes === undefined
@@ -373,6 +404,7 @@ function ServerProvidersStory(props: {
       },
       get agentStatus() {
         if (hermesAgentStatus) return hermesAgentStatus;
+        if (poolAccounts) return poolAccounts.agentStatus();
         if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
@@ -414,7 +446,7 @@ function ServerProvidersStory(props: {
         : props.providerDownloads || hermes !== undefined
           ? fn()
           : undefined,
-      accountActions: usageResetAccounts,
+      accountActions: poolAccounts?.actions ?? usageResetAccounts,
       providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
@@ -665,6 +697,14 @@ export const ProvidersOff: Story = {
  */
 export const CodexUsageReset: Story = {
   render: () => <ServerProvidersStory usageReset />,
+};
+
+/**
+ * Open Codex: two accounts show the Pool accounts switch, off at first. On, agents use one account
+ * until it nears a usage limit. The ⋯ menu of an account leaves it out of the pool or puts it back.
+ */
+export const AccountPool: Story = {
+  render: () => <ServerProvidersStory accountPool />,
 };
 
 /** A host that sends no Hermes installer status, such as a Windows host: the row opens the install guide. */

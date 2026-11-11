@@ -46,6 +46,8 @@ export const messages = {
   "error.skill.managedSlug": "OpenBot נותן לכל סוכן מיומנות {slug} משלו. יש לתת למיומנות הזו שם אחר.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md גדול מ-64 KB. יש לקצר אותו לפני הפרסום.",
   "error.skill.localNoRevisions": "למיומנות מקומית אין גרסאות שפורסמו.",
+  "error.skill.localNotFound": "המיומנות המקומית הזו לא קיימת. יש לבדוק את המזהה שלה ברשימת המיומנויות המקומיות.",
+  "error.skill.localRevisionNotFound": "למיומנות המקומית הזו אין גרסה {revision}. הגרסה האחרונה שלה היא {latest}.",
   "error.skill.localNameTaken": "כבר קיימת מיומנות מקומית בשם הזה. יש לערוך אותה במקום זאת.",
   "error.skill.localKeepName": "יש להשאיר את שם המיומנות ללא שינוי בעת עריכתה.",
   "error.skill.localRelativeFolder": "יש להשתמש בתיקיית מיומנות יחסית בתוך סביבת העבודה של הסוכן הנוכחי.",

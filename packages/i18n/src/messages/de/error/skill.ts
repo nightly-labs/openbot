@@ -53,6 +53,10 @@ export const messages = {
   "error.skill.templateMarkdownTooLarge":
     "{name}: SKILL.md ist größer als 64 KB. Kürze die Datei vor dem Veröffentlichen.",
   "error.skill.localNoRevisions": "Die lokale Fähigkeit hat keine veröffentlichten Überarbeitungen.",
+  "error.skill.localNotFound":
+    "Diese lokale Fähigkeit gibt es nicht. Prüfe ihre ID in der Liste der lokalen Fähigkeiten.",
+  "error.skill.localRevisionNotFound":
+    "Diese lokale Fähigkeit hat keine Überarbeitung {revision}. Die neueste Überarbeitung ist {latest}.",
   "error.skill.localNameTaken":
     "Eine lokale Fähigkeit mit diesem Namen existiert bereits. Überarbeite sie stattdessen.",
   "error.skill.localKeepName": "Behalte den Namen der Fähigkeit bei der Überarbeitung bei.",

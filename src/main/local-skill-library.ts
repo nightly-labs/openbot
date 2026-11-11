@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Schema, Semaphore } from "effect";
+import { Effect, Result, Schema, Semaphore } from "effect";
 import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -42,25 +42,40 @@ export class LocalSkillLibrary {
     return join(this.root, id);
   }
 
+  /**
+   * The requested revision, or the latest when none is requested. A skill or revision that the library
+   * does not have fails with text that names it, so an agent can correct its call (#7193).
+   */
   private revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number, LocalSkillFailure> {
-      if (requested !== undefined) {
-        if (!Number.isSafeInteger(requested) || requested < 1)
-          return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
-        return requested;
-      }
+      if (requested !== undefined && (!Number.isSafeInteger(requested) || requested < 1))
+        return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
       const revisions = yield* this.revisions(id);
       if (!revisions.length)
         return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNoRevisions")) });
-      return Math.max(...revisions);
+      const latest = Math.max(...revisions);
+      if (requested === undefined) return latest;
+      if (!revisions.includes(requested))
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            sourceText("error.skill.localRevisionNotFound", { revision: String(requested), latest: String(latest) }),
+          ),
+        });
+      return requested;
     });
   }
 
   /** Every saved revision of a skill. */
   revisions(id: string): Effect.Effect<number[], LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number[], LocalSkillFailure> {
-      const entries = yield* localIO(() => readdir(this.directory(id), { withFileTypes: true }));
-      return entries
+      const listed = yield* Effect.result(localIO(() => readdir(this.directory(id), { withFileTypes: true })));
+      if (Result.isFailure(listed)) {
+        const error = listed.failure.cause;
+        if (isDynamicRecord(error) && error.code === "ENOENT")
+          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNotFound")) });
+        return yield* listed.failure;
+      }
+      return listed.success
         .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
         .map((entry) => Number(entry.name));
     });

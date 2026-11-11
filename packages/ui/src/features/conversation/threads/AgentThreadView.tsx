@@ -52,6 +52,10 @@ import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerSta
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import {
+  preferredMessageScrollBehavior,
+  ScrollToLatestButton,
+} from "@openbot/ui/features/conversation/MessageNavigation";
+import {
   DeleteMessageDialog,
   MessageActions,
   MessageMenu,
@@ -82,6 +86,8 @@ const HOLD_TEXT = {
 
 /** The list stays at its end while new text comes in, when the user has not scrolled up. */
 const STICK_DISTANCE = 48;
+/** A message this many view heights from the middle of the view or nearer slides into place. */
+const NEAR_SCROLL_VIEWS = 2;
 
 /**
  * Whether the thread shows this message as a row. A stopped turn can leave an agent message with no
@@ -232,6 +238,11 @@ export interface AgentThreadViewProps {
    * or when the server cannot read them.
    */
   olderMessages?: AgentThreadOlderMessages | undefined;
+  /**
+   * The thread shows a part around an old message, and its latest messages are not loaded: a way back
+   * to the latest message shows. `onLoad` reads them in the place of the part.
+   */
+  newerMessages?: AgentThreadOlderMessages | undefined;
   /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
   messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /**
@@ -282,6 +293,10 @@ export interface AgentThreadViewProps {
   onCancelReply?: (() => void) | undefined;
   /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
   focusMessage?: { messageId: string; nonce: number } | undefined;
+  /** Pins a message to this thread, or unpins it. Without it, the message menu has no such item. */
+  messagePins?:
+    | { isPinned: (messageId: string) => boolean; onToggle: (messageId: string, pinned: boolean) => void }
+    | undefined;
   /**
    * The queue of the thread, as the agent's own chat shows its queue. Without it the thread lists the
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
@@ -339,6 +354,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         olderAnchor = undefined;
     },
   );
+  // A read of the latest messages takes the place of the part, and the view follows its end again.
+  createEffect(
+    () => props.newerMessages?.loading === true,
+    (loading) => {
+      if (loading) atEnd = true;
+    },
+  );
+  function loadLatest(newer: AgentThreadOlderMessages): void {
+    atEnd = true;
+    newer.onLoad();
+  }
   let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
@@ -378,7 +404,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (atEnd) element.scrollTop = element.scrollHeight;
     });
     follow.observe(list);
-    element.scrollTop = element.scrollHeight;
+    // A thread that opens at a message, such as a pin, stays at it.
+    if (atEnd) element.scrollTop = element.scrollHeight;
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
@@ -390,9 +417,15 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   function showMessage(messageId: string): boolean {
     const message = scroller?.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
     const row = message?.closest<HTMLElement>(".virtual-chat-row");
-    if (!row) return false;
+    if (!row || !scroller) return false;
     atEnd = false;
-    row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    // A row near the view slides into place. A far row, or a part that took the place of the
+    // messages, shows at once: a long slide over messages that the reader did not ask for helps nobody.
+    const view = scroller.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    const distance = Math.abs(bounds.top + bounds.height / 2 - (view.top + view.height / 2));
+    const behavior = distance <= view.height * NEAR_SCROLL_VIEWS ? preferredMessageScrollBehavior() : "auto";
+    row.scrollIntoView({ behavior, block: "center", inline: "nearest" });
     // The row lights up, then fades.
     delete row.dataset.replyFlash;
     void row.offsetWidth;
@@ -408,7 +441,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   let focusedNonce: number | undefined;
   // The thread scrolls to a message once, when its row shows, for example its source after "Branched from".
   createEffect(
-    () => ({ focus: props.focusMessage, count: props.messages.length, taskId: props.task?.id }),
+    // A part that takes the place of the messages can have as many messages, so the ends are in the key too.
+    () => ({
+      focus: props.focusMessage,
+      count: props.messages.length,
+      first: props.messages[0]?.id,
+      last: props.messages.at(-1)?.id,
+      taskId: props.task?.id,
+    }),
     ({ focus }) => {
       if (!focus || focus.nonce === focusedNonce) return;
       if (showMessage(focus.messageId)) focusedNonce = focus.nonce;
@@ -537,7 +577,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       </Show>
     );
   };
-  /** The items of a message's menu: Reply, Copy, Branch on the last answer of a finished turn, and Delete. */
+  function pinAction(message: AgentMessage) {
+    const pins = props.messagePins;
+    if (!pins || message.streaming) return undefined;
+    const pinned = pins.isPinned(message.id);
+    return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
+  }
+  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -547,6 +593,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onCopy: () => onCopy(message),
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
+      pin: pinAction(message),
       onDelete: deleteAction(message),
     };
   }
@@ -711,6 +758,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         aria-label={t("conversation.threads.view.label", { title: title() })}
         onScroll={fades.measure}
       >
+        <Show when={props.newerMessages}>
+          {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
+        </Show>
         <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
           <Show when={props.olderMessages}>
             {(older) => (

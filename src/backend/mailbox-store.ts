@@ -2879,12 +2879,18 @@ export class MailboxStore {
   /**
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
    * threads. Channel work counts only with `includeChannels`: on a provider that runs one turn at a
-   * time, a channel turn holds the agent's own chat too.
+   * time, a channel turn holds the agent's own chat too. The `exceptQueued` deliveries do not count
+   * while they are queued.
    */
-  hasUnfinishedDeliveryOutsideTasks(agentId: string, includeChannels: boolean): boolean {
+  hasUnfinishedDeliveryOutsideTasks(
+    agentId: string,
+    includeChannels: boolean,
+    exceptQueued: readonly string[] = [],
+  ): boolean {
     const messages = this.#messagesById();
     return this.#state.deliveries.some((delivery) => {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+      if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
       return lane === null || (includeChannels && laneChannelId(lane) !== null);
     });
@@ -3167,6 +3173,15 @@ export class MailboxStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** The content digest of a staged or saved generated attachment, or null for any other file. */
+  generatedAttachmentSha256(attachmentId: string): string | null {
+    return (
+      this.#stagedGeneratedAttachments.get(attachmentId)?.sha256 ??
+      this.#state.generatedAttachments.find((candidate) => candidate.id === attachmentId)?.sha256 ??
+      null
+    );
+  }
 
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
     this: MailboxStore,

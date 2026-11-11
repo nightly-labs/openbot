@@ -427,6 +427,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "رقم شخصي",
   "connector.whatsapp.ownNumberDescription":
     "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+  "connector.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
+  "connector.whatsapp.workingMessageDescription":
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",

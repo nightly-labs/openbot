@@ -79,6 +79,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
   "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
+  "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
   "error.team.sidebarPinsUnsupported":
@@ -180,6 +181,7 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
   "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
+  "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
   "error.team.queuedMessageThreadUnsupported":
     "Running a queued message as a new thread is not supported by this connection.",
   "error.team.backgroundProcessesUnsupported": "Background processes are not supported by this connection.",

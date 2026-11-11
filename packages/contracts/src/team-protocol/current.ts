@@ -93,6 +93,7 @@ import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
+import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
@@ -104,12 +105,14 @@ import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
@@ -162,6 +165,7 @@ import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -303,6 +307,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
@@ -313,6 +318,7 @@ export {
   MCP_SIGN_IN_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
+  MESSAGE_PINS_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
@@ -376,6 +382,7 @@ export {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -557,6 +564,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   AGENT_WAITS_CAPABILITY,
+  MESSAGE_PINS_CAPABILITY,
   AGENT_QUEUE_TASK_CAPABILITY,
   BACKGROUND_PROCESSES_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -572,6 +580,9 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -764,6 +775,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== THREAD_MESSAGE_SEARCH_CAPABILITY &&
     capability !== WORKFLOWS_CHANNELS_CAPABILITY &&
     capability !== AGENT_WAITS_CAPABILITY &&
+    capability !== MESSAGE_PINS_CAPABILITY &&
     capability !== AGENT_QUEUE_TASK_CAPABILITY &&
     capability !== BACKGROUND_PROCESSES_CAPABILITY &&
     capability !== PROVIDER_USE_CAPABILITY &&
@@ -778,7 +790,10 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY &&
     capability !== CHANNEL_BROWSER_CAPABILITY &&
-    capability !== STORAGE_CHANNEL_CAPABILITY,
+    capability !== STORAGE_CHANNEL_CAPABILITY &&
+    capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
+    capability !== LIBRARY_FOLDERS_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -846,6 +861,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   AGENT_WAITS_CAPABILITY,
+  MESSAGE_PINS_CAPABILITY,
   AGENT_QUEUE_TASK_CAPABILITY,
   BACKGROUND_PROCESSES_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -861,6 +877,9 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
+  WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1012,6 +1031,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== THREAD_MESSAGE_SEARCH_CAPABILITY &&
       capability !== WORKFLOWS_CHANNELS_CAPABILITY &&
       capability !== AGENT_WAITS_CAPABILITY &&
+      capability !== MESSAGE_PINS_CAPABILITY &&
       capability !== AGENT_QUEUE_TASK_CAPABILITY &&
       capability !== BACKGROUND_PROCESSES_CAPABILITY &&
       capability !== PROVIDER_USE_CAPABILITY &&
@@ -1026,6 +1046,9 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CLAUDE_COMPACT_WINDOW_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_MODELS_CAPABILITY &&
       capability !== CHANNEL_BROWSER_CAPABILITY &&
-      capability !== STORAGE_CHANNEL_CAPABILITY,
+      capability !== STORAGE_CHANNEL_CAPABILITY &&
+      capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
+      capability !== LIBRARY_FOLDERS_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
   );
 }
