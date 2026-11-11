@@ -344,9 +344,9 @@ must not hold the request until a person acts. `channel_result` is refused while
 task waits for its answer. `channel_reply` refuses, with
 `accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
 a person or of the caller, to a streaming message, to a member that takes no work, and over the
-limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. A
-refusal of `channel_result` or `channel_reply` is a failed tool call (`success: false`), so Claude
-Code asks for an answer when the turn then ends empty (see [Providers](providers.md)). The
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. Claude
+gets a refusal of `channel_result` or `channel_reply` as a failed tool call, so Claude Code asks for
+an answer when the turn then ends empty (see [Providers](providers.md)). The
 reply text is agent text that reaches another agent, so its assignment starts with a line that
 names the sender and says it is not the user, and a reply turn only answers: it cannot use
 `channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or

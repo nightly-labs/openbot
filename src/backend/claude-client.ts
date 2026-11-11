@@ -280,14 +280,31 @@ const OPENBOT_CLAUDE_CLIENT = {
  * The channel tools whose accepted call ends the turn: the tool result tells the agent to end it with no
  * more text. When a step ends with no text, Claude Code asks the model for a visible answer, and the agent
  * wrote its channel result again (#6923). The CLI does not ask after a successful call of a tool in
- * `CLAUDE_CODE_TERMINAL_MCP_TOOLS` (2.1.322). A refused call is a failed call (`openbot-tool-router.ts`),
- * so after a refusal the CLI still asks. The CLI knows only the direct name of a tool, not a call
- * through `tool_call`, so a channel thread gets these tools directly.
+ * `CLAUDE_CODE_TERMINAL_MCP_TOOLS` (2.1.309 and 2.1.322). A refused call is a failed call
+ * (`terminalChannelRefusal`), so after a refusal the CLI still asks. The CLI knows only the direct
+ * name of a tool, not a call through `tool_call`, so a channel thread gets these tools directly.
  */
 const CLAUDE_TERMINAL_CHANNEL_TOOLS: readonly string[] = [
   "mcp__openbot__channel_result",
   "mcp__openbot__channel_reply",
 ];
+
+/**
+ * A refused call of a tool in `CLAUDE_TERMINAL_CHANNEL_TOOLS` (`accepted: false`). The agent still
+ * has work to do, so Claude gets the refusal as a failed call, and the CLI asks for an answer when the
+ * turn then ends empty, as before #6923. The other providers keep the refusal as a result.
+ */
+function terminalChannelRefusal(namespace: string, name: string, content: CallToolResult["content"]): boolean {
+  if (namespace !== "openbot" || !CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${name}`)) return false;
+  const [first] = content;
+  if (first?.type !== "text") return false;
+  try {
+    const value = JSON.parse(first.text);
+    return isRecord(value) && value.accepted === false;
+  } catch {
+    return false;
+  }
+}
 /**
  * The client labels for a CLI environment. Anthropic bills a request with a label other than `sdk-*`
  * as Claude Code, and promotional API credit can leave Claude Code out: a key with $200 of such credit
@@ -2548,7 +2565,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (Array.isArray(result.contentItems)) {
       for (const item of result.contentItems) content.push(...dynamicContent(item));
     }
-    return { content, isError: result.success === false };
+    return { content, isError: result.success === false || terminalChannelRefusal(namespace, name, content) };
   });
 
   readonly #requestUserInputEffect = Effect.fn("ClaudeAgentClient.requestUserInput")(function* (
@@ -2722,12 +2739,23 @@ export function claudeOpenBotTools(
         CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${definition.name}`),
       )
     : [];
-  return [...visibleToolDefinitions("claude"), ...channel]
-    .filter((definition) => definition.name !== "ask_user")
-    .map((definition) => {
-      const shape = advertisedZodShape(z.strictObject(definition.shape));
-      return tool(definition.name, definition.description, shape, (args) => call(definition.name, args));
-    });
+  // The channel tools are always loaded: behind the CLI's tool search, the model did not see them, and
+  // it called channel_result through `tool_call` as the channel instructions say, which the CLI does not
+  // count as a terminal tool.
+  const claudeTool = (definition: (typeof channel)[number], extras?: { alwaysLoad: true }) =>
+    tool(
+      definition.name,
+      definition.description,
+      advertisedZodShape(z.strictObject(definition.shape)),
+      (args) => call(definition.name, args),
+      extras,
+    );
+  return [
+    ...visibleToolDefinitions("claude")
+      .filter((definition) => definition.name !== "ask_user")
+      .map((definition) => claudeTool(definition)),
+    ...channel.map((definition) => claudeTool(definition, { alwaysLoad: true })),
+  ];
 }
 
 /** The direct browser tools, as `mcp__openbot_browser__<tool>`: the form of a bridged browser call. */

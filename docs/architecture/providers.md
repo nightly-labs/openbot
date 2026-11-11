@@ -15,8 +15,11 @@ A Claude session of a channel thread also gets `channel_result` and `channel_rep
 and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
 turn with no more text. Without the variable, Claude Code asked the model for a visible answer, and
 the agent wrote its result again (#6923). The CLI reads only direct tool names, not a `tool_call`.
-A refused call of these tools is a failed call, so the CLI still asks for an answer after it. Other
-threads do not get these tools, so their requests do not grow.
+The two tools are always loaded (`alwaysLoad`): behind the CLI's tool search the model did not see
+them, and it used `tool_call`, as the channel instructions say for a tool that is not in its list.
+Claude gets a refused call of these tools (`accepted: false`) as a failed call, so the CLI still asks
+for an answer after it. The other providers keep the refusal as a result. Other threads do not get
+these tools, so their requests do not grow.
 
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or

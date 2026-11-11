@@ -1583,22 +1583,16 @@ export class OpenBotToolRouter {
     const channelId = this.#channels.store.channelForThread(executionThreadId);
     if (channelId && (params.tool.startsWith("channel_") || params.tool === "send_message")) {
       if (params.tool === "send_message") throw new Error("Use channel_assign or channel_transfer for channel work.");
-      const result = yield* this.#channels.tool(
-        channelId,
-        senderAgentId,
-        params.turnId,
-        params.callId,
-        params.tool,
-        params.arguments,
+      return openBotToolResult(
+        yield* this.#channels.tool(
+          channelId,
+          senderAgentId,
+          params.turnId,
+          params.callId,
+          params.tool,
+          params.arguments,
+        ),
       );
-      // Claude Code lets a turn end with no text after a successful call of these tools
-      // (`CLAUDE_TERMINAL_CHANNEL_TOOLS`). After a refusal the agent still has work to do, so the
-      // refusal is a failed call, and the CLI still asks for an answer when the turn ends empty.
-      const refused =
-        (params.tool === "channel_result" || params.tool === "channel_reply") &&
-        isRecord(result) &&
-        result.accepted === false;
-      return refused ? { ...openBotToolResult(result), success: false } : openBotToolResult(result);
     }
     if (params.tool.startsWith("channel_")) {
       return {
