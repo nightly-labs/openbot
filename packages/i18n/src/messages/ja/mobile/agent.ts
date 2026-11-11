@@ -318,6 +318,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
   "mobile.agent.runtime.searchModels": "モデルを検索",
   "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
   "mobile.agent.runtime.usageLimitWindow": "{window}の上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} にリセット",

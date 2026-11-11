@@ -317,6 +317,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
   "mobile.agent.runtime.usageLimitWindow": "Limiet ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Reset op {time}",

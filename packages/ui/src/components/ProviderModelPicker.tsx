@@ -1141,7 +1141,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
                                   search().trim()
-                                    ? t("provider.picker.noMatches")
+                                    ? // OpenRouter lists only the models that the key's account settings allow (#7093).
+                                      provider === "openrouter"
+                                      ? t("provider.picker.openrouterNoMatches")
+                                      : t("provider.picker.noMatches")
                                     : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
                                       provider === "muse"
                                       ? t("provider.picker.museNoModels")

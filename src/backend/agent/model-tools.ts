@@ -45,6 +45,8 @@ interface ProviderModels {
   /** The number of models of the provider that the list leaves out. */
   omittedModels?: number;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
+  /** Why a query found no model of the provider, when the provider can hide models itself. */
+  noMatchReason?: string;
 }
 
 type ToolModel = Pick<AgentModelOption, "id" | "name"> &
@@ -77,6 +79,13 @@ const FIX_IN = "Server settings > Providers";
 const SHORT_LIST_LENGTH = 8;
 /** The models that a `list_models` query returns at most, over all providers. */
 const QUERY_RESULT_LIMIT = 20;
+/**
+ * Pi lists only the OpenRouter models that the key may use: OpenRouter filters them by the privacy,
+ * provider and guardrail settings of the key's account. Without this, an agent told the user that
+ * OpenRouter had no Gemini model and could not say why (#7093).
+ */
+const OPENROUTER_NO_MATCH_REASON =
+  "OpenRouter lists only the models that the privacy, provider and guardrail settings of the key's account on openrouter.ai allow. The user changes them on openrouter.ai.";
 
 export interface ListModelsRequest {
   provider?: AgentProvider | undefined;
@@ -159,6 +168,9 @@ export function listModelsPayload(
           defaultModel: fallback.id,
           models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
+          ...(id === "openrouter" && words.length > 0 && candidates.length === 0
+            ? { noMatchReason: OPENROUTER_NO_MATCH_REASON }
+            : {}),
           ...(rows
             ? {
                 accounts: rows.map((account) => {

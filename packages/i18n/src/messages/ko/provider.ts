@@ -118,6 +118,8 @@ export const messages = {
   "provider.picker.download": "{name} 다운로드",
   "provider.picker.search": "모델 검색",
   "provider.picker.noMatches": "검색과 일치하는 모델이 없어요.",
+  "provider.picker.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",

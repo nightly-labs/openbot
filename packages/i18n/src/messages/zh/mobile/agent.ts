@@ -304,6 +304,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
   "mobile.agent.runtime.searchModels": "搜索模型",
   "mobile.agent.runtime.noMatches": "没有匹配的模型。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
   "mobile.agent.runtime.usageLimitWindow": "{window}上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 重置",

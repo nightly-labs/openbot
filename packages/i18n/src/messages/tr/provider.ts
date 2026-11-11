@@ -117,6 +117,8 @@ export const messages = {
   "provider.picker.download": "{name} indirmesi",
   "provider.picker.search": "Modellerde ara",
   "provider.picker.noMatches": "Aramanızla eşleşen model yok.",
+  "provider.picker.openrouterNoMatches":
+    "Aramanızla eşleşen model yok. openrouter.ai üzerindeki gizlilik, sağlayıcı ve koruma (guardrail) ayarlarınız bu listedeki bazı modelleri gizleyebilir.",
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",

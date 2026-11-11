@@ -340,6 +340,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Для этого провайдера нет доступных моделей.",
   "mobile.agent.runtime.searchModels": "Поиск моделей",
   "mobile.agent.runtime.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
   "mobile.agent.runtime.usageLimit": "Лимит использования исчерпан",
   "mobile.agent.runtime.usageLimitWindow": "Лимит ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Сброс: {time}",

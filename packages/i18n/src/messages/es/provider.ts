@@ -120,6 +120,8 @@ export const messages = {
   "provider.picker.download": "Descarga de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "provider.picker.openrouterNoMatches":
+    "Ningún modelo coincide con tu búsqueda. Tus ajustes de privacidad, proveedores y guardrails en openrouter.ai pueden ocultar modelos de esta lista.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "No hay modelos disponibles de {name}.",

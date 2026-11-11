@@ -111,6 +111,8 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
   "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",

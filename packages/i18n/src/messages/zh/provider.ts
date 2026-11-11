@@ -129,6 +129,8 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
   "provider.picker.noModels": "{name} 没有可用的模型。",

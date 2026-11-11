@@ -312,6 +312,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",
   "mobile.agent.runtime.searchModels": "모델 검색",
   "mobile.agent.runtime.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
   "mobile.agent.runtime.usageLimit": "사용 한도에 도달했어요",
   "mobile.agent.runtime.usageLimitWindow": "{window} 한도",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 초기화",
