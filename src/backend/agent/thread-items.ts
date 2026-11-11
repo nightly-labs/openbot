@@ -552,9 +552,11 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return sourceText(completed ? "status.agent.screenCaptureReviewing" : "status.agent.screenCaptureProgress");
   }
   // Before the generic words too: each browser tool name contains `browser`, which is a web search word.
+  // As for computer use, the completed text names the model's wait: a page text there made a long
+  // decision look like a stuck page (#6578).
   const browser = browserTool(item);
   if (browser !== null) {
-    return completed ? sourceText("status.agent.browserReviewing") : browserProgressText(browser);
+    return completed ? sourceText("status.agent.browserDeciding") : browserProgressText(browser);
   }
   // The model's own label of the step, such as "Show folder sizes in home", tells the user more than
   // the generic words below. It can quote a path or a value, so it is redacted like the trace's command.

@@ -48,6 +48,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserTyping": "Typing on the web page…",
   "status.agent.browserActing": "Using the web page…",
   "status.agent.browserReviewing": "Reviewing the web page…",
+  "status.agent.browserDeciding": "Deciding the next step on the web page…",
   "status.agent.memoriesSearching": "Searching its memories…",
   "status.agent.memoriesSearched": {
     one: "Searched its memories: {count} found",

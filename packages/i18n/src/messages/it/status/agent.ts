@@ -49,6 +49,7 @@ export const messages = {
   "status.agent.browserTyping": "Digitazione nella pagina web…",
   "status.agent.browserActing": "Uso della pagina web…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
+  "status.agent.browserDeciding": "Scelta del prossimo passo nella pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
   "status.agent.memoriesSearched": {
     one: "Ha cercato nelle sue memorie: {count} trovata",

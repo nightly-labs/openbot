@@ -45,6 +45,7 @@ export const messages = {
   "status.agent.browserTyping": "מקליד בדף האינטרנט…",
   "status.agent.browserActing": "משתמש בדף האינטרנט…",
   "status.agent.browserReviewing": "בודק את דף האינטרנט…",
+  "status.agent.browserDeciding": "מחליט על הצעד הבא בדף האינטרנט…",
   "status.agent.memoriesSearching": "מחפש בזיכרונות שלו…",
   "status.agent.memoriesSearched": {
     one: "חיפש בזיכרונות שלו: נמצא אחד",

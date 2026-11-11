@@ -45,6 +45,7 @@ export const messages = {
   "status.agent.browserTyping": "Web sayfasına yazılıyor…",
   "status.agent.browserActing": "Web sayfası kullanılıyor…",
   "status.agent.browserReviewing": "Web sayfası inceleniyor…",
+  "status.agent.browserDeciding": "Web sayfasındaki sonraki adıma karar veriliyor…",
   "status.agent.memoriesSearching": "Belleklerinde arıyor…",
   "status.agent.memoriesSearched": {
     one: "Belleklerinde aradı: {count} bulundu",
