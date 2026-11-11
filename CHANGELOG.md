@@ -228,6 +228,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - An agent no longer stays in the "Unread" group after you read its chat. Before, unread messages in its side threads, such as the thread of a routine, kept it in the group, and each routine run put it back. Now only unread messages in the chat itself move a chat to the "Unread" group or to the top in the "Unread first" order. The row still shows a dot for unread side threads.
 - A GitHub Copilot agent answers again after a turn that stopped responding or that you stopped.
   Before, each new message failed with "Session … is already loaded" until you restarted OpenBot.
+- A message to a Gemini agent after an idle time now waits up to 3 minutes for Gemini to start, and longer after an earlier slow start. This also applies to an agent set to "Workspace only" or to its own account. Before, on a slow or busy computer, mostly on Windows, the message often failed after 30 s with "Gemini did not answer in time", and OpenBot did not send it again.
 
 ## [0.67.1] - 2026-11-10
 
