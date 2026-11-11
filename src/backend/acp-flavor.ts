@@ -182,6 +182,11 @@ export interface AcpFlavor {
    * servers did not reach then fails, as the agent cannot use OpenBot's tools.
    */
   mcpServersLoadWithSession?: true;
+  /**
+   * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
+   * of a session server with the same name, so that server travels as `openbot_<name>`.
+   */
+  ownMcpServerNames?(cwd: string, env: Readonly<Record<string, string | undefined>>): readonly string[];
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */

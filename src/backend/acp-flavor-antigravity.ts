@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { isRecord } from "./protocol";
+import { getRecord, isRecord } from "./protocol";
 
 /**
  * Antigravity 1.3.0's `quota_exhausted_message`: a fixed header, then the reset time. The 1.5 CLI
@@ -129,7 +132,36 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }
 
+/** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
+export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
+  return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
+}
+
+/**
+ * The server names in the two `mcp_config.json` files that the Antigravity CLI 1.5.6 reads: the
+ * user's, in the Gemini home, and the workspace's. A file that is missing or is not JSON gives no
+ * names: the CLI starts no server from it.
+ */
+function antigravityOwnMcpServerNames(cwd: string, env: Readonly<Record<string, string | undefined>>): string[] {
+  const files = [
+    join(antigravityGeminiHome(env), "config", "mcp_config.json"),
+    join(cwd, ".agents", "mcp_config.json"),
+  ];
+  return files.flatMap((file) => {
+    try {
+      const servers = getRecord(JSON.parse(readFileSync(file, "utf8")), "mcpServers");
+      return servers ? Object.keys(servers) : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
+  // Antigravity 1.5.6 starts the entry of its own `mcp_config.json` in place of a session server with
+  // the same name, and does not start the session server. With an `enabledTools` list, that entry
+  // refused each other tool: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio" (#7785).
+  ownMcpServerNames: antigravityOwnMcpServerNames,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own

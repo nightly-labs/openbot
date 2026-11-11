@@ -4296,7 +4296,8 @@ export class ProviderRuntime implements ProviderPort {
     const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
     const named = (name: string) => {
       const given = providerMcpServerName(name);
-      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+      // An ACP agent can have the server as `openbot_<name>` (`acpMcpServerName`).
+      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && (word(given) || word(`openbot_${given}`)));
     };
     const config = configs.find((row) => named(row.name));
     if (config) return { name: config.name, builtIn: builtIn(config.id) };

@@ -511,12 +511,31 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * params` when one name has a space, so a server the user named "My Server" failed every Gemini
  * task (#2801). A changed name that another server already has, such as "computer use", or that is
  * one of OpenBot's own, is reported as a drop. So is the second of two names that become the same.
+ *
+ * **A name the agent's own files already use travels as `openbot_<name>`.** See `acpMcpServerName`.
  */
 export type AcpMcpServer =
   | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
   | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
 
-export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<AcpMcpServer[]> {
+/**
+ * The name one server travels under to an ACP agent. Antigravity starts the entry of its own files
+ * in place of a session server with the same name, with the user's `enabledTools` list, so the
+ * agent could not call the other tools of OpenBot's server (#7785). A name in `own`, the agent's
+ * own files, travels as `openbot_<name>`, as for Codex (`codexMcpServerKey`). Computer Use keeps its
+ * name, and so does a server whose renamed form is the user's too or is reserved.
+ */
+export function acpMcpServerName(config: McpServerConfig, own: readonly string[] = []): string {
+  const name = providerMcpServerName(config.name);
+  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !own.includes(name)) return name;
+  const renamed = `openbot_${name}`;
+  return own.includes(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
+}
+
+export function acpMcpServers(
+  servers: readonly UsableMcpServer[],
+  own: readonly string[] = [],
+): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
   const configured = new Set(servers.map((server) => server.config.name));
@@ -526,7 +545,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
       continue;
     }
     const { config } = server;
-    const name = providerMcpServerName(config.name);
+    const name = acpMcpServerName(config, own);
     if (
       entries.some((entry) => entry.name === name) ||
       (name !== config.name && (configured.has(name) || isReservedMcpServerName(name)))
