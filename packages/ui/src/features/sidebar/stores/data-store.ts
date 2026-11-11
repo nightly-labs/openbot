@@ -119,8 +119,15 @@ export function createSidebarDataStore(deps: {
   const chatWaits = (chatId: string) => waitingIds().has(chatId);
   const chatOrder = () => props.chatOrder ?? "manual";
   const activeChatId = () => props.activeChannelId || props.activeAgentId || "";
-  const chatIsUnread = (chatId: string) =>
-    props.agentStates[chatId]?.kind === "unread" || (channelById().get(chatId)?.unreadCount ?? 0) > 0;
+  /**
+   * A chat with unread messages of its own. An agent whose only unread messages are in side threads
+   * has an unread mark with no number. Opening its chat does not clear that mark, and a routine thread
+   * sets it again at each run, so the mark alone does not move the agent in an unread order.
+   */
+  const chatIsUnread = (chatId: string) => {
+    const state = props.agentStates[chatId];
+    return (state?.kind === "unread" && state.count > 0) || (channelById().get(chatId)?.unreadCount ?? 0) > 0;
+  };
   /**
    * The chats that an unread order puts first: the unread chats, and the open chat when it was in the
    * set before and the pointer is over the list. The open chat keeps its place while the pointer is
@@ -427,6 +434,7 @@ export function createSidebarDataStore(deps: {
     assignedSectionId,
     agentById,
     channelById,
+    chatIsUnread,
     chatKind,
     chatName,
     chatPinnedItems,

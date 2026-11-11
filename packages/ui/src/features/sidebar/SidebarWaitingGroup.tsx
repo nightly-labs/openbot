@@ -34,14 +34,11 @@ export function SidebarWaitingGroup() {
 }
 
 export function SidebarUnreadGroup() {
-  const { props, unreadChats } = useSidebarScope();
+  const { chatIsUnread, props, unreadChats } = useSidebarScope();
   const { t } = useText();
   // The open chat stays in the group after the user reads it while the pointer is over the list. It
   // is not unread, so it is not counted.
-  const count = () =>
-    unreadChats().filter((chat) =>
-      chat.kind === "agent" ? props.agentStates[chat.id]?.kind === "unread" : chat.channel.unreadCount > 0,
-    ).length;
+  const count = () => unreadChats().filter((chat) => chatIsUnread(chat.id)).length;
   return (
     <SidebarChatGroup
       chats={unreadChats()}
