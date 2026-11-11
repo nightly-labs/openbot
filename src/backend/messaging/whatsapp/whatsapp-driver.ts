@@ -236,6 +236,7 @@ class WhatsAppAdapter implements MessagingAdapter {
           .pipe(Effect.catch(() => Effect.void));
     }
     for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
+    this.#rememberPost(target, firstId, markdown);
     return firstId;
   });
 
@@ -256,13 +257,13 @@ class WhatsAppAdapter implements MessagingAdapter {
           if (size === 0 || size > WHATSAPP_FILE_BYTES_LIMIT) return false;
           const image = IMAGE_TYPES[extname(file.name).toLowerCase()];
           const content: AnyMessageContent = image
-            ? { image: { url: file.path }, mimetype: image }
+            ? { image: { url: file.path }, mimetype: image, ...this.#runtime.imagePreview(file.path) }
             : {
                 document: { url: file.path },
                 fileName: file.name.slice(0, 255) || "file",
                 mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
-          yield* this.#send(target, content);
+          this.#rememberPost(target, yield* this.#send(target, content), file.name);
           return true;
         }),
       );
@@ -392,15 +393,32 @@ class WhatsAppAdapter implements MessagingAdapter {
         const oldest = this.#sentAt.keys().next().value;
         if (oldest !== undefined) this.#sentAt.delete(oldest);
       }
-      const threadKey = isJidGroup(target.platformChannelId)
-        ? target.replyThreadId
-          ? whatsAppThreadKey(target)
-          : id
-        : WHATSAPP_DIRECT_THREAD;
       // A reply to this post continues its conversation, also after a restart.
-      this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey });
+      this.#handle.store.putPost(id, { chatJid: target.platformChannelId, threadKey: this.#threadKey(target, id) });
       this.#handle.chats.rememberKey(id, { fromMe: true, participant: null, text: "" });
       return id;
+    });
+  }
+
+  /** The conversation of a post: the one it answers in a group, or a new one; the direct chat otherwise. */
+  #threadKey(target: MessageTarget, postId: string): string {
+    if (!isJidGroup(target.platformChannelId)) return WHATSAPP_DIRECT_THREAD;
+    return target.replyThreadId ? whatsAppThreadKey(target) : postId;
+  }
+
+  /**
+   * Keeps an answer or a file of OpenBot as a message of its chat. WhatsApp sends no history to this
+   * device, so without it the next turn and `messaging_history` do not see a post that another chat,
+   * a teammate or a routine sent here.
+   */
+  #rememberPost(target: MessageTarget, postId: string, text: string): void {
+    this.#handle.chats.rememberMessage({
+      id: postId,
+      chatJid: target.platformChannelId,
+      threadKey: this.#threadKey(target, postId),
+      authorName: "OpenBot",
+      text,
+      sentAt: new Date().toISOString(),
     });
   }
 
