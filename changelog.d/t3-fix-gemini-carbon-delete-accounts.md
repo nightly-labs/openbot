@@ -12,3 +12,5 @@
   give Gemini 4 Carbon or the Claude and GPT models of the Google plan. Before, the account kept a
   Reconnect that opened nothing, and the models changed with no reason shown. Remove the key to use
   the account's plan again.
+- Show the Google account email on each Gemini account. Before, every account showed only its label,
+  such as "Account 1", so two accounts could not be told apart.

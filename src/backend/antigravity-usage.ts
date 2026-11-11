@@ -49,6 +49,11 @@ const TokenFile = Schema.Struct({
   token: Schema.Struct({ access_token: Schema.String, expiry: Schema.optional(Schema.String) }),
 });
 
+/** The Google account that the CLI saved with its token. Empty for a token copied from the 1.4 server. */
+const TokenFileEmail = Schema.Struct({ id_token_email: Schema.optional(Schema.String) });
+
+const decodeTokenFileEmail = Schema.decodeUnknownOption(Schema.fromJsonString(TokenFileEmail));
+
 const LoadCodeAssistAnswer = Schema.Struct({ cloudaicompanionProject: Schema.optional(Schema.String) });
 
 const QuotaBucket = Schema.Struct({
@@ -114,6 +119,17 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
     ),
     Effect.map((summary) => antigravityRateLimits(summary, options.model)),
     Effect.orElseSucceed(() => NO_USAGE),
+  );
+});
+
+/**
+ * The email of the Google account whose token file is `tokenFile`, so the account row names it. The ACP
+ * server does not say who is signed in. A missing or unreadable file, or no email in it, gives `null`.
+ */
+export const readAntigravityEmail = Effect.fn("AntigravityUsage.readEmail")(function* (tokenFile: string) {
+  return yield* Effect.tryPromise(() => readFile(tokenFile, "utf8")).pipe(
+    Effect.map((text) => Option.getOrNull(decodeTokenFileEmail(text))?.id_token_email?.trim() || null),
+    Effect.orElseSucceed(() => null),
   );
 });
 
