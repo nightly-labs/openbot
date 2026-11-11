@@ -23,6 +23,7 @@ import { Context, Effect, Exit, Fiber, Layer, ManagedRuntime, Scope } from "effe
 import { scanAcpAgents } from "../backend/acp-agent-scan";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 import { ModelServerProbe, type ProbeError } from "./model-server-probe";
+import type { ModelReleaseCatalog } from "./model-visibility";
 
 /** A server on this computer answers at once, so a slow address is not held for long. */
 const SCAN_TIMEOUT_MS = 1_500;
@@ -40,6 +41,8 @@ export interface ProviderDetectionDependencies {
   customProviders: { configs(): readonly CustomProviderConfig[] };
   customAgents: { configs(): readonly { id: string }[] };
   probe?: Context.Service.Shape<typeof ModelServerProbe>["probe"];
+  /** Gives the limits of a model that an endpoint lists with none. */
+  catalog?: ModelReleaseCatalog;
   scanAgents?: typeof scanAcpAgents;
 }
 
@@ -188,7 +191,17 @@ class ProviderDiscovery extends Context.Service<
             scope,
             { startImmediately: true },
           );
-          return { models: yield* Fiber.join(request) };
+          const models = yield* Fiber.join(request);
+          // A model that the endpoint gives a window keeps what the endpoint says. The form shows each
+          // value, so the user can correct one for a server that runs the model with a smaller window.
+          const catalog = dependencies.catalog;
+          if (!catalog) return { models };
+          const lookup = yield* catalog.lookup();
+          return {
+            models: models.map((model) =>
+              model.contextWindow === undefined ? { ...model, ...lookup.limits(model.id) } : model,
+            ),
+          };
         });
         return ProviderDiscovery.of({
           scanModelServers: scan,
