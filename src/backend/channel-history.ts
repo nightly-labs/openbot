@@ -3,9 +3,11 @@ import {
   type ChannelMessage,
   type ChannelPage,
   type ChannelTask,
+  type ConversationMessage,
   channelRoutingConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -16,6 +18,22 @@ import { channelWorkOwners } from "./channel-management";
 import type { ChannelMemoryStore } from "./channel-memory-store";
 import { CHANNEL_REPLY_ID_PREFIX, CHANNEL_REPLY_LIMIT, channelReplySender, isReplyTask } from "./channel-replies";
 import type { ChannelStore } from "./channel-store";
+
+/**
+ * The cards that a member's tool adds to its own thread for the person, such as the Marketplace app
+ * card of `suggest_marketplace_app`. The member tells the channel that the card is in the chat, so
+ * the channel copies it (#6691). A card is not a member's answer: no model reads it, and it does not
+ * count as unread. A new kind of card goes in this list, and each of these rules follows.
+ */
+export const CHANNEL_CARD_ITEM_TYPE_PREFIXES = [MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX] as const;
+
+export function isChannelCard(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    CHANNEL_CARD_ITEM_TYPE_PREFIXES.some((prefix) => message.itemType?.startsWith(prefix) === true)
+  );
+}
 
 /**
  * Runs `prompt` on the lead's model. When that model is not available, on the model of the first
@@ -165,6 +183,7 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
     (message) =>
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
+      !isChannelCard(message.message) &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&
