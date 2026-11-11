@@ -71,14 +71,23 @@
   padding: var(--openbot-space-1) 0 0;
 }
 
-.tasks-page-composer .composer-notice {
-  margin-bottom: var(--openbot-space-2);
-}
-
 .tasks-page-composer-agent {
   display: flex;
   min-width: 0;
   align-items: center;
+}
+
+/* One row: the agent, the text of the task, then the microphone and Start. */
+.tasks-page-composer .composer[data-compact] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* The agent button is 32px, so 7px keeps the 48px of the chat input. */
+  padding-block: 7px;
+  padding-inline-start: var(--openbot-space-3);
+}
+
+.tasks-page-composer .composer[data-compact] .tasks-page-composer-agent {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .tasks-page-agent.ui-button {
