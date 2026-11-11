@@ -433,6 +433,12 @@ export class ProviderRuntime implements ProviderPort {
   readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
+  /**
+   * True from launch until each provider of the launch has a client or a failure. `onProvidersReady`
+   * settles every unresolved delivery, and would record a turn of a provider that has no client yet
+   * as interrupted. Thus no connect runs it during this time; the last connect of the launch does.
+   */
+  #launchStartsPending = false;
   readonly #providerConnectionCommands = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   readonly #replacingCli = new Set<AgentProvider>();
   #removingCustomRuntime = false;
@@ -1447,13 +1453,38 @@ export class ProviderRuntime implements ProviderPort {
     const others = providers.filter((provider) => provider !== first);
     // Without another start to come, a failed first provider must show as "blocked" at once.
     const othersFollow = others.some((provider) => !this.#off.has(provider) && !this.#startStopped(provider));
-    if (first) yield* this.#connect("starting", [first], { othersFollow, refreshRuntimeInBackground: true });
-    // Chat can be ready now, so a refresh or a turn can ask for one of the others. As in
-    // `#refreshProviders`, they join this start and do not start a second process.
-    const starting = others.filter((provider) => !this.#clients.has(provider) && !this.#providerStarts.has(provider));
+    this.#launchStartsPending = true;
     const completion = Deferred.makeUnsafe<void, ProviderOperationFailed>();
-    for (const provider of starting) this.#providerStarts.set(provider, completion);
-    const exit = yield* Effect.exit(this.#connect("starting", starting, { concurrency: LAUNCH_START_CONCURRENCY }));
+    let starting: AgentProvider[] = [];
+    let startsReleased = false;
+    // A turn that joined this start must not wait for the model catalogue and the ready hook, and
+    // must not get their failure. The processes are all it needs.
+    const releaseStarts = Effect.gen({ self: this }, function* () {
+      startsReleased = true;
+      this.#launchStartsPending = false;
+      yield* Deferred.succeed(completion, undefined);
+      for (const provider of starting)
+        if (this.#providerStarts.get(provider) === completion) this.#providerStarts.delete(provider);
+    });
+    const exit = yield* Effect.exit(
+      Effect.gen({ self: this }, function* () {
+        if (first) yield* this.#connect("starting", [first], { othersFollow, refreshRuntimeInBackground: true });
+        // Chat can be ready now, so a refresh or a turn can ask for one of the others. As in
+        // `#refreshProviders`, they join this start and do not start a second process.
+        starting = others.filter((provider) => !this.#clients.has(provider) && !this.#providerStarts.has(provider));
+        for (const provider of starting) this.#providerStarts.set(provider, completion);
+        yield* this.#connect("starting", starting, {
+          concurrency: LAUNCH_START_CONCURRENCY,
+          afterStarts: releaseStarts,
+        });
+        if (startsReleased) return;
+        // No other provider had to start, so the connect above did nothing and the first one's
+        // connect did not run the ready hook.
+        this.#launchStartsPending = false;
+        if (this.#clients.size > 0) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
+      }),
+    );
+    this.#launchStartsPending = false;
     yield* Deferred.done(completion, exit);
     for (const provider of starting)
       if (this.#providerStarts.get(provider) === completion) this.#providerStarts.delete(provider);
@@ -3545,6 +3576,8 @@ export class ProviderRuntime implements ProviderPort {
       concurrency?: number;
       /** A second connect of this launch follows, so no client here is not yet "blocked". */
       othersFollow?: boolean;
+      /** Runs when each requested provider has a client or a failure, before the status and the catalogue. */
+      afterStarts?: Effect.Effect<void>;
     } = {},
   ) {
     requestedProviders = requestedProviders.filter((provider) => !this.#off.has(provider));
@@ -3749,6 +3782,7 @@ export class ProviderRuntime implements ProviderPort {
       },
       { concurrency: options.concurrency ?? "unbounded" },
     );
+    if (options.afterStarts) yield* options.afterStarts;
     if (disposed()) return;
     for (const provider of requestedProviders) this.#released.delete(provider);
     const failures = results.filter((message): message is string => message !== null);
@@ -3812,7 +3846,8 @@ export class ProviderRuntime implements ProviderPort {
       // This used to ride along with a Computer Use probe that no longer exists.
       this.#setStatus({});
       if (codexClient) yield* this.#refreshUsage(codexClient).pipe(Effect.ignore, Effect.forkIn(this.#scope));
-      if (options.notifyReady !== false) yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
+      if (options.notifyReady !== false && !this.#launchStartsPending)
+        yield* this.#hooks.onProvidersReady().pipe(toProviderOperationFailed);
     });
     if (options.refreshRuntimeInBackground) {
       yield* refreshRuntime.pipe(

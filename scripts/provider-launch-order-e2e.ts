@@ -75,6 +75,8 @@ interface Report {
   startedAtChatReady?: string[];
   /** The Codex row when chat became ready. */
   codexAtChatReady?: string | null;
+  /** The Codex row at each call of the ready hook, which settles the turns of a restart. */
+  codexAtReadyHook?: (string | null)[];
   atEnd?: { phase: string; pi: string | null; codex: string | null };
   error?: string;
 }
@@ -97,6 +99,7 @@ const started = async () => (await readFile(log, "utf8").catch(() => "")).split(
 const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
 /** Set at the first status event that says chat is ready. */
 const chatReady: Promise<{ started: string[]; codex: string | null }>[] = [];
+const codexAtReadyHook: (string | null)[] = [];
 const providers = new ProviderRuntime({
   offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "pi" && id !== "codex"),
   conversation: new ConversationRuntime(
@@ -106,7 +109,7 @@ const providers = new ProviderRuntime({
   ),
   hooks: {
     bindClient: () => undefined,
-    onProvidersReady: () => Effect.void,
+    onProvidersReady: () => Effect.sync(() => void codexAtReadyHook.push(row("codex"))),
     onProviderLost: () => undefined,
     onClientStopped: () => Effect.void,
     isStopping: () => false,
@@ -159,6 +162,12 @@ try {
   assert.equal(report.processOrder[0], "pi", "the provider that chat uses starts first");
   assert.ok(!startedAtChatReady.includes("codex"), "chat is ready before the other provider starts");
   assert.notEqual(report.codexAtChatReady, "available");
+  report.codexAtReadyHook = codexAtReadyHook;
+  assert.ok(codexAtReadyHook.length > 0, "the ready hook ran before the start ended");
+  assert.ok(
+    codexAtReadyHook.every((state) => state === "available"),
+    "the ready hook does not run while a provider of the launch has no client",
+  );
   assert.deepEqual(report.atEnd, { phase: "ready", pi: "available", codex: "available" });
   report.passed = true;
 } catch (error) {
