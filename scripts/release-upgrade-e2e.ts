@@ -43,7 +43,7 @@
 // a modified install. electron-updater installs on Windows with the same `--updated /S` arguments
 // that this test uses, and on Linux it replaces the AppImage file, as this test does; macOS
 // replaces the bundle. `bun run verify:update-artifacts` checks the feed files of the new build.
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import {
@@ -527,10 +527,10 @@ async function quit(app: RunningApp): Promise<QuitResult> {
   const pid = app.child.pid;
   check(pid, "OpenBot has no process id.");
   if (process.platform === "win32") {
-    try {
-      execFileSync("taskkill.exe", ["/pid", String(pid)], { stdio: "ignore" });
-    } catch {
-      // The app can exit before taskkill finds its windows.
+    // The app can exit before taskkill finds its windows, so a failure only goes to the log.
+    const result = spawnSync("taskkill.exe", ["/pid", String(pid)], { encoding: "utf8", windowsHide: true });
+    if (result.status !== 0) {
+      logger.warn(`taskkill exited with code ${result.status}: ${`${result.stdout}${result.stderr}`.trim()}`);
     }
   } else app.child.kill("SIGTERM");
   const limit = sleep(QUIT_LIMIT_MS).then(() => "limit" as const);
@@ -895,7 +895,9 @@ async function checkDatabase(
 async function printLogs(): Promise<void> {
   const logs = join(userDataPath, "logs");
   if (!existsSync(logs)) return;
-  for (const name of (await readdir(logs)).filter((entry) => entry.endsWith(".log"))) {
+  // Main writes `logs/main/main.log`, the updater `logs/update/update.log`, and so on.
+  const names = await readdir(logs, { recursive: true });
+  for (const name of names.filter((entry) => entry.endsWith(".log"))) {
     // The app can still hold a file open; one unreadable file must not hide the others.
     const text = await readFile(join(logs, name), "utf8").catch(
       (error: unknown) => `(not readable: ${error instanceof Error ? error.message : String(error)})`,
