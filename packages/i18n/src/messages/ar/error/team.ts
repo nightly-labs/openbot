@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",
   "error.team.providerDetectionUnsupported": "لا يمكن لهذا الاتصال العثور على خوادم النماذج والوكلاء على الخادم.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
+  "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.sidebarPinsUnsupported":

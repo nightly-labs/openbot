@@ -25,6 +25,7 @@ import {
   type RoutineFields,
   type ServerConnectionState,
   type ServerSummary,
+  STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
 import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
@@ -198,6 +199,7 @@ import {
   AgentUsagePanel,
   RoutineFlowsCanvas,
   ScheduleView,
+  ServerLibrary,
   ServerOnboarding,
   ServerSettingsModal,
   TasksView,
@@ -241,7 +243,11 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
-import { createAgentMessageDeleteAccess, readerCanDeleteMessage } from "../conversation/message-delete-access";
+import {
+  type AgentLevelsSource,
+  createAgentMessageDeleteAccess,
+  readerCanDeleteMessage,
+} from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import type { FilesPort } from "../files/files-port";
@@ -379,7 +385,7 @@ async function reportedFailure(send: () => Promise<unknown>, options: PromptAnsw
 }
 
 /** The pages of the connected host that cover the conversation. */
-type HostPageView = "usage" | "schedule" | "tasks" | "workflows";
+type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library";
 
 type WebWorkspaceProps = {
   accountId: string;
@@ -1266,6 +1272,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     githubConnector: githubPort,
   });
+  const librarySupported = () => workspace.state.capabilities.includes(STORAGE_CAPABILITY);
+  // As the Tasks page: an older host has no storage routes and no Library button.
+  createEffect(
+    () => page() === "library" && workspace.state.status === "online" && !librarySupported(),
+    (unsupported) => {
+      if (unsupported) setHostPage(null);
+    },
+  );
+  /** The Library button of the page rail, only on a host with `storage-v1`. A named function, not a ternary prop. */
+  function libraryRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!librarySupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (id) void openHostPage(id, "library", button);
+    };
+  }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
   function workflowsRailAction(): (() => void) | undefined {
     if (!workflowsSupported()) return undefined;
@@ -1433,6 +1455,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     hostAdmin: machineCalls.hostAdmin,
     storage: {
       getMachineMetrics: machineCalls.storage.getMachineMetrics,
+      getLibraryFolders: machineCalls.storage.getLibraryFolders,
+      changeLibraryFolders: machineCalls.storage.changeLibraryFolders,
       // The host names previews with the desktop `openbot-attachment:` scheme, as it does in chat.
       getUsage: async (input, serverId) => {
         if (input.scope === "channel" && !workspace.state.capabilities.includes(STORAGE_CHANNEL_CAPABILITY))
@@ -1624,6 +1648,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       accountUserId: props.accountId,
       onOwnComputer: false,
     });
+  /** The levels of a member on the connected host, for the messages and the Library folders that the member can change. */
+  const hostAgentLevels: Pick<AgentLevelsSource, "readLevels" | "onLevelsChanged"> = {
+    readLevels: (serverId) => hostAgentAccessCalls.getAgentAccess(serverId),
+    onLevelsChanged: (_serverId, listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "agent-access-changed") listener();
+      }),
+  };
   const messageDeleteSupported = () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY);
   const deletesAnyAgentMessage = createAgentMessageDeleteAccess({
     deletesAny: () => canAdministerServer(workspace.state.host?.role),
@@ -1633,11 +1665,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return null;
       return messageDeleteSupported() && workspace.state.capabilities.includes(AGENT_ACCESS_CAPABILITY) ? hostId : null;
     },
-    readLevels: (serverId) => hostAgentAccessCalls.getAgentAccess(serverId),
-    onLevelsChanged: (_serverId, listener) =>
-      workspace.onHostEvent((event) => {
-        if (event.type === "agent-access-changed") listener();
-      }),
+    ...hostAgentLevels,
   });
   /** Whether the reader may delete `message` in the open agent's chat or side threads. */
   const canDeleteAgentMessage = (message: AgentMessage) =>
@@ -2718,6 +2746,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 if (id) void openHostPage(id, "schedule", button);
               }}
               onWorkflows={workflowsRailAction()}
+              onLibrary={libraryRailAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
@@ -2787,7 +2816,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               windowPage={page()}
               page={
                 <Show
-                  when={page() === "usage" || page() === "schedule" || page() === "workflows" ? server() : undefined}
+                  when={
+                    page() === "usage" || page() === "schedule" || page() === "workflows" || page() === "library"
+                      ? server()
+                      : undefined
+                  }
                   fallback={
                     <Show
                       when={settingsKind()}
@@ -2911,6 +2944,25 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               self={account().name ?? undefined}
                             />
                           </Loading>
+                        </Show>
+                      </Match>
+                      <Match when={page() === "library"}>
+                        {/* Keyed: the page reads the files and folders of one server, as on desktop. */}
+                        <Show when={target().id} keyed>
+                          {(serverId) => (
+                            <Loading>
+                              <ServerLibrary
+                                serverId={serverId}
+                                server={server()}
+                                calls={() => storageCalls}
+                                levels={hostAgentLevels}
+                                onShowInChat={(agentId, messageId) => void openMessage(agentId, messageId)}
+                                onOpenUrl={(url) => void openWebLink(url)}
+                                mediaSource={runtime.attachmentMedia}
+                                opensFiles={false}
+                              />
+                            </Loading>
+                          )}
                         </Show>
                       </Match>
                       <Match when={page() === "schedule"}>

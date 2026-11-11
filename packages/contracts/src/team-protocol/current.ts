@@ -93,6 +93,7 @@ import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
+import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
@@ -304,6 +305,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
@@ -573,6 +575,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
 ] as const;
 
@@ -781,6 +784,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHANNEL_BROWSER_CAPABILITY &&
     capability !== STORAGE_CHANNEL_CAPABILITY &&
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
+    capability !== LIBRARY_FOLDERS_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
 );
 /**
@@ -864,6 +868,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_BROWSER_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1031,6 +1036,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHANNEL_BROWSER_CAPABILITY &&
       capability !== STORAGE_CHANNEL_CAPABILITY &&
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
+      capability !== LIBRARY_FOLDERS_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
   );
 }

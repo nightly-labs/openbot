@@ -175,6 +175,7 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -334,6 +335,7 @@ import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
+import { routeLibraryFolders } from "./team-api/route-library-folders";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./team-api/route-live-voice";
 import { routeLocalServers } from "./team-api/route-local-servers";
@@ -1140,7 +1142,17 @@ export class TeamApiServer {
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeProviderSignOut(context, this.#options.providerSignOut)) === "handled") return;
-      if ((await routeStorage(context, this.#options.storage, this.#options.channels, hidden)) === "handled") return;
+      if (
+        (await routeStorage(
+          context,
+          this.#options.storage,
+          this.#options.channels,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+          this.#options.libraryFolders,
+        )) === "handled"
+      )
+        return;
       if ((await routeMachineResources(context, this.#options.machine)) === "handled") return;
       if ((await routeBackgroundProcesses(context, this.#options.backgroundProcesses, hidden)) === "handled") return;
       if ((await routeHostedSites(context, this.#options.hostedSites)) === "handled") return;
@@ -1177,6 +1189,15 @@ export class TeamApiServer {
       )
         return;
       if ((await routeSidebarFolders(context, this.#options.sidebarLayout, this.#options.agents, hidden)) === "handled")
+        return;
+      if (
+        (await routeLibraryFolders(
+          context,
+          this.#options.libraryFolders,
+          hidden,
+          () => new Set(this.#options.agents.listAgents().map((agent) => agent.id)),
+        )) === "handled"
+      )
         return;
       if (
         (await routeAgentNotificationLevels(
@@ -1380,6 +1401,7 @@ export class TeamApiServer {
       agents: this.#options.agents,
       skills: this.#options.skills,
       sidebarLayout: this.#options.sidebarLayout,
+      libraryFolders: this.#options.libraryFolders,
       duplicateAgent: (agentId, operationId) => this.#duplicateAgent(agentId, operationId),
       ...(this.#options.admin?.modelVisibility ? { visibleModels: this.#options.admin.modelVisibility } : {}),
     });
@@ -2472,6 +2494,7 @@ export class TeamApiServer {
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === LIBRARY_FOLDERS_CAPABILITY) return this.#options.libraryFolders !== undefined;
           if (capability === STORAGE_CHANNEL_CAPABILITY)
             return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;

@@ -256,6 +256,7 @@
     "./team-protocol/live-voice-v1": "./src/team-protocol/live-voice-v1.ts",
     "./team-protocol/reasoning-efforts-v1": "./src/team-protocol/reasoning-efforts-v1.ts",
     "./team-protocol/sidebar-folders-v1": "./src/team-protocol/sidebar-folders-v1.ts",
+    "./team-protocol/library-folders-v1": "./src/team-protocol/library-folders-v1.ts",
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",
     "./team-protocol/skills-events-v1": "./src/team-protocol/skills-events-v1.ts",
     "./team-protocol/optional-routes": "./src/team-protocol/optional-routes.ts",
