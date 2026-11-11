@@ -2835,16 +2835,21 @@ export class OpenBotToolRouter {
       const args = isRecord(params.arguments) ? params.arguments : {};
       const quote = typeof args.quote === "string" ? args.quote.trim() : "";
       const pinned = args.pinned !== false;
-      const threadId = params.threadId;
+      const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+      const turnMessages = this.#mailbox
+        .findDeliveriesByTurn(senderAgentId, params.turnId)
+        .filter((candidate) => candidate.delivery.sender.kind === "user")
+        .map((candidate) => candidate.delivery.id);
       const target = quote
-        ? this.#messagePins.findByQuote(senderAgentId, threadId, quote)?.id
-        : this.#mailbox
-            .findDeliveriesByTurn(senderAgentId, params.turnId)
-            .findLast((candidate) => candidate.delivery.sender.kind === "user")?.delivery.id;
+        ? this.#messagePins.findByQuote(senderAgentId, threadId, quote, {
+            exclude: new Set(turnMessages),
+            pinned,
+          })?.id
+        : turnMessages.at(-1);
       if (!target)
         return openBotToolFailure(
           quote
-            ? "No finished message of this chat contains that quote. Copy a short exact part of the message text and call this again."
+            ? `No ${pinned ? "finished" : "pinned"} message of this chat contains that quote. Copy a short exact part of the message text and call this again.`
             : "This turn has no user message. Pass quote with a short exact part of the message to pin.",
         );
       const result = yield* this.#messagePins

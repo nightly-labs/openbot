@@ -93,14 +93,27 @@ export class MessagePins {
 
   /**
    * The newest shown message of the agent's chat or side thread whose text contains `quote`, or null.
-   * The `pin_message` tool names a message with it, as the agent does not see message ids.
+   * The `pin_message` tool names a message with it, as the agent does not see message ids. It skips
+   * `exclude`: the user's request that quotes the message also contains the quote. For an unpin it
+   * takes the newest pinned match, so an unpinned newer copy of the text does not hide the pin.
    */
-  findByQuote(agentId: string, threadId: string, quote: string): ConversationMessage | null {
+  findByQuote(
+    agentId: string,
+    threadId: string,
+    quote: string,
+    options: { exclude: ReadonlySet<string>; pinned: boolean },
+  ): ConversationMessage | null {
     if (!this.#pinnableThread(agentId, threadId)) return null;
+    const database = this.#store.database;
     return (
-      this.#store.database
+      database
         .threadMessagesContaining(threadId, quote, QUOTE_MATCH_LIMIT)
-        .find((message) => canPin(message)) ?? null
+        .find(
+          (message) =>
+            canPin(message) &&
+            !options.exclude.has(message.id) &&
+            (options.pinned || database.threadMessagePinner(threadId, message.id) !== null),
+        ) ?? null
     );
   }
 
