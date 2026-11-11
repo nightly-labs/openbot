@@ -1,5 +1,7 @@
 const MAGIC = new Uint8Array([0x4f, 0x42, 0x44, 0x31]);
-const MAX_SIGNAL_BYTES = 1024 * 1024;
+/** The most bytes one binary message carries through the WebRTC tunnel. */
+export const REMOTE_DESKTOP_MAX_SIGNAL_BYTES = 1024 * 1024;
+const MAX_SIGNAL_BYTES = REMOTE_DESKTOP_MAX_SIGNAL_BYTES;
 
 export type RemoteDesktopSignalControl =
   | { type: "open"; streamId: string; path: string }

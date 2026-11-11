@@ -3,12 +3,14 @@ import {
   BROWSER_VIEW_CONTEXT_MENU_QUERY,
   BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_FRAME_SIZE_QUERY,
   BROWSER_VIEW_VIEWPORT_QUERY,
   type BrowserViewCopied,
   type BrowserViewFrame,
   type BrowserViewHostMessage,
   type BrowserViewInput,
   type BrowserViewViewport,
+  browserViewFrameSizeQuery,
   browserViewInputForHost,
   browserViewViewportQuery,
   decodeBrowserViewFrame,
@@ -56,6 +58,8 @@ export interface RemoteBrowserViewFeatures {
   contextMenu: boolean;
   /** `browser-view-viewport`: the page size the client asks the host to hold while the view is open. */
   viewport: BrowserViewViewport | null;
+  /** `browser-view-frame-size`: the screen pixels the client draws a frame at. */
+  frameSize?: BrowserViewViewport | null;
 }
 const NO_FEATURES: RemoteBrowserViewFeatures = { cursor: false, contextMenu: false, viewport: null };
 /** One browser tab view per client. All paths still pass the host's stream allowlist. */
@@ -141,6 +145,8 @@ export function createRemoteBrowserView(
     if (asked.cursor && message) path.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
     if (asked.contextMenu && message) path.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
     if (asked.viewport) path.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, browserViewViewportQuery(asked.viewport));
+    if (asked.frameSize)
+      path.searchParams.set(BROWSER_VIEW_FRAME_SIZE_QUERY, browserViewFrameSizeQuery(asked.frameSize));
     yield* sendFrame(
       encodeRemoteDesktopSignalControl({
         type: "open",

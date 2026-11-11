@@ -99,14 +99,14 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       bitmap.close();
       return;
     }
-    if (element.width !== next.width || element.height !== next.height) {
-      element.width = next.width;
-      element.height = next.height;
+    // The canvas keeps every pixel of the picture, and the panel scales it once. A canvas the size of
+    // the page's CSS viewport would scale the picture twice, and the text would blur. Points are a
+    // fraction of the frame's CSS size, which has the same shape.
+    if (element.width !== bitmap.width || element.height !== bitmap.height) {
+      element.width = bitmap.width;
+      element.height = bitmap.height;
     }
-    // The picture is at most 1280 by 800, and the frame's size is the page's CSS viewport. Drawn at
-    // its own size, a larger page fills only the top left of the canvas, and every point misses by
-    // the ratio between the two, more towards the bottom right.
-    context.drawImage(bitmap, 0, 0, next.width, next.height);
+    context.drawImage(bitmap, 0, 0);
     bitmap.close();
     setFrame({ sequence: next.sequence, width: next.width, height: next.height });
   };

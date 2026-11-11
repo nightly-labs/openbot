@@ -23,6 +23,7 @@ import {
   type BrowserViewSessionResponse,
   type BrowserViewViewport,
   browserViewClientAcksFrames,
+  browserViewClientFrameSize,
   browserViewClientViewport,
   browserViewClientWantsContextMenu,
   browserViewClientWantsCursor,
@@ -33,6 +34,7 @@ import {
   encodeBrowserViewFrame,
   encodeBrowserViewHostMessage,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
 import type * as Ws from "ws";
 import type { BrowserHost } from "../backend/browser-host";
 import { rawDataSize, rawDataText } from "./ws-raw-data";
@@ -138,6 +140,8 @@ interface ManagedViewSession {
   reportContextMenu: boolean;
   /** The page size the client asked the page to keep while it watches. */
   viewport: BrowserViewViewport | null;
+  /** The screen pixels the client draws a frame at. */
+  frameSize: BrowserViewViewport | null;
 }
 
 export class BrowserViewGateway {
@@ -176,6 +180,7 @@ export class BrowserViewGateway {
       reportCursor: false,
       reportContextMenu: false,
       viewport: null,
+      frameSize: null,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -259,6 +264,7 @@ export class BrowserViewGateway {
     session.reportCursor = browserViewClientWantsCursor(url);
     session.reportContextMenu = browserViewClientWantsContextMenu(url);
     session.viewport = browserViewClientViewport(url);
+    session.frameSize = browserViewClientFrameSize(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => this.#dispatch(this.#connect(session, client)));
   }
 
@@ -315,7 +321,11 @@ export class BrowserViewGateway {
           // fraction of. Recording its shape here would expand the client's next point with a size
           // only this side knows about, and the click would land somewhere the user never pointed.
           if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
-          client.send(encodeBrowserViewFrame(frame), { binary: true });
+          // A tunneled socket carries one message of at most this size, and a larger one ends the relay.
+          if (frame.image.byteLength > REMOTE_DESKTOP_MAX_SIGNAL_BYTES) return;
+          const data = encodeBrowserViewFrame(frame);
+          if (data.byteLength > REMOTE_DESKTOP_MAX_SIGNAL_BYTES) return;
+          client.send(data, { binary: true });
           session.frameWidth = frame.width;
           session.frameHeight = frame.height;
           if (session.rememberFrames) {
@@ -335,6 +345,7 @@ export class BrowserViewGateway {
             ? { onCursor: (cursor) => this.#send(session, client, { type: "cursor", cursor }) }
             : {}),
           ...(session.viewport ? { viewport: session.viewport } : {}),
+          ...(session.frameSize ? { frameSize: session.frameSize } : {}),
         },
       );
       if (session.socket === client) session.stopView = stopView;

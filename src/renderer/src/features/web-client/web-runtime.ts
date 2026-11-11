@@ -112,6 +112,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   CHANNEL_PICTURE_CAPABILITY,
@@ -998,6 +999,16 @@ export function createWebWorkspaceRuntime(
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
     () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+    // The window's screen pixels, which no panel in it is larger than. An older host sends at most
+    // 1280 by 800 and does not read the size.
+    () => ({
+      cursor: false,
+      contextMenu: false,
+      viewport: null,
+      frameSize: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)
+        ? { width: window.innerWidth * window.devicePixelRatio, height: window.innerHeight * window.devicePixelRatio }
+        : null,
+    }),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;

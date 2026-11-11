@@ -8,7 +8,10 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_FRAME_SIZE_QUERY,
   type BrowserViewInput,
+  type BrowserViewViewport,
+  browserViewFrameSizeQuery,
   browserViewInputForHost,
   decodeBrowserViewCopied,
   decodeBrowserViewFrame,
@@ -16,6 +19,7 @@ import {
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Fiber } from "effect";
@@ -29,6 +33,8 @@ export interface BrowserViewClientOptions {
   >;
   /** `owner` is the id that `start` got, so the event goes to the window that started the view. */
   onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
+  /** The screen pixels of the owner's window, which no panel in it is larger than. */
+  frameSize?: (owner: number) => BrowserViewViewport | null;
 }
 
 interface ActiveView {
@@ -65,6 +71,11 @@ export class BrowserViewClient {
       // An older client never does, and the host must not retain every frame for the whole session.
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
+      }
+      // An older host sends at most 1280 by 800 and does not read the size.
+      const frameSize = this.#options.frameSize?.(owner);
+      if (frameSize && this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_FRAME_SIZE_QUERY, browserViewFrameSizeQuery(frameSize));
       }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
