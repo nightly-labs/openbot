@@ -551,9 +551,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A session with a process of its own closes when that process ends.
     // A watched session stays open: a closed one would not report the end of its background task.
     canRelease: (thread) =>
-      this.#loadsSessions &&
-      (thread.transport !== null || Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close)) &&
-      thread.backgroundUntil === 0,
+      this.#loadsSessions && (thread.transport !== null || this.#closesSessions) && thread.backgroundUntil === 0,
     snapshot: ({ cwd, developerInstructions, dynamicTools, workspaceRoots, computerUse, agentId }) => ({
       cwd,
       developerInstructions,
@@ -1516,6 +1514,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.loadSession === true;
   }
 
+  /** Whether the agent answers `session/close`, which it advertises in its initialization. */
+  get #closesSessions(): boolean {
+    return Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close);
+  }
+
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
@@ -1595,6 +1598,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#startingThreads.set(requestedThreadId, completion);
     // A session's own process ends with its harness, which can still run the stopped turn.
     if (recovering && held.transport) yield* held.transport.stop(Effect.void).pipe(Effect.ignore);
+    // A shared process that still holds the session can refuse to load it again: GitHub Copilot CLI
+    // 1.0.108 answers "Session <id> is already loaded" to each load (#6962). `session/close` also
+    // cancels the stopped turn, and the load then opens the session as after an idle release. A resume
+    // keeps the held session until it succeeds, and a watched session stays open, as `canRelease` says.
+    // As at each close, its subagents end here: the agent sends no end for them after it (#6448).
+    else if (recovering && this.#closesSessions && !this.#supportsSessionResume && held.backgroundUntil === 0) {
+      this.#stopThreadSubagents(requestedThreadId);
+      yield* providerCall(() => this.#requireConnection().closeSession({ sessionId: requestedThreadId })).pipe(
+        this.#backgroundTimeout("session/close"),
+        Effect.ignore,
+      );
+    }
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
     // Keep its bridge until the replacement succeeds, so a failure can be retried in this session.
@@ -3449,18 +3464,38 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: DynamicRecord,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
     const sessionId = getString(params, "sessionId") ?? [...this.#threads.ids()][0];
-    if (sessionId && this.#historyReplays.has(sessionId)) return {};
+    // The agent's own question method has questions without ids, and needs its own reply shape.
+    const own = this.#flavor.userQuestions;
+    const isOwn = own?.method === method.replace(/^_/u, "");
+    if (sessionId && this.#historyReplays.has(sessionId)) return own && isOwn ? own.reply([], {}) : {};
     const thread = sessionId ? this.#threads.get(sessionId) : undefined;
+    const asked = isOwn
+      ? getArray(params, "questions")
+          .filter(isRecord)
+          .map((question, index) => ({
+            ...question,
+            id: `question-${index}`,
+            question: getString(question, "question") ?? "",
+          }))
+      : null;
     const result = yield* this.#waitForUser(
       thread?.activeTurn,
       this.#serverRequests.call("item/tool/requestUserInput", {
         ...params,
+        ...(asked ? { questions: asked } : {}),
         threadId: sessionId,
         turnId: thread?.activeTurn?.id ?? randomUUID(),
         sourceMethod: method,
       }),
     ).pipe(toProviderClientOperationError);
-    return yield* providerSync(() => (isRecord(result) ? result : {}));
+    return yield* providerSync(() => {
+      if (!(own && asked)) return isRecord(result) ? result : {};
+      const answers = getRecord(result, "answers") ?? {};
+      return own.reply(
+        asked,
+        Object.fromEntries(asked.map(({ id }) => [id, getArray(answers[id], "answers").filter(isString)])),
+      );
+    });
   });
 
   readonly #createElicitation = Effect.fn("AcpAgentClient.createElicitation")(function* (

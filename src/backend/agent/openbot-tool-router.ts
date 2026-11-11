@@ -911,7 +911,7 @@ export class OpenBotToolRouter {
     const blockId = parsed.data.blockId ?? randomUUID();
     if (!spec || !isUiBlockId(blockId)) {
       refuse(
-        "The block breaks a rule: ids and option labels must be unique, an id must not be botId or a similar name, a value must be one of its options, a single choice selects at most one option, and a secret field is a text field with no value. Correct the block and retry.",
+        "The block breaks a rule: ids and option labels must be unique, an id must not be botId or a similar name, and a value must be one of its options. Correct the block and retry.",
       );
       return;
     }

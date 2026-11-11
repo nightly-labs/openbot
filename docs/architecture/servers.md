@@ -412,6 +412,10 @@ in words on a block that has one, is for the owner and admins only; the host ans
 resolution leave it out. The provider transcript of the tool call can keep it, and the agent can
 repeat it in a reply or a thought, which the conversation stores as any other message.
 
+The `ask_ui` tool gives agents only the `confirm` block, to approve an action or a draft; a question
+with options goes to `ask_user`. The contract and every client keep `choice` and `form`: OpenBot
+builds forms itself, such as the API key and Vault cards, and older messages hold both.
+
 `agent-task-ui-blocks-v1` (`team-protocol/agent-task-ui-blocks-v1.ts`) adds the same `uiBlock`, with
 the same normalization and wire budget, to the task conversations of `agent-tasks-v1`: the response
 of `POST /v1/agent-tasks/read` and the `snapshot` of the `agent-task-conversation` event. A client

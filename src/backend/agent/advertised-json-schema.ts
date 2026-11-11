@@ -137,16 +137,6 @@ function uniqueBranches(branches: readonly JsonValue[]): JsonValue[] {
   });
 }
 
-/** The JSON key that `ADVERTISE_AS_UNION` writes and `compact` removes. */
-const KEEP_UNION_KEY = "x-openbot-keep-union";
-
-/**
- * Zod metadata for a union of objects: advertise it as a union, not as one merged object. Use it when
- * the branches are strict and have different properties: a merged object shows the model properties
- * that its branch rejects. Such as `z.discriminatedUnion(…).meta(ADVERTISE_AS_UNION)`.
- */
-export const ADVERTISE_AS_UNION = { [KEEP_UNION_KEY]: true };
-
 /** The JSON of a schema without the parts that tell the model nothing. Values that are not JSON are left out. */
 function compact(schema: unknown): JsonValue | undefined {
   if (schema === null || typeof schema === "boolean" || typeof schema === "number" || typeof schema === "string")
@@ -171,14 +161,6 @@ function compact(schema: unknown): JsonValue | undefined {
       result = { ...only, ...rest };
     }
   }
-  const { [KEEP_UNION_KEY]: keep, ...unmarked } = result;
-  if (keep === true) {
-    // As `anyOf`: Kimi Code CLI types a schema with no `type` as `string`, but keeps an `anyOf`. The tags
-    // differ, so one branch at most matches, as with `oneOf`.
-    const { oneOf, ...rest } = unmarked;
-    return Array.isArray(oneOf) && rest.anyOf === undefined ? { ...rest, anyOf: oneOf } : unmarked;
-  }
-  result = unmarked;
   for (const union of ["oneOf", "anyOf"] as const) {
     const branches = result[union];
     if (!Array.isArray(branches)) continue;
@@ -196,7 +178,7 @@ function compact(schema: unknown): JsonValue | undefined {
 /**
  * The input schema that OpenBot advertises for a tool. It leaves out JSON that each request pays for
  * and that tells the model nothing: `$schema`, validation-only keywords and nested or repeated `anyOf`. A union of
- * objects that a tag tells apart becomes one object, except a union with `ADVERTISE_AS_UNION`. Calls are still
+ * objects that a tag tells apart becomes one object. Calls are still
  * decoded with the Zod schema, so the rules of each branch still apply. `null` branches stay: a `null` value can mean "clear".
  */
 export function advertisedJsonSchema(schema: z.ZodType): JsonObject {

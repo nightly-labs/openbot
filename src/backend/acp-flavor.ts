@@ -219,6 +219,18 @@ export interface AcpFlavor {
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
   promptUsage?(response: PromptResponse): DynamicRecord | null;
+  /**
+   * The agent asks the user its questions with this extension method (the name without the `_` of
+   * the wire) and reads a reply of its own shape. `answers` has the answers of each question by its
+   * id; a question with no answer has none.
+   */
+  userQuestions?: {
+    method: string;
+    reply(
+      questions: readonly { id: string; question: string }[],
+      answers: Readonly<Record<string, readonly string[]>>,
+    ): DynamicRecord;
+  };
 }
 
 /** The protocol's own behavior, with no change for one agent. */
@@ -250,6 +262,22 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
+  // fails the tool on a reply without it. `accepted` has the answers by question text, each a text
+  // or a list of texts, and `annotations`. `cancelled` tells the model that the user did not answer.
+  userQuestions: {
+    method: "x.ai/ask_user_question",
+    reply: (questions, answers) => {
+      const given = questions.flatMap((question): [string, string | readonly string[]][] => {
+        const [first, ...more] = answers[question.id] ?? [];
+        if (first === undefined) return [];
+        return [[question.question, more.length > 0 ? [first, ...more] : first]];
+      });
+      return given.length > 0
+        ? { outcome: "accepted", answers: Object.fromEntries(given), annotations: {} }
+        : { outcome: "cancelled" };
+    },
+  },
 };
 
 /**
