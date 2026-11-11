@@ -248,6 +248,13 @@ export const DEFERRED_MCP_NOTE =
 export const CODEX_DEFERRED_MCP_NOTE =
   "The tools of your MCP servers are not in this catalog. Find them with the separate tool named exactly tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.";
 
+/**
+ * OpenCode 2.2.7 puts the tools of the user's MCP servers only in `execute`, and lists only some
+ * tools of a large server there (#7097).
+ */
+export const OPENCODE_DEFERRED_MCP_NOTE =
+  "The tools of your MCP servers are not in this catalog. They are in execute: when one is not listed there, find it with search(...) inside execute and call the path that it returns.";
+
 function words(text: string): string[] {
   return text
     .toLowerCase()

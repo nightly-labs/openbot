@@ -43,6 +43,7 @@ import {
   type McpToolRuntimes,
   mcpFingerprintValues,
   NO_MCP_TOOL_RUNTIMES,
+  openCodeMcpServers,
   toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
@@ -1415,7 +1416,11 @@ export class ThreadLifecycle {
       workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
       deferredMcpServers:
-        client.provider === "codex" ? codexDeferredMcpServers(mcpServers).map((config) => config.name) : [],
+        client.provider === "codex"
+          ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
+          : client.provider === "opencode"
+            ? openCodeMcpServers(mcpServers).map((config) => config.name)
+            : [],
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };
