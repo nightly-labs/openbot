@@ -168,8 +168,10 @@ export function SettingsRow({
       <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
         <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
         {trailingContent ? (
+          // The value limit is a part of this row, which has a fixed width. A percent limit inside the
+          // value would refer to this wrapper, which takes the width of its contents.
           <View
-            className={stacked ? "max-w-full self-start overflow-hidden" : measures ? "min-w-0 shrink" : undefined}
+            className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 max-w-[60%] shrink"}
             onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
           >
             {trailingContent}
