@@ -8,10 +8,10 @@ afterEach(() => {
   for (const database of databases.splice(0)) database.close();
 });
 
-const MIGRATION = "0053_billing_currency_brl.sql";
+const MIGRATION = "0054_billing_currency_brl.sql";
 
 function beforeMigration(): DatabaseSync {
-  const database = migratedDatabase("0052_hosted_server_operator_host.sql");
+  const database = migratedDatabase("0053_operator_host_pool.sql");
   databases.push(database);
   database.exec(`
     INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
@@ -22,17 +22,17 @@ function beforeMigration(): DatabaseSync {
       provider_event_at, last_wake_reason, claim_token_hash, claim_expires_at, claim_redeemed_at, auth_session_id,
       last_active_at, lease_until, next_run_at, idempotency_key, created_at, updated_at, deleted_at,
       deletion_scheduled_at, deletion_subscription_id, lifecycle_token, lifecycle_lease_until, legacy_member_limits,
-      start_requested_at, operator_host, retired_sandbox_id
+      start_requested_at, operator_host, retired_sandbox_id, plan_ended_at
     ) VALUES
       ('running', 'owner', 'Studio', 'sbx_1', 'tpl_1', 'small', 'default', 'starter', 'month', 'eur', 'cs_1',
        'running', 'running', NULL, 5, 'message', 'claim_1', 9, 8, 'auth_1', 5, 10, 11, 'key-1', 1, 5, NULL,
-       NULL, NULL, 'life_1', 12, 1, 4, NULL, NULL),
+       NULL, NULL, 'life_1', 12, 1, 4, NULL, NULL, NULL),
       ('moved', 'owner', 'Lab', NULL, 'tpl_1', 'default', NULL, 'standard', 'year', 'pln', NULL, 'idle', 'stopped',
        NULL, 3, 'schedule', NULL, NULL, NULL, NULL, 3, NULL, NULL, 'key-2', 2, 3, NULL, NULL, NULL, NULL, NULL, 0,
-       NULL, 'leaseweb:1', 'sbx_2'),
+       NULL, 'leaseweb:1', 'sbx_2', 7),
       ('ended', 'owner', 'Old', 'sbx_3', NULL, 'large', NULL, 'pro', 'month', 'usd', NULL, 'deleted', 'deleted',
        'plan_ended', 4, 'create', NULL, NULL, NULL, NULL, 4, NULL, NULL, 'key-3', 3, 4, 6, 5, 'sub_3', NULL, NULL,
-       0, NULL, NULL, NULL);
+       0, NULL, NULL, NULL, NULL);
     INSERT INTO billing_sales_checkouts(
       session_id, return_token_hash, user_id, server_id, plan, interval, currency, amount, return_url, created_at,
       expires_at, completed_at, expired_at, returned_at, subscription_id, updated_at

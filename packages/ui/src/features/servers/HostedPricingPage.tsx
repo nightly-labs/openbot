@@ -70,6 +70,8 @@ export interface HostedPricingPageProps {
   /** True while the order goes to the payment page. */
   busy: boolean;
   error: UserErrorDetails | null;
+  /** The title of the error. Without it, the title says that the server could not be created. */
+  errorTitle?: string | undefined;
   onSubmit: (order: PricingOrder) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
@@ -194,7 +196,7 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
                   <OctagonX />
                 </AlertIcon>
                 <AlertContent>
-                  <AlertTitle>{t("settings.hostedServers.createFailed")}</AlertTitle>
+                  <AlertTitle>{props.errorTitle ?? t("settings.hostedServers.createFailed")}</AlertTitle>
                   <AlertDescription>{failure().message}</AlertDescription>
                   <ErrorReference reference={failure().reference} />
                 </AlertContent>

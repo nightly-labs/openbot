@@ -109,7 +109,8 @@ export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {
 
 /**
  * The monthly list price of each plan, in minor units (cents, grosze, centavos). Each amount divides by 5, so
- * a year (12 months less 20%) is a whole number. BRL is the EUR price times 6.
+ * a year (12 months less 20%) is a whole number. BRL is the EUR price times 6. (The BRL Starter license is 30% lower;
+ * see license.ts.)
  */
 const BILLING_PLAN_MONTHLY_PRICES: Readonly<Record<BillingPlanId, Readonly<Record<BillingCurrency, number>>>> = {
   starter: { eur: 2000, usd: 2500, pln: 8000, brl: 12000 },

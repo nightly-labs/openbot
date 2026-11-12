@@ -203,10 +203,15 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [chosenCurrency, setCurrency] = createSignal<HostedCurrency | undefined>(
     untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))),
   );
-  /** The chosen currency when the plans have it, else a guess from the time zone. */
+  /**
+   * The chosen currency when the plans have it, else a guess from the time zone. A locked currency is the
+   * currency of the Stripe customer, so it stays: a guess only gets a refusal.
+   */
   const currency = (): HostedCurrency => {
     const chosen = chosenCurrency();
-    return chosen && currencies().includes(chosen) ? chosen : guessHostedCurrency(currencies());
+    return chosen && (props.currencyLocked || currencies().includes(chosen))
+      ? chosen
+      : guessHostedCurrency(currencies());
   };
   const [pendingPlan, setPendingPlan] = createSignal<HostedServerPlanId | null>(null);
   const [createError, setCreateError] = createSignal<UserErrorDetails | null>(null);
@@ -420,7 +425,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         <HostedUseSwitch work={work()} onChange={setWork} disabled={creating()} />
                       </Show>
                       <HostedCurrencySelect
-                        options={currencies()}
+                        options={currencies().includes(currency()) ? currencies() : [...currencies(), currency()]}
                         currency={currency()}
                         onChange={(next) => {
                           setCurrency(next);

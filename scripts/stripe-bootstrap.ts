@@ -1,6 +1,7 @@
 import {
   BILLING_BASE_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingInterval,
@@ -145,6 +146,19 @@ async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<
   logger.info(`Created product ${id}.`);
 }
 
+/**
+ * The optional currencies of a new or kept Price: the ones that the run adds, and the ones that the current
+ * Price has. A replaced Price then keeps its BRL option, and BRL orders do not stop.
+ */
+function optionalCurrenciesOf(
+  current: Price | undefined,
+  optional: readonly BillingOptionalCurrency[],
+): BillingOptionalCurrency[] {
+  return BILLING_OPTIONAL_CURRENCIES.filter(
+    (currency) => optional.includes(currency) || current?.currency_options?.[currency] !== undefined,
+  );
+}
+
 function priceMatches(
   price: Price,
   plan: BillingPlanId,
@@ -177,7 +191,8 @@ async function ensurePrice(
   const lookupKey = billingLookupKey(plan, interval);
   const amounts = billingListPrices(plan, interval);
   const current = existing.find((price) => price.lookup_key === lookupKey);
-  if (current && priceMatches(current, plan, interval, amounts, optional)) {
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (current && priceMatches(current, plan, interval, amounts, currencies)) {
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -193,7 +208,7 @@ async function ensurePrice(
     "metadata[openbot_plan]": plan,
     "metadata[openbot_interval]": interval,
   });
-  for (const currency of optional) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
   const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
   return created.id;
@@ -230,8 +245,8 @@ async function ensureLicenseProduct(stripe: StripeAdmin): Promise<void> {
  * extra user. A 1-user Price is a flat amount for each user. A bundle Price is for an account that pays
  * for a hosted server. EUR is the base currency, and USD, PLN and each currency of `optional` are
  * currency options with their own amounts. Only an active Price with the same amounts is kept, so
- * an archived Price stays archived and a new Price takes its lookup key. Without `optional`, a Price
- * that also has the BRL amounts is kept.
+ * an archived Price stays archived and a new Price takes its lookup key. A BRL option that the current
+ * Price has stays, also on a new Price.
  */
 async function ensureLicensePrice(
   stripe: StripeAdmin,
@@ -242,22 +257,18 @@ async function ensureLicensePrice(
   const lookupKey = licenseLookupKey(plan);
   const pricesIn = (currencies: readonly BillingCurrency[]) =>
     Object.fromEntries(currencies.map((currency) => [currency, licensePlanPrice(plan, currency)] as const));
-  const prices = pricesIn([...BILLING_BASE_CURRENCIES, ...optional]);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const prices = pricesIn([...BILLING_BASE_CURRENCIES, ...optionalCurrenciesOf(current, optional)]);
   const bundle = String(plan.bundle);
   const included = licenseIncludedUsers(plan.tier);
   const signature = licensePriceSignature(prices, included);
-  const kept =
-    optional.length > 0
-      ? [signature]
-      : [signature, licensePriceSignature(pricesIn([...BILLING_BASE_CURRENCIES, "brl"]), included)];
-  const current = existing.find((price) => price.lookup_key === lookupKey);
   if (
     current &&
     current.active !== false &&
     current.product === LICENSE_PRODUCT_ID &&
     current.currency === "eur" &&
     current.recurring?.interval === plan.interval &&
-    kept.includes(current.metadata?.openbot_license_prices ?? "") &&
+    current.metadata?.openbot_license_prices === signature &&
     current.metadata?.[LICENSE_METADATA.tier] === plan.tier &&
     current.metadata?.[LICENSE_METADATA.interval] === plan.interval &&
     current.metadata?.[LICENSE_METADATA.bundle] === bundle

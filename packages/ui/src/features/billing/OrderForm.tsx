@@ -382,10 +382,13 @@ export function OrderForm(props: OrderFormProps) {
   const plans = () => props.plans;
   /** BRL is in the catalog only when each Stripe Price has it. A form without plans sells in the base currencies. */
   const currencies = createMemo(() => catalogCurrencies(plans()));
+  // A locked currency is the currency of the Stripe customer: a change to EUR only gets a refusal.
   const currency = (): BillingCurrency => {
     const chosen = chosenCurrency();
-    return currencies().includes(chosen) ? chosen : "eur";
+    return props.currencyLocked || currencies().includes(chosen) ? chosen : "eur";
   };
+  const shownCurrencies = (): BillingCurrency[] =>
+    currencies().includes(currency()) ? [...currencies()] : [...currencies(), currency()];
   const minTeam = () => clamp(props.used ?? 0, LICENSE_INCLUDED_USERS, LICENSE_MAX_USERS);
   const starterFits = () => (props.used ?? 0) <= 1;
   const [serverId, setServerId] = createSignal<ServerChoice>(untrack(() => props.initialServer) ?? "none");
@@ -517,7 +520,7 @@ export function OrderForm(props: OrderFormProps) {
         fallback={
           <Segment
             label={t("billing.order.currency")}
-            options={currencies().map((option) => ({ id: option, label: option.toUpperCase() }))}
+            options={shownCurrencies().map((option) => ({ id: option, label: option.toUpperCase() }))}
             value={currency()}
             disabled={props.currencyLocked}
             onChange={setCurrency}
@@ -526,7 +529,7 @@ export function OrderForm(props: OrderFormProps) {
       >
         <CurrencySelect
           label={t("billing.order.currency")}
-          options={currencies()}
+          options={shownCurrencies()}
           value={currency()}
           disabled={props.currencyLocked}
           onChange={setCurrency}

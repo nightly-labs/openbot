@@ -119,6 +119,8 @@ interface AddServerState {
   /** True after the pricing page ordered a server. The page then stays under the setup dialog until it closes. */
   orderedFromPage: boolean;
   orderError: UserErrorDetails | null;
+  /** The title of `orderError`: an order of only a license makes no server. */
+  orderErrorTitle: string;
 }
 
 /** The license offer of an account with no open license. A failed read offers no license. */
@@ -200,6 +202,7 @@ function AddServerSession(
     ordering: false,
     orderedFromPage: false,
     orderError: null,
+    orderErrorTitle: "",
   });
   const { t, errorDetails } = useText();
   const requestIds = untrack(() => props.requestIds);
@@ -409,7 +412,11 @@ function AddServerSession(
       }
     } catch (error) {
       setState((draft) => {
-        draft.orderError = errorDetails(error, t("settings.hostedServers.createFailed"));
+        const title = order.server
+          ? t("settings.hostedServers.createFailed")
+          : t("settings.hostedServers.checkoutFailed");
+        draft.orderError = errorDetails(error, title);
+        draft.orderErrorTitle = title;
       });
     } finally {
       setState((draft) => {
@@ -450,6 +457,16 @@ function AddServerSession(
     trackPlans("closed");
     props.onClose();
   };
+  /** Another window page opened. The setup dialog of an ordered server stays; only the page under it goes. */
+  const leavePage = () => {
+    if (!state.orderedFromPage) {
+      close();
+      return;
+    }
+    setState((draft) => {
+      draft.orderedFromPage = false;
+    });
+  };
 
   async function openPayment(): Promise<void> {
     const serverId = state.server?.serverId;
@@ -488,7 +505,7 @@ function AddServerSession(
       {(plans) => (
         <Loading>
           <Show when={pageShown()}>
-            <PricingPagePortal placement={props.pricingPage} overlayMount={overlayMount} onLeave={close}>
+            <PricingPagePortal placement={props.pricingPage} overlayMount={overlayMount} onLeave={leavePage}>
               <HostedPricingPage
                 overlay={props.pricingPage === undefined}
                 headerFrame={props.pricingPage ? headerFrame() : undefined}
@@ -502,6 +519,7 @@ function AddServerSession(
                 serverLimit={serverLimit()}
                 busy={state.ordering}
                 error={state.orderError}
+                errorTitle={state.orderErrorTitle}
                 onSubmit={(order) => void submitOrder(order)}
                 onClose={close}
                 onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}

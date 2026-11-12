@@ -61,6 +61,8 @@ CREATE TABLE hosted_servers_next (
   -- See 0052: a server on a machine that an operator runs has no boat sandbox.
   operator_host TEXT CHECK (operator_host IS NULL OR provider_sandbox_id IS NULL),
   retired_sandbox_id TEXT,
+  -- See 0053: when the plan of the server last ended.
+  plan_ended_at INTEGER,
   UNIQUE(owner_user_id, idempotency_key)
 );
 
@@ -70,7 +72,7 @@ INSERT INTO hosted_servers_next (
   provider_event_at, last_wake_reason, claim_token_hash, claim_expires_at, claim_redeemed_at, auth_session_id,
   last_active_at, lease_until, next_run_at, idempotency_key, created_at, updated_at, deleted_at,
   deletion_scheduled_at, deletion_subscription_id, lifecycle_token, lifecycle_lease_until, legacy_member_limits,
-  start_requested_at, operator_host, retired_sandbox_id
+  start_requested_at, operator_host, retired_sandbox_id, plan_ended_at
 )
 SELECT
   server_id, owner_user_id, name, provider, provider_sandbox_id, provider_template, size, pending_size, plan,
@@ -78,7 +80,7 @@ SELECT
   provider_event_at, last_wake_reason, claim_token_hash, claim_expires_at, claim_redeemed_at, auth_session_id,
   last_active_at, lease_until, next_run_at, idempotency_key, created_at, updated_at, deleted_at,
   deletion_scheduled_at, deletion_subscription_id, lifecycle_token, lifecycle_lease_until, legacy_member_limits,
-  start_requested_at, operator_host, retired_sandbox_id
+  start_requested_at, operator_host, retired_sandbox_id, plan_ended_at
 FROM hosted_servers;
 
 DROP TABLE hosted_servers;
