@@ -76,6 +76,10 @@ export const messages = {
   "error.import.transferSettingSkipped": "{name}을(를) 가져오지 않았어요. {reason}",
   "error.import.transferRunsSkipped": '{name}: 루틴 "{routine}"의 실행 기록은 가져오지 않아요.',
   "error.import.transferSharedSkillsSkipped": "공유 스킬을 읽을 수 없어서 파일에 포함되지 않았어요.",
+  "error.import.transferSharedSkillsNotAdded": "파일의 공유 스킬을 이 서버에 추가할 수 없었어요.",
+  "error.import.transferMemberPreferencesSkipped": {
+    other: "멤버 {count}명의 선택을 저장할 수 없었어요.",
+  },
   "error.import.transferSharedSkillExists": "이름이 같고 파일이 다른 공유 스킬이 이 서버에 이미 있어요.",
   "error.import.transferServerPreferencesSkipped": {
     other: "파일의 서버 환경설정 {count}개가 여기서 유효하지 않아 가져오지 않아요.",

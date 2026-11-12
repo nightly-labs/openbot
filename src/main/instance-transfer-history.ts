@@ -95,17 +95,14 @@ export const exportHistory = Effect.fn("InstanceTransfer.exportHistory")(functio
   let bytes = 0;
   for (const [threadIndex, thread] of threads.entries()) {
     const messages = thread.messages.map((message) => exportedMessage(message, agentKeys));
-    for (const attachment of messages.flatMap(messageFiles)) {
-      if (fileIds.has(attachment.id)) continue;
-      fileIds.add(attachment.id);
-      // A file that is gone keeps its card, as in a branch.
-      const file = yield* agents.resolveTransferFile(attachment.id).pipe(Effect.orElseSucceed(() => null));
-      if (!file) continue;
-      const path = `${folder}/files/${files.length + 1}`;
-      files.push({ id: attachment.id, path, name: file.name, mimeType: file.mimeType });
-      bytes += attachment.size;
-      entries.push({ name: path, read: () => readFile(file.path) });
-    }
+    bytes += yield* addMessageFiles(
+      (id) => agents.resolveTransferFile(id),
+      messages,
+      `${folder}/files/`,
+      files,
+      fileIds,
+      entries,
+    );
     const parts: string[] = [];
     for (let start = 0; start < messages.length; start += PART_MESSAGES) {
       const name = `${folder}/chat-${threadIndex + 1}-${parts.length + 1}.json`;
@@ -169,19 +166,7 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
     archiveCall(() => mkdir(directory, { recursive: true, mode: 0o700 })),
     () =>
       Effect.gen(function* () {
-        const files = new Map<string, HistoryFile>();
-        yield* withArchive(archive.path, (handle) =>
-          Effect.gen(function* () {
-            for (const [number, file] of index.files.entries()) {
-              const entry = archive.entries.get(file.path);
-              if (!entry) continue;
-              const target = join(directory, String(number + 1));
-              const written = yield* Effect.result(extractEntryEffect(handle, entry, target, 0o600));
-              if (Result.isSuccess(written))
-                files.set(file.id, { path: target, name: file.name, mimeType: file.mimeType });
-            }
-          }),
-        );
+        const files = yield* extractMessageFiles(archive, index.files, directory);
         let failed = 0;
         for (const thread of index.threads) {
           const result = yield* Effect.result(
@@ -214,6 +199,54 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
       }),
     () => archiveCall(() => rm(directory, { recursive: true, force: true })).pipe(Effect.ignore),
   );
+});
+
+/**
+ * Adds the files of `messages` that `files` does not list yet, each as `<folder><n>`, and returns
+ * their bytes. A file that is gone keeps its card, as in a branch. Chats and channel messages share it.
+ */
+const addMessageFiles = Effect.fn("InstanceTransfer.addMessageFiles")(function* (
+  resolveFile: TransferHistoryAgents["resolveTransferFile"],
+  messages: readonly ConversationMessage[],
+  folder: string,
+  files: IndexFile[],
+  fileIds: Set<string>,
+  entries: HistoryEntry[],
+): Effect.fn.Return<number> {
+  let bytes = 0;
+  for (const attachment of messages.flatMap(messageFiles)) {
+    if (fileIds.has(attachment.id)) continue;
+    fileIds.add(attachment.id);
+    const file = yield* resolveFile(attachment.id).pipe(Effect.orElseSucceed(() => null));
+    if (!file) continue;
+    const path = `${folder}${files.length + 1}`;
+    files.push({ id: attachment.id, path, name: file.name, mimeType: file.mimeType });
+    bytes += attachment.size;
+    entries.push({ name: path, read: () => readFile(file.path) });
+  }
+  return bytes;
+});
+
+/** Copies the listed files out of the archive into `directory`, by their ids. A file that fails is left out. */
+const extractMessageFiles = Effect.fn("InstanceTransfer.extractMessageFiles")(function* (
+  archive: ArchiveFile,
+  files: readonly IndexFile[],
+  directory: string,
+): Effect.fn.Return<Map<string, HistoryFile>, ArchiveOperationError> {
+  const extracted = new Map<string, HistoryFile>();
+  yield* withArchive(archive.path, (handle) =>
+    Effect.gen(function* () {
+      for (const [number, file] of files.entries()) {
+        const entry = archive.entries.get(file.path);
+        if (!entry) continue;
+        const target = join(directory, String(number + 1));
+        const written = yield* Effect.result(extractEntryEffect(handle, entry, target, 0o600));
+        if (Result.isSuccess(written))
+          extracted.set(file.id, { path: target, name: file.name, mimeType: file.mimeType });
+      }
+    }),
+  );
+  return extracted;
 });
 
 function decodeIndex(
@@ -335,16 +368,14 @@ export const exportChannelMessages = Effect.fn("InstanceTransfer.exportChannelMe
   const files: ChannelFile[] = [];
   const fileIds = new Set<string>();
   let bytes = 0;
-  for (const attachment of messages.flatMap((entry) => messageFiles(entry.message))) {
-    if (fileIds.has(attachment.id)) continue;
-    fileIds.add(attachment.id);
-    const file = yield* resolveFile(attachment.id).pipe(Effect.orElseSucceed(() => null));
-    if (!file) continue;
-    const path = `${prefix}files/${files.length + 1}`;
-    files.push({ id: attachment.id, path, name: file.name, mimeType: file.mimeType });
-    bytes += attachment.size;
-    entries.push({ name: path, read: () => readFile(file.path) });
-  }
+  bytes += yield* addMessageFiles(
+    resolveFile,
+    messages.map((entry) => entry.message),
+    `${prefix}files/`,
+    files,
+    fileIds,
+    entries,
+  );
   const parts: string[] = [];
   for (let start = 0; start < messages.length; start += PART_MESSAGES) {
     const name = `${prefix}messages-${parts.length + 1}.json`;
@@ -395,17 +426,10 @@ const importChannelParts = Effect.fn("InstanceTransfer.importChannelParts")(func
   input: ImportChannelInput,
   directory: string,
 ): Effect.fn.Return<void, ArchiveOperationError> {
-  const files = new Map<string, HistoryFile>();
-  yield* withArchive(archive.path, (handle) =>
-    Effect.gen(function* () {
-      for (const [number, file] of input.files.entries()) {
-        const entry = file.path.startsWith(input.prefix) ? archive.entries.get(file.path) : undefined;
-        if (!entry) continue;
-        const target = join(directory, String(number + 1));
-        const written = yield* Effect.result(extractEntryEffect(handle, entry, target, 0o600));
-        if (Result.isSuccess(written)) files.set(file.id, { path: target, name: file.name, mimeType: file.mimeType });
-      }
-    }),
+  const files = yield* extractMessageFiles(
+    archive,
+    input.files.filter((file) => file.path.startsWith(input.prefix)),
+    directory,
   );
   const threads = new Map<string, string>();
   const threadOf = (agentId: string) => {

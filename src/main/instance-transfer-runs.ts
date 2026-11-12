@@ -60,7 +60,7 @@ export function decodeRuns(values: readonly unknown[] | undefined, channel: bool
       !bounded(routineName, INPUT_LIMITS.routineName) ||
       !bounded(instruction, INPUT_LIMITS.routineInstruction) ||
       !isOneOf(ALL_STATUSES, status) ||
-      !(error === null || bounded(error, ERROR_LIMIT))
+      !(error === null || isString(error))
     )
       return [];
     const decodedMissed = decodeMissed(missed);
@@ -74,7 +74,8 @@ export function decodeRuns(values: readonly unknown[] | undefined, channel: bool
         routineName,
         instruction,
         status: finished(status, channel),
-        error,
+        // A long error, such as a provider's dump, is cut; the run stays.
+        error: error ? error.slice(0, ERROR_LIMIT) : null,
         ...(decodedMissed ? { missed: decodedMissed } : {}),
         createdAt,
         updatedAt,

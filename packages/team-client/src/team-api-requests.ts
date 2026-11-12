@@ -40,6 +40,7 @@ import {
   decodeRemoteInstanceTransferResult,
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
+  INSTANCE_TRANSFER_LIMITS,
   type InstalledSkill,
   type InstanceTransferPreview,
   type InstanceTransferSummary,
@@ -608,6 +609,7 @@ function decodeExportState(value: unknown): InstanceTransferExportState {
     typeof value.size !== "number" ||
     !Number.isSafeInteger(value.size) ||
     value.size <= 0 ||
+    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
     !isString(value.sha256) ||
     !SHA256.test(value.sha256) ||
     !isPartBytes(value.chunkBytes) ||
@@ -686,6 +688,11 @@ const decodeUploadState = (value: unknown): { uploadId: string; chunkBytes: numb
 
 const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/** The SHA-256 of `bytes` as the transfer routes write it: 64 lower-case hexadecimal digits. */
+export function sha256Hex(bytes: Uint8Array): string {
+  return hex(sha256(bytes));
+}
+
 /**
  * Sends a transfer file to the host in parts and answers the preview of `instance-transfer-v1` stage.
  * The whole file's SHA-256 is read first, in parts. A part that the host already has from an earlier
@@ -711,7 +718,7 @@ export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceT
     if (received.has(index)) continue;
     const offset = index * upload.chunkBytes;
     const bytes = yield* teamCall(() => file.readBytes(offset, Math.min(upload.chunkBytes, file.size - offset)));
-    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: hex(sha256(bytes)) });
+    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: sha256Hex(bytes) });
     yield* teamCall(() =>
       request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
         name: file.name,

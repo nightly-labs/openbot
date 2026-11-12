@@ -72,6 +72,11 @@ export const messages = {
   "error.import.transferRunsSkipped":
     "{name}: la cronologia delle esecuzioni della routine «{routine}» non viene importata.",
   "error.import.transferSharedSkillsSkipped": "Impossibile leggere le skill condivise, quindi non sono nel file.",
+  "error.import.transferSharedSkillsNotAdded": "Impossibile aggiungere a questo server le skill condivise del file.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Impossibile salvare le scelte di {count} membro.",
+    other: "Impossibile salvare le scelte di {count} membri.",
+  },
   "error.import.transferSharedSkillExists":
     "Su questo server è già presente una skill condivisa con questo nome e file diversi.",
   "error.import.transferServerPreferencesSkipped": {

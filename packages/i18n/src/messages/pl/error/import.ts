@@ -70,6 +70,13 @@ export const messages = {
   "error.import.transferSettingSkipped": "Nie zaimportowano: {name}. {reason}",
   "error.import.transferRunsSkipped": "{name}: nie zaimportowano historii uruchomień rutyny „{routine}”.",
   "error.import.transferSharedSkillsSkipped": "Nie udało się odczytać wspólnych umiejętności, więc nie ma ich w pliku.",
+  "error.import.transferSharedSkillsNotAdded": "Nie udało się dodać do tego serwera wspólnych umiejętności z pliku.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Nie udało się zapisać wyborów {count} członka.",
+    few: "Nie udało się zapisać wyborów {count} członków.",
+    many: "Nie udało się zapisać wyborów {count} członków.",
+    other: "Nie udało się zapisać wyborów {count} członków.",
+  },
   "error.import.transferSharedSkillExists":
     "Na tym serwerze jest już wspólna umiejętność o tej nazwie i innych plikach.",
   "error.import.transferServerPreferencesSkipped": {

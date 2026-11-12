@@ -73,6 +73,12 @@ export const messages = {
   "error.import.transferRunsSkipped": '{name}: o histórico de execuções da rotina "{routine}" não é importado.',
   "error.import.transferSharedSkillsSkipped":
     "Não foi possível ler as habilidades compartilhadas, então elas não estão no arquivo.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Não foi possível adicionar a este servidor as habilidades compartilhadas do arquivo.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Não foi possível salvar as escolhas de {count} membro.",
+    other: "Não foi possível salvar as escolhas de {count} membros.",
+  },
   "error.import.transferSharedSkillExists":
     "Já existe neste servidor uma habilidade compartilhada com este nome e outros arquivos.",
   "error.import.transferServerPreferencesSkipped": {

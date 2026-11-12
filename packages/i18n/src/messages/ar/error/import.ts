@@ -72,6 +72,15 @@ export const messages = {
   "error.import.transferSettingSkipped": "لا يُستورد {name}. {reason}",
   "error.import.transferRunsSkipped": "{name}: لا يُستورد سجل تشغيل المهمة الدورية «{routine}».",
   "error.import.transferSharedSkillsSkipped": "تعذّرت قراءة المهارات المشتركة، لذا فهي ليست في الملف.",
+  "error.import.transferSharedSkillsNotAdded": "تعذّرت إضافة المهارات المشتركة في الملف إلى هذا الخادم.",
+  "error.import.transferMemberPreferencesSkipped": {
+    zero: "تعذّر حفظ اختيارات {count} عضو.",
+    one: "تعذّر حفظ اختيارات عضو واحد.",
+    two: "تعذّر حفظ اختيارات عضوين.",
+    few: "تعذّر حفظ اختيارات {count} أعضاء.",
+    many: "تعذّر حفظ اختيارات {count} عضوًا.",
+    other: "تعذّر حفظ اختيارات {count} عضو.",
+  },
   "error.import.transferSharedSkillExists": "توجد على هذا الخادم مهارة مشتركة بهذا الاسم وبملفات أخرى.",
   "error.import.transferServerPreferencesSkipped": {
     zero: "{count} تفضيل للخادم في الملف غير صالح هنا، لذا لا تُستورد.",

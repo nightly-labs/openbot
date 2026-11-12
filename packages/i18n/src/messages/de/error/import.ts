@@ -73,6 +73,12 @@ export const messages = {
   "error.import.transferRunsSkipped": "{name}: Der Ausführungsverlauf der Routine „{routine}“ wird nicht importiert.",
   "error.import.transferSharedSkillsSkipped":
     "Die gemeinsamen Fähigkeiten konnten nicht gelesen werden und sind daher nicht in der Datei.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Die geteilten Skills in der Datei konnten nicht zu diesem Server hinzugefügt werden.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Die Auswahl von {count} Mitglied konnte nicht gespeichert werden.",
+    other: "Die Auswahl von {count} Mitgliedern konnte nicht gespeichert werden.",
+  },
   "error.import.transferSharedSkillExists":
     "Auf diesem Server gibt es bereits eine gemeinsame Fähigkeit mit diesem Namen und anderen Dateien.",
   "error.import.transferServerPreferencesSkipped": {

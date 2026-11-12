@@ -68,6 +68,11 @@ export const messages = {
   "error.import.transferSettingSkipped": "{name} içe aktarılmadı. {reason}",
   "error.import.transferRunsSkipped": '{name}: "{routine}" rutininin çalıştırma geçmişi içe aktarılmadı.',
   "error.import.transferSharedSkillsSkipped": "Paylaşılan beceriler okunamadı, bu yüzden dosyada değiller.",
+  "error.import.transferSharedSkillsNotAdded": "Dosyadaki paylaşılan beceriler bu sunucuya eklenemedi.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "{count} üyenin seçimleri kaydedilemedi.",
+    other: "{count} üyenin seçimleri kaydedilemedi.",
+  },
   "error.import.transferSharedSkillExists":
     "Bu sunucuda bu ada ve farklı dosyalara sahip paylaşılan bir beceri zaten var.",
   "error.import.transferServerPreferencesSkipped": {

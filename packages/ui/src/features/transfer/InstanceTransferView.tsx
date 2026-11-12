@@ -193,6 +193,11 @@ function ExportScreen(props: InstanceTransferViewProps) {
     lastPreset = next;
     return result;
   });
+  // `fromCustom` is read on each change, also while the choice is custom, so it sees each step.
+  const pill = () => {
+    const appear = fromCustom();
+    return preset() === "custom" ? "none" : appear ? "appear" : undefined;
+  };
   const toggle = (part: ExportPart, on: boolean) => {
     const next = new Set(parts());
     if (on) next.add(part);
@@ -269,7 +274,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
                 the first one and call onChange, so a hidden, disabled value holds it. */}
             <SlidingTabs.Root
               class="instance-transfer-presets"
-              data-pill={preset() === "custom" ? "none" : fromCustom() ? "appear" : undefined}
+              data-pill={pill()}
               value={preset()}
               disabled={busy()}
               onChange={(value: string) => {

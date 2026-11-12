@@ -3057,9 +3057,9 @@ export async function createApplicationServices({
             Effect.flatMap((local) => local.list()),
             Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
           ),
-        assigned: () =>
-          Effect.forEach(service.listAgents(), (agent) =>
-            skills.lockedSkillIds(agent.id).pipe(Effect.orElseSucceed(() => [])),
+        assigned: (agentIds: readonly string[]) =>
+          Effect.forEach(agentIds, (agentId) =>
+            skills.lockedSkillIds(agentId).pipe(Effect.orElseSucceed(() => [])),
           ).pipe(Effect.map((ids) => new Set(ids.flat()))),
         bundle: (id: string, version: number) => library.pipe(Effect.flatMap((local) => local.bundle(id, version))),
         add: (bytes: Uint8Array) => library.pipe(Effect.flatMap((local) => local.createFromBundle(bytes))),

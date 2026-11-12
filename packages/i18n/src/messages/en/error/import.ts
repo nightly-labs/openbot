@@ -82,6 +82,11 @@ export const messages = defineMessages("error.import", {
   "error.import.transferSettingSkipped": "{name} is not imported. {reason}",
   "error.import.transferRunsSkipped": "{name}: the run history of the routine “{routine}” is not imported.",
   "error.import.transferSharedSkillsSkipped": "The shared skills could not be read, so they are not in the file.",
+  "error.import.transferSharedSkillsNotAdded": "The shared skills in the file could not be added to this server.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "The choices of {count} member could not be saved.",
+    other: "The choices of {count} members could not be saved.",
+  },
   "error.import.transferSharedSkillExists": "A shared skill with this name and other files is already on this server.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} server preference in the file is not valid here, so it is not imported.",

@@ -14,6 +14,7 @@ import {
   finishInstanceTransferExport,
   loadInstanceTransferSummary,
   readInstanceTransferExportPart,
+  sha256Hex,
   stageInstanceTransfer,
   stageInstanceTransferInParts,
   type TeamApiRequest,
@@ -110,7 +111,8 @@ async function exportInParts(
     beginInstanceTransferFullCopy(request, input).pipe(Effect.mapError((error) => error.cause)),
   );
   try {
-    const parts: Uint8Array<ArrayBuffer>[] = [];
+    // Each part becomes a Blob at once, so the browser can keep it out of the page's memory.
+    const parts: Blob[] = [];
     for (const [index, expected] of file.chunks.entries()) {
       const part = await runTeamEffect(
         readInstanceTransferExportPart(options.download(serverId), { exportId: file.exportId, index }).pipe(
@@ -120,9 +122,9 @@ async function exportInParts(
       const bytes = base64ToBytes(part.base64);
       const length = Math.min(file.chunkBytes, file.size - index * file.chunkBytes);
       // Each part is checked against the SHA-256 that the host named for it.
-      if (bytes.length !== length || (await sha256Hex(bytes)) !== expected)
+      if (bytes.length !== length || sha256Hex(bytes) !== expected)
         throw new Error(currentText().t("error.import.transferPartInvalid"));
-      parts.push(bytes);
+      parts.push(new Blob([bytes]));
     }
     const fileName = `openbot-transfer-${new Date().toISOString().slice(0, 10)}.zip`;
     options.saveFile({ name: fileName, blob: new Blob(parts, { type: "application/zip" }) });
@@ -130,9 +132,4 @@ async function exportInParts(
   } finally {
     await runTeamEffect(finishInstanceTransferExport(request, file.exportId)).catch(() => undefined);
   }
-}
-
-async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }

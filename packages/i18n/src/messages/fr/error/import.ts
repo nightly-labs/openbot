@@ -74,6 +74,12 @@ export const messages = {
     "{name} : l’historique des exécutions de la routine « {routine} » n’est pas importé.",
   "error.import.transferSharedSkillsSkipped":
     "Impossible de lire les compétences partagées, elles ne sont donc pas dans le fichier.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Les compétences partagées du fichier n’ont pas pu être ajoutées à ce serveur.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Les choix de {count} membre n’ont pas pu être enregistrés.",
+    other: "Les choix de {count} membres n’ont pas pu être enregistrés.",
+  },
   "error.import.transferSharedSkillExists":
     "Une compétence partagée avec ce nom et d’autres fichiers existe déjà sur ce serveur.",
   "error.import.transferServerPreferencesSkipped": {

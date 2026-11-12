@@ -294,8 +294,8 @@ export interface InstanceTransferOptions {
   /** The skills of the shared library. Absent where the server has no library. */
   sharedSkills?: {
     list(): Effect.Effect<{ id: string; slug: string; name: string; version: number }[], unknown>;
-    /** The ids of the skills that an agent of this server has. */
-    assigned(): Effect.Effect<ReadonlySet<string>, unknown>;
+    /** The ids of the skills that these agents have. They carry those skills themselves. */
+    assigned(agentIds: readonly string[]): Effect.Effect<ReadonlySet<string>, unknown>;
     bundle(id: string, version: number): Effect.Effect<Uint8Array, unknown>;
     /** Adds a skill to the library without giving it to an agent. */
     add(bytes: Uint8Array): Effect.Effect<unknown, unknown>;
@@ -636,9 +636,16 @@ export class InstanceTransferService {
       }
     }
     const sharedSkills = input.includeSettings
-      ? yield* this.#exportSharedSkills(entries, warnings)
+      ? yield* this.#exportSharedSkills(
+          agents.map((agent) => agent.id),
+          entries,
+          warnings,
+        )
       : { skills: [], bytes: 0 };
     bytes += sharedSkills.bytes;
+    // Before the limits, so the logo counts.
+    const serverIdentity = input.includeServerPreferences ? yield* this.#exportServerIdentity(entries) : {};
+    bytes += serverIdentity.bytes ?? 0;
     // A transfer file has the same text for both limits.
     if (entries.length + 1 > limits.files || bytes > (limits.bytes?.limit ?? Number.POSITIVE_INFINITY))
       return yield* archiveFailure(new Error(limits.expandedTooLarge));
@@ -653,7 +660,7 @@ export class InstanceTransferService {
       shared,
       signedIn: this.options.settings.signedInProviders(),
       ...(channels.length > 0 ? { channels, exporter: exporter ?? this.options.channelActor().id } : {}),
-      ...(input.includeServerPreferences ? this.#exportServerIdentity(entries) : {}),
+      ...(serverIdentity.serverIdentity ? { serverIdentity: serverIdentity.serverIdentity } : {}),
       ...(input.includeServerPreferences ? this.#exportMemberPreferences(keys, channelKeys) : {}),
       // The owner's own notification level only when the owner exports.
       ...(input.includeServerPreferences && this.options.serverPreferences
@@ -804,11 +811,13 @@ export class InstanceTransferService {
   }).bind(this);
 
   /**
-   * The skills of the shared library that no agent of this server has: the agents carry their own.
-   * The files of each go into `library/<slug>/`.
+   * The skills of the shared library that no exported agent has: those agents carry their own. A skill
+   * of an agent that stays here goes in too, so the new library has it. The files of each go into
+   * `library/<slug>/`.
    */
   readonly #exportSharedSkills = Effect.fn("InstanceTransfer.exportSharedSkills")(function* (
     this: InstanceTransferService,
+    agentIds: readonly string[],
     entries: ZipEntry[],
     warnings: string[],
   ): Effect.fn.Return<{ skills: NonNullable<TransferManifestFile["sharedSkills"]>; bytes: number }> {
@@ -816,7 +825,7 @@ export class InstanceTransferService {
     if (!port) return { skills: [], bytes: 0 };
     const read = yield* Effect.result(
       Effect.gen(function* () {
-        const assigned = yield* port.assigned();
+        const assigned = yield* port.assigned(agentIds);
         const skills = (yield* port.list()).filter((skill) => !assigned.has(skill.id));
         const shared: NonNullable<TransferManifestFile["sharedSkills"]> = [];
         let size = 0;
@@ -861,7 +870,7 @@ export class InstanceTransferService {
     if (!port) return;
     const listed = yield* Effect.result(port.list());
     if (Result.isFailure(listed)) {
-      warnings.push(sourceText("error.import.transferSharedSkillsSkipped"));
+      warnings.push(sourceText("error.import.transferSharedSkillsNotAdded"));
       return;
     }
     const existing = new Map(listed.success.map((skill) => [skill.slug, skill]));
@@ -970,24 +979,31 @@ export class InstanceTransferService {
       );
       if (Result.isFailure(result)) failed += 1;
     }
-    if (failed > 0) warnings.push(sourceText("error.import.transferServerPreferencesSkipped", { count: failed }));
+    if (failed > 0) warnings.push(sourceText("error.import.transferMemberPreferencesSkipped", { count: failed }));
   });
 
-  /** The server's name and logo for the manifest; the logo goes into `server/`. */
-  #exportServerIdentity(entries: ZipEntry[]): { serverIdentity?: TransferManifestFile["serverIdentity"] } {
+  /**
+   * The server's name and logo for the manifest, with the logo's size; the logo goes into `server/`.
+   * A logo file that is gone leaves the logo out, and the name still goes.
+   */
+  readonly #exportServerIdentity = Effect.fn("InstanceTransfer.exportServerIdentity")(function* (
+    this: InstanceTransferService,
+    entries: ZipEntry[],
+  ): Effect.fn.Return<{ serverIdentity?: TransferManifestFile["serverIdentity"]; bytes?: number }> {
     const identity = this.options.serverIdentity?.read();
     if (!identity) return {};
-    let logo: { path: string; mimeType: AvatarImageInput["mimeType"] } | null = null;
-    if (identity.logo) {
-      const source = identity.logo.path;
-      logo = {
-        path: `${SERVER_FOLDER}/logo.${AVATAR_EXTENSIONS[identity.logo.mimeType]}`,
-        mimeType: identity.logo.mimeType,
-      };
-      entries.push({ name: logo.path, read: () => readFile(source) });
-    }
-    return { serverIdentity: { name: identity.name, logo } };
-  }
+    const source = identity.logo;
+    const size = source
+      ? yield* archiveCall(() => stat(source.path)).pipe(
+          Effect.map((info) => (info.isFile() ? info.size : null)),
+          Effect.orElseSucceed(() => null),
+        )
+      : null;
+    if (!source || size === null) return { serverIdentity: { name: identity.name, logo: null }, bytes: 0 };
+    const logo = { path: `${SERVER_FOLDER}/logo.${AVATAR_EXTENSIONS[source.mimeType]}`, mimeType: source.mimeType };
+    entries.push({ name: logo.path, read: () => readFile(source.path) });
+    return { serverIdentity: { name: identity.name, logo }, bytes: size };
+  });
 
   /**
    * Gives this server the name and logo of the file, through the same save as Server settings >
@@ -1004,6 +1020,8 @@ export class InstanceTransferService {
     const name = value.name;
     const result = yield* Effect.result(
       Effect.gen(function* () {
+        // The logo changes only when the file has one that reads: a logo that is not in the file, or
+        // that cannot be read, leaves this server's logo as it is.
         let logo: AvatarImageInput | null = null;
         const source = isDynamicRecord(value.logo) ? value.logo : null;
         if (
@@ -1018,7 +1036,7 @@ export class InstanceTransferService {
           ];
           if (bytes) logo = parseAvatarImage({ mimeType: source.mimeType, bytes });
         }
-        const input = parseHostIdentity({ serverName: name, logo });
+        const input = parseHostIdentity({ serverName: name, ...(logo ? { logo } : {}) });
         yield* port.save(input);
       }),
     );

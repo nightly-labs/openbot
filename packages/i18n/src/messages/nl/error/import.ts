@@ -83,6 +83,12 @@ export const messages = {
   "error.import.transferRunsSkipped": "{name}: de rungeschiedenis van routine “{routine}” is niet geïmporteerd.",
   "error.import.transferSharedSkillsSkipped":
     "De gedeelde vaardigheden konden niet worden gelezen, dus ze staan niet in het bestand.",
+  "error.import.transferSharedSkillsNotAdded":
+    "De gedeelde skills in het bestand konden niet aan deze server worden toegevoegd.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "De keuzes van {count} lid konden niet worden opgeslagen.",
+    other: "De keuzes van {count} leden konden niet worden opgeslagen.",
+  },
   "error.import.transferSharedSkillExists":
     "Er staat al een gedeelde vaardigheid met deze naam en andere bestanden op deze server.",
   "error.import.transferServerPreferencesSkipped": {
