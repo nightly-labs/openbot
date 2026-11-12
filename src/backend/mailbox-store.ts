@@ -1057,6 +1057,16 @@ export class MailboxStore {
     );
   }
 
+  /** Whether a routine run is starting or running in this task, and not a message that someone sent there. */
+  taskRoutineRunning(agentId: string, taskId: string): boolean {
+    return this.#state.deliveries.some((delivery) => {
+      if (delivery.recipientAgentId !== agentId) return false;
+      if (delivery.status !== "starting" && delivery.status !== "running") return false;
+      const message = this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+      return message?.taskId === taskId && message.sender.kind === "routine";
+    });
+  }
+
   /**
    * Removes the messages of a deleted side thread, with their deliveries, reactions and idempotency keys.
    * Their files leave the Transfers folder through the deletion outbox, as in {@link deleteStoredFile},

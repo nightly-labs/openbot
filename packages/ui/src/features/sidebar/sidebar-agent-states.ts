@@ -31,9 +31,9 @@ export interface SidebarAgentStatesInput {
    */
   usageLimits?: Record<string, number | null>;
   /**
-   * How many of each agent's routine threads run a turn now. The queue does not list the work of a
-   * side thread, so a routine that runs in its own thread is found here. Absent where the host does
-   * not name the routine of a thread.
+   * How many of each agent's routine threads run a routine run now. The queue does not list the work
+   * of a side thread, so a routine that runs in its own thread is found here. Absent where the host
+   * does not report it, as on a joined server: its frozen task routes do not carry it.
    */
   runningRoutineThreads?: Record<string, number>;
 }

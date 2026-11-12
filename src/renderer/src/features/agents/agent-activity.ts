@@ -34,12 +34,13 @@ export function createAgentActivity() {
   });
 
   /* A routine that runs in its own thread is not in the agent's queue, so its thread names it. The
-   * badge then shows the routine, not a reply that the user waits for (#7674). */
+   * badge then shows the routine, not a reply that the user waits for (#7674). A reply to a message
+   * sent in that thread keeps the working badge. */
   const runningRoutineThreads = createMemo(() => {
     const counts: Record<string, number> = {};
     for (const agent of agentList()) {
       const count = (agentTasks.snapshot(agent.id)?.tasks ?? []).filter(
-        (task) => task.state === "running" && task.routineId,
+        (task) => task.state === "running" && task.routineRunning === true,
       ).length;
       if (count > 0) counts[agent.id] = count;
     }
