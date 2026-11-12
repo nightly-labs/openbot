@@ -653,14 +653,15 @@ interface TurnListDigest {
 }
 
 /**
- * The first `limit` turns of the index as one hash. Each turn adds its id and range, and the last one
- * only its id and start: its end moves when a new turn comes after it. A changed branch, a
- * compaction or a rewritten transcript changes an earlier turn, so the hash changes too.
+ * The first `limit` turns of the index as one hash. Each turn adds its id, range and final answer, and
+ * the last one only its id and start: its end and answer move when records come after it. The hash
+ * also counts the selected records before the last turn. A changed branch, a compaction or a
+ * rewritten transcript changes an earlier turn or that count, so the hash changes too.
  */
 function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
   const rows = [
     ...database
-      .prepare("SELECT turn_id, start_seq, end_seq FROM turn_metadata ORDER BY start_seq LIMIT ?")
+      .prepare("SELECT turn_id, start_seq, end_seq, final_answer_uuid FROM turn_metadata ORDER BY start_seq LIMIT ?")
       .iterate(limit),
   ].map((raw) => {
     const row = databaseRow(raw);
@@ -669,13 +670,17 @@ function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest |
       requiredStringColumn(row, "turn_id"),
       requiredNumberColumn(row, "start_seq"),
       requiredNumberColumn(row, "end_seq"),
+      optionalStringColumn(row, "final_answer_uuid") ?? null,
     ] as const;
   });
   const last = rows.at(-1);
   if (!last) return null;
+  const selectedBefore = databaseRow(
+    database.prepare("SELECT COUNT(*) AS count FROM selected WHERE seq < ?").get(last[1]),
+  );
   const hash = createHash("sha256");
-  for (const [turnId, start, end] of rows.slice(0, -1)) hash.update(`${JSON.stringify([turnId, start, end])}\n`);
-  hash.update(JSON.stringify([last[0], last[1]]));
+  for (const row of rows.slice(0, -1)) hash.update(`${JSON.stringify(row)}\n`);
+  hash.update(JSON.stringify([last[0], last[1], selectedBefore ? requiredNumberColumn(selectedBefore, "count") : 0]));
   return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
 }
 
