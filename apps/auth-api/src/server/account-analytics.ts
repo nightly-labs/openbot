@@ -154,7 +154,7 @@ export type AccountAnalyticsEvent =
       durationMs?: number;
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
-  /** Each minute: the machines of the operator in one location and product, by state. */
+  /** Each 5 minutes: the machines of the operator in one location and product, by state. */
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
