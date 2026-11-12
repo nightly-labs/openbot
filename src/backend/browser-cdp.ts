@@ -584,8 +584,8 @@ export class BrowserCdpEngine {
 
   /**
    * Types a saved card into the fields that the agent named, in the main page or in an HTTPS payment
-   * frame that runs in its own process. Each field is checked before any value goes in: attached, in
-   * an HTTPS frame that `checkOrigin` allows, enabled, of a kind that takes the value, and for the
+   * frame. Each field is checked in the automation world of its own frame before any value goes in:
+   * attached, in an HTTPS frame that `checkOrigin` allows, enabled, of a kind that takes the value, and for the
    * number and the code, not in a form that sends its fields in the page address. When `allowFill`
    * then refuses, nothing is typed and the result is empty; when it allows, it can prepare the tab
    * first. Each field is then filled with native input after its identity is checked again. Snapshots
@@ -612,6 +612,7 @@ export class BrowserCdpEngine {
           field: BrowserCardField;
           backendNodeId: number;
           sessionId?: string | undefined;
+          contextId: number;
           description: BrowserCardFieldDescription;
           text: string;
           fingerprint: string;
@@ -624,8 +625,19 @@ export class BrowserCdpEngine {
           const key = `${node.sessionId ?? "main"}:${node.backendNodeId}`;
           if (seen.has(key)) return yield* browserFailure(new Error("Each card field needs its own target."));
           seen.add(key);
+          // A frame of another origin in the same process cannot read the field, so checks run in its frame.
+          const contextId = yield* this.#nodeFrameContextId(send, node.backendNodeId, node.sessionId);
+          if (contextId === undefined)
+            return yield* unavailable(field, "is unavailable here. Take a fresh snapshot, or use request_takeover.");
           const description = parseCardFieldDescription(
-            yield* this.#callOnNode(send, node.backendNodeId, CARD_FIELD_DESCRIPTION_FUNCTION, [], node.sessionId),
+            yield* this.#callOnNode(
+              send,
+              node.backendNodeId,
+              CARD_FIELD_DESCRIPTION_FUNCTION,
+              [],
+              node.sessionId,
+              contextId,
+            ),
           );
           if (!description?.connected)
             return yield* unavailable(field, "is unavailable here. Take a fresh snapshot, or use request_takeover.");
@@ -650,9 +662,10 @@ export class BrowserCdpEngine {
             CARD_FIELD_FINGERPRINT_FUNCTION,
             [],
             node.sessionId,
+            contextId,
           );
           if (!isString(fingerprint)) return yield* unavailable(field, "is unavailable. Take a fresh snapshot.");
-          fields.push({ field, ...node, description, text, fingerprint });
+          fields.push({ field, ...node, contextId, description, text, fingerprint });
         }
         if (!(yield* policy.allowFill())) return { filled: [], unconfirmed: [] };
         yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -674,6 +687,7 @@ export class BrowserCdpEngine {
                 CARD_SELECT_OPTION_FUNCTION,
                 [entry.field === "expYear" ? "year" : "month", card.expMonth, card.expYear, entry.fingerprint],
                 entry.sessionId,
+                entry.contextId,
               );
               filled.push(entry.field);
               continue;
@@ -685,6 +699,7 @@ export class BrowserCdpEngine {
               CARD_FIELD_SELECT_FUNCTION,
               [entry.fingerprint],
               entry.sessionId,
+              entry.contextId,
             );
             // Native entry sends trusted input events, so payment frames and masked fields take the value.
             yield* send("Input.insertText", { text: entry.text }, entry.sessionId);
@@ -695,6 +710,7 @@ export class BrowserCdpEngine {
               CARD_FIELD_CHECK_FUNCTION,
               [entry.text, entry.field !== "nameOnCard"],
               entry.sessionId,
+              entry.contextId,
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (holds !== true) unconfirmed.push(entry.field);
           }
@@ -2536,6 +2552,47 @@ export class BrowserCdpEngine {
   });
 
   /**
+   * The frame of the session that holds the node, and its automation world. A frame in the same
+   * process can have another origin, and the world of another frame cannot reach the node.
+   */
+  readonly #nodeFrameWorld = Effect.fn("BrowserCdp.nodeFrameWorld")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId: string | undefined,
+    frames: string[],
+  ) {
+    for (const frameId of frames) {
+      // A frame that detached since the tree was read, or that has no world, is not the target's.
+      const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (contextId === undefined) continue;
+      const own = yield* this.#callOnNode(
+        send,
+        backendNodeId,
+        "function() { return this.ownerDocument === document; }",
+        [],
+        sessionId,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(false)));
+      if (own === true) return { frameId, contextId };
+    }
+    return undefined;
+  });
+
+  /** The automation world of the frame that holds the node, or undefined when no frame holds it. */
+  readonly #nodeFrameContextId = Effect.fn("BrowserCdp.nodeFrameContextId")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId: string | undefined,
+  ) {
+    const frames = frameIds(yield* send("Page.getFrameTree", {}, sessionId));
+    return (yield* this.#nodeFrameWorld(send, backendNodeId, sessionId, frames))?.contextId;
+  });
+
+  /**
    * The node, then each frame element that holds its document, up to the page. The node keeps focus
    * only while each of them holds focus in its own document. CDP names a frame's owner even inside a
    * closed shadow root, and the parent of a frame in another process is in another session.
@@ -2550,27 +2607,10 @@ export class BrowserCdpEngine {
     let node = { backendNodeId, sessionId };
     for (let depth = 0; depth <= MAX_FOCUSED_FRAME_DEPTH; depth += 1) {
       const frames = frameIds(yield* send("Page.getFrameTree", {}, node.sessionId));
-      let frameId: string | undefined;
-      for (const id of frames) {
-        // A frame that detached since the tree was read, or that has no world, is not the target's.
-        const contextId = yield* frameAutomationContextId(send, id, node.sessionId).pipe(
-          Effect.catch(() => Effect.succeed(undefined)),
-        );
-        if (contextId === undefined) continue;
-        const own = yield* this.#callOnNode(
-          send,
-          node.backendNodeId,
-          "function() { return this.ownerDocument === document; }",
-          [],
-          node.sessionId,
-          contextId,
-        ).pipe(Effect.catch(() => Effect.succeed(false)));
-        if (own !== true) continue;
-        frameId = id;
-        chain.push({ ...node, contextId });
-        break;
-      }
-      if (!frameId) break;
+      const world = yield* this.#nodeFrameWorld(send, node.backendNodeId, node.sessionId, frames);
+      if (!world) break;
+      const { frameId } = world;
+      chain.push({ ...node, contextId: world.contextId });
       // The page's own frame has no owner. The root frame of another session is owned in its parent.
       if (frameId === frames[0] && node.sessionId === undefined) return chain;
       const owners =
