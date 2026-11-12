@@ -592,7 +592,7 @@ export function acpMcpServerName(config: McpServerConfig, own: readonly string[]
  * agent's workspace, whose `preload` would otherwise run first and could write to stdout.
  * `--no-env-file`, because Bun would otherwise add the variables of a `.env` file to the server.
  */
-export function workingDirectoryLaunch(
+function workingDirectoryLaunch(
   server: ResolvedMcpServer,
   bun: string | undefined,
   platform: NodeJS.Platform = process.platform,
