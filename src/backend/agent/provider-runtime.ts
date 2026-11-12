@@ -384,6 +384,13 @@ const INITIAL_STATUS: AgentStatus = {
   fullAccess: true,
 };
 
+/** The text of each kind of provider MCP failure that `#reportMcpServerFailure` shows. */
+const MCP_SERVER_FAILURE_TEXT = {
+  sign_in: "error.backend.mcpServerSignInForProvider",
+  timeout: "error.backend.mcpServerTimedOutInProvider",
+  failed: "error.backend.mcpServerFailedInProvider",
+} as const;
+
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
  *
@@ -4416,14 +4423,9 @@ export class ProviderRuntime implements ProviderPort {
     const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
-    const text = {
-      sign_in: "error.backend.mcpServerSignInForProvider",
-      timeout: "error.backend.mcpServerTimedOutInProvider",
-      failed: "error.backend.mcpServerFailedInProvider",
-    } as const;
     this.#emitError(
       "mcp_server_not_started",
-      sourceText(text[kind], { provider: providerLabel(provider), name: server }),
+      sourceText(MCP_SERVER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
     );
   }
 
