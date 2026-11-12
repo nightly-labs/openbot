@@ -3479,7 +3479,8 @@ export class ChannelService {
       // A model can copy the brackets, or the whole `[memoryId] text` line, as the id.
       const givenId = isString(args.memoryId) ? args.memoryId.trim() : "";
       const memoryId = /^\[([^\]\s]+)\]/u.exec(givenId)?.[1] ?? givenId;
-      const text = isString(args.text) ? args.text : "";
+      // `text` is the argument of the earlier tool. A given id that matches no memory can be its text.
+      const text = isString(args.text) ? args.text : givenId.replace(/^\[[^\]\s]+\]\s*/u, "");
       if (!memoryId && !text.trim()) return yield* channelFailure(new Error("Provide the memoryId of the memory."));
       const deleted = yield* channelSync(
         () =>
