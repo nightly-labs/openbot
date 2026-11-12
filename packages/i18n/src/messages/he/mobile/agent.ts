@@ -516,6 +516,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "סוכנים",
   "mobile.agent.section.moveFailed": "לא ניתן להעביר את הצ'אט",
   "mobile.agent.section.moveTo": "העברה לתיקייה",
+  "mobile.agent.noMessages": "עדיין אין הודעות",
   "mobile.agent.section.newInside": "תיקייה חדשה בפנים",
   "mobile.agent.section.moveFolder": "העברה אל",
   "mobile.agent.section.topLevel": "הרמה העליונה",
