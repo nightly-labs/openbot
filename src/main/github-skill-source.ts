@@ -59,7 +59,7 @@ interface GithubLink {
 }
 
 /** Reads `https://github.com/<owner>/<repo>[/tree|blob/<ref>/<path>]`, with or without the scheme. */
-export function parseGithubLink(text: string): GithubLink | null {
+function parseGithubLink(text: string): GithubLink | null {
   const trimmed = text.trim();
   let url: URL;
   try {
