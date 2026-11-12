@@ -257,6 +257,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "סוכן Cursor נמצא, אך לא ניתן לקרוא את הגרסה שלו.",
   "error.provider.cursorVersionUnreadable": "לא ניתן לקרוא את הגרסה של סוכן Cursor.",
   "error.provider.cursorSignIn": "יש להתחבר עם Cursor או להגדיר CURSOR_API_KEY כדי להשתמש ב-Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor לא הצליח להתחבר לשרת שלו עם פרטי ההתחברות שלך. יש לבדוק את החיבור לאינטרנט ואז להתחבר שוב ל-Cursor.",
   "error.provider.clineArchivePath": "בארכיון של Cline יש נתיב לא צפוי.",
   "error.provider.clinePackageMismatch": "החבילה של Cline אינה תואמת לקטלוג סביבות ההרצה.",
   "error.provider.clineChecksum": "סכום הביקורת של סביבת ההרצה של Cline אינו תואם.",

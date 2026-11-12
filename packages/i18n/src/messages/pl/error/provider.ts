@@ -272,6 +272,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Znaleziono agenta Cursor, ale nie można odczytać jego wersji.",
   "error.provider.cursorVersionUnreadable": "Nie można odczytać wersji agenta Cursor.",
   "error.provider.cursorSignIn": "Zaloguj się przez Cursor lub ustaw CURSOR_API_KEY, aby używać Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",

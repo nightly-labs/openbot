@@ -271,6 +271,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Агент Cursor найден, но его версию прочитать не удаётся.",
   "error.provider.cursorVersionUnreadable": "Не удалось прочитать версию агента Cursor.",
   "error.provider.cursorSignIn": "Войдите через Cursor или задайте CURSOR_API_KEY, чтобы использовать Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor не смог подключиться к своему серверу с вашим входом. Проверьте подключение к интернету, затем снова войдите в Cursor.",
   "error.provider.clineArchivePath": "В архиве Cline неожиданный путь.",
   "error.provider.clinePackageMismatch": "Пакет Cline не соответствует каталогу сред выполнения.",
   "error.provider.clineChecksum": "Контрольная сумма среды выполнения Cline не совпадает.",
