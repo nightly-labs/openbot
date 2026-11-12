@@ -71,6 +71,7 @@ import type {
   HostGitHubConnectorStatus,
   HostMessagingConnectInput,
   HostMessagingWorkspaceInput,
+  HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
@@ -486,6 +487,17 @@ export interface MobileWorkspaceContextValue {
   /** How many memories each agent of the server can keep, and the values that the host permits. */
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  /** An owner or admin of an online host that serves `host-personality-v1`. The host checks the role again. */
+  canManageServerPersonality: (serverId: string) => boolean;
+  /** An online host that serves `host-personality-v1`. Any member reads its personality. */
+  servesServerPersonality: (serverId: string) => boolean;
+  /**
+   * How the agents of the server talk while they work. Any member reads it, because the chat shows
+   * progress updates only for a "natural" server. A host without `host-personality-v1` is "classic".
+   */
+  loadServerPersonality: (serverId: string) => Promise<HostPersonality>;
+  /** Owners and admins only. The change applies from the next turn of each agent. */
+  setServerPersonality: (personality: HostPersonality, serverId: string) => Promise<HostPersonality>;
   /** An owner or admin of an online host that serves `agent-access-v1`. The host checks the role again. */
   canManageServerRoles: (serverId: string) => boolean;
   /**
@@ -1170,6 +1182,8 @@ type MobileWorkspaceStateKey =
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageServerPersonality"
+  | "servesServerPersonality"
   | "canManageServerRoles"
   | "canReadServerAudit"
   | "hasAgentAccessLimits"

@@ -8,6 +8,7 @@ import { useMessageDelete } from "@/features/chat/components/use-message-delete"
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
+import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
@@ -39,9 +40,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     () => serverAgents.filter((agent) => channel?.members.some((member) => member.agentId === agent.id)),
     [serverAgents, channel?.members],
   );
+  const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
-    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null),
-    [page?.messages, server?.membershipId],
+    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null, progressUpdates),
+    [page?.messages, server?.membershipId, progressUpdates],
   );
   // A host with channel-attention-v1 names the thread of each member in this channel. A request on
   // one of them belongs here, and not in the agent's own chat.

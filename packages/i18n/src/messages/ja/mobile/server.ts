@@ -319,6 +319,7 @@ export const messages = {
   "mobile.server.route.invite": "ユーザーを招待",
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
+  "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -442,6 +443,16 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.responseStyleDescription":
+    "ナチュラル: エージェントは作業中に短い進捗を送り、チャットに表示されます。クラシック: エージェントは完了時に一度だけ答えます。",
+  "mobile.server.settings.responseStyleNatural": "ナチュラル",
+  "mobile.server.settings.responseStyleClassic": "クラシック",
+  "mobile.server.settings.personalityLoadFailed": "サーバーのパーソナリティを読み込めませんでした。",
+  "mobile.server.settings.personalitySaveFailed": "応答スタイルを保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.personalityUnsupported":
+    "ここで応答スタイルを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.personalityUnavailable":
+    "エージェントの性格を変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.route.browserProfiles": "ブラウザープロファイル",
   "mobile.server.browserProfiles.unavailable":
     "オンラインのサーバーのオーナーまたは管理者だけが、そのブラウザープロファイルを管理できます。",

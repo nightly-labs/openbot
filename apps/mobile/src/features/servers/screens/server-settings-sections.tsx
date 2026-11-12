@@ -11,6 +11,7 @@ import Brain from "lucide-react-native/icons/brain";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
 import Earth from "lucide-react-native/icons/earth";
+import Smile from "lucide-react-native/icons/face-slightly-smiling";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
@@ -36,6 +37,7 @@ import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
+import { RESPONSE_STYLE_LABEL_KEYS, useServerPersonality } from "@/features/servers/model/use-server-personality";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
@@ -300,6 +302,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const { canManageAgentMemoryLimit } = useMobileWorkspace();
   const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
   const timezone = useServerTimezone(serverId);
+  const personality = useServerPersonality(serverId);
   const update = useServerUpdate(serverId, { poll: false });
   const updateShown = Boolean(update.access || update.query.data);
   const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
@@ -314,7 +317,8 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!updateShown && !timezone.available && !memoryLimitAvailable) return null;
+  if (!updateShown && !timezone.available && !personality.canManage && !memoryLimitAvailable) return null;
+  const responseStyle = personality.query.data?.responseStyle;
   const zone = timezone.query.data;
   const limit = memoryLimit.data;
 
@@ -365,6 +369,15 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
           onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
         >
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {personality.canManage ? (
+        <SettingsRow
+          leading={<RowIcon icon={Smile} />}
+          trailing={responseStyle ? <TrailingValue value={t(RESPONSE_STYLE_LABEL_KEYS[responseStyle])} /> : undefined}
+          onPress={() => router.push({ pathname: "/server-settings/personality", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.route.personality")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
       {memoryLimitAvailable ? (
