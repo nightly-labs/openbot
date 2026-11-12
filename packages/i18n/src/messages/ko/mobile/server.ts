@@ -313,6 +313,7 @@ export const messages = {
   "mobile.server.route.invite": "사람 초대",
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
+  "mobile.server.route.personality": "에이전트 성격",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -428,6 +429,14 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.responseStyleDescription":
+    "자연형: 에이전트가 작업 중에 짧은 업데이트를 보내고 채팅에 표시돼요. 클래식: 에이전트가 끝나면 한 번만 답해요.",
+  "mobile.server.settings.responseStyleNatural": "자연형",
+  "mobile.server.settings.responseStyleClassic": "클래식",
+  "mobile.server.settings.personalityLoadFailed": "서버 성격을 불러올 수 없었어요.",
+  "mobile.server.settings.personalitySaveFailed": "응답 스타일을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.personalityUnsupported":
+    "여기에서 응답 스타일을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.route.browserProfiles": "브라우저 프로필",
   "mobile.server.browserProfiles.unavailable": "온라인 서버의 소유자나 관리자만 브라우저 프로필을 관리할 수 있습니다.",
   "mobile.server.browserProfiles.unsupported":

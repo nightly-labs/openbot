@@ -369,6 +369,7 @@ export const messages = {
   "mobile.server.route.invite": "Zaproś osoby",
   "mobile.server.route.member": "Członek",
   "mobile.server.route.timezone": "Strefa czasowa",
+  "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -501,6 +502,14 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Nie udało się zapisać limitu wspomnień. Spróbuj ponownie.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wspomnień.",
+  "mobile.server.settings.responseStyleDescription":
+    "Naturalny: agenci wysyłają krótkie aktualizacje podczas pracy, a czat je pokazuje. Klasyczny: agenci odpowiadają raz, gdy skończą.",
+  "mobile.server.settings.responseStyleNatural": "Naturalny",
+  "mobile.server.settings.responseStyleClassic": "Klasyczny",
+  "mobile.server.settings.personalityLoadFailed": "Nie udało się wczytać osobowości serwera.",
+  "mobile.server.settings.personalitySaveFailed": "Nie udało się zapisać stylu odpowiedzi. Spróbuj ponownie.",
+  "mobile.server.settings.personalityUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego styl odpowiedzi.",
   "mobile.server.route.browserProfiles": "Profile przeglądarki",
   "mobile.server.browserProfiles.unavailable":
     "Tylko właściciel lub administrator serwera online może zarządzać jego profilami przeglądarki.",

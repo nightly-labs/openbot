@@ -26,6 +26,7 @@ import {
   isQueueSnapshot,
   isRoutine,
   isRoutineRun,
+  LEGACY_RESPONSE_STYLE,
   MCP_SERVERS_CAPABILITY,
   type RoutineCalendarOwner,
   type SetAgentHiddenInput,
@@ -118,6 +119,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -183,6 +185,7 @@ import {
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostPersonality,
   getHostReleaseStatus,
   getHostTimezone,
   getHostUpdateStatus,
@@ -238,6 +241,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowserProfileProxy,
+  setHostPersonality,
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
@@ -418,6 +422,8 @@ type HostRequestActions = Pick<
   | "setServerTimezone"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadServerPersonality"
+  | "setServerPersonality"
   | "loadServerRoles"
   | "setServerRoles"
   | "loadServerAuditLog"
@@ -653,6 +659,9 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  /** Any member reads the personality; the host lets only an owner or admin set it. */
+  const personalityApi = (serverId: string) =>
+    capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
@@ -756,6 +765,13 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    // A host before host-personality-v1 uses the classic prompt, as the desktop and the web client read it.
+    loadServerPersonality: async (serverId) =>
+      has(serverId, HOST_PERSONALITY_CAPABILITY)
+        ? runTeamRequest(getHostPersonality(personalityApi(serverId)))
+        : { responseStyle: LEGACY_RESPONSE_STYLE },
+    setServerPersonality: async (personality, serverId) =>
+      runTeamRequest(setHostPersonality(personalityApi(serverId), personality)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
     loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),

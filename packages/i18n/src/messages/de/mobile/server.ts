@@ -331,6 +331,7 @@ export const messages = {
   "mobile.server.route.invite": "Personen einladen",
   "mobile.server.route.member": "Mitglied",
   "mobile.server.route.timezone": "Zeitzone",
+  "mobile.server.route.personality": "Agent-Persönlichkeit",
   "mobile.server.settings.storage": "Speicher",
   "mobile.server.route.storage": "Speicher",
   "mobile.server.route.storageFiles": "Alle Dateien",
@@ -459,6 +460,15 @@ export const messages = {
     "Das Erinnerungslimit konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um sein Erinnerungslimit hier zu ändern.",
+  "mobile.server.settings.responseStyleDescription":
+    "Natürlich: Agenten senden während der Arbeit kurze Updates, und der Chat zeigt sie. Klassisch: Agenten antworten einmal, wenn sie fertig sind.",
+  "mobile.server.settings.responseStyleNatural": "Natürlich",
+  "mobile.server.settings.responseStyleClassic": "Klassisch",
+  "mobile.server.settings.personalityLoadFailed": "Die Persönlichkeit des Servers konnte nicht geladen werden.",
+  "mobile.server.settings.personalitySaveFailed":
+    "Der Antwortstil konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.personalityUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seinen Antwortstil hier zu ändern.",
   "mobile.server.route.browserProfiles": "Browser-Profile",
   "mobile.server.browserProfiles.unavailable":
     "Nur Besitzer oder Admins eines Online-Servers können seine Browser-Profile verwalten.",

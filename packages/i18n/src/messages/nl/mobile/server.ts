@@ -322,6 +322,7 @@ export const messages = {
   "mobile.server.route.invite": "Mensen uitnodigen",
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
+  "mobile.server.route.personality": "Agentpersoonlijkheid",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -445,6 +446,14 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.responseStyleDescription":
+    "Natuurlijk: agents sturen korte updates terwijl ze werken, en de chat toont ze. Klassiek: agents antwoorden één keer, als ze klaar zijn.",
+  "mobile.server.settings.responseStyleNatural": "Natuurlijk",
+  "mobile.server.settings.responseStyleClassic": "Klassiek",
+  "mobile.server.settings.personalityLoadFailed": "Kan de persoonlijkheid van de server niet laden.",
+  "mobile.server.settings.personalitySaveFailed": "Kan de antwoordstijl niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.personalityUnsupported":
+    "Werk OpenBot bij op deze server om de antwoordstijl hier te wijzigen.",
   "mobile.server.route.browserProfiles": "Browserprofielen",
   "mobile.server.browserProfiles.unavailable":
     "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",

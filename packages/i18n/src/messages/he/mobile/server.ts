@@ -444,6 +444,7 @@ export const messages = {
   "mobile.server.route.invite": "הזמנת אנשים",
   "mobile.server.route.member": "חבר",
   "mobile.server.route.timezone": "אזור זמן",
+  "mobile.server.route.personality": "אישיות הסוכן",
   "mobile.server.settings.storage": "אחסון",
   "mobile.server.route.storage": "אחסון",
   "mobile.server.route.storageFiles": "כל הקבצים",
@@ -564,6 +565,13 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "לא ניתן לטעון את מגבלת הזיכרונות של השרת הזה.",
   "mobile.server.settings.memoryLimitSaveFailed": "לא ניתן לשמור את מגבלת הזיכרונות. אפשר לנסות שוב.",
   "mobile.server.settings.memoryLimitUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת הזיכרונות שלו.",
+  "mobile.server.settings.responseStyleDescription":
+    "טבעי: הסוכנים שולחים עדכונים קצרים בזמן העבודה, והצ'אט מציג אותם. קלאסי: הסוכנים עונים פעם אחת, כשהם מסיימים.",
+  "mobile.server.settings.responseStyleNatural": "טבעי",
+  "mobile.server.settings.responseStyleClassic": "קלאסי",
+  "mobile.server.settings.personalityLoadFailed": "לא ניתן לטעון את אישיות השרת.",
+  "mobile.server.settings.personalitySaveFailed": "לא ניתן לשמור את סגנון התגובה. אפשר לנסות שוב.",
+  "mobile.server.settings.personalityUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את סגנון התגובה שלו.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
   "mobile.server.route.browserProfiles": "פרופילי דפדפן",
