@@ -24,6 +24,7 @@ import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CODECS } from "./agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CODECS } from "./agent-session-settings-v1";
+import { AGENT_SPEED_CODECS } from "./agent-speed-v1";
 import { AGENT_TASK_LIMIT_CODECS } from "./agent-task-limit-v1";
 import { AGENT_TASKS_CODECS } from "./agent-tasks-v1";
 import { AGENT_THREAD_BRANCHES_CODECS } from "./agent-thread-branches-v1";
@@ -198,6 +199,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_NEW_CHAT_CODECS,
   ...AGENT_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
+  ...AGENT_SPEED_CODECS,
   ...CONTEXT_COMPACT_CODECS,
   ...AGENT_INSTRUCTIONS_CODECS,
   ...MCP_SIGN_IN_CODECS,

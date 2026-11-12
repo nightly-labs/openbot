@@ -252,7 +252,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+          "Active step only: one password/whole-code field (+ sign-up confirm field), or each single-digit field in order. Fresh snapshot refs; no username field.",
         ),
       digits: z
         .number()
@@ -286,7 +286,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(VAULT_TEXT_LIMIT)
         .optional()
         .describe(
-          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password in the OpenBot Vault from the card, the login gets this username.",
+          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password to the Vault from the card, the login gets this username.",
         ),
     },
   }),

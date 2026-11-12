@@ -1552,6 +1552,7 @@ export const messages = {
   "mobile.server.customProviders.namePlaceholder": "مزوّدي",
   "mobile.server.customProviders.id": "معرّف المزوّد",
   "mobile.server.customProviders.idHint": "أحرف لاتينية صغيرة أو أرقام أو شرطات أو شرطات سفلية. لا يمكنك تغييره لاحقًا.",
+  "mobile.server.customProviders.idSavedHint": "لا يمكنك تغيير معرّف نقطة نهاية محفوظة.",
   "mobile.server.customProviders.idPattern":
     "استخدم أحرفًا لاتينية صغيرة أو أرقامًا أو شرطات أو شرطات سفلية، تبدأ بحرف أو رقم.",
   "mobile.server.customProviders.idBuiltIn": "يملك OpenBot مسبقًا مزوّدًا باسم {id}. اختر معرّفًا آخر.",
@@ -1565,6 +1566,8 @@ export const messages = {
   "mobile.server.customProviders.apiKeyPlaceholder": "اختياري",
   "mobile.server.customProviders.apiKeyHint":
     "اتركه فارغًا إذا لم تحتج نقطة النهاية إلى مفتاح. يُرسل المفتاح إلى الخادم، ولا يحتفظ به هذا الهاتف.",
+  "mobile.server.customProviders.apiKeyKeptHint":
+    "يوجد مفتاح محفوظ. اترك الحقل فارغًا للاحتفاظ به. يُرسل المفتاح إلى الخادم، ولا يحتفظ به هذا الهاتف.",
   "mobile.server.customProviders.models": "النماذج",
   "mobile.server.customProviders.modelsHint": "معرّفات النماذج التي تقدّمها نقطة النهاية. أضف واحدًا على الأقل.",
   "mobile.server.customProviders.modelName": "الاسم المعروض",
@@ -1578,6 +1581,8 @@ export const messages = {
     "لا يمكن استخدام معرّف النموذج هذا. أزل المسافات وعلامات الاقتباس وعلامات الترقيم الأخرى.",
   "mobile.server.customProviders.headers": "الترويسات",
   "mobile.server.customProviders.headersHint": "اختياري. يرسلها الخادم مع كل طلب إلى نقطة النهاية.",
+  "mobile.server.customProviders.headersKeptHint":
+    "اترك قيمة الترويسة المحفوظة فارغة للاحتفاظ بها. أزل ترويسة لحذفها من الخادم.",
   "mobile.server.customProviders.headerValue": "القيمة",
   "mobile.server.customProviders.headerNameLabel": "اسم الترويسة {position}",
   "mobile.server.customProviders.headerValueLabel": "قيمة الترويسة {position}",
@@ -1588,6 +1593,7 @@ export const messages = {
   "mobile.server.customProviders.headerDuplicate": "يعيّن هذا المزوّد {name} مسبقًا.",
   "mobile.server.customProviders.headerValueRequired": "أدخل قيمة ترويسة.",
   "mobile.server.customProviders.saveFailed": "تعذّر على OpenBot إضافة نقطة النهاية هذه.",
+  "mobile.server.customProviders.updateFailed": "تعذّر على OpenBot حفظ نقطة النهاية هذه.",
   "mobile.server.customProviders.runsOn": "يعمل على",
   "mobile.server.customProviders.editHint": "لتغيير نقطة النهاية هذه، أزلها ثم أضفها مجددًا.",
   "mobile.server.customProviders.remove": "إزالة",

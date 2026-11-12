@@ -7,12 +7,16 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   type AddedAgent,
   type AgentAdminSettings,
+  type AgentFastModeSettings,
+  agentFastModeSettings,
+  agentSpeed,
   type BrowserComputerSharing,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
   decodeAgentDefaultsOverview,
   decodeAgentPlanCardSettings,
+  decodeAgentSpeedSettings,
   decodeAgentTaskLimitSettings,
   decodeBrowserComputerSharing,
   decodeBrowserProfileList,
@@ -42,6 +46,7 @@ import {
   parseUpdateAgentPlanCardInput,
   parseUpdateAgentTaskLimitInput,
   parseUpdateBrowserProfileInput,
+  type UpdateAgentFastModeInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import {
@@ -68,6 +73,7 @@ import {
   AGENT_PUBLISH_IMAGE_BYTES,
   AGENT_PUBLISH_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-publish-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -224,11 +230,11 @@ export function agentAdminIpcHandlers({
       }),
       getAgentFastMode: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => hostSettings.readFastMode(agentId),
-        remote: (agentId, serverId) => remoteFastMode(serverId, AGENT_FAST_MODE_ROUTES.settings, { agentId }),
+        remote: (agentId, serverId) => remoteFastMode(serverId, { agentId }),
       }),
       updateAgentFastMode: scopedHandler(parseUpdateAgentFastModeInput, {
         local: (input) => runCauseEffect(hostSettings.updateFastMode(input)),
-        remote: (input, serverId) => remoteFastMode(serverId, AGENT_FAST_MODE_ROUTES.update, input),
+        remote: (input, serverId) => remoteFastMode(serverId, { agentId: input.agentId }, input),
       }),
       listBrowserProfiles: scopedQueryHandler({
         local: () => browserProfiles.list(),
@@ -460,9 +466,28 @@ export function agentAdminIpcHandlers({
     );
   }
 
-  function remoteFastMode(serverId: string, path: string, body: unknown) {
+  /**
+   * Reads, or with `update` changes, the fast mode of an agent on a joined server: on `agent-speed-v1`,
+   * or on `agent-fast-mode-v1` from an older host, which has no Ultrafast.
+   */
+  async function remoteFastMode(
+    serverId: string,
+    { agentId }: { agentId: string },
+    update?: UpdateAgentFastModeInput,
+  ): Promise<AgentFastModeSettings> {
+    if (remoteServers.supportsCapability(serverId, AGENT_SPEED_CAPABILITY)) {
+      const path = update ? AGENT_SPEED_ROUTES.update : AGENT_SPEED_ROUTES.settings;
+      const body = update ? { agentId, speed: agentSpeed(update) } : { agentId };
+      const settings = await runCauseEffect(
+        remoteServers.request(serverId, path, decodeAgentSpeedSettings, { method: "POST", body }),
+      );
+      return agentFastModeSettings(settings);
+    }
     if (!remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    if (update?.ultrafast) throw new Error(sourceText("error.agent.settingsLocalOnly"));
+    const path = update ? AGENT_FAST_MODE_ROUTES.update : AGENT_FAST_MODE_ROUTES.settings;
+    const body = update ? { agentId, fastMode: update.fastMode } : { agentId };
     return runCauseEffect(
       remoteServers.request(serverId, path, decodeRemoteAgentFastModeSettings, { method: "POST", body }),
     );

@@ -292,6 +292,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesNotStarted": "Hermes Agent could not start. Run `hermes --version` in a terminal.",
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Server settings › MCP, then send your message again.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.claudeContextFull":
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",

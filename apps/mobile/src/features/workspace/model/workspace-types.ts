@@ -12,7 +12,6 @@ import type {
   AgentBrowserProfile,
   AgentDefaultsOverview,
   AgentExclusionChange,
-  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
@@ -30,6 +29,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
+  AgentSpeedSettings,
   AgentTask,
   AgentTaskInput,
   AgentTaskLimitSettings,
@@ -149,11 +149,11 @@ import type {
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
   UpdateAgentDefaultsInput,
-  UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
+  UpdateAgentSpeedInput,
   UpdateAgentTaskLimitInput,
   UpdateBrowserProfileInput,
   UpdateRestartMode,
@@ -947,12 +947,16 @@ export interface MobileWorkspaceContextValue {
   /** Stops one of these programs with its children. A program that ended is not an error. Owners and admins only. */
   stopBackgroundProcess: (id: string, serverId: string) => Promise<void>;
   /**
-   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
-   * setting, and with manage access changes it, as the model. The host checks the access.
+   * The speed of an agent, from `agent-speed-v1`, or from `agent-fast-mode-v1` on an older host. Null
+   * when the host advertises neither. A member with view access reads the setting, and with manage
+   * access changes it, as the model. The host checks the access.
    */
-  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
-  /** Resolves with the setting the host saved. It applies from the next turn. */
-  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  loadAgentSpeed: (agentId: string, serverId: string) => Promise<AgentSpeedSettings | null>;
+  /**
+   * Resolves with the setting the host saved. It applies from the next turn. "ultrafast" needs
+   * `agent-speed-v1`; an older host has no Ultrafast tier in its model list, so no screen offers it.
+   */
+  updateAgentSpeed: (input: UpdateAgentSpeedInput, serverId: string) => Promise<AgentSpeedSettings>;
   /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
   canManageAgentInstructions: (serverId: string) => boolean;
   /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */

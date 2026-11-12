@@ -1544,6 +1544,7 @@ export const messages = {
   "mobile.server.customProviders.namePlaceholder": "הספק שלי",
   "mobile.server.customProviders.id": "מזהה ספק",
   "mobile.server.customProviders.idHint": "אותיות קטנות באנגלית, מספרים, מקפים או קווים תחתונים. אי אפשר לשנות אחר כך.",
+  "mobile.server.customProviders.idSavedHint": "אי אפשר לשנות את המזהה של נקודת קצה שמורה.",
   "mobile.server.customProviders.idPattern":
     "יש להשתמש באותיות קטנות באנגלית, במספרים, במקפים או בקווים תחתונים, ולהתחיל באות או במספר.",
   "mobile.server.customProviders.idBuiltIn": "ב-OpenBot כבר יש ספק בשם {id}. יש לבחור מזהה אחר.",
@@ -1557,6 +1558,8 @@ export const messages = {
   "mobile.server.customProviders.apiKeyPlaceholder": "אופציונלי",
   "mobile.server.customProviders.apiKeyHint":
     "אם נקודת הקצה לא צריכה מפתח, אפשר להשאיר ריק. המפתח נשלח לשרת, והטלפון הזה לא שומר אותו.",
+  "mobile.server.customProviders.apiKeyKeptHint":
+    "יש מפתח שמור. כדי לשמור אותו, יש להשאיר את השדה ריק. המפתח נשלח לשרת, והטלפון הזה לא שומר אותו.",
   "mobile.server.customProviders.models": "מודלים",
   "mobile.server.customProviders.modelsHint": "מזהי המודלים שנקודת הקצה מספקת. יש להוסיף לפחות אחד.",
   "mobile.server.customProviders.modelName": "שם לתצוגה",
@@ -1570,6 +1573,8 @@ export const messages = {
     "אי אפשר להשתמש במזהה המודל הזה. יש להסיר רווחים, מרכאות וסימני פיסוק אחרים.",
   "mobile.server.customProviders.headers": "כותרות",
   "mobile.server.customProviders.headersHint": "אופציונלי. השרת שולח אותן עם כל בקשה לנקודת הקצה.",
+  "mobile.server.customProviders.headersKeptHint":
+    "כדי לשמור ערך של כותרת שמורה, יש להשאיר אותו ריק. כדי למחוק כותרת מהשרת, יש להסיר אותה.",
   "mobile.server.customProviders.headerValue": "ערך",
   "mobile.server.customProviders.headerNameLabel": "שם כותרת {position}",
   "mobile.server.customProviders.headerValueLabel": "ערך כותרת {position}",
@@ -1580,6 +1585,7 @@ export const messages = {
   "mobile.server.customProviders.headerDuplicate": "הספק הזה כבר מגדיר את {name}.",
   "mobile.server.customProviders.headerValueRequired": "יש להזין ערך לכותרת.",
   "mobile.server.customProviders.saveFailed": "OpenBot לא הצליח להוסיף את נקודת הקצה הזו.",
+  "mobile.server.customProviders.updateFailed": "OpenBot לא הצליח לשמור את נקודת הקצה הזו.",
   "mobile.server.customProviders.runsOn": "רץ ב-",
   "mobile.server.customProviders.editHint": "כדי לשנות את נקודת הקצה הזו, יש להסיר אותה ולהוסיף אותה שוב.",
   "mobile.server.customProviders.remove": "הסרה",
