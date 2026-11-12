@@ -3,7 +3,8 @@
 // The authorization server acts as ElevenLabs' does: it has no registration endpoint and sets
 // `client_id_metadata_document_supported`. OpenBot must send its client metadata document URL as
 // the `client_id`, with no secret, and keep a record that the encrypted store can read again after
-// a restart. A server that offers registration as well must keep the registration.
+// a restart. A server that offers registration as well must keep the registration. The document
+// names the `/mcp-auth` address, and a registration names `/callback` on the same port (#7480).
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -18,6 +19,8 @@ import { testMcpServer } from "../src/backend/mcp-probe";
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-metadata-document-e2e");
 const CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 const REDIRECT_URL = "http://127.0.0.1:28417/mcp-auth";
+/** The address that a registration names, as the app's listener gives it. */
+const REGISTRATION_REDIRECT_URL = "http://127.0.0.1:28417/callback";
 /** The address when another program holds the preferred port. */
 const OTHER_REDIRECT_URL = "http://127.0.0.1:28418/mcp-auth";
 const ACCESS_TOKEN = "e2e-access-token";
@@ -44,6 +47,7 @@ interface Case {
   name: string;
   attempts: { toolCount: number; error: string | null }[];
   pageClientIds: (string | null)[];
+  pageRedirectUris: (string | null)[];
   tokenClientIds: (string | null)[];
   tokenRequestsWithSecret: boolean[];
   registrations: number;
@@ -207,6 +211,7 @@ function oauthOn(records: Map<string, McpOAuthRecord>, server: FakeServer, redir
       setTimeout(() => oauth.receiveAuthorizationCode(state, "e2e-grant"), 50);
     },
     redirectUrl,
+    registrationRedirectUrl: redirectUrl.replace("/mcp-auth", "/callback"),
     signInTimeoutMs: 10_000,
   });
   return oauth;
@@ -235,6 +240,7 @@ async function runCase(name: string, registration: boolean): Promise<Case> {
       name,
       attempts: [first],
       pageClientIds: [...server.pageClientIds],
+      pageRedirectUris: [...server.pageRedirectUris],
       tokenClientIds: [...server.tokenClientIds],
       tokenRequestsWithSecret: [...server.tokenRequestsWithSecret],
       registrations: server.registrations,
@@ -353,6 +359,12 @@ async function main(): Promise<void> {
     check(both, both.attempts[0]?.error === null, `the sign-in failed: ${both.attempts[0]?.error}`);
     check(both, both.registrations === 1, `the sign-in registered ${both.registrations} times`);
     check(both, both.pageClientIds.join() === REGISTERED_CLIENT, `the pages named ${both.pageClientIds.join()}`);
+    check(
+      both,
+      both.storedClient?.redirectUris.join() === REGISTRATION_REDIRECT_URL &&
+        both.pageRedirectUris.join() === REGISTRATION_REDIRECT_URL,
+      `the registration named ${both.storedClient?.redirectUris.join()} and the page sent ${both.pageRedirectUris.join()}`,
+    );
     check(both, both.afterRestart?.error === null, `after a restart: ${both.afterRestart?.error}`);
     check(both, both.signedIn, "no token is stored after the sign-in");
     report.cases.push(both);

@@ -162,6 +162,14 @@ export interface McpOAuthOptions {
    */
   redirectUrl: string;
   /**
+   * The address that an RFC 7591 registration names: `/callback` on the port of `redirectUrl`, the
+   * path that most MCP clients use. Aliyun answers each registration with one shared client that
+   * accepts only `/callback` and `/oauth/callback` (#7480). Unset: `redirectUrl`. A sign-in app and
+   * the client metadata document keep `redirectUrl`, which their administrator and `apps/auth-api`
+   * registered.
+   */
+  registrationRedirectUrl?: string | undefined;
+  /**
    * The `openbot://mcp-auth` deep link, which a sign-in in this computer's browser registers after
    * the browser did not come back on `127.0.0.1` or on `localhost`. TradingView's firewall blocks a
    * sign-in page that names either one (#7230). Read at each sign-in: `undefined` while the
@@ -823,6 +831,7 @@ export class McpOAuth implements McpOAuthAuthority {
       state,
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
+      registrationRedirectUrl: this.#options.registrationRedirectUrl ?? this.#options.redirectUrl,
       // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
       deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
@@ -841,7 +850,10 @@ interface ClientProviderOptions {
   resource: string;
   state: string | null;
   storage: McpOAuthStorage;
+  /** The address of a sign-in app and of the client metadata document. */
   redirectUrl: string;
+  /** The address that a registration names. See `McpOAuthOptions`. */
+  registrationRedirectUrl: string;
   /** The deep link to register after `localhost` got no grant back, or unset. See `McpOAuthOptions`. */
   deepLinkRedirectUrl?: (() => string | undefined) | undefined;
   openExternal: (url: string) => Promise<void>;
@@ -898,7 +910,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
-    this.#localhostRedirectUrl = localhostRedirectUrl(options.redirectUrl);
+    this.#localhostRedirectUrl = localhostRedirectUrl(options.registrationRedirectUrl);
     // `127.0.0.1`, then `localhost`, then the deep link, and then `127.0.0.1` again. TradingView's
     // firewall blocks a sign-in page that names either loopback name, and lets the deep link through
     // (#7230). The deep link is read only here, when the attempt needs it: on Linux the check runs
@@ -909,7 +921,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     this.#retryRedirectUrl = this.#deepLinkRedirectUrl ?? this.#otherRedirectName(unanswered);
   }
 
-  /** The `localhost` form of this run's loopback address, for a server that refuses `127.0.0.1`. */
+  /** The `localhost` form of this run's registration address, for a server that refuses `127.0.0.1`. */
   readonly #localhostRedirectUrl: string | null;
   /** The deep link, when this attempt registers it instead of a loopback name. */
   readonly #deepLinkRedirectUrl: string | null;
@@ -921,18 +933,22 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   /** The `redirect_uri` of the authorization page this attempt opened, or `null` before it opens one. */
   #openedRedirectUrl: string | null = null;
 
-  /** The `localhost` form of this run's address for its `127.0.0.1` form, and the reverse. */
+  /** The `localhost` form of this run's registration address for its `127.0.0.1` form, and the reverse. */
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
     const localhost = this.#localhostRedirectUrl;
     if (!localhost) return null;
-    if (redirectUrl === this.#options.redirectUrl) return localhost;
-    return redirectUrl === localhost ? this.#options.redirectUrl : null;
+    if (redirectUrl === this.#options.registrationRedirectUrl) return localhost;
+    return redirectUrl === localhost ? this.#options.registrationRedirectUrl : null;
   }
 
   /**
-   * This run's address, or its `localhost` form when the registration on file names that form. A
-   * server that refused `127.0.0.1` registered that form (#5584), and the authorization request and
-   * the token request must send the address that was registered.
+   * This run's registration address, or its `localhost` form when the registration on file names
+   * that form. A server that refused `127.0.0.1` registered that form (#5584), and the authorization
+   * request and the token request must send the address that was registered.
+   *
+   * A sign-in app and the client metadata document send `redirectUrl`, the address they list. A
+   * registration that names neither form of the registration address, such as one from a build that
+   * registered `/mcp-auth`, is not used: `clientInformation` registers again.
    *
    * The deep link only in the attempt that registered it: a build from before the loopback listener
    * registered it too, and Canva refuses it at `/authorize`.
@@ -944,10 +960,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const record = this.#record();
     const { app } = record;
     const client = this.#registeredClient ?? record.client;
+    if (app || client?.client_id === MCP_CLIENT_METADATA_URL) return this.#options.redirectUrl;
     const deepLink = this.#deepLinkRedirectUrl;
-    if (!app && deepLink && client?.redirect_uris.includes(deepLink)) return deepLink;
+    if (deepLink && client?.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
-    return localhost && !app && client?.redirect_uris.includes(localhost) ? localhost : this.#options.redirectUrl;
+    return localhost && client?.redirect_uris.includes(localhost) ? localhost : this.#options.registrationRedirectUrl;
   }
 
   /**
@@ -978,7 +995,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       client_name: "OpenBot",
       client_uri: "https://openbot.run",
       logo_uri: "https://openbot.run/icon-512x512.png",
-      redirect_uris: [this.#retryRedirectUrl ?? this.#options.redirectUrl],
+      redirect_uris: [this.#retryRedirectUrl ?? this.#options.registrationRedirectUrl],
       application_type: "native",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
@@ -1116,7 +1133,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
     const deepLink = this.#deepLinkRedirectUrl;
     const other = this.#otherRedirectName(sent);
-    const names = deepLink && sent === deepLink ? [this.#options.redirectUrl, localhost] : other ? [other] : [];
+    const names =
+      deepLink && sent === deepLink ? [this.#options.registrationRedirectUrl, localhost] : other ? [other] : [];
     return names.map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
   }
 

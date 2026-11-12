@@ -17,6 +17,11 @@
  * not. When another program holds that port, the operating system gives one, and the registration
  * is remade when the stored one names another address.
  *
+ * An RFC 7591 registration names `/callback` on the same port, the path that most MCP clients use.
+ * Aliyun answers each registration with one shared client that accepts only `/callback` and
+ * `/oauth/callback`, whatever the registration named (#7480). A sign-in app and the client metadata
+ * document keep `/mcp-auth`: an administrator, and `apps/auth-api`, registered that exact address.
+ *
  * The grant travels no further than this process. The page the browser is left on says only that
  * the window can be closed - the code is in the request line, and a page that repeated it would
  * put a credential in the browser's history.
@@ -25,15 +30,23 @@
 import type { LanguageService } from "./language-service";
 import { type CallbackAnswer, startLoopbackCallbackServer } from "./loopback-callback-server";
 
-/** The one path this listener answers. Everything else is a 404, including `/`. */
-export const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+/** The path of a sign-in app and of the client metadata document. */
+const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+
+/** The path that an RFC 7591 registration names. */
+const MCP_OAUTH_REGISTRATION_REDIRECT_PATH = "/callback";
+
+/** The paths this listener answers. Everything else is a 404, including `/`. */
+export const MCP_OAUTH_REDIRECT_PATHS = [MCP_OAUTH_REDIRECT_PATH, MCP_OAUTH_REGISTRATION_REDIRECT_PATH] as const;
 
 /** The port tried first. Not assigned by IANA as far as this was checked; any other works the same. */
 export const MCP_OAUTH_REDIRECT_PORT = 28_417;
 
 export interface McpOAuthRedirectServer {
-  /** The address to register and to send. Stable for as long as this process runs. */
+  /** The address of a sign-in app and of the client metadata document. Stable for as long as this process runs. */
   readonly redirectUrl: string;
+  /** The address that an RFC 7591 registration names, on the same port. */
+  readonly registrationRedirectUrl: string;
   close: () => Promise<void>;
 }
 
@@ -68,7 +81,7 @@ export async function startMcpOAuthRedirectServer({
   preferredPort,
 }: McpOAuthRedirectServerOptions): Promise<McpOAuthRedirectServer> {
   const server = await startLoopbackCallbackServer({
-    path: MCP_OAUTH_REDIRECT_PATH,
+    paths: MCP_OAUTH_REDIRECT_PATHS,
     receive: (url) => receiveGrant(url, deliver, relayRefusal),
     language,
     port: { preferred: preferredPort },
@@ -76,6 +89,7 @@ export async function startMcpOAuthRedirectServer({
   });
   return {
     redirectUrl: `http://127.0.0.1:${server.port}${MCP_OAUTH_REDIRECT_PATH}`,
+    registrationRedirectUrl: `http://127.0.0.1:${server.port}${MCP_OAUTH_REGISTRATION_REDIRECT_PATH}`,
     close: server.close,
   };
 }

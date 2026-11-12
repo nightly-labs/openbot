@@ -20,7 +20,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 
 | Kind | Example | On this computer | On a joined server |
 | --- | --- | --- | --- |
-| Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and path `/mcp-auth` ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
+| Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and the paths `/callback` (an RFC 7591 registration) and `/mcp-auth` (a sign-in app and the client metadata document) ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
 | Device code | Codex (`codex-device`), Grok, Cline, Kimi, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`; Kimi `providers-v8` only). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
 | Pasted code | Claude on Linux (`cli` / `paste`), Cursor (`cli` / `link`) | The page shows a code, and the user pastes it into OpenBot. | The host starts it and the client takes the code (`providers-v3` to `providers-v5`). |
 | CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
@@ -197,7 +197,7 @@ POST status {flowId}     ---------------------> SignInRelayHost.status
 Read port, path and state from authorizeUrl
 (refuse a page with no state)
 Listen on that port (or use the own
-MCP listener on 28417 /mcp-auth, by state)
+MCP listener on 28417 /callback or /mcp-auth, by state)
 Show the page's host name; the user clicks
 "Open sign-in page" (https only)
         ... the user signs in ...
@@ -228,8 +228,9 @@ POST complete {flowId, query} ----------------> check state, give code to McpOAu
 
 The client tries these, in this order:
 
-1. **Its own MCP listener.** The callback names port 28417 and path `/mcp-auth`, and the client's
-   own MCP grant listener has that port. The listener gives a `state` that no local sign-in started
+1. **Its own MCP listener.** The callback names port 28417 and path `/callback` or `/mcp-auth`, and
+   the client's own MCP grant listener has that port. A client from before #7480 answers only
+   `/mcp-auth`, so a registration callback on `/callback` goes to the pasted address. The listener gives a `state` that no local sign-in started
    to `SignInRelayClient.deliver`. The `openbot://mcp-auth` link does the same.
 2. **The exact port.** The client binds `127.0.0.1:<port>` for the time of the sign-in with
    `listenLoopbackExact`. It never takes another port, because the page sends the browser to the
@@ -422,7 +423,9 @@ OpenBot's client metadata document (CIMD, SEP-991) as the `client_id`:
 ([`mcp-client[.]json.ts`](../../apps/auth-api/src/routes/oauth/mcp-client%5B.%5Djson.ts)). Its
 `redirect_uris` holds only `http://127.0.0.1:28417/mcp-auth`: ElevenLabs refuses a document that
 also lists a custom scheme such as `openbot://mcp-auth` (#5748). A server that
-offers registration keeps it. ElevenLabs accepts only the document. When port 28417 is in use, the
+offers registration keeps it, and the registration names `/callback`: Aliyun gives each
+registration one shared client that accepts only `/callback` and `/oauth/callback` (#7480).
+ElevenLabs accepts only the document. When port 28417 is in use, the
 loopback address has another port, and a server that compares ports refuses it.
 
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
