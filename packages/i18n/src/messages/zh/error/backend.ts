@@ -229,6 +229,8 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请打开 MCP 设置并选择“登录”。",
   "error.backend.mcpServerFailedForProvider":

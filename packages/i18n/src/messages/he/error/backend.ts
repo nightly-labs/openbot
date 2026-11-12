@@ -238,6 +238,8 @@ export const messages = {
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":

@@ -256,6 +256,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте настройки MCP и выберите «Войти».",
   "error.backend.mcpServerFailedForProvider":
