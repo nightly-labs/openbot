@@ -16,9 +16,9 @@ import { Effect } from "effect";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import {
   CLINE_ACP_FLAVOR,
+  COPILOT_ACP_FLAVOR,
   CURSOR_ACP_FLAVOR,
   customAgentFlavor,
-  DEFAULT_ACP_FLAVOR,
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
@@ -1401,7 +1401,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
         provider: "copilot",
-        flavor: DEFAULT_ACP_FLAVOR,
+        flavor: COPILOT_ACP_FLAVOR,
         argv: COPILOT_ARGV,
         env: { ...COPILOT_ENV },
         ...(confinement
@@ -1425,7 +1425,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
         provider: "copilot",
-        flavor: DEFAULT_ACP_FLAVOR,
+        flavor: COPILOT_ACP_FLAVOR,
         argv: COPILOT_ARGV,
         profileGeneration: true,
         env: { ...COPILOT_ENV },
