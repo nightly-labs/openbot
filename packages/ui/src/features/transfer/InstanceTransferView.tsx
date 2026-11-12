@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
+  ArrowLeftRight,
   ArrowRight,
   Bot,
   Brain,
@@ -69,6 +70,8 @@ export interface InstanceTransferViewProps {
   onImportDone: () => void;
   /** Absent for a joined server: its providers are signed in on that computer. */
   onSignIn?: ((provider: AgentProviderId) => void) | undefined;
+  /** Opens the dialog that copies agents to another server. Absent when there is no other server. */
+  onCopy?: (() => void) | undefined;
 }
 
 /**
@@ -123,6 +126,15 @@ export function InstanceTransferView(props: InstanceTransferViewProps) {
             <span class="instance-transfer-tile-title">{t("settings.transfer.new.title")}</span>
             <span class="instance-transfer-tile-text">{t("settings.transfer.new.text")}</span>
           </Button>
+          <Show when={props.onCopy}>
+            {(copy) => (
+              <Button type="button" variant="outline" class="instance-transfer-tile" onClick={() => copy()()}>
+                <ArrowLeftRight class="instance-transfer-tile-icon" aria-hidden="true" />
+                <span class="instance-transfer-tile-title">{t("settings.transfer.copy.tileTitle")}</span>
+                <span class="instance-transfer-tile-text">{t("settings.transfer.copy.tileText")}</span>
+              </Button>
+            )}
+          </Show>
         </div>
         <NotMoved />
       </Show>
@@ -172,7 +184,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
       <h3 class="agent-import-heading">{t("settings.transfer.export.title")}</h3>
       {/* Outside the summary, so a summary that fails is shown and not left loading. */}
       <Show when={props.exportError}>
-        {(error) => <Alert title={t("settings.transfer.export.failed")} description={error()} />}
+        {(error) => <TransferAlert title={t("settings.transfer.export.failed")} description={error()} />}
       </Show>
       <Show when={props.summary} fallback={<p class="agent-import-lede">{t("settings.transfer.loading")}</p>}>
         <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
@@ -277,7 +289,7 @@ function ExportSaved(props: {
         <p class="storage-message-description">{props.fileName}</p>
       </Show>
       <Show when={props.warnings.length > 0}>
-        <Notes title={t("settings.transfer.result.warnings")} notes={props.warnings} />
+        <TransferNotes title={t("settings.transfer.result.warnings")} notes={props.warnings} />
       </Show>
       <ol class="agent-import-steps">
         <li class="agent-import-step">
@@ -324,7 +336,7 @@ function ImportScreen(props: InstanceTransferViewProps) {
         <h3 class="agent-import-heading">{t("settings.transfer.import.title")}</h3>
         <p class="agent-import-lede">{t("settings.transfer.import.lede")}</p>
         <Show when={props.importError}>
-          {(error) => <Alert title={t("settings.transfer.import.openFailed")} description={error()} />}
+          {(error) => <TransferAlert title={t("settings.transfer.import.openFailed")} description={error()} />}
         </Show>
         <div class="agent-import-actions instance-transfer-start">
           <Button
@@ -390,10 +402,10 @@ function ImportReview(props: {
       <p class="storage-summary-caption">{source()}</p>
       <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
       <Show when={props.error}>
-        {(error) => <Alert title={t("settings.transfer.import.failed")} description={error()} />}
+        {(error) => <TransferAlert title={t("settings.transfer.import.failed")} description={error()} />}
       </Show>
       <Show when={props.preview.warnings.length > 0}>
-        <Notes title={t("settings.transfer.import.warnings")} notes={props.preview.warnings} />
+        <TransferNotes title={t("settings.transfer.import.warnings")} notes={props.preview.warnings} />
       </Show>
       <Show when={props.preview.agents.length > 0}>
         <AgentChecklist
@@ -492,13 +504,13 @@ function ImportResult(props: {
         </section>
       </Show>
       <Show when={props.result.skipped.length > 0}>
-        <Notes
+        <TransferNotes
           title={t("settings.transfer.result.notImported")}
           notes={props.result.skipped.map((entry) => `${entry.name}: ${entry.reason}`)}
         />
       </Show>
       <Show when={props.result.warnings.length > 0}>
-        <Notes title={t("settings.transfer.result.warnings")} notes={props.result.warnings} />
+        <TransferNotes title={t("settings.transfer.result.warnings")} notes={props.result.warnings} />
       </Show>
       <div class="agent-import-actions instance-transfer-start">
         <Button type="button" variant="secondary" onClick={() => props.onDone()}>
@@ -610,12 +622,13 @@ function AgentChecklist(props: {
   );
 }
 
-function NotMoved() {
+/** What a transfer leaves on the old server. The copy dialog names it with its own word. */
+export function NotMoved(props: { text?: "settings.transfer.notMovedSecrets" | "settings.transfer.copy.notCopied" }) {
   const { t } = useText();
   return (
     <p class="instance-transfer-not-moved">
       <Lock class="instance-transfer-not-moved-icon" aria-hidden="true" />
-      <span>{t("settings.transfer.notMovedSecrets")}</span>
+      <span>{t(props.text ?? "settings.transfer.notMovedSecrets")}</span>
     </p>
   );
 }
@@ -637,7 +650,7 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
   );
 }
 
-function Alert(props: { title: string; description: string }) {
+export function TransferAlert(props: { title: string; description: string }) {
   return (
     <div class="storage-message" role="alert">
       <TriangleAlert class="storage-message-icon" aria-hidden="true" />
@@ -649,7 +662,7 @@ function Alert(props: { title: string; description: string }) {
   );
 }
 
-function Notes(props: { title: string; notes: readonly string[] }) {
+export function TransferNotes(props: { title: string; notes: readonly string[] }) {
   const { sourceText } = useText();
   return (
     <div class="storage-message">

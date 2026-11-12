@@ -19,7 +19,7 @@ import { desktopAnalytics } from "../../analytics";
  * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
  * host. In the browser client they go to the connected host, and a download has no folder to show.
  */
-export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport"> &
+export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport" | "copy"> &
   Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
 
 interface ServerTransferState {
