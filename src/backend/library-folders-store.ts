@@ -280,7 +280,14 @@ export class LibraryFoldersStore {
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#snapshot = next;
-    for (const listener of this.#listeners) listener();
+    // The change is saved: a listener that fails must not report it as failed.
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch {
+        // The next change or read brings the client up to date.
+      }
+    }
   });
 }
 

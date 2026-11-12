@@ -29,13 +29,15 @@ interface ChangeLane {
   queue: Promise<void>;
   pending: number;
   generation: number;
+  /** The cause of the failed change that dropped the changes after it. A dropped change rejects with it. */
+  failure: unknown;
 }
 const lanes = new Map<string, ChangeLane>();
 
 function laneOf(key: string): ChangeLane {
   let lane = lanes.get(key);
   if (!lane) {
-    lane = { queue: Promise.resolve(), pending: 0, generation: 0 };
+    lane = { queue: Promise.resolve(), pending: 0, generation: 0, failure: undefined };
     lanes.set(key, lane);
   }
   return lane;
@@ -60,6 +62,9 @@ async function changeFolders(
 ): Promise<void> {
   const queryKey = queryKeys.serverLibraryFolders(scope, serverId);
   const lane = laneOf(JSON.stringify(queryKey));
+  // A read that started before this change must not replace it. The base is read after the cancel,
+  // so a second change made at once applies on top of the first.
+  await queryClient.cancelQueries({ queryKey, exact: true });
   const base = queryClient.getQueryData<LibraryFoldersSnapshot>(queryKey);
   if (!base) return;
   let next: LibraryFoldersSnapshot | null = null;
@@ -70,13 +75,12 @@ async function changeFolders(
     if (!(error instanceof LibraryFolderRefusal)) throw error;
   }
   if (next === base) return;
-  // A read that started before this change must not replace it.
-  await queryClient.cancelQueries({ queryKey, exact: true });
   if (next) queryClient.setQueryData(queryKey, next);
   lane.pending += 1;
   const generation = lane.generation;
   const run = lane.queue.then(async () => {
-    if (generation !== lane.generation) return;
+    // An earlier change failed, and this one was made on top of it: it does not go, and it fails too.
+    if (generation !== lane.generation) throw lane.failure;
     try {
       const answer = await send(action, serverId);
       if (generation !== lane.generation) return;
@@ -86,6 +90,7 @@ async function changeFolders(
       if (generation === lane.generation) {
         lane.generation += 1;
         lane.pending = 0;
+        lane.failure = cause;
         // Another member can be the cause, so the host tells what it has now.
         void queryClient.invalidateQueries({ queryKey, exact: true });
       }

@@ -263,11 +263,11 @@ function PlaceSheet() {
   const accent = String(useCSSVariable("--openbot-accent"));
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const removedFiles = files.filter((file) => fromRemovedAgent(file, folders.livingAgentIds));
-  const chosen = resolveLibraryPlace(
-    useLibraryPlace(serverId),
-    snapshot,
-    folders.livingAgentIds,
-    removedFiles.length > 0,
+  const storedPlace = useLibraryPlace(serverId);
+  const removedFilesExist = removedFiles.length > 0;
+  const chosen = useMemo(
+    () => resolveLibraryPlace(storedPlace, snapshot, folders.livingAgentIds, removedFilesExist),
+    [storedPlace, snapshot, folders.livingAgentIds, removedFilesExist],
   );
   // The agent and the folders of the place show open, so the place is in view.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => {
@@ -359,9 +359,7 @@ function PlaceSheet() {
             </>
           }
         />,
-        ...(open && depth + 1 < LIBRARY_FOLDER_LIMITS.levels
-          ? folderRows(agentId, agentName, folder.id, depth + 1)
-          : []),
+        ...(open && depth < LIBRARY_FOLDER_LIMITS.levels ? folderRows(agentId, agentName, folder.id, depth + 1) : []),
       ];
     });
 
@@ -572,6 +570,13 @@ export function LibraryFolderNameScreen() {
   const parent = params.parentId ? snapshot?.folders.find((folder) => folder.id === params.parentId) : undefined;
   const agentId = renaming?.agentId ?? params.agentId ?? null;
   const [name, setName] = useState(renaming?.name ?? "");
+  // The folders can load after the page opens. The field then starts with the folder's name.
+  const touched = useRef(false);
+  const loadedName = renaming?.name;
+  useEffect(() => {
+    if (loadedName === undefined || touched.current) return;
+    setName(loadedName);
+  }, [loadedName]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const trimmed = name.trim();
@@ -651,6 +656,7 @@ export function LibraryFolderNameScreen() {
         label={t("mobile.server.library.folders.name")}
         value={name}
         onChangeText={(value) => {
+          touched.current = true;
           setName(value);
           if (error) setError(null);
         }}

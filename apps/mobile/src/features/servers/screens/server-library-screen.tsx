@@ -117,7 +117,11 @@ export function ServerLibraryScreen() {
   // As on desktop, a file that is gone from the disk does not show.
   const files = useMemo(() => (query.data?.files ?? []).filter((file) => file.status !== "missing"), [query.data]);
   const removedFilesExist = useMemo(() => files.some((file) => fromRemovedAgent(file, living)), [files, living]);
-  const place = resolveLibraryPlace(useLibraryPlace(serverId), snapshot, living, removedFilesExist);
+  const storedPlace = useLibraryPlace(serverId);
+  const place = useMemo(
+    () => resolveLibraryPlace(storedPlace, snapshot, living, removedFilesExist),
+    [storedPlace, snapshot, living, removedFilesExist],
+  );
   const placeFiles = useMemo(() => filesOfPlace(files, place, snapshot, living), [files, place, snapshot, living]);
   const counts = useMemo(() => fileTypeCounts(placeFiles), [placeFiles]);
   // A type that a new measurement leaves empty is no longer selected.
@@ -167,7 +171,8 @@ export function ServerLibraryScreen() {
   const knownFileIds = useMemo(() => new Set((query.data?.files ?? []).map((file) => file.id)), [query.data]);
   const rescannedRevision = useRef<number | null>(null);
   useEffect(() => {
-    if (!snapshot || !query.data || rescannedRevision.current === snapshot.revision) return;
+    // A cut list does not hold every file, so a missing file is no reason to scan again.
+    if (!snapshot || !query.data || query.data.truncated || rescannedRevision.current === snapshot.revision) return;
     if (!Object.keys(snapshot.placement).some((fileId) => !knownFileIds.has(fileId))) return;
     rescannedRevision.current = snapshot.revision;
     void rescan().catch(() => undefined);
