@@ -112,7 +112,7 @@ export const messages = {
   "mobile.chat.tryAgain": "Tente novamente.",
   "mobile.chat.attachment.typeText": "TEXTO",
   "mobile.chat.attachment.typeFile": "ARQUIVO",
-  "mobile.chat.attachment.tooLargeForMobile": "Este arquivo excede o limite de 10 MB do celular. Abra no computador.",
+  "mobile.chat.attachment.tooLargeForMobile": "Este arquivo excede o limite de {limit} do celular. Abra no computador.",
   "mobile.chat.attachment.sharingUnavailable": "O compartilhamento de arquivos está indisponível neste dispositivo.",
   "mobile.chat.attachment.unavailable": "O anexo está indisponível. Tente novamente.",
   "mobile.chat.attachment.openFailed": "Não foi possível abrir o anexo",

@@ -113,7 +113,7 @@ export const messages = {
   "mobile.chat.tryAgain": "יש לנסות שוב.",
   "mobile.chat.attachment.typeText": "TEXT",
   "mobile.chat.attachment.typeFile": "FILE",
-  "mobile.chat.attachment.tooLargeForMobile": "הקובץ הזה חורג ממגבלת 10 MB בנייד. יש לפתוח אותו במחשב.",
+  "mobile.chat.attachment.tooLargeForMobile": "הקובץ הזה חורג ממגבלת {limit} בנייד. יש לפתוח אותו במחשב.",
   "mobile.chat.attachment.sharingUnavailable": "שיתוף קבצים אינו זמין במכשיר הזה.",
   "mobile.chat.attachment.unavailable": "הקובץ המצורף אינו זמין. יש לנסות שוב.",
   "mobile.chat.attachment.openFailed": "לא ניתן לפתוח את הקובץ המצורף",

@@ -111,7 +111,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.tryAgain": "Try again.",
   "mobile.chat.attachment.typeText": "TEXT",
   "mobile.chat.attachment.typeFile": "FILE",
-  "mobile.chat.attachment.tooLargeForMobile": "This file exceeds the mobile 10 MB limit. Open it on desktop.",
+  "mobile.chat.attachment.tooLargeForMobile": "This file exceeds the mobile {limit} limit. Open it on desktop.",
   "mobile.chat.attachment.sharingUnavailable": "File sharing is unavailable on this device.",
   "mobile.chat.attachment.unavailable": "The attachment is unavailable. Try again.",
   "mobile.chat.attachment.openFailed": "Could not open attachment",

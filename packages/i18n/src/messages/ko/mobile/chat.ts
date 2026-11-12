@@ -111,7 +111,7 @@ export const messages = {
   "mobile.chat.tryAgain": "다시 시도해 주세요.",
   "mobile.chat.attachment.typeText": "TEXT",
   "mobile.chat.attachment.typeFile": "FILE",
-  "mobile.chat.attachment.tooLargeForMobile": "이 파일은 모바일 10MB 제한을 넘어요. 데스크톱에서 열어 주세요.",
+  "mobile.chat.attachment.tooLargeForMobile": "이 파일은 모바일 {limit} 제한을 넘어요. 데스크톱에서 열어 주세요.",
   "mobile.chat.attachment.sharingUnavailable": "이 기기에서는 파일 공유를 사용할 수 없어요.",
   "mobile.chat.attachment.unavailable": "첨부 파일을 사용할 수 없어요. 다시 시도해 주세요.",
   "mobile.chat.attachment.openFailed": "첨부 파일을 열 수 없어요",

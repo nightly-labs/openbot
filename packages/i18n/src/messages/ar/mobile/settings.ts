@@ -189,7 +189,7 @@ export const messages = {
   "mobile.settings.conversations.hiddenChats": "الدردشات المخفية",
   "mobile.settings.conversations.largeFiles": "تنزيل الملفات الكبيرة تلقائيًا",
   "mobile.settings.conversations.largeFilesFooter":
-    "الملفات الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيل الملفات حتى {large} مباشرةً. قد يستهلك هذا الكثير من بيانات الجوال.",
+    "الصور والفيديوهات والملفات الصوتية الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيلها مباشرةً حتى {large}. قد يستهلك هذا الكثير من بيانات الجوال.",
   "mobile.settings.profile.nameUnsafe": "أزل فواصل الأسطر وأحرف التحكم من اسمك.",
   "mobile.settings.profile.nameLength": "استخدم من 3 إلى 20 حرفًا لاسم العرض.",
   "mobile.settings.profile.saveFailed": "تعذّر حفظ التغييرات. أعد المحاولة.",

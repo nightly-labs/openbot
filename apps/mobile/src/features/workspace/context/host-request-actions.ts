@@ -1410,6 +1410,9 @@ export function createHostRequestActions({
           undefined,
           largeDownload,
         );
+      // A large file that the user asked for does not wait behind the images of the chat, and they
+      // do not wait behind it.
+      if (largeDownload) return download();
       // Limit native/DOM copies when a message contains several large images.
       const result = attachmentDownloads.current.then(download);
       attachmentDownloads.current = result.then(

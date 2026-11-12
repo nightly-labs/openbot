@@ -25,7 +25,7 @@ export async function loadLargeFilePreference(): Promise<void> {
 
 export async function saveLargeFilePreference(automatic: boolean): Promise<void> {
   if (!useLargeFilePreference.getState().ready || useLargeFilePreference.getState().saving) return;
-  // Apply immediately, including when storage fails. Settings offers a retry.
+  // Apply immediately, including when storage fails. Settings shows the error, and the user can switch again.
   useLargeFilePreference.setState({ automatic, saving: true });
   try {
     await SecureStore.setItemAsync(key, String(automatic));

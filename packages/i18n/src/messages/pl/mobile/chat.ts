@@ -128,7 +128,8 @@ export const messages = {
   "mobile.chat.tryAgain": "Spróbuj ponownie.",
   "mobile.chat.attachment.typeText": "TEKST",
   "mobile.chat.attachment.typeFile": "PLIK",
-  "mobile.chat.attachment.tooLargeForMobile": "Ten plik przekracza limit 10 MB na telefonie. Otwórz go na komputerze.",
+  "mobile.chat.attachment.tooLargeForMobile":
+    "Ten plik przekracza limit {limit} na telefonie. Otwórz go na komputerze.",
   "mobile.chat.attachment.sharingUnavailable": "Udostępnianie plików jest niedostępne na tym urządzeniu.",
   "mobile.chat.attachment.unavailable": "Załącznik jest niedostępny. Spróbuj ponownie.",
   "mobile.chat.attachment.openFailed": "Nie udało się otworzyć załącznika",

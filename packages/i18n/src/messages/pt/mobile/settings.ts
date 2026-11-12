@@ -185,7 +185,7 @@ export const messages = {
   "mobile.settings.conversations.hiddenChats": "Chats ocultos",
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
-    "Arquivos com mais de {small} só são baixados quando você toca neles. Ative para baixar na hora arquivos de até {large}. Isso pode usar muitos dados móveis.",
+    "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
   "mobile.settings.profile.nameUnsafe": "Remova quebras de linha e caracteres de controle do seu nome.",
   "mobile.settings.profile.nameLength": "Use de 3 a 20 caracteres no nome de exibição.",
   "mobile.settings.profile.saveFailed": "Não foi possível salvar as alterações. Tente novamente.",

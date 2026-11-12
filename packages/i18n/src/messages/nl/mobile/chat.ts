@@ -105,7 +105,7 @@ export const messages = {
   "mobile.chat.attachment.typeText": "TEKST",
   "mobile.chat.attachment.typeFile": "BESTAND",
   "mobile.chat.attachment.tooLargeForMobile":
-    "Dit bestand is groter dan de mobiele limiet van 10 MB. Open het op je computer.",
+    "Dit bestand is groter dan de mobiele limiet van {limit}. Open het op je computer.",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
   "mobile.chat.attachment.unavailable": "De bijlage is niet beschikbaar. Probeer opnieuw.",
   "mobile.chat.attachment.openFailed": "Kan bijlage niet openen",

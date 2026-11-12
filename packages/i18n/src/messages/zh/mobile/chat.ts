@@ -109,7 +109,7 @@ export const messages = {
   "mobile.chat.tryAgain": "请重试。",
   "mobile.chat.attachment.typeText": "文本",
   "mobile.chat.attachment.typeFile": "文件",
-  "mobile.chat.attachment.tooLargeForMobile": "该文件超过手机端 10 MB 上限，请在桌面端打开。",
+  "mobile.chat.attachment.tooLargeForMobile": "该文件超过手机端 {limit} 上限，请在桌面端打开。",
   "mobile.chat.attachment.sharingUnavailable": "这台设备不支持文件分享。",
   "mobile.chat.attachment.unavailable": "该附件不可用，请重试。",
   "mobile.chat.attachment.openFailed": "无法打开附件",

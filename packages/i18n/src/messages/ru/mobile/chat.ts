@@ -126,7 +126,7 @@ export const messages = {
   "mobile.chat.tryAgain": "Повторите попытку.",
   "mobile.chat.attachment.typeText": "ТЕКСТ",
   "mobile.chat.attachment.typeFile": "ФАЙЛ",
-  "mobile.chat.attachment.tooLargeForMobile": "Файл больше мобильного лимита в 10 МБ. Откройте его на компьютере.",
+  "mobile.chat.attachment.tooLargeForMobile": "Файл больше мобильного лимита в {limit}. Откройте его на компьютере.",
   "mobile.chat.attachment.sharingUnavailable": "На этом устройстве нельзя делиться файлами.",
   "mobile.chat.attachment.unavailable": "Вложение недоступно. Повторите попытку.",
   "mobile.chat.attachment.openFailed": "Не удалось открыть вложение",

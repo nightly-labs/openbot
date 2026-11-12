@@ -131,7 +131,7 @@ export const messages = {
   "mobile.chat.tryAgain": "حاول مرة أخرى.",
   "mobile.chat.attachment.typeText": "نص",
   "mobile.chat.attachment.typeFile": "ملف",
-  "mobile.chat.attachment.tooLargeForMobile": "يتجاوز هذا الملف حد الهاتف البالغ 10 MB. افتحه على سطح المكتب.",
+  "mobile.chat.attachment.tooLargeForMobile": "يتجاوز هذا الملف حد الهاتف البالغ {limit}. افتحه على سطح المكتب.",
   "mobile.chat.attachment.sharingUnavailable": "مشاركة الملفات غير متاحة على هذا الجهاز.",
   "mobile.chat.attachment.unavailable": "المرفق غير متاح. حاول مرة أخرى.",
   "mobile.chat.attachment.openFailed": "تعذّر فتح المرفق",

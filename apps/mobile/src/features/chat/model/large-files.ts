@@ -53,11 +53,14 @@ export function requestLargeFile(serverId: string, attachmentId: string) {
 }
 
 /**
- * The allowance a request needs for a file above the attachment limit. It takes only a file of
- * this size, so another file that downloads at the same time cannot use it.
+ * The allowance a request needs for a file above the attachment limit. It takes a file of this
+ * type and of this size or smaller. The host sends an attachment with its own type, or
+ * `application/octet-stream` when it has none.
  */
 export function largeDownloadOf(attachment: AttachmentSummary): RemoteLargeDownload | undefined {
-  return attachment.size > MOBILE_ATTACHMENT_BYTES ? { maxBytes: attachment.size } : undefined;
+  return attachment.size > MOBILE_ATTACHMENT_BYTES
+    ? { maxBytes: attachment.size, mimeType: attachment.mimeType || "application/octet-stream" }
+    : undefined;
 }
 
 /** A limit in whole megabytes, such as "10 MB". `format.fileSize` writes "10.0 MB". */

@@ -1,7 +1,7 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
@@ -17,7 +17,13 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
-import { attachmentDownload, largeDownloadOf } from "../model/large-files";
+import {
+  fileLimitText,
+  largeDownloadOf,
+  MOBILE_LARGE_FILE_BYTES,
+  requestLargeFile,
+  useAttachmentDownload,
+} from "../model/large-files";
 import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile } from "./use-media-file";
 
@@ -144,15 +150,17 @@ function attachmentFileQuery(
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
     queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
-      // A large file downloads only after the user asks for it, or with the setting on.
-      if (attachmentDownload(serverId, attachment) !== "download") throw new Error(tooLarge);
+      // A file between the two limits runs this query only when the user asks for it, or with the
+      // setting on: `useAttachmentFile` does not enable it before.
+      if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptImageFile(serverId, attachment);
       if (kept) return kept;
       const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
-      return {
-        ...data,
-        fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,
-      };
+      const fileUri = data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined;
+      // The cache does not keep the Base64 of a large image that is on disk: the file has it.
+      return fileUri && attachment.size > MOBILE_ATTACHMENT_BYTES
+        ? { ...data, base64: "", fileUri }
+        : { ...data, fileUri };
     },
     retry: false,
     staleTime: Infinity,
@@ -178,7 +186,10 @@ function imageExtension(attachment: AttachmentSummary, mimeType: string) {
  */
 export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
-  const { t, sourceText } = useText();
+  const text = useText();
+  const { t, sourceText } = text;
+  // A large file shows only after the user asks for it, or with the setting on.
+  const { download } = useAttachmentDownload(serverId, attachment);
   const [sharing, setSharing] = useState(false);
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
   const local =
@@ -186,8 +197,13 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       ? attachment.previewUrl
       : null;
   const query = useQuery({
-    ...attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
-    enabled: preview && !local && !pending,
+    ...attachmentFileQuery(
+      serverId,
+      attachment,
+      downloadAttachment,
+      t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+    ),
+    enabled: preview && download === "download" && !local && !pending,
   });
   const data = query.data;
   const dimensions = useMemo(() => {
@@ -201,6 +217,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   const uri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
   async function share() {
+    // The user asks for this file, so a large file downloads.
+    requestLargeFile(serverId, attachment.id);
     setSharing(true);
     let file: File | null = null;
     try {
@@ -227,6 +245,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   }
   /** Saves the image to the photo library. It reports its own failure and returns whether it saved. */
   async function saveToPhotos(): Promise<boolean> {
+    requestLargeFile(serverId, attachment.id);
     setSharing(true);
     let file: File | null = null;
     try {
@@ -279,11 +298,17 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
 export function useAttachmentFiles(serverId: string, attachments: readonly AttachmentSummary[]) {
   const { downloadAttachment } = useMobileWorkspaceActions();
   const queryClient = useQueryClient();
-  const { t, sourceText } = useText();
+  const text = useText();
+  const { t, sourceText } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
     queryClient.fetchQuery(
-      attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
+      attachmentFileQuery(
+        serverId,
+        attachment,
+        downloadAttachment,
+        t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+      ),
     );
   const fail = (error: unknown, title: string) => {
     void haptics.notification("error");

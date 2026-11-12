@@ -113,7 +113,7 @@ export const messages = {
   "mobile.chat.attachment.typeText": "テキスト",
   "mobile.chat.attachment.typeFile": "ファイル",
   "mobile.chat.attachment.tooLargeForMobile":
-    "このファイルはモバイルの上限 10 MB を超えています。パソコンで開いてください。",
+    "このファイルはモバイルの上限 {limit} を超えています。パソコンで開いてください。",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",
   "mobile.chat.attachment.unavailable": "添付ファイルを利用できません。もう一度お試しください。",
   "mobile.chat.attachment.openFailed": "添付ファイルを開けませんでした",

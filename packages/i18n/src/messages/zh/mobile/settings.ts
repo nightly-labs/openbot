@@ -175,7 +175,7 @@ export const messages = {
   "mobile.settings.conversations.hiddenChats": "隐藏的对话",
   "mobile.settings.conversations.largeFiles": "自动下载大文件",
   "mobile.settings.conversations.largeFilesFooter":
-    "超过 {small} 的文件只在你轻点时下载。开启后，{large} 以内的文件会立即下载。这可能会使用大量移动数据。",
+    "超过 {small} 的图片、视频和音频只在你轻点时下载。开启后，{large} 以内的会立即下载。这可能会使用大量移动数据。",
   "mobile.settings.profile.nameUnsafe": "请去掉名称中的换行和控制字符。",
   "mobile.settings.profile.nameLength": "显示名称请使用 3–20 个字符。",
   "mobile.settings.profile.saveFailed": "无法保存更改，请重试。",

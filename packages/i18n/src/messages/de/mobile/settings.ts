@@ -189,7 +189,7 @@ export const messages = {
   "mobile.settings.conversations.hiddenChats": "Ausgeblendete Chats",
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
-    "Dateien über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um Dateien bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+    "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
   "mobile.settings.profile.nameUnsafe": "Entferne Zeilenumbrüche und Steuerzeichen aus deinem Namen.",
   "mobile.settings.profile.nameLength": "Verwende 3–20 Zeichen für deinen Anzeigenamen.",
   "mobile.settings.profile.saveFailed": "Die Änderungen konnten nicht gespeichert werden. Versuche es erneut.",

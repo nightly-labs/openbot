@@ -112,7 +112,7 @@ export const messages = {
   "mobile.chat.tryAgain": "Tekrar deneyin.",
   "mobile.chat.attachment.typeText": "METİN",
   "mobile.chat.attachment.typeFile": "DOSYA",
-  "mobile.chat.attachment.tooLargeForMobile": "Bu dosya mobil 10 MB sınırını aşıyor. Masaüstünde açın.",
+  "mobile.chat.attachment.tooLargeForMobile": "Bu dosya mobil {limit} sınırını aşıyor. Masaüstünde açın.",
   "mobile.chat.attachment.sharingUnavailable": "Bu cihazda dosya paylaşımı kullanılamıyor.",
   "mobile.chat.attachment.unavailable": "Ek kullanılamıyor. Tekrar deneyin.",
   "mobile.chat.attachment.openFailed": "Ek açılamadı",
