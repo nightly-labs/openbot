@@ -1198,8 +1198,9 @@ export function ConversationTimeline() {
                                           suggestion(),
                                           Boolean(props.activeTurnId),
                                         )}
-                                        onSave={sendCardMessage}
-                                        onSaveSkill={() => saveSkillSuggestion(message()?.id ?? initialMessage.id)}
+                                        onSave={(reply) =>
+                                          saveSkillSuggestion(message()?.id ?? initialMessage.id, reply)
+                                        }
                                         onOpenSkill={skillOpener()}
                                       />
                                     )}

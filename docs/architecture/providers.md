@@ -287,7 +287,8 @@ from another window, returns at once; a press after the skill line saves nothing
 above is not added after a suggestion that a later skill line already saved. When the host saves
 nothing (the message is gone, no model, the writer or the save fails, or a joined host does not serve
 `skill-learning-v1`), the call returns `saved: false`, and the card sends a short yes as the user's
-message, which the note turns into the save. On a joined server and in the web client, Save sends
+message, which the note turns into the save. The yes goes to the chat of the press, also when the
+user opened another chat while the host wrote. On a joined server and in the web client, Save sends
 `POST /v1/skill-suggestions/save` to the host, which runs the same save. The card is busy from the press, and done
 when a skill line for the same skill follows (created for a new skill; revised or installed with the
 same id for an update). After a user message that saved nothing, the card has no action, because a
