@@ -176,7 +176,8 @@ Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` co
 Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
 in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
 Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
-are human". A long page that only mentions a captcha does not count. A check that passes by itself
+are human". A long page that only mentions a captcha does not count. Akamai markers also count only
+on a short page, because Akamai can leave them, hidden, on the normal page after its check passed. A check that passes by itself
 (`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
 seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
