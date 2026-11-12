@@ -76,9 +76,9 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
 
 /**
  * `registration` adds an RFC 7591 endpoint next to the client metadata document support. `refused`
- * makes that endpoint answer each registration as Railway's does.
+ * makes that endpoint answer each registration as Railway's does. `document` is the support itself.
  */
-async function fakeServer(registration: boolean, refused = false): Promise<FakeServer> {
+async function fakeServer(registration: boolean, refused = false, document = true): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     pageClientIds: [],
     pageRedirectUris: [],
@@ -103,7 +103,7 @@ async function fakeServer(registration: boolean, refused = false): Promise<FakeS
           code_challenge_methods_supported: ["S256"],
           grant_types_supported: ["authorization_code", "refresh_token"],
           token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
-          client_id_metadata_document_supported: true,
+          client_id_metadata_document_supported: document,
         });
       if (request.method === "POST" && path === "/register") {
         state.registrations++;
@@ -229,8 +229,8 @@ function probe(oauth: McpOAuth, url: string): Promise<{ toolCount: number; error
   return runCauseEffect(testMcpServer(httpConfig(url), 10_000, undefined, authority, "here"));
 }
 
-async function runCase(name: string, registration: boolean, refused = false): Promise<Case> {
-  const server = await fakeServer(registration, refused);
+async function runCase(name: string, registration: boolean, refused = false, document = true): Promise<Case> {
+  const server = await fakeServer(registration, refused, document);
   const records = new Map<string, McpOAuthRecord>();
   const oauth = oauthOn(records, server);
   let restarted: McpOAuth | null = null;
@@ -392,6 +392,22 @@ async function main(): Promise<void> {
     check(refused, refused.pageClientIds.length === 1, "a restart opened the sign-in page again");
     check(refused, refused.signedIn, "no token is stored after the sign-in");
     report.cases.push(refused);
+
+    // A server that refuses each registration and takes no document still says so in plain words.
+    const noDocument = await runCase("registration-refused-no-document", true, true, false);
+    check(
+      noDocument,
+      noDocument.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${noDocument.attempts[0]?.error}`,
+    );
+    check(noDocument, noDocument.pageClientIds.length === 0, `the pages named ${noDocument.pageClientIds.join()}`);
+    check(
+      noDocument,
+      noDocument.storedClient === null,
+      `the stored client is ${JSON.stringify(noDocument.storedClient)}`,
+    );
+    check(noDocument, !noDocument.signedIn, "a token is stored after a refused registration");
+    report.cases.push(noDocument);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }
