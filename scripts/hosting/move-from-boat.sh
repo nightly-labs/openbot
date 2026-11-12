@@ -626,7 +626,8 @@ EOF
 
 # Installs the apt packages that the customer installed in the sandbox, and names each package that
 # this machine cannot install. The service user has no root here, so a package that changes the
-# firewall, SSH or root access of this machine is not installed. $1 is the manifest.
+# firewall, SSH or root access of this machine is not installed. A package that needs the removal of
+# a package of this machine, such as resolvconf, is not installed either. $1 is the manifest.
 install_packages_of() {
   local packages="" failed="" refused="" package
   while read -r package; do
@@ -648,10 +649,10 @@ install_packages_of() {
   echo "Installing the apt packages that the customer installed in the sandbox:$packages"
   apt-get -o DPkg::Lock::Timeout=600 update -q >/dev/null || true
   # shellcheck disable=SC2086 # One word for each package.
-  if ! DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q --no-install-recommends \
+  if ! DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q --no-install-recommends --no-remove \
     $packages >/dev/null 2>&1; then
     for package in $packages; do
-      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q --no-install-recommends \
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q --no-install-recommends --no-remove \
         "$package" >/dev/null 2>&1 || failed+=" $package"
     done
   fi

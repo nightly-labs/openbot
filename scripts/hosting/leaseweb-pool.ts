@@ -981,6 +981,14 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       if (active !== "active") throw new Error(`openbot.service is ${active} on VPS ${vpsId} after 60 s.`);
       lap("OpenBot started");
     } catch (error) {
+      // The key of the sandbox must not write to the machine after a failure. An agent can get root there.
+      try {
+        this.#remote(machine, "sed -i '/ openbot-move$/d' /root/.ssh/authorized_keys 2>/dev/null || true", {
+          quiet: true,
+        });
+      } catch {
+        logger.warn(`Remove the openbot-move line of /root/.ssh/authorized_keys on VPS ${vpsId} by hand.`);
+      }
       logger.error(
         `The move of server ${serverId} stopped after the export started. OpenBot is stopped in sandbox ${sandbox}, and the row names VPS ${vpsId}. ` +
           `Read the error, then finish the move by hand or roll it back (docs/hosted-servers.md#move-a-server-from-boat). ` +
