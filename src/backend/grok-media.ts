@@ -22,6 +22,18 @@ const OUTPUT_KINDS: Record<string, GeneratedMediaKind> = {
   ReferenceToVideo: "video",
 };
 
+/**
+ * The media kind of the tool that Grok names in an update, or null when it names no media tool. Only
+ * the CLI writes the name; the model writes the arguments. Thus a permission uses this, not
+ * `grokMediaKind`.
+ */
+export function grokMediaToolKind(update: { _meta?: unknown; title?: string | null }): GeneratedMediaKind | null {
+  // The first update and a permission request can also name the tool only in the title.
+  const tool =
+    (isRecord(update._meta) ? getString(getRecord(update._meta, "x.ai/tool"), "name") : null) ?? update.title ?? null;
+  return tool && Object.hasOwn(TOOL_KINDS, tool) ? (TOOL_KINDS[tool] ?? null) : null;
+}
+
 /** The media kind of a Grok tool update, or null when the update does not name a media tool. */
 export function grokMediaKind(update: {
   _meta?: unknown;
@@ -29,10 +41,8 @@ export function grokMediaKind(update: {
   rawInput?: unknown;
   rawOutput?: unknown;
 }): GeneratedMediaKind | null {
-  // The first update and a permission request can also name the tool only in the title.
-  const tool =
-    (isRecord(update._meta) ? getString(getRecord(update._meta, "x.ai/tool"), "name") : null) ?? update.title ?? null;
-  if (tool && Object.hasOwn(TOOL_KINDS, tool)) return TOOL_KINDS[tool] ?? null;
+  const kind = grokMediaToolKind(update);
+  if (kind) return kind;
   for (const value of [update.rawOutput, update.rawInput]) {
     const type = isRecord(value) ? (getString(value, "type") ?? getString(value, "variant")) : null;
     if (type && Object.hasOwn(OUTPUT_KINDS, type)) return OUTPUT_KINDS[type] ?? null;

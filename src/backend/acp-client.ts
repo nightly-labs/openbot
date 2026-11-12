@@ -3511,7 +3511,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<RequestPermissionResponse, ProviderClientOperationError> {
     if (this.options.profileGeneration) {
       const allow = params.options.find((candidate) => candidate.kind === "allow_once");
-      if (this.options.mediaGeneration && allow && this.#flavor.mediaTools?.kind(params.toolCall))
+      if (this.options.mediaGeneration && allow && this.#flavor.mediaTools?.permitted(params.toolCall))
         return { outcome: { outcome: "selected", optionId: allow.optionId } };
       return { outcome: { outcome: "cancelled" } };
     }

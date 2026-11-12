@@ -5,7 +5,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
-import { grokMediaItem, grokMediaKind } from "./grok-media";
+import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
 import { isRecord, type ThreadItem } from "./protocol";
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
@@ -27,7 +27,9 @@ export interface AcpFlavor {
    * Tool calls that make an image or a video. `kind` gives the media kind of one update, or null.
    * The client keeps the kind of each call, because a later update can leave the tool out. `item`
    * gives the `imageGeneration` or `videoGeneration` item that the chat shows in place of the call,
-   * from the tool item with all updates so far and the content of the last update.
+   * from the tool item with all updates so far and the content of the last update. `permitted` gives
+   * the media kind of a permission request from the tool name that the CLI sets only, never from the
+   * arguments that the model writes.
    */
   mediaTools?: {
     kind(update: {
@@ -37,6 +39,7 @@ export interface AcpFlavor {
       rawOutput?: unknown;
     }): GeneratedMediaKind | null;
     item(kind: GeneratedMediaKind, call: ThreadItem, content: unknown): ThreadItem;
+    permitted(request: { _meta?: unknown; title?: string | null }): GeneratedMediaKind | null;
   };
   /** The `clientInfo` that `initialize` sends. Absent: `OPENBOT_ACP_CLIENT_INFO`. */
   clientInfo?: { name: string; title: string; version: string };
@@ -291,7 +294,7 @@ function noAnswerUnlessPlanOrCompaction(
  */
 export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 shows its image and video tools as plain tool calls (`grok-media.ts`).
-  mediaTools: { kind: grokMediaKind, item: grokMediaItem },
+  mediaTools: { kind: grokMediaKind, item: grokMediaItem, permitted: grokMediaToolKind },
   promptUsage: (response) => (isRecord(response._meta) && isRecord(response._meta.usage) ? response._meta.usage : null),
   // Grok CLI 1.0.77 fails the prompt when the model sends only its reasoning: `Internal error:
   // "empty response from model (reasoning_only)"` (#6073).
