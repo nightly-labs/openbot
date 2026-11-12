@@ -307,33 +307,47 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
     const parsed = JSON.parse(candidate);
-    const redacted = JSON.stringify(convertValue(parsed, new Set<object>(), emails));
-    // An equal result means the conversion stayed under its depth bound, so the count recurses safely.
-    if (redacted === JSON.stringify(parsed) && writtenKeyCount(candidate) === parsedKeyCount(parsed)) return candidate;
-    return redacted ?? null;
+    const converted = convertValue(parsed, new Set<object>(), emails);
+    if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
+    return JSON.stringify(converted) ?? null;
   } catch {
     return null;
   }
 }
 
-/** The keys a JSON text writes: each string that a `:` follows. The text is known to parse. */
+/**
+ * The keys of a parsed payload when its redacted form is the same value, or -1 when a rule changed it.
+ * The redacted form ends in "[too deep]" at the conversion depth bound, so the walk stops there too.
+ */
+function unchangedKeyCount(parsed: unknown, converted: unknown): number {
+  if (parsed === null || typeof parsed !== "object") return parsed === converted ? 0 : -1;
+  if (converted === null || typeof converted !== "object" || Array.isArray(parsed) !== Array.isArray(converted))
+    return -1;
+  const entries = Object.entries(parsed);
+  const convertedEntries = Object.entries(converted);
+  if (entries.length !== convertedEntries.length) return -1;
+  let count = Array.isArray(parsed) ? 0 : entries.length;
+  for (const [index, [key, value]] of entries.entries()) {
+    const [convertedKey, convertedValue] = convertedEntries[index] ?? [];
+    const inner = key === convertedKey ? unchangedKeyCount(value, convertedValue) : -1;
+    if (inner < 0) return -1;
+    count += inner;
+  }
+  return count;
+}
+
+/** The keys a JSON text writes: each string that a `:` follows. */
 function writtenKeyCount(text: string) {
   let count = 0;
   for (let index = 0; index < text.length; index += 1) {
     if (text[index] !== '"') continue;
     index += 1;
-    while (text[index] !== '"') index += text[index] === "\\" ? 2 : 1;
+    while (index < text.length && text[index] !== '"') index += text[index] === "\\" ? 2 : 1;
     let next = index + 1;
     while (text[next] === " " || text[next] === "\t" || text[next] === "\n" || text[next] === "\r") next += 1;
     if (text[next] === ":") count += 1;
   }
   return count;
-}
-
-function parsedKeyCount(value: unknown): number {
-  if (Array.isArray(value)) return value.reduce((sum: number, entry) => sum + parsedKeyCount(entry), 0);
-  if (value === null || typeof value !== "object") return 0;
-  return Object.values(value).reduce((sum: number, entry) => sum + 1 + parsedKeyCount(entry), 0);
 }
 
 /**
@@ -407,8 +421,7 @@ function redactSerializedJson(value: string, emails: boolean): string | null {
   // Neither a parse failure nor a conversion failure may become the failure
   // the caller was trying to report: `null` falls back to the regex rules,
   // which scan the text without recursing.
-  const redacted = parseRedacted(trimmed, emails);
-  return redacted === trimmed ? value : redacted;
+  return parseRedacted(trimmed, emails);
 }
 
 // The `typeof` checks below narrow caller-provided unions rather than

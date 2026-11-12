@@ -303,6 +303,18 @@ describe("redactText", () => {
     expect(redactText('ERROR {"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('ERROR {"headers":{}}');
     expect(redactText('{"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('{"headers":{}}');
   });
+
+  // Past the conversion depth bound the payload is cut, not kept, and a nesting too deep for the
+  // serializer must not turn the line into an unread one.
+  it("cuts a payload nested past the depth bound", () => {
+    const depth = 100_000;
+    const payload = `${'{"a":'.repeat(depth)}{"headers":{"X":"tenant-secret"}}${"}".repeat(depth)}`;
+    for (const line of [payload, `ERR ${payload}`]) {
+      const redacted = redactText(line);
+      expect(redacted).not.toContain("tenant-secret");
+      expect(redacted).toContain("[too deep]");
+    }
+  });
 });
 
 describe("registerSecretValue", () => {
