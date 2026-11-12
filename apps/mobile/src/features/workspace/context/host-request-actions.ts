@@ -342,7 +342,10 @@ export type WorkspaceRequest = <T>(
 /** The host shares its screen through Sunshine and Moonlight Web. */
 const REMOTE_DESKTOP_CAPABILITY = "remote-desktop" satisfies TeamProtocolV1Capability;
 
-type HostRequestChecks = Pick<MobileWorkspaceState, Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">>;
+export type HostRequestChecks = Pick<
+  MobileWorkspaceState,
+  Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
+>;
 
 type HostRequestActions = Pick<
   MobileWorkspaceActions,
@@ -590,6 +593,49 @@ export async function writeHostAgentColor(
   return (await request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColorsSnapshot, { agentId, color })).agents;
 }
 
+/** The checks of the capabilities that each server advertised. */
+export function createHostRequestChecks(capabilities: ServerCapabilities): HostRequestChecks {
+  const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
+  return {
+    canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
+    canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
+    canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
+    canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
+    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
+    canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
+    canUseWorkflowGitHub: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
+    canUseWorkflowChats: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
+      has(serverId, ROUTINE_RESULTS_CAPABILITY),
+    canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
+    canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+    canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
+    canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
+    canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+    canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
+    canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
+    canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
+    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
+    canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
+    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
+    attachmentSupport: (serverId) => {
+      const advertised = capabilities.get(serverId) ?? [];
+      return {
+        eml: advertised.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+        media: advertised.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+        zip: advertised.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
+        mp4: advertised.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
+        svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
+        anyFile: advertised.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
+      };
+    },
+  };
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -724,44 +770,7 @@ export function createHostRequestActions({
         catch: (cause) => new TeamRequestError({ cause }),
       });
   }
-  const checks: HostRequestChecks = {
-    canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
-    canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
-    canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
-    canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
-    canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
-    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
-    canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
-    canUseWorkflowGitHub: (serverId) =>
-      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
-    canUseWorkflowChats: (serverId) =>
-      has(serverId, WORKFLOWS_CAPABILITY) &&
-      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
-      has(serverId, ROUTINE_RESULTS_CAPABILITY),
-    canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
-    canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
-    canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
-    canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
-    canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
-    canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-    canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
-    canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
-    canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
-    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
-    canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
-    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
-    attachmentSupport: (serverId) => {
-      const advertised = capabilities.get(serverId) ?? [];
-      return {
-        eml: advertised.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
-        media: advertised.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
-        zip: advertised.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
-        mp4: advertised.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
-        svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
-        anyFile: advertised.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
-      };
-    },
-  };
+  const checks = createHostRequestChecks(capabilities);
   const actions: HostRequestActions = {
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),

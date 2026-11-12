@@ -412,6 +412,12 @@ export interface MobileWorkspaceContextValue {
   refreshServer: (serverId: string) => Promise<void>;
   /** The account server says that a hosted server starts, for example after a restart. The app connects again soon. */
   hostedServerStarting: (serverId: string) => void;
+  /**
+   * The checks with the capabilities of the last connection of a server, as if the host were online.
+   * Null when the phone does not know them. A screen shows the rows that they permit, disabled, while
+   * the server is not connected.
+   */
+  knownServerChecks: (serverId: string) => ServerChecks | null;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
   canEditServerIdentity: (serverId: string) => boolean;
   /**
@@ -1161,8 +1167,64 @@ export type MobileWorkspaceCapabilityCheck =
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
+/** The checks of the role of this member and the capabilities of one server. */
+type ServerCheckKey =
+  | Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
+  | "canEditServerIdentity"
+  | "canRotateServerKey"
+  | "canCreateLocalServers"
+  | "canManageServerTimezone"
+  | "canReadMachineMetrics"
+  | "canManageAgentMemoryLimit"
+  | "canManageServerPersonality"
+  | "servesServerPersonality"
+  | "canManageServerRoles"
+  | "canReadServerAudit"
+  | "hasAgentAccessLimits"
+  | "canManageConnectors"
+  | "canManageOnePasswordConnector"
+  | "canManageBitwardenConnector"
+  | "canManageWhatsAppConnector"
+  | "canManagePasswordManagers"
+  | "canManageVault"
+  | "canImportVault"
+  | "canImportAgents"
+  | "canTransferServer"
+  | "canManageVaultApiKeys"
+  | "canManageBrowserProfiles"
+  | "canManageBrowserProxies"
+  | "serverUpdateAccess"
+  | "canReadServerRelease"
+  | "canViewHostedSites"
+  | "canDeleteHostedSites"
+  | "canManageProviders"
+  | "canManageMcpServers"
+  | "canRelayMcpSignIn"
+  | "canAddMarketplaceAgents"
+  | "canUpdateMarketplaceAgents"
+  | "canManageEvents"
+  | "canManageMissedRuns"
+  | "canManageRoutineResults"
+  | "canManageAgentSkills"
+  | "canManageSharedTables"
+  | "canManageAgentFolders"
+  | "canNestSidebarFolders"
+  | "canManageAgentAccess"
+  | "canManageAgentHostSettings"
+  | "canManageAgentBackupModels"
+  | "canManageAgentTaskLimit"
+  | "canManageAgentNewChat"
+  | "canManageAgentPlanCard"
+  | "canManageAgentInstructions"
+  | "canPublishAgent"
+  | "canManageProviderAccounts";
+
+export type ServerChecks = Pick<MobileWorkspaceContextValue, ServerCheckKey>;
+
 type MobileWorkspaceStateKey =
   | MobileWorkspaceCapabilityCheck
+  | ServerCheckKey
+  | "knownServerChecks"
   | "sidebarByServer"
   | "servers"
   | "memberCountByServer"
