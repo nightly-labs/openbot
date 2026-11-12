@@ -21,7 +21,7 @@ import {
   isCustomProviderId,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
-  isCustomProviderReasoningEfforts,
+  isCustomProviderModelEfforts,
   isNewCustomProviderId,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -105,7 +105,7 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
     }
     if (entry.reasoningEfforts !== undefined) {
       // The form sends a known list in order, so only a malformed payload fails here.
-      if (!isCustomProviderReasoningEfforts(entry.reasoningEfforts))
+      if (!isCustomProviderModelEfforts(entry.reasoningEfforts))
         throw new Error(sourceText("error.provider.reasoningEffortsInvalid"));
       model.reasoningEfforts = [...entry.reasoningEfforts];
     }

@@ -80,6 +80,20 @@ const OPENCODE_UNREADABLE_CONTENT =
   /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
 
 /**
+ * An endpoint's refusal of the reasoning effort in a request. xAI answers "Model grok-4.20 does not
+ * support parameter reasoningEffort." (#7500); OpenAI-compatible servers name `reasoning_effort`.
+ */
+function isReasoningEffortRefusal(error: unknown): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32603) return false;
+  return (
+    /\breasoning[_ .]?effort\b/iu.test(error.message) &&
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|invalid|not allowed|not permitted)\b/iu.test(
+      error.message,
+    )
+  );
+}
+
+/**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
  * reports each kind as `Upstream request failed: <reason>`, so billing and the rate limit come
  * first. The provider's own failure comes before the network: a gateway that could not reach its
@@ -195,6 +209,12 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       });
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
       return sourceText("error.provider.opencodeServiceFailure");
+    // Each turn on the model sends the effort again, so only the model's efforts in the endpoint
+    // settings fix it. The endpoint's own text goes to the log.
+    if (endpoint && isReasoningEffortRefusal(error)) {
+      log(`A custom endpoint refused the reasoning effort: ${detail}`);
+      return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
+    }
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,

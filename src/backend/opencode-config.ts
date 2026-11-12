@@ -65,7 +65,9 @@ interface OpenCodeModelEntry {
   /**
    * The efforts of the model's effort menu, each sent as `reasoning_effort`. OpenCode 2.2.5 gives a
    * custom model without `variants` its own Low, Medium and High, and it drops a `reasoning` key
-   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set.
+   * (`migrateModel` in `packages/core/src/v1/config/migrate.ts`). Listed variants replace that set,
+   * and an empty `variants` leaves none: OpenCode 2.2.5 and 2.2.7 then offer no effort and send no
+   * `reasoning_effort`, which xAI refuses for some models (#7500).
    */
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
   /**

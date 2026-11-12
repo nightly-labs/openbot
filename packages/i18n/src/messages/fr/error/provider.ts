@@ -218,6 +218,8 @@ export const messages = {
     "Le point de terminaison « {provider} » a refusé sa clé d’API ou ses en-têtes. Saisissez-les de nouveau dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.customEndpointKeyMissing":
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
+  "error.provider.customEndpointEffortRefused":
+    "Le point de terminaison « {provider} » a refusé l’effort de raisonnement de ce modèle. Dans Réglages du serveur → Fournisseurs, modifiez « {provider} ». Sous Effort, gardez seulement les niveaux que ce modèle accepte, ou décochez-les tous pour Sans raisonnement. Puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeServiceFailure":

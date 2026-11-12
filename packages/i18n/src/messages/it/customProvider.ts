@@ -84,7 +84,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "Output massimo",
   "customProvider.model.efforts": "Impegno del modello {number}",
   "customProvider.model.effortsLabel": "Impegno",
-  "customProvider.model.effortsDefault": "Predefinito",
   "customProvider.model.effortsNone": "Nessun ragionamento",
   "customProvider.model.inputs": "Input del modello {number}",
   "customProvider.model.inputsLabel": "Accetta",

@@ -187,6 +187,8 @@ export const messages = {
     "رفضت نقطة النهاية «{provider}» مفتاح API أو الترويسات. أدخلها مرة أخرى في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
   "error.provider.customEndpointKeyMissing":
     "تحتاج نقطة النهاية «{provider}» إلى مفتاح API. أضف المفتاح في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
+  "error.provider.customEndpointEffortRefused":
+    "رفضت نقطة النهاية «{provider}» جهد التفكير لهذا النموذج. في إعدادات الخادم ← المزوّدون، عدّل «{provider}». في جهد التفكير، أبقِ فقط المستويات التي يقبلها هذا النموذج، أو ألغِ تحديدها كلها لاختيار بدون تفكير. ثم أعد المحاولة.",
   "error.provider.opencodeKeyExpired":
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
   "error.provider.opencodeServiceFailure":

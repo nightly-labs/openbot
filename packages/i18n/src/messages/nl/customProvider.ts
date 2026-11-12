@@ -85,7 +85,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "Max. output",
   "customProvider.model.efforts": "Redeneerniveau van model {number}",
   "customProvider.model.effortsLabel": "Redeneerniveau",
-  "customProvider.model.effortsDefault": "Standaard",
   "customProvider.model.effortsNone": "Geen redenering",
   "customProvider.model.inputs": "Invoer van model {number}",
   "customProvider.model.inputsLabel": "Accepteert",

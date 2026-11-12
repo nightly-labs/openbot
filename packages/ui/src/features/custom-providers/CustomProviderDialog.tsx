@@ -10,6 +10,7 @@ import type {
 import {
   agentProviderName,
   CUSTOM_PROVIDER_DEFAULT_INPUTS,
+  CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS,
   CUSTOM_PROVIDER_HARNESS_INPUT_KINDS,
   CUSTOM_PROVIDER_LIMITS,
   CUSTOM_PROVIDER_REASONING_EFFORTS,
@@ -296,18 +297,19 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      // In place: the store tracks each item, so a new array would re-run every reader of the row.
-      model.reasoningEfforts ??= [];
+      // The first change saves the default that the field showed, as for the input kinds, so that
+      // clearing the last one leaves a model with no effort (#7500). In place: the store tracks each
+      // item, so a new array would re-run every reader of the row.
+      model.reasoningEfforts ??= [...CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS[harness()]];
       const at = model.reasoningEfforts.indexOf(effort);
       if (checked && at < 0) model.reasoningEfforts.push(effort);
       if (!checked && at >= 0) model.reasoningEfforts.splice(at, 1);
     });
   }
 
-  const modelEfforts = (row: ModelRow): readonly CustomProviderReasoningEffort[] => row.reasoningEfforts ?? [];
-  /** With no effort chosen, the model keeps the efforts of the provider that runs it. */
-  const noEfforts = () =>
-    harness() === "pi" ? t("customProvider.model.effortsNone") : t("customProvider.model.effortsDefault");
+  /** The saved efforts, or the default of the harness that runs the model. */
+  const modelEfforts = (row: ModelRow): readonly CustomProviderReasoningEffort[] =>
+    row.reasoningEfforts ?? CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS[harness()];
 
   /** What the model accepts beside text: the saved kinds, or the default of the harness that runs it. */
   const modelInputs = (row: ModelRow): readonly CustomProviderInputKind[] =>
@@ -346,7 +348,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       <>
         <ModelChoiceMenu
           label={t("customProvider.model.efforts", { number: index() + 1 })}
-          empty={noEfforts()}
+          empty={t("customProvider.model.effortsNone")}
           choices={CUSTOM_PROVIDER_REASONING_EFFORTS}
           name={(effort) => t(REASONING_LABEL[effort])}
           chosen={modelEfforts(row)}

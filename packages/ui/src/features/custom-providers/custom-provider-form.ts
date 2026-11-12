@@ -362,7 +362,8 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
         name,
         ...(typeof contextWindow === "number" ? { contextWindow } : {}),
         ...(typeof maxOutput === "number" ? { maxOutput } : {}),
-        ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+        // An empty list is a choice: a model that takes no effort (#7500).
+        ...(model.reasoningEfforts ? { reasoningEfforts } : {}),
         ...(inputs ? { inputs } : {}),
       };
     });
@@ -453,8 +454,8 @@ export function fillFoundValues(
     row.maxOutput = tokenCountText(found.maxOutput, format);
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
-  // No checked effort is an empty field: the model keeps the efforts of the harness that runs it.
-  if (!row.reasoningEfforts?.length && found.reasoningEfforts !== undefined) {
+  // No saved efforts is an empty field; an empty list is the user's choice of no effort (#7500).
+  if (row.reasoningEfforts === undefined && found.reasoningEfforts !== undefined) {
     row.reasoningEfforts = [...found.reasoningEfforts];
   }
 }

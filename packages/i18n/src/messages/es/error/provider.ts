@@ -210,6 +210,8 @@ export const messages = {
     "El endpoint «{provider}» rechazó su clave de API o sus encabezados. Vuelve a introducirlos en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
   "error.provider.customEndpointKeyMissing":
     "El endpoint «{provider}» necesita una clave de API. Añade la clave en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
+  "error.provider.customEndpointEffortRefused":
+    "El endpoint «{provider}» rechazó el esfuerzo de razonamiento de este modelo. En Ajustes del servidor → Proveedores, edita «{provider}». En Esfuerzo, deja solo los niveles que acepta este modelo, o desmárcalos todos para Sin razonamiento. Luego inténtalo de nuevo.",
   "error.provider.opencodeKeyExpired":
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeServiceFailure":

@@ -203,6 +203,8 @@ export const messages = {
     "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointEffortRefused":
+    "Het endpoint “{provider}” heeft het redeneerniveau van dit model geweigerd. Bewerk “{provider}” bij Serverinstellingen → Aanbieders. Houd bij Redeneerniveau alleen de niveaus die dit model accepteert, of vink ze allemaal uit voor Geen redenering. Probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":
