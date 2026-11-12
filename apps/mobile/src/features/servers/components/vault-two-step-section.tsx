@@ -17,7 +17,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { useText } from "@/shared/lib/text";
 
 /** The site of a login for the setup text: its host name, or "the site" while the field is empty. */
-export function twoStepSite(website: string, theSite: string): string {
+function twoStepSite(website: string, theSite: string): string {
   return website.trim() ? vaultLoginTitle({ website }) : theSite;
 }
 

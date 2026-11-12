@@ -53,7 +53,7 @@ export function useCopyTwoStepCode() {
  * The time until the next code, as a ring that empties. It moves smoothly from the last tick; with
  * reduced motion it steps once a second.
  */
-export function TwoStepTimer({
+function TwoStepTimer({
   code,
   now,
   size = 18,
@@ -114,7 +114,7 @@ const DIGIT_SIZES = {
 } as const;
 
 /** The digits of a code in two groups. A new code fades in. */
-export function TwoStepDigits({
+function TwoStepDigits({
   code,
   now,
   size = "body",

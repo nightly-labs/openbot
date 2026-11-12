@@ -2001,7 +2001,7 @@ export function passwordManagerRequest(
  * The newest Vault capability of the host: 3 is `vault-v3` with two-step keys, 2 is `vault-v2` with API
  * keys, 1 is `vault-v1`.
  */
-export type HostVaultVersion = 1 | 2 | 3;
+type HostVaultVersion = 1 | 2 | 3;
 
 function vaultRoutes(version: HostVaultVersion) {
   return version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
