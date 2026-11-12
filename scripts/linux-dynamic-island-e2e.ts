@@ -119,6 +119,8 @@ const APPROVAL: DynamicIslandPresentation = {
     },
   },
 };
+const FIRST_QUESTION = "Which branch gets the pull request?";
+const SECOND_QUESTION = "Who reviews the pull request?";
 const QUESTION: DynamicIslandPresentation = {
   serverId: "local",
   mode: "question",
@@ -132,7 +134,7 @@ const QUESTION: DynamicIslandPresentation = {
       {
         id: "target",
         header: "Target",
-        question: "Which branch gets the pull request?",
+        question: FIRST_QUESTION,
         isSecret: false,
         options: [
           { label: "main", description: "The default branch" },
@@ -142,7 +144,7 @@ const QUESTION: DynamicIslandPresentation = {
       {
         id: "review",
         header: "Review",
-        question: "Who reviews the pull request?",
+        question: SECOND_QUESTION,
         isSecret: false,
         options: [
           { label: "Ada", description: "The agent" },
@@ -315,30 +317,23 @@ try {
   );
   steps.push({ step: "click on Approve answers the request" });
 
-  // 6. A multi-question card keeps its answers when the island shuts and opens again.
+  // 6. A multi-question card keeps its answers when the island shuts and opens again. A prompt that ended
+  // keeps none: the same request again starts at the first question.
   await leave(app, desktop);
-  await app.publish(QUESTION);
-  await until(
-    async () =>
-      await app.eval(
-        "island",
-        "document.querySelector('[data-slot=\"dynamic-island\"]')?.textContent?.includes('Ada') === true",
-        decodeBoolean,
-      ),
-    "the question",
-  );
+  await showQuestion(app);
   await hoverOpen(app, desktop, island);
-  assert.equal(await questionText(app), "Which branch gets the pull request?", "the card opens at the first question");
-  const firstOption = centreOf(await screenBoxOf(app, island, optionByLabel("release"), "the release option"));
-  desktop.move(firstOption.x, firstOption.y);
-  desktop.click();
-  await until(async () => (await questionText(app)) === "Who reviews the pull request?", "the second question");
-  await settle(app);
+  assert.equal(await questionText(app), FIRST_QUESTION, "the card opens at the first question");
+  await answerFirstQuestion(app, desktop, island);
+  await leave(app, desktop);
+  await showQuestion(app);
+  await hoverOpen(app, desktop, island);
+  assert.equal(await questionText(app), FIRST_QUESTION, "a prompt that ended keeps no answers");
+  await answerFirstQuestion(app, desktop, island);
   await leave(app, desktop);
   await hoverOpen(app, desktop, island);
   const reopened = await questionText(app);
   screenshot(session, "05-question-reopened");
-  assert.equal(reopened, "Who reviews the pull request?", "the card opens again at the unanswered question");
+  assert.equal(reopened, SECOND_QUESTION, "the card opens again at the unanswered question");
   const secondOption = centreOf(await screenBoxOf(app, island, optionByLabel("Me"), "the Me option"));
   desktop.move(secondOption.x, secondOption.y);
   desktop.click();
@@ -512,6 +507,39 @@ async function settle(app: App): Promise<void> {
 /** A script that gives the box of the first button whose text is `text`. */
 function buttonByText(text: string): string {
   return `[...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === ${JSON.stringify(text)})`;
+}
+
+/** Shows the idle island, then the question card: the card that comes after the end of another prompt. */
+async function showQuestion(app: App): Promise<void> {
+  await app.publish(IDLE);
+  await until(
+    async () =>
+      await app.eval(
+        "island",
+        "document.querySelector('.dynamic-island-surface-idle-greeting') !== null",
+        decodeBoolean,
+      ),
+    "the idle island",
+  );
+  await app.publish(QUESTION);
+  await until(
+    async () =>
+      await app.eval(
+        "island",
+        "document.querySelector('[data-slot=\"dynamic-island\"]')?.textContent?.includes('Ada') === true",
+        decodeBoolean,
+      ),
+    "the question",
+  );
+}
+
+/** Answers the first question of the open card and waits for the second question. */
+async function answerFirstQuestion(app: App, desktop: Desktop, island: IslandInfo): Promise<void> {
+  const option = centreOf(await screenBoxOf(app, island, optionByLabel("release"), "the release option"));
+  desktop.move(option.x, option.y);
+  desktop.click();
+  await until(async () => (await questionText(app)) === SECOND_QUESTION, "the second question");
+  await settle(app);
 }
 
 /** A script that gives the option button of the island question card whose label is `label`. */

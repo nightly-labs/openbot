@@ -131,10 +131,11 @@ const OPENBOT_COMPACT_HOVER_MOTION = {
   translateY: 4,
 } as const;
 /**
- * The answers given on an open question card. The card closes when the island shuts, so the answers stay
- * here until the last answer is sent, and the card opens again at the next unanswered question.
+ * The answers on the question card that the island shows. The card closes when the island shuts, so the
+ * answers stay here, and the card opens again at the next unanswered question. A question has the first
+ * place on the island, so when the island shows something else, the prompt has ended and its answers go.
  */
-const questionCardAnswers = new Map<string, Record<string, string[]>>();
+let questionCardAnswers: { key: string; answers: Record<string, string[]> } | undefined;
 const QUESTION_PROGRESS_DURATION = 300;
 const QUESTION_PROGRESS_BLUR = 2;
 const COMPACT_LEADING_SIZE = 20;
@@ -447,6 +448,15 @@ function measureCompactText(text: string, weight: number): number {
 
 export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Element {
   const { t } = useText();
+  createEffect(
+    () => {
+      const presentation = props.presentation;
+      return presentation.mode === "question" ? questionCardKey(presentation.serverId, presentation.item) : undefined;
+    },
+    (key) => {
+      if (questionCardAnswers?.key !== key) questionCardAnswers = undefined;
+    },
+  );
   const initialPresentation = untrack(() => props.presentation);
   const [visiblePresentation, setVisiblePresentation] = createSignal(initialPresentation);
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[visiblePresentation().mode];
@@ -1354,6 +1364,10 @@ export function ApprovalContent(props: {
   );
 }
 
+function questionCardKey(serverId: string, item: DynamicIslandPromptItem): string {
+  return JSON.stringify([serverId, item.agent.id, item.requestId, item.questions.map((question) => question.id)]);
+}
+
 function QuestionContent(props: {
   item: DynamicIslandPromptItem;
   serverId: string;
@@ -1365,16 +1379,8 @@ function QuestionContent(props: {
   onClose: () => void;
 }): JSX.Element {
   const { t } = useText();
-  // A provider can use a request id again after a restart, so the questions are part of the key.
-  const cardKey = createMemo(() =>
-    JSON.stringify([
-      props.serverId,
-      props.item.agent.id,
-      props.item.requestId,
-      props.item.questions.map((question) => [question.id, question.question]),
-    ]),
-  );
-  const savedAnswers = () => questionCardAnswers.get(cardKey()) ?? {};
+  const cardKey = createMemo(() => questionCardKey(props.serverId, props.item));
+  const savedAnswers = () => (questionCardAnswers?.key === cardKey() ? questionCardAnswers.answers : {});
   const [questionIndex, setQuestionIndex] = createSignal(untrack(() => Object.keys(savedAnswers()).length));
   const [answers, setAnswers] = createSignal<Record<string, string[]>>(untrack(savedAnswers));
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
@@ -1427,28 +1433,19 @@ function QuestionContent(props: {
     // The field keeps a typed answer that did not go anywhere.
     if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
-    const key = cardKey();
     if (questionIndex() < questions().length - 1) {
-      questionCardAnswers.set(key, nextAnswers);
+      questionCardAnswers = { key: cardKey(), answers: nextAnswers };
       props.onHaptic?.();
       void showNextQuestion(nextAnswers);
       return;
     }
-    const sent = props.onAction({
+    return props.onAction({
       type: "answer-prompt",
       serverId: props.serverId,
       agentId: props.item.agent.id,
       requestId: props.item.requestId,
       answers: nextAnswers,
     });
-    // The caller of `answerWith` handles a failure of `sent`.
-    void sent?.then(
-      (done) => {
-        if (done) questionCardAnswers.delete(key);
-      },
-      () => undefined,
-    );
-    return sent;
   }
 
   async function showNextQuestion(nextAnswers: Record<string, string[]>): Promise<void> {
