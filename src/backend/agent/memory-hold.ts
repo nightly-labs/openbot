@@ -27,6 +27,12 @@ export interface MemoryHoldHooks {
 export interface MemoryHoldOptions {
   /** Null on a desktop computer: nothing is held there. */
   memory: HostMemory | null;
+  /**
+   * The total that an owner or admin set, "unlimited" for no limit, or null for automatic: the memory
+   * sets it on a server, and a desktop computer has no limit. A set total can be above the automatic
+   * one; low memory still holds a new turn.
+   */
+  chosenTurnLimit?: () => number | "unlimited" | null;
   hooks: MemoryHoldHooks;
 }
 
@@ -40,6 +46,7 @@ export interface MemoryHoldOptions {
  */
 export class MemoryHold {
   readonly #memory: HostMemory | null;
+  readonly #chosenTurnLimit: () => number | "unlimited" | null;
   readonly #hooks: MemoryHoldHooks;
   #scope = Scope.makeUnsafe();
   readonly #told = new Set<string>();
@@ -56,6 +63,7 @@ export class MemoryHold {
 
   constructor(options: MemoryHoldOptions) {
     this.#memory = options.memory;
+    this.#chosenTurnLimit = options.chosenTurnLimit ?? (() => null);
     this.#hooks = options.hooks;
   }
 
@@ -94,7 +102,9 @@ export class MemoryHold {
 
   /** The most turns that run at the same time, or null for no limit. */
   turnLimit(): number | null {
-    return this.#memory?.turnLimit() ?? null;
+    const chosen = this.#chosenTurnLimit();
+    if (chosen === "unlimited") return null;
+    return chosen ?? this.#memory?.turnLimit() ?? null;
   }
 
   readonly #sampled = Effect.fn("MemoryHold.sampled")(function* (this: MemoryHold) {

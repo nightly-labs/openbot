@@ -72,6 +72,7 @@ import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_RESTART_CODECS } from "./host-restart-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_CODECS } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
@@ -166,6 +167,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_TURN_LIMITS_CODECS,
   ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
   ...LOCAL_SERVERS_CODECS,

@@ -76,6 +76,7 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Это подключение не может сохранить однократные регулярные задачи.",
   "error.team.routineRunCommandUnsupported": "Это подключение не может выдать команду запуска регулярной задачи.",
   "error.team.threadQueueUnsupported": "Это подключение не может показать очередь побочной ветки.",
+  "error.team.hostTurnLimitsUnsupported": "Это подключение не может показать или изменить ограничения веток сервера.",
   "error.team.usageLimitUnsupported": "Это подключение не может показать или изменить лимиты использования агентов.",
   "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
   "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",

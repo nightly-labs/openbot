@@ -51,7 +51,6 @@ import type {
   AgentHostSettings,
   AgentNewChatSettings,
   AgentPlanCardSettings,
-  AgentTaskLimitSettings,
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
@@ -60,7 +59,6 @@ import type {
   UpdateAgentHostSettingsInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
-  UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type {
@@ -361,6 +359,7 @@ import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
+import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
   DeleteHostedSiteInput,
   HostedSiteList,
@@ -1400,6 +1399,8 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
+    setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     // The server personality: how the server's agents talk while they work. Any member can read it;
     // only an owner or admin can set it.
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -2099,11 +2100,6 @@ export const IPC_ENDPOINTS = {
     getAgentBackupModels: scopedRequest<string, AgentBackupModelSettings>()("agent:admin:get-backup-models"),
     updateAgentBackupModels: scopedRequest<UpdateAgentBackupModelsInput, AgentBackupModelSettings>()(
       "agent:admin:update-backup-models",
-    ),
-    // Task limit: `agent-task-limit-v1` on a joined server.
-    getAgentTaskLimit: scopedRequest<string, AgentTaskLimitSettings>()("agent:admin:get-task-limit"),
-    updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
-      "agent:admin:update-task-limit",
     ),
     // Whether the agent starts a new chat itself: `agent-new-chat-v1` on a joined server.
     getAgentNewChat: scopedRequest<string, AgentNewChatSettings>()("agent:admin:get-new-chat"),

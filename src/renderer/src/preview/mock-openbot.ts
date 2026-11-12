@@ -233,6 +233,7 @@ import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
+import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
@@ -515,6 +516,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
+  const hostTurnLimits = createMockHostTurnLimits();
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -2347,15 +2349,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       revealAgentInstructions: async (agentId) => {
         requireMockAgent(agentId);
       },
-      getAgentTaskLimit: async (agentId) => {
-        const agent = agents.find((candidate) => candidate.id === agentId);
-        if (!agent) throw new Error("Agent not found");
-        return { taskLimit: agent.taskLimit ?? null };
-      },
-      updateAgentTaskLimit: async (input) => {
-        await api.agent.updateAgent(input);
-        return api.agent.getAgentTaskLimit(input.agentId);
-      },
       getAgentNewChat: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -3679,6 +3672,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...hostTurnLimits,
       ...createMockHostPersonality(),
       // Preview has one host, so every server shares one limit. Main tells the window, as here.
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
