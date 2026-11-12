@@ -5,6 +5,7 @@ import {
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
 import type {
+  HostedServerCatalog,
   HostedServerCatalogPlan,
   HostedServerEntryPoint,
   HostedServerList,
@@ -47,6 +48,13 @@ const TERMS_URL = "https://openbot.run/terms";
 const SETUP_POLL_INTERVAL_MS = 3_000;
 
 type AddServerCalls = Pick<HostedServersDesktopApi, "list" | "plans" | "create" | "openCheckout" | "wake">;
+
+/** The account server's answers that the flow opens with. */
+interface AddServerRead {
+  catalog: HostedServerCatalog;
+  list: HostedServerList;
+  licenseState: LicenseState | null;
+}
 
 /** A server that the user created before the dialog opened, such as on a return from the payment page. */
 export interface AddServerResume {
@@ -163,12 +171,23 @@ export function AddServerOverlay(props: AddServerOverlayProps) {
   const requestIds = new Map<string, RequestKey>();
   /** A return from the payment page whose first read failed. The next opening shows its setup. */
   let pendingResume: AddServerResume | null = null;
+  /** The answers of the last opening. The next opening shows them at once and reads again behind them. */
+  let lastRead: AddServerRead | null = null;
+  // The code of the page loads before the first opening, so the page does not wait for it.
+  onSettled(() => {
+    void HostedPricingPage.preload();
+    void AddServerDialog.preload();
+  });
   return (
     <Show when={props.open}>
       <AddServerSession
         {...props}
         resume={props.resume ?? pendingResume}
         requestIds={requestIds}
+        lastRead={lastRead}
+        onRead={(read) => {
+          lastRead = read;
+        }}
         onPendingResume={(resume) => {
           pendingResume = resume;
         }}
@@ -186,10 +205,35 @@ interface RequestKey {
 function AddServerSession(
   props: AddServerOverlayProps & {
     requestIds: Map<string, RequestKey>;
+    lastRead: AddServerRead | null;
+    onRead: (read: AddServerRead) => void;
     onPendingResume: (resume: AddServerResume | null) => void;
   },
 ) {
-  const [state, setState] = createStore<AddServerState>({
+  const { t, errorDetails } = useText();
+  const requestIds = untrack(() => props.requestIds);
+  const resume = untrack(() => props.resume) ?? null;
+  const entryPoint = untrack(() => props.entryPoint) ?? (resume ? "checkout_resume" : undefined);
+  const analytics = desktopAnalytics.scope();
+  const trackPlans = (action: PlansEvent["action"], properties: Omit<PlansEvent, "action" | "entry_point"> = {}) =>
+    analytics.track("hosted_server_plans_action", {
+      action,
+      ...properties,
+      ...(entryPoint ? { entry_point: entryPoint } : {}),
+    });
+  /** A read can take longer than the poll interval. The next tick then skips, so reads do not overlap. */
+  let refreshing = false;
+  /** True after this opening made a server. A read that arrives later then keeps its setup. */
+  let created = false;
+
+  // The answers of the last opening show the pricing page at once. A return from the payment page, an order from the
+  // web page, or a server in setup opens the dialog, which reads its first choices once, so they wait for new answers.
+  const lastRead = untrack(() =>
+    resume || props.order || !props.lastRead || newestInSetup(props.lastRead.list.servers, props.servers)
+      ? null
+      : props.lastRead,
+  );
+  const initial: AddServerState = {
     plans: null,
     serverCount: 0,
     paidCount: 0,
@@ -205,24 +249,40 @@ function AddServerSession(
     orderedFromPage: false,
     orderError: null,
     orderErrorTitle: "",
-  });
-  const { t, errorDetails } = useText();
-  const requestIds = untrack(() => props.requestIds);
-  const resume = untrack(() => props.resume) ?? null;
-  const entryPoint = untrack(() => props.entryPoint) ?? (resume ? "checkout_resume" : undefined);
-  const analytics = desktopAnalytics.scope();
-  const trackPlans = (action: PlansEvent["action"], properties: Omit<PlansEvent, "action" | "entry_point"> = {}) =>
-    analytics.track("hosted_server_plans_action", {
-      action,
-      ...properties,
-      ...(entryPoint ? { entry_point: entryPoint } : {}),
-    });
-  /** A read can take longer than the poll interval. The next tick then skips, so reads do not overlap. */
-  let refreshing = false;
+  };
+  if (lastRead) {
+    applyRead(initial, lastRead);
+    trackPlans("viewed");
+  }
+  const [state, setState] = createStore<AddServerState>(initial);
+  /** True when the new answers arrived. An order waits for them, so it does not use the answers of the last opening. */
+  const loaded = load();
 
-  void load();
+  function applyRead(draft: AddServerState, read: AddServerRead): void {
+    const { catalog, list, licenseState } = read;
+    draft.plans = hostedServerPlansFromCatalog(catalog);
+    draft.serverCount = list.servers.length;
+    draft.paidCount = paidCount(list);
+    draft.maxServers = list.maxServers;
+    if (!created) {
+      const resumed = resume
+        ? list.servers.find((server) => server.serverId === resume.serverId)
+        : newestInSetup(
+            list.servers,
+            untrack(() => props.servers),
+          );
+      draft.server = resumed ?? null;
+      draft.paid = resume?.paid ?? false;
+      draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
+    }
+    draft.licenseOffer = licenseOfferOf(licenseState);
+    draft.currency =
+      HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
+    draft.catalog = [...catalog.plans];
+    draft.ownLicense = licenseState?.license ? isOpenBillingStatus(licenseState.license.status) : false;
+  }
 
-  async function load(): Promise<void> {
+  async function load(): Promise<boolean> {
     try {
       const license = untrack(() => props.license);
       const [catalog, list, licenseState] = await Promise.all([
@@ -230,12 +290,6 @@ function AddServerSession(
         props.calls.list(),
         license ? license.getState().catch(() => null) : Promise.resolve(null),
       ]);
-      const resumed = resume
-        ? list.servers.find((server) => server.serverId === resume.serverId)
-        : newestInSetup(
-            list.servers,
-            untrack(() => props.servers),
-          );
       for (const [choice, key] of requestIds) {
         const unpaid = list.servers.some(
           (server) => server.serverId === key.serverId && server.state === "awaiting_payment",
@@ -243,22 +297,12 @@ function AddServerSession(
         if (key.serverId && !unpaid) requestIds.delete(choice);
       }
       props.onPendingResume(null);
-      setState((draft) => {
-        draft.plans = hostedServerPlansFromCatalog(catalog);
-        draft.serverCount = list.servers.length;
-        draft.paidCount = paidCount(list);
-        draft.maxServers = list.maxServers;
-        draft.server = resumed ?? null;
-        draft.paid = resume?.paid ?? false;
-        draft.licenseOffer = licenseOfferOf(licenseState);
-        draft.currency =
-          HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
-        draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
-        draft.catalog = [...catalog.plans];
-        draft.ownLicense = licenseState?.license ? isOpenBillingStatus(licenseState.license.status) : false;
-      });
-      trackPlans("viewed");
+      const read = { catalog, list, licenseState };
+      props.onRead(read);
+      setState((draft) => applyRead(draft, read));
+      if (!lastRead) trackPlans("viewed");
       if (serverLimit() !== null) analytics.track("limit_reached", { kind: "servers", action: "shown" });
+      return true;
     } catch (error) {
       const text = currentText();
       const title = text.t("settings.hostedServers.loadFailed");
@@ -269,6 +313,7 @@ function AddServerSession(
       });
       if (resume) props.onPendingResume(resume);
       props.onClose();
+      return false;
     }
   }
 
@@ -380,6 +425,7 @@ function AddServerSession(
         throw error;
       });
     key.serverId = server.serverId;
+    created = true;
     setState((draft) => {
       draft.server = server;
       draft.paid = false;
@@ -399,6 +445,7 @@ function AddServerSession(
       draft.orderError = null;
     });
     try {
+      if (!(await loaded)) return;
       if (order.server) {
         await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
       } else if (order.license) {
@@ -436,6 +483,15 @@ function AddServerSession(
    * and does not go back to the page below it.
    */
   const pageShown = () => pageOpen() || state.orderedFromPage;
+  const pageCurrency = (plans: HostedServerPlan[]) =>
+    HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans))];
+  const offerLicense = () => !state.ownLicense && props.license !== undefined;
+  /**
+   * The page reads its first choices once. When the new read changes them, after the page showed the last answers,
+   * the page starts again with the new ones.
+   */
+  const pageKey = (plans: HostedServerPlan[]) =>
+    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}`;
   /** The web client has no window page, so the page covers the app frame there. */
   const overlayMount = () => document.querySelector(".app-window > .app-frame") ?? document.body;
   const headerFrame = createPageHeaderFrame();
@@ -510,30 +566,32 @@ function AddServerSession(
         <Loading>
           <Show when={pageShown()}>
             <PricingPagePortal placement={props.pricingPage} overlayMount={overlayMount} onLeave={leavePage}>
-              <HostedPricingPage
-                overlay={props.pricingPage === undefined}
-                headerFrame={props.pricingPage ? headerFrame() : undefined}
-                plans={state.catalog}
-                currency={HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans()))]}
-                currencyLocked={state.currency !== null}
-                used={state.licenseOffer?.used}
-                licenseTrialEnd={state.licenseOffer?.trialEnd}
-                offerLicense={!state.ownLicense && props.license !== undefined}
-                thisComputer={props.thisComputer === true}
-                serverLimit={serverLimit()}
-                busy={state.ordering}
-                error={state.orderError}
-                errorTitle={state.orderErrorTitle}
-                onSubmit={(order) => void submitOrder(order)}
-                onClose={close}
-                onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
-                onOpenTerms={() => props.onOpenUrl(TERMS_URL)}
-                onContactUs={contactUs()}
-                onManageServers={manageServers()}
-                onCreateLocal={props.onCreateLocal}
-                onInstallServer={props.onInstallServer}
-                onJoinWithInvite={joinWithInvite()}
-              />
+              <Show when={pageKey(plans())} keyed>
+                <HostedPricingPage
+                  overlay={props.pricingPage === undefined}
+                  headerFrame={props.pricingPage ? headerFrame() : undefined}
+                  plans={state.catalog}
+                  currency={pageCurrency(plans())}
+                  currencyLocked={state.currency !== null}
+                  used={state.licenseOffer?.used}
+                  licenseTrialEnd={state.licenseOffer?.trialEnd}
+                  offerLicense={offerLicense()}
+                  thisComputer={props.thisComputer === true}
+                  serverLimit={serverLimit()}
+                  busy={state.ordering}
+                  error={state.orderError}
+                  errorTitle={state.orderErrorTitle}
+                  onSubmit={(order) => void submitOrder(order)}
+                  onClose={close}
+                  onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
+                  onOpenTerms={() => props.onOpenUrl(TERMS_URL)}
+                  onContactUs={contactUs()}
+                  onManageServers={manageServers()}
+                  onCreateLocal={props.onCreateLocal}
+                  onInstallServer={props.onInstallServer}
+                  onJoinWithInvite={joinWithInvite()}
+                />
+              </Show>
             </PricingPagePortal>
           </Show>
           <Show when={!pageOpen()}>
