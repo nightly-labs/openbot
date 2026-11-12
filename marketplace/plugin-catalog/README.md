@@ -231,7 +231,8 @@ Troubleshooting:
 - The server replies 402 with "Active subscription required.": the TryPost Cloud account of the
   workspace has no active subscription. Subscribe in TryPost, then test the server again.
 - The agent does not see the posts or channels that the user expects: the connection uses another
-  workspace. Sign out of the app and sign in again, and choose the correct workspace.
+  workspace. In the MCP servers settings, select Sign out on the TryPost server, then Sign in, and
+  choose the correct workspace.
 - A self-hosted TryPost: add an MCP server with the address of the instance followed by
   `/mcp/trypost`, in the MCP servers settings, and select Sign in.
 

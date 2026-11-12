@@ -19,7 +19,7 @@ export const TRYPOST_PLUGIN_GUIDE: PluginGuide = {
     },
     {
       title: "Read analytics",
-      text: "The get-analytics-report-tool tool gives the report of the workspace for a period, and get-channel-insights-tool gives the insights and the best posts of one channel.",
+      text: "The get-analytics-report-tool tool gives the report of the workspace for a period, get-channel-insights-tool gives the insights of one channel, and list-channel-publications-tool lists its best posts.",
     },
     {
       title: "Ideas and approvals",
