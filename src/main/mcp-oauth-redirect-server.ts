@@ -18,8 +18,8 @@
  * is remade when the stored one names another address.
  *
  * The grant travels no further than this process. The page the browser is left on says only that
- * the window can be closed - the code is in the request line, and a page that repeated it would
- * put a credential in the browser's history.
+ * the window can be closed - the code is in the request line or the posted form, and a page that
+ * repeated it would put a credential in the browser's history.
  */
 
 import type { LanguageService } from "./language-service";

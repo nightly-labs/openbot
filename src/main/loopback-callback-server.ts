@@ -3,12 +3,13 @@
  * computer, and the listener of a sign-in that this computer relays to a joined server.
  *
  * Every refusal that does not depend on the sign-in is here, so each listener makes the same checks:
- * the `Host` header names the loopback address, the method is GET or HEAD, and the path is the one
- * the sign-in sent. The page the browser is left on is a fixed catalog message. The code is in the
- * request line, and a page that repeated it would put a credential in the browser's history.
+ * the `Host` header names the loopback address, the method is GET, HEAD or a form POST, and the path
+ * is the one the sign-in sent. The page the browser is left on is a fixed catalog message. The code
+ * is in the request line or the form, and a page that repeated it would put a credential in the
+ * browser's history.
  */
 
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { Socket } from "node:net";
 import type { AppTextKey } from "@openbot/i18n";
 import type { LanguageService } from "./language-service";
@@ -61,16 +62,25 @@ export async function startLoopbackCallbackServer(
       answering.delete(socket);
       if (closing) socket.destroy();
     });
+    const send = (answer: CallbackAnswer) =>
+      response
+        .writeHead(answer.status, {
+          "content-type": "text/html; charset=utf-8",
+          // The grant is in this request's own URL. A page kept on disk keeps the URL that fetched
+          // it, and nothing here is worth a second read anyway.
+          "cache-control": "no-store",
+        })
+        .end(callbackPage(options.language.locale, options.language.translate(answer.message)));
     const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.path);
-    const answer = checked instanceof URL ? options.receive(checked) : checked;
-    response
-      .writeHead(answer.status, {
-        "content-type": "text/html; charset=utf-8",
-        // The grant is in this request's own URL. A page kept on disk keeps the URL that fetched
-        // it, and nothing here is worth a second read anyway.
-        "cache-control": "no-store",
-      })
-      .end(callbackPage(options.language.locale, options.language.translate(answer.message)));
+    if (!(checked instanceof URL)) return send(checked);
+    if (request.method !== "POST") return send(options.receive(checked));
+    // A server that answers with `response_mode=form_post` posts the same fields as a form (#7709).
+    // They take the place of the query, so the sign-in reads them exactly as it reads a redirect.
+    void readFormBody(request).then((form) => {
+      if (form === null) return send({ status: 400, message: "error.mcp.redirectNotSignIn" });
+      checked.search = form;
+      send(options.receive(checked));
+    });
   });
   server.on("connection", (socket) => {
     sockets.add(socket);
@@ -106,7 +116,9 @@ function checkCallbackRequest(
   // deliver a grant of its own choosing. The `Host` header is what the browser thinks it reached,
   // so a request naming anything but the loopback address is not from a redirect this sent.
   if (!isLoopbackHost(host)) return { status: 403, message: "error.mcp.redirectByName" };
-  if (method !== "GET" && method !== "HEAD") return { status: 405, message: "error.mcp.redirectGetOnly" };
+  if (method !== "GET" && method !== "HEAD" && method !== "POST") {
+    return { status: 405, message: "error.mcp.redirectGetOnly" };
+  }
   let url: URL;
   try {
     url = new URL(target ?? "/", "http://127.0.0.1");
@@ -115,6 +127,28 @@ function checkCallbackRequest(
   }
   if (url.pathname !== path) return { status: 404, message: "error.mcp.redirectNotSignIn" };
   return url;
+}
+
+/** More than a grant needs. The rest of a larger body is read and dropped. */
+const FORM_BODY_LIMIT = 16 * 1024;
+
+/** The body of a urlencoded form post, or `null` when it is another type, too large, or cut off. */
+function readFormBody(request: IncomingMessage): Promise<string | null> {
+  const type = request.headers["content-type"]?.split(";")[0]?.trim().toLowerCase();
+  if (type !== "application/x-www-form-urlencoded") {
+    request.resume();
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size <= FORM_BODY_LIMIT) chunks.push(chunk);
+    });
+    request.on("end", () => resolve(size <= FORM_BODY_LIMIT ? Buffer.concat(chunks).toString("utf8") : null));
+    request.on("error", () => resolve(null));
+  });
 }
 
 function isLoopbackHost(host: string | undefined): boolean {
