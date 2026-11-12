@@ -1051,6 +1051,16 @@ export function ChatView({
     (message: ChatBubbleMessage) => markUnread?.(hostMessageIds.get(message.id) ?? message.id),
     [markUnread, hostMessageIds],
   );
+  const togglePinListMessage = useCallback(
+    async (message: ChatBubbleMessage, pinned: boolean) =>
+      togglePin?.(hostMessageIds.get(message.id) ?? message.id, pinned),
+    [togglePin, hostMessageIds],
+  );
+  // The pins name host messages. A message sent here keeps its row id after the host gives it an id.
+  const pinnedRowIds = useMemo(
+    () => (pinnedMessageIds ? new Set([...pinnedMessageIds].map((id) => messageAliases.get(id) ?? id)) : undefined),
+    [pinnedMessageIds, messageAliases],
+  );
   // Select text starts the selection, and a second tap on it ends the selection.
   const selectText = useCallback((message: ChatBubbleMessage) => {
     Keyboard.dismiss();
@@ -1163,8 +1173,8 @@ export function ChatView({
               deletesAnyMessage={deletesAnyMessage}
               onMarkUnread={markUnread ? markListMessageUnread : undefined}
               markUnreadMessageIds={markUnreadMessageIds}
-              onTogglePin={togglePin ? (message, pinned) => togglePin(message.id, pinned) : undefined}
-              pinnedMessageIds={pinnedMessageIds}
+              onTogglePin={togglePin ? togglePinListMessage : undefined}
+              pinnedMessageIds={pinnedRowIds}
               unreadLineMessageIds={unreadLineMessageIds}
               sendChannels={sendToChannel?.channels}
               onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}
