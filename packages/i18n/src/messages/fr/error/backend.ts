@@ -277,6 +277,10 @@ export const messages = {
     "{provider} n’a pas pu utiliser le serveur MCP {name}, car ce serveur demande une connexion. Ouvrez les réglages MCP et choisissez Se connecter.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} n’a pas pu démarrer le serveur MCP {name}. Ouvrez les réglages MCP et choisissez Tester la connexion pour voir la cause.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour les agents {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":

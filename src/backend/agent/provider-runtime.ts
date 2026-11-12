@@ -111,6 +111,7 @@ import {
   isIgnoredConfigDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
+  isMcpTimeoutDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -4406,20 +4407,23 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Shows that a provider could not use an MCP server from this app's list, once for each server and
    * kind in this run: a server spawns for each session, so the same line arrives at every start. The
-   * provider works without the server, so its row keeps no error, and the toast sends the user to
-   * the MCP settings, where Sign in and Test connection give the cause.
+   * provider works without the server, so its row keeps no error, and the toast links to the MCP
+   * settings. The provider connects with its own client, so OpenBot's connection test can pass while
+   * the provider fails, and the toast does not send the user to the test for the cause (#7370).
    */
   #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
-    const signIn = isMcpSignInDiagnostic(message);
-    const key = [provider, server, signIn].join("\u0000");
+    const kind = isMcpSignInDiagnostic(message) ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+    const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
+    const text = {
+      sign_in: "error.backend.mcpServerSignInForProvider",
+      timeout: "error.backend.mcpServerTimedOutInProvider",
+      failed: "error.backend.mcpServerFailedInProvider",
+    } as const;
     this.#emitError(
       "mcp_server_not_started",
-      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
-        provider: providerLabel(provider),
-        name: server,
-      }),
+      sourceText(text[kind], { provider: providerLabel(provider), name: server }),
     );
   }
 

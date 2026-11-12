@@ -38,6 +38,15 @@ export function isMcpSignInDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether an MCP diagnostic says that the server did not answer in time. A provider can wait less
+ * than OpenBot's connection test, so a server that downloads packages at its start can pass the
+ * test and still time out in the provider. `deadline has elapsed` is the Rust `tokio` timeout text.
+ */
+export function isMcpTimeoutDiagnostic(message: string): boolean {
+  return /\btimed out\b|\btimeout\b|\bdeadline has elapsed\b/i.test(message);
+}
+
+/**
  * Whether a provider diagnostic is about the CLI's own telemetry export rather than about the
  * agent's work.
  *
