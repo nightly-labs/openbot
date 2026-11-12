@@ -187,7 +187,7 @@ const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises a
  * names the tool only by its place in the request, which the log does not map to a name (#7482).
  */
 const GOOGLE_REFUSED_FIELD =
-  /\bGenerateContentRequest\.tools\[(\d+)\]\.function_declarations\[\d+\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty)/gu;
+  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty)/gu;
 /** One step of the field path in `GOOGLE_REFUSED_FIELD`: a key, and a property name or an index. */
 const GOOGLE_FIELD_STEP = /\.(\w+)(?:\[([^\]]*)\])?/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
@@ -282,7 +282,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     else if (Array.isArray(value)) node = /^\d+$/u.test(index) ? value[Number(index)] : undefined;
     else node = isRecord(value) && Object.hasOwn(value, index) ? value[index] : undefined;
   }
-  if (missing) return last.index === undefined && isRecord(node) && !Object.hasOwn(node, last.key);
+  if (missing) {
+    if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
+    // Google asks for `items` only in an array. A field of another type with the same name is not refused.
+    return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+  }
   return node === "" || (Array.isArray(node) && node.length === 0);
 }
 
@@ -298,7 +302,8 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
     refused.set(place, [...(refused.get(place) ?? []), { path, reason }]);
   if (refused.size === 0) return [];
   const tools: string[] = [];
-  for (const server of folderNames(folder)) {
+  // In name order, so that the same files give the same server to leave out first.
+  for (const server of folderNames(folder).sort()) {
     for (const file of folderNames(join(folder, server))) {
       if (!file.endsWith(".json")) continue;
       let schema: unknown;

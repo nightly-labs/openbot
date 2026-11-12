@@ -315,7 +315,7 @@ try {
       apiKey: () => null,
       customProviders: () => [],
       mcpServers: () => [
-        httpServer("wiki", "wiki", "https://wiki.example/mcp"),
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
         httpServer("ticktick", "ticktick", "https://ticktick.example/mcp"),
       ],
       reportMcpDrops: (_provider, dropped) => googleDrops.push(...dropped),
@@ -336,7 +336,7 @@ try {
     ["ticktick"],
     "Only the server whose tool has the refused fields is left out.",
   );
-  assert.match(googleDrops[0]?.detail ?? "", /list_tasks/u, "The report names the tool.");
+  assert.match(googleDrops[0]?.detail ?? "", /list_tasks|get_task/u, "The report names the tool.");
   const googlePrompts = (await readJsonl<RefusedEntry>(googleLog)).filter((entry) => entry.method === "session/prompt");
   assert.deepEqual(
     googlePrompts.map((entry) => entry.refused),

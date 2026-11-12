@@ -23,31 +23,26 @@ const logFile = join(folder, `acp-server-20261111_000000-${process.pid}.log`);
 const log = (line: string) => appendFileSync(logFile, `${line}\n`);
 log(`I1111 00:00:00.000000       1 options.go:485] Starting ACP server (pid ${process.pid})`);
 
-/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick` has one that Google refuses. */
 interface SavedTool {
   name: string;
   parameters: { type: "object"; properties: object };
 }
 
-const SCHEMAS: Partial<Record<string, SavedTool>> = {
-  ticktick: {
-    name: "list_tasks",
-    parameters: {
-      type: "object",
-      properties: { tags: { type: "array" }, status: { type: "string", enum: ["open", ""] } },
+/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick` has tools that Google refuses. */
+const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
+  ticktick: [
+    { name: "list_tasks", parameters: { type: "object", properties: { tags: { type: "array" } } } },
+    {
+      name: "get_task",
+      parameters: { type: "object", properties: { status: { type: "string", enum: ["open", ""] } } },
     },
-  },
-  wiki: {
-    name: "search",
-    parameters: {
-      type: "object",
-      properties: { tags: { type: "array", items: { type: "string" } }, status: { type: "string", enum: ["open"] } },
-    },
-  },
+  ],
+  // A field with the same name as a refused one, which Google accepts.
+  atlas: [{ name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } }],
 };
 const GOOGLE_REFUSAL = [
   "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
-  "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
+  "* GenerateContentRequest.tools[21].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
 ].join("\n");
 
 /** The servers of each session that this process started. A resume does not change them. */
@@ -58,10 +53,10 @@ function record(request: AcpRequest, sessionId: string): void {
   const names = (request.params.mcpServers ?? []).map((server) => server.name);
   if (!started.has(sessionId)) started.set(sessionId, names);
   for (const name of names) {
-    const schema = SCHEMAS[name];
-    if (!schema) continue;
-    mkdirSync(join(appData, "mcp", name), { recursive: true });
-    writeFileSync(join(appData, "mcp", name, `${schema.name}.json`), JSON.stringify(schema));
+    for (const schema of SCHEMAS[name] ?? []) {
+      mkdirSync(join(appData, "mcp", name), { recursive: true });
+      writeFileSync(join(appData, "mcp", name, `${schema.name}.json`), JSON.stringify(schema));
+    }
   }
   logEntry({ method: request.method, sessionId, pid: process.pid, names });
 }
