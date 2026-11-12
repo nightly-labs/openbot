@@ -958,7 +958,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * so an authorization server will not send a grant anywhere else.
    *
    * No `scope` unless a sign-in app names one: the SDK takes the scope the server's own
-   * protected-resource metadata asks for.
+   * protected-resource metadata asks for. A resource with no such metadata gets the scope its
+   * authorization server lists (see `#authorizationServerScope`).
    *
    * A public client (`none`) when the server lists that method. RFC 8252 makes a native app a public
    * client, because a secret on the user's computer is not secret, and PKCE protects the grant.
@@ -975,7 +976,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * must only use the https scheme". The SDK schema does not name the field, but sends it.
    */
   get clientMetadata(): OAuthClientMetadata & { application_type: "native" } {
-    const scope = this.#record().app?.scope;
+    const { app } = this.#record();
+    const scope = app ? app.scope : this.#authorizationServerScope();
     const methods = this.#discoveryState?.authorizationServerMetadata?.token_endpoint_auth_methods_supported;
     return {
       client_name: MCP_CLIENT_NAME,
@@ -988,6 +990,20 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       ...tokenEndpointAuthMethod(methods),
       ...(scope ? { scope } : {}),
     };
+  }
+
+  /**
+   * The `scopes_supported` of the authorization server, for a resource that has no
+   * protected-resource metadata. The SDK asks for the scope of the 401 challenge, then of the
+   * resource's metadata, then of `clientMetadata`, and sends no scope when all three are empty.
+   * Microsoft Entra refuses a request with no scope (AADSTS900144), and the Microsoft 365 MCP server
+   * lists its scopes only in its authorization server metadata (#7812). The MCP Python SDK uses the
+   * same fallback. A resource that has metadata keeps the scope it names, or none.
+   */
+  #authorizationServerScope(): string | undefined {
+    const discovery = this.#discoveryState;
+    if (!discovery || discovery.resourceMetadata) return undefined;
+    return discovery.authorizationServerMetadata?.scopes_supported?.join(" ") || undefined;
   }
 
   state(): string {
