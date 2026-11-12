@@ -122,10 +122,10 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
   deadline?: number,
 ) {
   const strict = yield* collectSnapshotPass(send, captures, revision, includeText, false, deadline);
-  if (!includeText || strict.elements.length > 0 || strict.text) return strict;
+  if (!includeText || strict.elements.length > 0 || strict.text) return { ...strict, fallback: false };
   // Nothing passed the strict rules. A page that is still drawn has put aria-hidden, inert or
   // opacity 0 on its main container, so read what the page draws (#7770).
-  return yield* collectSnapshotPass(send, captures, revision, includeText, true, deadline);
+  return { ...(yield* collectSnapshotPass(send, captures, revision, includeText, true, deadline)), fallback: true };
 });
 
 const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
@@ -914,7 +914,9 @@ export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
 export function fallbackRole(node: CdpResult): string {
   const tag = (stringValue(node.localName) || stringValue(node.nodeName)).toLowerCase();
   const attributes = nodeAttributes(node.attributes);
-  if (attributes.role) return attributes.role.toLowerCase();
+  // The first token of a role list is the role, as in the candidate walk. None and presentation do not apply to a control.
+  const role = (attributes.role ?? "").trim().split(/\s+/u)[0]?.toLowerCase() ?? "";
+  if (role && role !== "none" && role !== "presentation") return role;
   if (tag === "button" || tag === "summary") return "button";
   if (tag === "a") return "link";
   if (tag === "select") return attributes.multiple === undefined ? "combobox" : "listbox";
@@ -924,6 +926,7 @@ export function fallbackRole(node: CdpResult): string {
   if (attributes.type === "radio") return "radio";
   if (attributes.type === "range") return "slider";
   if (attributes.type === "number") return "spinbutton";
+  if (["button", "submit", "reset", "image"].includes(attributes.type ?? "")) return "button";
   return "textbox";
 }
 
@@ -940,8 +943,10 @@ export function controlIdentity(
     return { role: axValue(ax.role).toLowerCase() || fallbackRole(node), name: axValue(ax.name).slice(0, 500) };
   }
   const attributes = nodeAttributes(node.attributes);
-  const name = attributes["aria-label"] || visibleText || attributes.placeholder || attributes.title || "";
-  return { role: fallbackRole(node), name: name.slice(0, 500) };
+  const role = fallbackRole(node);
+  const value = stringValue(node.localName) === "input" && role === "button" ? attributes.value || attributes.alt : "";
+  const name = attributes["aria-label"] || visibleText || value || attributes.placeholder || attributes.title || "";
+  return { role, name: name.slice(0, 500) };
 }
 
 function nodeAttributes(value: unknown): Record<string, string> {

@@ -866,7 +866,8 @@ export class BrowserCdpEngine {
         const emptyWait =
           settle !== null &&
           !settle.busy &&
-          parsed.elements.length === 0 &&
+          // A fallback result can be a page that fades in from opacity 0: it waits as an empty page did.
+          (parsed.elements.length === 0 || parsed.fallback) &&
           settle.emptyWaitMs > 0 &&
           settle.document !== this.#emptyWaitedDocument;
         // The second collect needs time before the read's deadline.
@@ -910,7 +911,8 @@ export class BrowserCdpEngine {
         this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
         this.#lastSnapshot = snapshot;
         // An empty snapshot of a web page also needs the image: the page draws nothing that the snapshot can read.
-        const emptyPage = parsed.elements.length === 0 && !parsed.text && /^https?:/u.test(snapshot.url);
+        const emptyPage =
+          parsed.elements.length === 0 && !parsed.text && !snapshot.loading && /^https?:/u.test(snapshot.url);
         const lowCoverage = (parsed.elements.length < 3 && parsed.text.length > 200) || emptyPage;
         const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
         const imageReason = parsed.hasVisualSurface
