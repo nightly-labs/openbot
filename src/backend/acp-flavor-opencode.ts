@@ -48,7 +48,9 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  *
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
- * OpenCode sign-in sent the user to the wrong place.
+ * OpenCode sign-in sent the user to the wrong place. OpenCode 2.2.7 also answers an HTTP 403 or a
+ * `permission_denied` this way, with empty data: the key can be correct while the endpoint's account
+ * cannot use the model. With no status, the text names both causes (#7691).
  *
  * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
  * user's country: `opencode run` shows "This model is not available in your country". A free model
@@ -59,7 +61,9 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
-      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      endpoint.hasCredentials
+        ? "error.provider.customEndpointAccessRefused"
+        : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))

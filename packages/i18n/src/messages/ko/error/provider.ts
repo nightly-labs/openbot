@@ -201,6 +201,8 @@ export const messages = {
     "OpenCode가 이 무료 모델을 거부했어요. 일부 무료 모델은 국가에 따라 사용할 수 없어요. 무료 라벨이 있는 다른 모델을 선택하거나, OpenCode 설정에 OpenCode Go 키를 붙여넣고 OpenCode Go 모델을 선택하세요.",
   "error.provider.customEndpointKeyRefused":
     '엔드포인트 "{provider}"이(가) API 키 또는 헤더를 거부했어요. 서버 설정 → 제공자에서 다시 입력한 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointAccessRefused":
+    '엔드포인트 "{provider}"이(가) 요청을 거부했어요. API 키 또는 헤더가 잘못되었거나, 계정이 이 모델을 사용할 수 없을 수 있어요. 서버 설정 → 제공자에서 확인하거나 다른 모델을 선택한 다음 다시 시도해 주세요.',
   "error.provider.customEndpointKeyMissing":
     '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":

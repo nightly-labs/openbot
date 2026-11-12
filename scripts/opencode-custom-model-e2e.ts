@@ -431,7 +431,7 @@ try {
     "The endpoint must get the saved key.",
   );
   const refused = await keyedTurn("e2e-refused-key");
-  assert.equal(refused.error, sourceText("error.provider.customEndpointKeyRefused", { provider: "Vault" }));
+  assert.equal(refused.error, sourceText("error.provider.customEndpointAccessRefused", { provider: "Vault" }));
   const missing = await keyedTurn(null);
   assert.equal(missing.error, sourceText("error.provider.customEndpointKeyMissing", { provider: "Vault" }));
   report.passed = true;
