@@ -1007,7 +1007,6 @@ export class MailboxStore {
    * completed deliveries, so the reads of each task must not scan the mailbox again.
    */
   taskWork(agentId: string): Map<string, TaskWork> {
-    const messages = this.#messagesById();
     const works = new Map<string, TaskWork>();
     const workOf = (taskId: string): TaskWork => {
       const existing = works.get(taskId);
@@ -1017,14 +1016,19 @@ export class MailboxStore {
       return work;
     };
     const queued: StoredDelivery[] = [];
+    const active: StoredDelivery[] = [];
     for (const delivery of this.#state.deliveries) {
       if (delivery.recipientAgentId !== agentId) continue;
       if (delivery.status === "queued") {
         if (!waitsForPlanContinuation(delivery)) queued.push(delivery);
-      } else if (delivery.status === "starting" || delivery.status === "running") {
-        const taskId = this.#taskIdOf(delivery, messages);
-        if (taskId) workOf(taskId).active = true;
-      }
+      } else if (delivery.status === "starting" || delivery.status === "running") active.push(delivery);
+    }
+    // An agent with no work does not index the message history.
+    if (queued.length === 0 && active.length === 0) return works;
+    const messages = this.#messagesById();
+    for (const delivery of active) {
+      const taskId = this.#taskIdOf(delivery, messages);
+      if (taskId) workOf(taskId).active = true;
     }
     const queuedByTask = new Map<string, Array<{ delivery: StoredDelivery; message: StoredMessage }>>();
     for (const delivery of queued.sort(compareQueueOrder)) {
