@@ -113,6 +113,10 @@ const GEMINI_REQUEST_FAILURES = [
   // this text, and another model let the user continue (#7116). Not the status name: a refused API
   // key is also INVALID_ARGUMENT.
   ["error.provider.antigravityRequestRejected", /\bRequest contains an invalid argument\b/iu],
+  // Go's text when the connection to Google drops during a request, after the CLI's own retries. The
+  // chat showed the Google URL and the IP addresses, and the user did not know that a new try helps
+  // (#7374, #8042). Last, so that a status that Google sent keeps its own kind.
+  ["error.provider.antigravityNetwork", /\bconnection reset by peer\b|\bunexpected EOF\b/u],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */

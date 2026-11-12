@@ -261,6 +261,8 @@ export const messages = {
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "답변이 완료되기 전에 Gemini와의 연결이 끊겼어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 메시지를 다시 보내 주세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
