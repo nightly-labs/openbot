@@ -226,6 +226,7 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -260,6 +261,10 @@ import {
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
+import {
+  restorePromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
@@ -1270,6 +1275,25 @@ const fakeAgents: TeamApiAgents = {
                 // A memory review's skill question, for the skill-learning-v1 projection.
                 ...(anchor.messageId === "skill-question"
                   ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
+                  : {}),
+                // An ask_user question with detail text, for the prompt-detail-v1 projection.
+                ...(anchor.messageId === "detail-question"
+                  ? {
+                      questionPrompt: {
+                        requestId: "request-detail",
+                        questions: [
+                          {
+                            id: "install",
+                            header: "Install",
+                            question: "Did the install work?",
+                            detail: "Run:\n```sh\nbrew install openbot\n```",
+                            isSecret: false,
+                            options: null,
+                          },
+                        ],
+                        resolution: null,
+                      },
+                    }
                   : {}),
               },
             ]
@@ -4856,6 +4880,61 @@ try {
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
     );
+  }
+
+  // ---- Question detail (prompt-detail-v1) ----
+  {
+    const capabilities = [TEAM_PROMPT_DETAIL_CAPABILITY];
+    const detail = "Run:\n```sh\nbrew install openbot\n```";
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises prompt-detail-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(TEAM_PROMPT_DETAIL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(TEAM_PROMPT_DETAIL_CAPABILITY),
+    );
+    const detailPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=detail-question`;
+    const withDetail = await call("GET", detailPagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9, capabilities });
+    const withoutDetail = await call("GET", detailPagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const pageQuestion = (body: Json) =>
+      list(field(list(field(body, "messages"))[0], "questionPrompt", "questions"))[0];
+    check(
+      "a conversation page carries the detail of an agent question only with prompt-detail-v1",
+      withDetail.status === 200 &&
+        field(pageQuestion(withDetail.body), "detail") === detail &&
+        field(pageQuestion(withDetail.body), "question") === "Did the install work?" &&
+        withoutDetail.status === 200 &&
+        field(pageQuestion(withoutDetail.body), "question") === "Did the install work?" &&
+        field(pageQuestion(withoutDetail.body), "detail") === undefined,
+      [summary(withDetail), summary(withoutDetail)],
+    );
+    // The client decodes the page with the frozen codec, which leaves the detail out, then copies it back.
+    const decoded = teamHttpCodec(TEAM_PROTOCOL_V9).decodeResponse("GET", detailPagePath, 200, withDetail.body);
+    const frozenDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    restorePromptQuestionDetails(decoded, withDetail.body);
+    const restoredDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    check(
+      "a client copies the question detail back after the frozen codec decodes the page",
+      frozenDetail === undefined && restoredDetail === detail,
+      { frozenDetail: frozenDetail ?? null, restoredDetail: restoredDetail ?? null },
+    );
+    // A malformed detail on the wire fails closed: the client refuses the page.
+    const refused = [42, "", "x".repeat(INPUT_LIMITS.promptQuestion + 1)].every((value) => {
+      const wire = parseJson(JSON.stringify(withDetail.body));
+      const question = pageQuestion(wire);
+      if (typeof question !== "object" || question === null || Array.isArray(question)) return false;
+      question.detail = value;
+      try {
+        restorePromptQuestionDetails(
+          teamHttpCodec(TEAM_PROTOCOL_V9).decodeResponse("GET", detailPagePath, 200, wire),
+          wire,
+        );
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    check("a client refuses a page whose question detail is not a nonempty string within the limit", refused);
   }
 
   // ---- Skill learning (skill-learning-v1) ----

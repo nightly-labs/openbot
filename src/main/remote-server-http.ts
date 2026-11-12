@@ -11,6 +11,10 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import {
+  restorePromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
@@ -120,8 +124,8 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   if (value !== undefined) {
     const input = value;
     const decodedValue = yield* Effect.try({
-      try: () =>
-        sideRoute
+      try: () => {
+        const decoded = sideRoute
           ? sideRoute.response(path, response.status, input, {
               historyExtent: true,
               channelAttention: true,
@@ -131,7 +135,12 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelBrowser: true,
               mcpManyServers: true,
             })
-          : codec.decodeResponse(method, path, response.status, input),
+          : codec.decodeResponse(method, path, response.status, input);
+        // The frozen response codec leaves the detail of an agent question out; the wire body has it.
+        // A malformed detail fails the response as unsafe data.
+        if (options.capabilities?.includes(TEAM_PROMPT_DETAIL_CAPABILITY)) restorePromptQuestionDetails(decoded, input);
+        return decoded;
+      },
       catch: (cause) =>
         new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
     });

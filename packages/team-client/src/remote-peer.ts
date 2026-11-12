@@ -29,6 +29,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { restorePromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
@@ -1784,15 +1785,19 @@ export function createRemoteTeamPeer(
             status: frame.result.status,
             body: sideRoute
               ? yield* peerDecode(() =>
-                  sideRoute.response(pending.path, status, body, {
-                    historyExtent: true,
-                    channelAttention: true,
-                    agentTaskUiBlocks: true,
-                    channelIsolation: true,
-                    channelPicture: true,
-                    channelBrowser: true,
-                    mcpManyServers: true,
-                  }),
+                  withWirePromptDetails(
+                    state,
+                    sideRoute.response(pending.path, status, body, {
+                      historyExtent: true,
+                      channelAttention: true,
+                      agentTaskUiBlocks: true,
+                      channelIsolation: true,
+                      channelPicture: true,
+                      channelBrowser: true,
+                      mcpManyServers: true,
+                    }),
+                    body,
+                  ),
                 )
               : yield* peerDecode(() =>
                   withWireBlockExtensions(
@@ -1841,6 +1846,10 @@ export function createRemoteTeamPeer(
         : yield* peerDecode(() => decodeTeamProtocolV8CurrentEvent(frame));
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
+      // The frozen event codec leaves the detail of an agent question out; the wire frame has it. A
+      // malformed detail fails the event before its sequence counts.
+      if (decoded.status === "known" && sendsBlockExtensions(state))
+        yield* peerDecode(() => restorePromptQuestionDetails(decoded.event, frame.payload));
       state.lastEventSequence = frame.sequence;
       if (decoded.status === "known") {
         // The frozen event codec leaves the automatic answer and the Vault request of a block, and the
@@ -2569,17 +2578,19 @@ function signalErrorCode(data: string): string | null {
 }
 
 /**
- * Whether the host can send `ui-block-auto-answer-v1`, `ui-block-vault-v1` and `skill-learning-v1`:
- * the client advertises them only on protocol 9, so the walk is skipped for every older host.
+ * Whether the host can send `ui-block-auto-answer-v1`, `ui-block-vault-v1`, `skill-learning-v1` and
+ * `prompt-detail-v1`: the client advertises them only on protocol 9, so the walk is skipped for every
+ * older host.
  */
 function sendsBlockExtensions(state: PeerState): boolean {
   return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;
 }
 
 /**
- * A decoded response with the automatic answer and the Vault request of each block, and the skill name
- * of each skill question, which the frozen response codec leaves out. Only a host that the client told
- * `ui-block-auto-answer-v1`, `ui-block-vault-v1` or `skill-learning-v1` puts them on the wire.
+ * A decoded response with the automatic answer and the Vault request of each block, the skill name of
+ * each skill question, and the detail of each agent question, which the frozen response codec leaves
+ * out. Only a host that the client told `ui-block-auto-answer-v1`, `ui-block-vault-v1`,
+ * `skill-learning-v1` or `prompt-detail-v1` puts them on the wire.
  */
 function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown): T {
   if (sendsBlockExtensions(state)) {
@@ -2587,5 +2598,14 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
     addUiBlockVaultRequests(decoded, wire);
     addSkillSuggestionNames(decoded, wire);
   }
+  return withWirePromptDetails(state, decoded, wire);
+}
+
+/**
+ * A decoded response with the detail of each agent question, which the frozen codecs leave out. Only a
+ * host that the client told `prompt-detail-v1` puts it on the wire. A malformed detail throws.
+ */
+function withWirePromptDetails<T>(state: PeerState, decoded: T, wire: unknown): T {
+  if (sendsBlockExtensions(state)) restorePromptQuestionDetails(decoded, wire);
   return decoded;
 }

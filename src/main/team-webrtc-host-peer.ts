@@ -26,6 +26,11 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   addSkillSuggestionNames,
@@ -909,6 +914,7 @@ export class TeamWebRtcHostPeer {
           frame = withUiBlockAutoAnswers(frame, event);
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
         if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
+        if (this.#peerCapabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) frame = withPromptQuestionDetails(frame, event);
       } catch {
         return;
       }
@@ -1247,8 +1253,9 @@ class GatewayError extends Error {
 
 /**
  * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
- * its Vault request, for a peer with `ui-block-vault-v1`, and the skill name of each skill question,
- * for a peer with `skill-learning-v1`.
+ * its Vault request, for a peer with `ui-block-vault-v1`, the skill name of each skill question,
+ * for a peer with `skill-learning-v1`, and the detail of each agent question, for a peer with
+ * `prompt-detail-v1`.
  */
 function withBlockExtensions(
   capabilities: ReadonlySet<string>,
@@ -1258,5 +1265,6 @@ function withBlockExtensions(
   if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
   if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
   if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
+  if (capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(encoded, source);
   return encoded;
 }
