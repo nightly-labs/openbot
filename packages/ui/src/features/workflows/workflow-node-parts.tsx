@@ -373,7 +373,7 @@ export interface ShellProps {
    * The input ports, when a type has more than one, as the first and the last frame of a video. A
    * port with a branch puts its source in the field of that name. Without it, one port for each input.
    */
-  inputPorts?: readonly WfnInputPort[];
+  inputPorts?: readonly WfnInputPort[] | undefined;
   /** The step cannot run until a line comes into one of its inputs. */
   requires?: boolean;
   output?: WfnPortType | undefined;
