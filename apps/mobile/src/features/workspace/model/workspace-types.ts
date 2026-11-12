@@ -866,11 +866,6 @@ export interface MobileWorkspaceContextValue {
    * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
    */
   canOrganizeLibrary: (serverId: string) => boolean;
-  /**
-   * True when the host also advertises `library-folders-events-v1`: it sends `library-folders-changed`
-   * after each change, so the Library follows a change on another device at once.
-   */
-  followsLibraryFolders: (serverId: string) => boolean;
   /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
   canReadMachineMetrics: (serverId: string) => boolean;
   /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
@@ -1230,7 +1225,6 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowChats"
   | "canReadServerStorage"
   | "canOrganizeLibrary"
-  | "followsLibraryFolders"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 

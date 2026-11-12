@@ -109,7 +109,6 @@ async function changeFolders(
  */
 function useLibraryFolders(serverId: string, files: readonly StoredFileRow[] | undefined) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canOrganizeLibrary(serverId));
-  const follows = useMobileWorkspaceSelector((workspace) => workspace.followsLibraryFolders(serverId));
   const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const { loadLibraryFolders, changeLibraryFolders } = useMobileWorkspaceActions();
   const scope = useQueryScope();
@@ -119,8 +118,9 @@ function useLibraryFolders(serverId: string, files: readonly StoredFileRow[] | u
     queryKey,
     enabled: available,
     retry: false,
-    // A host without the event gives no news of a change: the page reads the folders each time it shows.
-    staleTime: follows ? Number.POSITIVE_INFINITY : 0,
+    // The page reads the folders each time it shows: an event can be lost while the phone is offline
+    // or the app is in the background.
+    staleTime: 0,
     queryFn: async () => {
       const answer = await loadLibraryFolders(serverId);
       // A change waits for the host: the screen keeps it, and the answer of the change comes after.
