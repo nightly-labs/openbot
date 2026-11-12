@@ -118,7 +118,9 @@ function repairFields(tool: string, fields: DynamicRecord): DynamicRecord {
   }
   for (const key of ["target", "source", "submitTarget"])
     if (args[key] !== undefined) args = { ...args, [key]: repairTarget(args[key]) ?? args[key] };
-  const { targets } = args;
+  const { targets, codeTargets } = args;
+  if (Array.isArray(codeTargets))
+    args = { ...args, codeTargets: codeTargets.map((value) => repairTarget(value) ?? value) };
   if (Array.isArray(targets)) args = { ...args, targets: targets.map((value) => repairTarget(value) ?? value) };
   else if (isDynamicRecord(targets))
     args = {

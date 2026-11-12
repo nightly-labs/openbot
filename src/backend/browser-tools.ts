@@ -254,6 +254,14 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
         ),
+      codeTargets: z
+        .array(browserTargetSchema)
+        .min(1)
+        .max(12)
+        .optional()
+        .describe(
+          "Only for method=password with loginId, when the same form also asks for the authenticator-app code: the code field, or all single-digit code fields in entry order. Set digits for the code. OpenBot fills the saved password and current code together, then submits once.",
+        ),
       digits: z
         .number()
         .int()
