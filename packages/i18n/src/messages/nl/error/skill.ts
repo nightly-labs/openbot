@@ -68,6 +68,7 @@ export const messages = {
   "error.skill.githubUnavailable": "OpenBot kan GitHub nu niet lezen. Probeer het later opnieuw.",
   "error.skill.githubRateLimited":
     "GitHub beperkt hoe vaak OpenBot het zonder account kan lezen. Probeer het over een uur opnieuw.",
+  "error.skill.githubTooLarge": "OpenBot kan niet alle bestanden van {repository} lezen. De repository is te groot.",
   "error.skill.githubHostTooOld": "Werk deze server bij om vaardigheden van GitHub toe te voegen.",
   "error.skill.publishGithub":
     "{name} komt van GitHub. Je kunt alleen vaardigheden publiceren die je zelf hebt gemaakt.",

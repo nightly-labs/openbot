@@ -60,6 +60,7 @@ export const messages = {
   "error.skill.githubNoSkills": "لا يوجد SKILL.md في {folder}.",
   "error.skill.githubUnavailable": "لا يستطيع OpenBot قراءة GitHub الآن. حاول مرة أخرى لاحقًا.",
   "error.skill.githubRateLimited": "يحدّ GitHub من عدد مرات قراءة OpenBot له بدون حساب. حاول مرة أخرى بعد ساعة.",
+  "error.skill.githubTooLarge": "لا يستطيع OpenBot قراءة كل ملفات {repository}. المستودع كبير جدًا.",
   "error.skill.githubHostTooOld": "حدّث هذا الخادم لإضافة مهارات من GitHub.",
   "error.skill.publishGithub": "{name} من GitHub. يمكنك نشر المهارات التي أنشأتها فقط.",
 } as const satisfies PartialTranslation<typeof source>;

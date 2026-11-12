@@ -61,6 +61,7 @@ export const messages = {
   "error.skill.githubNoSkills": "{folder} 中没有 SKILL.md。",
   "error.skill.githubUnavailable": "OpenBot 现在无法读取 GitHub，请稍后再试。",
   "error.skill.githubRateLimited": "GitHub 限制了 OpenBot 在没有账户时的读取次数，请一小时后再试。",
+  "error.skill.githubTooLarge": "OpenBot 无法读取 {repository} 的所有文件。仓库太大。",
   "error.skill.githubHostTooOld": "请更新此服务器，以便从 GitHub 添加技能。",
   "error.skill.publishGithub": "{name} 来自 GitHub。你只能发布自己创建的技能。",
 } as const satisfies PartialTranslation<typeof source>;

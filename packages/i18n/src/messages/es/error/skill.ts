@@ -66,6 +66,8 @@ export const messages = {
   "error.skill.githubUnavailable": "OpenBot no puede leer GitHub ahora. Inténtalo de nuevo más tarde.",
   "error.skill.githubRateLimited":
     "GitHub limita la frecuencia con la que OpenBot puede leerlo sin una cuenta. Inténtalo de nuevo en una hora.",
+  "error.skill.githubTooLarge":
+    "OpenBot no puede leer todos los archivos de {repository}. El repositorio es demasiado grande.",
   "error.skill.githubHostTooOld": "Actualiza este servidor para añadir habilidades desde GitHub.",
   "error.skill.publishGithub": "{name} viene de GitHub. Solo puedes publicar las habilidades que creaste tú.",
 } as const satisfies PartialTranslation<typeof source>;

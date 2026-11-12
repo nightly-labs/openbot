@@ -66,6 +66,7 @@ export const messages = {
   "error.skill.githubUnavailable": "지금은 OpenBot이 GitHub를 읽을 수 없어요. 나중에 다시 시도해 주세요.",
   "error.skill.githubRateLimited":
     "GitHub는 계정 없이 OpenBot이 읽을 수 있는 횟수를 제한해요. 1시간 후에 다시 시도해 주세요.",
+  "error.skill.githubTooLarge": "OpenBot이 {repository}의 모든 파일을 읽을 수 없습니다. 저장소가 너무 큽니다.",
   "error.skill.githubHostTooOld": "GitHub에서 스킬을 추가하려면 이 서버를 업데이트해 주세요.",
   "error.skill.publishGithub": "{name}은(는) GitHub에서 가져온 스킬이에요. 직접 만든 스킬만 게시할 수 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

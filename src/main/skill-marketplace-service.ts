@@ -25,6 +25,7 @@ import {
   githubSkillDetail,
   githubSkillUrl,
   isGithubSkillId,
+  isOtherGithubCommit,
   isSkillCategory,
   marketplaceQueryParams,
   parseGithubSkillId,
@@ -810,17 +811,7 @@ const removeFolder = Effect.fn("SkillMarketplace.removeFolder")(function* (
 
 /** The lock key of the same GitHub skill folder at another commit, if the agent has one. */
 function githubPredecessor(lock: SkillsLock, skillId: string): string | undefined {
-  const address = parseGithubSkillId(skillId);
-  if (!address) return undefined;
-  return Object.keys(lock.skills).find((key) => {
-    const other = key === skillId ? null : parseGithubSkillId(key);
-    return (
-      other !== null &&
-      other.owner.toLowerCase() === address.owner.toLowerCase() &&
-      other.repo.toLowerCase() === address.repo.toLowerCase() &&
-      other.path === address.path
-    );
-  });
+  return Object.keys(lock.skills).find((key) => isOtherGithubCommit(skillId, key));
 }
 
 function toInstalledSkill(

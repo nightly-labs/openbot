@@ -51,6 +51,21 @@ const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 const REPO = /^[A-Za-z0-9._-]{1,100}$/u;
 const COMMIT = /^[0-9a-f]{40}$/u;
 
+/** A GitHub account or organization name. */
+export function isGithubOwner(name: string): boolean {
+  return OWNER.test(name);
+}
+
+/** A GitHub repository name. */
+export function isGithubRepo(name: string): boolean {
+  return REPO.test(name);
+}
+
+/** A full commit SHA. */
+export function isGithubCommit(sha: string): boolean {
+  return COMMIT.test(sha);
+}
+
 export function isGithubSkillId(id: string): boolean {
   return id.startsWith(GITHUB_SKILL_ID_PREFIX);
 }
@@ -75,10 +90,24 @@ export function isGithubSkillPath(path: string): boolean {
   return path.split("/").every((part) => part !== "" && part !== "." && part !== ".." && !part.includes("\\"));
 }
 
+/** True when two ids name the same skill folder of the same repository, at different commits. */
+export function isOtherGithubCommit(id: string, other: string): boolean {
+  if (id === other) return false;
+  const a = parseGithubSkillId(id);
+  const b = parseGithubSkillId(other);
+  return (
+    a !== null &&
+    b !== null &&
+    a.owner.toLowerCase() === b.owner.toLowerCase() &&
+    a.repo.toLowerCase() === b.repo.toLowerCase() &&
+    a.path === b.path
+  );
+}
+
 /** The page of the skill folder on GitHub, at the commit that the id names. */
 export function githubSkillUrl(address: GithubSkillAddress): string {
-  const base = `https://github.com/${address.owner}/${address.repo}`;
-  return address.path ? `${base}/tree/${address.commit}/${address.path}` : `${base}/tree/${address.commit}`;
+  const base = `https://github.com/${address.owner}/${address.repo}/tree/${address.commit}`;
+  return address.path ? `${base}/${address.path.split("/").map(encodeURIComponent).join("/")}` : base;
 }
 
 /**
@@ -107,7 +136,7 @@ export function githubSkillDetail(source: GithubSkillSource, skill: GithubSkill)
   };
 }
 
-/** Main and the preload read a host's answer with this; a wrong shape is an error. */
+/** Main and the web client read a host's answer with this; a wrong shape is an error. */
 export function decodeGithubSkillSource(value: unknown): GithubSkillSource {
   if (
     !isDynamicRecord(value) ||

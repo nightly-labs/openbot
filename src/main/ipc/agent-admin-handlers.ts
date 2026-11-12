@@ -18,7 +18,6 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
-  decodeGithubSkillSource,
   decodeHostAddedAgent,
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
@@ -90,6 +89,7 @@ import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import {
   decodeAgentHostSettingsFromHost,
+  decodeGithubSkillSourceFromHost,
   decodeRemoteAgentFastModeSettings,
   decodeRemoteAgentNewChatSettings,
 } from "../remote-agent-decoding";
@@ -330,7 +330,7 @@ export function agentAdminIpcHandlers({
           if (!remoteServers.supportsCapability(serverId, GITHUB_SKILLS_CAPABILITY))
             throw new Error(sourceText("error.skill.githubHostTooOld"));
           return runCauseEffect(
-            remoteServers.request(serverId, GITHUB_SKILLS_ROUTES.read, decodeGithubSkillSource, {
+            remoteServers.request(serverId, GITHUB_SKILLS_ROUTES.read, decodeGithubSkillSourceFromHost, {
               method: "POST",
               body: { link },
             }),

@@ -19,7 +19,7 @@ export function githubLinkOf(model: MarketplaceModel, query: string): string | n
   return model.readGithubSkills && GITHUB_LINK.test(text) ? text : null;
 }
 
-/** A pasted link is read at once; typed text waits until the user stops typing. Each read uses the GitHub limit. */
+/** The read waits until the user stops typing: each read uses the GitHub limit. */
 const READ_DELAY_MS = 400;
 
 /**

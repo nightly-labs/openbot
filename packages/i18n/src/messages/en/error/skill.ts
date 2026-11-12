@@ -65,6 +65,7 @@ export const messages = defineMessages("error.skill", {
   "error.skill.githubUnavailable": "OpenBot cannot read GitHub now. Try again later.",
   "error.skill.githubRateLimited":
     "GitHub limits how often OpenBot can read it without an account. Try again in one hour.",
+  "error.skill.githubTooLarge": "OpenBot cannot read all files of {repository}. The repository is too large.",
   "error.skill.githubHostTooOld": "Update this server to add skills from GitHub.",
   "error.skill.publishGithub": "{name} comes from GitHub. You can publish only the skills that you made.",
 });

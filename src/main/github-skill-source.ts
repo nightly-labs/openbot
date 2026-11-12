@@ -1,7 +1,7 @@
 // Skills from a public GitHub repository. The host reads them with no GitHub account: two REST calls
-// (the commit and its file tree) for each read or install, and the files from
-// raw.githubusercontent.com. The read pins the commit, and an install downloads the files of that
-// commit only, so the agent gets what the user read.
+// (the commit and its file tree) for each read, one (the tree) for each skill download, and the
+// files from raw.githubusercontent.com. The read pins the commit, and an install downloads the files
+// of that commit only, so the agent gets what the user read.
 
 import { createHash } from "node:crypto";
 import {
@@ -13,6 +13,9 @@ import {
   type GithubSkillSource,
   githubSkillDetail,
   githubSkillId,
+  isGithubCommit,
+  isGithubOwner,
+  isGithubRepo,
   isGithubSkillPath,
   type MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
@@ -21,20 +24,20 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { zipSync } from "fflate";
 import { causeHelpers } from "../backend/effect-boundary";
+import { GITHUB_REQUEST_TIMEOUT_MS, type GitHubFetch } from "./github-device-flow";
 import { inspectSkillMarkdown, isUnsafeArchivePath, MAX_BYTES, SKILL_FRONTMATTER } from "./skill-package";
-
-export type GithubSkillFetch = (url: string, init: RequestInit) => Promise<Response>;
 
 const API = "https://api.github.com";
 const RAW = "https://raw.githubusercontent.com";
-const REQUEST_TIMEOUT_MS = 30_000;
 /** The same limit as a skill package. */
 const MAX_FILES = 200;
 const CONCURRENCY = 8;
 /** A branch or tag can have slashes, so a link can split at several places. Each try is one REST call. */
 const REF_TRIES = 4;
-const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
-const REPO = /^[A-Za-z0-9._-]{1,100}$/u;
+/** The `github-skills-v1` answer takes a folder path of this length at most. */
+const MAX_PATH_LENGTH = 1024;
+/** The commit of an id never changes, so a download serves each agent of one add. */
+const DOWNLOADS_KEPT = 8;
 
 export class GithubSkillFailure extends Schema.TaggedError<GithubSkillFailure>()("GithubSkillFailure", {
   cause: Schema.Defect(),
@@ -76,7 +79,7 @@ export function parseGithubLink(text: string): GithubLink | null {
   }
   const [owner = "", rawRepo = "", kind, ...rest] = parts;
   const repo = rawRepo.replace(/\.git$/u, "");
-  if (!OWNER.test(owner) || !REPO.test(repo)) return null;
+  if (!isGithubOwner(owner) || !isGithubRepo(repo)) return null;
   if (kind === undefined) return { owner, repo, kind: "repository", rest: [] };
   if ((kind === "tree" || kind === "blob") && rest.length > 0) return { owner, repo, kind, rest };
   return null;
@@ -85,14 +88,23 @@ export function parseGithubLink(text: string): GithubLink | null {
 interface TreeEntry {
   path: string;
   size: number;
+  /** A symbolic link. raw.githubusercontent.com gives its target as the file text. */
+  link: boolean;
 }
 
-export function githubSkillSource(fetchImpl: GithubSkillFetch) {
+/** The files of a commit. `truncated` when GitHub did not list all of them. */
+interface Tree {
+  files: TreeEntry[];
+  truncated: boolean;
+}
+
+export function githubSkillSource(fetchImpl: GitHubFetch) {
+  const downloads = new Map<string, { detail: MarketplaceSkillDetail; bundle: Uint8Array }>();
   const request = (url: string) =>
     io((signal) =>
       fetchImpl(url, {
         headers: { Accept: "application/vnd.github+json", "User-Agent": "OpenBot" },
-        signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)]),
       }),
     ).pipe(Effect.mapError(() => failure(sourceText("error.skill.githubUnavailable"))));
 
@@ -127,12 +139,12 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
       isDynamicRecord(body) && isDynamicRecord(body.commit) && isDynamicRecord(body.commit.committer)
         ? body.commit.committer.date
         : undefined;
-    if (!isDynamicRecord(body) || !isString(body.sha) || !/^[0-9a-f]{40}$/u.test(body.sha))
+    if (!isDynamicRecord(body) || !isString(body.sha) || !isGithubCommit(body.sha))
       return yield* failure(sourceText("error.skill.githubUnavailable"));
     return { sha: body.sha, committedAt: isString(date) ? date : new Date(0).toISOString() };
   });
 
-  /** The files of the commit. A tree that GitHub cuts off still gives the files it lists. */
+  /** The files of the commit. A read shows the skills of a tree that GitHub cuts off; a download refuses it. */
   const tree = Effect.fn("GithubSkillSource.tree")(function* (address: Omit<GithubSkillAddress, "path">) {
     const body = yield* api(`/repos/${address.owner}/${address.repo}/git/trees/${address.commit}?recursive=1`);
     if (!isDynamicRecord(body) || !Array.isArray(body.tree))
@@ -140,8 +152,9 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
     const files: TreeEntry[] = [];
     for (const entry of body.tree)
       if (isDynamicRecord(entry) && entry.type === "blob" && isString(entry.path) && isNumber(entry.size))
-        files.push({ path: entry.path, size: entry.size });
-    return files;
+        files.push({ path: entry.path, size: entry.size, link: entry.mode === "120000" });
+    const result: Tree = { files, truncated: body.truncated === true };
+    return result;
   });
 
   /** The files under `folder`, with names relative to it. */
@@ -150,7 +163,7 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
     const prefix = `${folder}/`;
     return files
       .filter((file) => file.path.startsWith(prefix))
-      .map((file) => ({ path: file.path.slice(prefix.length), size: file.size }));
+      .map((file) => ({ ...file, path: file.path.slice(prefix.length) }));
   }
 
   const resolve = Effect.fn("GithubSkillSource.resolve")(function* (link: GithubLink) {
@@ -167,7 +180,8 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
       const after = link.rest.slice(split);
       // A blob link names a file: the skill is its folder.
       const path = (link.kind === "blob" ? after.slice(0, -1) : after).join("/");
-      if (!isGithubSkillPath(path)) return yield* failure(sourceText("error.skill.githubLinkInvalid"));
+      if (!isGithubSkillPath(path) || path.length > MAX_PATH_LENGTH)
+        return yield* failure(sourceText("error.skill.githubLinkInvalid"));
       return { ...found, path };
     }
     return yield* notFound();
@@ -193,7 +207,11 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
       name: metadata.success.name,
       description: metadata.success.description,
       instructions: text.slice(text.match(SKILL_FRONTMATTER)?.[0].length ?? 0).trim(),
-      files: own.map((file) => file.path).sort(),
+      // The answer lists as many files as a skill package can hold; a download refuses a longer list.
+      files: own
+        .map((file) => file.path)
+        .sort()
+        .slice(0, MAX_FILES),
     };
     return skill;
   });
@@ -205,7 +223,7 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
       if (!link) return yield* failure(sourceText("error.skill.githubLinkInvalid"));
       const resolved = yield* resolve(link);
       const base = { owner: link.owner, repo: link.repo, commit: resolved.sha };
-      const files = yield* tree(base);
+      const { files } = yield* tree(base);
       const inside = filesIn(files, resolved.path);
       const folders = inside
         .filter((file) => file.path === "SKILL.md" || file.path.endsWith("/SKILL.md"))
@@ -242,7 +260,14 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
 
     /** The files of one skill folder at the pinned commit, as a skill package, and its detail. */
     download: Effect.fn("GithubSkillSource.download")(function* (address: GithubSkillAddress) {
-      const files = yield* tree(address);
+      const id = githubSkillId(address);
+      const kept = downloads.get(id);
+      if (kept) return kept;
+      const { files, truncated } = yield* tree(address);
+      if (truncated)
+        return yield* failure(
+          sourceText("error.skill.githubTooLarge", { repository: `${address.owner}/${address.repo}` }),
+        );
       const skill = yield* readSkill(address, files);
       if (!skill)
         return yield* failure(
@@ -252,6 +277,7 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
         );
       // A file that a skill package must not carry stays on GitHub.
       const own = filesIn(files, address.path).filter((file) => !isUnsafeArchivePath(file.path));
+      if (own.some((file) => file.link)) return yield* failure(sourceText("error.skill.symlinks"));
       if (own.length > MAX_FILES) return yield* failure(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES }));
       if (own.reduce((total, file) => total + file.size, 0) > MAX_BYTES)
         return yield* failure(sourceText("error.skill.expandedTooLarge"));
@@ -271,7 +297,10 @@ export function githubSkillSource(fetchImpl: GithubSkillFetch) {
         ),
         bundleSha256: createHash("sha256").update(bundle).digest("hex"),
       };
-      return { detail, bundle };
+      const result = { detail, bundle };
+      downloads.set(id, result);
+      if (downloads.size > DOWNLOADS_KEPT) downloads.delete(downloads.keys().next().value ?? id);
+      return result;
     }),
   };
 }

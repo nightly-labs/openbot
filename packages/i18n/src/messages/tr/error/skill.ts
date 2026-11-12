@@ -65,6 +65,7 @@ export const messages = {
   "error.skill.githubUnavailable": "OpenBot şu anda GitHub'ı okuyamıyor. Daha sonra yeniden deneyin.",
   "error.skill.githubRateLimited":
     "GitHub, OpenBot'un hesap olmadan ne sıklıkla okuyabileceğini sınırlıyor. Bir saat sonra yeniden deneyin.",
+  "error.skill.githubTooLarge": "OpenBot, {repository} deposunun tüm dosyalarını okuyamıyor. Depo çok büyük.",
   "error.skill.githubHostTooOld": "GitHub'dan beceri eklemek için bu sunucuyu güncelleyin.",
   "error.skill.publishGithub":
     "{name} GitHub'dan geliyor. Yalnızca kendi oluşturduğunuz becerileri yayımlayabilirsiniz.",

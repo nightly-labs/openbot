@@ -1,4 +1,5 @@
 import {
+  githubSkillUrl,
   type InstalledSkill,
   type MarketplaceSkillSort,
   type MarketplaceSkillSummary,
@@ -468,7 +469,7 @@ function GithubSkills(props: { scope: MarketplaceScope; link: string }) {
                   aria-label={t("marketplace.skills.github.openName", {
                     repository: repository(source().owner, source().repo),
                   })}
-                  onClick={() => model().openUrl(props.link)}
+                  onClick={() => model().openUrl(githubSkillUrl(source()))}
                 >
                   {t("marketplace.skills.github.open")}
                   <ExternalLink aria-hidden="true" />

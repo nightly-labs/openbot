@@ -23,6 +23,7 @@ import {
   DEFAULT_MCP_SERVER_ACCESS,
   githubSkillDetail,
   isGithubSkillId,
+  isOtherGithubCommit,
   isRemovableSkill,
   isSkillEnabled,
   mcpConfigErrors,
@@ -220,6 +221,8 @@ const MAC_AUTOMATION_APP_NAME = {
 
 /** How often the page of a relayed sign-in is read while it waits. */
 const SIGN_IN_RELAY_POLL_MS = 1_000;
+/** How long a found GitHub read stays good for the same link. */
+const GITHUB_READ_KEPT_MS = 5 * 60_000;
 
 /** The relayed sign-in of one app while it waits. */
 export interface MarketplaceSignInRelayState {
@@ -561,7 +564,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     for (const agentId of addIds) {
       if (restores.includes(agentId) || storedSkill(agentId, skill.id)) continue;
       const list = skills.installed[agentId] ?? [];
-      if (skills.read[agentId] === "loaded" && assignedSkillCount(list) >= INPUT_LIMITS.agentSkills) {
+      /* The host replaces an older commit of the same GitHub skill: the count stays the same. */
+      const replaces = list.some((item) => isOtherGithubCommit(skill.id, item.skillId));
+      if (!replaces && skills.read[agentId] === "loaded" && assignedSkillCount(list) >= INPUT_LIMITS.agentSkills) {
         failed.push(nameOf(agentId));
         reasons.add(t("skill.marketplace.limitReason", { limit: INPUT_LIMITS.agentSkills }));
       } else installs.push(agentId);
@@ -811,13 +816,20 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   /* The skills of the GitHub links that this window read, by id: the skill page and the agents dialog
      show them without a second read, which would use the GitHub limit again. */
   const githubDetails = new Map<string, MarketplaceSkillDetail>();
+  /* The last reads of each link on each host. A search that goes back to a link does not read it again
+     for a short time, because each read uses the GitHub limit. */
+  const githubReads = new Map<string, { at: number; source: GithubSkillSource }>();
 
   async function readGithubSkills(link: string): Promise<GithubSkillRead> {
     const read = skillCalls().readGithub;
     if (!read) return { status: "failed", message: t("error.skill.githubHostTooOld") };
+    const key = `${untrack(() => props.hostServerId) ?? ""}\n${link}`;
+    const kept = githubReads.get(key);
+    if (kept && Date.now() - kept.at < GITHUB_READ_KEPT_MS) return { status: "found", source: kept.source };
     try {
       const source: GithubSkillSource = await read(link);
       for (const skill of source.skills) githubDetails.set(skill.id, githubSkillDetail(source, skill));
+      githubReads.set(key, { at: Date.now(), source });
       return { status: "found", source };
     } catch (cause) {
       return { status: "failed", message: marketplaceErrorMessage(cause) };
