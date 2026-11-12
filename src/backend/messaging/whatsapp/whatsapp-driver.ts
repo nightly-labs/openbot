@@ -286,7 +286,7 @@ class WhatsAppAdapter implements MessagingAdapter {
     return Effect.sync(() => this.#handle.chats.history(platformChannelId, threadKey, afterId, beforeId));
   }
 
-  /** WhatsApp sends no history to this device: this is what it saw since it started. */
+  /** WhatsApp sends no history to this device: this is the newest of what it saw, also before a restart. */
   recent(
     platformChannelId: string,
     threadKey: string | null,

@@ -73,7 +73,7 @@ export class WhatsAppRuntime {
       storeId,
       store,
       session: this.#session(store, pairing),
-      chats: new WhatsAppChatState(),
+      chats: new WhatsAppChatState(store),
     };
     this.#open.set(storeId, handle);
     return handle;
@@ -108,6 +108,7 @@ export class WhatsAppRuntime {
   close(storeId: string): void {
     const handle = this.#open.get(storeId);
     this.#open.delete(storeId);
+    handle?.chats.flush();
     handle?.store.close();
   }
 

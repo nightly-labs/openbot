@@ -281,8 +281,9 @@ chat each morning. It reads only a place that the list shows. A turn that answer
 or a teammate's turn on a request from it, cannot read a different place: a person there is not the
 OpenBot user. Slack can limit it to one read a minute; it
 then fails at once, and the agent can try again. Discord gives the text only of messages that
-mention OpenBot, and of bot posts. Discord messages name their files. Telegram and WhatsApp give
-what this computer saw since it started; WhatsApp keeps the newest 200 messages of all its chats.
+mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this
+computer saw since it started. WhatsApp gives what this computer saw: it keeps the newest 200
+messages of all its chats, also after a restart, without their files.
 
 ## Posts that an agent sends
 
@@ -355,9 +356,10 @@ while this computer has no Signal connection is lost, except for a hosted server
   and a protocol change of WhatsApp can stop the connection until OpenBot updates. Use a number only
   for OpenBot when you can.
 - WhatsApp removes a linked device after about 14 days without a connection. Link the number again.
-- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw since
-  it started. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
-  server connects. A message older than one day gets no answer.
+- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw after
+  the number was linked: the newest 200 messages of all its chats. A hosted server does not start
+  for a WhatsApp message: WhatsApp keeps it until the server connects. A message older than one day
+  gets no answer.
 - WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
   stops with "locked"; link it as its own device.
 - An owner or admin of a joined server links and manages the host's numbers from their own computer
