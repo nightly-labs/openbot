@@ -132,11 +132,7 @@ export function bloubAvatarProfile(
   return {
     shape: silhouette,
     expression,
-    color:
-      color ??
-      (hue === null
-        ? colorHex(requiredItem(AUTOMATIC_COLORS, stableIndex(`${seed}:color`, AUTOMATIC_COLORS.length)))
-        : HUE_COLORS[hue]),
+    color: color ?? (hue === null ? colorHex(automaticColor(seed)) : HUE_COLORS[hue]),
   };
 }
 
@@ -157,7 +153,11 @@ export function avatarHeadColor(seed: string, hue: AvatarHue | null, color: Avat
 export type ServerPlushColor = (typeof AUTOMATIC_COLORS)[number];
 
 export function serverPlushColor(serverId: string): ServerPlushColor {
-  return requiredItem(AUTOMATIC_COLORS, stableIndex(`${serverId}:color`, AUTOMATIC_COLORS.length));
+  return automaticColor(serverId);
+}
+
+function automaticColor(seed: string): ServerPlushColor {
+  return requiredItem(AUTOMATIC_COLORS, stableIndex(`${seed}:color`, AUTOMATIC_COLORS.length));
 }
 
 export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch: number): string[] {

@@ -49,7 +49,7 @@
   animation: server-install-pop-in 520ms var(--server-install-spring) 380ms backwards;
 }
 
-.server-install-card-logo > img {
+.server-install-card-logo > .server-rail-logo {
   width: 100%;
   height: 100%;
   border-radius: inherit;
