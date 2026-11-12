@@ -102,7 +102,8 @@ There is no configuration for a developer or for a packaged build:
   first name again. Sign-in apps and the client metadata document keep `127.0.0.1`.
 - Some firewalls block both loopback names (TradingView, #7230). After `localhost` gets no grant
   back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
-  that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`.
+  that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,
+  and then `localhost`.
   A relayed sign-in, or one that an in-app tab shows, keeps the two loopback names: the deep link
   opens only in the browser of the computer that runs OpenBot, and only while the operating system
   opens `openbot://` in this app (`app.isDefaultProtocolClient`). The deep link is sent only in the

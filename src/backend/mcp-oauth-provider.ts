@@ -936,9 +936,14 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * The deep link only in the attempt that registered it: a build from before the loopback listener
    * registered it too, and Canva refuses it at `/authorize`.
+   *
+   * A registration that this sign-in keeps in memory while tokens are on file (#6975) is the client
+   * that the authorization request names, so its address is the one to send.
    */
   get redirectUrl(): string {
-    const { app, client } = this.#record();
+    const record = this.#record();
+    const { app } = record;
+    const client = this.#registeredClient ?? record.client;
     const deepLink = this.#deepLinkRedirectUrl;
     if (!app && deepLink && client?.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
@@ -1100,8 +1105,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * The registration body with each other name of this run's address, in order, or none when it sends
-   * neither name. A refused deep link gets `localhost` and then `127.0.0.1`: a server that accepts
-   * only `localhost` (#5584) still signs in, as before #7230.
+   * neither name. A refused deep link gets `127.0.0.1` and then `localhost`, so the next attempt after
+   * that page moves on to `localhost`, as before #7230, and a server that accepts only `localhost`
+   * (#5584) still signs in.
    */
   #withOtherRedirectNames(init: RequestInit): RequestInit[] {
     const localhost = this.#localhostRedirectUrl;
@@ -1110,7 +1116,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
     const deepLink = this.#deepLinkRedirectUrl;
     const other = this.#otherRedirectName(sent);
-    const names = deepLink && sent === deepLink ? [localhost, this.#options.redirectUrl] : other ? [other] : [];
+    const names = deepLink && sent === deepLink ? [this.#options.redirectUrl, localhost] : other ? [other] : [];
     return names.map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));
   }
 
