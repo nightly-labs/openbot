@@ -141,6 +141,11 @@ export function instanceTransferIpcHandlers({
     requireRemote(serverId);
     const path = await chooseFile();
     if (!path) return null;
+    return stageRemoteFile(serverId, path);
+  };
+
+  /** Sends the file at `path` to the host. The size check comes before the read. */
+  const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
     if (inParts(serverId)) return runCauseEffect(uploadTransferInParts(remoteServers, serverId, path));
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
@@ -183,26 +188,10 @@ export function instanceTransferIpcHandlers({
     routeToServer(serverId, {
       // The local stage reads the file again at apply, so the file stays until `copy` ends.
       local: () => runCauseEffect(instanceTransfer.stage(path)),
-      remote: async (target) => {
+      remote: (target) => {
         requireRemote(target);
-        if (inParts(target)) return runCauseEffect(uploadTransferInParts(remoteServers, target, path));
-        const bytes = await readFile(path);
-        if (bytes.byteLength > INSTANCE_TRANSFER_REMOTE_BYTES)
-          throw new Error(sourceText("error.import.transferRemoteTooLarge"));
-        return runCauseEffect(remoteServers.stageInstanceTransfer(target, new Uint8Array(bytes)));
+        return stageRemoteFile(target, path);
       },
-    });
-
-  const discardAt = (serverId: string, token: string) =>
-    routeToServer(serverId, {
-      local: () => Effect.runPromise(instanceTransfer.discard(token)),
-      remote: (target) =>
-        runCauseEffect(
-          remoteServers.request(target, INSTANCE_TRANSFER_ROUTES.discard, () => undefined, {
-            method: "POST",
-            body: { token },
-          }),
-        ),
     });
 
   const copy = async (
@@ -220,17 +209,11 @@ export function instanceTransferIpcHandlers({
         keys: preview.agents.map((agent) => agent.key),
         includeSettings: false,
       };
-      let result: InstanceTransferResult;
-      try {
-        result = await routeToServer(serverId, {
-          local: () => runCauseEffect(instanceTransfer.apply(input)),
-          remote: (target) => applyRemote(input, target),
-        });
-      } catch (error) {
-        // A failed apply keeps the token. Release it, so the file does not wait for its expiry.
-        await discardAt(serverId, input.token).catch(() => undefined);
-        throw error;
-      }
+      // The apply releases the token and the staged file, also when it fails.
+      const result = await routeToServer(serverId, {
+        local: () => runCauseEffect(instanceTransfer.apply(input)),
+        remote: (target) => applyRemote(input, target),
+      });
       // The export and the stage can drop files and agents. Show why, as a file export and import do.
       const warnings = [...new Set([...exportWarnings, ...preview.warnings, ...result.warnings])];
       return { ...result, warnings: warnings.slice(0, AGENT_IMPORT_LIMITS.warnings) };
