@@ -4,6 +4,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { restorePromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
@@ -603,8 +604,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         const status = envelope.status;
         const body = file
           ? null
-          : yield* remoteDecode(() =>
-              sideRoute
+          : yield* remoteDecode(() => {
+              const decoded = sideRoute
                 ? sideRoute.response(path, status, envelope.body, {
                     historyExtent: true,
                     channelAttention: true,
@@ -614,8 +615,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelBrowser: true,
                     mcpManyServers: true,
                   })
-                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
-            ).pipe(
+                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body);
+              // The frozen response codec leaves the detail of an agent question out; the wire body has
+              // it. A malformed detail fails the response as an invalid body.
+              if (this.#sendsProtocol9Extensions(hostId)) restorePromptQuestionDetails(decoded, envelope.body);
+              return decoded;
+            }).pipe(
               Effect.mapError(
                 () =>
                   new RemoteWorkflowError({
@@ -628,7 +633,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               ),
             );
         // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
+        if (this.#sendsProtocol9Extensions(hostId)) addSkillSuggestionNames(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
           this.#hostProtocols.set(hostId, support.protocol.maximum);
@@ -1504,8 +1509,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (decoded.status === "known") {
-        // The frozen event codec leaves the skill name of a skill question out; the wire frame has it.
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
+        // The frozen event codec leaves the skill name of a skill question and the detail of an agent
+        // question out; the wire frame has them.
+        if (this.#sendsProtocol9Extensions(hostId)) {
+          addSkillSuggestionNames(decoded.event, frame.payload);
+          restorePromptQuestionDetails(decoded.event, frame.payload);
+        }
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);
@@ -1519,8 +1528,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }
   }
 
-  /** A protocol 9 host adds `skillSuggestion` for this client, which advertises skill-learning-v1. */
-  #sendsSkillSuggestionNames(hostId: string): boolean {
+  /**
+   * A protocol 9 host adds `skillSuggestion` and the question `detail` for this client, which advertises
+   * skill-learning-v1 and prompt-detail-v1.
+   */
+  #sendsProtocol9Extensions(hostId: string): boolean {
     return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
 

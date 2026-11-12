@@ -53,7 +53,7 @@ export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
-  /** A short line under the question. The Team API does not carry it. */
+  /** A short line under the question. The Team API carries it only under `prompt-detail-v1`. */
   detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;

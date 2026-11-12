@@ -488,6 +488,17 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+`prompt-detail-v1` (protocol 9 only) carries the `detail` text under an agent question
+(`team-protocol/prompt-detail-v1.ts`), in the same places as `prompt-multi-select-v1`. The host adds it
+after the frozen projection, for a connection that advertises the capability. Each question gets the
+detail of the source question with the same agent (when the prompt names one), `requestId`, question
+`id` and question text. The frozen
+codecs leave it out, so the client copies it back from the wire value after it decodes: the team client
+and, on desktop, `remote-server-http.ts`, `remote-server-event-stream.ts` and
+`team-webrtc-client-transport.ts`, each inside its decode error boundary. The host leaves out a detail
+that is not a nonempty string of at most `INPUT_LIMITS.promptQuestion` characters, and a client fails
+closed on one with `protocol_error`.
+
 ### Reasoning efforts
 
 `reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of
