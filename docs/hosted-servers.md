@@ -954,7 +954,9 @@ To take a VPS:
 2. Set its reference at once, before any other work on it. Then read the VPS again: when the
    reference is not yours, another operator took it, and you select another one.
 3. Never take a VPS that has a reference, also `pool-free`. A pool VPS leaves the pool only with
-   `leaseweb-pool.ts remove`, by a decision of the operator.
+   `leaseweb-pool.ts remove`, by a decision of the operator. `remove` keeps the reference
+   `pool-free`, so the operator then sets the new reference, or clears it with
+   `{"reference": ""}` when the VPS is not used.
 
 `leaseweb-pool.ts add` gives `pool-free` to a VPS with no reference, and refuses a VPS with another
 reference. For a pool VPS, the record of the account service, not the reference, decides which VPS
