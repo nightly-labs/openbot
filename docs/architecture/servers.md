@@ -51,6 +51,18 @@ says "Storage almost full" and can be closed until the next level; under 2% free
 is red and cannot be closed. "Free up space" opens Server settings › Storage. A host without the
 capability shows no card.
 
+The optional `storage-user-files-v1` capability (`team-protocol/storage-user-files-v1.ts`, protocol 9
+only) adds `POST /v1/storage/user-files`. It answers the same free and total bytes, plus `userBytes`:
+the bytes that the home folder and the temporary folders of the server's user use on that disk. The
+frozen `storage-disk-v1` reply cannot get a new field, so this is a new route. Only a hosted server
+measures it (`src/backend/user-files-bytes.ts`, `nice -n 19 du -s -x -c`), at most each 10 minutes,
+in the background after the first value. It is null on another host, and on a machine with Docker,
+because `du` cannot read the Docker folder. The clients count the plan storage that is left
+(`hostedPlanDisk` in `@openbot/contracts/hosted-servers`) from `userBytes`. When it is null or the
+host does not have the capability, they subtract `HOSTED_SERVER_BASE_IMAGE_GB` for the system, which
+is correct only for a boat sandbox. Every member can read it. The desktop, the web client and mobile
+prefer this route and use `storage-disk-v1` with an older host.
+
 The optional `library-folders-v1` capability (`team-protocol/library-folders-v1.ts`, protocol 9 only)
 adds `POST /v1/library-folders` and `POST /v1/library-folders/actions` for the folders of the Library
 page. Each agent has folders for its files, five levels in all, and a file is in one folder of its
@@ -689,7 +701,7 @@ the host computer needs no report: the host reads `powerMonitor` itself (`hostCo
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`, `storage-user-files-v1`,
 `storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1` and `agent-speed-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 

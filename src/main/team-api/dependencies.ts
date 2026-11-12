@@ -313,7 +313,7 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 /** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
-export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
 /** Its presence is what `#protocolSupport` advertises `library-folders-v1` on. Each member reads and changes the folders. */
 export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */

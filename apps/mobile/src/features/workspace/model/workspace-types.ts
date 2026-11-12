@@ -143,6 +143,7 @@ import type {
   SidebarPin,
   SignInRelayStatus,
   StartWhatsAppLinkInput,
+  StorageDisk,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
@@ -256,6 +257,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** The plan storage of a hosted server in GB. Absent for each other server, or when the account server gave none. */
+  storageGb?: number;
   /** False for a hosted server that the account service cannot restart. Absent for each other server. */
   restartAvailable?: boolean;
   /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
@@ -873,6 +876,11 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /**
+   * The disk of the host data, with the bytes of the user's files from a host with
+   * `storage-user-files-v1`. Null when the host has neither that nor `storage-disk-v1`.
+   */
+  loadServerDisk: (serverId: string) => Promise<StorageDisk | null>;
   /** Owners and admins only; the host refuses a member. */
   clearServerStorage: (category: ClearableStorageCategory, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */

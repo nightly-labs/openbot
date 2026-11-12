@@ -32,6 +32,7 @@ import {
 } from "./database/storage-usage-queries";
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import type { UserFilesBytes } from "./user-files-bytes";
 
 interface StorageRoots {
   /** The SQLite file. Its `-wal` and `-shm` companions are counted with it. */
@@ -64,6 +65,8 @@ export interface StorageUsageSources {
    * Absent on a host without channels.
    */
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
+  /** The bytes of the files of the server's user. Only a hosted server has it. */
+  userFiles?: Pick<UserFilesBytes, "read" | "dispose">;
 }
 
 export interface StorageChannelFile {
@@ -540,7 +543,7 @@ function scopeKey(input: GetStorageUsageInput): string {
  */
 export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
-  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox">;
+  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
   readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
@@ -550,7 +553,7 @@ export class StorageUsageService {
 
   constructor(
     scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
-    sources: Pick<StorageUsageSources, "roots" | "mailbox">,
+    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">,
     now: () => number = Date.now,
   ) {
     this.#scanner = scanner;
@@ -598,6 +601,13 @@ export class StorageUsageService {
     return diskSpace(this.#sources.roots.data);
   }
 
+  /** The disk with the bytes of the user's files (`storage-user-files-v1`). */
+  readonly diskUse = Effect.fn("StorageUsage.diskUse")(function* (this: StorageUsageService) {
+    const disk = yield* diskSpace(this.#sources.roots.data);
+    const userBytes = this.#sources.userFiles ? yield* this.#sources.userFiles.read() : null;
+    return { ...disk, userBytes };
+  }).bind(this);
+
   clear(category: ClearableStorageCategory) {
     return clearStorageCategory(this.#sources.roots, category).pipe(
       Effect.ensuring(Effect.sync(() => this.invalidate())),
@@ -605,7 +615,9 @@ export class StorageUsageService {
   }
 
   dispose() {
-    return Scope.close(this.#scope, Exit.void);
+    return Scope.close(this.#scope, Exit.void).pipe(
+      Effect.andThen(this.#sources.userFiles ? this.#sources.userFiles.dispose() : Effect.void),
+    );
   }
 
   invalidate(): void {

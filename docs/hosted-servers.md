@@ -1244,8 +1244,12 @@ The VPS is not the same machine as the sandbox:
   form keep the plan table, because a new server starts in a boat sandbox. A client or a host from
   before this number shows the plan table. A rollback gives the server the plan table again, so a
   server that used more on the VPS shows a full disk.
-- The number is not a limit that the machine enforces. The clients count
-  `HOSTED_SERVER_BASE_IMAGE_GB` (22 GB) for the system, so the disk has much more than the user sees:
+- The number is not a limit that the machine enforces. A host with `storage-user-files-v1` measures
+  the files of its user (the home folder, `/tmp` and `/var/tmp`) with `du`, and the clients show the
+  plan minus that number. A host from before that capability gets the boat count: the clients
+  subtract `HOSTED_SERVER_BASE_IMAGE_GB` (22 GB) for the system from the used disk, which on a VPS
+  shows about 5 to 10 GB less free space than is correct, because the system part and the reserved
+  blocks of a VPS are not 22 GB. The disk has much more than the user sees:
 
   | Plan | Machine | Disk | User sees | Disk above that |
   | --- | --- | --- | --- | --- |
@@ -1255,7 +1259,8 @@ The VPS is not the same machine as the sandbox:
 
   The 200 GB is from the Leaseweb API (`rootDiskSize`, 2026-11-11). The VPS 3 (8 vCPU, 24 GB,
   300 GB) is from the Leaseweb product page; no VPS 3 was bought on 2026-11-11, so its disk is not
-  measured. The system part of a VPS was not measured; the 22 GB is from the boat servers.
+  measured. The 22 GB is from the boat servers; it is not used for a VPS host with
+  `storage-user-files-v1`.
 - Move a Pro server to a VPS 3. A plan change does not change the machine of a moved server. After a
   change to Pro, a server on a VPS 2 shows 150 GB at once and has about 28 GB of disk above that,
   until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
