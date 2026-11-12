@@ -597,6 +597,12 @@
       "detailSha256": "f77d58b834b80eae4d1763bb34602425348d36b9cf5848ed78f9964a6182c5a8"
     },
     {
+      "slug": "elixir-games",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "ad0d9b75a1d396df50f2e1dcc282a80a4fda1a91897818e85210b08b6411ff2c"
+    },
+    {
       "slug": "era",
       "version": "1.0.0",
       "featured": false,
