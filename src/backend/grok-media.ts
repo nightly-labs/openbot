@@ -15,9 +15,6 @@ const TOOL_KINDS: Record<string, GeneratedMediaKind> = {
   reference_to_video: "video",
 };
 
-/** The Grok tools that make an image or a video. */
-export const GROK_MEDIA_TOOLS: readonly string[] = Object.keys(TOOL_KINDS);
-
 const OUTPUT_KINDS: Record<string, GeneratedMediaKind> = {
   ImageGen: "image",
   ImageEdit: "image",

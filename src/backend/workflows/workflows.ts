@@ -194,7 +194,7 @@ interface WorkflowTextRequest {
 }
 
 /** One image or video of an image step. */
-export interface WorkflowMediaRequest {
+interface WorkflowMediaRequest {
   kind: WorkflowMediaKind;
   provider: WorkflowMediaModel["provider"];
   prompt: string;

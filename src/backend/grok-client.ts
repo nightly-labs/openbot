@@ -81,7 +81,7 @@ export class GrokAgentClient extends AcpAgentClient {
 }
 
 /**
- * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`GROK_MEDIA_TOOLS`). A
+ * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`grok-media.ts`). A
  * media client denies each by name, and every MCP tool with `mcp__*`: a deny rule wins over an allow
  * rule, so `--deny *` would also refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
  * (`AcpAgentOptions.mediaGeneration`).
