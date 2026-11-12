@@ -8,6 +8,9 @@
 // Make lists only `client_secret_post` and refuses a registration that names no method it lists.
 // RevenueCat (#4884) registers only the clients it approved and answers every other registration
 // with 400 `invalid_client`: the refusal must say so, not quote "The client is not registered.".
+// Omnisend (#7722) registers only the app names it approved and answers OpenBot with 400
+// `invalid_client_metadata` "unknown application: OpenBot": the refusal must say so too. The same
+// error about other metadata keeps the server's own words.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -68,15 +71,26 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
+/** The 400 body of a registration that is refused, word for word from the service that answers it. */
+const REGISTRATION_REFUSALS = {
+  revenueCat: {
+    error: "invalid_client",
+    error_description: "The client is not registered. Contact support if you need to register a new client.",
+  },
+  omnisend: { error: "invalid_client_metadata", error_description: "unknown application: OpenBot" },
+  badMetadata: { error: "invalid_client_metadata", error_description: "redirect URI must have a host" },
+} as const;
+type RegistrationRefusal = keyof typeof REGISTRATION_REFUSALS;
+
 /**
  * `secretAccepted` is Make: the token endpoint takes the secret in the body. Without it, the server
- * is Railway and refuses every secret it issued. `registrationRefused` is RevenueCat: no
- * registration is accepted.
+ * is Railway and refuses every secret it issued. With `registrationRefused`, no registration is
+ * accepted.
  */
 async function fakeServer(
   authMethods: string[],
   secretAccepted: boolean,
-  registrationRefused: boolean,
+  registrationRefused: RegistrationRefusal | null,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -107,12 +121,7 @@ async function fakeServer(
         const id = `e2e-client-${state.registrations.length}`;
         // RFC 7591: a registration that names no method asks for `client_secret_basic`.
         const method = asked.token_endpoint_auth_method ?? "client_secret_basic";
-        // RevenueCat's answer, word for word.
-        if (registrationRefused)
-          return json(response, 400, {
-            error: "invalid_client",
-            error_description: "The client is not registered. Contact support if you need to register a new client.",
-          });
+        if (registrationRefused) return json(response, 400, REGISTRATION_REFUSALS[registrationRefused]);
         if (!authMethods.includes(method))
           return json(response, 400, {
             code: "SC400",
@@ -209,7 +218,11 @@ async function runCase(
   name: string,
   authMethods: string[],
   attempts: number,
-  { storedDiscovery = false, secretAccepted = false, registrationRefused = false } = {},
+  {
+    storedDiscovery = false,
+    secretAccepted = false,
+    registrationRefused = null,
+  }: { storedDiscovery?: boolean; secretAccepted?: boolean; registrationRefused?: RegistrationRefusal | null } = {},
 ): Promise<Case> {
   const server = await fakeServer(authMethods, secretAccepted, registrationRefused);
   const records = new Map<string, McpOAuthRecord>();
@@ -333,7 +346,7 @@ async function main(): Promise<void> {
     // registers once more after it drops the credentials, both times as a public client. Then the
     // probe says that the server does not accept OpenBot.
     const revenueCat = await runCase("registration-refused-invalid-client", ["client_secret_basic", "none"], 2, {
-      registrationRefused: true,
+      registrationRefused: "revenueCat",
     });
     const registrationRefused = sourceText("error.backend.mcpRegistrationRefused");
     for (const [index, attempt] of revenueCat.attempts.entries())
@@ -347,6 +360,29 @@ async function main(): Promise<void> {
     check(revenueCat, !revenueCat.storedClient, "a client is stored after a refused registration");
     check(revenueCat, !revenueCat.signedIn, "a token is stored after a refused registration");
     report.cases.push(revenueCat);
+
+    // Omnisend refuses the name with 400 `invalid_client_metadata`. The probe says that the server
+    // does not accept OpenBot, not "unknown application: OpenBot".
+    const omnisend = await runCase("registration-refused-unknown-application", ["none"], 2, {
+      registrationRefused: "omnisend",
+    });
+    for (const [index, attempt] of omnisend.attempts.entries())
+      check(omnisend, attempt.error === registrationRefused, `attempt ${index + 1} reported: ${attempt.error}`);
+    check(omnisend, omnisend.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(omnisend, !omnisend.storedClient, "a client is stored after a refused registration");
+    check(omnisend, !omnisend.signedIn, "a token is stored after a refused registration");
+    report.cases.push(omnisend);
+
+    // The same error about metadata that does not name OpenBot is not a refusal of OpenBot.
+    const badMetadata = await runCase("registration-bad-metadata", ["none"], 1, { registrationRefused: "badMetadata" });
+    const [metadataAttempt] = badMetadata.attempts;
+    check(
+      badMetadata,
+      metadataAttempt?.error !== registrationRefused && metadataAttempt?.error?.includes("must have a host") === true,
+      `the attempt reported: ${metadataAttempt?.error}`,
+    );
+    check(badMetadata, !badMetadata.signedIn, "a token is stored after a refused registration");
+    report.cases.push(badMetadata);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

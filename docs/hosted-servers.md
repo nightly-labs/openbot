@@ -885,7 +885,52 @@ The Worker makes no Leaseweb server: boat is the provider of each new hosted ser
 runs all the time, so it has no stop and no resume. An operator can move one hosted server at a time
 from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the record and the steps.
 For a server that never was on boat, the VPS is a [self-hosted server](self-hosted-server.md) that
-an operator sets up for the customer:
+an operator sets up for the customer. The customer is the owner: the server signs in with a
+[server claim](self-hosted-server.md#sign-in-with-a-server-claim) for the customer's email, never
+with the account of an operator. One command does all the steps below.
+
+Before you start, you need:
+
+- The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
+  gives the four Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+- An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
+- The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
+  that the customer sees (6 to 32 characters).
+
+```sh
+env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
+# 1. Find the VPS just bought: each VPS with no reference on the four accounts.
+$env bun scripts/hosting/leaseweb-pool.ts free
+# 2. The public keys of the operators, which the bootstrap installs.
+ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
+# 3. See the plan, then do it.
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys --apply
+```
+
+When it ends, the owner sees the server in the app, and can invite the other members.
+
+- With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
+  the hosted pool.
+- A custom VPS never has the reference `pool-free`, and each pool step that changes a machine
+  (`prepare`, `move`, and then `sync`) needs it, so the pool never uses a custom VPS. When `add` and
+  `custom` take the same VPS at the same time, each one reads the reference again, and the one that
+  lost stops.
+- It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
+  highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
+- It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
+  operator keys sign in, so `--keys` must have a key of this computer.
+- It makes the claim just before the install, because a claim works for 15 minutes.
+- At the end it runs `leaseweb-bootstrap-e2e.ts`, which restarts the server, and then checks that
+  OpenBot is online and that D1 shows the owner as the active owner of the server.
+- A run that stops can run again with the same arguments: it continues with the same reference,
+  does not install again when the owner is signed in, and stops when another account is signed in.
+- Its output has no email and no key. The report of the checks is in
+  `.openbot-build/leaseweb-bootstrap/`.
+
+The steps of the command:
 
 1. Order a VPS with Ubuntu 24.04 or 26.04. The order takes no SSH key and no user data. The root password
    comes from `GET /publicCloud/v1/vps/{id}/credentials`.
@@ -944,7 +989,7 @@ Leaseweb accounts use one scheme:
 | None (no reference, or an empty one) | Not used. **Only a VPS with no reference can be taken for a new use.** | |
 | `pool-free` | In the hosted pool, with no server. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use it. | `pool-free` |
 | `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. | `jane@example.com 1a2b3c4d` |
-| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number on all accounts; a number is never used again. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
+| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
 
@@ -1422,10 +1467,13 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
 turns off the password, and the script refuses a list without such a key.
 
-The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each hour, at minute 0, the
+The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each 5 minutes, the
 production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
-`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. The
-snapshot counts each machine in one state:
+`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. Each
+report is a bar with the largest value of the snapshots in the last 30 minutes. Two local patches of
+the OpenPanel dashboard make this work: a bar with the `max` metric reads the value of each minute,
+and a tile with its own 30-minute range keeps it when the dashboard date picker has a longer range.
+A longer interval adds up more than one snapshot. The snapshot counts each machine in one state:
 
 | State | Machine |
 | --- | --- |

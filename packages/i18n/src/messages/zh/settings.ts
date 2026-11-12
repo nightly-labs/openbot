@@ -261,6 +261,9 @@ export const messages = {
     "停靠栏隐藏后，边缘会留下一条细条。将指针移近即可显示停靠栏。当代理向你提问时，细条上会有一道彩色波浪经过。",
   "settings.agentDock.results.title": "显示已完成的工作",
   "settings.agentDock.results.description": "智能体完成的结果会在停靠栏旁短暂显示。",
+  "settings.agentDock.activeSeats.title": "显示有新消息的智能体",
+  "settings.agentDock.activeSeats.description":
+    "不在停靠栏上的智能体或频道，在有新消息或等待你回复时会显示在停靠栏上。",
   "settings.agentDock.agents.title": "停靠栏中的智能体",
   "settings.agentDock.agents.description": "{server} 的智能体。每台服务器都有自己的停靠栏。",
   "settings.agentDock.agents.empty": "这台服务器还没有智能体。",

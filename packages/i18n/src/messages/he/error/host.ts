@@ -21,6 +21,7 @@ export const messages = {
   "error.host.noServer": "במחשב הזה אין שרת לשינוי.",
   "error.host.identityLocalOnly": "אפשר לשנות את שם השרת ואת הלוגו שלו רק במחשב שמריץ אותו.",
   "error.host.timezoneInvalid": "אזור הזמן הזה אינו מוכר.",
+  "error.host.turnLimitInvalid": "מגבלת השרשורים הזו אינה תקינה.",
   "error.host.maintenanceInterrupted":
     "תחזוקת המארח הופסקה. יש לוודא את האפליקציה ולאפס את מצב המארח לפני ניסיון נוסף.",
   "error.host.updateFailed":

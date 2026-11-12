@@ -170,6 +170,8 @@ export const messages = {
   "provider.geminiKey.title": "Gemini-API-Schlüssel",
   "provider.geminiKey.description":
     "Speichere einen Gemini-API-Schlüssel auf diesem Computer. Ein gespeicherter Schlüssel wird statt deines Google-Kontos verwendet. Um dich mit Google anzumelden, entferne den Schlüssel und wähle „Verbinden“ in der Gemini-Zeile.",
+  "provider.geminiKey.descriptionHost":
+    "Speichere einen Gemini-API-Schlüssel auf dem Host. Ein gespeicherter Schlüssel wird statt deines Google-Kontos verwendet. Um dich mit Google anzumelden, entferne den Schlüssel und wähle „Verbinden“ in der Gemini-Zeile.",
   "provider.geminiKey.label": "Gemini-API-Schlüssel",
   "provider.claudeKey.title": "Anthropic-API-Schlüssel",
   "provider.claudeKey.description":
@@ -178,14 +180,20 @@ export const messages = {
   "provider.inceptionKey.title": "Inception-API-Schlüssel",
   "provider.inceptionKey.description":
     "Speichere einen Inception-API-Schlüssel auf diesem Computer, um die Mercury-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.inceptionKey.descriptionHost":
+    "Speichere einen Inception-API-Schlüssel auf dem Host, um die Mercury-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.inceptionKey.label": "Inception-API-Schlüssel",
   "provider.deepseekKey.title": "DeepSeek-API-Schlüssel",
   "provider.deepseekKey.description":
     "Speichere einen DeepSeek-API-Schlüssel auf diesem Computer, um die DeepSeek-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.deepseekKey.descriptionHost":
+    "Speichere einen DeepSeek-API-Schlüssel auf dem Host, um die DeepSeek-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.deepseekKey.label": "DeepSeek-API-Schlüssel",
   "provider.openrouterKey.title": "OpenRouter-API-Schlüssel",
   "provider.openrouterKey.description":
     "Speichere einen OpenRouter-API-Schlüssel auf diesem Computer, um die Modelle von OpenRouter zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
+  "provider.openrouterKey.descriptionHost":
+    "Speichere einen OpenRouter-API-Schlüssel auf dem Host, um die Modelle von OpenRouter zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",
   "provider.openrouterKey.label": "OpenRouter-API-Schlüssel",
   "provider.openCodeKey.title": "Bei OpenCode Go anmelden",
   "provider.openCodeKey.description":

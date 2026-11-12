@@ -342,6 +342,17 @@ export const messages = {
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
+  "server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "server.settings.turnLimitUnlimited": "Sınırsız",
+  "server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "server.settings.memoryLimit": "Ajan başına bellek",
   "server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",

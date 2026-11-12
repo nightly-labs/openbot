@@ -29,7 +29,7 @@ interface ProviderHistoryImportDatabase {
     threadId: string;
     provider: AgentProviderId;
     externalSessionId: string;
-  }): unknown;
+  }): { state: string; createdAt: string };
   stageProviderHistoryFragment(input: { sessionId: string; fragment: ProviderHistoryFragment }): {
     turnImported: boolean;
   };
@@ -105,13 +105,16 @@ export function importProviderHistory(
   input: ProviderHistoryImportInput,
 ): Effect.Effect<ProviderHistoryImportResult, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    yield* providerSync(() =>
-      input.database.ensureProviderHistoryImport({
-        sessionId: input.sessionId,
-        threadId: input.publicThreadId,
-        provider: input.provider,
-        externalSessionId: input.externalSessionId,
-      }),
+    const resumeKey = yield* providerSync(() =>
+      importResumeKey(
+        input,
+        input.database.ensureProviderHistoryImport({
+          sessionId: input.sessionId,
+          threadId: input.publicThreadId,
+          provider: input.provider,
+          externalSessionId: input.externalSessionId,
+        }),
+      ),
     );
     let turns = 0;
     let messages = 0;
@@ -162,6 +165,7 @@ export function importProviderHistory(
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
           items: "full",
           providerOnly: true,
+          ...(resumeKey === undefined ? {} : { resumeKey }),
         } satisfies ProviderHistoryRequest,
         consume,
       )
@@ -176,6 +180,27 @@ export function importProviderHistory(
       yield* providerSync(() => input.database.markProviderHistoryImportState(input.sessionId, "complete"));
     return { turns, messages };
   });
+}
+
+/**
+ * The key that lets the provider read send only changed turns. It is given only when the last read
+ * of this import row ended complete, and no complete turn waits for its import. A new import row has
+ * a new creation time, so a cursor of an earlier row does not apply to it.
+ */
+function importResumeKey(
+  input: ProviderHistoryImportInput,
+  current: { state: string; createdAt: string },
+): string | undefined {
+  if (current.state !== "complete") return undefined;
+  const waiting = databaseRow(
+    input.database.connection
+      .prepare(
+        `SELECT 1 AS waiting FROM provider_history_turns
+         WHERE session_id = ? AND imported = 0 AND complete = 1 LIMIT 1`,
+      )
+      .get(input.sessionId),
+  );
+  return waiting ? undefined : `${input.sessionId}:${current.createdAt}`;
 }
 
 function importCompletedTurn(

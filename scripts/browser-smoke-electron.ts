@@ -460,7 +460,7 @@ const server = createServer((request, response) => {
       <span class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by transfer" /></span>
       <span hidden data-hidden-wait>hidden wait sentinel</span>
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
-      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
+      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault();requestAnimationFrame(() => { this.dataset.dropFrame = 'yes'; })" ondrop="event.preventDefault();document.querySelector('output').textContent=this.dataset.dropFrame === 'yes' ? 'drag:' + event.isTrusted : 'drag:no-frame';delete this.dataset.dropFrame">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
       <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
       <button aria-label="No chooser">No chooser</button>
@@ -3280,6 +3280,8 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
     tabId: tabId,
     source: { kind: "role", role: "button", name: "Drag source", exact: true },
     target: { kind: "role", role: "button", name: "Drop target", exact: true },
+    // The smoke tab draws about one frame each second, and each pointer move waits for a frame.
+    timeoutMs: 30_000,
   });
   if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
   const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
@@ -3294,6 +3296,7 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
       }))()`,
       true,
     );
+    // "drag:no-frame" means that the drop came before the frame that the page's dragover asked for.
     throw new Error(`V2 drag did not produce a trusted drop event: ${JSON.stringify(dragDiagnostics)}`);
   }
 }

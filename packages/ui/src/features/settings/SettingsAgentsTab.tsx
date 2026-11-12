@@ -146,7 +146,7 @@ export interface SettingsAgentsTabProps {
 }
 
 /**
- * Settings › Agents, in the design of Server settings › Roles. The list has one row for each
+ * Server Settings › Agents, in the design of Server settings › Roles. The list has one row for each
  * setting, with the agents that have it on. A setting page has its default, and each agent with a
  * menu and Set all. An agent with no value of its own follows the default.
  */

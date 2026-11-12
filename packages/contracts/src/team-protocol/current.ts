@@ -94,6 +94,7 @@ import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
@@ -162,6 +163,7 @@ import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
+import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
@@ -318,6 +320,7 @@ export {
   HOST_RELEASE_CAPABILITY,
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -390,6 +393,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   VAULT_CAPABILITY,
@@ -615,6 +619,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_SPEED_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -836,7 +842,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_DEFAULTS_CAPABILITY &&
     capability !== AGENT_SPEED_CAPABILITY &&
     capability !== WORKFLOWS_SUNRA_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
+    capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
+    capability !== HOST_TURN_LIMITS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -934,6 +942,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_SPEED_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1114,6 +1124,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_DEFAULTS_CAPABILITY &&
       capability !== AGENT_SPEED_CAPABILITY &&
       capability !== WORKFLOWS_SUNRA_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
+      capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
+      capability !== HOST_TURN_LIMITS_CAPABILITY,
   );
 }

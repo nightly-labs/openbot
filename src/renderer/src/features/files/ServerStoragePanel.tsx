@@ -25,8 +25,8 @@ export interface ServerStorageOptions {
   /** The storage calls of a client with no `window.openbot`, such as the web client. */
   calls?: FilesPort;
   /**
-   * The joined server serves `background-processes-v1`. With `canManage`, Storage lists the programs
-   * that its agents left running. This computer lists its own in Settings > Agents.
+   * This computer, or a joined server that serves `background-processes-v1`. With `canManage`, Storage
+   * lists the programs that its agents left running.
    */
   backgroundProcesses?: boolean;
 }
@@ -50,11 +50,7 @@ export function ServerStoragePanel(
   const processes = createServerBackgroundProcesses(
     () => ({
       serverId: props.serverId,
-      shown:
-        props.serverId !== LOCAL_SERVER_ID &&
-        props.canManage &&
-        props.backgroundProcesses === true &&
-        calls().backgroundProcesses !== undefined,
+      shown: props.canManage && props.backgroundProcesses === true && calls().backgroundProcesses !== undefined,
     }),
     calls,
   );

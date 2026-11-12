@@ -83,6 +83,8 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Cette connexion ne peut pas fournir la commande d’exécution d’une routine.",
   "error.team.threadQueueUnsupported": "Cette connexion ne peut pas afficher la file d’attente d’un fil annexe.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Cette connexion ne peut pas afficher ni modifier les limites de fils du serveur.",
   "error.team.usageLimitUnsupported":
     "Cette connexion ne peut pas afficher ni modifier les limites d’utilisation des agents.",
   "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",

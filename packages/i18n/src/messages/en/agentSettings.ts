@@ -148,8 +148,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.accessLabel": "Agent access",
   "agentSettings.runtime.busyMessage": "While working",
   "agentSettings.runtime.busyMessageLabel": "Messages while the agent works",
-  "agentSettings.runtime.taskLimit": "Parallel threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads that run at the same time",
   "agentSettings.runtime.workingDirectory": "Working directory",
   "agentSettings.runtime.notAvailable": "Not available yet",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +167,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.busyMessage.steer": "Steer",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
-  "agentSettings.taskLimit.default": "Default ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
   "agentSettings.notificationLevel.title": "Notify me",
   "agentSettings.notificationLevel.server": "Server default ({level})",

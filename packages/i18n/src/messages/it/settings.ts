@@ -274,6 +274,9 @@ export const messages = {
     "Una striscia sottile resta dove il dock si nasconde. Avvicina il puntatore per mostrare il dock. Un'onda di colore sale lungo la striscia quando un agente ti chiede qualcosa.",
   "settings.agentDock.results.title": "Mostra il lavoro finito",
   "settings.agentDock.results.description": "I risultati degli agenti compaiono per poco accanto al dock.",
+  "settings.agentDock.activeSeats.title": "Mostra gli agenti con novità",
+  "settings.agentDock.activeSeats.description":
+    "Un agente o un canale che non è nel dock vi compare finché ha un nuovo messaggio o ti aspetta.",
   "settings.agentDock.agents.title": "Agenti nel dock",
   "settings.agentDock.agents.description": "Gli agenti di {server}. Ogni server ha il suo dock.",
   "settings.agentDock.agents.empty": "Questo server non ha ancora agenti.",

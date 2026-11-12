@@ -22,12 +22,14 @@ import {
   decodeHostPersonality,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
   decodeServerAuditLog,
   type HostPersonality,
+  type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
@@ -43,6 +45,7 @@ import {
   type PromptCacheTtl,
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
+  parseHostTurnLimitsInput,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
   type ServerAuditLog,
@@ -84,6 +87,10 @@ import {
 } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import {
+  HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_ROUTES,
+} from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -108,6 +115,7 @@ import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preferenc
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
+import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
@@ -140,6 +148,7 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
@@ -169,6 +178,7 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
   memoryReview,
@@ -201,6 +211,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
+    if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
+      throw new Error(sourceText("error.team.hostTurnLimitsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostTurnLimits, { method: "POST", body }));
   }
   function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
@@ -389,6 +404,14 @@ export function hostAdminIpcHandlers({
       setTimezone: scopedHandler(parseServerTimezone, {
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
+      }),
+      getTurnLimits: scopedQueryHandler({
+        local: () => hostTurnLimits.get(),
+        remote: (serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.settings, {}),
+      }),
+      setTurnLimits: scopedHandler(parseHostTurnLimitsInput, {
+        local: (input) => runCauseEffect(hostTurnLimits.set(input)),
+        remote: (input, serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.update, input),
       }),
       // A host before host-personality-v1 uses the classic prompt.
       getPersonality: scopedQueryHandler({

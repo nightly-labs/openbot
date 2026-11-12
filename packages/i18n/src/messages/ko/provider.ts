@@ -167,6 +167,8 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API 키",
   "provider.geminiKey.description":
     "이 컴퓨터에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
+  "provider.geminiKey.descriptionHost":
+    "호스트에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
   "provider.geminiKey.label": "Gemini API 키",
   "provider.claudeKey.title": "Anthropic API 키",
   "provider.claudeKey.description":
@@ -175,14 +177,20 @@ export const messages = {
   "provider.inceptionKey.title": "Inception API 키",
   "provider.inceptionKey.description":
     "Mercury 모델을 사용하려면 이 컴퓨터에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury 모델을 사용하려면 호스트에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.inceptionKey.label": "Inception API 키",
   "provider.deepseekKey.title": "DeepSeek API 키",
   "provider.deepseekKey.description":
     "DeepSeek 모델을 사용하려면 이 컴퓨터에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek 모델을 사용하려면 호스트에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.deepseekKey.label": "DeepSeek API 키",
   "provider.openrouterKey.title": "OpenRouter API 키",
   "provider.openrouterKey.description":
     "OpenRouter 모델을 사용하려면 이 컴퓨터에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter 모델을 사용하려면 호스트에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.openrouterKey.label": "OpenRouter API 키",
 
   "provider.openCodeKey.title": "OpenCode Go에 로그인",

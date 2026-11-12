@@ -123,6 +123,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_TASK_LIMIT_DEFAULT,
   type AgentDefaults,
   type AgentModelChoice,
   agentAutomationAllowed,
@@ -522,6 +523,12 @@ export interface AgentServiceOptions {
    */
   hostMemory?: HostMemory | null;
   /**
+   * The turn limits that an owner or admin set for this host. `turnLimit` is the total, "unlimited"
+   * for no limit, or null for automatic (see `hostMemory`); `agentTaskLimit` is the task limit of an agent with no limit of its
+   * own. Without it, both keep their defaults. Call `turnLimitsChanged` after a change.
+   */
+  hostTurnLimits?: { turnLimit(): number | "unlimited" | null; agentTaskLimit(): number };
+  /**
    * The plan storage in GB of a hosted server, or null elsewhere and until the account server answers.
    * The agent instructions name the limit.
    */
@@ -628,6 +635,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #developmentDefaults: boolean;
   readonly #busyMessageMode: () => BusyMessageMode;
+  /** The task limit of an agent that has no limit of its own on this host. */
+  readonly #defaultTaskLimit: () => number;
   /** The last turn of each agent's chat that the user stopped. One per agent, so it needs no clean-up. */
   readonly #stoppedTurns = new Map<string, string>();
 
@@ -665,10 +674,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer = () => null,
       githubConnector = null,
       hostMemory = null,
+      hostTurnLimits,
       busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
     } = options;
     this.#developmentDefaults = developmentDefaults;
     this.#busyMessageMode = busyMessageMode;
+    this.#defaultTaskLimit = () => hostTurnLimits?.agentTaskLimit() ?? AGENT_TASK_LIMIT_DEFAULT;
     this.#localSkillTools = localSkillTools;
     this.#routineFlowTools = routineFlowTools;
     this.#workflowTools = workflowTools;
@@ -737,6 +748,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         agent: (agentId) => store.list().find((agent) => agent.id === agentId),
+        defaultTaskLimit: () => this.#defaultTaskLimit(),
         // Read late: the drain is built further down this constructor.
         hold: (agentId, taskId) => this.#drain.taskHold(agentId, taskId),
         queued: (agentId) => {
@@ -1567,6 +1579,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#memoryHold = new MemoryHold({
       memory: hostMemory,
+      chosenTurnLimit: () => hostTurnLimits?.turnLimit() ?? null,
       hooks: {
         scheduleAll: () => {
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
@@ -2195,6 +2208,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** How many memories one agent can hold now. */
   memoryLimit(): number {
     return this.#memories.limit();
+  }
+
+  /**
+   * The turn limits of this host changed. A higher limit can start a waiting turn now; a lower one
+   * stops no running turn, and the next turn waits.
+   */
+  turnLimitsChanged(): void {
+    for (const agent of this.#store.list()) {
+      this.#tasks.changed(agent.id);
+      this.#drain.scheduleDrain(agent.id);
+    }
+    this.#drain.retrySlotWaiters();
   }
 
   /** The developer instructions state the limit, so a new limit reloads every agent's threads. */
@@ -3704,7 +3729,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#attention.answerGrantedRequests();
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     // The task limit follows the agent's own setting and its provider. A higher one can start a task now.
-    if (providerChanged || (previous && agentTaskLimit(previous) !== agentTaskLimit(agent))) {
+    if (
+      providerChanged ||
+      (previous &&
+        agentTaskLimit(previous, this.#defaultTaskLimit()) !== agentTaskLimit(agent, this.#defaultTaskLimit()))
+    ) {
       this.#tasks.changed(agent.id);
       this.#drain.scheduleDrain(agent.id);
     }
