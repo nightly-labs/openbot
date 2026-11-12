@@ -762,7 +762,7 @@ export class TurnLifecycle {
       deliveries.length === 0 ||
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
-      deliveries.every(({ delivery }) => this.#quietTeammateDelivery(delivery)) ||
+      deliveries.every(({ delivery }) => quietTeammateDelivery(delivery)) ||
       this.#quietRoutineTurn(agentId, threadId, deliveries)
     )
       return false;
@@ -1373,12 +1373,13 @@ export class TurnLifecycle {
   }
 
   /**
-   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs and
-   * teammate updates, so its completion keeps the text answers as quiet answers; `shown` when a
-   * person waits for the answer, as in a Test run; null when neither a routine run nor a teammate
-   * update or an answered teammate request started the turn. The completion decides again, because
-   * a message can join the turn after the call. `channelRun` is a turn that owns a main task of a channel routine's request: the channel
-   * then posts no message for the turn (#7166).
+   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs, teammate
+   * updates and answered teammate requests, so its completion keeps the text answers as quiet answers;
+   * `shown` when a person waits for the answer, as in a Test run, or a request has no reply yet; null
+   * when neither a routine run nor a teammate's message started the turn. The completion decides
+   * again, because a message can join the turn after the call, and a reply that the provider sent in
+   * parallel with the call can arrive after it. `channelRun` is a turn that owns a main task of a
+   * channel routine's request: the channel then posts no message for the turn (#7166).
    */
   requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun = false): "quiet" | "shown" | null {
     if (channelRun) {
@@ -1386,7 +1387,7 @@ export class TurnLifecycle {
       return this.#reportedFailures.has(turnId) ? "shown" : "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || this.#quietTeammateDelivery(delivery)))
+    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || quietTeammateDelivery(delivery, true)))
       return null;
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
@@ -1418,8 +1419,9 @@ export class TurnLifecycle {
   }
 
   /**
-   * Only a turn that runs nothing but quiet routine runs and teammate updates, in the agent's own
-   * chat or in a routine's side thread: not in a channel, a messaging thread or another task.
+   * Only a turn that runs nothing but quiet routine runs, teammate updates and answered teammate
+   * requests, in the agent's own chat or in a routine's side thread: not in a channel, a messaging
+   * thread or another task.
    */
   #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
@@ -1435,9 +1437,16 @@ export class TurnLifecycle {
     );
   }
 
-  /** A teammate's update, or a request that this agent already answered with openbot.send_message. */
+  /**
+   * A teammate's update, or a request that this agent already answered with openbot.send_message.
+   * The auto-relay uses the same reply check, so a quiet request turn sends the requester nothing less.
+   */
   #quietTeammateDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateDelivery(delivery, this.#mailbox.hasReplyFrom(delivery.recipientAgentId, delivery.messageId));
+    return (
+      quietTeammateDelivery(delivery) ||
+      (quietTeammateDelivery(delivery, true) &&
+        this.#mailbox.hasReplyFrom(delivery.recipientAgentId, delivery.messageId))
+    );
   }
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
