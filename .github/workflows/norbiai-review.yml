@@ -144,6 +144,10 @@ jobs:
       # request or the changed files can choose another model or effort.
       MODEL: claude-opus-5-5
       EFFORT: high
+      # The self-hosted runners reach Claude through the EasyCLIProxyAPI on the runner host,
+      # never the runner user's own sign-in. The proxy's client key is CLIPROXY_API_KEY in
+      # each runner's `.env`, which stays on the machine.
+      ANTHROPIC_BASE_URL: http://127.0.0.1:8317
 
     steps:
       - name: Checkout repository
@@ -666,6 +670,15 @@ jobs:
           claude_denied=('Bash(*--output*)' 'Bash(*--no-index*)')
           claude_errors_file="$RUNNER_TEMP/norbiai-claude-errors.txt"
           claude_facts_file="$RUNNER_TEMP/norbiai-claude-facts.txt"
+          # Authenticate to the proxy only. A bearer token outranks the runner user's
+          # keychain sign-in, and a missing key fails the run instead of falling back to it.
+          if [ -z "${CLIPROXY_API_KEY:-}" ]; then
+            echo "::error title=NorbiAI has no proxy key::Set CLIPROXY_API_KEY in the runner's .env and restart the runner."
+            exit 1
+          fi
+          export ANTHROPIC_AUTH_TOKEN="$CLIPROXY_API_KEY"
+          unset ANTHROPIC_API_KEY
+          export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
           claude_version=$(claude --version 2>/dev/null | head -1 | cut -d ' ' -f 1 | tr -cd '0-9A-Za-z.-' | cut -c 1-40 || true)
           echo "Claude Code ${claude_version:-unknown}"
           claude_tool_calls=0
