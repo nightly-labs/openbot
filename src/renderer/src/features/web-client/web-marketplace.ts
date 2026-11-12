@@ -81,7 +81,9 @@ export function createWebMarketplaceCalls(
       // in this browser, and the user pastes the address it ends on.
       signInMcpServer: async ({ config }, serverId) => {
         if (!serverId) throw new Error(sourceText("error.mcp.signInOnHost"));
-        return relay.signIn(request(serverId), config);
+        // Marketplace apps sign in on https pages; this keeps the answer for any other page.
+        const result = await relay.signIn(request(serverId), config);
+        return result ?? { toolCount: 0, error: sourceText("error.backend.mcpSignInNotWebPage") };
       },
       cancelMcpSignIn: async (input, serverId) => {
         await runTeamEffect(cancelMcpSignIn(request(serverId), input).pipe(Effect.mapError((error) => error.cause)));

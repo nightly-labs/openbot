@@ -12,6 +12,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "Het MCP-inlogbestand is te groot.",
   "error.mcp.unsupported": "Deze server ondersteunt geen MCP-servers.",
   "error.mcp.signInOnHost": "Inloggen bij een MCP-server werkt alleen in OpenBot op de hostcomputer.",
+  "error.mcp.signInPageOnServer":
+    "Deze inlogpagina opent alleen op de server. Vraag een eigenaar of beheerder van de server om in te loggen.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Deze inlogpagina opent alleen op de server. Wissel naar deze server en kies daarna opnieuw Inloggen.",
   "error.mcp.signInAppUnsupported": "Deze server ondersteunt geen inlogapps. Werk OpenBot bij op de host.",
   "error.mcp.redirectRelayed": "OpenBot heeft de inlog naar de server gestuurd. Je kunt dit venster sluiten.",
   "error.mcp.relayEnded": "Deze inlog is afgelopen. Start opnieuw.",

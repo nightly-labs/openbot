@@ -13,6 +13,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelMcpSignIn as cancelMcpSignInRequest,
@@ -72,6 +73,8 @@ export function createWebServerSettings(options: {
   refreshHosts: () => Promise<void>;
   /** Whether the host relays sign-ins (`sign-in-relay-v1`), so the page opens in this browser. */
   relaySupported: () => boolean;
+  /** Whether the host opens a sign-in page in its own tab, which the live view shows (`mcp-sign-in-v1`, `browser-view`). */
+  hostTabSupported: () => boolean;
 }) {
   const [state, setState] = createStore<WebServerSettingsState>({
     open: false,
@@ -260,11 +263,18 @@ export function createWebServerSettings(options: {
    * person to sign in, so the status is read until the sign-in ends; the page shows meanwhile.
    */
   async function signInMcpServer(config: McpServerConfig): Promise<McpTestResult> {
-    const { admin } = requireAdmin();
+    const { server, admin } = requireAdmin();
     const url = config.url;
     const run = <T>(effect: Effect.Effect<T, { cause: unknown }>) =>
       runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
-    if (options.relaySupported()) return signInRelayed(admin, config);
+    if (options.relaySupported()) {
+      const relayed = await signInRelayed(admin, config);
+      if (relayed !== null) return relayed;
+      // Only the host reaches the page, so its own tab shows it. The host shows its private sign-in
+      // tabs only to an owner or admin.
+      if (!serverRoleCanAdminister(server)) return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") };
+      if (!options.hostTabSupported()) return { toolCount: 0, error: sourceText("error.mcp.signInOnHost") };
+    }
     await run(startMcpSignIn(admin.request, { config }));
     try {
       while (true) {
@@ -284,7 +294,7 @@ export function createWebServerSettings(options: {
   }
 
   /** A relayed sign-in waits in this browser: see `webMcpRelay`. */
-  async function signInRelayed(admin: WebAdminRuntime, config: McpServerConfig): Promise<McpTestResult> {
+  async function signInRelayed(admin: WebAdminRuntime, config: McpServerConfig): Promise<McpTestResult | null> {
     try {
       return await relay.signIn(admin.request, config);
     } finally {

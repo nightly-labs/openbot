@@ -12,6 +12,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "El archivo de inicio de sesión de MCP es demasiado grande.",
   "error.mcp.unsupported": "Este servidor no admite servidores MCP.",
   "error.mcp.signInOnHost": "Solo puedes iniciar sesión en un servidor MCP desde OpenBot en el equipo host.",
+  "error.mcp.signInPageOnServer":
+    "Esta página de inicio de sesión solo se abre en el servidor. Pide a un propietario o administrador del servidor que inicie sesión.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Esta página de inicio de sesión solo se abre en el servidor. Cambia a este servidor y luego elige Iniciar sesión otra vez.",
   "error.mcp.signInAppUnsupported": "Este servidor no admite apps de inicio de sesión. Actualiza OpenBot en el host.",
   "error.mcp.redirectRelayed": "OpenBot envió el inicio de sesión al servidor. Puedes cerrar esta ventana.",
   "error.mcp.relayEnded": "Este inicio de sesión terminó. Vuelve a iniciarlo.",

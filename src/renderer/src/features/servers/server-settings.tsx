@@ -571,7 +571,8 @@ const ServerSettings = createSimpleContext({
       if (server.kind === "remote") {
         if (serverSupportsCapability(server, "sign-in-relay-v1"))
           void followMcpSignInRelay(server.id, config.url, () => waiting);
-        else void followMcpSignInPage(server.id, config.url, () => waiting);
+        // A relaying host also opens its own tab for a page that only the host can reach.
+        void followMcpSignInPage(server.id, config.url, () => waiting);
       }
       const result = await signIn.finally(() => {
         waiting = false;

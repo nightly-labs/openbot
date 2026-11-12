@@ -13,6 +13,8 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "MCP 登录文件过大。",
   "error.mcp.unsupported": "该服务器不支持 MCP 服务器。",
   "error.mcp.signInOnHost": "MCP 服务器登录只能在主机电脑上的 OpenBot 中完成。",
+  "error.mcp.signInPageOnServer": "此登录页面只在服务器上打开。请让服务器的所有者或管理员登录。",
+  "error.mcp.signInPageOnServerSwitch": "此登录页面只在服务器上打开。请切换到该服务器，然后再次选择“登录”。",
   "error.mcp.signInAppUnsupported": "该服务器不支持登录应用，请更新主机上的 OpenBot。",
   "error.mcp.redirectRelayed": "OpenBot 已将登录结果发送到服务器，你可以关闭该窗口。",
   "error.mcp.relayEnded": "本次登录已结束，请重新开始。",

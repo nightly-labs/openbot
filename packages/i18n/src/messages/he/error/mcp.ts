@@ -12,6 +12,8 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "קובץ ההתחברות של MCP גדול מדי.",
   "error.mcp.unsupported": "שרתי MCP אינם נתמכים בשרת הזה.",
   "error.mcp.signInOnHost": "התחברות לשרת MCP פועלת רק ב-OpenBot במחשב המארח.",
+  "error.mcp.signInPageOnServer": "דף ההתחברות הזה נפתח רק בשרת. יש לבקש מבעלים או ממנהל של השרת להתחבר.",
+  "error.mcp.signInPageOnServerSwitch": "דף ההתחברות הזה נפתח רק בשרת. יש לעבור לשרת הזה, ואז לבחור שוב התחברות.",
   "error.mcp.signInAppUnsupported": "השרת הזה אינו תומך באפליקציות התחברות. יש לעדכן את OpenBot במארח.",
   "error.mcp.redirectRelayed": "OpenBot שלח את ההתחברות לשרת. אפשר לסגור את החלון הזה.",
   "error.mcp.relayEnded": "ההתחברות הזו הסתיימה. יש להתחיל אותה מחדש.",

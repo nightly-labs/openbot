@@ -13,6 +13,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "MCP のサインインファイルが大きすぎます。",
   "error.mcp.unsupported": "このサーバーは MCP サーバーに対応していません。",
   "error.mcp.signInOnHost": "MCP サーバーへのサインインは、ホストコンピューターの OpenBot でのみ行えます。",
+  "error.mcp.signInPageOnServer":
+    "このサインインページはサーバー上でのみ開きます。サーバーのオーナーまたは管理者にサインインを依頼してください。",
+  "error.mcp.signInPageOnServerSwitch":
+    "このサインインページはサーバー上でのみ開きます。このサーバーに切り替えてから、もう一度「サインイン」を選んでください。",
   "error.mcp.signInAppUnsupported":
     "このサーバーはサインインアプリに対応していません。ホストの OpenBot をアップデートしてください。",
   "error.mcp.redirectRelayed": "OpenBot がサインインをサーバーに送信しました。このウィンドウは閉じてかまいません。",

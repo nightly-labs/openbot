@@ -12,6 +12,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "Il file di accesso MCP è troppo grande.",
   "error.mcp.unsupported": "I server MCP non sono supportati da questo server.",
   "error.mcp.signInOnHost": "L'accesso a un server MCP funziona solo in OpenBot sul computer host.",
+  "error.mcp.signInPageOnServer":
+    "Questa pagina di accesso si apre solo sul server. Chiedi a un proprietario o a un amministratore del server di accedere.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Questa pagina di accesso si apre solo sul server. Passa a questo server, poi scegli di nuovo Accedi.",
   "error.mcp.signInAppUnsupported": "Questo server non supporta le app di accesso. Aggiorna OpenBot sull'host.",
   "error.mcp.redirectRelayed": "OpenBot ha inviato l'accesso al server. Puoi chiudere questa finestra.",
   "error.mcp.relayEnded": "Questo accesso è terminato. Avvialo di nuovo.",

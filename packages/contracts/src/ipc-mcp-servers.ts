@@ -364,6 +364,16 @@ export function loopbackCallback(pageUrl: string): NonNullable<SignInRelayStatus
 }
 
 /**
+ * Whether a joined server's sign-in page is `http` on a loopback name, such as the page of an MCP server
+ * on the host's own computer. The host accepts it, but only a browser on the host can reach it, so
+ * the host's own tab shows it, not a relay to another computer.
+ */
+export function hostOnlySignInPage(address: string): boolean {
+  const page = URL.parse(address);
+  return page?.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(page.hostname);
+}
+
+/**
  * A sign-in page that an agent printed and that a joined server can relay: an https page that returns
  * to a loopback address with a `state`. Any other link opens as a normal link.
  */

@@ -12,6 +12,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "O arquivo de login MCP é muito grande.",
   "error.mcp.unsupported": "Este servidor não oferece suporte a servidores MCP.",
   "error.mcp.signInOnHost": "O login em um servidor MCP só funciona no OpenBot do computador anfitrião.",
+  "error.mcp.signInPageOnServer":
+    "Esta página de login abre apenas no servidor. Peça a um proprietário ou administrador do servidor para fazer login.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Esta página de login abre apenas no servidor. Mude para este servidor e depois escolha Entrar de novo.",
   "error.mcp.signInAppUnsupported":
     "Este servidor não é compatível com apps de login. Atualize o OpenBot no computador anfitrião.",
   "error.mcp.redirectRelayed": "O OpenBot enviou o login para o servidor. Você pode fechar esta janela.",
