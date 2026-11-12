@@ -236,6 +236,10 @@ export const messages = {
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La réponse du modèle a dépassé sa limite de sortie trois fois, le tour s'est donc arrêté. Choisissez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La réponse du modèle a dépassé sa limite de sortie trois fois, le tour s'est donc arrêté. Dans Réglages, ouvrez Fournisseur personnalisé, cliquez sur Modifier pour ce point de terminaison et définissez une Sortie max. plus grande pour ce modèle. Ou choisissez un effort plus faible ou un autre modèle.",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":

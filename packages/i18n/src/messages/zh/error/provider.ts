@@ -195,6 +195,10 @@ export const messages = {
   "error.provider.opencodeProviderFailed":
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请选择更低的强度或其他模型，然后重新发送消息。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请在设置中打开自定义服务商，点击此端点的编辑，为该模型设置更大的最大输出。也可以选择更低的强度或其他模型。",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",

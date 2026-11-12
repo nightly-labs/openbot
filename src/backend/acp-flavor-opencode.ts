@@ -113,6 +113,7 @@ function openCodeRequestFailure(
   detail: string,
   redact: (text: string) => string,
   log: (text: string) => void,
+  endpoint: AcpCustomEndpoint | null,
 ): string {
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
   const reason = error.message.replace(/^Internal error:\s*/u, "");
@@ -137,6 +138,11 @@ function openCodeRequestFailure(
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 asks the model twice to continue a reply cut at the output limit, then fails the
+  // turn with one fixed text. A small local model that thinks at length meets the limit each time
+  // (#7356). Only an endpoint model has a Max output that the user can raise.
+  if (isRecord(error.data) && error.data.errorName === "output-limit")
+    return sourceText(endpoint ? "error.provider.opencodeOutputLimitEndpoint" : "error.provider.opencodeOutputLimit");
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
@@ -160,6 +166,7 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
   "provider.timeout": "timeout",
   "provider.internal": "provider_unavailable",
   "provider.invalid-output": "provider_internal_error",
+  "output-limit": "provider_internal_error",
   "provider.invalid-request": "invalid_request",
   "provider.unsupported-operation": "invalid_request",
   "provider.no-route": "model_not_found",
@@ -195,7 +202,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       });
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
       return sourceText("error.provider.opencodeServiceFailure");
-    return openCodeRequestFailure(error, detail, redact, log);
+    return openCodeRequestFailure(error, detail, redact, log, endpoint);
   },
   failureCause: openCodeFailureCause,
   // OpenCode reports a model reply with no text, or with reasoning only, as a successful empty
