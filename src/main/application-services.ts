@@ -220,6 +220,7 @@ import {
   COMPUTER_USE_CURSOR_MAX_AGE_MS,
   chooseTarget,
   liveSession,
+  pointerOnDesktop,
 } from "./computer-use-target-window";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
@@ -2014,6 +2015,9 @@ export async function createApplicationServices({
   const computerUseReads = new CuaDriverDaemonClient(() =>
     cuaDriver.mcpServerForProviders() ? cuaDriver.socketPath() : null,
   );
+  // The window list of the last placement, in the driver's own units. `readPointer` runs right after
+  // `readTarget` in the same tick, so a point in a window is placed against the same list as the rim.
+  let computerUseWindows: unknown = null;
   const computerUseHighlight = new ComputerUseHighlightController({
     createWindow: createComputerUseHighlightWindow,
     loadWindow: loadComputerUseHighlightRenderer,
@@ -2025,7 +2029,8 @@ export async function createApplicationServices({
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
     readPointer: () => {
       const pointer = cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS);
-      return pointer ? computerUseDesktopPoint(pointer) : null;
+      const point = pointer ? pointerOnDesktop(pointer, computerUseWindows) : null;
+      return point ? computerUseDesktopPoint(point) : null;
     },
     readTarget: (previous) =>
       Effect.gen(function* () {
@@ -2041,6 +2046,7 @@ export async function createApplicationServices({
         const session = liveSession(yield* computerUseReads.sessions(), (Date.now() - turnStartedAt) / 1000);
         if (!session) return null;
         const windows = yield* computerUseReads.listWindows();
+        computerUseWindows = windows;
         const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
         return chooseTarget({
           windows,
