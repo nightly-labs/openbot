@@ -31,10 +31,10 @@ import type { LanguageService } from "./language-service";
 import { type CallbackAnswer, startLoopbackCallbackServer } from "./loopback-callback-server";
 
 /** The path of a sign-in app and of the client metadata document. */
-export const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
 
 /** The path that an RFC 7591 registration names. */
-export const MCP_OAUTH_REGISTRATION_REDIRECT_PATH = "/callback";
+const MCP_OAUTH_REGISTRATION_REDIRECT_PATH = "/callback";
 
 /** The paths this listener answers. Everything else is a 404, including `/`. */
 export const MCP_OAUTH_REDIRECT_PATHS = [MCP_OAUTH_REDIRECT_PATH, MCP_OAUTH_REGISTRATION_REDIRECT_PATH] as const;
