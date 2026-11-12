@@ -5,7 +5,7 @@ import type {
   CopyAgentsServer,
 } from "@openbot/ui/features/transfer/CopyAgentsDialog";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
 export type ServerCopyCalls = Pick<OpenBotDesktopApi["instanceTransfer"], "summary" | "copy">;
@@ -15,7 +15,9 @@ interface ServerCopyState {
   toId: string | null;
   fromAgents: CopyAgentsAgent[] | null;
   toAgents: CopyAgentsAgent[] | null;
-  loadError: string | null;
+  /** The load error of each side. A load of one side keeps the error of the other. */
+  fromError: string | null;
+  toError: string | null;
   phase: CopyAgentsPhase;
   result: InstanceTransferResult | null;
   error: string | null;
@@ -32,10 +34,11 @@ export function createServerCopyStore(
 ) {
   const [state, setState] = createStore<ServerCopyState>({
     fromId: serverId,
-    toId: servers().find((server) => server.id !== serverId)?.id ?? null,
+    toId: untrack(servers).find((server) => server.id !== serverId)?.id ?? null,
     fromAgents: null,
     toAgents: null,
-    loadError: null,
+    fromError: null,
+    toError: null,
     phase: "idle",
     result: null,
     error: null,
@@ -43,9 +46,13 @@ export function createServerCopyStore(
 
   function load(side: "from" | "to", id: string | null): void {
     setState((draft) => {
-      if (side === "from") draft.fromAgents = null;
-      else draft.toAgents = null;
-      draft.loadError = null;
+      if (side === "from") {
+        draft.fromAgents = null;
+        draft.fromError = null;
+      } else {
+        draft.toAgents = null;
+        draft.toError = null;
+      }
     });
     if (!id) return;
     void calls
@@ -61,7 +68,9 @@ export function createServerCopyStore(
       .catch((error: unknown) =>
         setState((draft) => {
           if ((side === "from" ? draft.fromId : draft.toId) !== id) return;
-          draft.loadError = message(error, "settings.transfer.copy.loadFailed");
+          const text = message(error, "settings.transfer.copy.loadFailed");
+          if (side === "from") draft.fromError = text;
+          else draft.toError = text;
         }),
       );
   }
@@ -79,7 +88,7 @@ export function createServerCopyStore(
     setState((draft) => {
       if (id === draft.toId) draft.toId = draft.fromId;
       draft.fromId = id;
-      draft.error = null;
+      reset(draft);
     });
   }
 
@@ -87,9 +96,18 @@ export function createServerCopyStore(
     setState((draft) => {
       if (id === draft.fromId) draft.fromId = draft.toId ?? id;
       draft.toId = id;
-      draft.error = null;
+      reset(draft);
     });
   }
+
+  /** A new pair of servers starts a new copy. The result of the last copy names the old destination. */
+  function reset(draft: ServerCopyState): void {
+    draft.phase = "idle";
+    draft.result = null;
+    draft.error = null;
+  }
+
+  const loadError = () => state.fromError ?? state.toError;
 
   function copy(agentIds: string[]): void {
     const toId = state.toId;
@@ -121,7 +139,7 @@ export function createServerCopyStore(
       });
   }
 
-  return { state, setFrom, setTo, copy };
+  return { state, loadError, setFrom, setTo, copy };
 }
 
 function message(error: unknown, fallback: "settings.transfer.copy.loadFailed" | "settings.transfer.copy.failed") {

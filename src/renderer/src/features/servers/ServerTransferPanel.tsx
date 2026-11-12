@@ -1,7 +1,7 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { CopyAgentsDialog, type CopyAgentsServer } from "@openbot/ui/features/transfer/CopyAgentsDialog";
 import { InstanceTransferView } from "@openbot/ui/features/transfer/InstanceTransferView";
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, untrack } from "solid-js";
 import { createServerCopyStore, type ServerCopyCalls } from "./server-copy-store";
 import { createServerTransferStore, type ServerTransferCalls } from "./server-transfer-store";
 
@@ -65,10 +65,11 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
 
 /** A new copy each time the dialog opens. */
 function ServerCopy(props: { serverId: string; options: ServerCopyOptions; onClose: () => void }) {
+  // The dialog starts from this server, with the calls of the time it opens.
   const store = createServerCopyStore(
-    props.serverId,
+    untrack(() => props.serverId),
     () => props.options.servers,
-    props.options.calls ?? window.openbot.instanceTransfer,
+    untrack(() => props.options.calls) ?? window.openbot.instanceTransfer,
   );
   const openServer = () => {
     const toId = store.state.toId;
@@ -83,7 +84,7 @@ function ServerCopy(props: { serverId: string; options: ServerCopyOptions; onClo
       onToChange={(id) => store.setTo(id)}
       fromAgents={store.state.fromAgents}
       toAgents={store.state.toAgents}
-      loadError={store.state.loadError}
+      loadError={store.loadError()}
       phase={store.state.phase}
       result={store.state.result}
       error={store.state.error}

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
@@ -294,8 +294,15 @@ function ServerSelect(props: {
   mount: Element | undefined;
 }) {
   const { t } = useText();
-  // One array for the life of the select: Kobalte loops on a new options array from each write.
-  const options = createMemo(() => [...props.servers]);
+  // A new array only when a server changes: Kobalte loops on a new options array from each write,
+  // and the server list gets a new array on each status change.
+  const key = createMemo(() =>
+    props.servers.map((server) => `${server.id}\n${server.name}\n${server.logoUrl ?? ""}`).join("\n"),
+  );
+  const options = createMemo(() => {
+    key();
+    return untrack(() => [...props.servers]);
+  });
   return (
     <Select<CopyAgentsServer>
       options={options()}
