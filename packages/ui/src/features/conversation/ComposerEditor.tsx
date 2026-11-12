@@ -696,6 +696,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
       if (caret !== null) restoreEditorSelection(editor, { anchor: caret, focus: caret });
     }
     emitValue();
+    // macOS sends a correction after the next character, maybe before that character's selection event.
+    savedCaret = readEditorSelection(editor)?.focus ?? savedCaret;
     updateMention();
   }
 
