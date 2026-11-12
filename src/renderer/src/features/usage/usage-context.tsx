@@ -1,4 +1,4 @@
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createSignal, createStore, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 
@@ -19,6 +19,12 @@ const context = createSimpleContext({
       serverId: null,
       view: "usage",
     });
+    /**
+     * The workflow that the workflows page opens, such as the one of a clicked notification. Each call
+     * of `openWorkflows` sets a new object, so the open page opens it again after the user opened
+     * another workflow. Without it, the page opens its first workflow.
+     */
+    const [workflowRequest, setWorkflowRequest] = createSignal<{ workflowId: string } | undefined>();
     const { activeServerId } = useServers();
     let trigger: HTMLElement | null = null;
 
@@ -44,7 +50,8 @@ const context = createSimpleContext({
       open("tasks", serverId, source);
     }
 
-    function openWorkflows(serverId: string, source: HTMLElement | null) {
+    function openWorkflows(serverId: string, source: HTMLElement | null, workflowId?: string) {
+      setWorkflowRequest(workflowId === undefined ? undefined : { workflowId });
       open("workflows", serverId, source);
     }
 
@@ -89,6 +96,7 @@ const context = createSimpleContext({
       openSchedule,
       openTasks,
       openWorkflows,
+      workflowRequest,
       openLibrary,
       closeUsage() {
         clear();

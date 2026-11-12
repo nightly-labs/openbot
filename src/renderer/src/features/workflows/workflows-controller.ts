@@ -66,9 +66,15 @@ type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features
  * another device or a restore loads the graph again. The first workflow of the host opens; a host
  * with none gets a new one, as the canvas needs a workflow.
  *
- * `analytics` gives the scope of the account that acts. Stories give none.
+ * `analytics` gives the scope of the account that acts. Stories give none. `requested` names a
+ * workflow to open in place of the first one, such as the one of a clicked notification. A new
+ * request opens its workflow on the open page too.
  */
-export function createWorkflowsController(host: WorkflowHost, analytics?: () => DesktopAnalyticsScope) {
+export function createWorkflowsController(
+  host: WorkflowHost,
+  analytics?: () => DesktopAnalyticsScope,
+  requested?: () => { workflowId: string } | undefined,
+) {
   const { t, errorMessage } = useText();
   /** Reports how a user action ended. No title, text or ID leaves the app. */
   const tracked = async <T>(
@@ -383,9 +389,22 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   });
   write(async () => {
     const list = await host.workflows.list();
-    const first = list[0] ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
+    // Read after the list, so that a request that comes while the list loads opens.
+    const wanted = untrack(() => requested?.())?.workflowId;
+    const first =
+      list.find((summary) => summary.id === wanted) ??
+      list[0] ??
+      (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
     if (!disposed) await load(first.id);
   });
+  // A request after the first workflow opened. Before that, the first load reads the request.
+  createEffect(
+    () => requested?.(),
+    (request) => {
+      if (!request || current === "" || request.workflowId === current) return;
+      if (untrack(summaries).some((summary) => summary.id === request.workflowId)) open(request.workflowId);
+    },
+  );
 
   /**
    * Why the open workflow is read-only, or undefined when this account may change it: it has steps

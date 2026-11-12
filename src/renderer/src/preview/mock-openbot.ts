@@ -3620,6 +3620,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       test: async () => undefined,
       openSettings: async () => undefined,
       onOpened: () => () => undefined,
+      onWorkflowOpened: () => () => undefined,
     },
     maintenance: {
       exportData: async () => ({ saved: true }),

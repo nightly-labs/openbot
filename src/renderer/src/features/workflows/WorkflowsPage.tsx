@@ -5,6 +5,7 @@ import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { WorkflowsCanvas } from "./WorkflowsCanvas";
 import { desktopWorkflowHost, type WorkflowHost } from "./workflows-port";
 
@@ -51,6 +52,7 @@ export function WorkflowsPage(props: { serverId: string }) {
 function DesktopWorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
   const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
+  const { workflowRequest } = useUsage();
   return (
     <WorkflowsCanvas
       host={props.host}
@@ -59,6 +61,7 @@ function DesktopWorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
       models={modelOptions()}
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
+      request={workflowRequest()}
     />
   );
 }
