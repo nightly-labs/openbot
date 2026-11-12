@@ -163,6 +163,7 @@ import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
+import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
@@ -390,6 +391,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   VAULT_CAPABILITY,
@@ -611,6 +613,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
 ] as const;
 
@@ -832,6 +835,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_CAPABILITY &&
     capability !== AGENT_DEFAULTS_CAPABILITY &&
     capability !== AGENT_SPEED_CAPABILITY &&
+    capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
     capability !== HOST_TURN_LIMITS_CAPABILITY,
 );
 /**
@@ -928,6 +932,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1108,6 +1113,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_CAPABILITY &&
       capability !== AGENT_DEFAULTS_CAPABILITY &&
       capability !== AGENT_SPEED_CAPABILITY &&
+      capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
       capability !== HOST_TURN_LIMITS_CAPABILITY,
   );
 }

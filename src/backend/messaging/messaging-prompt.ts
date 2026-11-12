@@ -113,10 +113,14 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
     lines.push(
       `When a person gives a lasting fact or default of this ${words.workspace}, such as the repository or account to use or a person's role, save it with openbot.messaging_remember in the same turn. A new conversation, and a restart, keep only the saved facts.`,
     );
-  // Only Slack takes back the "Working" post of a quiet answer.
+  // Slack and WhatsApp take back the "Working" post of a quiet answer.
   if (input.platform === "slack" && !input.isDirect)
     lines.push(
       `A reply in this thread can reach you without a mention. When a message needs no answer, such as thanks or people talking to each other, answer only ${QUIET_ANSWER}: nothing is posted.`,
+    );
+  if (input.platform === "whatsapp")
+    lines.push(
+      `When you must not answer this message, such as when your instructions say not to answer this person or chat, answer only ${QUIET_ANSWER}: nothing is posted. An empty answer posts a notice in the chat.`,
     );
   if (input.memories.length)
     lines.push(

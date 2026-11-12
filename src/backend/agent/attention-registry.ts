@@ -1695,7 +1695,7 @@ export class AttentionRegistry {
       spec: block.spec,
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
       ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
-      // The app draws the choice of who can use the key small, next to the submit button.
+      // The app shows the Vault card, whose dialog has the choice of who can use the key.
       ...(block.apiKey?.vault ? { apiKey: true } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {

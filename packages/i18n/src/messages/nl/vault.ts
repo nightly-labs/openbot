@@ -105,6 +105,8 @@ export const messages = {
   "vault.request.addLogin": "Login toevoegen",
   "vault.request.addCard": "Kaart toevoegen",
   "vault.request.addContact": "Adres toevoegen",
+  "vault.request.addApiKey": "API-sleutel toevoegen",
+  "vault.request.apiKeyPrivate": "Gaat naar je Kluis, niet naar de chat.",
   "vault.request.saved": "Opgeslagen in de Kluis",
   "vault.twoStep.title": "Verificatiecode",
   "vault.twoStep.on": "Aan",
