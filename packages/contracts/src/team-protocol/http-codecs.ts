@@ -68,6 +68,8 @@ export interface TeamHttpCodecOptions {
   subagents?: boolean;
   /** Read only by V7 responses: the negotiated prompt-multi-select-v1 capability. */
   promptMultiSelect?: boolean;
+  /** Read only by V7 and V8 responses: the negotiated video-generation-v1 capability. */
+  videoGeneration?: boolean;
 }
 
 type DecodedRequest =

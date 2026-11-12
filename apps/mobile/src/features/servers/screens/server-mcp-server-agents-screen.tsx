@@ -1,10 +1,12 @@
-import { useLocalSearchParams } from "expo-router";
+import { canAdministerServer } from "@openbot/contracts/ipc";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import { useMemo } from "react";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { useMcpAccess, useServerMcp } from "@/features/servers/model/use-server-mcp";
+import { mcpAccessAllows, useMcpAccess } from "@/features/servers/model/use-mcp-access";
+import { useServerMcp } from "@/features/servers/model/use-server-mcp";
 import {
   SettingsContent,
   SettingsNote,
@@ -12,63 +14,84 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 /**
- * MCP servers > one server > Agents: each agent of the server, with a check on the agents that get the
- * MCP server. A tap saves at once. With all agents on, the host stores "all agents", so an agent that
- * is added later also gets the server. An owner or admin of a host with `mcp-access-v1` only.
+ * MCP server page > Access > Agents: the agents that get the MCP server. All agents also gives it to
+ * each agent that is added later. A tap saves at once; the agents get a new provider session.
  */
 export function ServerMcpServerAgentsScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const { serverId, mcpServerId } = useLocalSearchParams<{ serverId: string; mcpServerId: string }>();
   const mcp = useServerMcp(serverId);
-  const access = useMcpAccess(serverId);
-  // The selector returns the stored list, so the page does not render again for a new copy.
+  const saved = mcp.list.data?.find((config) => config.id === mcpServerId);
+  const access = useMcpAccess(serverId, mcpServerId);
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
-  const saved = mcp.list.data?.find((config) => config.id === mcpServerId);
-  if (!access.admin || !saved)
+  const { entry, action, snapshot } = access;
+  if (!access.available || !saved || !entry)
     return (
       <SettingsContent>
         <SettingsNote>
-          {access.access.isError
-            ? errorMessage(access.access.error, t("mobile.server.mcp.access.loadFailed"))
-            : access.access.isPending || mcp.list.isPending
-              ? t("mobile.server.mcp.loading")
-              : !saved
-                ? t("mobile.server.mcp.gone")
-                : t("mobile.server.mcp.access.unavailable")}
+          {!access.available
+            ? // An owner or admin of an online host that is too old for `mcp-access-v1`.
+              showsOnline(mcp.server) && canAdministerServer(mcp.server?.role)
+              ? t("mobile.server.mcp.accessUnsupported")
+              : t("mobile.server.mcp.access.unavailable")
+            : snapshot.isError
+              ? errorMessage(snapshot.error, t("mobile.server.mcp.access.loadFailed"))
+              : mcp.list.isError
+                ? errorMessage(mcp.list.error, t("mobile.server.mcp.access.loadFailed"))
+                : mcp.list.isPending || snapshot.isPending
+                  ? t("mobile.server.mcp.loading")
+                  : t("mobile.server.mcp.gone")}
         </SettingsNote>
       </SettingsContent>
     );
-  const savedId = saved.id;
-  const entry = access.entry(savedId);
-  const allows = (agentId: string) => entry.agents === null || entry.agents.includes(agentId);
 
+  const shown = new Set(agents.map((agent) => agent.id));
   function toggle(agentId: string): void {
-    if (access.action.isPending) return;
     void haptics.selection();
-    const shown = new Set(agents.map((agent) => agent.id));
-    const on = agents.filter((agent) => (agent.id === agentId ? !allows(agentId) : allows(agent.id)));
-    // An agent that this list does not show keeps its place. All agents: also each agent added later.
-    const kept = (entry.agents ?? []).filter((id) => !shown.has(id));
-    const next = on.length === agents.length ? null : [...kept, ...on.map((agent) => agent.id)];
-    void access.set(savedId, { ...entry, agents: next });
+    void access.save((held) => {
+      const on = agents
+        .filter((agent) => (agent.id === agentId ? !mcpAccessAllows(held, agent.id) : mcpAccessAllows(held, agent.id)))
+        .map((agent) => agent.id);
+      // An agent that this list does not show keeps its place. Each agent on: also each agent added later.
+      const kept = (held.agents ?? []).filter((id) => !shown.has(id));
+      return { ...held, agents: on.length === agents.length ? null : [...kept, ...on] };
+    });
+  }
+  function chooseAll(): void {
+    if (entry?.agents === null) return;
+    void haptics.selection();
+    void access.save((held) => ({ ...held, agents: null }));
   }
 
   return (
     <SettingsContent>
+      <Stack.Screen options={{ title: saved.name }} />
       <SettingsSection
-        title={saved.name}
         footer={
-          access.action.error
-            ? errorMessage(access.action.error, t("mobile.server.mcp.access.saveFailed"))
-            : t("mobile.server.mcp.access.agentsHint")
+          action.error
+            ? errorMessage(action.error, t("mobile.server.mcp.saveFailed"))
+            : t("mobile.server.mcp.access.allAgentsHint")
         }
       >
+        <SettingsRow
+          checked={entry.agents === null}
+          multiple
+          disabled={action.isPending}
+          disclosure={false}
+          trailing={entry.agents === null ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+          onPress={chooseAll}
+        >
+          <Typography.Paragraph>{t("mobile.server.mcp.access.allAgents")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection title={t("mobile.server.mcp.access.agentsOf", { name: saved.name })}>
         {agents.length === 0 ? (
           <SettingsRow disclosure={false}>
             <Typography.Paragraph className="text-grouped-secondary">
@@ -77,13 +100,13 @@ export function ServerMcpServerAgentsScreen() {
           </SettingsRow>
         ) : null}
         {agents.map((agent) => {
-          const on = allows(agent.id);
+          const on = mcpAccessAllows(entry, agent.id);
           return (
             <SettingsRow
               key={agent.id}
               checked={on}
               multiple
-              disabled={access.action.isPending}
+              disabled={action.isPending}
               disclosure={false}
               leading={
                 <BloubAvatar

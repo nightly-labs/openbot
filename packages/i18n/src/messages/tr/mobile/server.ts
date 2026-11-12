@@ -1111,6 +1111,8 @@ export const messages = {
   "mobile.server.settings.mcpCount": { one: "{count} sunucu", other: "{count} sunucu" },
   "mobile.server.mcp.unsupported": "MCP sunucularını burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.unavailable": "MCP sunucularını yönetmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.mcp.accessUnsupported":
+    "MCP sunucularını kimin alacağını seçmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.description":
     "MCP sunucuları bu sunucunun ajanlarına daha fazla araç verir. Claude ve Codex ajanları yalnızca bu listedeki sunucuları alır.",
   "mobile.server.mcp.loading": "MCP sunucuları yükleniyor…",
@@ -1181,26 +1183,21 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "{name} kaldırılsın mı?",
   "mobile.server.mcp.removeBody": "Bu sunucunun ajanları artık araçlarını almaz. Ayarlar saklanmaz.",
   "mobile.server.mcp.remove": "MCP sunucusunu kaldır",
-  "mobile.server.mcp.access.unavailable":
-    "MCP sunucularını kimin alacağını yalnızca çevrimiçi bir sunucunun sahibi veya yöneticisi seçebilir.",
-  "mobile.server.mcp.access.loadFailed": "Bu MCP sunucusunu kimin aldığı yüklenemedi.",
-  "mobile.server.mcp.access.saveFailed": "Bu MCP sunucusunu kimin alacağı kaydedilemedi. Tekrar deneyin.",
-  "mobile.server.mcp.access.agentsTitle": "Ajanlar",
-  "mobile.server.mcp.access.agents": "Kullanabilen ajanlar",
-  "mobile.server.mcp.access.agentsHint":
-    "Tüm ajanlar açıkken, sonradan eklediğiniz bir ajan da bu MCP sunucusunu alır.",
+  "mobile.server.mcp.access.title": "Erişim",
+  "mobile.server.mcp.access.agents": "Ajanlar",
+  "mobile.server.mcp.access.agentsOf": "{name} kullanabilen ajanlar",
   "mobile.server.mcp.access.allAgents": "Tüm ajanlar",
+  "mobile.server.mcp.access.allAgentsHint": "Tüm ajanlar, daha sonra eklenen her ajanı da kapsar.",
   "mobile.server.mcp.access.noAgents": "Ajan yok",
-  "mobile.server.mcp.access.someAgents": "{checked} / {total}",
-  "mobile.server.mcp.access.roles": "Roller",
-  "mobile.server.mcp.access.rolesHint":
-    "Kullanabilir: üyeler bu MCP sunucusunu görür ve test eder. Yönetebilir: üyeler onu ayrıca değiştirir ve kaldırır. Bir üye, Herkes ve rollerinin en yüksek düzeyini alır. Sahipler, yöneticiler ve onu ekleyen üye onu her zaman yönetebilir.",
-  "mobile.server.mcp.access.levelLabel": "{role} rolünün {name} erişimi",
-  "mobile.server.mcp.access.level.none": "Erişim yok",
-  "mobile.server.mcp.access.level.use": "Kullanabilir",
-  "mobile.server.mcp.access.level.manage": "Yönetebilir",
-  "mobile.server.mcp.access.readOnly":
-    "Bu MCP sunucusunu kullanabilir ve test edebilirsiniz. Değiştirmek için bir sahipten veya yöneticiden Yönetebilir isteyin.",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "Kullanabilir",
+  "mobile.server.mcp.access.fromEveryone": "Herkes ile aynı",
+  "mobile.server.mcp.access.level": "{role} rolünün {name} erişimi",
+  "mobile.server.mcp.access.hint":
+    "Bir üye, Herkes ve rollerinin en yüksek düzeyini alır. Sahipler, yöneticiler ve sunucuyu ekleyen kişi onu her zaman yönetebilir.",
+  "mobile.server.mcp.access.loadFailed": "Bu MCP sunucusunu kimin aldığı yüklenemedi.",
+  "mobile.server.mcp.access.unavailable":
+    "Bu MCP sunucusunu kimin alacağını yalnızca çevrimiçi bir sunucunun sahibi veya yöneticisi seçebilir.",
   "mobile.server.usage.agents": "Ajanlar",
   "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Bu aralıkta ajan kullanımı kaydedilmedi.",

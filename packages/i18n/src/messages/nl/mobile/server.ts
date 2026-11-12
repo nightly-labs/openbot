@@ -1084,6 +1084,7 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",
   "mobile.server.mcp.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de MCP-servers te beheren.",
+  "mobile.server.mcp.accessUnsupported": "Werk OpenBot bij op deze server om te kiezen wie de MCP-servers krijgt.",
   "mobile.server.mcp.description":
     "MCP-servers geven de agents van deze server meer tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst.",
   "mobile.server.mcp.loading": "MCP-servers laden…",
@@ -1156,26 +1157,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "De agents van deze server krijgen de tools ervan niet meer. De instellingen worden niet bewaard.",
   "mobile.server.mcp.remove": "MCP-server verwijderen",
-  "mobile.server.mcp.access.unavailable":
-    "Alleen een eigenaar of beheerder van een online server kan kiezen wie de MCP-servers krijgt.",
-  "mobile.server.mcp.access.loadFailed": "Kan niet laden wie deze MCP-server krijgt.",
-  "mobile.server.mcp.access.saveFailed": "Kan niet opslaan wie deze MCP-server krijgt. Probeer het opnieuw.",
-  "mobile.server.mcp.access.agentsTitle": "Agents",
-  "mobile.server.mcp.access.agents": "Agents die hem mogen gebruiken",
-  "mobile.server.mcp.access.agentsHint":
-    "Met alle agents aan krijgt ook een agent die je later toevoegt deze MCP-server.",
+  "mobile.server.mcp.access.title": "Toegang",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents die {name} mogen gebruiken",
   "mobile.server.mcp.access.allAgents": "Alle agents",
+  "mobile.server.mcp.access.allAgentsHint": "Alle agents omvat ook elke agent die later wordt toegevoegd.",
   "mobile.server.mcp.access.noAgents": "Geen agents",
-  "mobile.server.mcp.access.someAgents": "{checked} van {total}",
-  "mobile.server.mcp.access.roles": "Rollen",
-  "mobile.server.mcp.access.rolesHint":
-    "Mag gebruiken: leden zien en testen deze MCP-server. Kan beheren: leden kunnen hem ook wijzigen en verwijderen. Een lid krijgt het hoogste niveau van Iedereen en van zijn rollen. Eigenaren, beheerders en het lid dat hem toevoegde, kunnen hem altijd beheren.",
-  "mobile.server.mcp.access.levelLabel": "Toegang van {role} tot {name}",
-  "mobile.server.mcp.access.level.none": "Geen toegang",
-  "mobile.server.mcp.access.level.use": "Mag gebruiken",
-  "mobile.server.mcp.access.level.manage": "Kan beheren",
-  "mobile.server.mcp.access.readOnly":
-    "Je kunt deze MCP-server gebruiken en testen. Vraag een eigenaar of beheerder om Kan beheren om hem te wijzigen.",
+  "mobile.server.mcp.access.someAgents": "{count} van {total}",
+  "mobile.server.mcp.access.use": "Mag gebruiken",
+  "mobile.server.mcp.access.fromEveryone": "Zoals Iedereen",
+  "mobile.server.mcp.access.level": "Toegang van {role} tot {name}",
+  "mobile.server.mcp.access.hint":
+    "Een lid krijgt het hoogste niveau van Iedereen en van de eigen rollen. Eigenaren, beheerders en wie de server heeft toegevoegd, kunnen hem altijd beheren.",
+  "mobile.server.mcp.access.loadFailed": "Kan niet laden wie deze MCP-server krijgt.",
+  "mobile.server.mcp.access.unavailable":
+    "Alleen een eigenaar of beheerder van een online server kan kiezen wie deze MCP-server krijgt.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Geen agentgebruik vastgelegd in deze periode.",

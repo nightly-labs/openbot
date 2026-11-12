@@ -19,6 +19,7 @@ export const messages = {
   "mobile.app.route.deletedChannels": "ערוצים שנמחקו",
   "mobile.app.route.cropPhoto": "הזזה ושינוי גודל",
   "mobile.app.route.queuedMessages": "הודעות בתור",
+  "mobile.app.route.pinnedMessages": "הודעות מוצמדות",
   "mobile.app.route.thinking": "חשיבה",
   "mobile.app.route.messageOptions": "אפשרויות הודעה",
   "mobile.app.route.editMessage": "עריכת הודעה",

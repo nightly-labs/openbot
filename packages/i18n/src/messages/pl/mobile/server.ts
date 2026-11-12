@@ -1226,6 +1226,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego serwerami MCP.",
   "mobile.server.mcp.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego serwerami MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby wybrać, kto dostaje jego serwery MCP.",
   "mobile.server.mcp.description":
     "Serwery MCP dają agentom tego serwera więcej narzędzi. Agenci Claude i Codex dostają tylko serwery z tej listy.",
   "mobile.server.mcp.loading": "Wczytywanie serwerów MCP…",
@@ -1303,26 +1305,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Agenci tego serwera przestają dostawać jego narzędzia. Ustawienia nie są zachowywane.",
   "mobile.server.mcp.remove": "Usuń serwer MCP",
-  "mobile.server.mcp.access.unavailable":
-    "Tylko właściciel lub administrator serwera online może wybrać, kto dostaje jego serwery MCP.",
-  "mobile.server.mcp.access.loadFailed": "Nie udało się wczytać, kto dostaje ten serwer MCP.",
-  "mobile.server.mcp.access.saveFailed": "Nie udało się zapisać, kto dostaje ten serwer MCP. Spróbuj ponownie.",
-  "mobile.server.mcp.access.agentsTitle": "Agenci",
-  "mobile.server.mcp.access.agents": "Agenci, którzy mogą go używać",
-  "mobile.server.mcp.access.agentsHint":
-    "Gdy wszyscy agenci są włączeni, agent dodany później też dostaje ten serwer MCP.",
+  "mobile.server.mcp.access.title": "Dostęp",
+  "mobile.server.mcp.access.agents": "Agenci",
+  "mobile.server.mcp.access.agentsOf": "Agenci, którzy mogą używać {name}",
   "mobile.server.mcp.access.allAgents": "Wszyscy agenci",
+  "mobile.server.mcp.access.allAgentsHint": "Wszyscy agenci obejmuje też każdego agenta dodanego później.",
   "mobile.server.mcp.access.noAgents": "Brak agentów",
-  "mobile.server.mcp.access.someAgents": "{checked} z {total}",
-  "mobile.server.mcp.access.roles": "Role",
-  "mobile.server.mcp.access.rolesHint":
-    "Może używać: członkowie widzą i testują ten serwer MCP. Może zarządzać: członkowie mogą go też zmieniać i usuwać. Członek dostaje najwyższy poziom z roli Wszyscy i ze swoich ról. Właściciele, administratorzy i członek, który go dodał, zawsze mogą nim zarządzać.",
-  "mobile.server.mcp.access.levelLabel": "Dostęp roli {role} do {name}",
-  "mobile.server.mcp.access.level.none": "Brak dostępu",
-  "mobile.server.mcp.access.level.use": "Może używać",
-  "mobile.server.mcp.access.level.manage": "Może zarządzać",
-  "mobile.server.mcp.access.readOnly":
-    "Możesz używać i testować ten serwer MCP. Aby go zmienić, poproś właściciela lub administratora o poziom Może zarządzać.",
+  "mobile.server.mcp.access.someAgents": "{count} z {total}",
+  "mobile.server.mcp.access.use": "Może używać",
+  "mobile.server.mcp.access.fromEveryone": "Jak Wszyscy",
+  "mobile.server.mcp.access.level": "Dostęp {role} do {name}",
+  "mobile.server.mcp.access.hint":
+    "Członek dostaje najwyższy poziom z Wszyscy i swoich ról. Właściciele, administratorzy i osoba, która dodała serwer, zawsze mogą nim zarządzać.",
+  "mobile.server.mcp.access.loadFailed": "Nie udało się wczytać, kto dostaje ten serwer MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Tylko właściciel lub administrator serwera online może wybrać, kto dostaje ten serwer MCP.",
   "mobile.server.usage.agents": "Agenci",
   "mobile.server.usage.agentLine": "Tokeny: {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Brak zarejestrowanego użycia agentów w tym okresie.",

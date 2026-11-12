@@ -33,6 +33,7 @@ import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useMessageDelete } from "./use-message-delete";
+import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
@@ -95,6 +96,17 @@ export function MobileChatView({
   );
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
+  // The pins of the agent's own chat, on a host with `message-pins-v1`.
+  const pins = useMessagePins(agent.serverId, agent.id);
+  const pinnedMessageIds = useMemo(
+    () => new Set(pins.pins.filter((pin) => pin.taskId === null).map((pin) => pin.messageId)),
+    [pins.pins],
+  );
+  const setPinned = pins.setPinned;
+  const togglePin = useCallback(
+    (messageId: string, pinned: boolean) => setPinned(null, messageId, pinned),
+    [setPinned],
+  );
   const liveActivity = openTurnActivity(useAgentActivity(agent.id), conversation);
   const threadId = conversation?.threadId ?? null;
   // A turn on another thread, such as channel work, is not this chat's work, as on desktop. A host
@@ -360,6 +372,8 @@ export function MobileChatView({
       deletesAnyMessage={messageDelete.deletesAny}
       markUnread={canMarkUnreadFrom ? markUnread : undefined}
       markUnreadMessageIds={markUnreadMessageIds}
+      togglePin={pins.enabled ? togglePin : undefined}
+      pinnedMessageIds={pinnedMessageIds}
       unreadLineMessageIds={unreadLineMessageIds}
       sendToChannel={sendToChannel}
       questionForm={questionForm}

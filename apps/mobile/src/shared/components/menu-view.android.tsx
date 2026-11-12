@@ -45,6 +45,7 @@ import Star from "lucide-react-native/icons/star";
 import StarOff from "lucide-react-native/icons/star-off";
 import TextWrap from "lucide-react-native/icons/text-wrap";
 import Trash2 from "lucide-react-native/icons/trash";
+import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import Users from "lucide-react-native/icons/users";
 import X from "lucide-react-native/icons/x";
 import {
@@ -86,6 +87,7 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   "doc.on.clipboard": ClipboardPaste,
   "doc.on.doc": Copy,
   ellipsis: Ellipsis,
+  "exclamationmark.triangle": TriangleAlert,
   "envelope.badge": MailBadge,
   "envelope.open": MailOpen,
   eye: Eye,

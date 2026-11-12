@@ -191,6 +191,8 @@ export const messages = {
     "Die CLI von {provider} bearbeitet einen Durchlauf. Warte auf den Abschluss und aktualisiere dann.",
   "error.provider.cliSelectFailed": "OpenBot konnte die installierte verwaltete CLI nicht auswählen.",
   "error.provider.noAuthenticatedAccount": "{provider} hat kein authentifiziertes Konto zurückgegeben.",
+  "error.provider.codexModelProvider":
+    "Codex verwendet auf diesem Computer einen anderen Modellanbieter, und dieser Anbieter verwendet keine ChatGPT-Anmeldung und keinen OpenAI-API-Schlüssel. ChatGPT-Agenten können diesen Anbieter jetzt verwenden. Um dein ChatGPT-Konto zu verwenden, stelle den Modellanbieter von Codex wieder auf OpenAI.",
   "error.provider.signInExpired":
     "Deine Anmeldung bei {provider} ist abgelaufen. Melde dich erneut an, um fortzufahren.",
   "error.provider.cliActivateFailed": "OpenBot konnte die verwaltete CLI nicht aktivieren.",

@@ -111,7 +111,7 @@ A host with `mcp-access-v1` keeps one entry for each MCP server in
 | Routes | `POST /v1/mcp-access` reads and `POST /v1/mcp-access/set` replaces one entry ([`route-mcp-access.ts`](../../src/main/team-api/route-mcp-access.ts)). Only an owner or admin reads the entries and sets them; a member reads `mine`. |
 | Revision | The snapshot has a `revision`, and a replace names the one that the client read. Each replace adds 1. When another admin saved first, the host answers 409 `error.team.mcpAccessStale` and changes nothing; the client reads again. |
 | Sessions | A replace that changes the agents of a server gives each agent a new provider session. A replace of the levels only does not. |
-| Client | The Marketplace page of a connected app or custom server shows the Agents and Roles sections when `serverCanAdminister(server, "mcp-access-v1")` is true. On the phone, the page of one MCP server shows them when `canManageMcpAccess` is true. A member on the phone reads `mine` (`hasMcpAccessLimits`): at `use`, the page shows the server but no action that changes it. |
+| Client | The Marketplace page of a connected app or custom server shows the Agents and Roles sections when `serverCanAdminister(server, "mcp-access-v1")` is true. |
 | Damaged file | Each server is closed to agents and members until an owner or admin saves its access. |
 | Not covered | Access for each tool. The built-in entries (Computer Use, the GitHub connector) have no MCP row, so each agent gets them, also after a damaged file. The MCP management tools of an agent do not apply the agent list. |
 

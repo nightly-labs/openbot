@@ -49,6 +49,7 @@ import {
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
 import { isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
+import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
 import {
@@ -237,6 +238,8 @@ interface AcpTurn {
   toolNames: Map<string, string>;
   /** The ACP `kind` of each tool call; a later update can omit it. */
   toolKinds: Map<string, string>;
+  /** The media kind of each image or video tool call (`AcpFlavor.mediaTools`); a later update can omit the tool. */
+  mediaKinds: Map<string, GeneratedMediaKind>;
   /** The latest durable shape of each tool call until ACP reports its terminal status. */
   toolItems: Map<string, ThreadItem>;
   /** Approved edits that no call under another id ran yet, with their files (`approvedEditSweep`). */
@@ -2302,6 +2305,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       messages: [],
       toolNames: new Map(),
       toolKinds: new Map(),
+      mediaKinds: new Map(),
       toolItems: new Map(),
       approvedEdits: [],
       approvedEditRuns: new Map(),
@@ -2882,18 +2886,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       };
       turn.toolItems.set(update.toolCallId, item);
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
+      const mediaKind = this.#flavor.mediaTools?.kind(update) ?? turn.mediaKinds.get(update.toolCallId);
+      if (mediaKind) turn.mediaKinds.set(update.toolCallId, mediaKind);
+      // The chat shows an image or a video tool call as the media that it made.
+      const shown =
+        mediaKind && this.#flavor.mediaTools ? this.#flavor.mediaTools.item(mediaKind, item, update.content) : item;
       this.emit("notification", {
         method: reported === "completed" || reported === "failed" ? "item/completed" : "item/started",
         params: {
           threadId: thread.id,
           turnId: turn.id,
           filePaths: update.locations?.map((location) => location.path),
-          item,
+          item: shown,
         },
       });
       if (reported === "completed" || reported === "failed") {
-        turn.messages.push(item);
+        turn.messages.push(shown);
         turn.toolItems.delete(update.toolCallId);
+        turn.mediaKinds.delete(update.toolCallId);
       }
       if (this.#flavor.unsentBackgroundTurns && update.status === "completed" && startsBackgroundTask(update.rawOutput))
         this.#watchBackground(thread);

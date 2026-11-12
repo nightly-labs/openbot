@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { useSyncExternalStore } from "react";
 
@@ -26,6 +27,10 @@ export interface MessageActionsRequest {
   onSelectText?: () => void;
   /** Marks the message and the messages after it unread, as on desktop. Unset where it cannot. */
   onMarkUnread?: () => void;
+  /** The message is pinned in its chat. */
+  pinned?: boolean;
+  /** Pins the message, or unpins it when `pinned`, as on desktop. Unset where the chat cannot pin. */
+  onTogglePin?: () => void;
   /**
    * The open channels that the message text can go to, as on desktop. The channel opens with the text
    * in its composer. Unset outside an agent's own chat, and for a message without text.
@@ -33,6 +38,13 @@ export interface MessageActionsRequest {
   sendToChannel?: MessageChannelTargets;
   /** Asks, then deletes the message for everyone. Unset where the reader cannot delete it. */
   onDelete?: () => void;
+  /** The files of the message, which the sheet copies, shares and saves. Unset for a message without files. */
+  files?: MessageFiles;
+}
+
+export interface MessageFiles {
+  serverId: string;
+  attachments: readonly AttachmentSummary[];
 }
 
 export interface MessageChannelTargets {
