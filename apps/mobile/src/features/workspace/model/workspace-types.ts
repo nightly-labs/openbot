@@ -274,6 +274,8 @@ export interface MobileAgent {
   description: string;
   preview: string;
   updatedLabel: string;
+  /** The host's last update of the agent, an ISO time, or null. The unread sort orders use it. */
+  updatedAt: string | null;
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
