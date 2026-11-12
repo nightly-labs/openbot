@@ -223,8 +223,6 @@ function AddServerSession(
     });
   /** A read can take longer than the poll interval. The next tick then skips, so reads do not overlap. */
   let refreshing = false;
-  /** True after this opening made a server. A read that arrives later then keeps its setup. */
-  let created = false;
 
   // The answers of the last opening show the pricing page at once. A return from the payment page, an order from the
   // web page, or a server in setup opens the dialog, which reads its first choices once, so they wait for new answers.
@@ -264,17 +262,15 @@ function AddServerSession(
     draft.serverCount = list.servers.length;
     draft.paidCount = paidCount(list);
     draft.maxServers = list.maxServers;
-    if (!created) {
-      const resumed = resume
-        ? list.servers.find((server) => server.serverId === resume.serverId)
-        : newestInSetup(
-            list.servers,
-            untrack(() => props.servers),
-          );
-      draft.server = resumed ?? null;
-      draft.paid = resume?.paid ?? false;
-      draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
-    }
+    const resumed = resume
+      ? list.servers.find((server) => server.serverId === resume.serverId)
+      : newestInSetup(
+          list.servers,
+          untrack(() => props.servers),
+        );
+    draft.server = resumed ?? null;
+    draft.paid = resume?.paid ?? false;
+    draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
     draft.licenseOffer = licenseOfferOf(licenseState);
     draft.currency =
       HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
@@ -425,7 +421,6 @@ function AddServerSession(
         throw error;
       });
     key.serverId = server.serverId;
-    created = true;
     setState((draft) => {
       draft.server = server;
       draft.paid = false;
