@@ -189,6 +189,7 @@ export class WhatsAppSession {
   /** A QR code was shown in this session, so a 408 means that the codes ran out. */
   #codeShown = false;
   #openedAt = 0;
+  #syncedBefore = false;
   #lastFrameAt = 0;
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
   #watchdog: ReturnType<typeof setInterval> | null = null;
@@ -210,6 +211,14 @@ export class WhatsAppSession {
   /** When the socket last opened, in milliseconds; 0 before the first open. */
   get openedAt(): number {
     return this.#openedAt;
+  }
+
+  /**
+   * The number had finished a sync before the socket last opened. Read at the open: the first sync of
+   * a new link ends on its socket while WhatsApp still sends it history.
+   */
+  get syncedBefore(): boolean {
+    return this.#syncedBefore;
   }
 
   get store(): WhatsAppAuthStore {
@@ -426,6 +435,7 @@ export class WhatsAppSession {
     }
     if (update.connection === "open") {
       this.#openedAt = this.#now();
+      this.#syncedBefore = this.#store.creds.accountSyncCounter > 0;
       this.#lastFrameAt = this.#openedAt;
       this.#startWatchdog();
       this.#setState("open");
