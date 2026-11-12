@@ -11,6 +11,10 @@
 // before the stderr line: the turn still goes on, and the message is not shown as an answer.
 // From #7785: the user's own `mcp_config.json` has a server with the name of one that OpenBot gives.
 // The CLI then starts only its own entry, so OpenBot's server travels as `openbot_<name>`.
+// From #7228: the CLI 1.5.6 refuses a tool schema of a server that started, names the tool only in
+// its own log, and keeps the server after a resume in the same process. The session opens again on a
+// new process without the server, and the turn answers. A refused tool of the user's own server
+// leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -34,6 +38,14 @@ interface LogEntry {
   failed?: string | null;
 }
 
+interface RefusedEntry {
+  method: string;
+  sessionId: string;
+  pid: number;
+  names?: string[];
+  refused?: string | null;
+}
+
 interface Report {
   passed: boolean;
   turns: Record<string, TurnResult>;
@@ -41,6 +53,8 @@ interface Report {
   drops?: McpServerDrop[];
   stdoutFirstDeltas?: string[];
   ownNames?: string[] | undefined;
+  refused?: RefusedEntry[];
+  refusedDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -223,6 +237,67 @@ try {
     assert.ok(ownNames?.includes(name), `The session gets ${name}.`);
   }
   assert.ok(!ownNames?.includes("docs") && !ownNames?.includes("notes"), "No server has a name from the CLI's files.");
+  // 6. The CLI refuses the tool schema of a server that started (#7228).
+  const refusedLog = join(root, "refused.jsonl");
+  const refusedExecutable = join(root, "agy-refused", "bin", "antigravity");
+  await installFakeAgent(refusedExecutable, "antigravity-refused-tool", { FAKE_LOG: refusedLog });
+  const refusedDrops: McpServerDrop[] = [];
+  const refusedClient = requireProviderDriver("antigravity").createClient(
+    { executable: refusedExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("resend", "resend", "https://resend.example/mcp"),
+        httpServer("wiki", "wiki", "https://wiki.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => refusedDrops.push(...dropped),
+    },
+  );
+  clients.push(refusedClient);
+  refusedClient.start();
+  const refusedWorkspace = join(root, "refused-workspace");
+  await mkdir(refusedWorkspace, { recursive: true });
+  const refusedThread = await startThread(refusedClient, { cwd: refusedWorkspace });
+  const refusedTurn = await runTurn(refusedClient, refusedThread, { text: "Reply with OK only.", timeoutMs: 30_000 });
+  report.turns.refusedTool = refusedTurn;
+  report.refusedDrops = refusedDrops;
+  assert.equal(refusedTurn.error, null, "The turn with a refused tool schema has no error.");
+  assert.equal(refusedTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    refusedDrops.map((drop) => drop.name),
+    ["resend"],
+    "The server of the refused tool is reported as left out.",
+  );
+  assert.match(refusedDrops[0]?.detail ?? "", /get-contact/u, "The report names the tool.");
+  const refused = await readJsonl<RefusedEntry>(refusedLog);
+  report.refused = refused;
+  const refusedPrompts = refused.filter((entry) => entry.method === "session/prompt");
+  assert.deepEqual(
+    refusedPrompts.map((entry) => entry.refused),
+    ["mcp_resend_get-contact", null],
+    "The prompt runs once more, and then without the refused tool.",
+  );
+  assert.notEqual(refusedPrompts[0]?.pid, refusedPrompts[1]?.pid, "The prompt runs again on a new process.");
+  const refusedResume = refused.find((entry) => entry.method === "session/resume");
+  assert.equal(refusedResume?.pid, refusedPrompts[1]?.pid, "The new process resumes the session.");
+  assert.ok(!refusedResume?.names?.includes("resend"), "The resumed session does not get the server.");
+  assert.ok(refusedResume?.names?.includes("wiki"), "The resumed session keeps the other servers.");
+
+  // 7. A refused tool of the user's own server `wiki_extra` does not leave out OpenBot's `wiki`.
+  await mkdir(join(refusedWorkspace, ".agents"), { recursive: true });
+  await writeFile(
+    join(refusedWorkspace, ".agents", "mcp_config.json"),
+    JSON.stringify({ mcpServers: { wiki_extra: {} } }),
+  );
+  const ownRefused = await runTurn(refusedClient, refusedThread, {
+    text: "REFUSE_TOOL=mcp_wiki_extra_search",
+    timeoutMs: 30_000,
+  });
+  report.turns.ownRefusedTool = ownRefused;
+  assert.equal(ownRefused.status, "failed", "The turn fails.");
+  assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

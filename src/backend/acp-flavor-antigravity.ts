@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
@@ -148,10 +148,16 @@ export function antigravityGeminiHome(env: Readonly<Record<string, string | unde
  */
 /** The flag that gives the CLI its Gemini home. */
 export const GEMINI_DIR_FLAG = "--gemini-dir=";
+/** The flag that gives the CLI its app data folder, relative to the Gemini home. */
+const APP_DATA_DIR_FLAG = "--app-data-dir=";
+
+function flagValue(argv: readonly string[], flag: string): string | undefined {
+  return argv.find((arg) => arg.startsWith(flag))?.slice(flag.length);
+}
 
 function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): string[] {
   // The account's folder travels in the flag, not in the environment of the process.
-  const home = argv.find((arg) => arg.startsWith(GEMINI_DIR_FLAG))?.slice(GEMINI_DIR_FLAG.length);
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
   const files = [...(home ? [join(home, "config", "mcp_config.json")] : []), join(cwd, ".agents", "mcp_config.json")];
   return files.flatMap((file) => {
     try {
@@ -161,6 +167,77 @@ function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): str
       return [];
     }
   });
+}
+
+/** The CLI 1.5.6 answer for a failure of its own, such as a refused tool schema. It names no cause. */
+const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due to error\.?\s*$/u;
+/** The Antigravity CLI 1.5.6 log line of each prompt, before it builds the toolbox for the prompt. */
+const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
+/**
+ * Antigravity 1.5.6 checks the parameter schema of each MCP tool with Go's RE2 when it builds the
+ * toolbox of a prompt. One `pattern` with a lookahead, such as the email of Resend's `get-contact`,
+ * ends every turn with only "Agent execution terminated due to error." as the answer (#7228). Only
+ * the CLI's own log names the tool, in `<Gemini home>/<app data>/log/acp-server-<time>-<pid>.log`.
+ */
+const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+/** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
+const GEMINI_LOG_RECENT_MS = 10 * 60_000;
+/** The end of a log that is read. The failure comes a few lines after the line of its prompt. */
+const GEMINI_LOG_TAIL_BYTES = 256 * 1024;
+
+function logTail(file: string, size: number): string {
+  const length = Math.min(size, GEMINI_LOG_TAIL_BYTES);
+  const buffer = Buffer.alloc(length);
+  const fd = openSync(file, "r");
+  try {
+    return buffer.subarray(0, readSync(fd, buffer, 0, length, size - length)).toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * The tools that the CLI refused after the last prompt of the session. Each session has a process,
+ * and so a log, of its own. A session that opened again on a new process has an older log too, so
+ * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
+ * the turn then fails as before.
+ */
+function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData) return [];
+  const folder = join(home, appData, "log");
+  const since = Date.now() - GEMINI_LOG_RECENT_MS;
+  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
+  let logs: { file: string; size: number; mtimeMs: number }[];
+  try {
+    logs = readdirSync(folder)
+      .filter((name) => name.endsWith(".log"))
+      .flatMap((name) => {
+        const file = join(folder, name);
+        try {
+          const stat = statSync(file);
+          return stat.isFile() && stat.mtimeMs >= since ? [{ file, size: stat.size, mtimeMs: stat.mtimeMs }] : [];
+        } catch {
+          return [];
+        }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  } catch {
+    return [];
+  }
+  for (const { file, size } of logs) {
+    let log: string;
+    try {
+      log = logTail(file, size);
+    } catch {
+      continue;
+    }
+    const at = log.lastIndexOf(prompt);
+    if (at >= 0) return Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  }
+  return [];
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
@@ -210,6 +287,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
         : null;
     },
     mcpLoadFailure: geminiMcpLoadFailure,
+    refusedMcpTools: antigravityRefusedMcpTools,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the

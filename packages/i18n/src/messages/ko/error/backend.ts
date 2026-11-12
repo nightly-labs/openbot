@@ -246,6 +246,8 @@ export const messages = {
     "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "이 서버의 도구 {tool}의 입력 형식을 이 제공자가 읽을 수 없어요. 다른 제공자의 에이전트는 계속 이 서버를 받아요.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. MCP 설정을 열고 로그인을 선택해 주세요.",
   "error.backend.mcpServerFailedForProvider":
