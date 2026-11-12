@@ -1,10 +1,10 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.9",
   "highlights": [
-    "Control your computer from the phone: open the server menu and tap Control computer to see its screen and use it like a trackpad.",
-    "Type @ in a chat to tag one of the agent's browser tabs or side threads. The host needs OpenBot 0.62.0 or later.",
-    "A new Library in the server drawer shows every picture and file from the chats of a server.",
-    "Talk with an agent by GPT live voice, or dictate on the phone with Parakeet Unified or Qwen3-ASR in 30 languages.",
-    "Sign in with your company account, and connect GitLab, Omnisend and ElevenLabs from the Apps marketplace."
+    "Get fixes without a store update: when a fix is ready, the home screen shows A new OpenBot is ready. Tap Update and the app restarts with the fix.",
+    "Attach MOV or MP4 videos from Photos, and search the model list in agent settings and Create agent.",
+    "New provider pages: add an API key for ChatGPT and Claude, choose a default provider for new agents, and sign in through the browser.",
+    "Give a channel its own picture, and get a notification when an agent finishes or stops with an error in a thread. The server needs the new OpenBot version.",
+    "Connect Postiz from the Apps marketplace so agents can draft, schedule and publish social media posts."
   ]
 }
