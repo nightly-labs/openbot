@@ -97,11 +97,12 @@ export function localAttachmentPreview(file: { mimeType: string; base64: string;
 }
 
 /**
- * A downloaded image as a file in the chat media folder. The image view gets a short file URI, not
- * a data URL of many megabytes: Android Glide copies its source text, and a large data URL ran
- * the app out of memory. A file that cannot be written leaves the data URL.
+ * A downloaded image, or a file above the attachment limit, as a file in the chat media folder. The
+ * image view gets a short file URI, not a data URL of many megabytes: Android Glide copies its
+ * source text, and a large data URL ran the app out of memory. A large file is not kept as Base64
+ * in the cache. A file that cannot be written leaves the data.
  */
-function keepImageFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
+function keepFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) {
@@ -115,14 +116,13 @@ function keepImageFile(serverId: string, attachment: AttachmentSummary, data: Re
 }
 
 /**
- * An image that this launch downloaded before, as a file that is whole, when the phone also knows
- * its size. The chat then shows it again without a new download. Its data has no Base64.
+ * A file that this launch downloaded before, as a file that is whole: an image when the phone also
+ * knows its shape, or a file above the attachment limit. It is used again without a new download.
+ * Its data has no Base64.
  */
-function keptImageFile(
-  serverId: string,
-  attachment: AttachmentSummary,
-): (RemoteFileUpload & { fileUri: string }) | null {
-  if (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id)) return null;
+function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
+  const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+  if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) return null;
@@ -153,14 +153,13 @@ function attachmentFileQuery(
       // A file between the two limits runs this query only when the user asks for it, or with the
       // setting on: `useAttachmentFile` does not enable it before.
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
-      const kept = keptImageFile(serverId, attachment);
+      const kept = keptFile(serverId, attachment);
       if (kept) return kept;
       const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
-      const fileUri = data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined;
-      // The cache does not keep the Base64 of a large image that is on disk: the file has it.
-      return fileUri && attachment.size > MOBILE_ATTACHMENT_BYTES
-        ? { ...data, base64: "", fileUri }
-        : { ...data, fileUri };
+      const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+      const fileUri = large || data.mimeType.startsWith("image/") ? keepFile(serverId, attachment, data) : undefined;
+      // The cache does not keep the Base64 of a large file that is on disk: the file has it.
+      return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
     },
     retry: false,
     staleTime: Infinity,
@@ -356,7 +355,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
       for (const attachment of attachments) {
         const data = await load(attachment);
         // The chat media folder holds the file with a safe name, and the next launch clears it.
-        const uri = data.fileUri ?? keepImageFile(serverId, attachment, data);
+        const uri = data.fileUri ?? keepFile(serverId, attachment, data);
         if (!uri) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
         types.add(data.mimeType);
         uris.push(uri);

@@ -687,6 +687,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [directoryRefresh]);
 
   const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
+  const largeAttachmentDownloads = useRef<Promise<void>>(Promise.resolve());
   const request = useCallback(
     async <T,>(
       method: string,
@@ -1761,6 +1762,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         queryScope,
         capabilities: serverCapabilities.current,
         attachmentDownloads,
+        largeAttachmentDownloads,
       }),
     [request, teamApi, queryClient, queryScope],
   );

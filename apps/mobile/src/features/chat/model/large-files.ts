@@ -27,15 +27,6 @@ function downloadOf(size: number, automatic: boolean, requested: boolean): Attac
   return automatic || requested ? "download" : "ask";
 }
 
-/** The download of a file now, for a download that starts outside a render. */
-export function attachmentDownload(serverId: string, attachment: AttachmentSummary): AttachmentDownload {
-  return downloadOf(
-    attachment.size,
-    useLargeFilePreference.getState().automatic,
-    useRequestedFiles.getState().keys.has(fileKey(serverId, attachment.id)),
-  );
-}
-
 /** The download of a file, and the tap that lets a large file download. */
 export function useAttachmentDownload(serverId: string, attachment: AttachmentSummary) {
   const automatic = useLargeFilePreference((state) => state.automatic);

@@ -585,6 +585,7 @@ export function createHostRequestActions({
   queryScope,
   capabilities,
   attachmentDownloads,
+  largeAttachmentDownloads,
 }: {
   request: WorkspaceRequest;
   teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
@@ -593,6 +594,8 @@ export function createHostRequestActions({
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
   attachmentDownloads: { current: Promise<void> };
+  /** The lane of the files above the attachment limit, one at a time. */
+  largeAttachmentDownloads: { current: Promise<void> };
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   /** The Team API of a server that serves `capability`, for an optional admin route set. */
@@ -1410,12 +1413,12 @@ export function createHostRequestActions({
           undefined,
           largeDownload,
         );
-      // A large file that the user asked for does not wait behind the images of the chat, and they
-      // do not wait behind it.
-      if (largeDownload) return download();
-      // Limit native/DOM copies when a message contains several large images.
-      const result = attachmentDownloads.current.then(download);
-      attachmentDownloads.current = result.then(
+      // Limit native/DOM copies when a message contains several large images. A file above the
+      // attachment limit has its own lane: the images of the chat do not wait behind it, and two
+      // such files never download at the same time.
+      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      const result = lane.current.then(download);
+      lane.current = result.then(
         () => {},
         () => {},
       );
