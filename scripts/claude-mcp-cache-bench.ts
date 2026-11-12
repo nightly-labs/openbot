@@ -27,10 +27,9 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/claude-mcp-cache-ben
 const SERVER = resolve(import.meta.dirname, "claude-mcp-cache-bench-server.ts");
 const PROMPT = "Reply with the single word OK. Do not use any tool.";
 const MODEL = "claude-haiku-5-5";
+const argument = (name: string) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
 /** `--delay=<ms>`: how late the bench MCP server answers `initialize`. */
-const SLOW_SERVER_DELAY_MS = Number(
-  process.argv.find((arg) => arg.startsWith("--delay="))?.slice("--delay=".length) ?? "3000",
-);
+const SLOW_SERVER_DELAY_MS = Number(argument("delay") ?? "3000");
 
 interface Scenario {
   name: string;
@@ -103,7 +102,6 @@ interface RunReport {
   error?: string;
 }
 
-const argument = (name: string) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
 const runs = Number(argument("runs") ?? "1");
 const onlyScenario = argument("scenario");
 /** `--debug=<folder>` keeps a CLI debug log of each query there. */

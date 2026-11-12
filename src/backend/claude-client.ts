@@ -231,13 +231,12 @@ const CLAUDE_NAME_ONLY_SKILLS = [
  * The exception is an automatic `ENABLE_TOOL_SEARCH` mode: see `isClaudeAutoToolSearch`.
  */
 const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
+  userSettings: DynamicRecord,
   configDirectory: string,
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
   processToolSearch: string | undefined,
 ) {
-  // The `env` of the user settings applies also without the user setup: `claudeSignInSettings` copies it.
-  const userSettings = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
   const projectFiles = [
     ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
     ...(sources.includes("local") ? [join(cwd, ".claude", "settings.local.json")] : []),
@@ -245,8 +244,10 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   const projectSettings = yield* Effect.forEach(projectFiles, readClaudeSettingsFile);
   const ownSettings = [...(sources.includes("user") ? [userSettings] : []), ...projectSettings];
   // A settings `env` value replaces the process value, and a later file replaces an earlier one.
+  // Without the user setup, `claudeSignInSettings` copies the user `env` into the flag settings,
+  // which come before the project and local settings.
   const toolSearch =
-    [userSettings, ...projectSettings]
+    (sources.includes("user") ? [userSettings, ...projectSettings] : [...projectSettings, userSettings])
       .map((file) => (isDynamicRecord(file.env) ? file.env.ENABLE_TOOL_SEARCH : undefined))
       .filter(isString)
       .at(-1) ?? processToolSearch;
@@ -284,7 +285,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
 function isClaudeAutoToolSearch(value: string | undefined): boolean {
   if (value === "auto") return true;
   if (!value?.startsWith("auto:")) return false;
-  const percent = Number.parseFloat(value.slice("auto:".length));
+  const percent = Number.parseInt(value.slice("auto:".length), 10);
   return Number.isNaN(percent) || (percent > 0 && percent < 100);
 }
 
@@ -625,10 +626,9 @@ const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (pa
  * account and API backend keys, which cost no prompt tokens. The sign-in probe reads the whole file,
  * so without them an agent turn could use another account or backend than the provider settings
  * show: Bedrock, Vertex or a gateway set in `env`, or an `apiKeyHelper`. They go in as flag settings.
- * A missing or unreadable file gives nothing. The file can hold secrets, so no value of it is logged.
+ * The file can hold secrets, so no value of it is logged.
  */
-const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (configDirectory: string) {
-  const parsed = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
+function claudeSignInSettings(parsed: DynamicRecord): Settings {
   const stringSetting = (key: string): string | null => {
     const value = parsed[key];
     return isString(value) ? value : null;
@@ -656,7 +656,7 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
     ...(Object.keys(env).length > 0 ? { env } : {}),
   };
   return settings;
-});
+}
 
 /**
  * The model ids that a model list of any sign-in reported. A client for one generation or an agent's
@@ -1332,7 +1332,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
-    const signInSettings: Settings = userSetup ? {} : yield* claudeSignInSettings(configDirectory);
+    const userSettingsFile = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
+    const signInSettings: Settings = userSetup ? {} : claudeSignInSettings(userSettingsFile);
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(
@@ -1376,7 +1377,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
     const openBotSettings: Settings = config.profileGeneration
       ? {}
-      : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources, cliEnvironment.ENABLE_TOOL_SEARCH);
+      : yield* claudeFlagSettings(
+          userSettingsFile,
+          configDirectory,
+          config.cwd,
+          settingSources,
+          cliEnvironment.ENABLE_TOOL_SEARCH,
+        );
     const flagSettings: Settings = {
       ...openBotSettings,
       ...nodeOptionsSettings,
