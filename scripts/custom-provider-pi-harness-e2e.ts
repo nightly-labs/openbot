@@ -6,7 +6,8 @@
 // limit must reach the request as the model's budget (#4234). A model with saved efforts must list
 // exactly those efforts and send the effort of the turn; a model with none must not reason (#4154).
 // A model saved with image input must send an attached image to the endpoint; a text-only model
-// must not (#5332).
+// must not (#5332). A model with saved efforts must get the instructions in the `system` role, which
+// each OpenAI-compatible endpoint accepts, and not in `developer` (#7434).
 // `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -53,6 +54,8 @@ interface Request {
   reasoningEffort: string | null;
   /** The `image_url` content parts of the request's messages. */
   images: number;
+  /** The role of the first message, which holds the instructions. */
+  instructionRole: string | null;
 }
 
 interface Report {
@@ -82,17 +85,24 @@ function header(request: IncomingMessage, name: string): string | null {
 /** The model that a chat completion request names, and the output budget that it asks for. */
 async function requestedModel(
   request: IncomingMessage,
-): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images">> {
+): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images" | "instructionRole">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
   const value = text ? JSON.parse(text) : null;
   const sent = isRecord(value) ? (value.max_completion_tokens ?? value.max_tokens) : null;
   const budget = typeof sent === "number" ? sent : null;
-  const images = getArray(value, "messages")
+  const messages = getArray(value, "messages");
+  const images = messages
     .flatMap((message) => getArray(message, "content"))
     .filter((part) => getString(part, "type") === "image_url").length;
-  return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort"), images };
+  return {
+    model: getString(value, "model"),
+    budget,
+    reasoningEffort: getString(value, "reasoning_effort"),
+    images,
+    instructionRole: getString(messages[0], "role"),
+  };
 }
 
 /** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
@@ -254,6 +264,7 @@ try {
     assert.equal(effortTurn.error, null, `The turn at ${effort} failed: ${effortTurn.error}`);
     const last = report.requests.filter((request) => request.model === EFFORT_MODEL).at(-1);
     assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
+    assert.equal(last?.instructionRole, "system", "Pi must send the instructions of a custom model as system.");
   }
 
   // #5332: an attached image reaches a model saved with image input, and not a text-only model.
