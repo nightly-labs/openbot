@@ -134,6 +134,7 @@ import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
+import { REMOTE_DESKTOP_QUALITY_CAPABILITY } from "./remote-desktop-quality-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
@@ -583,6 +584,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  REMOTE_DESKTOP_QUALITY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -793,7 +795,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_CHANNEL_CAPABILITY &&
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
-    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+    capability !== REMOTE_DESKTOP_QUALITY_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -880,6 +883,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  REMOTE_DESKTOP_QUALITY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1049,6 +1053,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_CHANNEL_CAPABILITY &&
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
-      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+      capability !== REMOTE_DESKTOP_QUALITY_CAPABILITY,
   );
 }

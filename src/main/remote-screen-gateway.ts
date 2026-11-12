@@ -14,6 +14,11 @@ import type {
   RemoteDesktopTestStatus,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  REMOTE_DESKTOP_QUALITY_PRESETS,
+  type RemoteDesktopQuality,
+  remoteDesktopViewerQuality,
+} from "@openbot/contracts/team-protocol/remote-desktop-quality-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Result, Schema, Scope } from "effect";
 import type * as Ws from "ws";
@@ -741,7 +746,13 @@ export class RemoteScreenGateway {
       if (!session || route === undefined) return sendText(response, 404, "Remote session not found.");
       if (request.method === "GET" && route === "viewer") {
         if (!this.#runtimeState) return sendText(response, 503, "Moonlight runtime is unavailable.");
-        return sendViewer(response, session.snapshot.id, session.streamerSlot, this.#runtimeState);
+        return sendViewer(
+          response,
+          session.snapshot.id,
+          session.streamerSlot,
+          this.#runtimeState,
+          remoteDesktopViewerQuality(url),
+        );
       }
       if (request.method === "POST" && route === "viewer-state") {
         if (!this.#viewerAuthorized(request, session))
@@ -1373,11 +1384,25 @@ function sendViewer(
   sessionId: string,
   streamerSlot: number,
   runtime: SunshineMoonlightRuntimeState,
+  quality: RemoteDesktopQuality | null,
 ): void {
   const sessionPath = TEAM_API_ROUTES.remoteScreen.session(sessionId);
   const hostId = runtime.hostIds[streamerSlot - 1] ?? runtime.hostId;
   const target = `${sessionPath}/moonlight/stream.html?hostId=${hostId}&appId=${runtime.desktopAppId}`;
-  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";const refused=()=>parent.postMessage(${JSON.stringify({ source: "openbot-moonlight", type: "viewer-state", sessionId, state: "error" })},"*");document.readyState==="complete"?refused():addEventListener("load",refused);throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;
+  // Moonlight's stream page reads its settings from this origin's storage when the stream starts.
+  // The other saved settings stay; a viewer that names no quality keeps what it had.
+  const preset = quality === null ? null : REMOTE_DESKTOP_QUALITY_PRESETS[quality];
+  const applyQuality = preset
+    ? `try{const saved=JSON.parse(localStorage.getItem("mlSettings")||"{}");localStorage.setItem("mlSettings",JSON.stringify(Object.assign(saved&&typeof saved==="object"?saved:{},${JSON.stringify(
+        {
+          fps: preset.fps,
+          bitrate: preset.bitrate,
+          videoSize: "custom",
+          videoSizeCustom: { width: preset.width, height: preset.height },
+        },
+      )})))}catch{}`
+    : "";
+  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";const refused=()=>parent.postMessage(${JSON.stringify({ source: "openbot-moonlight", type: "viewer-state", sessionId, state: "error" })},"*");document.readyState==="complete"?refused():addEventListener("load",refused);throw new Error("grant rejected")}${applyQuality}location.replace(${JSON.stringify(target)});</script>`;
   response.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy":

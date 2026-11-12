@@ -173,6 +173,17 @@ An extra server on the same computer (`local-server-child.ts`) runs its own gate
 policy file and no question, tray or notification. Its members are not covered by the desktop's
 settings.
 
+### Stream quality on the desktop
+
+The desktop app cannot run a script in the viewer frame: the frame belongs to the host or to the
+viewer proxy. A host with `remote-desktop-quality-v1`
+(`packages/contracts/src/team-protocol/remote-desktop-quality-v1.ts`) reads `?quality=` on the
+viewer address. Its viewer page writes the preset to Moonlight's `mlSettings` before it opens the
+stream. The presets have the phone's frame rates and bitrates, at 1920 x 1080 or 1280 x 720. Smooth
+is the default, and it is Moonlight Web's own default. The workspace header shows the Quality menu
+only for a host with the capability. A change opens a new session, because Moonlight reads its
+settings only when a stream starts. The renderer keeps the choice for the app run.
+
 ### Remote desktop on the phone
 
 The mobile app shows the host's own Moonlight Web viewer, as the desktop app does
