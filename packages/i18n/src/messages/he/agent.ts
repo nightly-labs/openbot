@@ -84,6 +84,7 @@ export const messages = {
   "agent.error.settingsFailed": "לא ניתן לשמור את הגדרות הסוכן",
   "agent.error.adminOnly": "רק מנהל של השרת יכול לשנות את הגדרות הסוכן.",
   "agent.error.continueFailed": "הסוכן לא הצליח להמשיך. יש לנסות שוב.",
+  "agent.error.copyDetails": "העתקת הפרטים",
   "agent.error.mcpNotStarted": "שרת MCP לא הופעל",
   "agent.error.openMcpSettings": "פתיחת הגדרות MCP",
   "agent.error.provider": "שגיאת ספק",
