@@ -524,11 +524,15 @@ export function createConversationViewScope(props: ConversationProps) {
     providerOffline,
   } = activity;
   // A sent message makes room for the working agent's line at once. The chat then moves one time,
-  // with the message, and not again when the line shows.
+  // with the message, and not again when the line shows. The value names the chat, so that a switch
+  // between two chats that both send makes the room again after the activity store resets it.
   createEffect(
-    () => !channel && currentPendingSends().length > 0,
-    (sending) => {
-      if (sending) setAgentActivitySpaceReserved(true);
+    () =>
+      !channel && currentPendingSends().length > 0
+        ? agentConversationKey(props.server?.id ?? "local", props.agent?.id ?? "")
+        : undefined,
+    (sendingChat) => {
+      if (sendingChat) setAgentActivitySpaceReserved(true);
     },
   );
   /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */

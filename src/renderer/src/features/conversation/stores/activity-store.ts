@@ -185,15 +185,19 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     window.clearTimeout(agentActivityExitDelayTimer);
     agentActivityExitDelayTimer = undefined;
   };
-  /** The chat that the line follows, as server and agent. */
+  /** The chat that the line follows. A memo, so that a new server object does not start the timers again. */
+  const chat = createMemo(() => agentConversationKey(deps.props.server?.id ?? "local", deps.props.agent?.id ?? ""));
+  const waitsForUser = createMemo(() =>
+    Boolean(deps.props.prompt || deps.props.approval || deps.props.browserTakeover),
+  );
   let openChat: string | undefined;
   createEffect(
     () => ({
       activityId: activeActivityId(),
       agent: deps.props.agent,
-      chat: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+      chat: chat(),
       label: activityLabel(),
-      waitsForUser: Boolean(deps.props.prompt || deps.props.approval || deps.props.browserTakeover),
+      waitsForUser: waitsForUser(),
     }),
     ({ activityId, agent, chat, label, waitsForUser }) => {
       clearAgentActivityShowTimer();
