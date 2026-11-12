@@ -1261,8 +1261,10 @@ export class BrowserHost {
         Effect.gen({ self: this }, function* () {
           return yield* untilStopped(
             tab,
+            // A reload gets the page's files from the site again. A site can send a bad file that
+            // the browser keeps for hours (#7772); a normal reload used it again and the page stayed blank.
             navigateAndWait(tab.contents, () => {
-              tab.contents.reload();
+              tab.contents.reloadIgnoringCache();
               return true;
             }),
           );
@@ -2060,7 +2062,7 @@ export class BrowserHost {
                   return;
                 case "reload":
                   yield* navigateAndWait(tab.contents, () => {
-                    tab.contents.reload();
+                    tab.contents.reloadIgnoringCache();
                     return true;
                   });
               }
@@ -2876,7 +2878,7 @@ export class BrowserHost {
             yield* navigateAndWait(
               tab.contents,
               () => {
-                tab.contents.reload();
+                tab.contents.reloadIgnoringCache();
                 return true;
               },
               operationTimeout,
