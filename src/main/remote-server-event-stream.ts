@@ -154,6 +154,8 @@ export class RemoteEventStream {
   readonly #offlineHosts = new Map<string, number>();
   /** When this app last saw each host online. */
   readonly #seenOnlineAt = new Map<string, number>();
+  /** When the WebRTC transport last connected to each host. */
+  readonly #transportConnectedAt = new Map<string, number>();
   /** Hosted servers that start after a wake request. */
   readonly #startingHosts = new Set<string>();
   #appFocused = true;
@@ -195,6 +197,7 @@ export class RemoteEventStream {
     this.#reconnectAttempts.clear();
     this.#offlineHosts.clear();
     this.#seenOnlineAt.clear();
+    this.#transportConnectedAt.clear();
     this.#transportAttempts.clear();
     this.#authenticationPaused.clear();
     yield* Scope.close(this.#scope, Exit.void);
@@ -252,7 +255,34 @@ export class RemoteEventStream {
     this.syncScopes();
   }
 
-  // The transport reconnected on its own, so the backoff it earned no longer applies.
+  /**
+   * The WebRTC transport connected. A pending retry is not necessary now, but the backoff stays until
+   * the connection is healthy, as for an HTTPS socket. A connection that dropped after some seconds
+   * used to clear it, so the next attempt ran after one second, and again after each drop.
+   */
+  transportConnected(serverId: string): void {
+    const reconnectTimer = this.#reconnectTimers.get(serverId);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    this.#reconnectTimers.delete(serverId);
+    this.#offlineHosts.delete(serverId);
+    this.#startingHosts.delete(serverId);
+    this.#transportConnectedAt.set(serverId, Date.now());
+  }
+
+  /**
+   * The WebRTC transport disconnected. A connection that stayed healthy clears the backoff. The result
+   * is true when no retry failed since the last healthy connection: only that drop reads the host list
+   * again, not each drop of a connection that cannot stay up.
+   */
+  transportDisconnected(serverId: string): boolean {
+    const connectedAt = this.#transportConnectedAt.get(serverId);
+    this.#transportConnectedAt.delete(serverId);
+    if (connectedAt !== undefined && Date.now() - connectedAt >= REMOTE_EVENT_HEALTHY_MS)
+      this.#reconnectAttempts.delete(serverId);
+    return !this.#reconnectAttempts.has(serverId);
+  }
+
+  // The backoff no longer applies: the computer woke, or the user asked for the server again.
   clearReconnectBackoff(serverId: string): void {
     const reconnectTimer = this.#reconnectTimers.get(serverId);
     if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -388,6 +418,7 @@ export class RemoteEventStream {
     this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
     this.#seenOnlineAt.delete(serverId);
+    this.#transportConnectedAt.delete(serverId);
     this.#startingHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);

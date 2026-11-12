@@ -242,6 +242,9 @@ export function createWebHostConnections(options: {
           // A resync can follow lost events, an `agents-changed` among them.
           if (update.state === "online" && update.resync && !entry.incompatible && options.onNotice)
             void readAgents(entry);
+          // Signal holds the attempt until the host connects. The attempt continues, so the recovery
+          // reports no state for this wait.
+          if (update.hostOffline) setState(host.hostId, "offline");
           if (update.state !== "offline") return;
           if (update.code === "session_revoked") options.onSessionRevoked();
           if (update.code === "protocol_error") entry.recovery?.suspend(failed(update.message, update.reference));
@@ -257,7 +260,11 @@ export function createWebHostConnections(options: {
         },
       },
     };
-    const peer = options.createPeer(actions, options.peerOptions);
+    // Signal holds the attempt while the host is offline, as for the opened host. Without the hold,
+    // each attempt failed at once, and the recovery asked for a new ticket five times in each
+    // 70 seconds for as long as the tab stayed open. The held attempt asks for a ticket only when
+    // the host can be on another Signal machine, at most each 5 minutes.
+    const peer = options.createPeer(actions, { ...options.peerOptions, waitForHost: true });
     entry.actions = actions;
     entry.peer = peer;
     const recovery = createRemoteConnectionRecovery(

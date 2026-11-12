@@ -124,6 +124,11 @@ export class LiveActivityPushService {
     if (previous) this.#clearTimer(previous);
     if (previous && !same) this.#stop(previous);
     const now = this.#now();
+    // A phone that signs in again gets a new session. The registration of the old session has the same
+    // token, so it would send each update to the same activity a second time.
+    const others = [...this.#registrations.values()].filter(
+      (other) => other.sessionId !== sessionId && other.value.token === value.token,
+    );
     const registration: Registration = {
       sessionId,
       viewer,
@@ -136,7 +141,7 @@ export class LiveActivityPushService {
           : new DynamicIslandCoordinator(() => liveActivityIslandText(phoneText(value.locale))),
       expiresAt: now + REGISTRATION_LIFETIME_MS,
       // The same token is the same activity.
-      startedAt: same && previous ? previous.startedAt : now,
+      startedAt: Math.min(same && previous ? previous.startedAt : now, ...others.map((other) => other.startedAt)),
       // The phone shows its own state now, so an alert from before is old.
       alert: null,
       // The request came over the connection of this session, so it is open.
@@ -144,12 +149,13 @@ export class LiveActivityPushService {
       timer: null,
       // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
-      timestamp: same && previous ? previous.timestamp : 0,
+      timestamp: Math.max(same && previous ? previous.timestamp : 0, ...others.map((other) => other.timestamp)),
       sending: false,
       failures: 0,
       retryAt: 0,
     };
     this.#registrations.set(sessionId, registration);
+    for (const other of others) this.#stop(other);
     this.#schedule(registration, 0);
     this.#listen();
   }
@@ -242,6 +248,12 @@ export class LiveActivityPushService {
     // Access can end while the phone is away: a removed or disabled member gets no more content.
     if (now >= registration.expiresAt || !this.#options.memberActive(registration.viewer.memberId)) {
       this.#stop(registration);
+      return;
+    }
+    // iOS ended the activity and ignores its updates. The registration stays until it expires, so the
+    // same token that the phone gives again keeps its start.
+    if (now >= registration.startedAt + ACTIVITY_LIFETIME_MS) {
+      this.#schedule(registration, registration.expiresAt - now);
       return;
     }
     if (registration.sending) {
