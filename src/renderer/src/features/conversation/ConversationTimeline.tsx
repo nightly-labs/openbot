@@ -715,6 +715,7 @@ export function ConversationTimeline() {
             ),
           ),
       }),
+    omittedSteps: () => turnSteps.omittedStepsAbove(messageId),
     keyboard: traceKeyboard,
     // The chat shows a subagent of the trace in the side panel, as its card in the chat does.
     canSelectSpan: (id) => id.startsWith(SUBAGENT_SPAN_PREFIX),

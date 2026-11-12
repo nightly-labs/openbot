@@ -205,6 +205,8 @@ function stepsSummary(steps: readonly AgentStep[], text: TextValue): string {
 export interface AgentStepsTrace {
   /** Read only while the dialog is open. */
   spans: () => readonly TraceSpan[];
+  /** The steps of the turn that the trace does not have. Read only while the dialog is open. */
+  omittedSteps?: () => number;
   keyboard: TraceKeyboard;
   /** The spans that are not steps of the list but that the chat can show, such as subagents. */
   canSelectSpan?: (id: string) => boolean;
@@ -319,6 +321,7 @@ export function AgentStepsDisclosure(props: {
                 if (!next) setTraceOpenedAt(null);
               }}
               spans={spans()}
+              omittedSteps={trace().omittedSteps?.() ?? 0}
               now={traceOpenedAt() ?? 0}
               keyboard={trace().keyboard}
               canSelectSpan={canSelectSpan}

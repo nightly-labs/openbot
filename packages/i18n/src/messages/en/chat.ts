@@ -90,6 +90,10 @@ export const messages = defineMessages("chat", {
   "chat.trace.step.reply": "Reply",
   "chat.trace.empty.title": "No matching steps",
   "chat.trace.empty.description": "Nothing in this trace matches “{query}”.",
+  "chat.trace.omitted": {
+    one: "This trace does not show 1 later step of the turn. The totals do not count it.",
+    other: "This trace does not show {count} later steps of the turn. The totals do not count them.",
+  },
   "chat.trace.collapse": "Hide the steps of {name}",
   "chat.trace.expand": "Show the steps of {name}",
   "chat.awaiting.title": "Waiting for replies",

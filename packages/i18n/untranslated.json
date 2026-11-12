@@ -87,6 +87,7 @@
   "chat.mcpSignIn.signInNamed": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "chat.mcpSignIn.signedIn": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "chat.mcpSignIn.unavailable": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
+  "chat.trace.omitted": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "composer.placeholder.answer": ["ko", "nl", "zh"],
   "composer.send.answer": ["ko", "nl", "zh"],
   "customProvider.acp.error.usagePromptInvalid": ["ko"],

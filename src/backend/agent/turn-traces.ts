@@ -15,18 +15,22 @@ import { redactText } from "@openbot/logging";
 interface RunningTrace {
   startedAt: string;
   steps: Map<string, ConversationTraceStep>;
+  /** The ids of the items that came after the step limit. Only their number is kept. */
+  omitted: Set<string>;
 }
 
 /**
  * Owns the steps of each running turn, by provider item id, until the turn ends. The providers send
  * no times, so each time is when the host got the event. A turn ends with `take`, which removes it;
- * only a turn that `begin` started records steps, so a compaction turn keeps nothing here.
+ * only a turn that `begin` started records steps, so a compaction turn keeps nothing here. After
+ * `CONVERSATION_TRACE_STEP_LIMIT` steps it keeps no new step, but it counts them, so the trace can
+ * say that it is partial.
  */
 export class TurnTraces {
   readonly #turns = new Map<string, RunningTrace>();
 
   begin(turnId: string, startedAt: string): void {
-    this.#turns.set(turnId, { startedAt, steps: new Map() });
+    this.#turns.set(turnId, { startedAt, steps: new Map(), omitted: new Set() });
   }
 
   /**
@@ -56,7 +60,10 @@ export class TurnTraces {
     const now = new Date().toISOString();
     let step = trace.steps.get(itemId);
     if (!step) {
-      if (trace.steps.size >= CONVERSATION_TRACE_STEP_LIMIT) return;
+      if (trace.steps.size >= CONVERSATION_TRACE_STEP_LIMIT) {
+        trace.omitted.add(itemId);
+        return;
+      }
       step = { id: itemId, kind, startedAt: now, endedAt: null };
       trace.steps.set(itemId, step);
     }
@@ -79,7 +86,9 @@ export class TurnTraces {
     const trace = this.#turns.get(turnId);
     this.#turns.delete(turnId);
     if (!trace) return null;
-    return { startedAt: trace.startedAt, endedAt, steps: [...trace.steps.values()] };
+    const steps = [...trace.steps.values()];
+    if (trace.omitted.size === 0) return { startedAt: trace.startedAt, endedAt, steps };
+    return { startedAt: trace.startedAt, endedAt, steps, omittedSteps: trace.omitted.size };
   }
 
   drop(turnId: string): void {
