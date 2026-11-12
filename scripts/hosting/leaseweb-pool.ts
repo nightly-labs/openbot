@@ -72,6 +72,8 @@ const SANDBOX_MOVE = "/root/openbot-move";
 const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
+// boat restores the disk of an archived sandbox after the resume. Seen on 2026-11-12: some minutes.
+const RESTORE_WAIT_MS = 30 * 60_000;
 
 /** A SQL literal of a checked value. Wrangler takes no bound values, so each text must match a pattern. */
 function literal(value: string | number, pattern?: RegExp): string {
@@ -884,6 +886,19 @@ exit "$status"`;
       } else {
         // The Worker does not extend the lease any more. boat would stop the sandbox at its end.
         await this.#boat("PATCH", `/sandboxes/${sandbox}`, { ttlSeconds: 7200 });
+      }
+      // While boat restores the disk, a directory can show no files, and the export refuses to start.
+      const restoreDeadline = Date.now() + RESTORE_WAIT_MS;
+      const restoring =
+        "[ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ] && echo restoring || true";
+      if ((await this.#sandboxRun(sandbox, restoring)).includes("restoring")) {
+        logger.info(`boat restores the disk of sandbox ${sandbox}. Wait.`);
+        do {
+          if (Date.now() > restoreDeadline)
+            throw new Error(`boat did not restore the disk of sandbox ${sandbox} in 30 minutes.`);
+          await delay(15_000);
+        } while ((await this.#sandboxRun(sandbox, restoring)).includes("restoring"));
+        lap("Disk restored");
       }
       const output = await this.#sandboxRun(
         sandbox,
