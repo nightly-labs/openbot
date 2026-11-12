@@ -19,6 +19,7 @@ import {
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
+import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -102,6 +103,8 @@ export async function routeChannels(
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
     requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
+    // The codec drops the field for a peer without the capability, so the frame budget leaves it out too.
+    const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
     // Long messages, such as a member's thinking, make a page of fewer messages, so it fits one WebRTC
     // frame. The client reads the rest as older pages. A page larger than the frame cannot reach a
     // remote client.
@@ -109,6 +112,10 @@ export async function routeChannels(
       const page = channels.store.page(input.channelId, input.beforeSequence, limit);
       let body = {
         ...page,
+        tasks:
+          seenSubtasks && input.beforeSequence === undefined
+            ? channels.store.withSeenDependencies(input.channelId, page.tasks)
+            : page.tasks,
         channel: peerChannel(page.channel),
         messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
       };
