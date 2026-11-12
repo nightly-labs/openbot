@@ -2185,7 +2185,11 @@ export class ProviderRuntime implements ProviderPort {
                     Effect.as(null),
                     Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
                   ),
-                ).pipe(Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) })),
+                ).pipe(
+                  Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
+                  // A sign-in with no page stops, as a CLI code sign-in does.
+                  Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+                ),
                 submit() {
                   throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
                 },
