@@ -137,9 +137,9 @@ export class TeamWebRtcHostGateway {
   #signalHomed = false;
   // The moves since Signal last accepted the host. Each one doubles the time before the next.
   #signalMoves = 0;
-  // The account service refused a move for good. No move is sent until the next start, which
+  // The account service refused a Signal ticket for good. No move or renewal is sent until the next start, which
   // registers the host again and gets a new machine token.
-  #signalMoveRefused = false;
+  #signalRenewalRefused = false;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
@@ -183,7 +183,7 @@ export class TeamWebRtcHostGateway {
     this.#signalEnded = false;
     this.#signalHomed = ticketNamesSignalHome(input.ticket);
     this.#signalMoves = 0;
-    this.#signalMoveRefused = false;
+    this.#signalRenewalRefused = false;
     this.#localApiPort = input.localApiPort;
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
@@ -219,7 +219,7 @@ export class TeamWebRtcHostGateway {
       this.#localApiPort = null;
       this.#signalUrl = null;
       this.#signalMoves = 0;
-      this.#signalMoveRefused = false;
+      this.#signalRenewalRefused = false;
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
@@ -390,7 +390,7 @@ export class TeamWebRtcHostGateway {
       this.#signalMoveTimer !== null ||
       !this.#hostId ||
       !this.#signalHomed ||
-      this.#signalMoveRefused ||
+      this.#signalRenewalRefused ||
       !this.#options.renewSignal
     )
       return;
@@ -410,7 +410,7 @@ export class TeamWebRtcHostGateway {
   // as the failed one and can give the host another home. When the ticket request or the new
   // connection fails, the hidden window continues to connect and the host tries again later. When the
   // account service refuses the ticket for good, such as for a machine token that it no longer accepts
-  // (401), the host reports the failure and stops: a start registers it again.
+  // (401), the host stops asking: a start registers it again.
   readonly #moveSignal = (): void => {
     this.#signalMoveTimer = null;
     const hostId = this.#hostId;
@@ -428,19 +428,17 @@ export class TeamWebRtcHostGateway {
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
-            const refused = this.#options.renewalRefused?.(cause) === true;
-            if (refused) {
-              this.#signalMoveRefused = true;
-              this.#cancelSignalMove();
-              logger.warn("The account service refused the host Signal ticket; the host does not ask again.");
-            }
-            if (refused || this.#signalEnded) {
+            const refused = this.#noteRenewalRefused(cause);
+            if (this.#signalEnded) {
               this.#options.onSignalRecoveryFailure?.(
                 cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
                 `move ${refused ? "refused" : "failed"} after ${this.#lastSignalEnd ?? "a Signal close"}`,
               );
               return;
             }
+            // The socket still connects again to its home, which can come back. A long outage shows as
+            // the lost registration.
+            if (refused) return;
             logger.warn(
               `Host Signal move failed; the host tries again in ${Math.round(this.#signalMoveDelay() / 1000)} s.`,
             );
@@ -466,6 +464,7 @@ export class TeamWebRtcHostGateway {
       peerId !== this.#hostId ||
       !this.#options.renewSignal ||
       this.#signalRecovery ||
+      this.#signalRenewalRefused ||
       (code !== "authentication_required" && code !== "session_revoked")
     )
       return;
@@ -473,11 +472,12 @@ export class TeamWebRtcHostGateway {
       this.#recoverSignal(peerId).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
-            if (this.#hostId === peerId)
-              this.#options.onSignalRecoveryFailure?.(
-                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
-                `recovery failed after ${this.#lastSignalEnd ?? "a Signal error"}`,
-              );
+            if (this.#hostId !== peerId) return;
+            this.#noteRenewalRefused(cause);
+            this.#options.onSignalRecoveryFailure?.(
+              cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+              `recovery failed after ${this.#lastSignalEnd ?? "a Signal error"}`,
+            );
           }),
         ),
       ),
@@ -487,6 +487,17 @@ export class TeamWebRtcHostGateway {
       if (this.#signalRecovery === fiber) this.#signalRecovery = null;
     });
   };
+
+  // The account service refused a Signal ticket for good. No move or renewal is sent until the next
+  // start, which registers the host again.
+  #noteRenewalRefused(cause: unknown): boolean {
+    if (this.#options.renewalRefused?.(cause) !== true) return false;
+    if (!this.#signalRenewalRefused)
+      logger.warn("The account service refused the host Signal ticket; the host does not ask again.");
+    this.#signalRenewalRefused = true;
+    this.#cancelSignalMove();
+    return true;
+  }
 
   readonly #recoverSignal = Effect.fn("HostGateway.recoverSignal")(function* (
     this: TeamWebRtcHostGateway,

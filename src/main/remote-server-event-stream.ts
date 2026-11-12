@@ -156,6 +156,8 @@ export class RemoteEventStream {
   readonly #seenOnlineAt = new Map<string, number>();
   /** When the WebRTC transport last connected to each host. */
   readonly #transportConnectedAt = new Map<string, number>();
+  /** The WebRTC connections to each host in a sequence that dropped before they were healthy. */
+  readonly #transportDrops = new Map<string, number>();
   /** Hosted servers that start after a wake request. */
   readonly #startingHosts = new Set<string>();
   #appFocused = true;
@@ -198,6 +200,7 @@ export class RemoteEventStream {
     this.#offlineHosts.clear();
     this.#seenOnlineAt.clear();
     this.#transportConnectedAt.clear();
+    this.#transportDrops.clear();
     this.#transportAttempts.clear();
     this.#authenticationPaused.clear();
     yield* Scope.close(this.#scope, Exit.void);
@@ -256,38 +259,49 @@ export class RemoteEventStream {
   }
 
   /**
-   * The WebRTC transport connected. A pending retry is not necessary now, but the backoff stays until
-   * the connection is healthy, as for an HTTPS socket. A connection that dropped after some seconds
-   * used to clear it, so the next attempt ran after one second, and again after each drop.
+   * The WebRTC transport connected. A pending retry is not necessary now. The backoff starts again from
+   * the connections that dropped before they were healthy, not from the failed attempts of an outage.
+   * Before, each connection cleared it, so a connection that dropped after some seconds was tried again
+   * after one second, and again after each drop.
    */
   transportConnected(serverId: string): void {
-    const reconnectTimer = this.#reconnectTimers.get(serverId);
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    this.#reconnectTimers.delete(serverId);
-    this.#offlineHosts.delete(serverId);
-    this.#startingHosts.delete(serverId);
+    this.#cancelPendingReconnect(serverId);
+    const drops = this.#transportDrops.get(serverId);
+    if (drops) this.#reconnectAttempts.set(serverId, drops);
+    else this.#reconnectAttempts.delete(serverId);
     this.#transportConnectedAt.set(serverId, Date.now());
   }
 
   /**
    * The WebRTC transport disconnected. A connection that stayed healthy clears the backoff. The result
-   * is true when no retry failed since the last healthy connection: only that drop reads the host list
+   * is true for the first drop since the last healthy connection: only that drop reads the host list
    * again, not each drop of a connection that cannot stay up.
    */
   transportDisconnected(serverId: string): boolean {
     const connectedAt = this.#transportConnectedAt.get(serverId);
     this.#transportConnectedAt.delete(serverId);
-    if (connectedAt !== undefined && Date.now() - connectedAt >= REMOTE_EVENT_HEALTHY_MS)
+    if (connectedAt === undefined) return !this.#transportDrops.has(serverId);
+    if (Date.now() - connectedAt >= REMOTE_EVENT_HEALTHY_MS) {
+      this.#transportDrops.delete(serverId);
       this.#reconnectAttempts.delete(serverId);
-    return !this.#reconnectAttempts.has(serverId);
+      return true;
+    }
+    const drops = (this.#transportDrops.get(serverId) ?? 0) + 1;
+    this.#transportDrops.set(serverId, drops);
+    return drops === 1;
   }
 
   // The backoff no longer applies: the computer woke, or the user asked for the server again.
   clearReconnectBackoff(serverId: string): void {
+    this.#cancelPendingReconnect(serverId);
+    this.#reconnectAttempts.delete(serverId);
+    this.#transportDrops.delete(serverId);
+  }
+
+  #cancelPendingReconnect(serverId: string): void {
     const reconnectTimer = this.#reconnectTimers.get(serverId);
     if (reconnectTimer) clearTimeout(reconnectTimer);
     this.#reconnectTimers.delete(serverId);
-    this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
     this.#startingHosts.delete(serverId);
   }
@@ -419,6 +433,7 @@ export class RemoteEventStream {
     this.#offlineHosts.delete(serverId);
     this.#seenOnlineAt.delete(serverId);
     this.#transportConnectedAt.delete(serverId);
+    this.#transportDrops.delete(serverId);
     this.#startingHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);

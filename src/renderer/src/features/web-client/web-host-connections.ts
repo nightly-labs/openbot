@@ -154,7 +154,10 @@ export function createWebHostConnections(options: {
   channel: BroadcastChannel;
   actions: Pick<RemoteTeamPeerActions, "getBootstrap" | "endSession">;
   createPeer: typeof createRemoteTeamPeer;
-  /** The opened host's peer options apart from `waitForHost`, so a status connection can become it. */
+  /**
+   * The opened host's peer options apart from `waitForHost`, so a status connection can become it. A
+   * status connection also waits for the host, as the opened host does.
+   */
   peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols">;
   acquireHostLock: typeof acquireWebHostLock;
   /** Throws when the host identity differs from the pinned one. */

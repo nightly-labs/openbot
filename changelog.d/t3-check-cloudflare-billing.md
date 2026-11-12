@@ -7,9 +7,8 @@
 - The web client no longer asks for a new connection to an offline server about every 15 seconds. It
   shows the server as offline and connects when the server comes back.
 - A server that cannot reach its Signal machine now waits longer between each request for a new one,
-  up to 10 minutes. When the account service no longer accepts the server, the server shows an error
-  and stops these requests until it starts again.
+  up to 10 minutes. When the account service no longer accepts the server, the server stops these
+  requests until it starts again.
 - A server sends a Live Activity update to a phone only once when the phone signed in again, and it
   stops sending updates after iOS ends the activity at 8 hours.
-- The desktop app checks a joined server that is not a hosted server for a hosted status only each
-  6 hours.
+- The web client checks a server that is not a hosted server for a hosted status only each 6 hours.
