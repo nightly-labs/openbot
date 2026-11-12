@@ -12,6 +12,7 @@ import {
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
   isWorkflowMediaCredits,
+  isWorkflowMediaProviders,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
@@ -155,8 +156,7 @@ export function decodeRemoteWorkflowPicture(value: unknown): string {
 
 /** The `workflows-sunra-v1` providers route answers `{ sunra }`. */
 export function decodeRemoteWorkflowMediaProviders(value: unknown): { sunra: boolean } {
-  if (!isDynamicRecord(value) || typeof value.sunra !== "boolean")
-    throw new Error("Invalid remote workflow providers.");
+  if (!isWorkflowMediaProviders(value)) throw new Error("Invalid remote workflow providers.");
   return { sunra: value.sunra };
 }
 

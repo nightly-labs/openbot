@@ -18,7 +18,9 @@ import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Duration, Effect, Schema } from "effect";
+import { readLimitedBody } from "../limited-body";
 import { secureOAuthFetch } from "../mcp-oauth-provider";
+import { hostAddresses, isPublicAddress, systemAddressLookup } from "../network-address";
 import type { MediaImageRole } from "./workflow-walk";
 
 /** The host of Sunra's MCP server. An enabled http MCP row with this host is the Sunra connection. */
@@ -37,6 +39,10 @@ const SUNRA_POLL = { image: Duration.seconds(3), video: Duration.seconds(6) } as
 const SUNRA_CALL_TIMEOUT_MS = 120_000;
 /** A read of the credits that takes longer shows no credits. */
 const SUNRA_CREDITS_DEADLINE = Duration.seconds(20);
+/** The longest time for one upload of an input picture, and for the download of the file. */
+const SUNRA_TRANSFER_DEADLINE = { upload: Duration.minutes(2), download: Duration.minutes(5) } as const;
+/** How many `get_job` calls in a row can fail before the step fails. */
+const SUNRA_POLL_FAILURES = 3;
 /** The longest reason from Sunra that an error quotes. */
 const SUNRA_REASON_LIMIT = 300;
 
@@ -220,10 +226,18 @@ const uploadPicture = Effect.fnUntraced(function* (
       )
     : { "Content-Type": file.mimeType };
   const method = text(target.method) ?? "PUT";
+  // Sunra chooses the upload address. It must not point at this computer or its local network.
+  const addresses = yield* hostAddresses(new URL(uploadUrl), systemAddressLookup).pipe(Effect.mapError(() => failed()));
+  if (addresses.length === 0 || !addresses.every(isPublicAddress)) return yield* failed();
   const response = yield* Effect.tryPromise({
     try: (signal) => fetch(uploadUrl, { method, headers, body: bytes, signal, redirect: "error" }),
     catch: () => failed(),
-  });
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: SUNRA_TRANSFER_DEADLINE.upload,
+      orElse: () => Effect.fail(fail(sourceText("error.workflow.sunraTimeout"))),
+    }),
+  );
   if (!response.ok) return yield* failed();
   return assetUrl;
 });
@@ -252,8 +266,18 @@ function taskId(answer: DynamicRecord): string | null {
 
 /** Asks for the job until it is done, and answers the address of its file. */
 const waitForFile = Effect.fnUntraced(function* (client: Client, task: string, kind: WorkflowMediaKind) {
+  let failures = 0;
   while (true) {
-    const job = yield* callTool(client, "get_job", { task_id: task });
+    // A short network failure must not lose a job that Sunra already charged for.
+    const answer = yield* callTool(client, "get_job", { task_id: task }).pipe(Effect.result);
+    if (answer._tag === "Failure") {
+      failures += 1;
+      if (failures >= SUNRA_POLL_FAILURES) return yield* answer.failure;
+      yield* Effect.sleep(SUNRA_POLL[kind]);
+      continue;
+    }
+    failures = 0;
+    const job = answer.success;
     const status = (text(job.task_status) ?? text(job.status) ?? "").toUpperCase();
     if (status === "COMPLETED" || status === "SUCCEEDED" || status === "SUCCESS") {
       const urls = Array.isArray(job.urls) ? job.urls : [];
@@ -279,18 +303,27 @@ const MEDIA_TYPES: Record<string, string> = {
 
 /** Downloads the file, with the size limit of a stored attachment. */
 const download = Effect.fnUntraced(function* (url: string, kind: WorkflowMediaKind) {
-  const response = yield* Effect.tryPromise({
-    try: (signal) => fetch(url, { signal }),
-    catch: () => failed(),
-  });
-  // A redirect must stay on Sunra's file hosts.
-  if (!response.ok || !isSunraMedia(response.url || url)) return yield* failed();
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > ATTACHMENT_LIMITS.fileBytes)
-    return yield* fail(
+  const tooLarge = () =>
+    fail(
       sourceText(kind === "video" ? "error.backend.generatedVideoTooLarge" : "error.backend.generatedImageTooLarge"),
     );
-  const bytes = new Uint8Array(yield* Effect.tryPromise({ try: () => response.arrayBuffer(), catch: () => failed() }));
+  const { response, bytes } = yield* Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: (signal) => fetch(url, { signal }),
+      catch: () => failed(),
+    });
+    // A redirect must stay on Sunra's file hosts.
+    if (!response.ok || !isSunraMedia(response.url || url)) return yield* failed();
+    const bytes = yield* readLimitedBody(response, ATTACHMENT_LIMITS.fileBytes, (reason) =>
+      reason === "too-large" ? tooLarge() : failed(),
+    );
+    return { response, bytes: new Uint8Array(bytes) };
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: SUNRA_TRANSFER_DEADLINE.download,
+      orElse: () => Effect.fail(fail(sourceText("error.workflow.sunraTimeout"))),
+    }),
+  );
   if (bytes.byteLength === 0) return yield* failed();
   const header = (response.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
   const mimeType = MEDIA_TYPES[header] ? header : kind === "video" ? "video/mp4" : "image/png";
@@ -338,7 +371,7 @@ export const generateSunraMedia = Effect.fn("generateSunraMedia")(function* (
         aspect_ratio: request.specs.aspect,
         ...(request.specs.resolution ? { resolution: request.specs.resolution } : {}),
         auto_confirm: true,
-        // The Personal account makes one file for a repeated request with this id.
+        // A new id for each run: Sunra makes one file for one id, so a resent create does not charge twice.
         ...(team ? {} : { request_id: `openbot-${randomUUID()}` }),
       };
       const first = urls("first")[0];

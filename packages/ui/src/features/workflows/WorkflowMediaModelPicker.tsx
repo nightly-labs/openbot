@@ -163,7 +163,10 @@ export function MediaModelPicker(props: {
     const [key = "", id = ""] = value.split("|");
     const entry = entries().find((candidate) => candidate.key === key);
     const model = props.models.find((candidate) => candidate.id === id);
-    if (entry && model && value !== selected()) props.onChange(model, entry.accountId);
+    // The same row also saves again when the step keeps an account that its payer no longer has.
+    const stored = props.account === DEFAULT_PROVIDER_ACCOUNT_ID ? "" : props.account;
+    if (entry && model && (value !== selected() || stored !== (entry.accountId ?? "")))
+      props.onChange(model, entry.accountId);
     setOpen(false);
   };
   const selected = () => (props.model ? rowValue(current(), props.model.id) : undefined);
