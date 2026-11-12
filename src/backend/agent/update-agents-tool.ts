@@ -9,7 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { agentReasoningEffort, requestedRuntime, requestedToolModel } from "./model-tools";
+import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableProvider } from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -52,7 +52,13 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
     senderAgentId: string,
     hooks: Pick<
       OpenBotToolRouterHooks,
-      "listAgents" | "listModels" | "agentModels" | "providerAccounts" | "updateAgent" | "redactMcp"
+      | "listAgents"
+      | "listModels"
+      | "agentModels"
+      | "providerAccounts"
+      | "providerStatuses"
+      | "updateAgent"
+      | "redactMcp"
     >,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
     const { agentIds, provider, model, reasoningEffort, access, computerUse, notifications } =
@@ -70,7 +76,8 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       const accountOnly = AGENT_PROVIDERS.flatMap((id) =>
         (hooks.providerAccounts(id) ?? []).flatMap((account) => account.models ?? []),
       );
-      requestedToolModel(runtimeRequest, [...hooks.listModels(), ...accountOnly]);
+      const named = requestedToolModel(runtimeRequest, [...hooks.listModels(), ...accountOnly]);
+      if (named) requireRunnableProvider(named, hooks.providerStatuses());
     }
     const failed = (agentId: string, message: string): AgentResult => ({ agentId, ok: false, error: message });
     const failure = (agentId: string, cause: unknown) =>

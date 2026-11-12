@@ -143,6 +143,7 @@ import {
   requestedRuntime,
   requestedToolModel,
   requireReasoningEffort,
+  requireRunnableProvider,
 } from "./model-tools";
 import {
   createAgentToolSchema,
@@ -2596,6 +2597,7 @@ export class OpenBotToolRouter {
       // Checked before the agent exists: a named model the provider does not list, or an effort the
       // model does not support, is an error the calling agent can correct, never a silent default.
       const named = requestedToolModel(args, listed);
+      if (named) requireRunnableProvider(named, this.#hooks.providerStatuses());
       // A request that names no provider and no model gives the new agent the caller's own model, so
       // a team that one agent recruits runs where that agent runs. When the caller's provider no
       // longer lists that model, the new agent starts where one the user creates does.
@@ -2738,6 +2740,14 @@ export class OpenBotToolRouter {
         runtimeRequest,
         this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
       );
+      // Only a change is refused: an agent that names the model it has keeps the other fields of the call.
+      if (
+        runtime.provider !== undefined &&
+        runtime.model !== undefined &&
+        (runtime.provider !== target.provider || runtime.model !== target.model)
+      ) {
+        requireRunnableProvider({ provider: runtime.provider, id: runtime.model }, this.#hooks.providerStatuses());
+      }
       // The model and account the agent has after this call.
       const ownProvider = runtime.provider ?? target.provider;
       const own: AgentModelChoice = {

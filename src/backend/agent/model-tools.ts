@@ -66,7 +66,37 @@ function toolModel(model: AgentModelOption): ToolModel {
 }
 
 /** A provider row of the settings page, as `list_models` reads it. */
-export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message" | "accounts">;
+
+/**
+ * Whether an agent can run on the provider now or soon, as the model picker lets the user choose its
+ * models: it runs, starts or is checked, or one of its accounts is connected. The catalogue keeps a
+ * built-in list of some providers' models when they are signed out or missing, so a listed model is
+ * no proof (#7866). A provider with no row has nothing against it. Custom agents share one row,
+ * and one that fails does not stop the others.
+ */
+export function providerCanRun(provider: AgentProvider, statuses: readonly ProviderStatusRow[]): boolean {
+  const row = statuses.find((candidate) => candidate.id === provider);
+  if (!row || provider === "acp") return true;
+  if (row.off) return false;
+  return (
+    row.state === "available" ||
+    row.state === "checking" ||
+    row.state === "not-started" ||
+    (row.accounts?.some((account) => account.state === "connected") ?? false)
+  );
+}
+
+/** Refuses a model whose provider cannot run, so an agent does not get one that never answers (#7866). */
+export function requireRunnableProvider(
+  model: Pick<AgentModelOption, "provider" | "id">,
+  statuses: readonly ProviderStatusRow[],
+): void {
+  if (providerCanRun(model.provider, statuses)) return;
+  throw new AgentSettingsRefused(
+    sourceText("error.agent.modelProviderNotConnected", { model: model.id, provider: providerLabel(model.provider) }),
+  );
+}
 
 /** The states in which a provider that is on lists no model until the user acts in its settings. */
 const NEEDS_USER_STATES: ReadonlySet<AgentProviderState> = new Set(["sign-in-required", "outdated", "error"]);
@@ -113,6 +143,7 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * only it serves, never its email, its credentials or its folder. A provider that is on but lists no model until the user signs in,
  * updates or repairs it is in `unavailableProviders`, with the text of its settings row and where
  * that row is: without it, the agent could not tell the user why the provider is missing (#6053).
+ * A provider that cannot run lists no model, also when the catalogue keeps its built-in models (#7866).
  * A provider that the request names is there in each state in which it has no model, also when it is
  * off or not downloaded: a CLI of the user's own on `PATH` does not make it available, and the agent
  * got an empty list with no reason (#7647). A list of all providers leaves those rows out.
@@ -140,7 +171,7 @@ export function listModelsPayload(
   const providers = AGENT_PROVIDERS.filter((id) => request.provider === undefined || id === request.provider).flatMap(
     (id) => {
       const fallback = providerDefault(id, models);
-      if (!fallback) return [];
+      if (!fallback || !providerCanRun(id, statuses)) return [];
       const own = models.filter((model) => model.provider === id);
       const candidates = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
       let listed: AgentModelOption[];
