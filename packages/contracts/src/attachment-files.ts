@@ -1,11 +1,11 @@
 export const IMAGE_ATTACHMENT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif"] as const;
 
-export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "mov"] as const;
+export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "wav", "m4a", "aac", "flac", "ogg", "opus", "mov"] as const;
 
-export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
+export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip", "tar", "gz", "tgz", "7z", "rar"] as const;
 
 /** MP4 came after `media-attachments`, so a remote host advertises it with its own capability. */
-export const MP4_ATTACHMENT_EXTENSIONS = ["mp4"] as const;
+export const MP4_ATTACHMENT_EXTENSIONS = ["mp4", "webm", "mkv"] as const;
 
 /**
  * SVG came after the other types, so a remote host advertises it with its own capability. An SVG is
@@ -146,7 +146,7 @@ export function supportedAttachmentExtensions(support: Omit<AttachmentSupport, "
 
 export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
-  "images, MP3 audio, MOV or MP4 video, ZIP archives, PDF, Office documents, EML, text, Markdown, data, or source files";
+  "images, audio, video, archives, PDF, Office documents, EML, text, Markdown, data, or source files";
 
 export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -225,12 +225,37 @@ export function attachmentMimeTypeForName(name: string) {
       return "image/avif";
     case "mp3":
       return "audio/mpeg";
+    case "wav":
+      return "audio/wav";
+    case "m4a":
+      return "audio/mp4";
+    case "aac":
+      return "audio/aac";
+    case "flac":
+      return "audio/flac";
+    case "ogg":
+      return "audio/ogg";
+    case "opus":
+      return "audio/opus";
     case "mov":
       return "video/quicktime";
     case "mp4":
       return "video/mp4";
+    case "webm":
+      return "video/webm";
+    case "mkv":
+      return "video/x-matroska";
     case "zip":
       return "application/zip";
+    case "tar":
+    case "tgz":
+      return "application/x-tar";
+    case "gz":
+      return "application/gzip";
+    case "7z":
+      return "application/x-7z-compressed";
+    case "rar":
+      return "application/vnd.rar";
     case "pdf":
       return "application/pdf";
     // An SVG attachment keeps this type for its preview, but it is a `file` attachment, not an
