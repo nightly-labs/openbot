@@ -13,6 +13,7 @@ import { readFile } from "node:fs/promises";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -102,6 +103,23 @@ function sunraFailure(text: string | null): SunraMediaFailed {
 const unauthorized = (cause: unknown) =>
   cause instanceof UnauthorizedError || (cause instanceof StreamableHTTPError && cause.code === 401);
 
+/**
+ * The SDK transport behind the SDK's own `Transport` type. The SDK class declares `sessionId` and its
+ * callbacks without `undefined`, so `exactOptionalPropertyTypes` refuses the class itself.
+ */
+function forwardingTransport(inner: StreamableHTTPClientTransport): Transport {
+  const transport: Transport = {
+    start: () => inner.start(),
+    send: (message, options) => inner.send(message, options),
+    close: () => inner.close(),
+    setProtocolVersion: (version) => inner.setProtocolVersion(version),
+  };
+  inner.onclose = () => transport.onclose?.();
+  inner.onerror = (error) => transport.onerror?.(error);
+  inner.onmessage = (message) => transport.onmessage?.(message);
+  return transport;
+}
+
 /** A Client on Sunra's server with one token, closed when the scope ends. */
 function connect(url: string, token: string) {
   return Effect.acquireRelease(
@@ -112,7 +130,7 @@ function connect(url: string, token: string) {
           fetch: secureOAuthFetch({ resource: url, mcpTraffic: true }),
           requestInit: { headers: { Authorization: `Bearer ${token}` } },
         });
-        await client.connect(transport, { signal });
+        await client.connect(forwardingTransport(transport), { signal });
         return client;
       },
       catch: (cause) => cause,
