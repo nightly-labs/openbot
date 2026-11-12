@@ -204,8 +204,16 @@ export const queryKeys = {
   providerAccounts: (scope: QueryScope, serverId: string) => ["provider-accounts", ...scope, serverId],
   /** The custom ACP agents of a host. A save or a removal answers with the whole list. */
   customAgents: (scope: QueryScope, serverId: string) => ["custom-agents", ...scope, serverId],
-  /** The custom endpoints of a host. A save or a removal answers with the whole list. */
-  customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
+  /**
+   * The custom endpoints of a host. A save or a removal answers with the whole list. Only the
+   * `custom-provider-edit-v1` list has the header names that Edit needs, so it has its own key.
+   */
+  customProviders: (scope: QueryScope, serverId: string, edits: boolean) => [
+    "custom-providers",
+    ...scope,
+    serverId,
+    edits ? "edit" : "list",
+  ],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
   /** Who gets each MCP server of a host. A change answers with the whole snapshot. */
