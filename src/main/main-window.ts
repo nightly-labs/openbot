@@ -71,7 +71,12 @@ import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
-import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
+import {
+  followWindowButtonSide,
+  followWindowButtons,
+  WINDOW_BUTTON_INSET,
+  windowButtonOptions,
+} from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
@@ -250,15 +255,9 @@ export function createMainWindowController({
           ? getTranslate()("window.localClientTitle")
           : getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      // The dots are drawn over the renderer, so this position is a layout value, not a chrome
-      // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
-      // it 11px clear of the 82px where the top row's first control starts, in the app frame and in
-      // the full-bleed browser header alike, and y 13 puts its centre line within half a pixel of
-      // both of those rows. The setup window below uses the same offsets. In a right-to-left language
-      // the group is at the top right with the same offsets (`window-buttons.ts`).
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      // No system title bar: the window buttons are in the top row of the page (`window-buttons.ts`).
+      // The setup window below uses the same macOS offsets.
+      ...windowButtonOptions(),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -338,7 +337,7 @@ export function createMainWindowController({
       });
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
-    followWindowButtonSide(window, getLayoutDirection);
+    followWindowButtons(window, getLayoutDirection);
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
@@ -398,9 +397,7 @@ export function createMainWindowController({
       // The page sets the chat name as its title when it loads.
       title: getTranslate()("window.localHostTitle"),
       icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
-        : {}),
+      ...windowButtonOptions(),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -431,7 +428,7 @@ export function createMainWindowController({
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
-    followWindowButtonSide(window, getLayoutDirection);
+    followWindowButtons(window, getLayoutDirection);
     announceChatWindows();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     url.searchParams.set("window", "chat");

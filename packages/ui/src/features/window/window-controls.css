@@ -1,0 +1,40 @@
+/* The window buttons (`WindowControls.tsx`): fixed at the top inline-end corner of the window, as
+ * system buttons are, so they do not move when the rows below them change. The close button ends 8px
+ * from the window edge, as the first rail button starts 8px from the other edge. The buttons have the
+ * size, the icons and the centre line of the buttons in the top row, 20px below the top. The group
+ * starts with 9px for the short line that the top row draws before it (`window.css`). It stays above
+ * dialogs and stays usable while a modal dialog turns off pointer events on the page. Only a tooltip
+ * is above it. */
+.window-controls {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-tooltip) - 1);
+  top: calc(20px - var(--openbot-control-sm) / 2);
+  inset-inline-end: var(--openbot-space-2);
+  display: flex;
+  margin: 0;
+  border: 0;
+  gap: var(--openbot-space-0-5);
+  padding-block: 0;
+  padding-inline: calc(var(--openbot-space-2) + 1px) 0;
+  color: var(--openbot-text-muted);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls > .ui-icon-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+/* The three glyphs fill about the same 10px box, as system window buttons do: Lucide draws its square
+ * larger and its cross smaller than its line. A 20px icon takes the lighter stroke (`tokens.css`). */
+.window-controls-box {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.window-controls-cross {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
+}

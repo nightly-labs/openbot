@@ -1,15 +1,23 @@
+import { IPC_ENDPOINTS, type WindowControlsState } from "@openbot/contracts/ipc";
 import type { LayoutDirection } from "@openbot/i18n";
-import { app, type BrowserWindow } from "electron";
+import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
+import { sendToRenderer } from "./renderer-ipc";
 
 /**
- * The macOS window buttons sit at the inline start of the page: the top left in a left-to-right
- * language and the top right in Arabic and Hebrew, as in other right-to-left macOS apps. The renderer keeps its top
- * row clear of them with `padding-inline-start`.
+ * The app and chat windows hide the system title bar, so their top row is the top of the window.
+ *
+ * macOS: the system draws its three buttons over the page, at the inline start: the top left in a
+ * left-to-right language and the top right in Arabic and Hebrew, as in other right-to-left macOS
+ * apps. The renderer keeps its top row clear of them with `padding-inline-start`.
  *
  * AppKit puts the buttons on the right only when Chromium's own locale is right to left, and Chromium
  * reads its locale once, at launch. The app language can change while the app runs, and it can have
  * the other direction from the system. Then the buttons are measured from the far edge, again after
  * each resize, because `setWindowButtonPosition` counts from the edge that AppKit starts at.
+ *
+ * Windows: the system draws no buttons. The page shows minimize, maximize or restore, and close at
+ * the end of its top row (`WindowControls` in `@openbot/ui`), and asks for them through the
+ * `windowControls` IPC group. Linux keeps the system title bar (#3126).
  */
 
 /** The offset of the button group from the top corner, as in every window with these buttons. */
@@ -25,6 +33,41 @@ const placements = new WeakMap<BrowserWindow, () => void>();
 function chromiumDirection(): LayoutDirection {
   const language = app.getLocale().split("-")[0]?.toLowerCase() ?? "";
   return RIGHT_TO_LEFT_LANGUAGES.has(language) ? "rtl" : "ltr";
+}
+
+/** The constructor options of an app or chat window: no system title bar on macOS and Windows. */
+export function windowButtonOptions(): Pick<BrowserWindowConstructorOptions, "titleBarStyle" | "trafficLightPosition"> {
+  // The dots are drawn over the renderer, so this position is a layout value, not a chrome detail.
+  // x 12 leaves the 59px group 11px clear of the 82px where the top row's first control starts, in
+  // the app frame and in the full-bleed browser header alike, and y 13 puts its centre line within
+  // half a pixel of both of those rows.
+  if (process.platform === "darwin") return { titleBarStyle: "hidden", trafficLightPosition: WINDOW_BUTTON_INSET };
+  if (process.platform === "win32") return { titleBarStyle: "hidden" };
+  return {};
+}
+
+export function windowControlsState(window: BrowserWindow): WindowControlsState {
+  return { maximized: window.isMaximized(), fullScreen: window.isFullScreen() };
+}
+
+/**
+ * Keeps the window buttons of a window made with `windowButtonOptions` in place until it closes: on
+ * macOS at the inline start of `direction()`; on Windows, the page's buttons on the window state.
+ */
+export function followWindowButtons(window: BrowserWindow, direction: () => LayoutDirection): void {
+  if (process.platform === "win32") followWindowControls(window);
+  else followWindowButtonSide(window, direction);
+}
+
+/** Tells the page when the window is maximized, restored, or in or out of full screen. */
+function followWindowControls(window: BrowserWindow): void {
+  const send = () => {
+    if (!window.isDestroyed()) sendToRenderer(window, IPC_ENDPOINTS.windowControls.state, windowControlsState(window));
+  };
+  window.on("maximize", send);
+  window.on("unmaximize", send);
+  window.on("enter-full-screen", send);
+  window.on("leave-full-screen", send);
 }
 
 /** Keeps the buttons of `window` at the inline start of `direction()`. No effect outside macOS. */

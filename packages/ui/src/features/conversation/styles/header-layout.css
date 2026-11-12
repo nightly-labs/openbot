@@ -6,7 +6,14 @@
   justify-content: space-between;
   border-bottom: 0;
   padding-block: 0;
-  padding-inline: 8px 12px;
+  /* The window buttons, where the window has them, reach into the end of the header by
+   * `--window-controls-reach` (`window.css`), less the side panel that ends the chat before them.
+   * The header then ends 8px before them. */
+  --window-controls-overlap: max(
+    0px,
+    calc(var(--window-controls-reach, 0px) - var(--conversation-header-end-inset, 0px))
+  );
+  padding-inline: 8px max(12px, calc(var(--openbot-space-2) + var(--window-controls-overlap)));
   background: transparent;
 }
 

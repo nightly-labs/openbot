@@ -1262,7 +1262,10 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-3);
-  padding-inline: var(--openbot-space-3) var(--openbot-space-4);
+  /* The row ends 8px before the window buttons where the window has them (`--window-controls-reach`). */
+  --window-controls-overlap: var(--window-controls-reach, 0px);
+  padding-inline: var(--openbot-space-3)
+    max(var(--openbot-space-4), calc(var(--openbot-space-2) + var(--window-controls-overlap)));
 }
 
 .library-path,

@@ -119,6 +119,7 @@ import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { vaultIpcHandlers } from "./ipc/vault-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { windowControlsIpcHandlers } from "./ipc/window-controls-handlers";
 import { workflowIpcHandlers } from "./ipc/workflow-handlers";
 import { KeepAwake } from "./keep-awake";
 import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
@@ -905,6 +906,9 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
+    ...windowControlsIpcHandlers({
+      isAppWindow: (window) => window === windowHolder.current || windows.getChatWindows().includes(window),
+    }),
     ...backgroundProcessIpcHandlers({
       platform: process.platform,
       agents: () => service.listAgents(),

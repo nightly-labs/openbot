@@ -108,3 +108,4 @@ export * from "./mobile-connect";
 export * from "./skill-conversation-events";
 export * from "./skill-suggestion-events";
 export * from "./ui-blocks";
+export * from "./window-controls";

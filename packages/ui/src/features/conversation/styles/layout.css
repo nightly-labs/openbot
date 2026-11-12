@@ -6,9 +6,21 @@
   min-width: 0;
   flex-direction: column;
   background: var(--openbot-bg-canvas);
-  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+  /* The end inset of the header moves with the end padding, so in each frame the header keeps the
+   * window buttons clear as far as they reach into it (`header-layout.css`). */
+  transition:
+    padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1),
+    --conversation-header-end-inset var(--panel-resize-duration, var(--openbot-duration-overlay))
     cubic-bezier(0.22, 1, 0.36, 1);
   --conversation-column-width: clamp(1440px, 65vw, 1920px);
+}
+
+/* A length, so that it can move with the end padding of the conversation panel. It is the part of the
+ * panel's end that a side panel takes from the chat (`remote-desktop.css`, `panel-layout.css`). */
+@property --conversation-header-end-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
 }
 
 /*

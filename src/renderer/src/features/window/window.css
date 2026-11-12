@@ -33,6 +33,56 @@
   --top-row-padding-inline: var(--openbot-space-2) var(--openbot-space-3);
 }
 
+/* The window buttons of a window without a system title bar (`DesktopWindowControls.tsx`) take
+ * `--window-controls-room` from the end of the window. `--window-controls-reach` is the part of that
+ * room past the end of the frame: how far the buttons reach into a top row that ends there. Both are
+ * 0 without the buttons. `--window-frame-end` is the end padding of the frame: the thin frame and the
+ * card's line, and the agent dock column when the dock is in the window. Each top row that the
+ * buttons can reach sets `--window-controls-overlap`, how far they reach into it from its end, and
+ * ends 8px before them. The values follow the layout in each frame, also while a panel opens. */
+.app-window > .app-frame-edge {
+  --window-frame-end: 0px;
+  --window-controls-reach: max(0px, calc(var(--window-controls-room, 0px) - var(--window-frame-end)));
+}
+
+/* The short line between the controls of a top row and the window buttons, as before the side panel
+ * button. Only a window with the buttons has it (`data-window-controls`). The row draws it at the
+ * start of the buttons, and only when the row has controls at its end, so no line shows with nothing
+ * before it. It shows only while the overlap is more than 0, so not in a chat header that a side
+ * panel ends before them. The rows start at the top of the window, so the line has the centre line
+ * of the buttons. */
+:where(:root[data-window-controls])
+:where(
+  .conversation-header,
+  .page-header,
+  .library-path-head,
+  .image-lightbox-toolbar,
+  .browser-full-top,
+  .settings-page
+) {
+  position: relative;
+}
+
+:where(:root[data-window-controls])
+  :where(
+    .conversation-header,
+    .side-panel-header:has(> .side-panel-actions > *),
+    .page-header:has(> .page-header-identity + *),
+    .library-path-head,
+    .image-lightbox-toolbar,
+    .browser-full-top,
+    .settings-page
+  )::after {
+  position: absolute;
+  top: calc(20px - var(--openbot-icon-lg) / 2);
+  inset-inline-end: max(0px, calc(var(--window-controls-overlap, 0px) - 1px));
+  width: clamp(0px, var(--window-controls-overlap, 0px), 1px);
+  height: var(--openbot-icon-lg);
+  background: var(--openbot-border-strong);
+  content: "";
+  pointer-events: none;
+}
+
 /* The frame below the edge layout keeps its own shape, so the rail would only take width. */
 @media (max-width: 720px) {
   .app-window > .window-rail {
@@ -269,10 +319,11 @@
    * card, and the panes have no background of their own, so the card's line and its four rounded
    * corners show. The padding keeps the panes inside the card's line. */
   .app-window > .app-frame-edge {
+    --window-frame-end: calc(var(--window-edge) + 1px);
     position: relative;
     isolation: isolate;
     padding-block: 0 calc(var(--window-edge) + 1px);
-    padding-inline: 0 calc(var(--window-edge) + 1px);
+    padding-inline: 0 var(--window-frame-end);
     background: var(--window-frame);
   }
 
@@ -296,7 +347,7 @@
    * (`DOCK_WIDTH` in `agent-dock-motion.ts`), so it does not cover the card. */
   .app-window > .app-frame-edge.app-frame-agent-dock {
     --agent-dock-column: calc(64px - var(--window-edge) - 1px);
-    padding-inline-end: calc(var(--window-edge) + 1px + var(--agent-dock-column));
+    --window-frame-end: calc(var(--window-edge) + 1px + var(--agent-dock-column));
   }
 
   .app-window > .app-frame-edge.app-frame-agent-dock::before {
@@ -502,6 +553,9 @@
     flex-wrap: nowrap;
     padding-block: var(--top-row-padding-block);
     padding-inline: var(--top-row-padding-inline);
+    /* The header ends 8px before the window buttons where the window has them. */
+    --window-controls-overlap: var(--window-controls-reach, 0px);
+    padding-inline-end: max(var(--openbot-space-3), calc(var(--openbot-space-2) + var(--window-controls-overlap)));
     border-bottom: 0;
     -webkit-app-region: drag;
   }
@@ -771,6 +825,8 @@
   min-height: 0;
   grid-template-columns: max(var(--left-panel-width, 280px), 220px) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
+  /* Close ends the top row of the page, 8px before the window buttons where the window has them. */
+  --window-controls-overlap: var(--window-controls-reach, 0px);
 }
 
 .settings-page-path-row {
@@ -780,8 +836,8 @@
   grid-row: 1;
   align-items: center;
   padding-block: var(--openbot-space-4) 0;
-  /* The room of the Close button. */
-  padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4));
+  /* The room of the Close button, and of the window buttons after it where the window has them. */
+  padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4) + var(--window-controls-reach, 0px));
 }
 
 .settings-page-path-row:empty {
@@ -796,7 +852,8 @@
   grid-row: 1;
   align-self: center;
   justify-self: end;
-  margin-inline-end: var(--openbot-space-3);
+  /* 8px before the window buttons where the window has them (`--window-controls-reach`). */
+  margin-inline-end: max(var(--openbot-space-3), calc(var(--openbot-space-2) + var(--window-controls-reach, 0px)));
 }
 
 /* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */

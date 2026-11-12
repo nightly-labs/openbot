@@ -1482,6 +1482,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     macAutomation: {
       request: async (targets) => targets.map((target) => ({ target, status: "granted" })),
     },
+    windowControls: {
+      getState: async () => ({ maximized: false, fullScreen: false }),
+      minimize: async () => undefined,
+      toggleMaximize: async () => undefined,
+      close: async () => undefined,
+      onState: () => () => undefined,
+    },
     backgroundProcesses: {
       list: async () => clone(backgroundProcesses),
       stop: async (id) => {
