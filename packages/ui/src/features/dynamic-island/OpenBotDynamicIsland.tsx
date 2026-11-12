@@ -131,11 +131,12 @@ const OPENBOT_COMPACT_HOVER_MOTION = {
   translateY: 4,
 } as const;
 /**
- * The answers on the question card that the island shows. The card closes when the island shuts, so the
- * answers stay here, and the card opens again at the next unanswered question. A question has the first
- * place on the island, so when the island shows something else, the prompt has ended and its answers go.
+ * The answers on question cards, by server and agent: an agent has one prompt at a time. The card closes
+ * when the island shuts, so the answers stay here, and the card opens again at the next unanswered
+ * question. A question has the first place on the island, so when the island shows no question, no prompt
+ * waits and the answers go.
  */
-let questionCardAnswers: { key: string; answers: Record<string, string[]> } | undefined;
+const questionCardAnswers = new Map<string, { requestKey: string; answers: Record<string, string[]> }>();
 const QUESTION_PROGRESS_DURATION = 300;
 const QUESTION_PROGRESS_BLUR = 2;
 const COMPACT_LEADING_SIZE = 20;
@@ -449,12 +450,9 @@ function measureCompactText(text: string, weight: number): number {
 export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Element {
   const { t } = useText();
   createEffect(
-    () => {
-      const presentation = props.presentation;
-      return presentation.mode === "question" ? questionCardKey(presentation.serverId, presentation.item) : undefined;
-    },
-    (key) => {
-      if (questionCardAnswers?.key !== key) questionCardAnswers = undefined;
+    () => props.presentation.mode === "question",
+    (question) => {
+      if (!question) questionCardAnswers.clear();
     },
   );
   const initialPresentation = untrack(() => props.presentation);
@@ -1364,10 +1362,6 @@ export function ApprovalContent(props: {
   );
 }
 
-function questionCardKey(serverId: string, item: DynamicIslandPromptItem): string {
-  return JSON.stringify([serverId, item.agent.id, item.requestId, item.questions.map((question) => question.id)]);
-}
-
 function QuestionContent(props: {
   item: DynamicIslandPromptItem;
   serverId: string;
@@ -1379,8 +1373,14 @@ function QuestionContent(props: {
   onClose: () => void;
 }): JSX.Element {
   const { t } = useText();
-  const cardKey = createMemo(() => questionCardKey(props.serverId, props.item));
-  const savedAnswers = () => (questionCardAnswers?.key === cardKey() ? questionCardAnswers.answers : {});
+  const agentKey = () => JSON.stringify([props.serverId, props.item.agent.id]);
+  const requestKey = createMemo(() =>
+    JSON.stringify([props.item.requestId, props.item.questions.map((question) => question.id)]),
+  );
+  const savedAnswers = () => {
+    const saved = questionCardAnswers.get(agentKey());
+    return saved?.requestKey === requestKey() ? saved.answers : {};
+  };
   const [questionIndex, setQuestionIndex] = createSignal(untrack(() => Object.keys(savedAnswers()).length));
   const [answers, setAnswers] = createSignal<Record<string, string[]>>(untrack(savedAnswers));
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
@@ -1389,7 +1389,7 @@ function QuestionContent(props: {
   let questionAnimations: Animation[] = [];
   let questionDisposed = false;
   let questionTransitionVersion = 0;
-  createEffect(cardKey, () => {
+  createEffect(requestKey, () => {
     questionTransitionVersion += 1;
     cancelQuestionAnimations();
     clearQuestionHidden(questionTransitionElements());
@@ -1434,7 +1434,7 @@ function QuestionContent(props: {
     if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
     if (questionIndex() < questions().length - 1) {
-      questionCardAnswers = { key: cardKey(), answers: nextAnswers };
+      questionCardAnswers.set(agentKey(), { requestKey: requestKey(), answers: nextAnswers });
       props.onHaptic?.();
       void showNextQuestion(nextAnswers);
       return;

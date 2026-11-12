@@ -4,7 +4,8 @@
 // 3. The pointer on the island expands it.
 // 4. Text typed in the inline reply is sent with Return.
 // 5. A click on Approve answers an approval request.
-// 6. A multi-question card keeps its answers when the island shuts and opens again.
+// 6. A multi-question card keeps its answers when the island shuts and opens again, and when another
+//    agent's card comes first for a time. A prompt that ended keeps no answers.
 // 7. A switch to another workspace keeps the island on the screen.
 // 8. With the pointer away, an idle island keeps its greeting and its logo still: it uses little CPU and
 //    does not send a new shape. The pointer on the island changes the greetings again. The greeting
@@ -152,6 +153,18 @@ const QUESTION: DynamicIslandPresentation = {
         ],
       },
     ],
+  },
+};
+const OTHER_QUESTION: DynamicIslandPresentation = {
+  serverId: "local",
+  mode: "question",
+  remainingCount: 1,
+  item: {
+    requestId: "request-3",
+    agent: { ...AGENT, id: "agent-2", name: "Bo", avatarSeed: "agent-2" },
+    title: "Bo asks",
+    detail: null,
+    questions: [{ id: "deploy", header: "Deploy", question: "Deploy now?", isSecret: false, options: null }],
   },
 };
 const WORKING: DynamicIslandPresentation = {
@@ -317,8 +330,9 @@ try {
   );
   steps.push({ step: "click on Approve answers the request" });
 
-  // 6. A multi-question card keeps its answers when the island shuts and opens again. A prompt that ended
-  // keeps none: the same request again starts at the first question.
+  // 6. A multi-question card keeps its answers when the island shuts and opens again, also after the card
+  // of another agent comes first for a time. A prompt that ended keeps none: the same request again starts
+  // at the first question.
   await leave(app, desktop);
   await showQuestion(app);
   await hoverOpen(app, desktop, island);
@@ -330,6 +344,10 @@ try {
   assert.equal(await questionText(app), FIRST_QUESTION, "a prompt that ended keeps no answers");
   await answerFirstQuestion(app, desktop, island);
   await leave(app, desktop);
+  await app.publish(OTHER_QUESTION);
+  await until(async () => await islandTextIncludes(app, "Bo"), "the question of the other agent");
+  await app.publish(QUESTION);
+  await until(async () => !(await islandTextIncludes(app, "Bo")), "the question again");
   await hoverOpen(app, desktop, island);
   const reopened = await questionText(app);
   screenshot(session, "05-question-reopened");
@@ -522,14 +540,14 @@ async function showQuestion(app: App): Promise<void> {
     "the idle island",
   );
   await app.publish(QUESTION);
-  await until(
-    async () =>
-      await app.eval(
-        "island",
-        "document.querySelector('[data-slot=\"dynamic-island\"]')?.textContent?.includes('Ada') === true",
-        decodeBoolean,
-      ),
-    "the question",
+  await until(async () => await islandTextIncludes(app, "Ada"), "the question");
+}
+
+function islandTextIncludes(app: App, text: string): Promise<boolean> {
+  return app.eval(
+    "island",
+    `document.querySelector('[data-slot="dynamic-island"]')?.textContent?.includes(${JSON.stringify(text)}) === true`,
+    decodeBoolean,
   );
 }
 
