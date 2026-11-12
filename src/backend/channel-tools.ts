@@ -77,8 +77,10 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_forget_memory",
     description:
-      "Delete one saved channel memory when the user asks the channel to forget it. Give its text exactly as it is listed.",
-    shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
+      "Delete one saved channel memory when the user asks the channel to forget it. Give the memoryId from its line.",
+    // One optional property keeps the advertised schema in its byte budget. A model can give a memory
+    // text, or the whole `[memoryId] text` line, here too: the service then matches the text.
+    shape: { memoryId: z.string().max(INPUT_LIMITS.agentMemoryText).optional() },
   },
   {
     name: "channel_add_member",

@@ -47,17 +47,39 @@ export class ChannelMemoryStore extends MemoryStore {
   }
 
   /**
-   * `channel_forget_memory` names the text, not an id: the model never sees a memory id. An exact,
-   * case-sensitive match wins first: `MemoryStore#save` does not merge entries that differ only by
-   * case, so two such entries can coexist, and forgetting one must not delete the other instead.
-   * Only when no exact match exists does this fall back to a case-insensitive match, since a model
-   * or user retypes the fact from memory rather than copying it verbatim.
+   * The fallback of `channel_forget_memory` when it has no `memoryId`. An exact, case-sensitive
+   * match wins first: `MemoryStore#save` does not merge entries that differ only by case, so two
+   * such entries can coexist, and forgetting one must not delete the other instead. Then a
+   * case-insensitive match, since a model retypes the fact rather than copying it verbatim. Last, a
+   * match that also ignores line breaks, full-width forms, quote and dash styles, because the packet
+   * shows each memory on one line and a model rewrites punctuation (#7428). That match must select
+   * exactly one memory: no part of a text selects a memory.
    */
   deleteByText(channelId: string, text: string): boolean {
     const target = text.trim();
     const entries = this.list(channelId);
-    const exact = entries.find((entry) => entry.text === target);
-    const memory = exact ?? entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase());
+    const memory =
+      entries.find((entry) => entry.text === target) ??
+      entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase()) ??
+      onlySimilar(entries, target);
     return memory ? this.delete(channelId, memory.id) : false;
   }
+}
+
+/** The one entry whose folded text is the folded target, or nothing when none or several match. */
+function onlySimilar(entries: ChannelMemory[], target: string): ChannelMemory | undefined {
+  const folded = foldMemoryText(target);
+  const similar = entries.filter((entry) => foldMemoryText(entry.text) === folded);
+  return similar.length === 1 ? similar[0] : undefined;
+}
+
+/** Compatibility forms (full-width punctuation, `…`), quote and dash styles, whitespace, and case. */
+function foldMemoryText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .replace(/[\u2018-\u201f"`]/gu, "'")
+    .replace(/[\u2010-\u2015\u2212]/gu, "-")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLowerCase();
 }
