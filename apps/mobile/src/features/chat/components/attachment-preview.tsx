@@ -150,7 +150,9 @@ const COPY_TEXT_BYTES = 1024 * 1024;
  * clipboard does not hold other files.
  */
 export function copiesToClipboard(attachment: Pick<AttachmentSummary, "kind" | "previewKind" | "size">): boolean {
-  return savesToPhotos(attachment) || (attachment.previewKind === "text" && attachment.size <= COPY_TEXT_BYTES);
+  // The clipboard takes an image as one Base64 string, so a large image stays out of JS memory, as in the viewer.
+  if (savesToPhotos(attachment)) return attachment.size <= MOBILE_ATTACHMENT_BYTES;
+  return attachment.previewKind === "text" && attachment.size <= COPY_TEXT_BYTES;
 }
 
 /** A name that a folder takes: no path separators or control characters. */
