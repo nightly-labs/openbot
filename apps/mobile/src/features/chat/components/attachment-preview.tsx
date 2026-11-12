@@ -132,10 +132,13 @@ function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileU
   }
 }
 
-/** The Base64 of a file, read from its kept copy when the data has none. */
-async function fileBase64(data: RemoteFileUpload & { fileUri?: string }): Promise<string> {
-  if (data.base64 || !data.fileUri) return data.base64;
-  return new File(data.fileUri).base64();
+/**
+ * Writes a downloaded file to `file`. Data with no Base64 copies its kept file, so a large file is
+ * not read back into memory.
+ */
+async function writeFileData(file: File, data: RemoteFileUpload & { fileUri?: string }) {
+  if (data.base64 || !data.fileUri) file.writeSync(data.base64, { encoding: "base64" });
+  else await new File(data.fileUri).copy(file);
 }
 
 type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
@@ -170,7 +173,7 @@ function attachmentFileQuery(
 /** A copy of a downloaded file with an extension, in a folder the caller deletes. */
 async function writeCopy(folder: Directory, name: string, data: RemoteFileUpload & { fileUri?: string }) {
   const file = new File(folder, name);
-  file.writeSync(await fileBase64(data), { encoding: "base64" });
+  await writeFileData(file, data);
   return file;
 }
 
@@ -227,7 +230,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
       file = new File(Paths.cache, `${Date.now()}-${name}`);
-      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
+      await writeFileData(file, result.data);
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
       void haptics.notification("error");
@@ -260,7 +263,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       // The photo library reads the type from the extension, so the file keeps one.
       const extension = imageExtension(attachment, result.data.mimeType);
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
-      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
+      await writeFileData(file, result.data);
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
