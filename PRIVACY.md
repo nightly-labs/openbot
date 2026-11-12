@@ -520,6 +520,18 @@ boat dashboard: `openbot-`, the plan, your account email with each other charact
 first 8 characters of the server ID, such as `openbot-starter-ada-example-com-1a2b3c4d`. boat keeps
 the name with the sandbox.
 
+An operator can move a Standard or Pro server from boat to a virtual server that OpenBot rents from
+[Leaseweb](https://www.leaseweb.com) in Amsterdam, the Netherlands. The operator copies the server's
+disk over SSH, and deletes the copy after the move. The virtual server then holds the server's
+workspaces, conversations, attachments, browser data and team data, as the sandbox did, and runs
+all the time, with no stop after the last use. boat keeps the old sandbox until the server is
+deleted. The account service stores the Leaseweb server ID with the server. So that an operator can
+find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
+email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
+delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
+sandbox, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
+its reference to `pool-free`.
+
 ## Central data retention
 
 Cloudflare runs a maintenance task once each day. The task removes:
