@@ -751,11 +751,7 @@ export const IPC_ENDPOINTS = {
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
-    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
-      "app:set-busy-message-mode",
-    ),
     getAgentDefaults: request<undefined, AgentDefaults>()("app:get-agent-defaults"),
-    setAgentDefaults: request<AgentDefaults, AgentDefaults>()("app:set-agent-defaults"),
     getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
     // Server settings set the limit of this computer (`hostAdmin.setAgentMemoryLimit`), here or from a
     // joined admin, so main tells the window.

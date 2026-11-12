@@ -229,10 +229,13 @@ try {
   }
   assert.deepEqual(pageErrors, [], "The renderer reported an error while the defaults changed.");
 } finally {
-  await page.evaluate((defaults) => window.openbot.setAgentDefaults(defaults), originalDefaults);
   await page.evaluate(
-    (steer) => window.openbot.setBusyMessageModePreference({ mode: steer ? "steer" : "queue" }),
-    originalSteer,
+    ([defaults, steer]) =>
+      window.openbot.agent.updateAgentDefaultsOverview(
+        { ...defaults, busyMessageMode: steer ? "steer" : "queue" },
+        "local",
+      ),
+    [originalDefaults, originalSteer] as const,
   );
   // The settings of the window still hold the values that the test chose, and the next change in
   // Settings would save them again. A reload reads the restored values from main.
