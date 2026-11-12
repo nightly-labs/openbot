@@ -52,15 +52,96 @@ const NAMES_NEXT_STEP = new RegExp(
  * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
  * The continuation note does not approve a risky action in any case.
  */
-const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch)`;
+const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch|query|consult|fetch|retrieve|pull)`;
+/** The "-ing" form of work verbs, for "I'm checking the connector." "Looking forward …" and "running late" are not in it. */
+const WORK_GERUND = String.raw`(?:(?:re-?)?running(?!\s+(?:late|low|out|behind)\b)|checking|testing|fixing|updating|editing|writing|creating|adding|building|installing|opening|reading|looking\s+(?:at|into|up|for|through)|searching|inspecting|reviewing|verifying|trying|applying|implementing|refactoring|debugging|configuring|generating|downloading|compiling|patching|querying|consulting|fetching|retrieving|pulling)`;
+/** The start of the last sentence. */
+const SENTENCE_START = String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)`;
 /**
  * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
  * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …", "I'll keep an eye on
  * it." and "I'll update you …" do not match.
  */
 const ANNOUNCES_WORK = new RegExp(
-  String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
   "i",
+);
+/**
+ * A last sentence that says that the work runs now, such as "I'm checking the connector now." or, with
+ * a closing ellipsis, "Checking the connector…". Nothing runs after the turn ends, so the turn stopped
+ * before that work.
+ */
+const STATES_WORK = new RegExp(
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|so)[,:]?\s+)*(?:(?:i['’]m|i\s+am)\s+(?:now\s+)?${WORK_GERUND}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${WORK_GERUND}\b${NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
+  "i",
+);
+
+/** Portuguese work verbs, as infinitives. Verbs that send, publish or delete are not in it. */
+const PT_WORK_VERBS = [
+  "rodar",
+  "executar",
+  "verificar",
+  "checar",
+  "conferir",
+  "testar",
+  "corrigir",
+  "consertar",
+  "atualizar",
+  "editar",
+  "escrever",
+  "criar",
+  "adicionar",
+  "compilar",
+  "instalar",
+  "abrir",
+  "ler",
+  "procurar",
+  "buscar",
+  "pesquisar",
+  "inspecionar",
+  "revisar",
+  "analisar",
+  "investigar",
+  "consultar",
+  "acessar",
+  "baixar",
+  "carregar",
+  "listar",
+  "obter",
+  "puxar",
+  "aplicar",
+  "implementar",
+  "renomear",
+  "mover",
+  "refatorar",
+  "depurar",
+  "validar",
+  "tentar",
+  "iniciar",
+  "começar",
+  "continuar",
+  "terminar",
+  "finalizar",
+  "configurar",
+  "gerar",
+];
+const PT_WORK_VERB = `(?:${PT_WORK_VERBS.join("|")})(?!\\p{L})`;
+/** The gerund of each verb: "consultar" gives "consultando", "ler" gives "lendo". */
+const PT_WORK_GERUND = `(?:${PT_WORK_VERBS.map((verb) => verb.replace(/r$/, "ndo")).join("|")})(?!\\p{L})`;
+/**
+ * The Portuguese form of `NOT_WAITING`: an offer to the user ("se você quiser"), the user's approval
+ * ("sua confirmação"), or a later time ("mais tarde", "amanhã"). JavaScript's `\b` sees only ASCII
+ * letters, so no `\b` follows an accented letter.
+ */
+const PT_NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*(?:\b(?:se|quando|assim\s+que|depois\s+que|logo\s+que|caso)\s+(?:você|voce|vc|o\s+senhor|a\s+senhora)|\b(?:sua|tua)\s+(?:aprovação|aprovacao|confirmação|confirmacao|autorização|autorizacao|permissão|permissao|resposta)|\bmais\s+tarde|\bamanh|\bpróxima\s+(?:semana|vez)|\bdepois\s+(?:te|lhe)\s+(?:aviso|retorno|falo)|\b(?:retorno|volto)\s+(?:em|mais|depois)))`;
+/**
+ * A Portuguese last sentence that announces the next work ("Vou consultar o conector agora."), says
+ * that it runs now ("Estou consultando o conector."), or, with a closing ellipsis, only names it
+ * ("Consultando o conector…").
+ */
+const PT_ANNOUNCES_WORK = new RegExp(
+  String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|certo|beleza|agora|então|primeiro|em\s+seguida)[,:]?\s+)*(?:(?:(?:eu\s+)?(?:vou|irei)\s+(?:agora\s+|já\s+|primeiro\s+)?|deix[ae](?:-me|\s+eu)\s+)${PT_WORK_VERB}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|(?:eu\s+)?(?:estou|tô)\s+(?:agora\s+)?${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
+  "iu",
 );
 
 /** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
@@ -91,7 +172,9 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
   if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
-  return NAMES_NEXT_STEP.test(text.slice(-160)) || ANNOUNCES_WORK.test(text.replace(/[*_`>#]/g, "").trimEnd());
+  if (NAMES_NEXT_STEP.test(text.slice(-160))) return true;
+  const plain = text.replace(/[*_`>#]/g, "").trimEnd();
+  return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
 }
 
 interface ContinuationCount {
