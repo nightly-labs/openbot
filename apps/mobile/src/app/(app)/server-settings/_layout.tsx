@@ -69,6 +69,8 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="custom-provider" options={{ title: t("mobile.server.route.provider") }} />
       <Stack.Screen name="mcp" options={{ title: t("mobile.server.route.mcp") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
+      {/* The page names its MCP server. */}
+      <Stack.Screen name="mcp-server-agents" options={{ title: t("mobile.server.mcp.access.agents") }} />
       <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       {/* The page names its item. */}

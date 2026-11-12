@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { useSyncExternalStore } from "react";
 
@@ -37,6 +38,13 @@ export interface MessageActionsRequest {
   sendToChannel?: MessageChannelTargets;
   /** Asks, then deletes the message for everyone. Unset where the reader cannot delete it. */
   onDelete?: () => void;
+  /** The files of the message, which the sheet copies, shares and saves. Unset for a message without files. */
+  files?: MessageFiles;
+}
+
+export interface MessageFiles {
+  serverId: string;
+  attachments: readonly AttachmentSummary[];
 }
 
 export interface MessageChannelTargets {

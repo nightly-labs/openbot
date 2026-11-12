@@ -1,11 +1,10 @@
 import {
-  BILLING_CURRENCIES,
   BILLING_INTERVALS,
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
 } from "@openbot/contracts/billing";
-import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
+import { catalogCurrencies, type HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_BUNDLE_DISCOUNT_PERCENT,
   LICENSE_INCLUDED_USERS,
@@ -22,7 +21,8 @@ import {
 import type { AppTextKey } from "@openbot/i18n";
 import { Button } from "@openbot/ui/button";
 import { RadioGroup } from "@openbot/ui/complex";
-import type { JSX } from "@solidjs/web";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui/select";
+import { type JSX, Portal } from "@solidjs/web";
 import { type Accessor, createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
@@ -39,7 +39,7 @@ type ServerChoice = BillingPlanId | "none";
 export interface OrderFormProps {
   /** The server plans with their prices. With none, the form sells only the license. */
   plans: readonly HostedServerCatalogPlan[];
-  /** The first currency. */
+  /** The first currency. A currency that the plans do not have, such as BRL on some catalogs, gives EUR. */
   currency?: BillingCurrency | undefined;
   /** A Stripe customer pays in one currency, so an account with open subscriptions cannot change it. */
   currencyLocked?: boolean | undefined;
@@ -53,8 +53,12 @@ export interface OrderFormProps {
   licenseTrialEnd?: number | undefined;
   initialServer?: BillingPlanId | null | undefined;
   initialLicense?: LicenseTier | null | undefined;
+  /** The title of the choice without a server. The app runs on the user's computer, so it says so. */
+  noServerTitle?: string | undefined;
   /** Shows left of the switches, such as the heading of the page. */
   heading?: (() => JSX.Element) | undefined;
+  /** Puts the switches in this element, such as the header of an app page, and not above the form. */
+  controlsMount?: HTMLElement | undefined;
   /** The buttons beside the total. They read the order when the user acts. */
   action: (order: Accessor<OrderFormOrder>) => JSX.Element;
   /**
@@ -83,13 +87,17 @@ function noBreak(text: string): string {
   return text.replaceAll(" ", " ");
 }
 
-/** The price for one month of a plan, in minor units. On yearly billing it is the yearly price divided by 12. */
+/**
+ * The price for one month of a plan, in minor units. On yearly billing it is the yearly price divided by 12.
+ * It is 0 in a currency that the plan does not have; the form offers only the currencies of the catalog.
+ */
 export function planMonthlyPrice(
   plan: HostedServerCatalogPlan,
   interval: BillingInterval,
   currency: BillingCurrency,
 ): number {
   const prices = plan.prices[currency];
+  if (!prices) return 0;
   return interval === "month" ? prices.month : Math.round(prices.year / 12);
 }
 
@@ -99,8 +107,9 @@ export function planMonthlyPrice(
  */
 export function yearlyDiscountPercent(plans: readonly HostedServerCatalogPlan[], currency: BillingCurrency): number {
   const discounts = plans.map((plan) => {
-    const twelveMonths = plan.prices[currency].month * 12;
-    return twelveMonths > 0 ? Math.floor(((twelveMonths - plan.prices[currency].year) * 100) / twelveMonths) : 0;
+    const prices = plan.prices[currency];
+    const twelveMonths = (prices?.month ?? 0) * 12;
+    return prices && twelveMonths > 0 ? Math.floor(((twelveMonths - prices.year) * 100) / twelveMonths) : 0;
   });
   return discounts.length === 0 ? 0 : Math.max(0, Math.min(...discounts));
 }
@@ -157,6 +166,40 @@ function Segment<T extends string>(props: {
         )}
       </For>
     </RadioGroup.Root>
+  );
+}
+
+/**
+ * The currency as a menu, for a page header with little space. The options change only with the catalog:
+ * the menu must not get a new options array on each change.
+ */
+function CurrencySelect(props: {
+  label: string;
+  options: BillingCurrency[];
+  value: BillingCurrency;
+  disabled?: boolean | undefined;
+  onChange: (value: BillingCurrency) => void;
+}) {
+  return (
+    <Select<BillingCurrency>
+      class="order-form-currency-select"
+      options={props.options}
+      value={props.value}
+      disabled={props.disabled ?? false}
+      onChange={(value) => {
+        if (value && value !== props.value) props.onChange(value);
+      }}
+      placement="bottom-end"
+      sameWidth={false}
+      itemComponent={(itemProps) => (
+        <SelectItem item={itemProps.item}>{itemProps.item.rawValue.toUpperCase()}</SelectItem>
+      )}
+    >
+      <SelectTrigger size="sm" aria-label={props.label}>
+        <SelectValue<BillingCurrency>>{(state) => state.selectedOption().toUpperCase()}</SelectValue>
+      </SelectTrigger>
+      <SelectContent />
+    </Select>
   );
 }
 
@@ -335,19 +378,23 @@ export function OrderForm(props: OrderFormProps) {
   const serverTitleId = `order-form-servers-${id}`;
   const licenseTitleId = `order-form-license-${id}`;
   const [interval, setInterval] = createSignal<BillingInterval>("year");
-  const [currency, setCurrency] = createSignal<BillingCurrency>(untrack(() => props.currency) ?? "eur");
+  const [chosenCurrency, setCurrency] = createSignal<BillingCurrency>(untrack(() => props.currency) ?? "eur");
   const plans = () => props.plans;
+  /** BRL is in the catalog only when each Stripe Price has it. A form without plans sells in the base currencies. */
+  const currencies = createMemo(() => catalogCurrencies(plans()));
+  // A locked currency is the currency of the Stripe customer: a change to EUR only gets a refusal.
+  const currency = (): BillingCurrency => {
+    const chosen = chosenCurrency();
+    return props.currencyLocked || currencies().includes(chosen) ? chosen : "eur";
+  };
+  const shownCurrencies = (): BillingCurrency[] =>
+    currencies().includes(currency()) ? [...currencies()] : [...currencies(), currency()];
   const minTeam = () => clamp(props.used ?? 0, LICENSE_INCLUDED_USERS, LICENSE_MAX_USERS);
   const starterFits = () => (props.used ?? 0) <= 1;
   const [serverId, setServerId] = createSignal<ServerChoice>(untrack(() => props.initialServer) ?? "none");
   const [license, setLicense] = createSignal<LicenseChoice>(untrack(() => props.initialLicense) ?? "none");
-  // Users and server members are the same people, so the Team license starts with every member of the server.
-  const [members, setMembers] = createSignal(
-    untrack(() => {
-      const plan = props.plans.find((item) => item.id === props.initialServer);
-      return clamp(Math.max(plan?.memberLimit ?? 0, props.used ?? 0), LICENSE_INCLUDED_USERS, LICENSE_MAX_USERS);
-    }),
-  );
+  // The Team license starts with its included users, or with the people who use the servers now when they are more.
+  const [members, setMembers] = createSignal(untrack(minTeam));
 
   const server = (): HostedServerCatalogPlan | undefined => plans().find((plan) => plan.id === serverId());
   const isYearly = () => interval() === "year";
@@ -452,11 +499,44 @@ export function OrderForm(props: OrderFormProps) {
       if (license() === "team") setLicense(starterFits() ? "starter" : "none");
       return;
     }
-    setMembers(clamp(Math.max(plan.memberLimit, minTeam()), LICENSE_INCLUDED_USERS, teamMax()));
+    setMembers(clamp(members(), minTeam(), teamMax()));
   };
   const pickLicense = (choice: LicenseChoice) => setLicense(choice);
   const hasServers = () => plans().length > 0;
   const heading = () => props.heading?.();
+  const controls = () => (
+    <div class="order-form-controls">
+      <Segment
+        label={t("billing.order.billing")}
+        options={BILLING_INTERVALS.map((option) => ({
+          id: option,
+          label: option === "month" ? t("billing.order.monthly") : t("billing.order.yearly"),
+        }))}
+        value={interval()}
+        onChange={setInterval}
+      />
+      <Show
+        when={props.controlsMount}
+        fallback={
+          <Segment
+            label={t("billing.order.currency")}
+            options={shownCurrencies().map((option) => ({ id: option, label: option.toUpperCase() }))}
+            value={currency()}
+            disabled={props.currencyLocked}
+            onChange={setCurrency}
+          />
+        }
+      >
+        <CurrencySelect
+          label={t("billing.order.currency")}
+          options={shownCurrencies()}
+          value={currency()}
+          disabled={props.currencyLocked}
+          onChange={setCurrency}
+        />
+      </Show>
+    </div>
+  );
 
   const order = createMemo<OrderFormOrder>(() => {
     const choice = license();
@@ -477,27 +557,17 @@ export function OrderForm(props: OrderFormProps) {
 
   return (
     <div class={cx("order-form", props.class)} data-servers={hasServers() ? "" : undefined}>
-      <div class="order-form-top">
-        {heading()}
-        <div class="order-form-controls">
-          <Segment
-            label={t("billing.order.billing")}
-            options={BILLING_INTERVALS.map((option) => ({
-              id: option,
-              label: option === "month" ? t("billing.order.monthly") : t("billing.order.yearly"),
-            }))}
-            value={interval()}
-            onChange={setInterval}
-          />
-          <Segment
-            label={t("billing.order.currency")}
-            options={BILLING_CURRENCIES.map((option) => ({ id: option, label: option.toUpperCase() }))}
-            value={currency()}
-            disabled={props.currencyLocked}
-            onChange={setCurrency}
-          />
-        </div>
-      </div>
+      <Show
+        when={props.controlsMount}
+        fallback={
+          <div class="order-form-top">
+            {heading()}
+            {controls()}
+          </div>
+        }
+      >
+        {(mount) => <Portal mount={mount()}>{controls()}</Portal>}
+      </Show>
 
       <div class="order-form-frame">
         <Show when={hasServers()}>
@@ -520,7 +590,7 @@ export function OrderForm(props: OrderFormProps) {
             >
               <ChoiceRow
                 value="none"
-                title={t("billing.order.server.none")}
+                title={props.noServerTitle ?? t("billing.order.server.none")}
                 detail={t("billing.order.server.noneDetail")}
                 price={0}
                 currency={currency()}

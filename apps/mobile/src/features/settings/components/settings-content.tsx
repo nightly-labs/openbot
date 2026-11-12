@@ -199,7 +199,13 @@ export function SettingsRow({
       {content}
     </ListGroup.Item>
   ) : (
-    <View className="min-h-12 flex-row items-center gap-3 px-4 py-3" onLayout={onRowLayout}>
+    <View
+      accessibilityState={disabled ? { disabled } : undefined}
+      className="min-h-12 flex-row items-center gap-3 px-4 py-3"
+      // The same dimming as a disabled row with an action, such as a row with a picker.
+      style={disabled ? { opacity: 0.45 } : undefined}
+      onLayout={onRowLayout}
+    >
       {content}
     </View>
   );

@@ -49,6 +49,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -145,6 +146,7 @@ import {
 import { createBrowserActions } from "@/features/workspace/context/browser-actions";
 import {
   createHostRequestActions,
+  createHostRequestChecks,
   hostKeepsAgentColors,
   hostOwnsHide,
   readHostAgentColors,
@@ -198,6 +200,7 @@ import { type QueryScope, queryKeys } from "@/features/workspace/model/query-key
 import {
   hasCapability,
   requireCapability,
+  type ServerCapabilities,
   SIDEBAR_LAYOUT_CAPABILITY,
   supportsBrowserView,
 } from "@/features/workspace/model/server-capabilities";
@@ -240,6 +243,7 @@ import type {
   MobileWorkspaceActions,
   MobileWorkspaceContextValue,
   MobileWorkspaceState,
+  ServerChecks,
 } from "@/features/workspace/model/workspace-types";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 import { isAndroid } from "@/shared/lib/platform";
@@ -2401,30 +2405,130 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [agents, activeServer.id, hiddenAgentIds],
   );
   const state = useMemo<MobileWorkspaceState>(() => {
-    /** An owner or admin of an online host that serves `capability`. The host checks the role again. */
-    const administers = (serverId: string, capability: string) => {
-      const server = servers.find((candidate) => candidate.id === serverId);
-      return Boolean(
-        server &&
-          showsOnline(server) &&
-          canAdministerServer(server.role) &&
-          hasCapability(serverCapabilities.current, serverId, capability),
-      );
-    };
     /**
-     * The same rule as `serverCanManageMcp` on the desktop: an owner or admin of an online host that
-     * serves `mcp-servers-v1`, or a member when the host also serves `mcp-member-access-v1`. The host
-     * lets a member change only the servers that the member added.
+     * The checks of the role and the capabilities of a server. The workspace uses the capabilities of
+     * the connection; `knownServerChecks` uses those of the last connection, as if the host were online.
      */
-    const managesMcp = (serverId: string) =>
-      administers(serverId, MCP_SERVERS_CAPABILITY) ||
-      Boolean(
-        servers.some((server) => server.id === serverId && showsOnline(server)) &&
-          hasCapability(serverCapabilities.current, serverId, MCP_SERVERS_CAPABILITY) &&
-          hasCapability(serverCapabilities.current, serverId, MCP_MEMBER_ACCESS_CAPABILITY),
-      );
+    const serverChecks = (
+      capabilities: ServerCapabilities,
+      online: (server: MobileServer) => boolean,
+    ): ServerChecks => {
+      /** An owner or admin of an online host that serves `capability`. The host checks the role again. */
+      const administers = (serverId: string, capability: string) => {
+        const server = servers.find((candidate) => candidate.id === serverId);
+        return Boolean(
+          server &&
+            online(server) &&
+            canAdministerServer(server.role) &&
+            hasCapability(capabilities, serverId, capability),
+        );
+      };
+      /**
+       * The same rule as `serverCanManageMcp` on the desktop: an owner or admin of an online host that
+       * serves `mcp-servers-v1`, or a member when the host also serves `mcp-member-access-v1`. The host
+       * lets a member change only the servers that the member added.
+       */
+      const managesMcp = (serverId: string) =>
+        administers(serverId, MCP_SERVERS_CAPABILITY) ||
+        Boolean(
+          servers.some((server) => server.id === serverId && online(server)) &&
+            hasCapability(capabilities, serverId, MCP_SERVERS_CAPABILITY) &&
+            hasCapability(capabilities, serverId, MCP_MEMBER_ACCESS_CAPABILITY),
+        );
+      return {
+        ...createHostRequestChecks(capabilities),
+        canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+        canRotateServerKey: (serverId) =>
+          servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
+          administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
+        canCreateLocalServers: (serverId) =>
+          servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
+          administers(serverId, LOCAL_SERVERS_CAPABILITY),
+        canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+        canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
+        canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
+        canManageServerPersonality: (serverId) => administers(serverId, HOST_PERSONALITY_CAPABILITY),
+        servesServerPersonality: (serverId) => {
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return Boolean(
+            server && online(server) && hasCapability(capabilities, serverId, HOST_PERSONALITY_CAPABILITY),
+          );
+        },
+        canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
+        canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
+        hasAgentAccessLimits: (serverId) => {
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return Boolean(
+            server &&
+              online(server) &&
+              !canAdministerServer(server.role) &&
+              hasCapability(capabilities, serverId, AGENT_ACCESS_CAPABILITY),
+          );
+        },
+        canManageConnectors: (serverId) => administers(serverId, CONNECTORS_CAPABILITY),
+        canManageOnePasswordConnector: (serverId) => administers(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY),
+        canManageBitwardenConnector: (serverId) => administers(serverId, BITWARDEN_CONNECTOR_CAPABILITY),
+        canManageWhatsAppConnector: (serverId) => administers(serverId, WHATSAPP_CONNECTOR_CAPABILITY),
+        canManagePasswordManagers: (serverId) => administers(serverId, PASSWORD_MANAGERS_CAPABILITY),
+        canManageVault: (serverId) => administers(serverId, VAULT_CAPABILITY),
+        canImportVault: (serverId) => administers(serverId, VAULT_IMPORT_CAPABILITY),
+        // Any member imports agents; only an owner or admin moves the whole server.
+        canImportAgents: (serverId) =>
+          servers.some((server) => server.id === serverId && online(server)) &&
+          hasCapability(capabilities, serverId, AGENT_IMPORT_CAPABILITY),
+        canTransferServer: (serverId) => administers(serverId, INSTANCE_TRANSFER_CAPABILITY),
+        canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
+        canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
+        canManageBrowserProxies: (serverId) => administers(serverId, BROWSER_PROXIES_CAPABILITY),
+        // The same rule as the Updates section of the desktop Server Settings.
+        serverUpdateAccess: (serverId) => {
+          if (administers(serverId, HOST_UPDATE_CAPABILITY)) return "admin";
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return server &&
+            online(server) &&
+            !canAdministerServer(server.role) &&
+            hasCapability(capabilities, serverId, HOST_MEMBER_UPDATE_CAPABILITY)
+            ? "member"
+            : null;
+        },
+        canReadServerRelease: (serverId) => hasCapability(capabilities, serverId, HOST_RELEASE_CAPABILITY),
+        canViewHostedSites: (serverId) =>
+          servers.some((server) => server.id === serverId && online(server)) &&
+          hasCapability(capabilities, serverId, HOSTED_SITES_CAPABILITY),
+        canDeleteHostedSites: (serverId) => administers(serverId, HOSTED_SITES_CAPABILITY),
+        canManageProviders: (serverId) => administers(serverId, PROVIDERS_ADMIN_CAPABILITY),
+        canManageMcpServers: managesMcp,
+        canRelayMcpSignIn: (serverId) =>
+          managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
+        canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
+        canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
+        canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),
+        canManageEvents: (serverId) => administers(serverId, EVENTS_CAPABILITY),
+        canManageMissedRuns: (serverId) =>
+          administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_RECOVERY_CAPABILITY),
+        canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
+        canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
+        canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
+        canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
+        canNestSidebarFolders: (serverId) => hasCapability(capabilities, serverId, SIDEBAR_FOLDERS_CAPABILITY),
+        canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
+        canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
+        canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),
+        canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
+        canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
+        canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+        canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
+        canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
+        canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
+      };
+    };
     return {
-      ...hostRequests.checks,
+      ...serverChecks(serverCapabilities.current, showsOnline),
+      // A server that is not connected shows the rows of its last connection, disabled.
+      knownServerChecks: (serverId) => {
+        const known = serverCapabilities.current.get(serverId) ?? keptCapabilities.current.get(serverId);
+        return known ? serverChecks(new Map([[serverId, known]]), () => true) : null;
+      },
       browserViewSupport: browser.browserViewSupport,
       sidebarByServer,
       servers: orderedServers,
@@ -2447,103 +2551,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canUnhideAgent: (agentId) =>
         !hostHiddenIds.includes(agentId) ||
         hostOwnsHide(serverCapabilities.current.get(activeServer.id), activeServer.role),
-      canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
-      canRotateServerKey: (serverId) =>
-        servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
-        administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
       localServerKind: (serverId) =>
         localServerLinks.computers.has(serverId)
           ? "computer"
           : localServerLinks.parents.has(serverId)
             ? "onComputer"
             : null,
-      canCreateLocalServers: (serverId) =>
-        servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
-        administers(serverId, LOCAL_SERVERS_CAPABILITY),
-      canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
-      canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
-      canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
-      canManageServerPersonality: (serverId) => administers(serverId, HOST_PERSONALITY_CAPABILITY),
-      servesServerPersonality: (serverId) => {
-        const server = servers.find((candidate) => candidate.id === serverId);
-        return Boolean(
-          server &&
-            showsOnline(server) &&
-            hasCapability(serverCapabilities.current, serverId, HOST_PERSONALITY_CAPABILITY),
-        );
-      },
-      canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
-      canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
-      hasAgentAccessLimits: (serverId) => {
-        const server = servers.find((candidate) => candidate.id === serverId);
-        return Boolean(
-          server &&
-            showsOnline(server) &&
-            !canAdministerServer(server.role) &&
-            hasCapability(serverCapabilities.current, serverId, AGENT_ACCESS_CAPABILITY),
-        );
-      },
-      canManageConnectors: (serverId) => administers(serverId, CONNECTORS_CAPABILITY),
-      canManageOnePasswordConnector: (serverId) => administers(serverId, ONEPASSWORD_CONNECTOR_CAPABILITY),
-      canManageBitwardenConnector: (serverId) => administers(serverId, BITWARDEN_CONNECTOR_CAPABILITY),
-      canManageWhatsAppConnector: (serverId) => administers(serverId, WHATSAPP_CONNECTOR_CAPABILITY),
-      canManagePasswordManagers: (serverId) => administers(serverId, PASSWORD_MANAGERS_CAPABILITY),
-      canManageVault: (serverId) => administers(serverId, VAULT_CAPABILITY),
-      canImportVault: (serverId) => administers(serverId, VAULT_IMPORT_CAPABILITY),
-      // Any member imports agents; only an owner or admin moves the whole server.
-      canImportAgents: (serverId) =>
-        servers.some((server) => server.id === serverId && showsOnline(server)) &&
-        hasCapability(serverCapabilities.current, serverId, AGENT_IMPORT_CAPABILITY),
-      canTransferServer: (serverId) => administers(serverId, INSTANCE_TRANSFER_CAPABILITY),
-      canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
-      canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
-      canManageBrowserProxies: (serverId) => administers(serverId, BROWSER_PROXIES_CAPABILITY),
-      // The same rule as the Updates section of the desktop Server Settings.
-      serverUpdateAccess: (serverId) => {
-        if (administers(serverId, HOST_UPDATE_CAPABILITY)) return "admin";
-        const server = servers.find((candidate) => candidate.id === serverId);
-        return server &&
-          showsOnline(server) &&
-          !canAdministerServer(server.role) &&
-          hasCapability(serverCapabilities.current, serverId, HOST_MEMBER_UPDATE_CAPABILITY)
-          ? "member"
-          : null;
-      },
-      canReadServerRelease: (serverId) => hasCapability(serverCapabilities.current, serverId, HOST_RELEASE_CAPABILITY),
-      canViewHostedSites: (serverId) =>
-        servers.some((server) => server.id === serverId && showsOnline(server)) &&
-        hasCapability(serverCapabilities.current, serverId, HOSTED_SITES_CAPABILITY),
-      canDeleteHostedSites: (serverId) => administers(serverId, HOSTED_SITES_CAPABILITY),
-      canManageProviders: (serverId) => administers(serverId, PROVIDERS_ADMIN_CAPABILITY),
-      canManageMcpServers: managesMcp,
-      canRelayMcpSignIn: (serverId) =>
-        managesMcp(serverId) && hasCapability(serverCapabilities.current, serverId, SIGN_IN_RELAY_CAPABILITY),
-      canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
-      canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),
       canSendNotifications: (serverId) =>
         servers.some((server) => server.id === serverId && showsOnline(server)) && supportsPushNotifications(serverId),
-      canManageEvents: (serverId) => administers(serverId, EVENTS_CAPABILITY),
-      canManageMissedRuns: (serverId) =>
-        administers(serverId, EVENTS_CAPABILITY) && administers(serverId, ROUTINE_RECOVERY_CAPABILITY),
-      canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
-      canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
-      canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
-      canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
-      canNestSidebarFolders: (serverId) =>
-        hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY),
-      canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
-      canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
-      canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),
-      canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
-      canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
-      canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
-      canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
-      canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
-      canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };
   }, [
     localServerLinks,
-    hostRequests,
     browser,
     sidebarByServer,
     orderedServers,

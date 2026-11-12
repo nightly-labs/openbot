@@ -8,7 +8,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
-import { type MessageChannelTargets, openMessageActions } from "../model/message-actions-sheet";
+import { type MessageChannelTargets, type MessageFiles, openMessageActions } from "../model/message-actions-sheet";
 
 /** A message that has actions: it is on the host and does not stream. */
 export interface MessageActionsInput {
@@ -35,6 +35,8 @@ export interface MessageActionsInput {
   pinned?: boolean;
   /** Pins the message, or unpins it when `pinned`. Unset where the chat cannot pin messages. */
   onTogglePin?: () => Promise<void>;
+  /** The files of the message on the host. Unset for a message without files. */
+  files?: MessageFiles;
 }
 
 /**
@@ -120,6 +122,7 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onTogglePin: togglePin,
           sendToChannel: input.sendToChannel,
           onDelete: confirmDelete,
+          files: input.files,
         })
     : undefined;
   return { shown, react, open };
