@@ -898,6 +898,10 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 
 - With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
   the hosted pool.
+- A custom VPS never has the reference `pool-free`, and each pool step that changes a machine
+  (`prepare`, `move`, and then `sync`) needs it, so the pool never uses a custom VPS. When `add` and
+  `custom` take the same VPS at the same time, each one reads the reference again, and the one that
+  lost stops.
 - It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
   highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
 - It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the

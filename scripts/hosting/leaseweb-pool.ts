@@ -434,7 +434,14 @@ class Pool {
         continue;
       }
       if (!this.#apply) continue;
-      if (machine.reference === null) await this.#setReference(machine, POOL_FREE);
+      if (machine.reference === null) {
+        await this.#setReference(machine, POOL_FREE);
+        // `custom` can take the same VPS at the same time: the reference read again tells who has it.
+        if ((await this.#vps(id)).reference !== POOL_FREE) {
+          logger.warn(`Another operator took VPS ${id}. It stays out of the pool.`);
+          continue;
+        }
+      }
       this.#write(
         `INSERT INTO operator_hosts(host_id, location, product, added_at, removed_at)
          VALUES (${literal(`leaseweb:${id}`, HOST_ID_PATTERN)}, ${literal(machine.location, LOCATION_PATTERN)},
@@ -821,6 +828,17 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     if (!this.#apply) logger.info("Nothing changed. Run again with --apply.");
   }
 
+  /** True when the hosted pool has the VPS. A pool machine is never a custom server. */
+  #inPool(id: string) {
+    const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
+    return (
+      this.#rows(
+        `SELECT host_id FROM operator_hosts WHERE host_id = ${host} AND removed_at IS NULL`,
+        z.object({ host_id: z.string() }),
+      ).length > 0
+    );
+  }
+
   /**
    * The references of all VPS on all Leaseweb accounts. Each account must answer: a missing account
    * could hide the highest `custom-<NN>`, and a number must never be used again.
@@ -935,12 +953,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     }
     const keys = this.#operatorKeys();
     if (!this.#claimsToken) throw new Error("SERVER_CLAIMS_ADMIN_TOKEN is not in the environment.");
-    const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
-    const inPool = this.#rows(
-      `SELECT host_id FROM operator_hosts WHERE host_id = ${host} AND removed_at IS NULL`,
-      z.object({ host_id: z.string() }),
-    );
-    if (inPool.length > 0) throw new Error(`VPS ${id} is in the hosted pool. It is not for a custom server.`);
+    if (this.#inPool(id)) throw new Error(`VPS ${id} is in the hosted pool. It is not for a custom server.`);
 
     let machine = await this.#vps(id);
     if (machine.state !== "RUNNING") throw new Error(`VPS ${id} is ${machine.state}, not RUNNING.`);
@@ -974,6 +987,10 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
       if (twins.length > 0) {
         await this.#setReference(machine, "");
         throw new Error(`VPS ${twins[0]?.id} took custom-${number} at the same time. Run the command again.`);
+      }
+      // `add` can take the same VPS at the same time: it reads the reference again before its D1 row.
+      if (this.#inPool(id)) {
+        throw new Error(`VPS ${id} went in the hosted pool at the same time. Check its reference by hand.`);
       }
       logger.info(`VPS ${id} has the reference ${label} <owner>.`);
       // A new VPS can have the address of a deleted one, with other host keys.
