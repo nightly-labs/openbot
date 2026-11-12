@@ -143,6 +143,7 @@ const TOOL_KINDS = [
   "browser",
   "computer_use",
   "image_generation",
+  "video_generation",
   "subagent",
   "other",
 ] as const;

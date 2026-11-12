@@ -175,7 +175,7 @@ const STORY_ROLES = [
   { id: "role-support", name: "Support" },
 ];
 
-const MANY_AGENTS: readonly ClientAgentSummary[] = [
+export const MANY_AGENTS: readonly ClientAgentSummary[] = [
   ...STORY_AGENT_SUMMARIES,
   ...MORE_AGENTS.flatMap((entry, index): ClientAgentSummary[] => {
     const [name = "", title = ""] = entry.split("|");

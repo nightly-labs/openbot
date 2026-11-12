@@ -131,6 +131,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
+    ...(message.videoGeneration === undefined ? {} : { videoGeneration: message.videoGeneration }),
     ...(message.questionPrompt === undefined ? {} : { questionPrompt: message.questionPrompt }),
     ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
     ...(message.exchange === undefined ? {} : { exchange: message.exchange }),

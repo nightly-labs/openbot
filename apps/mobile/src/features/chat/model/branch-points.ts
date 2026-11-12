@@ -40,7 +40,10 @@ function branchable(message: ConversationMessage): boolean {
     !message.questionPrompt &&
     !message.exchange &&
     !message.routine &&
-    (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))
+    (message.text.trim().length > 0 ||
+      Boolean(message.attachments?.length) ||
+      Boolean(message.imageGeneration) ||
+      Boolean(message.videoGeneration))
   );
 }
 

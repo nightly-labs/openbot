@@ -1082,6 +1082,7 @@ export const messages = {
   "mobile.server.settings.mcpCount": { other: "서버 {count}개" },
   "mobile.server.mcp.unsupported": "여기에서 MCP 서버를 관리하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.unavailable": "MCP 서버를 관리하려면 소유자나 관리자로 이 서버에 연결하세요.",
+  "mobile.server.mcp.accessUnsupported": "MCP 서버를 받을 대상을 선택하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.description":
     "MCP 서버는 이 서버의 에이전트에게 더 많은 도구를 제공해요. Claude와 Codex 에이전트는 이 목록에 있는 서버만 사용해요.",
   "mobile.server.mcp.loading": "MCP 서버 불러오는 중…",
@@ -1152,6 +1153,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "이 서버의 에이전트가 더 이상 이 서버의 도구를 사용할 수 없어요. 설정은 저장되지 않아요.",
   "mobile.server.mcp.remove": "MCP 서버 삭제",
+  "mobile.server.mcp.access.title": "액세스",
+  "mobile.server.mcp.access.agents": "에이전트",
+  "mobile.server.mcp.access.agentsOf": "{name}을(를) 사용할 수 있는 에이전트",
+  "mobile.server.mcp.access.allAgents": "모든 에이전트",
+  "mobile.server.mcp.access.allAgentsHint": "모든 에이전트에는 나중에 추가되는 에이전트도 포함됩니다.",
+  "mobile.server.mcp.access.noAgents": "에이전트 없음",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "사용 가능",
+  "mobile.server.mcp.access.fromEveryone": "모든 사람과 같음",
+  "mobile.server.mcp.access.level": "{name}에 대한 {role}의 액세스",
+  "mobile.server.mcp.access.hint":
+    "멤버는 모든 사람과 자신의 역할 중 가장 높은 수준을 받습니다. 소유자, 관리자, 서버를 추가한 사람은 항상 관리할 수 있습니다.",
+  "mobile.server.mcp.access.loadFailed": "이 MCP 서버의 액세스를 불러오지 못했습니다.",
+  "mobile.server.mcp.access.unavailable":
+    "온라인 서버의 소유자나 관리자만 이 MCP 서버를 받을 대상을 선택할 수 있습니다.",
   "mobile.server.usage.agents": "에이전트",
   "mobile.server.usage.agentLine": "토큰 {tokens}개 · {cost} · {percent}",
   "mobile.server.usage.noAgents": "이 기간에 기록된 에이전트 사용량이 없어요.",

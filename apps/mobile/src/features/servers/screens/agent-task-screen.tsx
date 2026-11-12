@@ -33,6 +33,7 @@ import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
+import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
 import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
@@ -59,6 +60,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
@@ -66,6 +68,8 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
 const NO_MESSAGES: never[] = [];
+/** The item of the thread's menu that opens the pinned messages. */
+const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 /** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
@@ -90,18 +94,20 @@ function leaveTask() {
  */
 export function AgentTaskScreen() {
   const { t } = useText();
-  const { serverId, agentId, taskId, messageId } = useLocalSearchParams<{
+  // `focusAt` changes when a pinned message of this thread opens again, so the thread goes to it again.
+  const { serverId, agentId, taskId, messageId, focusAt } = useLocalSearchParams<{
     serverId: string;
     agentId: string;
     taskId: string;
     messageId?: string;
+    focusAt?: string;
   }>();
   const { agents } = useMobileWorkspace();
   const agent = agents.find((item) => item.id === agentId && item.serverId === serverId);
   if (agent)
     return (
       <AgentTaskChat
-        key={`${serverId}:${taskId}`}
+        key={`${serverId}:${taskId}:${focusAt ?? ""}`}
         target={{ ...agent, kind: "agent" }}
         taskId={taskId}
         focusMessageId={messageId || null}
@@ -160,6 +166,13 @@ function AgentTaskChat({
   const mentionReferences = useAgentMentionReferences(serverId, agentId, taskId);
   // A deleted thread has no screen: the agent's chat takes its place.
   const threadActions = useThreadActions(target.serverId, onThreadDeleted);
+  // The thread's menu also opens the pinned messages of the agent's chats, on a host with `message-pins-v1`.
+  const pins = useMessagePins(serverId, agentId);
+  const pinsEnabled = pins.enabled;
+  const pinnedMessageIds = useMemo(
+    () => new Set(pins.pins.filter((pin) => pin.taskId === taskId).map((pin) => pin.messageId)),
+    [pins.pins, taskId],
+  );
   const {
     servers,
     agents,
@@ -496,11 +509,19 @@ function AgentTaskChat({
   }
 
   const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
+  const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
   const actionsMenu = task
     ? {
         label: t("mobile.server.threads.actions"),
-        actions: threadActions.menu(task),
-        onPressAction: (id: string) => threadActions.run(task, id),
+        actions: pinsEnabled && !isDraft ? [...threadActions.menu(task), pinsAction] : threadActions.menu(task),
+        onPressAction: (id: string) => {
+          if (id !== PINS_ACTION) {
+            threadActions.run(task, id);
+            return;
+          }
+          void haptics.impact("soft");
+          router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
+        },
       }
     : null;
 
@@ -614,6 +635,10 @@ function AgentTaskChat({
           onBranch={branch ? (message) => void branch(message.id) : undefined}
           onDeleteMessage={deleteMessage}
           deletesAnyMessage={messageDelete.deletesAny}
+          onTogglePin={
+            pinsEnabled && !isDraft ? (message, pinned) => pins.setPinned(taskId, message.id, pinned) : undefined
+          }
+          pinnedMessageIds={pinnedMessageIds}
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
           onOpenBranchSource={openBranchSource}
