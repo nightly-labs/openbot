@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Hidden agents now keep working. OpenBot turned off the routines of agents that you hid before this version, so turn on the routines that you want."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pin a message in an agent's chat: right-click it and select Pin. The pin button in the chat header shows the pins of all chats of the agent.",
+          "The Library has folders and three views. An agent can also save the files that it attaches in a folder that you name.",
+          "Teach a task: select Teach a task in the + menu, then do the task in the agent's browser. The agent saves the steps as a skill.",
+          "Pool the accounts of a provider in Settings. Agents use one account until it nears a usage limit, then the next account.",
+          "Add skills from GitHub: paste the link of a public repository into the Marketplace Skills search.",
+          "Server settings > Transfer can export a full copy of a server, and copy agents to another server in one step.",
+          "Mute an agent from its menu in the sidebar. A muted agent sends no notifications and plays no sound."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A message that you send to an agent while it works now steers the running turn. To queue it as before, turn off Steer agents while they work in Settings > Agents.",
+          "A hidden agent keeps working. It runs its routines, and it shows in Needs you when it waits for your answer.",
+          "The open server shows as a logo at the bottom of the page rail. The New button is at the end of the sidebar search field.",
+          "OpenBot uses Electron 45.3.0 with Chromium 156, and more sites with a bot check load in the agent browser."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot starts faster, most of all on Windows, and a slow computer stays usable after the start.",
+          "OpenBot stays responsive after a restart when you have many tasks or threads.",
+          "On Linux and Windows, OpenBot completes its shutdown when you close the main window.",
+          "Routines run on time after the computer clock is corrected.",
+          "Text that you copy from a chat no longer has empty lines at its start or end."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

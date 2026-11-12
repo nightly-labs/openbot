@@ -1,10 +1,10 @@
 {
-  "version": "0.68.0",
+  "version": "0.69.0",
   "highlights": [
-    "Set which members can use the browser in a channel, and see their tabs and the channel's files in the side panel.",
-    "Right-click the Dynamic Island or the agent dock to hide it, drag agents on the dock to move them, and change the dock size.",
-    "A chat that you read no longer stays in the Unread group, and you can turn the group off.",
-    "A Claude chat that got too long now starts a new session with its history, and an agent moves to its backup model at the 5-hour limit.",
-    "New versions now go to about 1 in 10 computers first, and to all computers about one day later."
+    "Hidden agents now keep working. Turn on again the routines of the agents that you hid before this version.",
+    "A message that you send to a working agent now steers its turn. You can still select Queue in Settings > Agents.",
+    "Pin messages in a chat, and sort your Library files into folders.",
+    "Teach an agent a task in its browser, and add skills from a GitHub link.",
+    "Pool the accounts of a provider, and export a full copy of a server or copy its agents to another server."
   ]
 }
