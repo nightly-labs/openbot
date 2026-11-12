@@ -2201,6 +2201,17 @@ export async function createApplicationServices({
         Effect.tap(() => providerRuntimes.providerUseChanged()),
         Effect.mapError((error) => new AgentLifecycleFailed({ operation: "saveProviderUse", cause: error.cause })),
       ),
+    installedCliProviders: providerUse.installed(),
+    saveInstalledCliChoice: (provider, installed) =>
+      isManagedRuntimeProvider(provider)
+        ? providerUse
+            .setInstalled(provider, installed)
+            .pipe(
+              Effect.mapError(
+                (error) => new AgentLifecycleFailed({ operation: "saveInstalledCliChoice", cause: error.cause }),
+              ),
+            )
+        : Effect.void,
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: (agent) =>

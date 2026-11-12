@@ -249,6 +249,10 @@ export const messages = {
     "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",
+  "provider.settings.otherVersionDownloaded": "Sin usar: {version} · descargada por OpenBot",
+  "provider.settings.useInstalledVersion": "Usar la instalada",
+  "provider.settings.useDownloadedVersion": "Usar la de OpenBot",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":

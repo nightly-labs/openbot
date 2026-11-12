@@ -269,6 +269,10 @@ export const messages = {
     "Zapisany klucz API Gemini jest używany zamiast logowania przez Google. Aby używać planu Google i jego modeli, usuń klucz.",
   "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",
+  "provider.settings.otherVersionDownloaded": "Nieużywana: {version} · pobrana przez OpenBot",
+  "provider.settings.useInstalledVersion": "Użyj zainstalowanej",
+  "provider.settings.useDownloadedVersion": "Użyj wersji OpenBot",
   "provider.settings.cache": "Pamięć podręczna",
   "provider.settings.promptCache": "Pamięć podręczna promptów",
   "provider.settings.promptCacheDescription":

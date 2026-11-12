@@ -1530,6 +1530,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     restartProvider: async () => clone(agentStatus),
     cancelProviderRestart: async () => clone(agentStatus),
+    // The preview runs no CLI: the two versions trade places, as a restart on the other CLI would show.
+    chooseInstalledCli: async ({ provider, installed }) => {
+      if (agentStatus.providers)
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers.map((row) =>
+            row.id === provider && row.otherCliVersion && (row.cliSource === "system") !== installed
+              ? {
+                  ...row,
+                  cliSource: installed ? "system" : "managed",
+                  version: row.otherCliVersion,
+                  ...(row.version ? { otherCliVersion: row.version } : {}),
+                }
+              : row,
+          ),
+        };
+      emitAgentEvent({ type: "status", status: clone(agentStatus) });
+      return clone(agentStatus);
+    },
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there. Claude signs in with a code its page shows, which the
     // user pastes back, Cursor with a page that signs its CLI in by itself, and Hermes with a Nous

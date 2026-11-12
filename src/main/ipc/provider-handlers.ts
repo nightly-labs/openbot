@@ -94,6 +94,9 @@ export function providerIpcHandlers({
       cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
         service.cancelProviderRestart(provider),
       ),
+      chooseInstalledCli: payloadHandler(parseInstalledCliChoice, ({ provider, installed }) =>
+        runCauseEffect(service.chooseInstalledCli(provider, installed)),
+      ),
       // The code and the page it is typed on come back; nothing the code is later traded for does.
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.startProviderCodeLogin(provider)),
@@ -230,6 +233,11 @@ export function parseProviderUseInput(value: unknown): { provider: AgentProvider
   const provider = parseProviderId(value.provider);
   if (provider === "acp") throw new Error("Custom agents do not have a built-in provider switch.");
   return { provider, on: value.on };
+}
+
+export function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
+  if (!isDynamicRecord(value) || typeof value.installed !== "boolean") throw new Error("Invalid provider CLI choice.");
+  return { provider: parseManagedProviderId(value.provider), installed: value.installed };
 }
 
 export function parseConnectProviderAccountInput(value: unknown): ConnectProviderAccountInput {

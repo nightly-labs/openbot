@@ -255,6 +255,10 @@ export const messages = {
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
+  "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.useInstalledVersion": "Utiliser l'installée",
+  "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":

@@ -808,6 +808,7 @@ const openbotApi: OpenBotDesktopApi = {
     setProviderOn: decodeAgentStatusFromMain,
     restartProvider: decodeAgentStatusFromMain,
     cancelProviderRestart: decodeAgentStatusFromMain,
+    chooseInstalledCli: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
     setProviderApiKey: decodeAgentStatusFromMain,
     clearProviderApiKey: decodeAgentStatusFromMain,

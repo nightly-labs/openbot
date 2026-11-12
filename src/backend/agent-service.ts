@@ -407,6 +407,9 @@ export interface AgentServiceOptions {
   /** The provider accounts after the first. Omitted, each provider holds its own sign-in only. */
   providerAccounts?: ProviderAccountStore;
   saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
+  /** The managed CLIs that run in the user's own install also when OpenBot's copy is newer. */
+  installedCliProviders?: readonly AgentProvider[];
+  saveInstalledCliChoice?: (provider: AgentProvider, installed: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: (() => LocalSkillTools) | undefined;
   /**
    * The skills that an agent has, read from this computer only. A memory review reads them to suggest
@@ -894,6 +897,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.providerAccounts ? { accounts: options.providerAccounts } : {}),
       saveProviderUse: (provider, on) =>
         (options.saveProviderUse?.(provider, on) ?? Effect.void).pipe(toProviderOperationFailed),
+      installedCliProviders: options.installedCliProviders ?? [],
+      saveInstalledCliChoice: (provider, installed) =>
+        (options.saveInstalledCliChoice?.(provider, installed) ?? Effect.void).pipe(toProviderOperationFailed),
       conversation: this.#conversation,
       hooks: {
         bindClient: (client) => {
@@ -4640,6 +4646,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .restartProviderWhenIdle(provider)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "restartProvider", cause: failure.cause })),
+      );
+  }
+
+  /** See `ProviderRuntime.chooseInstalledCli`. */
+  chooseInstalledCli(provider: AgentProvider, installed: boolean): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .chooseInstalledCli(provider, installed)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "chooseInstalledCli", cause: failure.cause }),
+        ),
       );
   }
 

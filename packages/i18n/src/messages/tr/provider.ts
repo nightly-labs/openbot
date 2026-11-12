@@ -246,6 +246,10 @@ export const messages = {
     "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
+  "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",
+  "provider.settings.otherVersionDownloaded": "Kullanılmıyor: {version} · OpenBot tarafından indirildi",
+  "provider.settings.useInstalledVersion": "Yüklü sürümü kullan",
+  "provider.settings.useDownloadedVersion": "OpenBot sürümünü kullan",
   "provider.settings.cache": "Önbellek",
   "provider.settings.promptCache": "İstem önbelleği",
   "provider.settings.promptCacheDescription":

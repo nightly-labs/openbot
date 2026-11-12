@@ -61,6 +61,11 @@ export interface AgentProviderStatus {
    * apart, and only the provider that resolved a CLI reports one at all.
    */
   cliSource?: "system" | "managed";
+  /**
+   * The version of the other CLI the user can run instead (`chooseInstalledCli`): the one they
+   * installed while OpenBot's copy runs, or OpenBot's newer copy while theirs runs by their choice.
+   */
+  otherCliVersion?: string;
   /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
   restartPending?: boolean;
   /**
@@ -165,6 +170,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.otherCliVersion === undefined || isBoundedString(value.otherCliVersion, 160)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
     (value.endpointsPending === undefined || typeof value.endpointsPending === "boolean") &&

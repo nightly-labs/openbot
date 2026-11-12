@@ -53,9 +53,9 @@ import {
   type AgentCliInfo,
   type BundledProviderExecutables,
   CodexCliError,
+  chooseInstalledFirst,
   cliPathEnvironment,
   cliSpawnTarget,
-  resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
@@ -448,6 +448,8 @@ export class ProviderRuntime implements ProviderPort {
    * offered a download instead of its own updater.
    */
   readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
+  /** The CLI the last resolution passed over, which the user can switch to (`chooseInstalledCli`). */
+  readonly #passedOverClis = new Map<AgentProvider, { source: AgentCliInfo["source"]; version: string }>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   /**
@@ -555,12 +557,23 @@ export class ProviderRuntime implements ProviderPort {
   readonly #modelCatalog: ModelCatalog;
   readonly #off: Set<AgentProvider>;
   readonly #saveProviderUse: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
+  /** The managed CLIs that the user chose to run in their own install, also when OpenBot's copy is newer. */
+  readonly #installedChosen: Set<AgentProvider>;
+  readonly #saveInstalledChoice: (
+    provider: AgentProvider,
+    installed: boolean,
+  ) => Effect.Effect<void, ProviderOperationFailed>;
   /** Null without a store, as in tests: each provider then holds its own sign-in only. */
   readonly #providerAccounts: ProviderAccounts | null;
 
   constructor(options: {
     offProviders?: readonly AgentProvider[];
     saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
+    installedCliProviders?: readonly AgentProvider[];
+    saveInstalledCliChoice?: (
+      provider: AgentProvider,
+      installed: boolean,
+    ) => Effect.Effect<void, ProviderOperationFailed>;
     conversation: ConversationRuntime;
     hooks: ProviderHooks;
     emit: (event: AgentEvent) => void;
@@ -578,6 +591,8 @@ export class ProviderRuntime implements ProviderPort {
   }) {
     this.#off = new Set(options.offProviders);
     this.#saveProviderUse = options.saveProviderUse ?? (() => Effect.void);
+    this.#installedChosen = new Set(options.installedCliProviders);
+    this.#saveInstalledChoice = options.saveInstalledCliChoice ?? (() => Effect.void);
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
     this.#emit = options.emit;
@@ -733,6 +748,7 @@ export class ProviderRuntime implements ProviderPort {
       providers: status.providers.map((row) => {
         if (this.#off.has(row.id)) return { id: row.id, state: "not-started", version: null, message: null, off: true };
         const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
+        const passedOver = this.#passedOverClis.get(row.id);
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
           row.id === "muse" && row.state === "available" && this.#accounts.get(row.id)?.type === "muse-unverified";
@@ -742,6 +758,7 @@ export class ProviderRuntime implements ProviderPort {
             ? { state: "sign-in-required" as const, message: sourceText("error.provider.museAuthUnverified") }
             : {}),
           ...(source ? { cliSource: source } : {}),
+          ...(passedOver && source && passedOver.source !== source ? { otherCliVersion: passedOver.version } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
           ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
@@ -865,18 +882,22 @@ export class ProviderRuntime implements ProviderPort {
         });
       }
       const driver = requireProviderDriver(provider);
-      const bundledExecutable = this.#bundledExecutables[driver.cliProvider ?? provider];
-      const cli = yield* resolveInstalledFirst(
+      const cliProvider = driver.cliProvider ?? provider;
+      const { cli, passedOver } = yield* chooseInstalledFirst(
         (input) => driver.resolveCli(input),
-        bundledExecutable,
+        this.#bundledExecutables[cliProvider],
         preferInstalled,
+        this.#installedChosen.has(cliProvider),
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli.source);
+      if (passedOver) this.#passedOverClis.set(provider, passedOver);
+      else this.#passedOverClis.delete(provider);
       return cli;
     }).pipe(
       Effect.onError(() =>
         Effect.sync(() => {
           this.#cliSources.delete(provider);
+          this.#passedOverClis.delete(provider);
         }),
       ),
     );
@@ -2551,6 +2572,11 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
+          // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
+          if (this.#installedChosen.delete(provider))
+            yield* this.#saveInstalledChoice(provider, false).pipe(
+              Effect.catch(() => Effect.sync(() => logger.warn("The provider CLI choice did not save.", { provider }))),
+            );
         }).pipe(
           Effect.mapError((error) => {
             if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
@@ -2865,6 +2891,27 @@ export class ProviderRuntime implements ProviderPort {
     });
     yield* this.#checkRestartWhenIdle(provider);
     return this.status();
+  }).bind(this);
+
+  /**
+   * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer. A launcher of
+   * theirs, such as a script that picks Pi's settings folder, then runs again (#6327). Otherwise the
+   * newer of the two runs, as before the choice. The provider restarts when its turns end. A provider
+   * that runs on its CLI, such as DeepSeek on Pi, takes the choice at its next start: both CLIs stay
+   * on disk, and its restart now would read the model list of the process this one replaces.
+   */
+  readonly chooseInstalledCli = Effect.fn("ProviderRuntime.chooseInstalledCli")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    installed: boolean,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    if (installed !== this.#installedChosen.has(provider)) {
+      yield* this.#saveInstalledChoice(provider, installed);
+      if (installed) this.#installedChosen.add(provider);
+      else this.#installedChosen.delete(provider);
+    }
+    return yield* this.restartProviderWhenIdle(provider);
   }).bind(this);
 
   /** Removes a restart that still waits for turns to end. One that already runs goes on. */
