@@ -1022,11 +1022,12 @@ start it, so the data is in place before the first start. `scripts/hosting/move-
 the parts of a move that run on the two machines, as root.
 
 `leaseweb-pool.ts move <server ID> <VPS ID> --apply` does steps 2 to 8 for one server, and writes the
-time of each step and of the downtime. Its checks run before the row changes: a Standard or Pro
-server that is `running` or `idle`, a free machine of the pool with the product of the plan, the same
-IDs of `user` on the two machines, and an OpenBot on the machine that is not older than that of the
-sandbox. When a step before the export fails, it gives the row back to the sandbox, and the customer
-sees no downtime. After the export starts, it stops and names the step; then finish or roll back by
+time of each step and of the downtime. Before the row changes, it checks for a Standard or Pro server
+that is `running` or `idle` and a free machine of the pool with the product of the plan. After the
+row changes and before the export, it checks the same IDs of `user` on the two machines, an OpenBot
+on the machine that is not older than that of the sandbox, and an ssh from the sandbox to the machine.
+When a step before the export fails, it gives the row back to the sandbox, and the customer sees no
+downtime. After the export starts, it stops and names the step; then finish or roll back by
 hand. It needs `BOAT_API_KEY` in the environment, from `apps/auth-api/.env.dev`:
 
 ```bash

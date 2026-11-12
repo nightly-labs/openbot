@@ -178,13 +178,15 @@ echo "enabled=$(systemctl is-enabled openbot.service 2>/dev/null || true)"
 if [ -e /home/user/.config/OpenBot ] || [ -e /srv/openbot-hosted/keyrings ]; then echo data=yes; else echo data=no; fi
 echo "hostkey=$(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"`;
 
+/** The ssh of the sandbox to the machine, with the key of the move. `$d` is the move directory. */
+const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \\
+  -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
+
 /** Runs in the sandbox as root. Sends the archive to the machine; the key of the move can only write it there. */
 const RUN_EXPORT = `#!/bin/bash
 set -o pipefail
 d=${SANDBOX_MOVE}
-bash "$d/move-from-boat.sh" export - 2>"$d/export.log" |
-  ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \\
-    -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15 "root@$1"
+bash "$d/move-from-boat.sh" export - 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
 echo "$?" >"$d/status"
 `;
 
@@ -316,26 +318,6 @@ class Pool {
     if (!response.ok) throw new Error(`Leaseweb refused the reference of VPS ${machine.id}: ${response.status}.`);
   }
 
-  #ssh(machine: Vps, remoteCommand: string) {
-    if (!machine.address) throw new Error(`VPS ${machine.id} has no public IPv4 address.`);
-    // A machine of the pool is new to this computer, or has new host keys after its reinstall
-    // (`#reinstall` removes the old ones), so ssh accepts a key that it does not know.
-    execFileSync(
-      "ssh",
-      [
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        "-o",
-        "ConnectTimeout=20",
-        `root@${machine.address}`,
-        remoteCommand,
-      ],
-      { stdio: ["ignore", "inherit", "inherit"] },
-    );
-  }
-
   #work() {
     const query = (where: string) =>
       this.#rows(
@@ -437,7 +419,7 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`${state === "stopped" ? "Stop" : "Start"} OpenBot on VPS ${machine.id} (server ${row.server_id}).`);
     if (!this.#apply) return;
-    this.#ssh(machine, `systemctl ${state === "stopped" ? "disable" : "enable"} --now openbot.service`);
+    this.#remote(machine, `systemctl ${state === "stopped" ? "disable" : "enable"} --now openbot.service`);
     const changes = this.#write(
       `UPDATE hosted_servers SET observed_state = '${state}', updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(row.server_id, SERVER_ID_PATTERN)}
@@ -925,6 +907,9 @@ bash "$d/move-from-boat.sh" packages`,
         "install -d -m 0700 /root/.ssh && touch /root/.ssh/authorized_keys && sed -i '/ openbot-move$/d' /root/.ssh/authorized_keys && cat >>/root/.ssh/authorized_keys",
         { input: `restrict,command="umask 077; cat >${MACHINE_ARCHIVE}" ${key}\n` },
       );
+      // An ssh that fails after the export starts makes a downtime. This one writes an empty archive.
+      await this.#sandboxRun(sandbox, `d=${SANDBOX_MOVE}\n${SANDBOX_SSH} "root@${machine.address}" </dev/null`);
+      lap("SSH from the sandbox to the machine");
     } catch (error) {
       await this.#undoRow(serverId, vpsId, sandbox, row, machine);
       throw error;
@@ -941,9 +926,25 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       const deadline = Date.now() + EXPORT_WAIT_MS;
       let status = "";
       let shown = Date.now();
+      let leased = Date.now();
+      let failures = 0;
       while (status === "" && Date.now() < deadline) {
         await delay(5_000);
-        status = (await this.#sandboxRun(sandbox, `cat ${SANDBOX_MOVE}/status 2>/dev/null || true`)).trim();
+        // The lease of 2 hours is shorter than the longest export. boat would stop the sandbox at its end.
+        // A failed call does not stop the export, so try again; stop only after 2 minutes of failures.
+        try {
+          if (Date.now() - leased > 30 * 60_000) {
+            await this.#boat("PATCH", `/sandboxes/${sandbox}`, { ttlSeconds: 7200 });
+            leased = Date.now();
+          }
+          status = (await this.#sandboxRun(sandbox, `cat ${SANDBOX_MOVE}/status 2>/dev/null || true`)).trim();
+          failures = 0;
+        } catch (error) {
+          failures += 1;
+          if (failures >= 24) throw error;
+          logger.warn("The status of the export is not available. Try again.", toLogValue(error));
+          continue;
+        }
         if (status === "" && Date.now() - shown > 30_000) {
           shown = Date.now();
           const size = this.#remote(machine, `stat -c %s ${MACHINE_ARCHIVE} 2>/dev/null || echo 0`, {
@@ -972,11 +973,12 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       );
       lap(`Sandbox ${stopped}`);
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh start && rm -f ${MACHINE_ARCHIVE}`);
-      for (let attempt = 0; attempt < 30; attempt += 1) {
-        const active = this.#remote(machine, "systemctl is-active openbot.service || true", { capture: true }).trim();
-        if (active === "active") break;
-        await delay(2_000);
+      let active = "";
+      for (let attempt = 0; attempt < 30 && active !== "active"; attempt += 1) {
+        if (attempt > 0) await delay(2_000);
+        active = this.#remote(machine, "systemctl is-active openbot.service || true", { capture: true }).trim();
       }
+      if (active !== "active") throw new Error(`openbot.service is ${active} on VPS ${vpsId} after 60 s.`);
       lap("OpenBot started");
     } catch (error) {
       logger.error(

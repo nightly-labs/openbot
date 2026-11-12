@@ -632,8 +632,9 @@ install_packages_of() {
   while read -r package; do
     [ -n "$package" ] || continue
     case $package in
-      ufw | firewalld | nftables | iptables* | *-persistent | openssh-server | sudo* | docker* | containerd* | \
-        podman | lxd* | incus* | fail2ban | tailscale | wireguard* | zerotier*)
+      ufw | firewalld | nftables | iptables* | *-persistent | ssh | openssh-server | task-ssh-server | sudo* | \
+        opendoas | docker* | containerd* | podman | lxd* | incus* | fail2ban | tailscale | wireguard* | zerotier* | \
+        xrdp | *telnetd*)
         refused+=" $package"
         continue
         ;;
@@ -766,8 +767,9 @@ import_data() {
   if openbot_runs; then fail "OpenBot runs, and the import is not complete. Stop it."; fi
   restore_commands "$manifest"
   remove_boat_config || echo "The boat configuration was not removed from the home."
-  if grep -q '^/usr/local/lib/node_modules/' <<<"$trees" && ! command -v node >/dev/null; then add_node_command; fi
+  # An apt package can install Node, so the Bun command is added only after the packages.
   install_packages_of "$manifest"
+  if grep -q '^/usr/local/lib/node_modules/' <<<"$trees" && ! command -v node >/dev/null; then add_node_command; fi
   if openbot_runs; then fail "OpenBot runs, and the import is not complete. Stop it."; fi
   {
     echo imported
