@@ -263,7 +263,7 @@ export const messages = {
   "error.backend.mcpServerFailedForProvider":
     "{provider} не может запустить MCP-сервер {name}. Откройте настройки MCP и выберите «Проверить подключение», чтобы увидеть причину.",
   "error.backend.mcpServerFailedInProvider":
-    "{provider} не может запустить MCP-сервер {name}. Его инструменты недоступны агентам {provider}. {provider} запускает сервер сам, поэтому проверка подключения в OpenBot может пройти успешно. Начните новый чат, чтобы попробовать снова.",
+    "{provider} не может запустить MCP-сервер {name}. Его инструменты недоступны для {provider}. {provider} запускает сервер сам, поэтому проверка подключения в OpenBot может пройти успешно. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} не может запустить MCP-сервер {name}, потому что сервер не ответил вовремя. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpOAuthProxyUnavailable":
