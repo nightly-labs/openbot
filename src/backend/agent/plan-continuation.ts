@@ -135,8 +135,13 @@ const PT_WORK_VERBS = [
 const ptPattern = (verbs: readonly string[]) =>
   `(?:${verbs.map((verb) => verb.replaceAll(" ", "\\s+")).join("|")})(?!\\p{L})`;
 const PT_WORK_VERB = ptPattern(PT_WORK_VERBS);
-/** The gerund of each verb: "consultar" gives "consultando", "ler" "lendo", "dar uma olhada" "dando uma olhada". */
-const PT_WORK_GERUND = ptPattern(PT_WORK_VERBS.map((verb) => verb.replace(/r(?=\s|$)/, "ndo")));
+/**
+ * The gerund of each verb: "consultar" gives "consultando", "ler" "lendo", "dar uma olhada" "dando uma
+ * olhada". "Ver" has none: "estou vendo um erro" reports what the agent sees, not work.
+ */
+const PT_WORK_GERUND = ptPattern(
+  PT_WORK_VERBS.filter((verb) => verb !== "ver").map((verb) => verb.replace(/r(?=\s|$)/, "ndo")),
+);
 /**
  * The Portuguese form of `NOT_WAITING`: an offer to the user ("se você quiser", "caso queira"), the
  * user's approval ("sua confirmação"), a later time ("mais tarde", "em breve", a closing "depois"), or

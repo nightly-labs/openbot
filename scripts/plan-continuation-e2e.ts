@@ -517,6 +517,7 @@ try {
       "Vou verificar com o time e te retorno.",
       "I'm running into a permission error.",
       "I'm checking with the team.",
+      "Estou vendo um erro de permissão no log.",
     ];
     for (const answer of answers) {
       const mark = loggedTurns().length;
