@@ -350,6 +350,8 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
     origin: string,
+    /** A password goes whole into each field, such as a sign-up form's password and its confirmation. */
+    wholeSecretInEachField: boolean,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
@@ -454,6 +456,9 @@ export class BrowserCdpEngine {
           fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
+        // A second copy of a password goes only to a password field, so no field shows the value.
+        if (wholeSecretInEachField && inputs.length > 1 && !fields.password)
+          return yield* browserFailure(new Error("A password and its confirmation must both be password fields."));
         return { inputs, button, fingerprints, fields, servedByWorker };
       }),
     );
@@ -494,7 +499,9 @@ export class BrowserCdpEngine {
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
-                yield* send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+                yield* send("Input.insertText", {
+                  text: wholeSecretInEachField || nodes.inputs.length === 1 ? secret : secret[index],
+                });
               }
               if (submission === "on_input" || generation !== this.#navigationGeneration) return;
               if (submission === "click" && nodes.button) {
