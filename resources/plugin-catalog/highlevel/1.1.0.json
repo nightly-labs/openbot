@@ -1,0 +1,57 @@
+{
+  "slug": "highlevel",
+  "name": "HighLevel",
+  "tagline": "CRM and marketing workspace",
+  "description": "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
+  "category": "productivity",
+  "creatorName": "HighLevel",
+  "iconUrl": "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
+  "version": "1.1.0",
+  "prompts": [
+    { "id": "prompt-new-leads", "text": "List the contacts that were added this week." },
+    { "id": "prompt-pipeline", "text": "Summarize the opportunities in my sales pipeline by stage." },
+    { "id": "prompt-appointments", "text": "What appointments are booked on my calendar tomorrow?" }
+  ],
+  "apps": [
+    {
+      "id": "app-highlevel-mcp",
+      "name": "HighLevel",
+      "description": "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
+      "iconUrl": "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
+      "server": {
+        "name": "highlevel",
+        "transport": "http",
+        "url": "https://services.leadconnectorhq.com/mcp",
+        "auth": [
+          {
+            "id": "highlevel-key",
+            "kind": "key",
+            "label": "Private Integration token",
+            "fields": [
+              {
+                "id": "token",
+                "label": "Private Integration token",
+                "header": "Authorization",
+                "prefix": "Bearer ",
+                "placeholder": "pit-…",
+                "hint": "In your HighLevel sub-account, open Settings > Private Integrations and create a token."
+              },
+              {
+                "id": "location-id",
+                "label": "Location ID",
+                "header": "locationId",
+                "hint": "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID."
+              }
+            ],
+            "docsUrl": "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+            "docsLabel": "Create a token"
+          }
+        ]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.gohighlevel.com",
+  "privacyPolicyUrl": "https://www.gohighlevel.com/privacy-policy",
+  "termsUrl": "https://www.gohighlevel.com/terms-of-service",
+  "skills": []
+}
