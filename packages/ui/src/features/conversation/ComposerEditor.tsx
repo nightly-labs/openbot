@@ -690,9 +690,29 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (!lineBreak && (event.inputType !== "insertText" || !event.data)) return;
     event.preventDefault();
     if (lineBreak) insertLineBreak(editor);
-    else if (event.data) insertPlainText(editor, event.data);
+    else if (event.data) {
+      const caret = caretAfterReplacement(editor, event.data);
+      insertPlainText(editor, event.data);
+      if (caret !== null) restoreEditorSelection(editor, { anchor: caret, focus: caret });
+    }
     emitValue();
     updateMention();
+  }
+
+  /*
+   * A macOS correction or text replacement, such as "i" to "I" after a space, selects the word behind
+   * the caret and inserts the new word there. Chromium puts the caret back after the space only when
+   * the insert is not cancelled. The selection event comes later, so the saved caret is still the one
+   * from before the word was selected. A selection that the user made has the caret at one of its ends.
+   */
+  function caretAfterReplacement(editor: HTMLDivElement, text: string): number | null {
+    if (savedCaret === null) return null;
+    const selection = readEditorSelection(editor);
+    if (!selection) return null;
+    const start = Math.min(selection.anchor, selection.focus);
+    const end = Math.max(selection.anchor, selection.focus);
+    if (start === end || savedCaret <= end) return null;
+    return savedCaret + text.length - (end - start);
   }
 
   function mentionAtSelection(): MentionContext | null {
