@@ -3411,8 +3411,44 @@ export class ChannelService {
       message.message.author = "assistant";
       message.message.turnId = turnId;
       if (isReplyTask(task)) message.message.replyToMessageId = task.requestMessageId;
-      yield* channelSync(() => this.store.update(channel, { messages: [message] }, operationId));
+      // A result after the task completed, as after a background job, is new to the task that waits
+      // for it. That task went on with the member's earlier answer, so it runs again and reads the
+      // result: at once when it completed, or after its running turn. A waiting or queued task reads
+      // it when it starts. Before, the lead kept the earlier status (#7450).
+      const parent =
+        assignment.state === "completed" && task.parentTaskId
+          ? tasks.find((item) => item.id === task.parentTaskId)
+          : undefined;
+      const parentAssignment =
+        parent?.state === "running"
+          ? (yield* channelSync(() => this.store.assignments(channelId))).find(
+              (item) => item.taskId === parent.id && item.taskRevision === parent.revision && activeAssignment(item),
+            )
+          : undefined;
+      yield* channelSync(() =>
+        this.store.update(
+          channel,
+          {
+            messages: [message],
+            ...(parent?.state === "completed"
+              ? { tasks: [{ ...parent, state: "queued", revision: parent.revision + 1 }] }
+              : {}),
+            ...(parentAssignment
+              ? {
+                  assignments: [
+                    {
+                      ...parentAssignment,
+                      awaitedTaskIds: parentAssignment.awaitedTaskIds.filter((id) => id !== task.id),
+                    },
+                  ],
+                }
+              : {}),
+          },
+          operationId,
+        ),
+      );
       this.publish(channelId);
+      if (parent?.state === "completed") yield* this.wake(channelId);
       return { accepted: true, instruction: "The result is in the shared chat. End your turn now with no more text." };
     }
     if (tool === "channel_reply") {
