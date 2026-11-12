@@ -9,7 +9,7 @@ import {
 import { currentText } from "@openbot/ui/text";
 import { createMemo, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { createWorkflowsController } from "./workflows-controller";
+import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
 /**
@@ -24,11 +24,14 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
+  /** The workflow to open, such as the one of a clicked notification. Without it, the first one opens. */
+  request?: WorkflowRequest | undefined;
 }) {
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
+    untrack(() => props.request),
   );
   const catalogs: WorkflowCatalogs = {
     get agents() {

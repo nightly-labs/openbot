@@ -224,6 +224,7 @@ import {
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
   decodeVoid,
+  decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
 import {
@@ -1537,6 +1538,7 @@ const openbotApi: OpenBotDesktopApi = {
     test: decodeVoid,
     openSettings: decodeVoid,
     opened: decodeNotificationOpenedEvent,
+    workflowOpened: decodeWorkflowNotificationOpenedEvent,
   }),
   maintenance: bridgeGroup(IPC_ENDPOINTS.maintenance, {
     exportData: decodeExportResult,

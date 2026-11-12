@@ -446,7 +446,11 @@ import type {
   WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
-import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type {
+  NotificationOpenedEvent,
+  NotificationPreference,
+  WorkflowNotificationOpenedEvent,
+} from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
   OnePasswordConnectorStatus,
@@ -1688,6 +1692,7 @@ export const IPC_ENDPOINTS = {
     // system that has no such page.
     openSettings: request<undefined, void>()("notifications:open-settings"),
     opened: event<NotificationOpenedEvent>()("notifications:opened-event"),
+    workflowOpened: event<WorkflowNotificationOpenedEvent>()("notifications:workflow-opened-event"),
   },
   agent: {
     getStatus: scopedQuery<AgentStatus>()("agent:get-status"),
