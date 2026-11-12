@@ -376,8 +376,11 @@ export function useChatMotion(
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
   }, []);
+  /** Counts the reader's drags, so that a placement of a row stops when the reader scrolls. */
+  const drags = useRef(0);
   const onScrollBeginDrag = useCallback(() => {
     // A drag is the reader's choice. A move of the list while rows get their sizes is not.
+    drags.current += 1;
     setOpeningFollow(false);
     leaveLatest();
     reveal();
@@ -387,11 +390,13 @@ export function useChatMotion(
   const openAt = useCallback(
     async (index: number): Promise<void> => {
       leaveLatest();
+      const startDrags = drags.current;
       let shown: number | null = null;
       try {
         for (let attempt = 0; attempt < FOCUS_PLACE_ATTEMPTS; attempt += 1) {
+          // The reader scrolled, or the list closed: the reader's position wins.
           const list = listRef.current;
-          if (!list) break;
+          if (!list || drags.current !== startDrags) break;
           await list.scrollToIndex({ index, viewOffset: header + FOCUS_GAP, animated: false });
           await afterLayout();
           const state = listRef.current?.getState();

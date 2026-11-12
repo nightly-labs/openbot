@@ -45,7 +45,6 @@ export function useMessagePins(serverId: string, agentId: string) {
     queryFn: () => workspace().loadMessagePins(agentId, serverId),
   });
   const pins = enabled ? (query.data?.pins ?? NO_PINS) : NO_PINS;
-  const pinned = useMemo(() => new Set(pins.map((pin) => pinKey(pin.taskId, pin.messageId))), [pins]);
   /** Pins or unpins one message. The host answers the new list. A failure rejects and keeps the list. */
   const setPinned = useCallback(
     async (taskId: string | null, messageId: string, next: boolean) => {
@@ -60,8 +59,6 @@ export function useMessagePins(serverId: string, agentId: string) {
   return {
     enabled,
     pins,
-    /** The keys (`pinKey`) of the pinned messages. */
-    pinned,
     loading: enabled && query.isPending,
     failed: enabled && query.isError && !query.data,
     refresh: () => void query.refetch(),
