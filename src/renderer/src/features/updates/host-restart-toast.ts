@@ -28,6 +28,22 @@ const RESTART_NOTICE_MS = 10 * 60_000;
 const toastId = (id: string) => `host-restart:${id}`;
 
 const [heldServers, setHeldServers] = createSignal<ReadonlySet<string>>(new Set());
+const [emptyServers, setEmptyServers] = createSignal<ReadonlySet<string>>(new Set());
+
+/**
+ * Records whether this window saw a server with no agents. The record outlives a server switch, which
+ * rebuilds the workspace: a server that the owner leaves during its setup, for example with the close
+ * button of its provider step, stays in its first run until this window sees its agents.
+ */
+export function noteServerAgents(serverId: string, empty: boolean): void {
+  setEmptyServers((current) => {
+    if (current.has(serverId) === empty) return current;
+    const next = new Set(current);
+    if (empty) next.add(serverId);
+    else next.delete(serverId);
+    return next;
+  });
+}
 
 /**
  * Holds the restart notice of a server whose hosted setup shows in this window: the owner sets the
@@ -60,7 +76,12 @@ export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView
   createEffect(
     () => {
       const held = heldServers();
-      return hosts().map((host) => ({ ...host, firstRun: host.firstRun || held.has(host.id) }));
+      const empty = emptyServers();
+      // A view that knows the agents of its server decides; the record of this window fills the others.
+      return hosts().map((host) => ({
+        ...host,
+        firstRun: Boolean(host.firstRun) || held.has(host.id) || (host.firstRun === undefined && empty.has(host.id)),
+      }));
     },
     (views) => {
       const { t } = currentText();

@@ -93,8 +93,8 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   const [toastClosed, setToastClosed] = createSignal(false);
   /**
    * A hosted server that starts and has no issue does what it must: it is not a failure, so it has no
-   * error code, and its toast waits as a long load does. The code that the connection gave while the
-   * server was not up yet stays in Details.
+   * error code, and its toast waits as a long load does. When the start fails, the issue makes the
+   * toast urgent again, with its code, Details and Retry.
    */
   const starting = () => props.phase === "waking" && !props.issue;
   const urgent = () =>

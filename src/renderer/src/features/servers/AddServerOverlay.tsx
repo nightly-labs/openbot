@@ -30,7 +30,7 @@ import {
 import { currentText, useText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { Portal } from "@solidjs/web";
-import { createEffect, createStore, Loading, onSettled, type ParentProps, Show, untrack } from "solid-js";
+import { createEffect, createSignal, createStore, Loading, onSettled, type ParentProps, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
 import { AddServerDialog, HostedPricingPage } from "../../lazy-views";
@@ -46,6 +46,12 @@ const TERMS_URL = "https://openbot.run/terms";
 
 /** How often the dialog reads the new server while it waits for the payment and the setup. */
 const SETUP_POLL_INTERVAL_MS = 3_000;
+/**
+ * How long a running server on the rail can stay without an answer before the setup offers it anyway.
+ * A rail that cannot report the server, such as a browser with no status connections, never says
+ * that it is online. The server then opens with its own connection notice, which has Retry.
+ */
+const RAIL_ANSWER_WAIT_MS = 60_000;
 
 type AddServerCalls = Pick<HostedServersDesktopApi, "list" | "plans" | "create" | "openCheckout" | "wake">;
 
@@ -273,6 +279,17 @@ function AddServerSession(
     }
   }
 
+  const onRail = (serverId: string) => props.servers.find((entry) => entry.id === serverId);
+  const [railWaitOver, setRailWaitOver] = createSignal(false);
+  createEffect(
+    () => state.server?.state === "running" && Boolean(onRail(state.server.serverId)),
+    (running) => {
+      if (!running) return;
+      const timer = window.setTimeout(() => setRailWaitOver(true), RAIL_ANSWER_WAIT_MS);
+      return () => window.clearTimeout(timer);
+    },
+  );
+
   const setupStatus = (): HostedServerSetupStatus | null => {
     const server = state.server;
     if (!server) return null;
@@ -287,12 +304,11 @@ function AddServerSession(
       // The machine runs before OpenBot on it answers. The server is ready when OpenBot on it
       // answered this client, so "Open server" opens a server that works and not a start notice.
       // A server of another version also answered: it shows its own notice when it opens.
-      case "running":
-        return props.servers.some(
-          (entry) => entry.id === server.serverId && (entry.state === "online" || entry.state === "incompatible"),
-        )
-          ? "ready"
-          : "connecting";
+      case "running": {
+        const entry = onRail(server.serverId);
+        if (!entry) return "connecting";
+        return entry.state === "online" || entry.state === "incompatible" || railWaitOver() ? "ready" : "connecting";
+      }
       default:
         return "error";
     }
@@ -325,7 +341,7 @@ function AddServerSession(
         props.calls.list().catch(() => null),
         // Only a server that is not on the rail yet needs a new read. A server on the rail connects by
         // itself, and a new read would start its connection again.
-        setupStatus() === "connecting" && !props.servers.some((entry) => entry.id === serverId)
+        setupStatus() === "connecting" && !onRail(serverId)
           ? props.onRefreshServers?.().catch(() => undefined)
           : undefined,
       ]);

@@ -35,7 +35,7 @@ import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
-import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
@@ -300,9 +300,7 @@ export function WorkspaceShell(props: {
     />
   );
 
-  // A server that this window saw with no agents stays in its first run after the owner leaves it,
-  // for example with the close button of its provider step, until it shows agents.
-  const [emptyServers, setEmptyServers] = createSignal<ReadonlySet<string>>(new Set());
+  // A server that this window saw with no agents stays in its first run after the owner leaves it.
   createEffect(
     () => {
       const server = activeServer();
@@ -311,14 +309,7 @@ export function WorkspaceShell(props: {
         : null;
     },
     (seen) => {
-      if (!seen) return;
-      setEmptyServers((current) => {
-        if (current.has(seen.id) === seen.empty) return current;
-        const next = new Set(current);
-        if (seen.empty) next.add(seen.id);
-        else next.delete(seen.id);
-        return next;
-      });
+      if (seen) noteServerAgents(seen.id, seen.empty);
     },
   );
 
@@ -333,10 +324,9 @@ export function WorkspaceShell(props: {
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
               // Until the agents load, the open server could be new; a notice that waits shows after them.
-              firstRun:
-                server.id === activeServer()?.id
-                  ? !agentListSettled() || agentList().length === 0
-                  : emptyServers().has(server.id),
+              ...(server.id === activeServer()?.id
+                ? { firstRun: !agentListSettled() || agentList().length === 0 }
+                : {}),
             },
           ]
         : [],

@@ -259,12 +259,14 @@ export function createSetupProviders(
     return onboardingProviderRows(providerOptions(), [...planRowIds(rows.listed), saved], freeRow(), host);
   });
   /**
-   * Whether each provider has reported its state. Until then the row rule can still change the
-   * list. After that the list keeps its rows, as after the first action of the user, so a status
-   * that changes later does not move a row.
+   * Whether each provider of a server has reported its state. Until then the row rule can still change
+   * the list. After that the list keeps its rows, as after the first action of the user, so a status
+   * that changes later does not move a row. The setup of this computer keeps the rule, so a CLI that
+   * the user installs during it can still move up.
    */
   const providersReported = createMemo(
     () =>
+      Boolean(props.hostProviders) &&
       props.agentStatus.phase !== "starting" &&
       props.agentStatus.phase !== "restarting" &&
       providerOptions().every((option) => option.state !== "checking"),
