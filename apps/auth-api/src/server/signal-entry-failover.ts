@@ -3,9 +3,8 @@ import { type RemoteSignalPlan, remoteSignalPlan, signalAnswers } from "./remote
 import type { WorkerBindings } from "./types";
 
 /**
- * The cron that runs only the entry check and the pool snapshot (`worker-handler.ts`). The other scheduled
- * jobs keep their own cron. Cloudflare reads `*\/1` as each minute, and `controller.cron` keeps the text,
- * so the two crons stay apart.
+ * The cron that runs only the entry check. The other scheduled jobs keep their own cron. Cloudflare
+ * reads `*\/1` as each minute, and `controller.cron` keeps the text, so the two crons stay apart.
  */
 export const SIGNAL_ENTRY_CRON = "*/1 * * * *";
 const CLOUDFLARE_API = "https://api.cloudflare.com/client/v4";

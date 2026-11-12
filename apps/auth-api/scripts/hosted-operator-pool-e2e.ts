@@ -462,12 +462,12 @@ async function run() {
     bodies,
   );
 
-  // The each-minute cron of the Worker sends the snapshot at each minute; the five-minute cron sends none.
-  const scheduledAt = t0 + OPERATOR_HOST_DATA_KEPT_MS + 7 * MINUTE;
-  const snapshots = await scheduledSnapshots(database, scheduledAt, SIGNAL_ENTRY_CRON);
+  // The five-minute cron of the Worker sends the snapshot at each run; the each-minute cron sends none.
+  const scheduledAt = t0 + OPERATOR_HOST_DATA_KEPT_MS + 5 * MINUTE;
+  const snapshots = await scheduledSnapshots(database, scheduledAt, FIVE_MINUTE_CRON);
   const expected = await pool(scheduledAt);
   check(
-    "the each-minute cron sends one snapshot for each group at a minute that is not on the hour",
+    "the five-minute cron sends one snapshot for each group at a minute that is not on the hour",
     snapshots.length === expected.groups.length &&
       expected.groups.every((group) =>
         snapshots.some((body) =>
@@ -476,8 +476,8 @@ async function run() {
       ),
     { snapshots, expected: expected.groups },
   );
-  const fiveMinuteRun = await scheduledSnapshots(database, scheduledAt + 3 * MINUTE, FIVE_MINUTE_CRON);
-  check("the five-minute cron sends no snapshot", fiveMinuteRun.length === 0, fiveMinuteRun);
+  const minuteRun = await scheduledSnapshots(database, scheduledAt + 3 * MINUTE, SIGNAL_ENTRY_CRON);
+  check("the each-minute cron sends no snapshot", minuteRun.length === 0, minuteRun);
 
   // On reinstalled machines: a plan whose renewal page is still open, and a first payment that never came.
   const late = t0 + 40 * DAY;

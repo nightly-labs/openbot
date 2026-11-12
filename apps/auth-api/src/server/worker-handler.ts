@@ -100,13 +100,7 @@ export function createWorkerHandler(
     ) {
       const bindings = { ...workerBindings, DB: observedD1(workerBindings.DB) };
       if (controller.cron === SIGNAL_ENTRY_CRON) {
-        // The pool snapshot runs each minute beside the entry check. The entry check can change DNS, so
-        // a failed snapshot fails the run only after the check ends. The first failure fails the run.
-        const results = await Promise.allSettled([
-          runSignalEntryCheck(bindings),
-          runApiEffect(tickHostedPool(bindings, controller.scheduledTime)),
-        ]);
-        for (const result of results) if (result.status === "rejected") throw result.reason;
+        await runSignalEntryCheck(bindings);
         return;
       }
       const now = controller.scheduledTime;
@@ -129,11 +123,12 @@ export function createWorkerHandler(
               bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
             ),
             Effect.exit(tickSalesAnalytics(bindings, now)),
+            Effect.exit(tickHostedPool(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit]),
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]),
           ),
         ),
       );
@@ -177,9 +172,9 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
 });
 
 /**
- * Each minute, the machines of the operator by location, product and state, for the "Server pool" dashboard
- * (docs/hosted-servers.md#reuse-a-pool-machine). Its reports count one snapshot in each minute. The scheduled
- * handler has no `waitUntil`, so the run waits for each send.
+ * Each 5 minutes, the machines of the operator by location, product and state, for the "Server pool"
+ * dashboard (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the
+ * run waits for each send.
  */
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;

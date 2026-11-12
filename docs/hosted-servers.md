@@ -1467,12 +1467,13 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
 turns off the password, and the script refuses a list without such a key.
 
-The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each minute, the
+The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each 5 minutes, the
 production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
 `location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. Each
-report shows one value for each minute, and the newest minute is the current pool. Set the dashboard
-range to 30 minutes or one hour: a longer range uses a longer interval, which adds up more than one
-snapshot. The snapshot counts each machine in one state:
+report is a bar with the largest value of the snapshots in the last 30 minutes. Two local patches of
+the OpenPanel dashboard make this work: a bar with the `max` metric reads the value of each minute,
+and a tile with its own 30-minute range keeps it when the dashboard date picker has a longer range.
+A longer interval adds up more than one snapshot. The snapshot counts each machine in one state:
 
 | State | Machine |
 | --- | --- |
