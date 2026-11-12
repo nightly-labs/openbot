@@ -1867,7 +1867,7 @@ export class OpenBotToolRouter {
           : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
-          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+          "Use this tool only in a routine run, for a teammate's message that wants no answer, or after you sent the result of a teammate's request with openbot.send_message.",
         );
       return openBotToolResult(
         outcome === "quiet"

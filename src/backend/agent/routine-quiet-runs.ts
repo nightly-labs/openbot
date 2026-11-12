@@ -62,14 +62,16 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
  * Whether a teammate's message may start a quiet turn: it wants no answer and does not reply to a
  * message of this agent, so it is information only and nobody waits for the turn. A provider such
  * as Claude Code makes the model write a visible answer, so without the no-update tool each such
- * update puts filler in the user's chat (#6821). A reply to this agent's message can hold the result
- * that the user asked for, so it is never quiet.
+ * update puts filler in the user's chat (#6821). A request is quiet too once the agent `answered` it
+ * with openbot.send_message: the result went to the sender, and nobody else waits for the turn
+ * (#7585). A reply to this agent's message can hold the result that the user asked for, so it is
+ * never quiet.
  */
-export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+export function quietTeammateDelivery(delivery: QueueDelivery, answered = false): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
-    delivery.expectsReply === false &&
+    (delivery.expectsReply === false || answered) &&
     !delivery.replyToMessageId
   );
 }

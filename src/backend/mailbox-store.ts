@@ -266,6 +266,9 @@ export interface CommittedChannelAttachments {
 /** The most completed messages that one `conversationMessages` read returns. */
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
 
+/** The idempotency key prefix of a turn's answer that OpenBot relays to the agent that asked. */
+export const AUTO_RESULT_KEY = "auto-result:";
+
 /**
  * A lane id for the channel thread of one channel. A task id never starts with this control
  * character, so a lane id names a task or a channel without a second field.
@@ -2167,6 +2170,25 @@ export class MailboxStore {
     return this.#state.messages.some(
       (message) =>
         message.sender.kind === "agent" && message.sender.agentId === agentId && message.replyToMessageId === messageId,
+    );
+  }
+
+  /**
+   * Whether the agent answered the message itself with openbot.send_message. The answer that OpenBot
+   * relays for a turn (`AUTO_RESULT_KEY`) does not count: that turn showed its answer to the user.
+   */
+  hasSentReplyFrom(agentId: string, messageId: string): boolean {
+    const relayed = new Set(
+      Object.entries(this.#state.idempotency)
+        .filter(([key]) => key.startsWith(AUTO_RESULT_KEY) && key.endsWith(`:${messageId}`))
+        .map(([, id]) => id),
+    );
+    return this.#state.messages.some(
+      (message) =>
+        message.sender.kind === "agent" &&
+        message.sender.agentId === agentId &&
+        message.replyToMessageId === messageId &&
+        !relayed.has(message.id),
     );
   }
 

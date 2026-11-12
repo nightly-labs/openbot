@@ -74,6 +74,11 @@ export interface ProviderHistoryImportInput {
    * routine's side thread, as at the turn completion. Left out, it cannot.
    */
   quietTeammateThread?: boolean;
+  /**
+   * Whether this agent answered the message with openbot.send_message, so a teammate's request can
+   * have ended quiet too (`quietTeammateDelivery`). Left out, it cannot.
+   */
+  answeredMessage?(messageId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -309,7 +314,8 @@ function routineTurnAnswers(
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
           routine =
             delivery !== undefined &&
-            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
+            ((input.quietTeammateThread === true &&
+              quietTeammateDelivery(delivery, input.answeredMessage?.(delivery.messageId) === true)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;

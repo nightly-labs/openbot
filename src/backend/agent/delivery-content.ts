@@ -311,6 +311,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           ]
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
+            `After you send it, when nothing in the request is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
             "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
             "Never acknowledge without a Status line.",
