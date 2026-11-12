@@ -781,6 +781,9 @@ export class HostedServerService {
     yield* Effect.gen({ self: this }, function* () {
       if (!(yield* billing.subscriptionEnded(newest.stripe_subscription_id).pipe(Effect.mapError(hostedFailure))))
         return;
+      // As in `#cancelPlans`: a renewal that the owner paid just now keeps the server, and its webhook starts it.
+      const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
+      if (checkout && (yield* this.#closeCheckout(checkout)) === "paid") return;
       const claimed = yield* hostedCall(() =>
         dependencies.database
           .prepare(
@@ -1474,7 +1477,11 @@ export class HostedServerService {
         dependencies.database
           .prepare(
             `SELECT ${ROW_COLUMNS}, plan_ended_at FROM hosted_servers
-         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ? LIMIT ?`,
+         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ?
+           AND EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id)
+           AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+             AND s.status IN ${OPEN_STATUSES_SQL})
+         ORDER BY plan_ended_at LIMIT ?`,
           )
           .bind(now - OPERATOR_HOST_DATA_KEPT_MS, TICK_BATCH_SIZE)
           .all<HostedServerRow & { plan_ended_at: number }>(),

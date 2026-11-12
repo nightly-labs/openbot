@@ -21,7 +21,7 @@ class HostedPoolSnapshotError extends Schema.TaggedError<HostedPoolSnapshotError
  *
  * `free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews:
  * the free ones, the ones to reinstall, and each other one whose date is in the time. A plan that ended
- * with a subscription that Stripe still retries (`unpaid`) has no date.
+ * with a subscription that Stripe still retries (`unpaid`), or with no subscription, has no date.
  */
 export interface HostedPoolGroup {
   location: string;
@@ -47,6 +47,7 @@ interface PoolRow {
   cancel_period_end: number | null;
   renewing: number;
   open_plan: number;
+  any_plan: number;
 }
 
 /** The subscription columns of the server of each machine. */
@@ -56,7 +57,8 @@ const PLAN_COLUMNS = `h.server_id, h.desired_state, h.observed_state, h.plan_end
   EXISTS(SELECT 1 FROM billing_subscriptions s
     WHERE s.server_id = h.server_id AND s.status IN ${OPEN_STATUSES_SQL} AND s.cancel_at_period_end = 0) AS renewing,
   EXISTS(SELECT 1 FROM billing_subscriptions s
-    WHERE s.server_id = h.server_id AND s.status IN ${OPEN_STATUSES_SQL}) AS open_plan`;
+    WHERE s.server_id = h.server_id AND s.status IN ${OPEN_STATUSES_SQL}) AS open_plan,
+  EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = h.server_id) AS any_plan`;
 
 /**
  * The machines of the pool, one group for each location and product, and one `all` group. A machine that
@@ -124,7 +126,8 @@ function machineState(row: PoolRow, now: number): { state: MachineState; freeAt:
   if (row.desired_state === "stopped") {
     return {
       state: "plan_ended",
-      freeAt: row.open_plan ? null : (row.plan_ended_at ?? now) + OPERATOR_HOST_DATA_KEPT_MS,
+      // The cron deletes only a server whose subscription Stripe ended, so a server with no subscription stays.
+      freeAt: row.open_plan || !row.any_plan ? null : (row.plan_ended_at ?? now) + OPERATOR_HOST_DATA_KEPT_MS,
     };
   }
   if (row.deletion_scheduled_at !== null) return { state: "cancel_scheduled", freeAt: row.deletion_scheduled_at };

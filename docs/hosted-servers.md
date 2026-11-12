@@ -1338,7 +1338,8 @@ snapshot counts each machine in one state:
 
 `free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews.
 A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
-subscription that Stripe still retries has no date. A server that names a machine that is not in the
+subscription that Stripe still retries, or with no subscription, has no date: the cron does not delete
+that server. A server that names a machine that is not in the
 pool is in the group `unknown`: add the machine. `bun run test:hosted-operator-pool` checks the
 delete, the snapshot and its event on the real service with a fake Stripe and a fake boat.
 

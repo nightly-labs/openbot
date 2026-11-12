@@ -170,7 +170,8 @@ class Pool {
     const accounts = known ? this.#keys.filter(({ key }) => key === known.key) : this.#keys;
     for (const account of accounts) {
       const response = await this.#leaseweb(account.key, `/${id}`);
-      if (response.status === 403 || response.status === 404) continue;
+      // A key that Leaseweb refuses (401) must not stop the work on the machines of the other accounts.
+      if (response.status === 401 || response.status === 403 || response.status === 404) continue;
       if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for VPS ${id} (${account.name}).`);
       const machine = toVps(await response.json(), account.key);
       this.#found.set(id, machine);
@@ -189,9 +190,22 @@ class Pool {
 
   #ssh(machine: Vps, remoteCommand: string) {
     if (!machine.address) throw new Error(`VPS ${machine.id} has no public IPv4 address.`);
-    execFileSync("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=20", `root@${machine.address}`, remoteCommand], {
-      stdio: ["ignore", "inherit", "inherit"],
-    });
+    // A machine of the pool is new to this computer, or has new host keys after its reinstall
+    // (`#reinstall` removes the old ones), so ssh accepts a key that it does not know.
+    execFileSync(
+      "ssh",
+      [
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ConnectTimeout=20",
+        `root@${machine.address}`,
+        remoteCommand,
+      ],
+      { stdio: ["ignore", "inherit", "inherit"] },
+    );
   }
 
   #work() {
@@ -273,10 +287,21 @@ class Pool {
 
   async sync() {
     const work = this.#work();
-    for (const row of work.stop) await this.#runService(row, "stopped");
-    for (const row of work.start) await this.#runService(row, "running");
-    for (const row of work.reinstall) await this.#reinstall(row);
+    // One machine that does not answer must not stop the work on the other machines.
+    let failed = 0;
+    const each = async (row: WorkRow, task: (row: WorkRow) => Promise<void>) => {
+      try {
+        await task(row);
+      } catch (error) {
+        failed += 1;
+        logger.error(`The work on ${row.operator_host} (server ${row.server_id}) failed.`, toLogValue(error));
+      }
+    };
+    for (const row of work.stop) await each(row, (item) => this.#runService(item, "stopped"));
+    for (const row of work.start) await each(row, (item) => this.#runService(item, "running"));
+    for (const row of work.reinstall) await each(row, (item) => this.#reinstall(item));
     if (!this.#apply) logger.info("Nothing changed. Run again with --apply.");
+    if (failed > 0) throw new Error(`${failed} machines failed. Run sync again.`);
   }
 
   /** Stops or starts OpenBot on the machine, then records the state that the Worker asked for. */
@@ -308,13 +333,16 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`Reinstall VPS ${machine.id}: server ${row.server_id} is deleted.`);
     if (!this.#apply) return;
+    // Without the keys before the reinstall, the wait cannot tell the new system from the old one.
     const oldKeys = this.#hostKeys(machine);
+    if (oldKeys === "") throw new Error(`VPS ${machine.id} does not answer on SSH, so it is not reinstalled.`);
     const response = await this.#leaseweb(machine.key, `/${machine.id}/reinstall`, {
       method: "PUT",
       body: JSON.stringify({ imageId: IMAGE }),
     });
     if (!response.ok) throw new Error(`Leaseweb refused the reinstall of VPS ${machine.id}: ${response.status}.`);
     await this.#waitForReinstall(machine, oldKeys);
+    this.#forgetHostKeys(machine);
     await this.#setReference(machine, POOL_FREE);
     const changes = this.#write(
       `UPDATE hosted_servers SET operator_host = NULL, updated_at = ${literal(Date.now())}
@@ -324,10 +352,6 @@ class Pool {
     logger.info(changes === 1 ? `VPS ${machine.id} is free.` : `The row of server ${row.server_id} changed.`);
   }
 
-  /**
-   * Waits until Leaseweb reports the machine as running after the reinstall. The first reinstalls opened SSH
-   * in under 50 seconds. A move runs its bootstrap over SSH, so a disk that is not ready stops the move.
-   */
   /**
    * Leaseweb shows `RUNNING` for the whole reinstall (smoke of 2026-11-11), so the state does not tell when
    * it ends. The new system makes new SSH host keys: the reinstall is done when the machine shows keys that
@@ -341,6 +365,15 @@ class Pool {
       if (keys !== "" && keys !== oldKeys) return;
     }
     throw new Error(`VPS ${machine.id} did not finish its reinstall in ${REINSTALL_WAIT_MS / 60_000} minutes.`);
+  }
+  /** Removes the old host keys of the machine from `known_hosts`, so that the next `#ssh` accepts the new ones. */
+  #forgetHostKeys(machine: Vps) {
+    if (!machine.address) return;
+    try {
+      execFileSync("ssh-keygen", ["-R", machine.address], { stdio: "ignore" });
+    } catch {
+      // No `known_hosts` file: there is no old key to remove.
+    }
   }
   /** The SSH host keys of the machine, or an empty text when SSH does not answer. */
   #hostKeys(machine: Vps) {

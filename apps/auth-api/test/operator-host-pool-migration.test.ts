@@ -91,6 +91,7 @@ describe("operator host pool migration", () => {
     for (const [host, location, product] of [
       ["sbx_1", "AMS-01", "VPS02"],
       ["leaseweb:", "AMS-01", "VPS02"],
+      ["leaseweb:1abc", "AMS-01", "VPS02"],
       ["leaseweb:12728114", "ams-01", "VPS02"],
       ["leaseweb:12728114", "AMS-01 <b>", "VPS02"],
       ["leaseweb:12728114", "AMS-01", "vps2"],
