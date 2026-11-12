@@ -247,6 +247,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "7a0d7ffb21a2bffd98f2b8e08e7dd9e778ee5054a96cfd69d791d77233aafd12",
     },
     {
+      slug: "trypost",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "0d25c76e1e3fb85fd265d7c588b9e494af646178ff893cead65a51b9ec0b8354",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -3052,6 +3058,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://postiz.com",
     privacyPolicyUrl: "https://postiz.com/privacy",
     termsUrl: "https://postiz.com/terms",
+    skills: [],
+  },
+  trypost: {
+    slug: "trypost",
+    name: "TryPost",
+    tagline: "Social media scheduling",
+    description:
+      "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "TryPost",
+    iconUrl: "https://app.trypost.it/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+      { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+    ],
+    apps: [
+      {
+        id: "app-trypost-mcp",
+        name: "TryPost",
+        description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+        iconUrl: "https://app.trypost.it/apple-touch-icon.png",
+        server: {
+          name: "trypost",
+          transport: "http",
+          url: "https://app.trypost.it/mcp/trypost",
+          auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://trypost.it",
+    privacyPolicyUrl: "https://trypost.it/en/privacy",
+    termsUrl: "https://trypost.it/en/terms",
     skills: [],
   },
   composio: {

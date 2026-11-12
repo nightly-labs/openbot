@@ -427,6 +427,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
   "marketplace.plugin.postiz.prompt.draft":
     "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.trypost.description":
+    "TryPost, ajanların bağlı kanallarınızı listelemesini ve X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest ve daha fazlasında gönderi taslağı hazırlamasını, planlamasını, sıraya eklemesini ve yayınlamasını sağlar. Ajanlar ayrıca analizleri okuyabilir, fikirleri ve onayları yönetebilir ve yayın saatlerini ayarlayabilir. Tarayıcıda TryPost hesabınıza giriş yapın ve bir çalışma alanı seçin. Ajanlar bir gönderiyi hemen yayınlayabilir, bu yüzden onaylamadan önce her gönderiyi gözden geçirin.",
+  "marketplace.plugin.trypost.app":
+    "Kanallar, gönderiler, sıra, fikirler ve analizler; tarayıcıda giriş ile TryPost'un MCP sunucusu üzerinden.",
+  "marketplace.plugin.trypost.prompt.week": "Bu hafta hangi gönderiler planlandı?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.prompt.analytics": "Geçen ayki gönderilerimden hangileri en çok etkileşim aldı?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",

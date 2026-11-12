@@ -376,6 +376,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "Postiz에 연결된 소셜 미디어 채널은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.week": "다음 주에 예약된 게시물은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성해 줘. 단, 예약하지는 마.",
+  "marketplace.plugin.trypost.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.trypost.description":
+    "TryPost를 사용하면 에이전트가 연결된 채널을 확인하고 X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest 등에 게시물을 작성, 예약, 대기열에 추가, 게시할 수 있습니다. 에이전트는 분석을 읽고, 아이디어와 승인을 관리하고, 게시 시간을 설정할 수도 있습니다. 브라우저에서 TryPost 계정에 로그인하고 워크스페이스를 선택하세요. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
+  "marketplace.plugin.trypost.app":
+    "브라우저 로그인을 사용하는 TryPost MCP 서버를 통한 채널, 게시물, 대기열, 아이디어, 분석.",
+  "marketplace.plugin.trypost.prompt.week": "이번 주에 예약된 게시물은 무엇인가요?",
+  "marketplace.plugin.trypost.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성하되, 예약하지는 마세요.",
+  "marketplace.plugin.trypost.prompt.analytics": "지난달 내 게시물 중 참여가 가장 많았던 것은 무엇인가요?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",

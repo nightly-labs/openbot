@@ -410,6 +410,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
   "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
   "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.tagline": "جدولة وسائل التواصل الاجتماعي",
+  "marketplace.plugin.trypost.description":
+    "يتيح TryPost للوكلاء عرض قنواتك المتصلة، وكتابة المنشورات وجدولتها وإضافتها إلى قائمة الانتظار ونشرها على X وLinkedIn وInstagram وFacebook وTikTok وYouTube وThreads وBluesky وMastodon وPinterest وغيرها. ويمكن للوكلاء أيضًا قراءة التحليلات وإدارة الأفكار والموافقات وتحديد أوقات النشر. سجّل الدخول إلى حسابك في TryPost عبر المتصفح واختر مساحة عمل. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.trypost.app":
+    "القنوات والمنشورات وقائمة الانتظار والأفكار والتحليلات، عبر خادم MCP الخاص بـ TryPost مع تسجيل الدخول من المتصفح.",
+  "marketplace.plugin.trypost.prompt.week": "ما المنشورات المجدولة لهذا الأسبوع؟",
+  "marketplace.plugin.trypost.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.prompt.analytics": "أي من منشوراتي في الشهر الماضي حصل على أكبر تفاعل؟",
   "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
     "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",

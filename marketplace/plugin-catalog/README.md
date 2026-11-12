@@ -216,6 +216,25 @@ Troubleshooting:
   instance (`NEXT_PUBLIC_BACKEND_URL`) followed by `/mcp`, and the same
   `Authorization` header, in the MCP servers settings.
 
+## TryPost
+
+The listing connects to TryPost's own MCP server at `https://app.trypost.it/mcp/trypost`
+(<https://docs.trypost.it/ai/introduction>). It answers 401 with a `Bearer` challenge. The
+protected-resource metadata names `https://app.trypost.it`, which has dynamic client registration
+with S256, so the user signs in through the browser and types no key. On the consent screen, the
+user chooses the workspace that the connection can use. One connection works on one workspace.
+
+TryPost Cloud needs an active subscription for MCP. A self-hosted TryPost does not.
+
+Troubleshooting:
+
+- The server replies 402 with "Active subscription required.": the TryPost Cloud account of the
+  workspace has no active subscription. Subscribe in TryPost, then test the server again.
+- The agent does not see the posts or channels that the user expects: the connection uses another
+  workspace. Sign out of the app and sign in again, and choose the correct workspace.
+- A self-hosted TryPost: add an MCP server with the address of the instance followed by
+  `/mcp/trypost`, in the MCP servers settings, and select Sign in.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`

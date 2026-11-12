@@ -427,6 +427,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Quels posts sont planifiés pour la semaine prochaine ?",
   "marketplace.plugin.postiz.prompt.draft":
     "Rédige un post LinkedIn sur notre nouvelle version, mais ne le planifie pas.",
+  "marketplace.plugin.trypost.tagline": "Planification des réseaux sociaux",
+  "marketplace.plugin.trypost.description":
+    "TryPost permet aux agents de lister vos canaux connectés, et de rédiger, planifier, mettre en file d'attente et publier des posts sur X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest et plus encore. Les agents peuvent aussi lire les statistiques, gérer les idées et les approbations, et définir les horaires de publication. Connectez-vous à votre compte TryPost dans le navigateur et choisissez un espace de travail. Les agents peuvent publier un post immédiatement, donc vérifiez chaque post avant de l'approuver.",
+  "marketplace.plugin.trypost.app":
+    "Canaux, posts, file d'attente, idées et statistiques, via le serveur MCP de TryPost avec connexion dans le navigateur.",
+  "marketplace.plugin.trypost.prompt.week": "Quels posts sont planifiés cette semaine ?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Rédige un post LinkedIn sur notre nouvelle version, mais ne le planifie pas.",
+  "marketplace.plugin.trypost.prompt.analytics": "Lesquels de mes posts du mois dernier ont eu le plus d'engagement ?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub et plus de 1 000 autres apps",
   "marketplace.plugin.composio.description":
     "Composio connecte vos agents à Gmail, Slack, GitHub et plus de 1 000 autres apps via un seul serveur MCP. Connectez-vous avec votre compte Composio. Quand un agent a besoin d’une app, il vous demande de la connecter.",

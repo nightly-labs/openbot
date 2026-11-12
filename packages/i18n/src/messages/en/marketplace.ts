@@ -428,6 +428,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.postiz.prompt.channels": "Which social media channels are connected to Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Which posts are scheduled for next week?",
   "marketplace.plugin.postiz.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.tagline": "Social media scheduling",
+  "marketplace.plugin.trypost.description":
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.trypost.app":
+    "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+  "marketplace.plugin.trypost.prompt.week": "Which posts are scheduled for this week?",
+  "marketplace.plugin.trypost.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.prompt.analytics": "Which of my posts from last month had the most engagement?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
