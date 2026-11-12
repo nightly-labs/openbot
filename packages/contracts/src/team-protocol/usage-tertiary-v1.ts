@@ -1,6 +1,7 @@
 import { isAccountUsageWindow } from "../ipc-agent-status";
 import { isDynamicRecord } from "../runtime-values";
 import { TEAM_API_ROUTES } from "../team-api-routes";
+import { scopedUsageRoute } from "./current-adapter-routes";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
 
 /**
@@ -24,9 +25,10 @@ export const TEAM_USAGE_TERTIARY_CAPABILITY = "usage-tertiary-v1";
 
 /** The two usage routes whose response is a usage reading. */
 export function isUsageRoute(method: string, path: string): boolean {
-  if (method !== "GET") return false;
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  return pathname === TEAM_API_ROUTES.agents.usage || /^\/v1\/agents\/[^/]+\/usage$/u.test(pathname);
+  return (
+    (method === "GET" && new URL(path, "http://openbot.invalid").pathname === TEAM_API_ROUTES.agents.usage) ||
+    scopedUsageRoute(method, path)
+  );
 }
 
 /** The window with only the v1 keys, or null for a value that the v1 shape cannot describe. */
