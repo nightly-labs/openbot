@@ -57,16 +57,17 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
  * messages before it and keeps its setup. The host refuses while the agent works, and its reason
  * shows in the alert.
  */
-export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function useAgentNewChat(agent: MobileAgent) {
   const { t } = useText();
   const { startNewChat } = useMobileWorkspaceActions();
   const [starting, setStarting] = useState(false);
 
-  function start(): void {
+  function start(onStarted?: () => void): void {
     setStarting(true);
     startNewChat(agent.id, agent.serverId)
       .then(() => {
         void haptics.notification("success");
+        onStarted?.();
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
@@ -81,21 +82,24 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
       .finally(() => setStarting(false));
   }
 
+  return {
+    starting,
+    confirm(onStarted?: () => void): void {
+      if (starting) return;
+      Alert.alert(t("mobile.agent.newChat.confirmTitle", { name: agent.name }), t("mobile.agent.newChat.confirmBody"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("mobile.agent.newChat.confirm"), onPress: () => start(onStarted) },
+      ]);
+    },
+  };
+}
+
+export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+  const { t } = useText();
+  const { starting, confirm } = useAgentNewChat(agent);
   return (
     <SettingsSection footer={t("mobile.agent.newChat.footer")}>
-      <SettingsRow
-        disabled={!available || starting}
-        onPress={() =>
-          Alert.alert(
-            t("mobile.agent.newChat.confirmTitle", { name: agent.name }),
-            t("mobile.agent.newChat.confirmBody"),
-            [
-              { text: t("common.cancel"), style: "cancel" },
-              { text: t("mobile.agent.newChat.confirm"), onPress: start },
-            ],
-          )
-        }
-      >
+      <SettingsRow disabled={!available || starting} onPress={() => confirm()}>
         <Typography.Paragraph>
           {t(starting ? "mobile.agent.newChat.starting" : "mobile.agent.newChat.title")}
         </Typography.Paragraph>

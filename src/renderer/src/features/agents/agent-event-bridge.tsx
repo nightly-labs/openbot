@@ -421,7 +421,8 @@ export function AgentEventBridge() {
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
           setConversationErrorRuns((current) => {
-            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
+            if (run || link || event.code === "codex_safety_stop")
+              return { ...current, [key]: { message, run, code: event.code, ...(link ? { link } : {}) } };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;

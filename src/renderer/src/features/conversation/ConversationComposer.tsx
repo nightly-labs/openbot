@@ -18,6 +18,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
+import { AgentNewChatDialog } from "@openbot/ui/features/conversation/AgentNewChatDialog";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -75,6 +76,11 @@ export function ConversationComposer() {
     currentChatError,
     currentChatErrorReference,
     currentChatErrorRun,
+    currentChatSafetyStop,
+    startNewChat,
+    newChatRequest,
+    requestNewChat,
+    closeNewChat,
     currentChatErrorLink,
     currentDraft,
     dismissCurrentChatErrors,
@@ -242,8 +248,11 @@ export function ConversationComposer() {
     props.contextState?.agentId === props.agent?.id && props.contextState?.threadId === props.agent?.threadId
       ? props.contextState
       : undefined;
-  const newChat = () =>
-    props.agent && props.onClearAgentContext ? { agent: props.agent, start: props.onClearAgentContext } : undefined;
+  const newChat = createMemo(() => {
+    const agent = props.agent;
+    const start = startNewChat();
+    return agent && start ? { agent, start } : undefined;
+  });
   const compaction = () => {
     const value = context()?.compaction;
     return value && value.id !== dismissedCompactions()[currentChatConversationKey() ?? ""] ? value : null;
@@ -275,6 +284,12 @@ export function ConversationComposer() {
   };
   /** The button of the error banner: the fix that the error names, or none. */
   const errorBannerAction = () => {
+    if (currentChatSafetyStop() && newChat())
+      return (
+        <Button variant="outline" size="sm" type="button" onClick={() => requestNewChat()}>
+          {t("composer.newChat.action")}
+        </Button>
+      );
     const updateKey = updateOpenCodeKey();
     if (updateKey)
       return (
@@ -457,6 +472,11 @@ export function ConversationComposer() {
       fallback={<p class="channel-preview-notice">{t("channel.conversation.archivedNotice")}</p>}
     >
       <ComposerBody />
+      <Show when={newChatRequest()} keyed>
+        {(request) => (
+          <AgentNewChatDialog agent={request.agent} open={true} onClose={closeNewChat} start={request.start} />
+        )}
+      </Show>
     </Show>
   );
   /** Built again for each provider: a sign-in that failed for one provider says nothing about the next. */

@@ -172,7 +172,7 @@ export function createStableConversationState(
    * account (#2419), keyed like `conversationErrors`.
    */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string | null; link?: string }>
+    Record<string, { message: string; run: string | null; link?: string; code?: string }>
   >({});
   createEffect(
     () => {

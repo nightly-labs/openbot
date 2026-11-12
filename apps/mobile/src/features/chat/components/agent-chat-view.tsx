@@ -2,6 +2,7 @@ import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAgentNewChat } from "@/features/agents/components/agent-chat-settings";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
@@ -48,6 +49,8 @@ export function MobileChatView({
   onLeave: () => void;
 }) {
   const { t } = useText();
+  const newChat = useAgentNewChat(agent);
+  const canStartNewChat = useMobileWorkspaceSelector((current) => current.canStartNewChat(agent.serverId));
   const workspace = useMobileWorkspaceReader();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
@@ -350,6 +353,7 @@ export function MobileChatView({
   return (
     <ChatView
       target={target}
+      onNewChat={canStartNewChat ? (onStarted) => newChat.confirm(onStarted) : undefined}
       queue={queue}
       agents={serverAgents}
       mentionAgents={mentionAgents}

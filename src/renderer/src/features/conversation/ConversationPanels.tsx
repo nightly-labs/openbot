@@ -167,6 +167,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     sidebarFileBack,
     openSidebarFileBack,
     props,
+    startNewChat,
     setActiveRightPanel,
     setBrowserPanelWidth,
     setSettingsPanelWidth,
@@ -780,7 +781,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               agentDefaults={localAgentDefaults()}
               memoryLimit={agentMemoryLimit()}
               agents={props.agents}
-              onStartNewChat={props.onClearAgentContext}
+              onStartNewChat={startNewChat()}
               onDeleteHistory={props.onDeleteAgentHistory}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
