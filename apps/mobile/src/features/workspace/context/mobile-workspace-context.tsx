@@ -49,6 +49,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -2518,6 +2519,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageMcpServers: managesMcp,
       canRelayMcpSignIn: (serverId) =>
         managesMcp(serverId) && hasCapability(serverCapabilities.current, serverId, SIGN_IN_RELAY_CAPABILITY),
+      canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
       canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
       canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),
       canSendNotifications: (serverId) =>

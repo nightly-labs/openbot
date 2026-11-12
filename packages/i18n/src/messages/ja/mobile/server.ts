@@ -1087,6 +1087,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "ここで MCP サーバーを管理するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.mcp.unavailable":
     "MCP サーバーを管理するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.mcp.accessUnsupported":
+    "MCP サーバーを受け取る相手を選ぶには、このサーバーの OpenBot を更新してください。",
   "mobile.server.mcp.description":
     "MCP サーバーは、このサーバーのエージェントにツールを追加します。Claude と Codex のエージェントは、このリストのサーバーだけを使います。",
   "mobile.server.mcp.loading": "MCP サーバーを読み込み中…",
@@ -1157,6 +1159,21 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "{name} を削除しますか？",
   "mobile.server.mcp.removeBody": "このサーバーのエージェントはそのツールを使えなくなります。設定は保持されません。",
   "mobile.server.mcp.remove": "MCP サーバーを削除",
+  "mobile.server.mcp.access.title": "アクセス",
+  "mobile.server.mcp.access.agents": "エージェント",
+  "mobile.server.mcp.access.agentsOf": "{name} を使用できるエージェント",
+  "mobile.server.mcp.access.allAgents": "すべてのエージェント",
+  "mobile.server.mcp.access.allAgentsHint": "すべてのエージェントには、後で追加されるエージェントも含まれます。",
+  "mobile.server.mcp.access.noAgents": "エージェントなし",
+  "mobile.server.mcp.access.someAgents": "{count} / {total}",
+  "mobile.server.mcp.access.use": "使用可能",
+  "mobile.server.mcp.access.fromEveryone": "全員と同じ",
+  "mobile.server.mcp.access.level": "{name} への {role} のアクセス",
+  "mobile.server.mcp.access.hint":
+    "メンバーには、全員と自分のロールのうち最も高いレベルが適用されます。オーナー、管理者、サーバーを追加した人は常に管理できます。",
+  "mobile.server.mcp.access.loadFailed": "この MCP サーバーのアクセスを読み込めませんでした。",
+  "mobile.server.mcp.access.unavailable":
+    "この MCP サーバーを受け取る相手を選べるのは、オンラインのサーバーのオーナーまたは管理者だけです。",
   "mobile.server.usage.agents": "エージェント",
   "mobile.server.usage.agentLine": "トークン数 {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "この期間にはエージェントの使用量が記録されていません。",
