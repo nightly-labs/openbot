@@ -101,6 +101,13 @@ const DOCUMENT_ID_PROPERTY = "__openbot_browser_document_id__";
 const MAX_SNAPSHOT_FRAMES = 12;
 const DOM_QUIET_MS = 250;
 const CHOOSER_WAIT_MS = 5_000;
+/**
+ * Many page editors find the drop position in an animation frame that `dragover` requests. A drop
+ * before that frame finds no position and adds nothing, so a drag lets one frame render first. A
+ * tab can draw only one frame each second, and a tab that draws no frames waits only this limit.
+ */
+const DROP_FRAME_WAIT_MS = 1_500;
+const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
 
 type ActionDispatch = () => void;
 
@@ -1733,6 +1740,21 @@ export class BrowserCdpEngine {
           if (!dragData) return yield* browserFailure(new Error("The source did not start a native drag operation."));
           yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
+          // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
+          const frameWaitMs =
+            deadline === undefined
+              ? DROP_FRAME_WAIT_MS
+              : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+          if (frameWaitMs > 0) {
+            yield* Effect.gen(function* () {
+              const contextId = yield* automationContextId(send, sessionId);
+              yield* send(
+                "Runtime.evaluate",
+                { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
+                sessionId,
+              );
+            }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+          }
           yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send(
             "Input.dispatchMouseEvent",
