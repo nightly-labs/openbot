@@ -58,6 +58,12 @@ const FAILURE_CODES = {
   rotate_webhook_secret: "update_failed",
 } as const satisfies Record<WorkflowAnalyticsAction, string>;
 
+/** A workflow that the page must open, and the call that marks the request as taken. */
+export interface WorkflowRequest {
+  workflowId: () => string | undefined;
+  taken: () => void;
+}
+
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
 /**
@@ -73,7 +79,7 @@ type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features
 export function createWorkflowsController(
   host: WorkflowHost,
   analytics?: () => DesktopAnalyticsScope,
-  requested?: () => { workflowId: string } | undefined,
+  requested?: WorkflowRequest,
 ) {
   const { t, errorMessage } = useText();
   /** Reports how a user action ended. No title, text or ID leaves the app. */
@@ -390,19 +396,28 @@ export function createWorkflowsController(
   write(async () => {
     const list = await host.workflows.list();
     // Read after the list, so that a request that comes while the list loads opens.
-    const wanted = untrack(() => requested?.())?.workflowId;
+    const wanted = untrack(() => requested?.workflowId());
+    if (wanted !== undefined) requested?.taken();
     const first =
       list.find((summary) => summary.id === wanted) ??
       list[0] ??
       (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
     if (!disposed) await load(first.id);
   });
-  // A request after the first workflow opened. Before that, the first load reads the request.
+  // A request after the first workflow opened. Before that, the first load reads the request. The
+  // list is read again, as a workflow that an agent just made may not be in the library yet.
   createEffect(
-    () => requested?.(),
-    (request) => {
-      if (!request || current === "" || request.workflowId === current) return;
-      if (untrack(summaries).some((summary) => summary.id === request.workflowId)) open(request.workflowId);
+    () => requested?.workflowId(),
+    (workflowId) => {
+      if (workflowId === undefined || current === "") return;
+      requested?.taken();
+      if (workflowId === current) return;
+      flush();
+      closePreview();
+      write(async () => {
+        const list = await host.workflows.list();
+        if (!disposed && list.some((summary) => summary.id === workflowId)) await load(workflowId);
+      });
     },
   );
 

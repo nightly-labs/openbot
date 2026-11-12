@@ -181,7 +181,7 @@ const ServerSelection = createSimpleContext({
       const onServer = servers().find((server) => server.active)?.id === event.serverId;
       if (!onServer && !(await selectServer(event.serverId, false))) return;
       // The window page sits above the server scope, so it opens the page on the new server too.
-      windowPage.openWorkflows(null, event.workflowId);
+      windowPage.openWorkflows(null, event);
     }
 
     onSettled(() =>

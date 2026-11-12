@@ -202,11 +202,11 @@ const context = createSimpleContext({
         const serverId = activeServerId();
         if (serverId) usage.openSchedule(serverId, source);
       },
-      /** Opens the workflows page, on `workflowId` when it is given. */
-      openWorkflows(source: HTMLElement | null, workflowId?: string) {
+      /** Opens the workflows page of the active server, or on `workflow` when it is given. */
+      openWorkflows(source: HTMLElement | null, workflow?: { serverId: string; workflowId: string }) {
         leavePricing();
-        const serverId = activeServerId();
-        if (serverId) usage.openWorkflows(serverId, source, workflowId);
+        const serverId = workflow?.serverId ?? activeServerId();
+        if (serverId) usage.openWorkflows(serverId, source, workflow?.workflowId);
       },
       openUsage(source: HTMLElement | null) {
         leavePricing();

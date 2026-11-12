@@ -20,11 +20,10 @@ const context = createSimpleContext({
       view: "usage",
     });
     /**
-     * The workflow that the workflows page opens, such as the one of a clicked notification. Each call
-     * of `openWorkflows` sets a new object, so the open page opens it again after the user opened
-     * another workflow. Without it, the page opens its first workflow.
+     * The workflow that the workflows page of `serverId` opens, such as the one of a clicked
+     * notification. The page takes it once, so a later mount opens its first workflow again.
      */
-    const [workflowRequest, setWorkflowRequest] = createSignal<{ workflowId: string } | undefined>();
+    const [workflowRequest, setWorkflowRequest] = createSignal<{ serverId: string; workflowId: string }>();
     const { activeServerId } = useServers();
     let trigger: HTMLElement | null = null;
 
@@ -51,7 +50,7 @@ const context = createSimpleContext({
     }
 
     function openWorkflows(serverId: string, source: HTMLElement | null, workflowId?: string) {
-      setWorkflowRequest(workflowId === undefined ? undefined : { workflowId });
+      setWorkflowRequest(workflowId === undefined ? undefined : { serverId, workflowId });
       open("workflows", serverId, source);
     }
 
@@ -84,6 +83,7 @@ const context = createSimpleContext({
     });
 
     function clear() {
+      setWorkflowRequest(undefined);
       setState((draft) => {
         draft.serverId = null;
         delete draft.agentId;
@@ -97,6 +97,7 @@ const context = createSimpleContext({
       openTasks,
       openWorkflows,
       workflowRequest,
+      takeWorkflowRequest: () => setWorkflowRequest(undefined),
       openLibrary,
       closeUsage() {
         clear();
