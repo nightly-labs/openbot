@@ -504,4 +504,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "Esperando por você em {channel}",
   "mobile.chat.channelWork.open": "{label}. Abre o canal.",
   "mobile.chat.viewOnly": "Você só pode visualizar este agente.",
+  "mobile.chat.appSuggestion.skip": "Ignorar",
+  "mobile.chat.appSuggestion.skipNamed": "Ignorar {name}",
+  "mobile.chat.appSuggestion.connectNamed": "Conectar {name}",
+  "mobile.chat.appSuggestion.skipped": "{name} ignorado",
+  "mobile.chat.appSuggestion.undo": "Desfazer",
+  "mobile.chat.appSuggestion.notAllowed": "Só o proprietário do servidor ou um administrador pode conectar {name}.",
+  "mobile.chat.appSuggestion.unavailable": "Este servidor não pode conectar {name}.",
 } as const satisfies PartialTranslation<typeof source>;

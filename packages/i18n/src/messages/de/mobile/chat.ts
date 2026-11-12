@@ -514,4 +514,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "Wartet in {channel} auf dich",
   "mobile.chat.channelWork.open": "{label}. Öffnet den Kanal.",
   "mobile.chat.viewOnly": "Du kannst diesen Agenten nur ansehen.",
+  "mobile.chat.appSuggestion.skip": "Überspringen",
+  "mobile.chat.appSuggestion.skipNamed": "{name} überspringen",
+  "mobile.chat.appSuggestion.connectNamed": "{name} verbinden",
+  "mobile.chat.appSuggestion.skipped": "{name} übersprungen",
+  "mobile.chat.appSuggestion.undo": "Rückgängig",
+  "mobile.chat.appSuggestion.notAllowed": "Nur der Serverbesitzer oder ein Admin kann {name} verbinden.",
+  "mobile.chat.appSuggestion.unavailable": "Dieser Server kann {name} nicht verbinden.",
 } as const satisfies PartialTranslation<typeof source>;

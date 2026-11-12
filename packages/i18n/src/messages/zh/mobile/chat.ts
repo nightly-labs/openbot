@@ -485,4 +485,11 @@ export const messages = {
   "mobile.chat.vaultRequest.skipped": "未添加到保险库",
   "mobile.chat.vaultRequest.gone": "此请求已不再有效。",
   "mobile.chat.vaultRequest.notAllowed": "只有服务器所有者或管理员可以向保险库添加项目。",
+  "mobile.chat.appSuggestion.skip": "跳过",
+  "mobile.chat.appSuggestion.skipNamed": "跳过 {name}",
+  "mobile.chat.appSuggestion.connectNamed": "连接 {name}",
+  "mobile.chat.appSuggestion.skipped": "已跳过 {name}",
+  "mobile.chat.appSuggestion.undo": "撤销",
+  "mobile.chat.appSuggestion.notAllowed": "只有服务器所有者或管理员可以连接 {name}。",
+  "mobile.chat.appSuggestion.unavailable": "此服务器无法连接 {name}。",
 } as const satisfies PartialTranslation<typeof source>;

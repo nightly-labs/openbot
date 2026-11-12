@@ -490,4 +490,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "{channel}에서 확인을 기다리는 중",
   "mobile.chat.channelWork.open": "{label}. 채널을 열어요.",
   "mobile.chat.viewOnly": "이 에이전트는 볼 수만 있어요.",
+  "mobile.chat.appSuggestion.skip": "건너뛰기",
+  "mobile.chat.appSuggestion.skipNamed": "{name} 건너뛰기",
+  "mobile.chat.appSuggestion.connectNamed": "{name} 연결",
+  "mobile.chat.appSuggestion.skipped": "{name}을(를) 건너뛰었습니다",
+  "mobile.chat.appSuggestion.undo": "실행 취소",
+  "mobile.chat.appSuggestion.notAllowed": "서버 소유자나 관리자만 {name}을(를) 연결할 수 있습니다.",
+  "mobile.chat.appSuggestion.unavailable": "이 서버는 {name}을(를) 연결할 수 없습니다.",
 } as const satisfies PartialTranslation<typeof source>;
