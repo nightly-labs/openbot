@@ -18,8 +18,10 @@
 // version that the site offers public. It does nothing while the site offers no APK or when the
 // release is public already, and it stops when that version has no release.
 //
-// The release is never the "latest" release: that one is the desktop app, and the desktop updater
-// reads it. `--dry-run` checks and changes nothing.
+// The release is a GitHub prerelease, as the remote desktop runtime releases are. A prerelease
+// cannot become the "latest" release, which is the desktop app and which the desktop updater reads,
+// and the notes of the next desktop release do not start from it. `--dry-run` checks and changes
+// nothing.
 //
 // Environment: for `stage`, ANDROID_HOME (aapt2 and apksigner of the build tools). To change a
 // release: GH_TOKEN with write access (a draft is not visible without it), GITHUB_REPOSITORY, and
@@ -156,7 +158,7 @@ async function releaseState(repository: string, tag: string): Promise<ReleaseSta
   }
 }
 
-/** The tag of the "latest" release: the desktop app. Empty when the repository has none. */
+/** The tag of the "latest" release: the desktop app. Empty when GitHub gives none. */
 async function latestRelease(repository: string): Promise<string> {
   const { stdout } = await run("gh", ["api", `repos/${repository}/releases/latest`, "--jq", ".tag_name"]).catch(() => ({
     stdout: "",
@@ -205,7 +207,7 @@ async function commandStage(args: readonly string[]) {
   if (!commit) throw new UsageError("Set GITHUB_SHA: the store build has no tag yet.");
   const notes = [
     `OpenBot for Android ${version} (build ${versionCode}) as an APK, for a phone with no Google Play. It is the universal APK that Google Play makes from the store bundle, so it has the signature of the app on Google Play. Install steps: ${INSTALL_PAGE}`,
-    "This release is not an update of the desktop app.",
+    "This release is not an update of the desktop app. It is a GitHub prerelease only so that it never becomes the latest release: the build is the one on Google Play.",
     `- Commit: ${commit}\n- SHA-256 of the file: \`${sha256}\`\n- SHA-256 of the signing certificate: \`${certificate}\``,
   ].join("\n\n");
 
@@ -217,7 +219,9 @@ async function commandStage(args: readonly string[]) {
     const gh = (...ghArgs: string[]) => run("gh", [...ghArgs, "--repo", repository]);
     if (state) {
       await gh("release", "upload", release.tag, asset, "--clobber");
-      await gh("release", "edit", release.tag, "--notes", notes, "--latest=false");
+      // A draft has no git tag yet. Its tag goes to the commit of this build when it becomes public.
+      const target = state.draft ? ["--target", commit] : [];
+      await gh("release", "edit", release.tag, "--notes", notes, "--prerelease", "--latest=false", ...target);
     } else {
       const title = `OpenBot for Android ${version}`;
       await gh(
@@ -226,6 +230,7 @@ async function commandStage(args: readonly string[]) {
         release.tag,
         asset,
         "--draft",
+        "--prerelease",
         "--target",
         commit,
         "--title",
@@ -273,12 +278,22 @@ async function commandPublish(args: readonly string[]) {
     summarize([`Android APK ${version}: dry run. The draft \`${release.tag}\` would become public.`]);
     return 0;
   }
-  // Without `--latest=false`, a release that becomes public can become the "latest" release, and
-  // then the desktop downloads and the desktop updater find no installer.
+  // A release that becomes public with no `--prerelease` and `--latest=false` can become the
+  // "latest" release, and then the desktop downloads and the desktop updater find no installer.
   const before = await latestRelease(repository);
-  await run("gh", ["release", "edit", release.tag, "--repo", repository, "--draft=false", "--latest=false"]);
+  await run("gh", [
+    "release",
+    "edit",
+    release.tag,
+    "--repo",
+    repository,
+    "--draft=false",
+    "--prerelease",
+    "--latest=false",
+  ]);
   const after = await latestRelease(repository);
-  if (after !== before) {
+  // An empty value is a failed read, not a change.
+  if (before !== "" && after !== "" && after !== before) {
     summarize([
       `## The "latest" release changed from \`${before}\` to \`${after}\``,
       `Desktop downloads and updates read the "latest" release. Mark \`${before}\` as latest again: \`gh release edit ${before} --latest\`.`,

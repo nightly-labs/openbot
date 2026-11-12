@@ -6,7 +6,8 @@ name: Publish the Android APK
 # public. `bun run mobile:release:published android` sets the newest Google Play version in
 # `mobile-features-config.ts`, and openbot.run offers the APK of that version. When that change is on
 # main, this workflow makes the draft `android-v<version>` public. The account Worker deploys at the
-# end of CI, some minutes later, so the file is there before the site links to it.
+# end of CI, some minutes later, so the file is there before the site links to it. The release is a
+# prerelease, so it never becomes the "latest" release, which is the desktop app.
 #
 # A run that finds nothing to do changes nothing: the site offers no APK yet, or the release is
 # public already. A run fails when the version has no release, because the link on the site is then
@@ -28,9 +29,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # The stage job changes the same release.
+    # A group of its own. In the group of the stage job, a waiting run of this job could be
+    # replaced by a later stage run, and nothing would start it again.
     concurrency:
-      group: release-android-apk
+      group: publish-android-apk
       cancel-in-progress: false
     permissions:
       # The `android-v<version>` release and its tag. A draft is visible only with write access.

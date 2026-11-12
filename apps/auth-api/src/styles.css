@@ -1902,11 +1902,12 @@ a {
   text-decoration: none;
 }
 
+/* The radius of `.landing-download-card`. `inherit` would take the radius of the link, which has none. */
 .landing-download-card-link::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  border-radius: 20px;
 }
 
 .landing-download-card-link:focus-visible {

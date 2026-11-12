@@ -550,14 +550,19 @@ The APK is not public after the build. It becomes public when the version is mar
    of a version replaces the file of the first. The release notes have the SHA-256 of the file and
    of the signing certificate.
 
+The workflow saves no workflow artifact of the APK: each signed-in GitHub user can download the
+artifacts of a public repository. The signed `.aab` of the build is such an artifact for seven days.
+
 **Publish, when the version is marked as available.** The site offers the APK of
 `MOBILE_LATEST_VERSIONS.android` (`apps/auth-api/src/server/mobile-features-config.ts`), so the APK
 and Google Play give the same version. `bun run mobile:release:published android` sets that version.
 When that change is on `main`, the `Publish the Android APK` workflow (`publish-android-apk.yml`)
 makes the draft of that version public (`scripts/android-apk-release.ts publish`). The account
 Worker deploys at the end of CI, some minutes later, so the file is there before the site links to
-it. The release is never the "latest" release, so desktop downloads and updates do not change; the
-workflow fails if the "latest" release changed.
+it. The release is a GitHub prerelease, as the remote desktop runtime releases are: a prerelease
+cannot become the "latest" release, so desktop downloads and updates do not change, and the notes
+of the next desktop release do not start from it. The workflow fails if the "latest" release changed.
+Do not publish the draft by hand in the GitHub page with the prerelease mark cleared.
 
 The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
 the version has no release: the link on the site is then dead. Stage the APK of that version, then
@@ -580,8 +585,9 @@ A build with `upload` cleared has no APK until Google Play has its bundle. If Go
 than one signing key for the app, Fastlane stops and lists them; the lane does not select one.
 
 A phone with the APK gets over-the-air updates as a phone with the store app does. For a new store
-version, Update in the app opens Google Play, or `/download/android` when the phone has no Google
-Play. Notifications use Firebase Cloud Messaging, so a phone with no Google Play services gets none.
+version, Update in the app opens the `market://` link of the app. When no app on the phone opens
+that link, it opens `/download/android`. Another store app can take the link and show no result
+(not tested on a device); the user then downloads the APK from the site. Notifications use Firebase Cloud Messaging, so a phone with no Google Play services gets none.
 See [Fastlane universal APK download](https://docs.fastlane.tools/actions/download_universal_apk_from_google_play/).
 
 ### Discord announcement

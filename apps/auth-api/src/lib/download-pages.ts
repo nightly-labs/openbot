@@ -410,7 +410,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
       { label: "System", value: "Android 7.0 or later" },
       { label: "Store", value: ANDROID_APK_AVAILABLE ? "Google Play, or an APK" : "Google Play" },
       { label: "Needs", value: "OpenBot on a computer" },
-      { label: "Updates", value: "Through Google Play" },
+      { label: "Updates", value: ANDROID_APK_AVAILABLE ? "Google Play, or a new APK" : "Through Google Play" },
     ],
     installSteps: [
       COMPUTER_STEP,

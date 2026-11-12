@@ -1,8 +1,9 @@
 // The Android app as an APK, for a phone with no Google Play. The file is the universal APK that
 // Google Play makes from the store bundle, so it has the signature of the store app. It is on a
 // GitHub release of its own, which is never the "latest" release: that one is the desktop app, and
-// the desktop updater reads it. The release is a draft, which is not public, until the version is
-// marked as available: then the `Publish the Android APK` workflow makes it public.
+// the desktop updater reads it (it is a prerelease, which cannot be "latest"). The release is a
+// draft, which is not public, until the version is marked as available: then the
+// `Publish the Android APK` workflow makes it public.
 // See apps/mobile/README.md#android-apk.
 
 import { isNewerMobileVersion } from "@openbot/contracts/mobile-features";
@@ -38,8 +39,8 @@ export function androidApkVersion(
   latest: string = MOBILE_LATEST_VERSIONS.android,
   first: string | null = ANDROID_APK_FIRST_VERSION,
 ): string | undefined {
-  if (first === null || !VERSION_PATTERN.test(latest) || isNewerMobileVersion(first, latest)) return undefined;
-  return latest;
+  if (first === null || !VERSION_PATTERN.test(first) || !VERSION_PATTERN.test(latest)) return undefined;
+  return isNewerMobileVersion(first, latest) ? undefined : latest;
 }
 
 /** True when the site shows the APK download. */

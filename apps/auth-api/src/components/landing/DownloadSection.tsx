@@ -41,7 +41,7 @@ function DownloadCardContent(props: DownloadCardContentProps) {
             </Show>
           }
         >
-          <div class="landing-download-actions">{props.actions}</div>
+          {(actions) => <div class="landing-download-actions">{actions()}</div>}
         </Show>
       </div>
     </>
