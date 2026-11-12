@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Agentes ocultos agora continuam trabalhando. O OpenBot desativou as rotinas dos agentes que você ocultou antes desta versão, então ative as rotinas que quiser."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Fixe uma mensagem no chat de um agente: clique com o botão direito nela e selecione Fixar. O botão de mensagens fixadas no cabeçalho do chat mostra as mensagens fixadas de todos os chats do agente.",
+          "A Biblioteca tem pastas e três visualizações. Um agente também pode salvar os arquivos que anexa em uma pasta que você escolher.",
+          "Ensine uma tarefa: selecione Ensinar uma tarefa no menu +, depois faça a tarefa no navegador do agente. O agente salva as etapas como uma habilidade.",
+          "Agrupe as contas de um provedor em Configurações. Os agentes usam uma conta até que ela esteja perto de um limite de uso, e depois a próxima.",
+          "Adicione habilidades do GitHub: cole o link de um repositório público na busca de Habilidades da Loja.",
+          "Configurações do servidor → Transferência pode exportar uma cópia completa de um servidor e copiar agentes para outro servidor em uma etapa.",
+          "Silencie um agente pelo menu dele na barra lateral. Um agente silenciado não envia notificações e não toca som."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Uma mensagem que você envia a um agente enquanto ele trabalha agora orienta a vez em andamento. Para enfileirá-la como antes, desative Orientar agentes enquanto trabalham em Configurações → Agentes.",
+          "Um agente oculto continua trabalhando. Ele executa as rotinas e aparece em Precisa de você quando espera sua resposta.",
+          "O servidor aberto aparece como um logo na parte de baixo da barra de páginas. O botão Novo fica no fim do campo de busca da barra lateral.",
+          "O OpenBot usa o Electron 45.3.0 com o Chromium 156, e mais sites com verificação antirrobô carregam no navegador do agente."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O OpenBot inicia mais rápido, principalmente no Windows, e um computador lento continua utilizável depois do início.",
+          "O OpenBot continua responsivo depois de reiniciar quando você tem muitas tarefas ou threads.",
+          "No Linux e no Windows, o OpenBot conclui o encerramento quando você fecha a janela principal.",
+          "As rotinas são executadas no horário certo depois que o relógio do computador é corrigido.",
+          "O texto que você copia de um chat não tem mais linhas vazias no início ou no fim."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

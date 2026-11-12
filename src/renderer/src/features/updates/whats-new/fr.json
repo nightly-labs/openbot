@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Les agents masqués continuent de travailler. OpenBot a désactivé les routines des agents que vous aviez masqués avant cette version. Réactivez les routines que vous voulez."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Épinglez un message dans la discussion d’un agent : faites un clic droit dessus et sélectionnez Épingler. Le bouton des messages épinglés de l’en-tête de la discussion affiche les messages épinglés de toutes les discussions de l’agent.",
+          "La Bibliothèque contient des dossiers et trois vues. Un agent peut aussi enregistrer les fichiers qu’il joint dans un dossier que vous nommez.",
+          "Enseigner une tâche : sélectionnez Enseigner une tâche dans le menu +, puis effectuez la tâche dans le navigateur de l’agent. L’agent enregistre les étapes comme une compétence.",
+          "Regroupez les comptes d’un fournisseur dans Réglages. Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’utilisation, puis le compte suivant.",
+          "Ajoutez des compétences depuis GitHub : collez le lien d’un dépôt public dans la recherche de compétences du Marketplace.",
+          "Réglages du serveur → Transfert peut exporter une copie complète d’un serveur et copier des agents vers un autre serveur en une seule étape.",
+          "Mettez un agent en sourdine depuis son menu dans la barre latérale. Un agent en sourdine n’envoie aucune notification et ne joue aucun son."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un message que vous envoyez à un agent pendant qu’il travaille oriente maintenant le tour en cours. Pour le mettre en file d’attente comme avant, désactivez Orienter les agents pendant leur travail dans Réglages → Agents.",
+          "Un agent masqué continue de travailler. Il exécute ses routines et apparaît dans Besoin de vous lorsqu’il attend votre réponse.",
+          "Le serveur ouvert apparaît sous forme de logo en bas de la barre des pages. Le bouton Nouveau se trouve à la fin du champ de recherche de la barre latérale.",
+          "OpenBot utilise Electron 45.3.0 avec Chromium 156, et davantage de sites protégés par une vérification anti-robot se chargent dans le navigateur de l’agent."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot démarre plus vite, surtout sous Windows, et un ordinateur lent reste utilisable après le démarrage.",
+          "OpenBot reste réactif après un redémarrage lorsque vous avez beaucoup de tâches ou de fils.",
+          "Sous Linux et Windows, OpenBot termine son arrêt lorsque vous fermez la fenêtre principale.",
+          "Les routines s’exécutent à l’heure après la correction de l’horloge de l’ordinateur.",
+          "Le texte que vous copiez depuis une discussion ne contient plus de lignes vides au début ou à la fin."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

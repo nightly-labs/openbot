@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Gizli ajanlar artık çalışmaya devam eder. OpenBot, bu sürümden önce gizlediğiniz ajanların rutinlerini kapattı; bu yüzden istediğiniz rutinleri açın."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajanın sohbetindeki bir mesajı sabitleyin: mesaja sağ tıklayıp Sabitle'yi seçin. Sohbet üst bilgisindeki sabitleme düğmesi, ajanın tüm sohbetlerindeki sabitlenmiş mesajları gösterir.",
+          "Kitaplık'ta klasörler ve üç görünüm var. Bir ajan, eklediği dosyaları da adını verdiğiniz bir klasöre kaydedebilir.",
+          "Görev öğret: + menüsünden Görev öğret'i seçin, sonra görevi ajanın tarayıcısında yapın. Ajan adımları bir beceri olarak kaydeder.",
+          "Ayarlar'da bir sağlayıcının hesaplarını havuzlayın. Ajanlar, kullanım sınırına yaklaşana kadar bir hesabı, sonra sıradaki hesabı kullanır.",
+          "GitHub'dan beceri ekleyin: herkese açık bir deponun bağlantısını Pazaryeri Becerileri aramasına yapıştırın.",
+          "Sunucu ayarları → Aktarım, bir sunucunun tam bir kopyasını dışa aktarabilir ve ajanları tek adımda başka bir sunucuya kopyalayabilir.",
+          "Kenar çubuğundaki menüsünden bir ajanı sessize alın. Sessize alınan ajan bildirim göndermez ve ses çalmaz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir ajan çalışırken ona gönderdiğiniz mesaj artık çalışan turu yönlendirir. Eskisi gibi kuyruğa almak için Ayarlar → Ajanlar bölümünde Ajanları çalışırken yönlendir seçeneğini kapatın.",
+          "Gizli ajan çalışmaya devam eder. Rutinlerini çalıştırır ve yanıtınızı beklediğinde Size ihtiyacı var bölümünde görünür.",
+          "Açık sunucu, sayfa çubuğunun altında bir logo olarak görünür. Yeni düğmesi kenar çubuğu arama alanının sonundadır.",
+          "OpenBot, Chromium 156 ile birlikte Electron 45.3.0 kullanır ve ajan tarayıcısında bot denetimi olan daha fazla site yüklenir."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot daha hızlı açılır, özellikle Windows'ta; yavaş bir bilgisayar açıldıktan sonra da kullanılabilir kalır.",
+          "Çok sayıda görev veya konu olduğunda OpenBot yeniden başlattıktan sonra da yanıt vermeye devam eder.",
+          "Linux ve Windows'ta ana pencereyi kapattığınızda OpenBot kapanışını tamamlar.",
+          "Bilgisayarın saati düzeltildikten sonra rutinler zamanında çalışır.",
+          "Bir sohbetten kopyaladığınız metnin başında ve sonunda artık boş satır yoktur."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

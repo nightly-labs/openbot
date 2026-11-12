@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Verborgen agents blijven nu werken. OpenBot heeft de routines uitgezet van agents die je vóór deze versie hebt verborgen, dus zet de routines aan die je wilt."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zet een bericht in de chat van een agent vast: klik er met de rechtermuisknop op en kies Vastmaken. De knop voor vastgemaakte berichten in de chatkop toont de vastgemaakte berichten van alle chats van de agent.",
+          "De Bibliotheek heeft mappen en drie weergaven. Een agent kan ook de bestanden die hij bijvoegt opslaan in een map die je kiest.",
+          "Een taak aanleren: kies Een taak aanleren in het menu +, en doe daarna de taak in de browser van de agent. De agent slaat de stappen op als vaardigheid.",
+          "Bundel de accounts van een aanbieder in Instellingen. Agents gebruiken één account tot het bijna een gebruikslimiet bereikt, en daarna het volgende account.",
+          "Voeg vaardigheden toe vanuit GitHub: plak de link van een openbare repository in het zoekveld voor vaardigheden in de Marktplaats.",
+          "Serverinstellingen → Overdracht kan een volledige kopie van een server exporteren, en agents in één stap naar een andere server kopiëren.",
+          "Demp een agent via zijn menu in de zijbalk. Een gedempte agent stuurt geen meldingen en speelt geen geluid af."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een bericht dat je naar een agent stuurt terwijl hij werkt, stuurt nu de lopende beurt bij. Om het zoals voorheen in de wachtrij te zetten, zet je Stuur agents bij terwijl ze werken uit in Instellingen → Agents.",
+          "Een verborgen agent blijft werken. Hij voert zijn routines uit en staat in Heeft je nodig als hij op je antwoord wacht.",
+          "De geopende server staat als logo onderaan de paginabalk. De knop Nieuw staat aan het einde van het zoekveld van de zijbalk.",
+          "OpenBot gebruikt Electron 45.3.0 met Chromium 156, en meer sites met een botcontrole laden in de browser van de agent."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot start sneller, vooral op Windows, en een trage computer blijft bruikbaar na de start.",
+          "OpenBot blijft reageren na een herstart als je veel taken of threads hebt.",
+          "Op Linux en Windows voltooit OpenBot zijn afsluiting wanneer je het hoofdvenster sluit.",
+          "Routines draaien op tijd nadat de klok van de computer is gecorrigeerd.",
+          "Tekst die je uit een chat kopieert, heeft niet langer lege regels aan het begin of het einde."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],
