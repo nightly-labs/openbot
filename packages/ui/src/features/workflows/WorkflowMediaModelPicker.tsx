@@ -61,7 +61,7 @@ function span(values: readonly string[]): string | undefined {
 }
 
 /** The account of a step that its payer has, or null for the payer's own sign-in. */
-export function mediaStepAccount(model: WorkflowImageModel | undefined, account: string): string | null {
+function mediaStepAccount(model: WorkflowImageModel | undefined, account: string): string | null {
   if (!model || account === "" || account === DEFAULT_PROVIDER_ACCOUNT_ID) return null;
   return model.accounts?.some((row) => row.id === account) ? account : null;
 }

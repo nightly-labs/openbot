@@ -75,7 +75,7 @@ export interface SunraMediaDependencies {
 }
 
 /** A failure whose `message` the user reads. It never holds a token. */
-export class SunraMediaFailed extends Schema.TaggedError<SunraMediaFailed>()("SunraMediaFailed", {
+class SunraMediaFailed extends Schema.TaggedError<SunraMediaFailed>()("SunraMediaFailed", {
   message: Schema.String,
 }) {}
 
