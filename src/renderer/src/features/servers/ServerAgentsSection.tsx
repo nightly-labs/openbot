@@ -1,10 +1,11 @@
-import type {
-  AgentDefaultChoice,
-  AgentDefaultSetting,
-  AgentDefaultsAgentValues,
-  AgentDefaultsOverview,
-  OpenBotDesktopApi,
-  UpdateAgentDefaultsInput,
+import {
+  type AgentDefaultChoice,
+  type AgentDefaultSetting,
+  type AgentDefaultsAgentValues,
+  type AgentDefaultsOverview,
+  agentDefaultChoiceValues,
+  type OpenBotDesktopApi,
+  type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { Alert, AlertContent, AlertDescription } from "@openbot/ui";
@@ -65,13 +66,6 @@ function ownValues(values: AgentDefaultsAgentValues): Omit<AgentDefaultsAgent, k
     ...(values.quickAcknowledgement === null ? {} : { quickAcknowledgement: values.quickAcknowledgement }),
     ...(values.busyMessageMode === null ? {} : { busyMessageMode: values.busyMessageMode }),
   };
-}
-
-/** The own value that `choice` gives for `setting`. Null follows the default. */
-function choiceValue(setting: AgentDefaultSetting, choice: AgentDefaultChoice): boolean | "steer" | "queue" | null {
-  if (choice === "default") return null;
-  if (setting === "busyMessageMode") return choice === "on" ? "steer" : "queue";
-  return choice === "on";
 }
 
 function showSaveFailure(error: unknown): void {
@@ -227,16 +221,11 @@ export function createServerAgentsSection(
 
   function changeChoice(agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice): void {
     const serverId = props.server.id;
-    const value = choiceValue(setting, choice);
+    const values = agentDefaultChoiceValues(setting, choice);
     save(
       serverId,
       (overview) => {
-        for (const item of overview.agents) {
-          if (!agentIds.includes(item.agentId)) continue;
-          if (setting === "busyMessageMode")
-            item.busyMessageMode = value === "steer" || value === "queue" ? value : null;
-          else item[setting] = typeof value === "boolean" ? value : null;
-        }
+        for (const item of overview.agents) if (agentIds.includes(item.agentId)) Object.assign(item, values);
       },
       () => calls().setAgentDefaultChoice({ agentIds: [...agentIds], setting, choice }, serverId),
     );

@@ -1,9 +1,10 @@
-import type {
-  AgentDefaultChoice,
-  AgentDefaultSetting,
-  AgentDefaultsAgentValues,
-  AgentDefaultsOverview,
-  UpdateAgentDefaultsInput,
+import {
+  type AgentDefaultChoice,
+  type AgentDefaultSetting,
+  type AgentDefaultsAgentValues,
+  type AgentDefaultsOverview,
+  agentDefaultChoiceValues,
+  type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,17 +88,12 @@ function withChoice(
   choice: AgentDefaultChoice,
 ): AgentDefaultsOverview {
   const ids = new Set(agentIds);
+  const values = agentDefaultChoiceValues(setting, choice);
   return {
     ...overview,
-    agents: overview.agents.map<AgentDefaultsAgentValues>((agent) => {
-      if (!ids.has(agent.agentId)) return agent;
-      if (setting === "busyMessageMode")
-        return { ...agent, busyMessageMode: choice === "default" ? null : choice === "on" ? "steer" : "queue" };
-      const own = choice === "default" ? null : choice === "on";
-      if (setting === "allowAutomation") return { ...agent, allowAutomation: own };
-      if (setting === "allowNewChat") return { ...agent, allowNewChat: own };
-      return { ...agent, quickAcknowledgement: own };
-    }),
+    agents: overview.agents.map<AgentDefaultsAgentValues>((agent) =>
+      ids.has(agent.agentId) ? { ...agent, ...values } : agent,
+    ),
   };
 }
 

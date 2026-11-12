@@ -50,6 +50,7 @@ import {
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
+  agentDefaultChoiceValues,
   agentExclusionCoverage,
   agentFolderCoverage,
   agentNewChatAllowed,
@@ -2428,14 +2429,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return api.agent.getAgentDefaultsOverview(serverId);
       },
       setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {
-        for (const agentId of agentIds) {
-          if (setting === "busyMessageMode")
-            await api.agent.updateAgent({
-              agentId,
-              busyMessageMode: choice === "default" ? null : choice === "on" ? "steer" : "queue",
-            });
-          else await api.agent.updateAgent({ agentId, [setting]: choice === "default" ? null : choice === "on" });
-        }
+        for (const agentId of agentIds)
+          await api.agent.updateAgent({ agentId, ...agentDefaultChoiceValues(setting, choice) });
         return api.agent.getAgentDefaultsOverview(serverId);
       },
       // The preview has no joined server, so no member shares a computer with it.

@@ -406,6 +406,19 @@ export interface AgentDefaultsOverview {
   agents: AgentDefaultsAgentValues[];
 }
 
+/**
+ * The own value that a choice gives one agent for one setting. `default` removes the own value, so the
+ * agent follows the default. For "Steer agents while they work", on is `steer`.
+ */
+export function agentDefaultChoiceValues(
+  setting: AgentDefaultSetting,
+  choice: AgentDefaultChoice,
+): Partial<Omit<AgentDefaultsAgentValues, "agentId">> {
+  if (setting === "busyMessageMode")
+    return { busyMessageMode: choice === "default" ? null : choice === "on" ? "steer" : "queue" };
+  return { [setting]: choice === "default" ? null : choice === "on" };
+}
+
 /** The defaults to change. An absent field keeps its value. */
 export type UpdateAgentDefaultsInput = Partial<AgentDefaults> & { busyMessageMode?: BusyMessageMode };
 

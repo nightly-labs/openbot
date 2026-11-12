@@ -2,12 +2,12 @@
 // agent, and the own values of the agents. The local window and the `agent-defaults-v1` host route use
 // this, so a remote owner or admin changes the same state as the local Settings.
 
-import type {
-  AgentDefaultsOverview,
-  AgentSummary,
-  SetAgentDefaultChoiceInput,
-  UpdateAgentDefaultsInput,
-  UpdateAgentInput,
+import {
+  type AgentDefaultsOverview,
+  type AgentSummary,
+  agentDefaultChoiceValues,
+  type SetAgentDefaultChoiceInput,
+  type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
@@ -45,16 +45,6 @@ function ownValues(agent: AgentSummary): AgentDefaultsOverview["agents"][number]
     quickAcknowledgement: agent.quickAcknowledgement ?? null,
     busyMessageMode: agent.busyMessageMode ?? null,
   };
-}
-
-function choiceUpdate(
-  agentId: string,
-  setting: SetAgentDefaultChoiceInput["setting"],
-  choice: SetAgentDefaultChoiceInput["choice"],
-): UpdateAgentInput {
-  if (setting === "busyMessageMode")
-    return { agentId, busyMessageMode: choice === "default" ? null : choice === "on" ? "steer" : "queue" };
-  return { agentId, [setting]: choice === "default" ? null : choice === "on" };
 }
 
 export function createAgentDefaultsSettings({
@@ -100,7 +90,8 @@ export function createAgentDefaultsSettings({
       if (agentIds.some((agentId) => !known.has(agentId)))
         throw new AgentNotFoundError(sourceText("error.team.agentNotFound"));
     });
-    for (const agentId of agentIds) yield* rewrap(agents.updateAgent(choiceUpdate(agentId, setting, choice)));
+    for (const agentId of agentIds)
+      yield* rewrap(agents.updateAgent({ agentId, ...agentDefaultChoiceValues(setting, choice) }));
     return read();
   });
 
