@@ -244,6 +244,16 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Faça no Higgsfield uma foto de produto de uma caneca de cerâmica sobre uma mesa de madeira.",
   "marketplace.plugin.higgsfield.prompt.clip": "Faça no Higgsfield um vídeo de 5 segundos de ondas ao pôr do sol.",
+  "marketplace.plugin.sunra.tagline": "Imagens, vídeos, áudio e 3D com IA",
+  "marketplace.plugin.sunra.description":
+    "O Sunra permite que agentes criem imagens, vídeos, áudio e modelos 3D com modelos como GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling e Veo, consultem o saldo de créditos e leiam os resultados. Os resultados vão para um projeto na conta do Sunra do usuário. Cada usuário entra na própria conta do Sunra pelo navegador. O Sunra informa primeiro o custo de cada geração e só gasta créditos dessa conta depois da confirmação.",
+  "marketplace.plugin.sunra.app":
+    "Geração de imagens, vídeos, áudio e 3D, créditos e resultados, pelo servidor MCP do Sunra com login no navegador.",
+  "marketplace.plugin.sunra.prompt.balance": "Quantos créditos do Sunra eu tenho?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Faça no Sunra um pôster de uma feira noturna na chuva, em formato retrato.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Faça no Sunra um vídeo de 5 segundos de um barquinho de papel em um rio. Me diga o custo antes.",
   "marketplace.plugin.elevenlabs.tagline": "Fala, vozes e agentes de voz",
   "marketplace.plugin.elevenlabs.description":
     "O ElevenLabs permite que agentes transformem texto em fala, trabalhem com vozes e criem, testem e revisem agentes de voz do ElevenLabs e suas conversas. O áudio gerado volta como um link de download de curta duração. Cada usuário entra na própria conta do ElevenLabs pelo navegador, e cada geração usa créditos dessa conta.",

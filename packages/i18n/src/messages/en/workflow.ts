@@ -120,6 +120,8 @@ export const messages = defineMessages("workflow", {
   "workflow.image.chooseModel": "Choose model",
   "workflow.media.subscription": "{name} subscription",
   "workflow.media.apiKey": "{name} API key",
+  "workflow.media.credits": "{name} credits",
+  "workflow.media.payers": "Pay with",
   "workflow.image.making": "Making the image, {time}",
   "workflow.video.title": "Video",
   "workflow.video.name": "video",

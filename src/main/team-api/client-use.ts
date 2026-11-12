@@ -72,6 +72,7 @@ import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
 /**
  * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
@@ -145,6 +146,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_FAST_MODE_ROUTES.models,
   AGENT_SPEED_ROUTES.settings,
   AGENT_SPEED_ROUTES.models,
+  WORKFLOWS_SUNRA_ROUTES.providers,
+  WORKFLOWS_SUNRA_ROUTES.credits,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,

@@ -243,6 +243,16 @@ export const messages = {
     "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
+  "marketplace.plugin.sunra.tagline": "AI-afbeeldingen, -video's, -audio en 3D",
+  "marketplace.plugin.sunra.description":
+    "Met Sunra maken agents afbeeldingen, video's, audio en 3D-modellen met modellen zoals GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling en Veo, controleren ze het creditsaldo en halen ze de resultaten op. Resultaten komen in een project in het Sunra-account van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Sunra-account. Sunra noemt eerst de kosten van elke generatie en gebruikt pas na bevestiging credits van dat account.",
+  "marketplace.plugin.sunra.app":
+    "Afbeeldingen, video, audio en 3D genereren, credits en resultaten, via de MCP-server van Sunra met aanmelden in de browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Hoeveel Sunra-credits heb ik?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Maak met Sunra een poster van een nachtmarkt in de regen, in staand formaat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Maak met Sunra een video van 5 seconden van een papieren bootje op een rivier. Vertel me eerst wat het kost.",
   "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
   "marketplace.plugin.elevenlabs.description":
     "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",

@@ -121,6 +121,8 @@ export const messages = {
   "workflow.image.chooseModel": "选择模型",
   "workflow.media.subscription": "{name} 订阅",
   "workflow.media.apiKey": "{name} API 密钥",
+  "workflow.media.credits": "{name} 积分",
+  "workflow.media.payers": "付款方式",
   "workflow.image.making": "正在生成图片，{time}",
   "workflow.video.title": "视频",
   "workflow.video.name": "视频",

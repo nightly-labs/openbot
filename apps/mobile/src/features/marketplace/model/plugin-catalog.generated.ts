@@ -627,6 +627,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "sunra",
+    name: "Sunra",
+    tagline: "AI images, videos, audio and 3D",
+    description:
+      "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+    category: "design",
+    creatorName: "Sunra",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+      { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+      { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+    ],
+    websiteUrl: "https://sunra.ai",
+    privacyPolicyUrl: "https://sunra.ai/privacy",
+    termsUrl: "https://sunra.ai/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-sunra-mcp",
+        name: "Sunra",
+        description:
+          "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+        server: {
+          name: "sunra",
+          transport: "http",
+          url: "https://mcp.sunra.ai",
+          auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "elevenlabs",
     name: "ElevenLabs",
     tagline: "Speech, voices and voice agents",

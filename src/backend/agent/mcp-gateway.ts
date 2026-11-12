@@ -550,6 +550,33 @@ export class McpGateway {
   }
 
   /**
+   * The sign-in of the first enabled row on `host` that goes through the OAuth proxy, for a feature
+   * of OpenBot itself that calls that server, such as the Sunra models of the canvas. The token stays
+   * in this process and is read at each use. Null when no such row is signed in.
+   */
+  serviceSignIn(host: string): {
+    url: string;
+    token: () => Effect.Effect<string | null, McpOperationError>;
+    refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  } | null {
+    const oauth = this.#oauth;
+    const config = this.#servers.listEnabled().find((row) => {
+      if (!this.#proxied(row) || !oauth?.signedIn(row.url)) return false;
+      try {
+        return new URL(row.url).hostname === host;
+      } catch {
+        return false;
+      }
+    });
+    if (!config || !oauth) return null;
+    return {
+      url: withoutMcpAccountFragment(config.url),
+      token: () => oauth.accessToken(config.url),
+      refresh: (rejected) => oauth.refreshAccessToken(config.url, rejected),
+    };
+  }
+
+  /**
    * Whether an http row that answered without a sign-in offers one. A key the user pasted into a
    * header is theirs to manage: a sign-in would not replace it.
    */

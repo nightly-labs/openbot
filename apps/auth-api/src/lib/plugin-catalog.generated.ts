@@ -109,6 +109,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
     },
     {
+      slug: "sunra",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d66c81db753e40551fde452f985a625e22e5681d63a8a4f87ed76ba5746dafdb",
+    },
+    {
       slug: "elevenlabs",
       version: "1.0.0",
       featured: false,
@@ -2134,6 +2140,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://higgsfield.ai",
     privacyPolicyUrl: "https://higgsfield.ai/privacy-policy",
     termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
+    skills: [],
+  },
+  sunra: {
+    slug: "sunra",
+    name: "Sunra",
+    tagline: "AI images, videos, audio and 3D",
+    description:
+      "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+    category: "design",
+    creatorName: "Sunra",
+    iconUrl: "https://sunra.ai/apple-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+      { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+      { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+    ],
+    apps: [
+      {
+        id: "app-sunra-mcp",
+        name: "Sunra",
+        description:
+          "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+        iconUrl: "https://sunra.ai/apple-icon.png",
+        server: {
+          name: "sunra",
+          transport: "http",
+          url: "https://mcp.sunra.ai",
+          auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://sunra.ai",
+    privacyPolicyUrl: "https://sunra.ai/privacy",
+    termsUrl: "https://sunra.ai/terms",
     skills: [],
   },
   elevenlabs: {

@@ -114,6 +114,8 @@ export const messages = {
   "workflow.image.chooseModel": "בחירת מודל",
   "workflow.media.subscription": "מינוי {name}",
   "workflow.media.apiKey": "מפתח API של {name}",
+  "workflow.media.credits": "קרדיטים של {name}",
+  "workflow.media.payers": "תשלום באמצעות",
   "workflow.image.making": "יצירת התמונה, {time}",
   "workflow.video.title": "וידאו",
   "workflow.video.name": "וידאו",

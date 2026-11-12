@@ -627,6 +627,8 @@ import type {
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
+  WorkflowMediaCredits,
+  WorkflowMediaProviders,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowRunsInput,
@@ -1936,6 +1938,16 @@ export const IPC_ENDPOINTS = {
      * `workflows-media-v1`.
      */
     keepPicture: scopedRequest<string, string>()("workflows:keep-picture"),
+    /**
+     * Whether the host can use Sunra for an image step now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has no Sunra.
+     */
+    mediaProviders: scopedQuery<WorkflowMediaProviders>()("workflows:media-providers"),
+    /**
+     * The credits that the host's Sunra sign-in can spend now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has none.
+     */
+    mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host

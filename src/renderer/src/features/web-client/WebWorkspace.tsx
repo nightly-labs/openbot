@@ -316,6 +316,7 @@ import {
   SettingsSearchField,
 } from "../window/SettingsPageFrame";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
@@ -1312,6 +1313,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
   });
+  // As on desktop: the rail shows the Sunra credits of the host while the Canvas page is open.
+  const mediaCredits = createWorkflowMediaCredits(
+    () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),
+    () => workflowHost.workflows.mediaCredits(),
+  );
   const librarySupported = () => workspace.state.capabilities.includes(STORAGE_CAPABILITY);
   // As the Tasks page: an older host has no storage routes and no Library button.
   createEffect(
@@ -2896,6 +2902,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
+              }}
+              mediaCredits={mediaCredits()}
+              onMediaCredits={(provider) => {
+                setSuggestedApp({ appId: provider, connect: false });
+                openMarketplace();
               }}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}

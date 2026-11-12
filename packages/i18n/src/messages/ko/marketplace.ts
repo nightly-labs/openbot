@@ -233,6 +233,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield로 나무 테이블 위 세라믹 머그잔의 제품 사진을 만들어 줘.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield로 해 질 녘 파도의 5초 동영상을 만들어 줘.",
+  "marketplace.plugin.sunra.tagline": "AI 이미지, 동영상, 오디오, 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra를 사용하면 에이전트가 GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling, Veo 같은 모델로 이미지, 동영상, 오디오, 3D 모델을 만들고, 크레딧 잔액을 확인하고, 결과를 가져올 수 있습니다. 결과는 사용자의 Sunra 계정에 있는 프로젝트에 저장됩니다. 각 사용자는 브라우저에서 자신의 Sunra 계정에 로그인합니다. Sunra는 생성할 때마다 먼저 비용을 알려 주고, 확인을 받은 뒤에만 그 계정의 크레딧을 사용합니다.",
+  "marketplace.plugin.sunra.app":
+    "Sunra MCP 서버를 통한 이미지·동영상·오디오·3D 생성, 크레딧, 결과. 브라우저에서 로그인합니다.",
+  "marketplace.plugin.sunra.prompt.balance": "Sunra 크레딧이 얼마나 남았어?",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra로 비 오는 야시장 포스터를 세로 형식으로 만들어 줘.",
+  "marketplace.plugin.sunra.prompt.clip": "Sunra로 강 위에 떠 있는 종이배의 5초 동영상을 만들어 줘. 비용부터 알려 줘.",
   "marketplace.plugin.elevenlabs.tagline": "음성, 보이스, 음성 에이전트",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs로 에이전트가 텍스트를 음성으로 바꾸고, 보이스를 다루고, ElevenLabs 음성 에이전트와 그 대화를 만들고 테스트하고 검토할 수 있습니다. 생성된 오디오는 잠시만 유효한 다운로드 링크로 돌아옵니다. 각 사용자는 브라우저에서 자신의 ElevenLabs 계정에 로그인하며, 생성할 때마다 그 계정의 크레딧을 사용합니다.",

@@ -121,6 +121,8 @@ export const messages = {
   "workflow.image.chooseModel": "モデルを選択",
   "workflow.media.subscription": "{name} サブスクリプション",
   "workflow.media.apiKey": "{name} API キー",
+  "workflow.media.credits": "{name} クレジット",
+  "workflow.media.payers": "支払い方法",
   "workflow.image.making": "画像を作成中、{time}",
   "workflow.video.title": "動画",
   "workflow.video.name": "動画",

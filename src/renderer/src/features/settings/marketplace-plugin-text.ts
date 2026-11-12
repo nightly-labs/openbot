@@ -141,6 +141,18 @@ const PLUGIN_TEXT = {
       "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
     },
   },
+  sunra: {
+    tagline: "marketplace.plugin.sunra.tagline",
+    description: "marketplace.plugin.sunra.description",
+    apps: {
+      "app-sunra-mcp": "marketplace.plugin.sunra.app",
+    },
+    prompts: {
+      "prompt-balance": "marketplace.plugin.sunra.prompt.balance",
+      "prompt-poster": "marketplace.plugin.sunra.prompt.poster",
+      "prompt-clip": "marketplace.plugin.sunra.prompt.clip",
+    },
+  },
   elevenlabs: {
     tagline: "marketplace.plugin.elevenlabs.tagline",
     description: "marketplace.plugin.elevenlabs.description",

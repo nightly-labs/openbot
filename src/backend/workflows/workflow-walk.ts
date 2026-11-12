@@ -25,14 +25,16 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   isWorkflowStepKind,
-  WORKFLOW_VIDEO_DURATIONS,
   WORKFLOW_VIDEO_VOICES,
   type WorkflowEdge,
   type WorkflowFields,
   type WorkflowGraph,
   type WorkflowMediaKind,
   type WorkflowMediaModel,
+  type WorkflowMediaProvider,
+  type WorkflowMediaSpecs,
   type WorkflowNode,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
@@ -278,6 +280,12 @@ export function mediaVoice(fields: WorkflowFields, kind: WorkflowMediaKind, mode
   return WORKFLOW_VIDEO_VOICES.some((preset) => preset.id === voice) ? voice : null;
 }
 
+/** The account that pays for the file of a media step, or null for the provider's own sign-in. */
+export function mediaAccount(fields: WorkflowFields): string | null {
+  const account = fields.account;
+  return typeof account === "string" && account !== "" && account !== DEFAULT_PROVIDER_ACCOUNT_ID ? account : null;
+}
+
 /** The longest error that a missing answer quotes, in characters, so a long error costs few tokens. */
 const MISSING_ERROR_LIMIT = 300;
 
@@ -442,16 +450,22 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 
 /**
  * The request of an image step: the frame and, for a video, its length and resolution, then the
- * description and the text that comes in.
+ * description and the text that comes in. Sunra takes the frame, the length and the resolution as
+ * fields of its tool, so its request is the description and the input only.
  */
-export function mediaStepPrompt(fields: WorkflowFields, kind: WorkflowMediaKind, input: string): string {
-  const aspect = typeof fields.aspect === "string" && fields.aspect ? fields.aspect : "1:1";
-  const duration = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
-  const resolution = typeof fields.resolution === "string" && fields.resolution ? fields.resolution : "720p";
+export function mediaStepPrompt(
+  fields: WorkflowFields,
+  kind: WorkflowMediaKind,
+  input: string,
+  specs: WorkflowMediaSpecs,
+  provider: WorkflowMediaProvider,
+): string {
   const ask =
-    kind === "video"
-      ? `Make one video of ${duration} seconds at ${resolution}, aspect ratio ${aspect}.`
-      : `Make one image, aspect ratio ${aspect}.`;
+    provider === "sunra"
+      ? ""
+      : kind === "video"
+        ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`
+        : `Make one image, aspect ratio ${specs.aspect}.`;
   const description = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
   return [ask, description, input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
 }
@@ -465,7 +479,7 @@ const GROK_VIDEO_REFERENCE_LIMIT = 14;
  * A provider reads it, so the words stay English.
  */
 export function mediaInputText(
-  provider: WorkflowMediaModel["provider"],
+  provider: WorkflowMediaProvider,
   kind: WorkflowMediaKind,
   images: readonly { role: MediaImageRole; path: string }[],
   voice: string | null,

@@ -513,3 +513,7 @@
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
+
+[data-provider="sunra"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}

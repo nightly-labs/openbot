@@ -265,6 +265,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
   "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
   "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
+  "marketplace.plugin.sunra.tagline": "صور وفيديو وصوت ونماذج ثلاثية الأبعاد بالذكاء الاصطناعي",
+  "marketplace.plugin.sunra.description":
+    "يتيح Sunra للوكلاء إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد بنماذج مثل GPT Image وNano Banana وSeedream وFLUX وSeedance وKling وVeo، والتحقق من رصيد الأرصدة، وقراءة النتائج. تُحفظ النتائج في مشروع داخل حساب المستخدم في Sunra. يسجّل كل مستخدم الدخول إلى حسابه في Sunra عبر المتصفح. يعرض Sunra تكلفة كل عملية إنشاء أولًا، ولا يستهلك أرصدة ذلك الحساب إلا بعد تأكيدها.",
+  "marketplace.plugin.sunra.app":
+    "إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد، والأرصدة والنتائج، عبر خادم MCP الخاص بـ Sunra مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.sunra.prompt.balance": "كم لديّ من أرصدة Sunra؟",
+  "marketplace.plugin.sunra.prompt.poster": "أنشئ في Sunra ملصقًا لسوق ليلي تحت المطر، بتنسيق عمودي.",
+  "marketplace.plugin.sunra.prompt.clip": "أنشئ في Sunra فيديو مدته 5 ثوانٍ لقارب ورقي على نهر. أخبرني بالتكلفة أولًا.",
   "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
   "marketplace.plugin.elevenlabs.description":
     "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",

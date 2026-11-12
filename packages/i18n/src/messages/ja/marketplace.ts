@@ -251,6 +251,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.sunra.tagline": "AI による画像、動画、音声、3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra を使うと、エージェントは GPT Image、Nano Banana、Seedream、FLUX、Seedance、Kling、Veo などのモデルで画像、動画、音声、3D モデルを作成し、クレジット残高を確認し、結果を取得できます。結果はユーザーの Sunra アカウント内のプロジェクトに保存されます。各ユーザーはブラウザで自分の Sunra アカウントにサインインします。Sunra は生成ごとに先に費用を提示し、確認されてからそのアカウントのクレジットを使います。",
+  "marketplace.plugin.sunra.app":
+    "Sunra の MCP サーバー経由で、画像・動画・音声・3D の生成、クレジット、結果を扱います。ブラウザでサインインします。",
+  "marketplace.plugin.sunra.prompt.balance": "Sunra のクレジットはどれくらい残っていますか？",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra で、雨の夜市のポスターを縦長で作ってください。",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra で、川を流れる紙の船の 5 秒の動画を作ってください。先に費用を教えてください。",
   "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",

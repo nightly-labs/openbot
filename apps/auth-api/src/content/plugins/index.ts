@@ -33,6 +33,7 @@ import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
 import { ROBINHOOD_PLUGIN_GUIDE } from "./robinhood";
 import { SENTRY_PLUGIN_GUIDE } from "./sentry";
 import { STRIPE_PLUGIN_GUIDE } from "./stripe";
+import { SUNRA_PLUGIN_GUIDE } from "./sunra";
 import { TICKTICK_PLUGIN_GUIDE } from "./ticktick";
 import { TODOIST_PLUGIN_GUIDE } from "./todoist";
 import { TRELLO_PLUGIN_GUIDE } from "./trello";
@@ -57,6 +58,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   notion: NOTION_PLUGIN_GUIDE,
   paper: PAPER_PLUGIN_GUIDE,
   higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
+  sunra: SUNRA_PLUGIN_GUIDE,
   elevenlabs: ELEVENLABS_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
