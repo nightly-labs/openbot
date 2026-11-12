@@ -224,12 +224,14 @@ interface AcpAuthenticateSignIn {
  * `codex-device` is the Codex app-server device code. `muse-device` is the device code a `muse serve`
  * host asks Meta for. `cli` spawns the provider's CLI and reads its link: `device` prints a code the
  * user confirms, `paste` waits for the code the provider's page shows, which the user copies back,
- * and `link` is a page that signs the CLI in by itself.
+ * and `link` is a page that signs the CLI in by itself. `acp-delegated` is an ACP sign-in whose server
+ * gives its page to OpenBot instead of a browser, as a `link`.
  */
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand }
+  | (Omit<AcpAuthenticateSignIn, "kind"> & { readonly kind: "acp-delegated" });
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -1429,6 +1431,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: {
       kind: "acp-authenticate",
       methodId: "browser-auth",
+      argv: MISTRAL_ARGV,
+      env: MISTRAL_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    // A joined server has no browser that the user sees. Vibe 3.1.0's `browser-auth-delegated` gives
+    // the Mistral page to OpenBot, and asks Mistral until the user finishes there, on any device.
+    codeSignIn: {
+      kind: "acp-delegated",
+      methodId: "browser-auth-delegated",
       argv: MISTRAL_ARGV,
       env: MISTRAL_ENV,
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,

@@ -49,6 +49,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -148,13 +149,15 @@ function codeSignInProviders(capabilities: readonly string[]): readonly AgentPro
     );
     if (!capabilities.includes(PROVIDERS_V8_CAPABILITY)) return v4;
     // `providers-v8` also signs in the later providers that have a device code, such as Kimi and
-    // Hermes. A provider that the relay already signs in, such as Muse, keeps the relay.
+    // Hermes. A provider that the relay already signs in, such as Muse, keeps the relay. Mistral's
+    // code sign-in is a page, not a device code, so it needs `mistral-code-sign-in-v1`.
     return AGENT_PROVIDERS.filter(
       (provider) =>
         isOneOf(v4, provider) ||
         (agentProviderDescriptor(provider).localCodeSignIn === "device" &&
           !isOneOf(PROVIDERS_V4_SIGN_IN_PROVIDERS, provider) &&
-          !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)),
+          !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)) ||
+        (provider === "mistral" && capabilities.includes(MISTRAL_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (capabilities.includes(PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_PROVIDERS;

@@ -101,6 +101,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */
   privateTemp?: ProviderTempOptions | undefined;
+  /**
+   * A delegated sign-in (Mistral Vibe's `browser-auth-delegated`): the server opens no browser. Its
+   * `start` gives the page, which goes here for the user to open on any device, and its `complete`
+   * answers when the user finished there.
+   */
+  onSignInUrl?: (url: string) => void;
 }) {
   // A Windows CLI opens the page on this computer, so a user at another device cannot sign in. The
   // refusal comes before the process starts, so a Reconnect does not sign the account out first.
@@ -198,6 +204,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       const timer = setTimeout(() => signInFailed(sourceText("error.provider.acpSignInTimedOut")), options.timeoutMs);
       timer.unref?.();
       const send = (message: AcpMessage) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+      const authenticate = () =>
+        send({
+          id: 2,
+          method: "authenticate",
+          params: { methodId: options.methodId, ...(options.onSignInUrl ? { action: "start" } : {}) },
+        });
       child.once("error", fail);
       const exited = () => signInFailed(sourceText("error.provider.acpSignInStopped"));
       child.once("exit", exited);
@@ -216,7 +228,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           send({ id: message.id, error: { code: -32601, message: "Method not found" } });
           return;
         }
-        if (message.error !== undefined && (message.id === 1 || message.id === 2 || message.id === 3)) {
+        if (message.error !== undefined && typeof message.id === "number" && message.id >= 1 && message.id <= 4) {
           const reason = serverReason(message.error);
           // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
           if (options.logoutOnly && reason)
@@ -245,12 +257,24 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           if (options.logoutOnly && options.signOutMethod) send({ id: 3, method: options.signOutMethod, params: {} });
           else if (options.logoutOnly && !canLogOut) signInFailed(sourceText("error.provider.acpSignOutFailed"));
           else if ((options.logout || options.logoutOnly) && canLogOut) send({ id: 3, method: "logout", params: {} });
-          else send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
+          else authenticate();
         } else if (message.id === 3) {
           options.onLoggedOut?.();
           if (options.logoutOnly) settle(null);
-          else send({ id: 2, method: "authenticate", params: { methodId: options.methodId } });
-        } else if (message.id === 2) {
+          else authenticate();
+        } else if (message.id === 2 && options.onSignInUrl) {
+          const result = isDynamicRecord(message.result) ? message.result : undefined;
+          const meta = isDynamicRecord(result?._meta) ? result._meta[options.methodId] : undefined;
+          const attempt = isDynamicRecord(meta) ? meta : undefined;
+          const page = typeof attempt?.signInUrl === "string" ? URL.parse(attempt.signInUrl) : null;
+          if (page?.protocol !== "https:" || typeof attempt?.attemptId !== "string")
+            return signInFailed(sourceText("error.provider.codeLoginNoLink"));
+          // The page names the sign-in attempt. It is registered as a secret and never logged.
+          registerSecretValue(page.toString());
+          options.onSignInUrl(page.toString());
+          const params = { methodId: options.methodId, action: "complete", attemptId: attempt.attemptId };
+          send({ id: 4, method: "authenticate", params });
+        } else if (message.id === 2 || message.id === 4) {
           settle(null);
         }
       });
@@ -259,7 +283,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         method: "initialize",
         params: {
           protocolVersion: 1,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+          clientCapabilities: {
+            fs: { readTextFile: false, writeTextFile: false },
+            terminal: false,
+            // The server offers its delegated sign-in only to a client that says it shows the page.
+            ...(options.onSignInUrl ? { _meta: { [options.methodId]: true } } : {}),
+          },
           clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
         },
       });
