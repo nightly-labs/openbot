@@ -331,6 +331,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
   "error.backend.apiKeyNotAllowed": "Ввести ключ API может только владелец или админ сервера.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot не смог прочитать ключ API. Введите ключ длиной не более 8000 символов и выберите, кто может его использовать.",
   "error.backend.authRequestInactive": "Этот запрос безопасной аутентификации больше не активен.",
   "error.backend.secureAuthUnavailable": "Безопасная аутентификация недоступна.",
   "error.backend.browserUrlRequired": "Нужен URL для браузера.",

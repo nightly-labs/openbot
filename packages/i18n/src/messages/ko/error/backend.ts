@@ -319,6 +319,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
   "error.backend.apiKeyNotAllowed": "서버 소유자 또는 관리자만 API 키를 입력할 수 있어요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot이 API 키를 읽지 못했어요. 8,000자 이하의 키를 입력하고 키를 사용할 대상을 선택하세요.",
   "error.backend.authRequestInactive": "이 보안 인증 요청은 더 이상 활성 상태가 아니에요.",
   "error.backend.secureAuthUnavailable": "보안 인증을 사용할 수 없어요.",
   "error.backend.browserUrlRequired": "브라우저 URL이 필요해요.",
