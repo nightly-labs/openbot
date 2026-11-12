@@ -891,7 +891,7 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
         else if (entry.isFile()) {
           const name = relative(root, path).replaceAll("\\", "/");
           files[name] = new Uint8Array(yield* skillIO(() => readFile(path)));
-          if ((yield* skillIO(() => lstat(path))).mode & 0o100) executable.add(name);
+          if ((yield* skillIO(() => lstat(path))).mode & 0o111) executable.add(name);
         }
       }
     });

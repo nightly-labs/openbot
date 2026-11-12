@@ -16,8 +16,8 @@ export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
 /** The file macOS Finder writes into each folder it opens. A package made from a folder leaves it out. */
 export const FINDER_METADATA_FILE = ".DS_Store";
-/** The mode that an archive entry gets when its file is executable: Unix (`os` 3), `rwxr-xr-x`. */
-const EXECUTABLE_ENTRY = { os: 3, attrs: 0o755 << 16 } as const;
+/** The mode that an archive entry gets when its file is executable: Unix (`os` 3), a regular file, `rwxr-xr-x`. */
+const EXECUTABLE_ENTRY = { os: 3, attrs: 0o100755 * 0x10000 } as const;
 
 /** Files for `zipSync`. Each name in `executable` keeps its execute bit in the archive (#7746). */
 export function skillZippable(files: Record<string, Uint8Array>, executable: ReadonlySet<string>): Zippable {
@@ -42,7 +42,7 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
           const name = relative(root, path).replaceAll("\\", "/");
           const stats = yield* archiveIO(() => lstat(path));
           expandedSize += stats.size;
-          if (stats.mode & 0o100) executable.add(name);
+          if (stats.mode & 0o111) executable.add(name);
           if (expandedSize > MAX_BYTES)
             return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.expandedTooLarge")) });
           files[name] = new Uint8Array(yield* archiveIO(() => readFile(path)));
@@ -89,7 +89,7 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
   return readSkillArchive(bytes).files;
 }
 
-/** The files of a skill package, and the names of the files whose owner execute bit the archive keeps. */
+/** The files of a skill package, and the names of the files that the archive marks executable. */
 export function readSkillArchive(bytes: Uint8Array): {
   files: Record<string, Uint8Array>;
   executable: Set<string>;
@@ -131,8 +131,9 @@ export function readSkillArchive(bytes: Uint8Array): {
 }
 
 /**
- * The entry names that a Unix or macOS archive marks owner executable. `unzipSync` gives no file
- * modes, so this reads the central directory as fflate does. Other bits, such as setuid, are not kept.
+ * The entry names that a Unix or macOS archive marks executable, as `agent-archive.ts` reads them.
+ * `unzipSync` gives no file modes, so this reads the central directory as fflate does. Other bits,
+ * such as setuid, are not kept.
  */
 function executableArchiveEntries(bytes: Uint8Array): Set<string> {
   const u16 = (at: number) => (bytes[at] ?? 0) | ((bytes[at + 1] ?? 0) << 8);
@@ -151,7 +152,7 @@ function executableArchiveEntries(bytes: Uint8Array): Set<string> {
     const os = bytes[offset + 5];
     const nameLength = u16(offset + 28);
     const name = strFromU8(bytes.subarray(offset + 46, offset + 46 + nameLength), !(u16(offset + 8) & 0x800));
-    if ((os === 3 || os === 19) && (u32(offset + 38) >>> 16) & 0o100) names.add(name);
+    if ((os === 3 || os === 19) && (u32(offset + 38) >>> 16) & 0o111) names.add(name);
     offset += 46 + nameLength + u16(offset + 30) + u16(offset + 32);
   }
   return names;
