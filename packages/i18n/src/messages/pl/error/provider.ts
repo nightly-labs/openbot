@@ -297,6 +297,8 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Nie można odczytać wersji Hermes Agent.",
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Ustawienia serwera › MCP, a potem wyślij wiadomość ponownie.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.claudeContextFull":
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
