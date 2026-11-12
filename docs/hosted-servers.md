@@ -1133,6 +1133,12 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    - the names of the apt packages that the customer installed (`~/.base-apt-packages.txt` of the
      image lists those of the image).
 
+   The move does not copy systemd units or their settings in `/etc`. When the sandbox has a unit of
+   the customer (a unit file in `/etc/systemd/system` of no package, or an enabled template instance
+   such as `wg-quick@wg0`), `packages` names it and the move stops before the downtime. The server
+   stays on boat. On 2026-11-12 an export failed because such a service wrote to the home during the
+   archive.
+
    The archive also has the SHA-256 of `openbot.db`, `agent-data.db`, `login.keyring` and
    `keyring-password`, the names of the npm commands and groups of the sandbox, and the Ubuntu
    version. It does not have `/opt/OpenBot`, `~/.boat`, `~/.boatignore`, `~/.Xauthority*`,

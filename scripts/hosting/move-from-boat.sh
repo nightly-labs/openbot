@@ -317,6 +317,28 @@ added_packages() {
   done
 }
 
+# The systemd units that the customer added: a unit file in /etc/systemd/system of no package and not of
+# boat or OpenBot, and an enabled instance of a template, such as `wg-quick@wg0`. The move does not copy
+# units or their files in /etc, and such a unit can write to the home during the export.
+# Seen on 2026-11-12: a Beeper service, Syncthing and WireGuard.
+customer_units() {
+  local file name
+  for file in /etc/systemd/system/*.service /etc/systemd/system/*.timer /etc/systemd/system/*.socket \
+    /etc/systemd/system/*.path; do
+    [ -f "$file" ] && [ ! -L "$file" ] || continue
+    name=${file##*/}
+    case $name in openbot* | ascii-* | ariana-* | sunshine* | moonlight-web* | ufw-docker-sync*) continue ;; esac
+    dpkg -S "$file" >/dev/null 2>&1 || echo "$name"
+  done
+  for file in /etc/systemd/system/*.wants/*@?*; do
+    [ -L "$file" ] || continue
+    name=${file##*/}
+    case $name in getty@* | serial-getty@* | autovt@* | openbot* | ascii-* | ariana-* | sunshine*) continue ;; esac
+    echo "$name"
+  done
+  return 0
+}
+
 # What the move does not copy, for the report of the import.
 not_moved() {
   local count
@@ -419,6 +441,7 @@ packages() {
   id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has no user $SERVICE_USER. It is not a boat sandbox."
   [ -s "$USER_HOME/.base-apt-packages.txt" ] || echo "The image has no list of its apt packages. The move installs no apt package." >&2
   added_packages | sed 's/^/apt=/'
+  customer_units | sort -u | sed 's/^/unit=/'
 }
 
 install_packages() {

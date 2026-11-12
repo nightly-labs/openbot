@@ -902,6 +902,13 @@ bash "$d/move-from-boat.sh" packages`,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
+      // The move does not copy systemd units, so a server with units of the customer stays on boat.
+      const units = output.split("\n").flatMap((line) => /^unit=([\w@.:-]+)$/u.exec(line)?.[1] ?? []);
+      if (units.length > 0) {
+        throw new Error(
+          `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
+        );
+      }
       const sandboxVersion = values.get("version") ?? "";
       if (values.get("ids") !== machineState.ids) {
         throw new Error(
