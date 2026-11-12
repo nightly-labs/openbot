@@ -675,8 +675,9 @@ The unit (`openbot.service`):
 
 The app (`ServerMemory`) reads the memory every 5 s. The free memory is the smaller of
 `MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
-plus `inactive_file` from `memory.stat`: the kernel takes that file cache back before the OOM killer
-acts). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
+plus `inactive_file` and half of `active_file` from `memory.stat`: the kernel takes that file cache
+back before the OOM killer acts. The other half of the active cache counts as used, because it can
+be program code that runs). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
 do not all pass the check before their processes grow. A start that fails counts nothing.
 
 | Level | When | What happens |
