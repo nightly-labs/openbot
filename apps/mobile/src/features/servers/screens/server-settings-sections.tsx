@@ -1,6 +1,5 @@
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
@@ -8,7 +7,6 @@ import AppWindow from "lucide-react-native/icons/app-window";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import Blocks from "lucide-react-native/icons/blocks";
 import Bot from "lucide-react-native/icons/bot";
-import Brain from "lucide-react-native/icons/brain";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
 import Earth from "lucide-react-native/icons/earth";
@@ -26,12 +24,12 @@ import UserRound from "lucide-react-native/icons/user-round";
 import UsersRound from "lucide-react-native/icons/users-round";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { useUniwind } from "uniwind";
 import { confirmOwner } from "@/features/app-lock/model/app-lock";
-import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import {
   ServerBrowsingMemoryRow,
+  ServerMemoryLimitRow,
   ServerMemoryReviewRow,
   ServerPersonalityRow,
   ServerSkillLearningRow,
@@ -48,10 +46,8 @@ import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
-import { queryKeys } from "@/features/workspace/model/query-keys";
 import { type ServerRowState, serverRowState } from "@/features/workspace/model/server-row-state";
 import type { MobileServer, ServerChecks } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -393,10 +389,6 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
  * that serves them. The host checks the role and the value again.
  */
 export function ServerAgentsSection({ serverId }: { serverId: string }) {
-  const { t, errorMessage } = useText();
-  const { theme } = useUniwind();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
   const {
     canManageServerPersonality,
     canManageAgentMemoryLimit,
@@ -404,74 +396,10 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageSkillLearning,
     canManageBrowsingMemory,
   } = useMobileWorkspace();
-  const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
-  const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
-  const memoryLimitAvailable = canManageAgentMemoryLimit(serverId);
-  const memoryLimit = useQuery({
-    queryKey: memoryLimitKey,
-    enabled: memoryLimitAvailable,
-    retry: false,
-    staleTime: 0,
-    gcTime: 0,
-    queryFn: () => loadAgentMemoryLimit(serverId),
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const limit = memoryLimit.data;
-
-  function chooseLimit(next: number) {
-    if (saving || !memoryLimitAvailable || next === limit?.limit) return;
-    void haptics.selection();
-    setSaving(true);
-    setError(null);
-    setAgentMemoryLimit(next, serverId)
-      .then(async (saved) => {
-        await queryClient.cancelQueries({ queryKey: memoryLimitKey, exact: true });
-        queryClient.setQueryData(memoryLimitKey, saved);
-        void haptics.notification("success");
-      })
-      .catch((cause: unknown) => {
-        void haptics.notification("error");
-        setError(errorMessage(cause, t("mobile.server.settings.memoryLimitSaveFailed")));
-      })
-      .finally(() => setSaving(false));
-  }
-
   return (
     <>
       {canManageServerPersonality(serverId) ? <ServerPersonalityRow serverId={serverId} /> : null}
-      {memoryLimitAvailable ? (
-        <SettingsSection
-          footer={
-            error ??
-            (memoryLimit.isError
-              ? errorMessage(memoryLimit.error, t("mobile.server.settings.memoryLimitLoadFailed"))
-              : t("mobile.server.settings.memoryLimitDescription"))
-          }
-        >
-          <SettingsRow
-            leading={<RowIcon icon={Brain} />}
-            disclosure={false}
-            trailing={
-              limit ? (
-                <SettingsPicker
-                  value={limit.limit}
-                  // A host that no longer permits its saved value still shows it.
-                  options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
-                    (choice) => ({ value: choice, label: String(choice) }),
-                  )}
-                  enabled={!saving}
-                  dark={theme === "dark"}
-                  label={t("mobile.server.settings.memoryLimit")}
-                  onChange={chooseLimit}
-                />
-              ) : null
-            }
-          >
-            <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
-          </SettingsRow>
-        </SettingsSection>
-      ) : null}
+      {canManageAgentMemoryLimit(serverId) ? <ServerMemoryLimitRow serverId={serverId} /> : null}
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}

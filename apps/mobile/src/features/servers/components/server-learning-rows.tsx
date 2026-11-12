@@ -2,6 +2,7 @@ import { isSkillLearningMode, RESPONSE_STYLES, type ResponseStyle } from "@openb
 import { type QueryKey, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import BookOpen from "lucide-react-native/icons/book-open";
+import Brain from "lucide-react-native/icons/brain";
 import BrainCog from "lucide-react-native/icons/brain-cog";
 import Smile from "lucide-react-native/icons/face-slightly-smiling";
 import MousePointerClick from "lucide-react-native/icons/mouse-pointer-click";
@@ -21,8 +22,8 @@ import { type MobileText, useText } from "@/shared/lib/text";
  * Reads one host setting and saves a change. Each setting is a group of one row; the load or save
  * error shows in place of its description under the group, as the desktop does.
  */
-function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: string) {
-  const { t, errorMessage } = useText();
+function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: string, saveFailed: string) {
+  const { errorMessage } = useText();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: key, retry: false, staleTime: 0, gcTime: 0, queryFn: load });
   const [saving, setSaving] = useState(false);
@@ -41,7 +42,7 @@ function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: st
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
-        setSaveError(errorMessage(cause, t("mobile.server.settings.learningSaveFailed")));
+        setSaveError(errorMessage(cause, saveFailed));
       })
       .finally(() => setSaving(false));
   }
@@ -108,6 +109,47 @@ function withSaved<T>(saved: T, choices: readonly T[]): readonly T[] {
   return choices.includes(saved) ? choices : [saved, ...choices];
 }
 
+/** How many memories each agent of the server can keep (`agent-memory-limit-v1`). The values come from the host. */
+export function ServerMemoryLimitRow({ serverId }: { serverId: string }) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
+  const setting = useHostSetting(
+    queryKeys.agentMemoryLimit(useQueryScope(), serverId),
+    () => loadAgentMemoryLimit(serverId),
+    t("mobile.server.settings.memoryLimitLoadFailed"),
+    t("mobile.server.settings.memoryLimitSaveFailed"),
+  );
+  const current = setting.value;
+  return (
+    <SettingsSection footer={setting.error ?? t("mobile.server.settings.memoryLimitDescription")}>
+      <SettingsRow
+        leading={<RowIcon icon={Brain} />}
+        disclosure={false}
+        trailing={
+          current ? (
+            <SettingsPicker
+              value={current.limit}
+              options={withSaved(current.limit, current.choices).map((choice) => ({
+                value: choice,
+                label: String(choice),
+              }))}
+              enabled={!setting.saving}
+              dark={theme === "dark"}
+              label={t("mobile.server.settings.memoryLimit")}
+              onChange={(limit) => {
+                if (limit !== current.limit) setting.save(() => setAgentMemoryLimit(limit, serverId));
+              }}
+            />
+          ) : null
+        }
+      >
+        <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
 /**
  * How many completed turns of one conversation pass between two background memory reviews of the
  * server's agents, or Off (`memory-review-v1`). The values come from the host.
@@ -120,6 +162,7 @@ export function ServerMemoryReviewRow({ serverId }: { serverId: string }) {
     queryKeys.memoryReview(useQueryScope(), serverId),
     () => loadMemoryReview(serverId),
     t("mobile.server.settings.memoryReviewLoadFailed"),
+    t("mobile.server.settings.learningSaveFailed"),
   );
   const current = setting.value;
   const label = (interval: number) =>
@@ -175,6 +218,7 @@ export function ServerSkillLearningRow({ serverId }: { serverId: string }) {
     queryKeys.skillLearning(useQueryScope(), serverId),
     () => loadSkillLearning(serverId),
     t("mobile.server.settings.skillLearningLoadFailed"),
+    t("mobile.server.settings.learningSaveFailed"),
   );
   const current = setting.value;
   return (
@@ -219,6 +263,7 @@ export function ServerBrowsingMemoryRow({ serverId }: { serverId: string }) {
     queryKeys.browsingMemory(useQueryScope(), serverId),
     () => loadBrowsingMemory(serverId),
     t("mobile.server.settings.browsingMemoryLoadFailed"),
+    t("mobile.server.settings.learningSaveFailed"),
   );
   const current = setting.value;
   return (
