@@ -1665,6 +1665,8 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            /** The password stays in its field for a page that sends the form again. */
+            let held = false;
             let leaked = false;
             // A blocked navigation ends the wait for one, so the user gets the tab at once.
             let stopWaiting = () => {};
@@ -1708,7 +1710,20 @@ export class BrowserHost {
                         return Effect.sync(cleanup);
                       });
                     }
-                    if (!protection.replaced) {
+                    if (!protection.replaced && !leaked && args.method === "password") {
+                      // A page can send the form again in this document, as after a "signed in on
+                      // another device" question, so a password field keeps the value. The engine
+                      // hides it from what the agent reads until the document goes.
+                      held = yield* boundEngineOperation(
+                        tab,
+                        entry.keep(secret),
+                        10_000,
+                        "Authentication field check timed out.",
+                        keepQueueBlocked,
+                      ).pipe(Effect.catch(() => Effect.succeed(false)));
+                      if (held && !protection.replaced) kept = true;
+                    }
+                    if (!protection.replaced && !kept) {
                       // A reload would restart a single-page sign-in at its first step. Keep the
                       // document when its fields are empty and nothing a snapshot reads shows the value.
                       const cleared = yield* boundEngineOperation(
@@ -1738,6 +1753,18 @@ export class BrowserHost {
               Effect.ensuring(
                 Effect.sync(() => {
                   contents.off("will-frame-navigate", blockLeak);
+                  if (held && kept && !contents.isDestroyed()) {
+                    // The page can still send the kept password in an address, so the block stays
+                    // until the document goes.
+                    const stopBlocking = () => {
+                      contents.off("will-frame-navigate", blockLeak);
+                      contents.off("did-navigate", stopBlocking);
+                      contents.off("destroyed", stopBlocking);
+                    };
+                    contents.on("will-frame-navigate", blockLeak);
+                    contents.once("did-navigate", stopBlocking);
+                    contents.once("destroyed", stopBlocking);
+                  }
                   protection.running = false;
                   tab.diagnostics.clearDiagnostics();
                   if (protection.replaced) {

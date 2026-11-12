@@ -93,4 +93,22 @@ describe("CardValueScrub", () => {
     const raw = snapshot(NUMBER, []);
     expect(new CardValueScrub().snapshot(raw)).toBe(raw);
   });
+
+  it("hides a password kept in a field until the document is replaced", () => {
+    const scrub = new CardValueScrub();
+    const password = "s3cr.t(pass)+word";
+    scrub.addDocumentSecret(password);
+    const scrubbed = scrub.snapshot(snapshot(`Welcome ${password}`, [element("e1", "Password", password)]));
+    expect(JSON.stringify(scrubbed)).not.toContain(password);
+    expect(scrubbed.text).toBe("Welcome •••");
+    expect(scrub.reveals(`text=${password}`)).toBe(true);
+    scrub.endDocument();
+    expect(scrub.text(password)).toBe(password);
+  });
+
+  it("hides a short password only as a whole word", () => {
+    const scrub = new CardValueScrub();
+    scrub.addDocumentSecret("ab1");
+    expect(scrub.text("ab1 and ab12 and xab1")).toBe("••• and ab12 and xab1");
+  });
 });

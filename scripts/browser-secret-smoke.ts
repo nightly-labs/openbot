@@ -14,12 +14,20 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   const protocol = seedContents.session.protocol;
   /** While true, the sign-in page of the takeover view case does not load. */
   let stuckPageFails = false;
-  await protocol.handle("https", (request) => {
+  await protocol.handle("https", async (request) => {
     const url = new URL(request.url);
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
     if (url.pathname === "/stuck" && stuckPageFails) return Response.error();
     if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
     if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
+    if (url.pathname === "/confirm" || url.pathname === "/confirm-get") return confirmLoginFixture(url.pathname);
+    if (url.pathname === "/confirmed") {
+      const password = new URLSearchParams(await request.text()).get("password");
+      return new Response(
+        `<!doctype html><h1>${password === CONFIRM_PASSWORD ? "Signed in" : "Password cannot be blank"}</h1>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    }
     const html =
       url.pathname === "/complete"
         ? "<h1>Signed in</h1>"
@@ -169,6 +177,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(tab.id));
       }
     }
+    await runResubmitScenario(browser);
     // A vault code goes only to a code field. An older Keycloak page names it otp with no
     // autocomplete="one-time-code"; a recovery, SMS, or phone field or a plain numeric field does not take it.
     for (const [selector, fillable] of [
@@ -364,4 +373,144 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   } finally {
     protocol.unhandle("https");
   }
+}
+
+const CONFIRM_PASSWORD = "fixture confirm+password/381904";
+
+interface ResubmitCase {
+  name: string;
+  submission: string;
+  keptInField: boolean;
+  secretInSnapshots: boolean;
+  evaluateBlocked: boolean;
+  page: string;
+  fieldAfter: "empty" | "filled" | null;
+}
+
+/**
+ * A sign-in page that asks whether to end the session on another device, as some company portals do,
+ * and sends the same form again when the person answers Yes. The page stays the same document until then.
+ */
+function confirmLoginFixture(path: string): Response {
+  const method = path === "/confirm-get" ? "get" : "post";
+  return new Response(
+    `<!doctype html><body>
+    <form id="form" method="${method}" action="/confirmed">
+      <label>Password<input id="password" name="password" type="password"></label>
+      <button type="button" id="sign-in" onclick="document.querySelector('#question').hidden = false">Sign in</button>
+      <div id="question" hidden>User logged in on another device. Continue?
+        <button type="button" id="yes" onclick="document.querySelector('#form').submit()">Yes</button></div>
+    </form>
+    <label>Show password<input id="show" type="checkbox" onchange="document.querySelector('#password').type = this.checked ? 'text' : 'password'"></label>
+    </body>`,
+    { headers: { "Content-Type": "text/html" } },
+  );
+}
+
+/**
+ * A saved password stays in its field after a submit that keeps the document, hidden from the agent,
+ * so the page can send the form again. A "show password" control empties the field, and a page that
+ * would send the kept password in an address is stopped.
+ */
+async function runResubmitScenario(browser: BrowserHost): Promise<void> {
+  const call = (tool: string, args: DynamicToolCallParams["arguments"]) =>
+    runCauseEffect(
+      browser.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool,
+        threadId: "secret-thread",
+        ownerAgentId: "secret-agent",
+        turnId: "secret-turn",
+        callId: `resubmit-${tool}`,
+        arguments: args,
+      }),
+    );
+  const cases: ResubmitCase[] = [];
+  for (const [path, action] of [
+    ["/confirm", "yes"],
+    ["/confirm", "show"],
+    ["/confirm-get", "yes"],
+  ] as const) {
+    const tab = await runCauseEffect(
+      browser.open(`https://authentication.openbot.test${path}`, "secret-thread", "secret-agent"),
+    );
+    try {
+      const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+      if (!contents) throw new Error(`Missing ${path} fixture.`);
+      await waitForPresentedFrame(contents);
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: `resubmit-${path}-${action}`,
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#sign-in" },
+          },
+        }),
+      );
+      const submission = await runCauseEffect(handoff.submit(CONFIRM_PASSWORD, true));
+      const keptSnapshot = await runCauseEffect(browser.snapshot(tab.id));
+      const kept = await contents.executeJavaScript(
+        `document.querySelector('#password').value === ${JSON.stringify(CONFIRM_PASSWORD)}`,
+      );
+      const evaluation = await call("evaluate", {
+        tabId: tab.id,
+        expression: "document.querySelector('#password').value",
+      });
+      await call("click", { tabId: tab.id, target: { kind: "css", selector: `#${action}` } });
+      // The page sends the form with the kept password; the next snapshot reads the answer.
+      if (action === "yes" && path === "/confirm" && new URL(contents.getURL()).pathname !== "/confirmed")
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("The confirmed sign-in did not load.")), 10_000);
+          contents.once("did-finish-load", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+      const after = await runCauseEffect(browser.snapshot(tab.id));
+      const fieldAfter =
+        new URL(contents.getURL()).pathname === "/confirmed"
+          ? null
+          : await contents.executeJavaScript("document.querySelector('#password').value");
+      const result: ResubmitCase = {
+        name: `${path} ${action}`,
+        submission,
+        keptInField: kept === true,
+        secretInSnapshots: [keptSnapshot, after].some((item) => JSON.stringify(item).includes(CONFIRM_PASSWORD)),
+        evaluateBlocked: !evaluation.success,
+        page: after.text.includes("Signed in")
+          ? "signed-in"
+          : after.text.includes("Password cannot be blank")
+            ? "blank-password"
+            : new URL(after.url).pathname,
+        fieldAfter: fieldAfter === null ? null : fieldAfter === "" ? "empty" : "filled",
+      };
+      cases.push(result);
+      const expected =
+        action === "show"
+          ? result.fieldAfter === "empty"
+          : path === "/confirm"
+            ? result.page === "signed-in"
+            : result.page === "/confirm-get" && !after.url.includes("381904");
+      if (
+        !expected ||
+        result.submission !== "submitted" ||
+        !result.keptInField ||
+        result.secretInSnapshots ||
+        !result.evaluateBlocked
+      )
+        throw new Error(`A kept password failed on ${path} with ${action}: ${JSON.stringify(result)}`);
+    } finally {
+      await runCauseEffect(browser.close(tab.id));
+    }
+  }
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(".openbot-build/browser-secret-resubmit.json", JSON.stringify({ status: "passed", cases }, null, 2));
 }
