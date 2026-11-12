@@ -70,7 +70,7 @@ export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state"
 
 /**
  * Whether an agent can run on the provider now or soon: it runs, OpenBot checks it, or it is not
- * started yet, as `workflowProvider` decides. A row has its accounts only while it is available, so a
+ * started yet. `workflowProvider` uses the same rule. A row has its accounts only while it is available, so a
  * provider whose own sign-in is out cannot run. The catalogue keeps a built-in list of some
  * providers' models when they are signed out or missing, so a listed model is no proof (#7866). A
  * provider with no row has nothing against it. Custom agents share one row, and one that fails does
