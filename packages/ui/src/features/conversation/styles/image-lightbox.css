@@ -106,9 +106,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-3);
-  /* The viewer covers the window, so the window buttons, where the window has them, take
-   * `--window-controls-room` from the end of the toolbar, which ends 8px before them
-   * (`WindowControls.tsx`). The toolbar then moves 8px up, to the centre line of the buttons. */
+  /* With the window buttons, the toolbar moves 8px up, to their centre line. */
   --window-controls-overlap: var(--window-controls-room, 0px);
   padding-block: calc(var(--openbot-space-3) - min(var(--openbot-space-2), var(--window-controls-overlap)))
     var(--openbot-space-3);

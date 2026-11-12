@@ -9,7 +9,6 @@
   width: calc(100% - var(--settings-panel-width, 360px));
 }
 
-/* The header ends at the settings panel, so the window buttons reach less far into it (`header-layout.css`). */
 .conversation-panel[data-settings-panel] .conversation-header {
   --conversation-header-end-inset: var(--settings-panel-width, 360px);
 }

@@ -33,24 +33,17 @@
   --top-row-padding-inline: var(--openbot-space-2) var(--openbot-space-3);
 }
 
-/* The window buttons of a window without a system title bar (`DesktopWindowControls.tsx`) take
- * `--window-controls-room` from the end of the window. `--window-controls-reach` is the part of that
- * room past the end of the frame: how far the buttons reach into a top row that ends there. Both are
- * 0 without the buttons. `--window-frame-end` is the end padding of the frame: the thin frame and the
- * card's line, and the agent dock column when the dock is in the window. Each top row that the
- * buttons can reach sets `--window-controls-overlap`, how far they reach into it from its end, and
- * ends 8px before them. The values follow the layout in each frame, also while a panel opens. */
+/* The window buttons (`DesktopWindowControls.tsx`) take `--window-controls-room` from the end of the
+ * window, and reach past the end padding of the frame by `--window-controls-reach`. Both are 0
+ * without the buttons. Each top row that they can reach sets `--window-controls-overlap`, how far they
+ * reach into it, and ends 8px before them. */
 .app-window > .app-frame-edge {
   --window-frame-end: 0px;
   --window-controls-reach: max(0px, calc(var(--window-controls-room, 0px) - var(--window-frame-end)));
 }
 
-/* The short line between the controls of a top row and the window buttons, as before the side panel
- * button. Only a window with the buttons has it (`data-window-controls`). The row draws it at the
- * start of the buttons, and only when the row has controls at its end, so no line shows with nothing
- * before it. It shows only while the overlap is more than 0, so not in a chat header that a side
- * panel ends before them. The rows start at the top of the window, so the line has the centre line
- * of the buttons. */
+/* The short line before the window buttons, as before the side panel button: only in a row that has
+ * controls at its end, and only while the buttons reach into the row. */
 :where(:root[data-window-controls])
 :where(
   .conversation-header,
@@ -553,7 +546,6 @@
     flex-wrap: nowrap;
     padding-block: var(--top-row-padding-block);
     padding-inline: var(--top-row-padding-inline);
-    /* The header ends 8px before the window buttons where the window has them. */
     --window-controls-overlap: var(--window-controls-reach, 0px);
     padding-inline-end: max(var(--openbot-space-3), calc(var(--openbot-space-2) + var(--window-controls-overlap)));
     border-bottom: 0;
@@ -825,7 +817,6 @@
   min-height: 0;
   grid-template-columns: max(var(--left-panel-width, 280px), 220px) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
-  /* Close ends the top row of the page, 8px before the window buttons where the window has them. */
   --window-controls-overlap: var(--window-controls-reach, 0px);
 }
 
@@ -836,7 +827,7 @@
   grid-row: 1;
   align-items: center;
   padding-block: var(--openbot-space-4) 0;
-  /* The room of the Close button, and of the window buttons after it where the window has them. */
+  /* The room of the Close button. */
   padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4) + var(--window-controls-reach, 0px));
 }
 
@@ -852,7 +843,6 @@
   grid-row: 1;
   align-self: center;
   justify-self: end;
-  /* 8px before the window buttons where the window has them (`--window-controls-reach`). */
   margin-inline-end: max(var(--openbot-space-3), calc(var(--openbot-space-2) + var(--window-controls-reach, 0px)));
 }
 

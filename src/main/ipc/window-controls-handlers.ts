@@ -13,9 +13,8 @@ export interface WindowControlsIpcDependencies {
 const RESTORED: WindowControlsState = { maximized: false, fullScreen: false };
 
 /**
- * Each request acts on the window of the page that sends it, so a page can minimize, maximize or close
- * only its own window. Every app window shares one origin, so the Dynamic Island, the docks and the
- * overlays could send these too; their windows are not app windows, and nothing happens to them.
+ * Each request acts only on the window that sends it. Every app window shares one origin, so the Dynamic
+ * Island, the docks and the overlays can send these too; they are not app windows, so nothing happens.
  */
 export function windowControlsIpcHandlers({
   isAppWindow,
@@ -39,8 +38,7 @@ export function windowControlsIpcHandlers({
         if (window.isMaximized()) window.unmaximize();
         else window.maximize();
       }),
-      // The same as the system close button: the main window's `close` handler decides whether the
-      // app hides to the tray or quits.
+      // As the system close button: the main window's `close` handler chooses between hide and quit.
       close: eventHandler((event) => {
         senderWindow(event)?.close();
       }),

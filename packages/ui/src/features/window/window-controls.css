@@ -1,10 +1,6 @@
-/* The window buttons (`WindowControls.tsx`): fixed at the top inline-end corner of the window, as
- * system buttons are, so they do not move when the rows below them change. The close button ends 8px
- * from the window edge, as the first rail button starts 8px from the other edge. The buttons have the
- * size, the icons and the centre line of the buttons in the top row, 20px below the top. The group
- * starts with 9px for the short line that the top row draws before it (`window.css`). It stays above
- * dialogs and stays usable while a modal dialog turns off pointer events on the page. Only a tooltip
- * is above it. */
+/* Fixed at the top inline-end corner, as system buttons are, with the size and centre line of the top
+ * row's buttons. The start padding holds the line that the top row draws before them (`window.css`).
+ * They stay usable while a modal dialog turns off pointer events on the page. */
 .window-controls {
   position: fixed;
   z-index: calc(var(--openbot-layer-tooltip) - 1);
@@ -26,8 +22,8 @@
   height: var(--openbot-control-sm);
 }
 
-/* The three glyphs fill about the same 10px box, as system window buttons do: Lucide draws its square
- * larger and its cross smaller than its line. A 20px icon takes the lighter stroke (`tokens.css`). */
+/* Lucide draws its square larger and its cross smaller than its line. These sizes give all three
+ * glyphs about the same 10px box, as system buttons have. */
 .window-controls-box {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);

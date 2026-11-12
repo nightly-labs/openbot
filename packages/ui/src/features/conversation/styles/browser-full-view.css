@@ -51,9 +51,7 @@ body[data-browser-full-view] .app-frame {
   align-items: center;
   gap: var(--openbot-space-1);
   margin-inline: var(--browser-full-edge);
-  /* The view covers the window, so the window buttons, where the window has them, take
-   * `--window-controls-room` from the end of the window (`WindowControls.tsx`). Hide keeps its 8px
-   * before them. */
+  /* Hide has its own 8px margin before the window buttons. */
   --window-controls-overlap: max(0px, calc(var(--window-controls-room, 0px) - var(--browser-full-edge)));
   padding-inline: var(--openbot-space-1) var(--window-controls-overlap);
   color: var(--openbot-text-secondary);

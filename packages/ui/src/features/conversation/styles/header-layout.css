@@ -6,9 +6,7 @@
   justify-content: space-between;
   border-bottom: 0;
   padding-block: 0;
-  /* The window buttons, where the window has them, reach into the end of the header by
-   * `--window-controls-reach` (`window.css`), less the side panel that ends the chat before them.
-   * The header then ends 8px before them. */
+  /* A side panel ends the chat before the window buttons, so they reach less far into the header. */
   --window-controls-overlap: max(
     0px,
     calc(var(--window-controls-reach, 0px) - var(--conversation-header-end-inset, 0px))

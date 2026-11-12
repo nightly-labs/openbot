@@ -14,7 +14,6 @@
   height: var(--left-header-height, 38px);
   min-width: 0;
   padding-block: 0;
-  /* The row ends 8px before the window buttons where the window has them (`--window-controls-reach`). */
   --window-controls-overlap: var(--window-controls-reach, 0px);
   padding-inline: var(--openbot-space-2) calc(var(--openbot-space-2) + var(--window-controls-overlap));
   container: side-panel-header / inline-size;

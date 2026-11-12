@@ -2315,8 +2315,7 @@ export const IPC_ENDPOINTS = {
     event: event<RemoteDesktopSession[]>()("remote-desktop:event"),
   },
 
-  // The window buttons that the page draws in its top row where the window has no system title bar
-  // (Windows). Each request acts on the app or chat window that sends it.
+  // The window buttons that the page draws on Windows. Each request acts on the window that sends it.
   windowControls: {
     getState: request<undefined, WindowControlsState>()("window-controls:get-state"),
     minimize: request<undefined, void>()("window-controls:minimize"),
