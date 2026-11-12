@@ -613,6 +613,7 @@ const windows = createMainWindowController({
   quitFromShortcut: () => quitFor("shortcut"),
   workingAgents,
   quitGuard,
+  onHiddenWhileWorking: (hidden) => backgroundTray?.setHiddenWhileWorking(hidden),
 });
 
 let appIconColorImage: NativeImage | undefined;
