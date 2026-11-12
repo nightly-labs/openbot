@@ -3271,6 +3271,27 @@ export class ChannelService {
   });
 
   /**
+   * Whether this computer's user started the agent's running task in this turn with a request whose
+   * text holds `value`. Only then can the task save that value to the Vault (#6369): the agent also
+   * reads the lead's and other members' words, which must not choose the key of every agent.
+   */
+  readonly localRequestHolds = Effect.fn("ChannelService.localRequestHolds")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+    value: string,
+  ) {
+    const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
+    const person = this.#requester(channelId, task, tasks);
+    if (person === null || (this.hooks.remotePerson?.(person.id) ?? false)) return false;
+    const root = tasks.find((item) => item.id === task.rootTaskId);
+    if (!root) return false;
+    const request = yield* channelSync(() => this.store.message(channelId, root.requestMessageId));
+    return request?.message.text.includes(value) === true;
+  });
+
+  /**
    * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
    * of the routine's request, also one that the lead routed to a member: its failure call ends the
    * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
