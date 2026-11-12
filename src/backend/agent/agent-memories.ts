@@ -13,6 +13,7 @@ import type {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
+import { z } from "zod";
 import {
   type AgentMemoryListPage,
   type AgentMemorySearchResult,
@@ -20,11 +21,11 @@ import {
   AgentMemoryStore,
 } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
-import { normalizeMemoryText } from "../memory-store";
+import { normalizeMemorySite, normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MemoryReviewOperation } from "./memory-review-prompt";
-import { listMemoriesInput, searchMemoriesInput, setMemoryInclusionInput } from "./memory-tool-inputs";
+import { listMemoriesInput, searchMemoriesArguments, setMemoryInclusionInput } from "./memory-tool-inputs";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
 type PendingMemoryMutation =
@@ -48,6 +49,8 @@ type PendingMemoryMutation =
       expectedSelectionRevision?: number;
       duplicate?: { memoryId: string; expectedRevision: number };
       inclusion: "essential" | "searchable";
+      /** A normalized site. Absent, an update keeps the site that the memory has. */
+      site?: string;
     }
   | {
       callId: string;
@@ -245,8 +248,8 @@ export class AgentMemories {
             operation.type === "forget"
               ? { memoryId: operation.memoryId }
               : operation.type === "update"
-                ? { memoryId: operation.memoryId, text: operation.text }
-                : { text: operation.text, inclusion: operation.inclusion },
+                ? { memoryId: operation.memoryId, text: operation.text, ...reviewSite(operation.site) }
+                : { text: operation.text, inclusion: operation.inclusion, ...reviewSite(operation.site) },
         },
         agentId,
       );
@@ -275,8 +278,15 @@ export class AgentMemories {
     redact: (value: string) => string,
   ): OpenBotToolResponse | null {
     if (params.tool === "search_memories") {
-      const parsed = searchMemoriesInput.safeParse(params.arguments);
-      if (!parsed.success) return openBotToolFailure(sourceText("error.backend.memorySearchQuery"));
+      const parsed = searchMemoriesArguments.safeParse(params.arguments);
+      // A query error keeps its own text. Another error names its field: an error about the words
+      // made the agent change a valid query and send the same bad field again (#6438).
+      if (!parsed.success)
+        return openBotToolFailure(
+          parsed.error.issues.every(({ path }) => path[0] === "query")
+            ? sourceText("error.backend.memorySearchQuery")
+            : `${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`,
+        );
       const result = memoryRecallResult(
         this.#memories.search(senderAgentId, parsed.data.query, parsed.data.limit),
         redact,
@@ -329,6 +339,9 @@ export class AgentMemories {
         return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
       if (args.inclusion !== undefined && args.inclusion !== "essential" && args.inclusion !== "searchable")
         return openBotToolFailure("inclusion must be essential or searchable.");
+      const site = isString(args.site) ? normalizeMemorySite(args.site) : undefined;
+      if ((args.site !== undefined && !isString(args.site)) || site === null)
+        return openBotToolFailure("site must be a host name or a URL.");
       const memoryId = args.memoryId;
       if (
         memoryId !== undefined &&
@@ -369,6 +382,7 @@ export class AgentMemories {
           id: selectedId ?? "00000000-0000-0000-0000-000000000000",
           text,
           origin: duplicate?.origin ?? ("automatic" as const),
+          ...((site ?? current?.site) ? { site: site ?? current?.site } : {}),
         };
         if (essentialMemoryBytes([...others, candidate]) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) {
           if (current && sourceSelection?.inclusion === "essential")
@@ -404,11 +418,13 @@ export class AgentMemories {
           ? { duplicate: { memoryId: duplicate.id, expectedRevision: duplicateSelection.revision } }
           : {}),
         inclusion,
+        ...(site ? { site } : {}),
       });
       return openBotToolResult({
         status: "staged",
         memoryId: memoryId ?? null,
         inclusion,
+        ...(site ? { site } : {}),
         ...(inclusion !== intendedInclusion ? { note: sourceText("error.backend.memoryEssentialBudget") } : {}),
       });
     }
@@ -670,6 +686,7 @@ export class AgentMemories {
         ...(mutation.memoryId ? { memoryId: mutation.memoryId } : {}),
         text: mutation.text,
         sourceTurnId: mutation.sourceTurnId,
+        ...(mutation.site ? { site: mutation.site } : {}),
       });
       if (!memory) return;
       const selection = this.#memories.getSelection(mutation.agentId, memory.id);
@@ -812,4 +829,10 @@ function addChanges(
 ): void {
   if (added.length === 0) return;
   changes.set(agentId, [...(changes.get(agentId) ?? []), ...added]);
+}
+
+/** The site of a review change, when it is a host: a review keeps a fact whose site it wrote badly. */
+function reviewSite(site: string | null | undefined): { site?: string } {
+  const normalized = site ? normalizeMemorySite(site) : null;
+  return normalized ? { site: normalized } : {};
 }

@@ -44,6 +44,10 @@ export const messages = defineMessages("error.import", {
   "error.import.empty": "The export is empty.",
   "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
+  "error.import.uploadDiskSpace":
+    "The export needs {size} GB of free disk space on the server, and {free} GB is free. Free up space on the server, then choose the export again.",
+  "error.import.remoteZipTooLargeOldHost":
+    "This server accepts an export of up to 100 MB. Update OpenBot on the server to import a larger export.",
   "error.import.skillKept":
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
   "error.import.skillRenamed":
@@ -76,6 +80,18 @@ export const messages = defineMessages("error.import", {
   "error.import.transferChannelInstructionsCut":
     "{name}: only the first {limit} characters of the channel instructions are in the file, because a new channel can have {limit}.",
   "error.import.transferSettingSkipped": "{name} is not imported. {reason}",
+  "error.import.transferRunsSkipped": "{name}: the run history of the routine “{routine}” is not imported.",
+  "error.import.transferSharedSkillsSkipped": "The shared skills could not be read, so they are not in the file.",
+  "error.import.transferSharedSkillsNotAdded": "The shared skills in the file could not be added to this server.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "The choices of {count} member could not be saved.",
+    other: "The choices of {count} members could not be saved.",
+  },
+  "error.import.transferSharedSkillExists": "A shared skill with this name and other files is already on this server.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} server preference in the file is not valid here, so it is not imported.",
+    other: "{count} server preferences in the file are not valid here, so they are not imported.",
+  },
   "error.import.transferRoutineFlowSkipped": "The import left out a routine flow. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: custom agents are not imported, because they run a command. Check the command "{command}" and add the agent again in Settings.',

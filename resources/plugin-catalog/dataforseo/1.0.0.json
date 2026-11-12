@@ -1,0 +1,33 @@
+{
+  "slug": "dataforseo",
+  "name": "DataForSEO",
+  "tagline": "SEO and search data",
+  "description": "DataForSEO lets agents read search results, keyword volumes, backlinks, rankings and on-page data. Each user signs in to their own DataForSEO account through the browser, and each request is paid from that account's balance.",
+  "category": "research",
+  "creatorName": "DataForSEO",
+  "iconUrl": "https://dataforseo.com/wp-content/uploads/2022/04/cropped-favicon_512-1-192x192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-keywords", "text": "What is the monthly search volume for these keywords in the US?" },
+    { "id": "prompt-serp", "text": "Who ranks in the top ten on Google for this query?" },
+    { "id": "prompt-backlinks", "text": "Summarize the backlink profile of this domain." }
+  ],
+  "apps": [
+    {
+      "id": "app-dataforseo-mcp",
+      "name": "DataForSEO",
+      "description": "Search results, keywords, backlinks, and rankings, over DataForSEO's MCP server with browser sign-in.",
+      "iconUrl": "https://dataforseo.com/wp-content/uploads/2022/04/cropped-favicon_512-1-192x192.png",
+      "server": {
+        "name": "dataforseo",
+        "transport": "http",
+        "url": "https://mcp.dataforseo.com/mcp",
+        "auth": [{ "id": "dataforseo-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://dataforseo.com",
+  "privacyPolicyUrl": "https://dataforseo.com/privacy-policy/",
+  "termsUrl": "https://dataforseo.com/terms-of-service/",
+  "skills": []
+}

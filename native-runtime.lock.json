@@ -241,57 +241,57 @@
   },
   "cuaDriver": {
     "repository": "https://github.com/trycua/cua",
-    "tag": "cua-driver-rs-v0.34.0",
-    "version": "0.34.0",
+    "tag": "cua-driver-rs-v0.41.3",
+    "version": "0.41.3",
     "license": "MIT",
     "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "cua-driver-rs-0.34.0-darwin-universal-binary.tar.gz",
-        "assetSha256": "940dc008e0f7c5d217d14c0f247d1ebab91b1bac965f4a649d19e8c789bdfd81",
-        "downloadBytes": 47108179,
+        "asset": "cua-driver-rs-0.41.3-darwin-universal-binary.tar.gz",
+        "assetSha256": "af23b26a6e2e1cd0917536244ca0050b1447f2d344c958cdb79bfb3342282268",
+        "downloadBytes": 54042598,
         "files": {
-          "cua-driver": "47fa8722003066246ee8a828d3fe2c769f2194d6cf3ad63ae6f0becdc00d383a"
+          "cua-driver": "82f1dee09a7f410c545a85386452178982587e42e43d6f2fb1d8c1c6c1e6439f"
         }
       },
       "darwin-x64": {
-        "asset": "cua-driver-rs-0.34.0-darwin-universal-binary.tar.gz",
-        "assetSha256": "940dc008e0f7c5d217d14c0f247d1ebab91b1bac965f4a649d19e8c789bdfd81",
-        "downloadBytes": 47108179,
+        "asset": "cua-driver-rs-0.41.3-darwin-universal-binary.tar.gz",
+        "assetSha256": "af23b26a6e2e1cd0917536244ca0050b1447f2d344c958cdb79bfb3342282268",
+        "downloadBytes": 54042598,
         "files": {
-          "cua-driver": "47fa8722003066246ee8a828d3fe2c769f2194d6cf3ad63ae6f0becdc00d383a"
+          "cua-driver": "82f1dee09a7f410c545a85386452178982587e42e43d6f2fb1d8c1c6c1e6439f"
         }
       },
       "linux-x64": {
-        "asset": "cua-driver-rs-0.34.0-linux-x86_64-binary.tar.gz",
-        "assetSha256": "629ac96eff829d4dfd5cf221f3f2165c2d813aed91e5efb7b20777a741cd70a7",
-        "downloadBytes": 34818314,
+        "asset": "cua-driver-rs-0.41.3-linux-x86_64-binary.tar.gz",
+        "assetSha256": "a00a7bc4a648adbcbc93bfbf5a058daf71ce8838ee172e33b197aaf649ecee14",
+        "downloadBytes": 38375345,
         "files": {
-          "cua-driver": "5fa60c7ab35194e0e050a337521ca0e0b0ae0a8fe898813b340f65c94e15264c",
-          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
-          "wayland-helper/README.md": "d43b236d07a46b91c3dacaddcf19284d37b51361fcf46b9cebd3cc72f0a369e1",
-          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
-          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+          "cua-driver": "83030028e7c9e3f4d753b3b27025135d44eb8d52f562cce0aaaf95777bc1b41f",
+          "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
+          "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
+          "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
+          "wayland-helper/winrects@cua/extension.js": "b7b5b922e68a8ee53eb549a3d2f85dd28259140633c0c34123f16910f7ac8e0c"
         }
       },
       "linux-arm64": {
-        "asset": "cua-driver-rs-0.34.0-linux-arm64-binary.tar.gz",
-        "assetSha256": "9db8b9084add57eb97be8164367b24b6be54ed4f3dc01213e64b72d7fc09fddb",
-        "downloadBytes": 34607515,
+        "asset": "cua-driver-rs-0.41.3-linux-arm64-binary.tar.gz",
+        "assetSha256": "9fe4b3a28eb0e1df9b48b26ba56c1c454966824bdd6e0f077d59d283d7c76cc4",
+        "downloadBytes": 37825705,
         "files": {
-          "cua-driver": "e989fa537a8c06a8d5ec7e9be692b04b2f7e76e46feb52e9c222420556bbf476",
-          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
-          "wayland-helper/README.md": "d43b236d07a46b91c3dacaddcf19284d37b51361fcf46b9cebd3cc72f0a369e1",
-          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
-          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+          "cua-driver": "a3a4f54229629407880a33f90b07fb2e0bfe3f143623b33a6eea0c709e150a04",
+          "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
+          "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
+          "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
+          "wayland-helper/winrects@cua/extension.js": "b7b5b922e68a8ee53eb549a3d2f85dd28259140633c0c34123f16910f7ac8e0c"
         }
       },
       "win32-x64": {
-        "asset": "cua-driver-rs-0.34.0-windows-x86_64-binary.zip",
-        "assetSha256": "bcc520e50861c7092cf775846fec76ae386d7dcd6b5b408608b0ea4423a8b888",
-        "downloadBytes": 31314221,
+        "asset": "cua-driver-rs-0.41.3-windows-x86_64-binary.zip",
+        "assetSha256": "915ebda0a94651c03d2ca24a2f0d8f12206c539375856af06939490ea7bdf5a7",
+        "downloadBytes": 36028623,
         "files": {
-          "cua-driver.exe": "77f5cac754b42b6a8bae126414fc8f7487432ace93466967965188e24e9e53fb"
+          "cua-driver.exe": "4f98bfd53b52932c55a053168b38d8a447b697707b3aaf13912065107995ee3a"
         }
       }
     }
@@ -448,66 +448,59 @@
     }
   },
   "antigravity": {
-    "registry": "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json",
-    "distribution": "https://dl.google.com/agy-extensions/releases",
-    "version": "1.2.1",
+    "version": "1.5.4",
     "license": "Proprietary",
     "licenseUrl": "https://antigravity.google/terms",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "agy-acp-server-1.2.1-darwin-arm64.zip",
-        "assetSha256": "0fab9938812e6b32b3b543e65e4f3a0025ceef755413db13542d9a9b81ea803c",
-        "downloadBytes": 111725488,
-        "installedBytes": 400000000,
-        "executable": "agy_acp_server.par",
-        "executableSha256": "c93c86c0f505fcdf8b13c695bed26d306141ef5446189d591397074d324db34e",
-        "harness": "localharness_external",
-        "harnessSha256": "1b8a2b712ca312c9769e425b800bfbcceec4770f19736404474d1e8e50d65456",
-        "platformDirectory": "macos"
+        "url": "https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.4/agy_cli_mac_arm64.tar.gz",
+        "assetSha256": "196e677727a0542f040a92e4a192bef844bfb40bd56d8925ddfa389aaac65834",
+        "downloadBytes": 65394664,
+        "installedBytes": 209477856,
+        "executable": "antigravity",
+        "files": {
+          "bin/antigravity": "bfa89f0d8cbf1b6961395cc54ac5a75bc2776bc4f6a5e50dd91d3dd1ba076b03"
+        }
       },
       "darwin-x64": {
-        "asset": "agy-acp-server-1.2.1-darwin-x86_64.zip",
-        "assetSha256": "d09bf99bdea7b82021e1afcff829da35e4aa583d8f0984ef364dc3a7c064e07e",
-        "downloadBytes": 117493869,
-        "installedBytes": 430000000,
-        "executable": "agy_acp_server.par",
-        "executableSha256": "928d195a8600f649629c8b0e8ff5acbc84cb8dee7482e11d492e17c985fa3116",
-        "harness": "localharness_external",
-        "harnessSha256": "e92d5478a2a777f4e805aa525c3495e48d287381f59a0dee20616ef3c9f9b461",
-        "platformDirectory": "macos"
+        "url": "https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.4/agy_cli_mac_x64.tar.gz",
+        "assetSha256": "214f8fbceacc0f79fa886501923c6a254ee0080343d3a829ea136e51f8b3e6d3",
+        "downloadBytes": 71090923,
+        "installedBytes": 218487520,
+        "executable": "antigravity",
+        "files": {
+          "bin/antigravity": "80abff019289adf481215c544da080d6d5a31d2ef1af4cea1e42fa9aeb673e22"
+        }
       },
       "linux-x64": {
-        "asset": "agy-acp-server-1.2.1-linux-x86_64.zip",
-        "assetSha256": "9fbf0bd584a26478161f637cabd75113f72541c842d148f578ef1a6a9edcb843",
-        "downloadBytes": 333590110,
-        "installedBytes": 1055000000,
-        "executable": "agy_acp_server.par",
-        "executableSha256": "adbf34295671d1fd68b347efe4e4e2587816023cf41b9eff92c451834eb3de95",
-        "harness": "localharness_external",
-        "harnessSha256": "428236f899a22181ecb47b2885b167e71d4f1a661f8ce0046225174a32018f72",
-        "platformDirectory": "linux"
+        "url": "https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.4/agy_cli_linux_x64.tar.gz",
+        "assetSha256": "96cccfec6f205db8fa4016531bda1567827f1d056095238735af6b8b55a7f7d6",
+        "downloadBytes": 73930009,
+        "installedBytes": 247460240,
+        "executable": "antigravity",
+        "files": {
+          "bin/antigravity": "c77851d1fc99b45bb7fc1dc4cddf09f5b668418cc498f92a09c73cddbc696343"
+        }
       },
       "linux-arm64": {
-        "asset": "agy-acp-server-1.2.1-linux-arm64.zip",
-        "assetSha256": "7e7ef4088bc185e1af4204029e0f4ec4210af20724f3ff262186ac0bcea6aa0e",
-        "downloadBytes": 321280184,
-        "installedBytes": 1050000000,
-        "executable": "agy_acp_server.par",
-        "executableSha256": "422da6b0a2691006d69b89f8d4ea6d8818f3fe90eddcdf5bf78b20fbd502c68a",
-        "harness": "localharness_external",
-        "harnessSha256": "f3ac92c3c19327659d4721b78d1741f809a6106858a3a47be97aa334ad8cbbd5",
-        "platformDirectory": "linux"
+        "url": "https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.4/agy_cli_linux_arm64.tar.gz",
+        "assetSha256": "aa8870d1b93b646ed52fd0862752b3ec8c5e91afd22d943eb2a9a0b0671fd939",
+        "downloadBytes": 70055573,
+        "installedBytes": 236147064,
+        "executable": "antigravity",
+        "files": {
+          "bin/antigravity": "874d86300e64ff6f378abd55bcb45cbc1f8749fa422629c10ddecbac683b7b97"
+        }
       },
       "win32-x64": {
-        "asset": "agy-acp-server-1.2.1-windows-x86_64.zip",
-        "assetSha256": "9b82493819bc14613baa76264d55ad307ddd8ab4a8d6e110edb32da35498c07b",
-        "downloadBytes": 124869770,
-        "installedBytes": 230000000,
-        "executable": "agy_acp_server.exe",
-        "executableSha256": "04fd51b5c6dfb6d11e649c2cfc61a64ca31d9a4a58a9a3e5c93db934cd7a9695",
-        "harness": "localharness_external.exe",
-        "harnessSha256": "d9283bd0505014ca44f0e02259b78209c13b2426c9780bd43b7779f8eafe438f",
-        "platformDirectory": "windows"
+        "url": "https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.4/agy_cli_windows_x64.zip",
+        "assetSha256": "73b426d62f06c9d81926d406590831b1c5946e8156e34bfcab84f562e1e5e974",
+        "downloadBytes": 70308500,
+        "installedBytes": 225746584,
+        "executable": "antigravity.exe",
+        "files": {
+          "bin/antigravity.exe": "df853652519e7a235271524776a31011d330d0ca50d568255a5072183fc7f057"
+        }
       }
     }
   },

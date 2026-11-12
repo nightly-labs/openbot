@@ -328,6 +328,11 @@ export interface ConversationLoadNoticeProps {
   loading: boolean;
   /** Why the history did not load. The notice then shows Retry. */
   error: string | null;
+  /**
+   * The wait is sure to be long, such as the first load of a saved frame: the screen shows at once,
+   * so the chat under it does not show for a moment first.
+   */
+  immediate?: boolean;
   onRetry: () => void;
 }
 
@@ -345,15 +350,28 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
   // The screen that started its exit. It stays ready, so a new wait does not stop its exit.
   const [exiting, setExiting] = createSignal<number | null>(null);
   let screens = 0;
+  // Whether the screen that shows now came at once.
+  let immediate = false;
   createEffect(waiting, (current) => {
     if (!current) {
-      setExiting(untrack(screen));
-      return;
+      // The chat under the screen measures its rows and moves to its latest message in the next two
+      // frames. The screen starts its exit after them, so the reader does not see the rows move.
+      const shown = untrack(screen);
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setExiting(shown));
+      });
+      return () => cancelAnimationFrame(frame);
     }
-    const timer = setTimeout(() => {
+    const show = () => {
       screens += 1;
       setScreen(screens);
-    }, CONVERSATION_LOADING_DELAY_MS);
+    };
+    immediate = untrack(() => props.immediate === true);
+    if (immediate) {
+      show();
+      return;
+    }
+    const timer = setTimeout(show, CONVERSATION_LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   });
   return (
@@ -362,7 +380,8 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
         {(key) => (
           <AppLoadingScreen
             scene="thinking"
-            ready={key === exiting() || !waiting()}
+            immediate={immediate}
+            ready={key === exiting()}
             label={t("server.connection.loading", { name: props.name })}
             title={t("server.connection.loading", { name: props.name })}
             onExited={() => setScreen((current) => (current === key ? null : current))}

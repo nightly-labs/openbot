@@ -33,3 +33,9 @@ export const decodeWorkflowGitHubOptions = guardedDecoder(
   "workflow GitHub options response",
 );
 export const decodeWorkflowGitHubHistory = guardedDecoder(isWorkflowGitHubHistory, "workflow GitHub history response");
+
+/** The file id of a picture that the host kept for an asset step. */
+export function decodeWorkflowPictureId(value: unknown): string {
+  if (typeof value !== "string" || !value) throw new Error("Invalid workflow picture response.");
+  return value;
+}

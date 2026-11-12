@@ -125,6 +125,8 @@ export const messages = {
     "אפשר להוסיף נקודת קצה תואמת OpenAI — שרת מודלים במחשב הזה, או כל שירות עם כתובת בסיס ומפתח.",
   "provider.picker.customPending":
     "המודלים של נקודות הקצה שלך עדיין לא נטענו. הספק קורא אותם אחרי שהמשימה הנוכחית שלו נעצרת.",
+  "provider.picker.customUnlisted": "{name} לא מציג את המודלים של נקודות הקצה שלך.",
+  "provider.picker.editEndpoints": "עריכת נקודות קצה",
   "provider.picker.defaultModelLabel": "{name}, ברירת מחדל",
   "provider.picker.usageLimit": "הגעת למגבלת השימוש",
   "provider.picker.usageLimitWindow": "מגבלת {window}",
@@ -227,6 +229,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "ל-{name} לא נותרו זיכויי איפוס שימוש.",
   "provider.account.resetUsageAlreadyRedeemed": "זיכוי האיפוס הזה של {name} כבר נוצל.",
   "provider.account.resetUsageFailed": "לא ניתן לאפס את השימוש של {name}.",
+  "provider.account.pool": "איגום חשבונות",
+  "provider.account.poolDescription":
+    "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "provider.account.inUse": "בשימוש",
+  "provider.account.notInPool": "מחוץ למאגר",
+  "provider.account.leaveOutOfPool": "הוצאה מהמאגר",
+  "provider.account.putBackInPool": "החזרה למאגר",
+  "provider.account.poolChip": "מאגר",
+  "provider.account.poolCount": "מאגר של {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} בשימוש",
   "provider.settings.connected": "מחובר",
   "provider.settings.other": "ספקים אחרים",
   "provider.settings.search": "חיפוש ספקים",
@@ -253,6 +265,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "ברירת מחדל לסוכנים חדשים · {use}",
   "provider.settings.accounts": "חשבונות",
   "provider.settings.accountsDescription": "{count} מתוך {max}. כל סוכן משתמש בחשבון אחד.",
+  "provider.settings.accountsPooledDescription": "{count} מתוך {max}. הסוכנים חולקים את החשבונות האלה.",
   "provider.settings.accountBlocked": "{agents} לא יכולים לפעול עד שתתחבר שוב.",
   "provider.settings.removeTitle": "להסיר את {name}?",
   "provider.settings.removeMoves": "{agents} ישתמשו ב-{name}.",
@@ -272,6 +285,8 @@ export const messages = {
   "provider.settings.keyOptional": "אופציונלי. מפתח מוסיף מודלים בתשלום.",
   "provider.settings.keyAlternative": "או להדביק מפתח API של {name}.",
   "provider.settings.geminiKeyInUse": "Gemini משתמש במפתח הזה, ולא בתוכנית Google AI שלך. השימוש בתוכנית לא מוצג.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "מפתח Gemini API שמור משמש במקום התחברות עם Google. כדי להשתמש בתוכנית Google ובמודלים שלה, הסר את המפתח.",
   "provider.settings.claudeKeyInUse":
     "Anthropic מחייבת את קרדיט ה-API של המפתח, ולא את מינוי Claude. יש לבחור את חשבון מפתח ה-API בתפריט המודל של סוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
   "provider.settings.codexKeyInUse":
@@ -297,7 +312,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":
     "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "הסוכנים טוענים את CLAUDE.md, המיומנויות, הסוכנים, ה-hooks והתוספים מ-~/.claude בשרת. כשהמתג כבוי, כל תור שולח הנחיה קצרה יותר. קובצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
+  "provider.settings.context": "הקשר",
+  "provider.settings.compactWindow": "כיווץ צ׳אטים ב־",
+  "provider.settings.compactWindowDescription":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.compactWindowTokens": "{size} טוקנים",
+  "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",
@@ -330,4 +354,6 @@ export const messages = {
     two: "{url} · שני מודלים",
     other: "{url} · {count} מודלים",
   },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
 } as const satisfies PartialTranslation<typeof source>;

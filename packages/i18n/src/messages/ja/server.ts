@@ -323,6 +323,8 @@ export const messages = {
   "server.settings.later": "後で",
   "server.settings.setUp": "設定",
   "server.settings.agents": "エージェント",
+  "server.settings.agentsDescription":
+    "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
     "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
@@ -343,6 +345,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "先に確認",
   "server.settings.skillLearningOff": "オフ",
   "server.settings.skillLearningLoadFailed": "スキル学習の設定を読み込めませんでした。",
+  "server.settings.browsingMemory": "自分の閲覧から学習",
+  "server.settings.browsingMemoryDescription":
+    "エージェントのブラウザーを操作すると、使ったページとボタンからエージェントがサイトの使い方を学習します。入力したテキストは保存されません。",
+  "server.settings.browsingMemoryLoadFailed": "閲覧の設定を読み込めませんでした。",
   "server.settings.remoteOnline": "ホストはオンラインです。公開設定はオーナーが管理しています。",
   "server.settings.remoteOffline": "ホストはオフラインです。公開設定はオーナーが管理しています。",
   "server.settings.reachable": "オンラインでアクセスできます。招待されたユーザーのみがサインインできます。",
@@ -360,7 +366,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "サーバーキーを変更しました",
   "server.settings.hostKeyChanged": "最終変更",
   "server.settings.hostKeyChangedDescription": "{date}。以前のキーと新しいキーの両方がこの変更に署名しました。",
-  "server.settings.hostKeyLocalOnly": "ここでキーを変更できるのは、このコンピューターのサーバーだけです。",
+  "server.settings.hostKeyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
   "server.settings.removeTitle": "サーバーを削除",
   "server.settings.removeDescription":
     "すべてのメンバーについて、このサーバーをアカウントサービスから削除します。サーバーのコンピューターが使えなくなったときに使います。",

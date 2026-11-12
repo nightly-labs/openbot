@@ -147,14 +147,7 @@ export function SettingsRow({
   const onRowLayout = measures
     ? (event: LayoutChangeEvent) => setRowWidth(Math.round(event.nativeEvent.layout.width))
     : undefined;
-  const measuredTrailing = (
-    <View
-      className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 shrink"}
-      onLayout={(event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width))}
-    >
-      {trailing}
-    </View>
-  );
+  const trailingContent = trailing || chevron;
   const title = (
     <>
       {children}
@@ -165,14 +158,26 @@ export function SettingsRow({
       ) : null}
     </>
   );
+  // The title and the value keep one place in the tree in all layouts; only the styles change. If
+  // the value moved to another parent, React would mount a new native control, which is narrow
+  // until it measures its contents. The row would then change its layout again at each mount and
+  // flicker.
   const content = (
     <>
       {leading}
-      <View className="min-w-0 flex-1 gap-1">
-        {title}
-        {stacked ? measuredTrailing : null}
+      <View className={stacked ? "min-w-0 flex-1 gap-1" : "min-w-0 flex-1 flex-row items-center gap-3"}>
+        <View className={stacked ? "gap-1" : "min-w-0 flex-1 gap-1"}>{title}</View>
+        {trailingContent ? (
+          // The value limit is a part of this row, which has a fixed width. A percent limit inside the
+          // value would refer to this wrapper, which takes the width of its contents.
+          <View
+            className={stacked ? "max-w-full self-start overflow-hidden" : "min-w-0 max-w-[60%] shrink"}
+            onLayout={measures ? (event) => setTrailingWidth(Math.round(event.nativeEvent.layout.width)) : undefined}
+          >
+            {trailingContent}
+          </View>
+        ) : null}
       </View>
-      {stacked ? null : measures ? measuredTrailing : trailing || chevron}
     </>
   );
   return onPress ? (
@@ -194,7 +199,13 @@ export function SettingsRow({
       {content}
     </ListGroup.Item>
   ) : (
-    <View className="min-h-12 flex-row items-center gap-3 px-4 py-3" onLayout={onRowLayout}>
+    <View
+      accessibilityState={disabled ? { disabled } : undefined}
+      className="min-h-12 flex-row items-center gap-3 px-4 py-3"
+      // The same dimming as a disabled row with an action, such as a row with a picker.
+      style={disabled ? { opacity: 0.45 } : undefined}
+      onLayout={onRowLayout}
+    >
       {content}
     </View>
   );

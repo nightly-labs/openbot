@@ -1,10 +1,10 @@
 {
-  "version": "0.66.0",
+  "version": "0.69.0",
   "highlights": [
-    "Agents now learn new skills by themselves after you correct them, and fix their own skills while they work.",
-    "Save two-step codes in the Vault, and let agents sign in with them.",
-    "The Dynamic Island and the agent dock now work on Windows, and the dock can hold channels.",
-    "Agents can watch public videos, such as YouTube or TikTok links, and read what is said in them.",
-    "Channel members answer while they work, and a greeting or an unclear message goes to the lead."
+    "Hidden agents now keep working. Turn on again the routines of the agents that you hid before this version.",
+    "A message that you send to a working agent now steers its turn. You can still select Queue in Settings > Agents.",
+    "Pin messages in a chat, and sort your Library files into folders.",
+    "Teach an agent a task in its browser, and add skills from a GitHub link.",
+    "Pool the accounts of a provider, and export a full copy of a server or copy its agents to another server."
   ]
 }

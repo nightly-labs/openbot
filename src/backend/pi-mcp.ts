@@ -21,11 +21,22 @@ import { providerCall } from "./provider-client-effects";
 // which Pi's MCP extension adds later, so the section is removed from each request's copy of the
 // messages instead. Pi's stored prompt keeps it, so Pi sends no section update. A `docs` section with
 // other text, from another extension, stays. A system update that only changes `docs` goes too.
+//
+// Pi loads a folder's `.agents/skills` only after a project trust decision, and RPC mode has no
+// trust prompt, so Pi skipped the skills that OpenBot installs in the agent's workspace (#6315).
+// Pi starts in that workspace, so the extension trusts the folder of the first decision of the
+// process. Pi gives that folder as its real path. A later decision, for a session in another
+// folder, stays Pi's. The decision is not saved in Pi's `trust.json`.
 const EXTENSION = String.raw`export default function (pi) {
   const slot = Symbol.for("openbot.pi.mcpServers");
   globalThis[slot] ??= JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]");
   delete process.env.OPENBOT_PI_MCP_SERVERS;
   for (const server of globalThis[slot]) pi.registerMcpServer(server.name, server.config);
+  const workspace = Symbol.for("openbot.pi.workspace");
+  pi.on("project_trust", (event) => {
+    globalThis[workspace] ??= event.cwd;
+    return { trusted: event.cwd === globalThis[workspace] ? "yes" : "undecided" };
+  });
   const piDocs = (message) =>
     message.role === "system" && message.sections?.docs?.startsWith?.("<docs>\nPi documentation (read only when ");
   pi.on("context_with_system", (event) => {

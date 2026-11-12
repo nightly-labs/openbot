@@ -116,6 +116,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
   "marketplace.app.connection": "接続",
+  "marketplace.app.access.use": "使用可能",
+  "marketplace.app.access.noAgents": "エージェントなし",
+  "marketplace.app.access.agentsOf": "{name} を使用できるエージェント",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}。エージェントを選択",
+  "marketplace.app.access.level": "{name} に対する {role} のアクセス",
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
@@ -196,6 +201,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
+  "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs の Honcho は、接続した他の AI ツールとも共有できる、あなたについての長期記憶をエージェントに与えます。エージェントは学んだことを保存し、Honcho はそれをもとに推論して、あなたの好み、目標、仕事の進め方のモデルを作ります。エージェントは作業を始める前に Honcho に質問します。OpenBot のエージェントにも独自の記憶があります。Honcho は他のツールでもあなたについていく記憶です。エージェントが保存したメッセージはあなたの Honcho アカウントに送られます。",
+  "marketplace.plugin.honcho.app": "1 つの MCP サーバーで、Honcho のワークスペースに長期記憶を保存して照会します。",
+  "marketplace.plugin.honcho.prompt.recall":
+    "始める前に、私の好きな仕事の進め方について Honcho が何を知っているか聞いてください。",
+  "marketplace.plugin.honcho.prompt.save": "このスレッドの決定事項を Honcho に保存してください。",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho は私の文章のスタイルについて何と言っていますか？この下書きに活かしてください。",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev でキーを作成してください。",
+  "marketplace.plugin.hindsight.tagline": "時間とともに学ぶ記憶",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize の Hindsight は、Hindsight Cloud にある長期記憶をエージェントに与えます。エージェントは事実や出来事を保持し、意味、時間、エンティティで呼び出し、それを振り返ってメンタルモデルを作ります。記憶はバンクに保管され、エージェントはプロジェクトや人ごとにバンクを作れます。OpenBot のエージェントにも独自の記憶があります。Hindsight は接続した他の AI ツールと共有できる記憶です。エージェントが保持した内容はあなたの Hindsight Cloud アカウントに送られます。",
+  "marketplace.plugin.hindsight.app":
+    "1 つの MCP サーバーで、Hindsight Cloud のバンクにある記憶を保持、呼び出し、振り返ります。",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "始める前に、このプロジェクトについて分かっていることを Hindsight から呼び出してください。",
+  "marketplace.plugin.hindsight.prompt.retain": "このスレッドの決定事項と未解決の質問を Hindsight に保持してください。",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "私の Hindsight の記憶を振り返ってください。この 1 か月の私の仕事にどんなパターンがありますか？",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",
   "marketplace.plugin.figma.description":
     "Figma を使うと、エージェントはデザインファイルを読み取り、コンポーネント、スタイル、変数を調べ、本番用の仕様をエンジニアに渡せます。このコンピューターの Figma デスクトップアプリにある MCP サーバーに接続します。サーバーはデザインの読み取りのみ可能で、書き込みには現在対応中です。",
@@ -379,6 +405,15 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
+  "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.postiz.description":
+    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.postiz.app":
+    "ブラウザでのサインインまたは API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz に接続されている SNS チャンネルはどれですか?",
+  "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",
@@ -539,6 +574,14 @@ export const messages = {
   "marketplace.skills.origin.local": "このコンピューターで作成",
   "marketplace.skills.origin.workspace": "このエージェントのフォルダー内",
   "marketplace.skills.origin.marketplace": "マーケットプレイスから · バージョン {version}",
+  "marketplace.skills.origin.github": "GitHub から · {repository}",
+  "marketplace.skills.github.search": "検索、または GitHub のリンクを貼り付け",
+  "marketplace.skills.github.reading": "リポジトリ内のスキルを探しています",
+  "marketplace.skills.github.trust":
+    "GitHub のスキルは OpenBot が確認したものではありません。追加する前にスキルの内容を読んでください。",
+  "marketplace.skills.github.source": "GitHub · {repository}（コミット {commit}）",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "GitHub で {repository} を開く",
   "marketplace.skills.status.notAdded": "未追加",
   "marketplace.skills.status.on": "{agents} でオン",
   "marketplace.skills.agentCount": { other: "エージェント {count} 件" },

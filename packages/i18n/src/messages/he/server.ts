@@ -265,7 +265,7 @@ export const messages = {
   "server.settings.generalTitle": "כללי",
   "server.settings.generalDescription": "ניהול השם, הלוגו וההעדפות של השרת הזה.",
   "server.settings.vaultTitle": "כספת",
-  "server.settings.vaultDescription": "שמירת התחברויות, כרטיסים ופרטי קשר שכל סוכן בשרת הזה יכול למלא.",
+  "server.settings.vaultDescription": "שמירת התחברויות, כרטיסים, פרטי קשר ומפתחות API עבור הסוכנים בשרת הזה.",
   "server.settings.membersTitle": "חברים",
   "server.settings.membersDescription": "פרסום השרת הזה, הזמנת אנשים וניהול גישה.",
   "server.settings.desktopTitle": "שולחן עבודה מרוחק",
@@ -376,6 +376,7 @@ export const messages = {
   "server.settings.later": "מאוחר יותר",
   "server.settings.setUp": "הגדרה",
   "server.settings.agents": "סוכנים",
+  "server.settings.agentsDescription": "בחרו מה הסוכנים בשרת הזה יכולים לעשות כשלא הגדרתם זאת לסוכן.",
   "server.settings.timezone": "אזור זמן",
   "server.settings.timezoneDescription":
     "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח.",
@@ -395,6 +396,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "לשאול קודם",
   "server.settings.skillLearningOff": "כבוי",
   "server.settings.skillLearningLoadFailed": "לא ניתן לטעון את הגדרת למידת המיומנויות.",
+  "server.settings.browsingMemory": "ללמוד מהגלישה שלי",
+  "server.settings.browsingMemoryDescription":
+    "כשאתה שולט בדפדפן של סוכן, הסוכן לומד איך אתרים עובדים מהדפים והכפתורים שאתה משתמש בהם. טקסט שהקלדת לא נשמר.",
+  "server.settings.browsingMemoryLoadFailed": "לא ניתן לטעון את הגדרת הגלישה.",
   "server.settings.rolesTitle": "הרשאות",
   "server.settings.rolesDescription":
     "יש לבחור את הסוכנים שחברים יכולים להשתמש בהם. חבר מקבל את רמת הגישה הגבוהה ביותר מבין כולם ותפקידיו. בעלים ומנהלים יכולים להשתמש בכל הסוכנים.",
@@ -418,7 +423,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "מפתח השרת הוחלף",
   "server.settings.hostKeyChanged": "השינוי האחרון",
   "server.settings.hostKeyChangedDescription": "{date}. המפתח הקודם והמפתח החדש חתמו שניהם על השינוי הזה.",
-  "server.settings.hostKeyLocalOnly": "רק השרת שבמחשב הזה יכול להחליף כאן את המפתח שלו.",
+  "server.settings.hostKeyOwnerOnly": "רק הבעלים יכול להחליף את מפתח השרת.",
   "server.settings.removeTitle": "הסרת השרת",
   "server.settings.removeDescription": "הסרת השרת הזה משירות החשבונות עבור כל החברים. מתאים כשהמחשב שלו כבר אינו זמין.",
   "server.settings.removeConfirmTitle": "להסיר את {name}?",

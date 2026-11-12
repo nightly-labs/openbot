@@ -30,7 +30,7 @@ import {
   type WAMessage,
 } from "@openbot/whatsapp/baileys";
 import { gc } from "bun";
-import { Effect } from "effect";
+import { Effect, Scope } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -394,6 +394,7 @@ interface Booted {
   agents: AgentService;
   messaging: MessagingService;
   runtime: WhatsAppRuntime;
+  mailbox: MailboxStore;
 }
 
 async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
@@ -434,7 +435,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   });
   await runCauseEffect(messaging.start());
   try {
-    return await use({ agents, messaging, runtime });
+    return await use({ agents, messaging, runtime, mailbox });
   } finally {
     await runCauseEffect(messaging.stop());
     await runCauseEffect(agents.stop());
@@ -547,7 +548,7 @@ try {
     return { sealed: true };
   });
 
-  await boot(async ({ agents, messaging, runtime }) => {
+  await boot(async ({ agents, messaging, runtime, mailbox }) => {
     await step("link without network: the link fails as unavailable, not as an expired code", async () => {
       phone.offline = true;
       await runCauseEffect(messaging.startWhatsAppLink(parseStartWhatsAppLinkInput({ method: "qr", ownNumber: true })));
@@ -629,6 +630,41 @@ try {
       await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the later message");
       assert.equal(received(agents, OWNER_JID, own.id), false, "An own post was read as a request.");
       return { echoId: own.id };
+    });
+
+    await step("status post: a number with the setting off gets no “Working on it…” post", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      // No provider runs here, so the check starts the request itself: a start names its request.
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const start = (turnId: string) =>
+        agents.messaging.event({ type: "turn-started", agentId: link.agentId, threadId: link.threadId, turnId }, scope);
+      // Posts and edits: a second start edits the post of the first one.
+      const working = () =>
+        phone.sent.filter(
+          (sent) =>
+            sent.jid === OWNER_JID &&
+            "text" in sent.content &&
+            typeof sent.content.text === "string" &&
+            sent.content.text.includes("Working on it"),
+        ).length;
+      const before = working();
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, true, "The post is not on by default.");
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, false));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, false);
+      start("turn-without-status-post");
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, true));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, true);
+      // The host handles the starts in order, so the post of this one shows that the first is done.
+      start("turn-with-status-post");
+      await until(() => working() > before, "the “Working on it…” post");
+      assert.equal(working(), before + 1, "A number with the setting off got a “Working on it…” post.");
+      // The request waits again, as the steps below expect.
+      await runCauseEffect(mailbox.restoreQueued(request.delivery.id));
+      return { posts: working() - before };
     });
 
     await step(

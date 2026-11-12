@@ -14,6 +14,9 @@ export interface SidebarPort {
   hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "getMachineAlerts">;
 }
 
+/** The calls of the sidebar storage and machine cards. The web client sends them to its connected host. */
+export type SidebarCardsPort = Pick<SidebarPort, "storage" | "hostAdmin">;
+
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function sidebarPort(): SidebarPort {
   return window.openbot;

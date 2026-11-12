@@ -224,6 +224,39 @@ async function main(): Promise<void> {
       recordCases("unique-css-target-acts");
     }
 
+    {
+      // The shared selector matches the five event-7 buttons in page order: L-1041 to L-1045.
+      const buttons = `${SHARED_LAYOUT_SELECTOR} button`;
+      const before = await clicks(contents);
+      const missing = refusal(await call("click", { tabId, target: { kind: "css", selector: buttons, nth: 5 } }));
+      assert.match(missing, /has no match at that index: it matches 5 elements/u);
+      assert.equal(await clicks(contents), before, "A refused nth reached the page.");
+      recordCases("nth-past-the-last-match-sends-no-input");
+
+      const third = await call("click", { tabId, target: { kind: "css", selector: `${buttons} >> nth=2` } });
+      assert.equal(third.success, true, text(third));
+      await waitUntil(async () => calendar.registrations.length > 2);
+      assert.deepEqual(calendar.registrations.slice(2), ["L-1043"]);
+      recordCases("css-nth-suffix-picks-one-match");
+
+      const first = await call("click", { tabId, target: { kind: "css", selector: buttons, nth: 0 } });
+      assert.equal(first.success, true, text(first));
+      await waitUntil(async () => calendar.registrations.length > 3);
+      assert.deepEqual(calendar.registrations.slice(3), ["L-1041"]);
+      recordCases("css-nth-picks-one-match");
+
+      // A booked lesson's button has another name, so two "Register" buttons are left: L-2001, then L-1045.
+      const script = await call("run_script", {
+        tabId,
+        script: "await click(role('button', 'Register', { exact: true }).nth(1)); return true;",
+        finalSnapshot: false,
+      });
+      assert.equal(script.success, true, text(script));
+      await waitUntil(async () => calendar.registrations.length > 4);
+      assert.deepEqual(calendar.registrations.slice(4), ["L-1045"]);
+      recordCases("script-role-nth-picks-one-match");
+    }
+
     const report = {
       status: "passed",
       runId,

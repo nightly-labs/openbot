@@ -1,0 +1,33 @@
+{
+  "slug": "dart",
+  "name": "Dart",
+  "tagline": "Tasks and project docs",
+  "description": "Dart lets agents read, create and update tasks, projects and docs in the workspace of the signed-in account. Each user signs in to their own Dart account through the browser.",
+  "category": "productivity",
+  "creatorName": "Dart",
+  "iconUrl": "https://cdn.prod.website-files.com/659e83b16fe25e7824e48b3a/65ce9b667ac4c3ae776ba117_apple.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-mine", "text": "Which Dart tasks are assigned to me this week?" },
+    { "id": "prompt-create", "text": "Create Dart tasks for each step of this plan." },
+    { "id": "prompt-doc", "text": "Summarize the project brief doc in Dart." }
+  ],
+  "apps": [
+    {
+      "id": "app-dart-mcp",
+      "name": "Dart",
+      "description": "Tasks, projects, and docs, over Dart's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/659e83b16fe25e7824e48b3a/65ce9b667ac4c3ae776ba117_apple.png",
+      "server": {
+        "name": "dart",
+        "transport": "http",
+        "url": "https://mcp.dartai.com/mcp",
+        "auth": [{ "id": "dart-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.dartai.com",
+  "privacyPolicyUrl": "https://app.dartai.com/legal/privacy-policy",
+  "termsUrl": "https://app.dartai.com/legal/terms-of-use",
+  "skills": []
+}

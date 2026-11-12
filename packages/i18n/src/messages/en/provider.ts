@@ -138,6 +138,8 @@ export const messages = defineMessages("provider", {
     "Add an OpenAI-compatible endpoint — a model server on this computer, or any service with a base URL and a key.",
   "provider.picker.customPending":
     "The models of your endpoints are not loaded yet. The provider reads them after its current task stops.",
+  "provider.picker.customUnlisted": "{name} does not list the models of your endpoints.",
+  "provider.picker.editEndpoints": "Edit endpoints",
   "provider.picker.defaultModelLabel": "{name}, default",
   "provider.picker.usageLimit": "Usage limit reached",
   "provider.picker.usageLimitWindow": "{window} limit",
@@ -242,6 +244,16 @@ export const messages = defineMessages("provider", {
   "provider.account.resetUsageNoCredit": "{name} has no usage reset credits left.",
   "provider.account.resetUsageAlreadyRedeemed": "This reset credit of {name} was already used.",
   "provider.account.resetUsageFailed": "Could not reset the usage of {name}.",
+  "provider.account.pool": "Pool accounts",
+  "provider.account.poolDescription":
+    "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "provider.account.inUse": "In use",
+  "provider.account.notInPool": "Not in pool",
+  "provider.account.leaveOutOfPool": "Leave out of pool",
+  "provider.account.putBackInPool": "Put back in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool of {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in use",
 
   // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "Connected",
@@ -265,6 +277,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.defaultSubtitle": "Default for new agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} of {max}. Each agent uses one account.",
+  "provider.settings.accountsPooledDescription": "{count} of {max}. Agents share these accounts.",
   "provider.settings.accountBlocked": "{agents} cannot run until you sign in again.",
   "provider.settings.removeTitle": "Remove {name}?",
   "provider.settings.removeMoves": "{agents} will use {name}.",
@@ -284,6 +297,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.keyOptional": "Optional. A key adds paid models.",
   "provider.settings.keyAlternative": "Or paste a {name} API key.",
   "provider.settings.geminiKeyInUse": "Gemini uses this key, not your Google AI plan. The plan's usage is not shown.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "A saved Gemini API key is used instead of a Google sign-in. To use a Google plan and its models, remove the key.",
   "provider.settings.claudeKeyInUse":
     "Anthropic bills the key's API credit, not your Claude plan. Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.settings.codexKeyInUse":
@@ -310,7 +325,16 @@ export const messages = defineMessages("provider", {
   "provider.settings.claudeUserSetup": "Use my Claude Code setup",
   "provider.settings.claudeUserSetupDescription":
     "Agents load your CLAUDE.md, skills, agents, hooks and plugins from ~/.claude. Off, each turn sends a shorter prompt. Workspace files still load.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on the server. Off, each turn sends a shorter prompt. Workspace files still load.",
   "provider.settings.claudeUserSetupLoadFailed": "Could not load the Claude Code setting.",
+  "provider.settings.context": "Context",
+  "provider.settings.compactWindow": "Compact chats at",
+  "provider.settings.compactWindowDescription":
+    "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
+  "provider.settings.compactWindowDefault": "Claude Code default",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Could not load the compaction size of this server.",
   "provider.settings.models": "Models",
   "provider.settings.modelsDescription": {
     one: "{shown} of {count} model shows in the model picker.",
@@ -339,4 +363,6 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "No endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
 });

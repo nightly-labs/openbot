@@ -333,6 +333,8 @@ export const messages = {
   "server.settings.later": "Plus tard",
   "server.settings.setUp": "Configurer",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choisissez ce que les agents de ce serveur peuvent faire quand vous ne le définissez pas pour un agent.",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
@@ -354,6 +356,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Demander d’abord",
   "server.settings.skillLearningOff": "Désactivé",
   "server.settings.skillLearningLoadFailed": "Impossible de charger le réglage d’apprentissage des compétences.",
+  "server.settings.browsingMemory": "Apprendre de ma navigation",
+  "server.settings.browsingMemoryDescription":
+    "Quand vous contrôlez le navigateur d'un agent, l'agent apprend le fonctionnement des sites à partir des pages et des boutons que vous utilisez. Le texte saisi n'est pas conservé.",
+  "server.settings.browsingMemoryLoadFailed": "Impossible de charger le réglage de navigation.",
   "server.settings.remoteOnline": "L’hôte est en ligne. Son propriétaire contrôle la publication.",
   "server.settings.remoteOffline": "L’hôte est hors ligne. Son propriétaire contrôle la publication.",
   "server.settings.reachable": "Accessible en ligne. Seules les personnes invitées peuvent se connecter.",
@@ -371,7 +377,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Clé du serveur changée",
   "server.settings.hostKeyChanged": "Dernier changement",
   "server.settings.hostKeyChangedDescription": "{date}. L’ancienne clé et la nouvelle clé ont signé ce changement.",
-  "server.settings.hostKeyLocalOnly": "Ici, seul le serveur de cet ordinateur peut changer sa clé.",
+  "server.settings.hostKeyOwnerOnly": "Seul le propriétaire peut changer la clé du serveur.",
   "server.settings.removeTitle": "Supprimer le serveur",
   "server.settings.removeDescription":
     "Supprimez ce serveur du service de comptes pour tous les membres. Utilisez cette action quand son ordinateur n’est plus disponible.",

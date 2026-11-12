@@ -746,6 +746,7 @@ export class GitHubConnectorService {
     }
     const response = attempt2.success;
     const answer = schema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
+    if (response.status === 401) yield* this.#refused(accessToken);
     if (!response.ok || !answer.success) {
       const path = new URL(url).pathname;
       return yield* new GitHubOperationError({
@@ -807,7 +808,7 @@ export class GitHubConnectorService {
     const generation = this.#generation;
     const userToken = yield* this.accessToken();
     if (!userToken) return;
-    yield* this.#botTokens.renew(userToken);
+    if (yield* this.#botTokens.renew(userToken)) yield* this.#refused(userToken);
     // Also after a failure: a token that expired while the API was not reachable leaves the file.
     const current = yield* this.#serialize(() =>
       Effect.gen({ self: this }, function* () {
@@ -819,6 +820,16 @@ export class GitHubConnectorService {
     if (!current) return;
     if (this.#mcpProxy)
       yield* this.#mcpProxy.retain(new Set([userToken, ...this.#botTokens.entries().map(([, token]) => token)]));
+  });
+
+  /**
+   * GitHub refused `token` with HTTP 401. A revoke on GitHub does not change the expiry time of the
+   * token, so the stored user token is refreshed now. GitHub rejects the refresh of a revoked sign-in,
+   * which then shows as expired with Reconnect. A refusal of another token changes nothing.
+   */
+  readonly #refused = Effect.fn("GitHubConnector.refused")(function* (this: GitHubConnectorService, token: string) {
+    if (this.#disposed || this.#store.read()?.accessToken !== token || !this.#agentConnected()) return;
+    yield* Effect.forkIn(this.#owned(this.#refresh()), this.#scope);
   });
 
   /** One refresh at a time: a hand-off and the check can ask together, and GitHub rotates the refresh token. */
@@ -985,6 +996,7 @@ export class GitHubConnectorService {
       userToken: () => this.accessToken(),
       botToken: (owner, name) => this.#botTokens.forRepository(owner, name),
       canRead: (owner, name, signal) => this.#canRead(owner, name, signal),
+      refused: (token) => this.#refused(token),
     });
     const attempt5 = yield* Effect.gen({ self: this }, function* () {
       return yield* proxy.start(record?.mcpProxy?.port ?? null);

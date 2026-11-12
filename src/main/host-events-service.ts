@@ -135,9 +135,12 @@ function eventRoutine(owner: EventRoutineOwner, record: OwnedRoutineRecord): Eve
   };
 }
 
-/** A random signing secret. The prefix makes a leaked value easy to recognize and to scan for. */
+/**
+ * A random signing secret. The prefix makes a leaked value easy to recognize and to scan for. Standard
+ * base64, as the Standard Webhooks specification says, so that senders such as PostHog accept it.
+ */
 function newWebhookSecret(): string {
-  return `whsec_${randomBytes(32).toString("base64url")}`;
+  return `whsec_${randomBytes(32).toString("base64")}`;
 }
 
 /** A sender's secret: 16 to 1024 visible ASCII characters, such as `whsec_...` from Svix or a Composio secret. */

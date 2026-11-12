@@ -1,6 +1,8 @@
 import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
+import type { LocalServers } from "../local-servers/local-servers";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { agentRequest } from "./agent-inputs";
@@ -31,6 +33,8 @@ import { stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
+  /** Null in a local server, in server mode and on a hosted server. */
+  localServers: LocalServers | null;
   remoteDesktop: RemoteDesktopManager;
   remoteServers: RemoteServerManager;
   takePendingInvite: () => string | null;
@@ -38,6 +42,7 @@ interface TeamIpcDependencies {
 
 export function teamIpcHandlers({
   host,
+  localServers,
   remoteDesktop,
   remoteServers,
   takePendingInvite,
@@ -69,8 +74,14 @@ export function teamIpcHandlers({
       previewInvite: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.previewInvite(request))),
       takePendingInvite: handler(takePendingInvite),
       login: payloadHandler(parseLoginServer, (request) => runCauseEffect(remoteServers.login(request))),
+      // A stopped server on this computer has no process to connect to, so Retry starts it. Only this
+      // computer can start its own child processes: web and mobile clients only reconnect.
       retryConnection: payloadHandler(stringPayload("serverId"), (serverId) =>
-        runCauseEffect(remoteServers.retryConnection(serverId)),
+        runCauseEffect(
+          (localServers?.startStopped(serverId) ?? Effect.succeed(null)).pipe(
+            Effect.flatMap((started) => (started ? Effect.succeed(started) : remoteServers.retryConnection(serverId))),
+          ),
+        ),
       ),
       remove: payloadHandler(stringPayload("serverId"), (serverId) => runCauseEffect(remoteServers.remove(serverId))),
       getPresence: handler(() =>

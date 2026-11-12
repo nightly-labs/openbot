@@ -267,10 +267,15 @@
   gap: var(--openbot-space-2);
 }
 
-/* The buttons stay on one row while they fit; in a narrow card, the main one goes to the next row, at the end. */
+/* The buttons stay on one row while they fit. When they do not fit, they fill each row, so the main
+   button does not stand alone at the end of the next row. A row that fits gives them no space to fill. */
 .ui-block-card-footer > .ui-block-actions {
   justify-content: flex-end;
   margin-inline-start: auto;
+}
+
+.ui-block-card-footer > .ui-block-actions > .ui-button {
+  flex-grow: 1;
 }
 
 /* Every button of a block is a pill, also one that a block wraps in its own element. */

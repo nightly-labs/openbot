@@ -30,6 +30,7 @@ import type {
   RoutineRunConversationEvent,
   SkillConversationEvent,
   SkillSuggestionEvent,
+  VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
@@ -102,7 +103,16 @@ export interface RoutineRunMarkerModel {
 }
 
 export type ChatActionMarkerModel =
-  | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
+  | (SkillConversationEvent & {
+      kind: "skill-lifecycle";
+      timestamp: string;
+      /**
+       * Set when this row stands for consecutive installs of one skill revision, one for each agent:
+       * the ids of their messages, oldest first. Only the timeline joins them, and `timestamp` is the
+       * time of the newest one.
+       */
+      installMessageIds?: readonly string[];
+    })
   | AgentMessageMarkerModel
   /**
    * Consecutive agent messages, oldest first, drawn as one row. Only the timeline joins them: each
@@ -231,6 +241,7 @@ export interface AgentMessage {
   /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  videoGeneration?: VideoGenerationInfo | undefined;
   questionPrompt?: ConversationQuestionPrompt | undefined;
   /** The interactive block an agent drew. A blocking block sits beside `questionPrompt`. */
   uiBlock?: ConversationUiBlock;

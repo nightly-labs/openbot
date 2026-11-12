@@ -37,6 +37,9 @@ jobs:
     environment: release-android
     permissions:
       contents: read
+    outputs:
+      runtime: ${{ steps.updates.outputs.runtime }}
+      build: ${{ steps.updates.outputs.build }}
     env:
       CI: "1"
       FASTLANE_SKIP_UPDATE_CHECK: "1"
@@ -123,6 +126,13 @@ jobs:
           bun run typecheck
           bun run test:desktop -- apps/mobile/src
 
+      # The binary must have this runtime version, and a later over-the-air update of this commit gets
+      # the same value in a clean checkout. Compute it before the build: on the Linux runner, the
+      # native build changes what a fingerprint of this checkout gives.
+      - name: Compute the runtime version of this commit
+        id: runtime
+        run: bun scripts/mobile-ota.ts runtime-version --platform android
+
       - name: Build production Android on this runner
         working-directory: apps/mobile
         env:
@@ -141,6 +151,14 @@ jobs:
           path: ${{ env.AAB_PATH }}
           if-no-files-found: error
           retention-days: 7
+
+      # A binary with another update server, channel or certificate gets no over-the-air update, and
+      # only the next store build can correct it. So it must not reach Google Play.
+      - name: Check the update settings of the binary
+        id: updates
+        env:
+          RUNTIME: ${{ steps.runtime.outputs.runtime }}
+        run: bun scripts/mobile-ota.ts verify-build --platform android --artifact "$AAB_PATH" --runtime "$RUNTIME"
 
       - name: Upload to Google Play
         if: inputs.upload
@@ -169,4 +187,50 @@ jobs:
             echo "Commit: $GITHUB_SHA"
             echo "Artifact: android-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
             echo 'Manage testers and promote releases in Play Console. This workflow does not publish to production.'
+            if [[ "$UPLOADED" == "true" ]]; then
+              echo 'The job "Stage the APK" saves the APK of this build as a draft GitHub release. It is not public. It becomes public, and openbot.run offers it, when the change of `bun run mobile:release:published android` is on main.'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # The APK of this build, for a phone with no Google Play. Google Play makes it from the bundle, so
+  # only an uploaded build has one. It is saved as a draft release, which is not public:
+  # `publish-android-apk.yml` makes it public when the version is marked as available. A failure
+  # here does not stop the build record below: run the failed jobs again, or start
+  # `Stage the Android APK` with the build number.
+  apk:
+    name: Stage the APK
+    needs: release
+    if: inputs.upload
+    uses: ./.github/workflows/release-android-apk.yml
+    with:
+      version_code: ${{ needs.release.outputs.build }}
+    permissions:
+      contents: write
+
+  # `bun run mobile:ota:publish` sends an update only to a runtime version that a tag here records.
+  # A build that was not uploaded is recorded too: someone can upload its artifact in Play Console.
+  record:
+    name: Record the store build
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # The `mobile-build/` tag.
+      contents: write
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Tag the commit with the build and its runtime version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD: ${{ needs.release.outputs.build }}
+          RUNTIME: ${{ needs.release.outputs.runtime }}
+        run: bun scripts/mobile-ota.ts record-build --platform android --build "$BUILD" --runtime "$RUNTIME"

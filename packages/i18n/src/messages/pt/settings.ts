@@ -16,6 +16,12 @@ export const messages = {
     "Mostra a área de trabalho desfocada atrás da janela. Sites e menus passam a usar o tema do app.",
   "settings.interfaceSize.title": "Tamanho da interface",
   "settings.interfaceSize.description": "O tamanho do texto e dos controles no OpenBot.",
+  "settings.interfaceFont.title": "Fonte da interface",
+  "settings.interfaceFont.description": "A fonte dos menus, das conversas e das configurações.",
+  "settings.interfaceFont.default": "Padrão (Inter)",
+  "settings.codeFont.title": "Fonte do código",
+  "settings.codeFont.description": "A fonte do código, dos terminais e dos caminhos de arquivo.",
+  "settings.codeFont.default": "Padrão",
   "settings.logoColor.title": "Cor do logotipo",
   "settings.logoColor.description": "Aparece no Dock, na barra de tarefas e na Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -92,6 +98,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "O link abriu no navegador padrão.",
   "settings.sendShortcut.title": "Atalho de envio",
   "settings.sendShortcut.description": "Escolha as teclas que enviam uma mensagem neste dispositivo e navegador.",
+  "settings.chatOrder.description":
+    "Escolha onde a barra lateral mostra as conversas não lidas neste dispositivo. Manual desativa o grupo Não lidas.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",
@@ -141,6 +149,7 @@ export const messages = {
   "settings.planStart.set": "Definir",
   "settings.automationLimit.sectionTitle": "Limite",
   "settings.automationLimit.sectionDescription": "Vale para todos os agentes neste computador.",
+  "settings.automationLimit.sectionDescriptionServer": "Vale para todos os agentes neste servidor.",
   "settings.automationLimit.title": "Pedidos por hora",
   "settings.automationLimit.option": "{limit} por hora",
   "settings.automationLimit.note":
@@ -253,9 +262,15 @@ export const messages = {
   "settings.agentDock.edge.description": "Arraste o dock para cima ou para baixo para movê-lo pela borda.",
   "settings.agentDock.edge.right": "Direita",
   "settings.agentDock.edge.left": "Esquerda",
+  "settings.agentDock.size.title": "Tamanho do dock",
+  "settings.agentDock.size.description":
+    "Arraste para mudar o tamanho do dock sobre os outros apps. Na janela principal, o dock segue o tamanho da interface.",
   "settings.agentDock.autoHide.title": "Ocultar quando não estiver em uso",
   "settings.agentDock.autoHide.description":
     "O dock desliza para dentro da borda. Leve o ponteiro até a borda para mostrá-lo.",
+  "settings.agentDock.edgeStrip.title": "Mostrar uma faixa na borda",
+  "settings.agentDock.edgeStrip.description":
+    "Uma faixa fina fica onde o dock se esconde. Aproxime o ponteiro para mostrar o dock. Uma onda de cor sobe pela faixa quando um agente pergunta algo.",
   "settings.agentDock.results.title": "Mostrar trabalho concluído",
   "settings.agentDock.results.description": "Os resultados dos agentes aparecem por pouco tempo ao lado do dock.",
   "settings.agentDock.agents.title": "Agentes no dock",
@@ -509,6 +524,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} está pronta. Reinicie para aplicar.",
   "settings.updates.status.installing": "Reiniciando para aplicar {target}…",
   "settings.updates.status.upToDate": "O OpenBot está atualizado no canal Estável.",
+  "settings.updates.status.staged": "{target} está sendo liberado em etapas. Busque atualizações para obtê-lo agora.",
   "settings.updates.status.checkFailed": "O OpenBot não conseguiu buscar atualizações. Tente novamente.",
   "settings.updates.status.unsupported": "As atualizações estão indisponíveis nesta compilação.",
   "settings.updates.actionFailed": "Não foi possível atualizar o OpenBot.",
@@ -657,6 +673,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Voz ao vivo do Codex",
   "settings.voice.speech.codexLive.description":
     "As conversas por voz com qualquer agente usam a voz ao vivo da OpenAI com a sua sessão do Codex. A sua voz, os seus pedidos e as respostas do agente vão para a OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "As conversas por voz com qualquer agente usam a voz ao vivo da OpenAI com a sessão do Codex do servidor. A sua voz, os seus pedidos e as respostas do agente vão para a OpenAI.",
   "settings.voice.speech.speed.title": "Velocidade",
   "settings.voice.speech.voice.title": "Voz",
   "settings.voice.speech.voice.female": "Voz feminina {number}",
@@ -687,12 +705,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sem configurações do servidor",
   "settings.transfer.includeAgent": "Incluir {name}",
   "settings.transfer.export.title": "Exportar este servidor",
-  "settings.transfer.export.files": "Incluir arquivos do espaço de trabalho",
-  "settings.transfer.export.filesDescription":
-    "Arquivos que seus agentes criaram e a pasta Shared. Desative para um arquivo pequeno.",
-  "settings.transfer.export.settings": "Incluir configurações do servidor",
+  "settings.transfer.preset.label": "O que vai no arquivo",
+  "settings.transfer.preset.templates": "Modelos",
+  "settings.transfer.preset.everything": "Tudo",
+  "settings.transfer.meter.files": "de {total} em arquivos do espaço de trabalho",
+  "settings.transfer.part.agents": "Agentes e sua configuração",
+  "settings.transfer.part.agentsDescription": "{contents}. Sempre no arquivo.",
+  "settings.transfer.part.settings": "Configurações do servidor",
+  "settings.transfer.part.chats": "Histórico de chats",
+  "settings.transfer.part.chatsDescription":
+    "Os chats e threads laterais com seus arquivos, e o histórico de execuções das rotinas. Os agentes continuam esses chats com o contexto deles.",
+  "settings.transfer.part.channels": "Mensagens dos canais",
+  "settings.transfer.part.channelsDescription":
+    "As mensagens dos canais em que os agentes exportados estão, com seus arquivos e o histórico de execuções das rotinas dos canais.",
+  "settings.transfer.part.files": "Arquivos do espaço de trabalho",
+  "settings.transfer.part.filesDescription": "Arquivos que seus agentes criaram e a pasta Shared.",
+  "settings.transfer.part.preferences": "Preferências do servidor",
+  "settings.transfer.part.preferencesDescription":
+    "Nome, logotipo, fuso horário, personalidade, padrões dos agentes, modelos escolhidos, configurações de memória e habilidades, e os níveis de notificações e itens fixados de cada pessoa.",
   "settings.transfer.export.settingsDescription":
-    "Servidores MCP, provedores de modelo personalizados, seções da barra lateral e fluxos de rotinas.",
+    "Servidores MCP, provedores de modelo personalizados, seções da barra lateral, fluxos de rotinas e habilidades compartilhadas.",
   "settings.transfer.export.chooseAgents": "Escolher agentes ({selected} de {total})",
   "settings.transfer.export.hideAgents": "Ocultar agentes",
   "settings.transfer.export.agentsLabel": "Agentes para exportar",
@@ -719,8 +751,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agentes no arquivo",
   "settings.transfer.import.nameExists": "Nome já usado",
   "settings.transfer.import.settings": "Importar configurações do servidor",
-  "settings.transfer.import.settingsDescription":
-    "Adiciona os servidores MCP, provedores de modelo personalizados e seções da barra lateral que este servidor não tem.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Adiciona os servidores MCP, provedores de modelo personalizados, seções da barra lateral e habilidades compartilhadas que este servidor não tem.",
+  "settings.transfer.import.preferences": "Importar preferências do servidor",
+  "settings.transfer.import.preferencesDescription":
+    "Substitui o nome, o logo e as preferências deste servidor, e os níveis de notificação e itens fixados de cada pessoa, pelos do arquivo.",
   "settings.transfer.import.submit": { one: "Importar {count} agente", other: "Importar {count} agentes" },
   "settings.transfer.import.submitSettings": "Importar configurações",
   "settings.transfer.import.importing": "Importando…",
@@ -733,4 +768,26 @@ export const messages = {
   "settings.transfer.result.signInButton": "Entrar em {provider}",
   "settings.transfer.result.notImported": "Não importado",
   "settings.transfer.result.warnings": "Verifique estes itens",
+  "settings.transfer.copy.tileTitle": "Copiar para outro servidor",
+  "settings.transfer.copy.tileText": "Envie agentes para outro dos seus servidores.",
+  "settings.transfer.copy.title": "Copiar agentes para outro servidor",
+  "settings.transfer.copy.from": "De",
+  "settings.transfer.copy.to": "Para",
+  "settings.transfer.copy.chooseServer": "Escolha um servidor",
+  "settings.transfer.copy.search": "Buscar agentes",
+  "settings.transfer.copy.agentsOn": "Agentes em {server}",
+  "settings.transfer.copy.all": { one: "Todos os agentes ({count})", other: "Todos os agentes ({count})" },
+  "settings.transfer.copy.noAgents": "Este servidor não tem agentes.",
+  "settings.transfer.copy.new": "Novo",
+  "settings.transfer.copy.notCopied":
+    "Os canais deles e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
+  "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "settings.transfer.copy.copying": "Copiando…",
+  "settings.transfer.copy.done": {
+    one: "{count} agente copiado para {server}.",
+    other: "{count} agentes copiados para {server}.",
+  },
+  "settings.transfer.copy.open": "Abrir {server}",
+  "settings.transfer.copy.loadFailed": "Não foi possível ler os agentes",
+  "settings.transfer.copy.failed": "A cópia não terminou",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,9 +1,11 @@
 import {
-  BILLING_CURRENCIES,
+  BILLING_BASE_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingInterval,
+  type BillingOptionalCurrency,
   type BillingPlanId,
   billingListPrices,
   billingLookupKey,
@@ -29,9 +31,11 @@ import { z } from "zod";
  * license Product and one Price for each license plan (`LICENSE_PLANS`), and sets the Customer Portal
  * features. Run it again at any time: it changes only what differs.
  *
- *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-bootstrap.ts [--live] [--webhook-url <url>]
+ *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-bootstrap.ts [--live] [--brl] [--webhook-url <url>]
  *
- * Without `--live` it refuses a live key. `--webhook-url` creates or updates the webhook endpoint at
+ * Without `--live` it refuses a live key. EUR, USD and PLN are in every Price. `--brl` also gives each
+ * Price a BRL currency option, and the account server then offers BRL. A run without `--brl` keeps a
+ * BRL option that a Price has, and does not add one. `--webhook-url` creates or updates the webhook endpoint at
  * that URL. Stripe shows the signing secret of an endpoint only when it creates the endpoint, so the
  * script prints it one time, for STRIPE_WEBHOOK_SECRET. `bun run hosting:setup` calls
  * `bootstrapStripe` and stores the secret itself.
@@ -142,11 +146,25 @@ async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<
   logger.info(`Created product ${id}.`);
 }
 
+/**
+ * The optional currencies of a new or kept Price: the ones that the run adds, and the ones that the current
+ * Price has. A replaced Price then keeps its BRL option, and BRL orders do not stop.
+ */
+function optionalCurrenciesOf(
+  current: Price | undefined,
+  optional: readonly BillingOptionalCurrency[],
+): BillingOptionalCurrency[] {
+  return BILLING_OPTIONAL_CURRENCIES.filter(
+    (currency) => optional.includes(currency) || current?.currency_options?.[currency] !== undefined,
+  );
+}
+
 function priceMatches(
   price: Price,
   plan: BillingPlanId,
   interval: BillingInterval,
   amounts: Record<BillingCurrency, number>,
+  optional: readonly BillingOptionalCurrency[],
 ): boolean {
   return (
     price.product === productId(plan) &&
@@ -154,7 +172,8 @@ function priceMatches(
     price.unit_amount === amounts.eur &&
     price.recurring?.interval === interval &&
     price.currency_options?.usd?.unit_amount === amounts.usd &&
-    price.currency_options?.pln?.unit_amount === amounts.pln
+    price.currency_options?.pln?.unit_amount === amounts.pln &&
+    optional.every((currency) => price.currency_options?.[currency]?.unit_amount === amounts[currency])
   );
 }
 
@@ -167,11 +186,13 @@ async function ensurePrice(
   existing: readonly Price[],
   plan: BillingPlanId,
   interval: BillingInterval,
+  optional: readonly BillingOptionalCurrency[],
 ): Promise<string> {
   const lookupKey = billingLookupKey(plan, interval);
   const amounts = billingListPrices(plan, interval);
   const current = existing.find((price) => price.lookup_key === lookupKey);
-  if (current && priceMatches(current, plan, interval, amounts)) {
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (current && priceMatches(current, plan, interval, amounts, currencies)) {
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -187,6 +208,7 @@ async function ensurePrice(
     "metadata[openbot_plan]": plan,
     "metadata[openbot_interval]": interval,
   });
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
   const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
   return created.id;
@@ -221,19 +243,25 @@ async function ensureLicenseProduct(stripe: StripeAdmin): Promise<void> {
  * The Price of one license plan. The quantity is the number of users. A Team Price is graduated tiers:
  * the first tier is the base amount for the included users, and the second tier is the amount of each
  * extra user. A 1-user Price is a flat amount for each user. A bundle Price is for an account that pays
- * for a hosted server. EUR is the base currency, and USD and PLN are currency options with their own
- * amounts. Only an active Price with the same amounts is kept, so
- * an archived Price stays archived and a new Price takes its lookup key.
+ * for a hosted server. EUR is the base currency, and USD, PLN and each currency of `optional` are
+ * currency options with their own amounts. Only an active Price with the same amounts is kept, so
+ * an archived Price stays archived and a new Price takes its lookup key. A BRL option that the current
+ * Price has stays, also on a new Price.
  */
-async function ensureLicensePrice(stripe: StripeAdmin, existing: readonly Price[], plan: LicensePlan): Promise<string> {
+async function ensureLicensePrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  plan: LicensePlan,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
   const lookupKey = licenseLookupKey(plan);
-  const prices = Object.fromEntries(
-    BILLING_CURRENCIES.map((currency) => [currency, licensePlanPrice(plan, currency)] as const),
-  );
+  const pricesIn = (currencies: readonly BillingCurrency[]) =>
+    Object.fromEntries(currencies.map((currency) => [currency, licensePlanPrice(plan, currency)] as const));
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const prices = pricesIn([...BILLING_BASE_CURRENCIES, ...optionalCurrenciesOf(current, optional)]);
   const bundle = String(plan.bundle);
   const included = licenseIncludedUsers(plan.tier);
   const signature = licensePriceSignature(prices, included);
-  const current = existing.find((price) => price.lookup_key === lookupKey);
   if (
     current &&
     current.active !== false &&
@@ -400,6 +428,8 @@ export interface StripeBootstrapOptions {
   secretKey: string;
   /** Without it, a live key is refused. */
   live: boolean;
+  /** Adds a BRL currency option to each Price. Without it, a BRL option that a Price has stays. */
+  brl?: boolean;
   /** The webhook endpoint to create or update, or null for none. */
   webhookUrl: string | null;
   /** Deletes the endpoint at `webhookUrl` and creates it again, for a new signing secret. */
@@ -413,6 +443,7 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
     throw new Error("STRIPE_SECRET_KEY is not a test-mode key. Add --live to change the live catalog.");
   }
   const stripe = new StripeAdmin(secretKey);
+  const optional: readonly BillingOptionalCurrency[] = options.brl ? ["brl"] : [];
 
   const lookupKeys = [
     ...BILLING_PLAN_IDS.flatMap((plan) => BILLING_INTERVALS.map((interval) => billingLookupKey(plan, interval))),
@@ -430,7 +461,8 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
   const prices: Record<BillingPlanId, string[]> = { starter: [], standard: [], pro: [] };
   for (const plan of BILLING_PLAN_IDS) {
     await ensureProduct(stripe, plan);
-    for (const interval of BILLING_INTERVALS) prices[plan].push(await ensurePrice(stripe, existing, plan, interval));
+    for (const interval of BILLING_INTERVALS)
+      prices[plan].push(await ensurePrice(stripe, existing, plan, interval, optional));
   }
 
   for (const plan of BILLING_PLAN_IDS) logger.info(`Prices ${productId(plan)}: ${prices[plan].join(", ")}`);
@@ -438,7 +470,7 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
   // The license is not in the Portal product list, so the Portal cannot change its users or price.
   await ensureLicenseProduct(stripe);
   for (const plan of LICENSE_PLANS)
-    logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan)}`);
+    logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan, optional)}`);
 
   await updatePortalConfiguration(stripe, prices);
   return webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl, options.replaceWebhook ?? false) : null;
@@ -448,7 +480,12 @@ async function main(args: readonly string[]): Promise<void> {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) throw new Error("Set STRIPE_SECRET_KEY to a Stripe secret key.");
   const webhookUrl = optionValue(args, "--webhook-url");
-  const webhookSecret = await bootstrapStripe({ secretKey, live: args.includes("--live"), webhookUrl });
+  const webhookSecret = await bootstrapStripe({
+    secretKey,
+    live: args.includes("--live"),
+    brl: args.includes("--brl"),
+    webhookUrl,
+  });
   const lines: string[] = [];
   if (webhookSecret) {
     // The operator asked for this secret, and Stripe never shows it again. Standard output only, not the log.

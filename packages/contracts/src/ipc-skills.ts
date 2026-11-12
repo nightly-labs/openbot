@@ -1,11 +1,12 @@
+/** In the order that the Marketplace shows them: most users are not developers, so Coding comes late. */
 export const SKILL_CATEGORIES = [
-  "coding",
-  "design",
-  "data-analytics",
-  "documents",
   "productivity",
+  "documents",
+  "design",
   "research",
+  "data-analytics",
   "automation",
+  "coding",
   "other",
 ] as const;
 

@@ -1965,7 +1965,8 @@ function projectProviderAwareRemoteDisplay(value: unknown): TeamProtocolProvider
   return projectProviderAwareObject(value, ["id", "label", "width", "height", "primary"]);
 }
 
-function projectProviderAwareConversationSearch(value: unknown): TeamProtocolProviderAwareJsonObject {
+/** The released message-search projection. `thread-message-search-v1` reuses it. */
+export function projectProviderAwareConversationSearch(value: unknown): TeamProtocolProviderAwareJsonObject {
   const projected = projectProviderAwareObject(
     value,
     TEAM_PROTOCOL_ProviderAware_HTTP_RESPONSE_KEYS["GET message-search"],
@@ -2829,7 +2830,8 @@ function isProviderAwareRoutineRun(value: unknown): boolean {
   );
 }
 
-function isProviderAwareConversationSearch(value: unknown): boolean {
+/** The released message-search validator. `thread-message-search-v1` reuses it. */
+export function isProviderAwareConversationSearch(value: unknown): boolean {
   return (
     isDynamicRecord(value) &&
     Array.isArray(value.results) &&

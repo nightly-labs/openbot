@@ -1,0 +1,28 @@
+{
+  "slug": "deepwiki",
+  "name": "DeepWiki",
+  "tagline": "Docs for public GitHub repos",
+  "description": "DeepWiki lets agents read generated documentation for public GitHub repositories and ask questions about their code. It needs no account and no key.",
+  "category": "coding",
+  "creatorName": "Cognition",
+  "iconUrl": "https://avatars.githubusercontent.com/u/163493330?s=128&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-architecture", "text": "Explain the architecture of the facebook/react repository." },
+    { "id": "prompt-where-defined", "text": "In vercel/next.js, where is the router cache implemented?" },
+    { "id": "prompt-topics", "text": "List the documentation topics for the tokio-rs/tokio repository." }
+  ],
+  "apps": [
+    {
+      "id": "app-deepwiki-mcp",
+      "name": "DeepWiki",
+      "description": "Repository documentation and code questions, over the DeepWiki MCP server with no sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/163493330?s=128&v=4",
+      "server": { "name": "deepwiki", "transport": "http", "url": "https://mcp.deepwiki.com/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://deepwiki.com",
+  "privacyPolicyUrl": "https://cognition.ai/legal/privacy-policy",
+  "termsUrl": "https://cognition.ai/legal/platform-terms-of-service"
+}

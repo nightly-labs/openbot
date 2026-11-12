@@ -144,6 +144,8 @@ export const messages = {
   "provider.picker.customEmpty":
     "أضف نقطة نهاية متوافقة مع OpenAI — خادم نماذج على هذا الحاسوب، أو أي خدمة لها عنوان URL أساسي ومفتاح.",
   "provider.picker.customPending": "لم يتم تحميل نماذج نقاط النهاية بعد. يقرأها المزوّد بعد توقف مهمته الحالية.",
+  "provider.picker.customUnlisted": "لا يعرض {name} نماذج نقاط النهاية الخاصة بك.",
+  "provider.picker.editEndpoints": "تعديل نقاط النهاية",
   "provider.picker.defaultModelLabel": "{name}، الافتراضي",
   "provider.picker.usageLimit": "تم بلوغ حد الاستخدام",
   "provider.picker.usageLimitWindow": "حد {window}",
@@ -256,6 +258,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "لم يتبقَّ لدى {name} أي رصيد لإعادة تعيين الاستخدام.",
   "provider.account.resetUsageAlreadyRedeemed": "رصيد إعادة التعيين هذا لـ {name} مستخدم بالفعل.",
   "provider.account.resetUsageFailed": "تعذّرت إعادة تعيين استخدام {name}.",
+  "provider.account.pool": "تجميع الحسابات",
+  "provider.account.poolDescription":
+    "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "provider.account.inUse": "قيد الاستخدام",
+  "provider.account.notInPool": "خارج المجموعة",
+  "provider.account.leaveOutOfPool": "استبعاد من المجموعة",
+  "provider.account.putBackInPool": "إعادة إلى المجموعة",
+  "provider.account.poolChip": "مجموعة",
+  "provider.account.poolCount": "مجموعة من {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} قيد الاستخدام",
   "provider.settings.connected": "متصل",
   "provider.settings.other": "مزوّدون آخرون",
   "provider.settings.search": "البحث في المزوّدين",
@@ -288,6 +300,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "الافتراضي للوكلاء الجدد · {use}",
   "provider.settings.accounts": "الحسابات",
   "provider.settings.accountsDescription": "{count} من {max}. يستخدم كل وكيل حسابًا واحدًا.",
+  "provider.settings.accountsPooledDescription": "{count} من {max}. يتشارك الوكلاء هذه الحسابات.",
   "provider.settings.accountBlocked": "لا يمكن تشغيل {agents} حتى تسجّل الدخول مرة أخرى.",
   "provider.settings.removeTitle": "إزالة {name}؟",
   "provider.settings.removeMoves": "سيستخدم {agents} الحساب {name}.",
@@ -307,6 +320,8 @@ export const messages = {
   "provider.settings.keyOptional": "اختياري. يضيف المفتاح نماذج مدفوعة.",
   "provider.settings.keyAlternative": "أو الصق مفتاح {name} API.",
   "provider.settings.geminiKeyInUse": "يستخدم Gemini هذا المفتاح، لا خطة Google AI. لا يُعرض استخدام الخطة.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "يُستخدم مفتاح Gemini API المحفوظ بدلًا من تسجيل الدخول بحساب Google. لاستخدام خطة Google ونماذجها، أزِل المفتاح.",
   "provider.settings.claudeKeyInUse":
     "تحتسب Anthropic رصيد API للمفتاح، وليس خطة Claude. اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.settings.codexKeyInUse":
@@ -333,7 +348,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
   "provider.settings.claudeUserSetupDescription":
     "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "يحمّل الوكلاء ملف CLAUDE.md والمهارات والوكلاء والخطافات والإضافات من ~/.claude على الخادم. عند الإيقاف، يرسل كل دور موجّهًا أقصر. تظل ملفات مساحة العمل تُحمَّل.",
   "provider.settings.claudeUserSetupLoadFailed": "تعذّر تحميل إعداد Claude Code.",
+  "provider.settings.context": "السياق",
+  "provider.settings.compactWindow": "ضغط المحادثات عند",
+  "provider.settings.compactWindowDescription":
+    "يلخّص Claude Code الأدوار الأقدم في المحادثة عندما تصل إلى هذا الحجم. القيمة الأقل تبقي الأدوار سريعة ورخيصة. القيمة الأعلى تحتفظ بتفاصيل أكثر. النموذج ذو النافذة الأصغر يضغط عند حده الخاص.",
+  "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
+  "provider.settings.compactWindowTokens": "{size} رمز",
+  "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",
@@ -373,4 +397,6 @@ export const messages = {
     many: "{url} · {count} نموذجًا",
     other: "{url} · {count} نموذج",
   },
+  "provider.settings.disconnectLocalOnly":
+    "يسجّل OpenBot خروج {provider} على هذا الكمبيوتر. تحتفظ واجهة {provider} CLI في الطرفية بتسجيل دخولها.",
 } as const satisfies PartialTranslation<typeof source>;

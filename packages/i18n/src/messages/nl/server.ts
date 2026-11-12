@@ -265,7 +265,7 @@ export const messages = {
   "server.settings.generalDescription": "Beheer de naam, het logo en de voorkeuren van deze server.",
   "server.settings.vaultTitle": "Kluis",
   "server.settings.vaultDescription":
-    "Bewaar logins, kaarten en contactgegevens die elke agent op deze server kan invullen.",
+    "Bewaar logins, kaarten, contactgegevens en API-sleutels voor de agents op deze server.",
   "server.settings.membersTitle": "Leden",
   "server.settings.membersDescription": "Publiceer deze server, nodig mensen uit en beheer de toegang.",
   "server.settings.desktopTitle": "Extern bureaublad",
@@ -340,6 +340,8 @@ export const messages = {
   "server.settings.later": "Later",
   "server.settings.setUp": "Instellen",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Kies wat de agents op deze server mogen doen als je het niet per agent instelt.",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft.",
@@ -360,6 +362,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Eerst vragen",
   "server.settings.skillLearningOff": "Uit",
   "server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "server.settings.browsingMemory": "Leren van mijn browsen",
+  "server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
   "server.settings.rolesTitle": "Machtigingen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",
@@ -384,7 +390,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Laatste wijziging",
   "server.settings.hostKeyChangedDescription":
     "{date}. De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
-  "server.settings.hostKeyLocalOnly": "Alleen de server op deze computer kan hier zijn sleutel wijzigen.",
+  "server.settings.hostKeyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "server.settings.removeTitle": "Server verwijderen",
   "server.settings.removeDescription":
     "Verwijder deze server uit de accountservice voor alle leden. Gebruik dit als de computer ervan niet meer beschikbaar is.",

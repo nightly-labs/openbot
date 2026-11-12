@@ -3,8 +3,11 @@
 //
 // The source has two agents with memories, routines, a chat with a file, a side thread made by a
 // branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
-// The export includes workspace files, server settings and chat history. The import goes into the
-// second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
+// It also has two hidden agents with active routines: one stays as written, and the file of the other
+// is changed to the file of an app that stopped a hidden agent, so its routines arrive turned off.
+// The export includes workspace files, server settings, chat history, channel messages and the
+// server preferences, one of which is changed to a value the import does not accept. A second export
+// has the chats without the channel messages. The import goes into the second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
 // messages in order with the file's bytes, the side thread, and that the first turn of an imported
 // agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
 // `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
@@ -14,7 +17,23 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentEvent, type AgentSummary } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentDefaults,
+  type AgentEvent,
+  type AgentMemoryLimit,
+  type AgentSummary,
+  type BusyMessageMode,
+  DEFAULT_AGENT_DEFAULTS,
+  DEFAULT_MACHINE_ALERT_SETTINGS,
+  type MachineAlertSettings,
+  type MemoryReviewInterval,
+  type PromptCacheTtl,
+  type ResponseStyle,
+  type ServerNotificationLevel,
+  type SkillLearningMode,
+  type UpdateHostIdentityInput,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -37,6 +56,8 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { HISTORY_IMPORTED_EVENT } = await import("../src/backend/agent-history-transfer");
 const { InstanceTransferService } = await import("../src/main/instance-transfer-service");
+type MemberPreferences<Id> = import("../src/main/instance-transfer-service").MemberPreferences<Id>;
+const { INSTANCE_TRANSFER_MANIFEST } = await import("../src/main/instance-transfer-manifest");
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
@@ -209,9 +230,71 @@ function profile(name: string) {
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
+  // The host-wide preferences, as the Server settings stores keep them.
+  const serverPreferences: {
+    timezone: string | null;
+    personality: { responseStyle: ResponseStyle };
+    busyMessageMode: { mode: BusyMessageMode };
+    agentDefaults: AgentDefaults;
+    memoryLimit: { limit: AgentMemoryLimit };
+    memoryReview: { interval: MemoryReviewInterval };
+    skillLearning: { mode: SkillLearningMode };
+    promptCacheTtl: PromptCacheTtl;
+    ownerNotificationLevel: ServerNotificationLevel | null;
+    browsingMemory: { enabled: boolean };
+    claudeUserSetup: boolean;
+    claudeCompactWindow: number | null;
+    machineAlerts: MachineAlertSettings;
+    modelVisibility: { provider: string; hidden: string[] }[];
+  } = {
+    timezone: null,
+    personality: { responseStyle: "natural" },
+    busyMessageMode: { mode: "queue" },
+    agentDefaults: DEFAULT_AGENT_DEFAULTS,
+    memoryLimit: { limit: 128 },
+    memoryReview: { interval: 0 },
+    skillLearning: { mode: "automatic" },
+    promptCacheTtl: "5m",
+    ownerNotificationLevel: null,
+    browsingMemory: { enabled: true },
+    claudeUserSetup: false,
+    claudeCompactWindow: null,
+    machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
+    modelVisibility: [],
+  };
+  // The server's name and logo, as Server settings > General keeps them.
+  const identity: {
+    name: string;
+    logo: { path: string; mimeType: "image/png" } | null;
+    saved: UpdateHostIdentityInput[];
+  } = {
+    name: `Newsroom ${name}`,
+    logo: null,
+    saved: [],
+  };
+  // Members' choices by account. Each server has its own member ids for the same accounts.
+  const members = new Map<string, MemberPreferences<string>>();
+  /** One preference of the in-memory server settings, as the transfer port reads and writes it. */
+  const preference = <K extends keyof typeof serverPreferences>(key: K) => ({
+    get: () => serverPreferences[key],
+    set: (value: (typeof serverPreferences)[K]) =>
+      Effect.sync(() => {
+        serverPreferences[key] = value;
+      }),
+  });
   const transfer = new InstanceTransferService({
     agents,
     skills: { library: () => library, installLocal: () => Effect.void },
+    sharedSkills: {
+      list: () =>
+        library
+          .list()
+          .pipe(Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version })))),
+      // No agent of the check installs a library skill, so each one counts as shared.
+      assigned: () => Effect.succeed(new Set<string>()),
+      bundle: (id, version) => library.bundle(id, version),
+      add: (bytes) => library.createFromBundle(bytes),
+    },
     sharedRoot: store.sharedRoot,
     channelActor: () => ({ id: "local", name: "You" }),
     webhookRoutines: {
@@ -226,6 +309,45 @@ function profile(name: string) {
       autoApproves: (agentId) => approvals.get(agentId) ?? true,
       setAutoApprove: (agentId, value) => Effect.sync(() => approvals.set(agentId, value)),
       apiKeyNames: () => Effect.succeed(["WEATHER_API_KEY"]),
+    },
+    serverPreferences: {
+      timezone: preference("timezone"),
+      personality: preference("personality"),
+      busyMessageMode: preference("busyMessageMode"),
+      agentDefaults: preference("agentDefaults"),
+      memoryLimit: preference("memoryLimit"),
+      memoryReview: preference("memoryReview"),
+      skillLearning: preference("skillLearning"),
+      promptCacheTtl: preference("promptCacheTtl"),
+      ownerNotificationLevel: preference("ownerNotificationLevel"),
+      browsingMemory: preference("browsingMemory"),
+      claudeUserSetup: preference("claudeUserSetup"),
+      claudeCompactWindow: preference("claudeCompactWindow"),
+      machineAlerts: preference("machineAlerts"),
+      modelVisibility: preference("modelVisibility"),
+    },
+    memberPreferences: {
+      read: () => [...members.values()],
+      apply: (preferences) =>
+        Effect.sync(() => {
+          const member = members.get(preferences.accountId);
+          if (!member) return false;
+          members.set(preferences.accountId, {
+            ...member,
+            server: preferences.server,
+            agents: [...member.agents, ...preferences.agents],
+            pins: [...member.pins, ...preferences.pins],
+          });
+          return true;
+        }),
+    },
+    serverIdentity: {
+      read: () => ({ name: identity.name, logo: identity.logo }),
+      save: (input) =>
+        Effect.sync(() => {
+          identity.saved.push(input);
+          if (input.serverName) identity.name = input.serverName;
+        }),
     },
     appVersion: "e2e",
     timezone: () => "UTC",
@@ -256,7 +378,23 @@ function profile(name: string) {
       signedInProviders: () => [],
     },
   });
-  return { database, store, mailbox, agents, transfer, pins, levels, approvals, workflows, events, positions };
+  return {
+    database,
+    store,
+    mailbox,
+    agents,
+    transfer,
+    pins,
+    levels,
+    approvals,
+    workflows,
+    events,
+    positions,
+    serverPreferences,
+    identity,
+    library,
+    members,
+  };
 }
 
 function idle(agents: InstanceType<typeof AgentService>, agentId: string) {
@@ -273,8 +411,11 @@ try {
   await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
   const source = profile("source");
   const target = profile("target");
+  // A server that a released client imports into: "Import server settings" without the new flag.
+  const released = profile("released");
   await runCauseEffect(source.agents.initialize());
   await runCauseEffect(target.agents.initialize());
+  await runCauseEffect(released.agents.initialize());
 
   // --- The source setup.
   const create = (name: string) =>
@@ -298,6 +439,31 @@ try {
     schedule: { kind: "daily", time: "08:00" },
   });
   await runCauseEffect(source.agents.updateAgent({ agentId: editor.id, computerUse: false, allowAutomation: true }));
+  // Two hidden agents with an active routine each. The file of the first one is changed below to the
+  // file of an app that stopped a hidden agent.
+  const archivist = await create("Archivist");
+  const keeper = await create("Keeper");
+  for (const agent of [archivist, keeper]) {
+    source.agents.createRoutine({
+      agentId: agent.id,
+      name: "Night backup",
+      instruction: "Back up the notes.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "daily", time: "02:00" },
+    });
+    await runCauseEffect(source.agents.setAgentHidden({ agentId: agent.id, hidden: true }));
+  }
+  await runCauseEffect(
+    source.events.saveRoutine({
+      owner: { kind: "agent", id: archivist.id },
+      name: "Backup alarm",
+      instruction: "Check the backup.",
+      active: true,
+      timezone: "UTC",
+      trigger: { kind: "webhook", eventType: "backup.failed", filters: [] },
+    }),
+  );
   source.pins.add(writer.id);
   source.levels.set(writer.id, "needs-me");
   source.approvals.set(editor.id, false);
@@ -315,6 +481,16 @@ try {
     }),
   );
   await idle(source.agents, writer.id);
+  // A test run of the writer's routine, which leaves a finished run and its messages in the chat.
+  const sourceRun = await runCauseEffect(source.agents.testRoutine({ agentId: writer.id, routineId: routine.id }));
+  await idle(source.agents, writer.id);
+  const finishedRun = await waitFor("the test run to finish", () =>
+    source.agents
+      .listRoutineRuns({ agentId: writer.id, routineId: routine.id }, true)
+      .find(
+        (run) => run.id === sourceRun.id && ["succeeded", "failed", "interrupted", "cancelled"].includes(run.status),
+      ),
+  );
   const sourceHistory = source.agents.readTransferHistory(writer.id);
   const sourceMain = sourceHistory.find((thread) => thread.main);
   assert.ok(sourceMain, "The source chat has no messages.");
@@ -377,7 +553,11 @@ try {
     schedule: { kind: "daily", time: "17:00" },
   });
 
-  // A real message in the channel, which an agent answers.
+  // A real message with a file in the channel, which an agent answers.
+  const layoutPath = join(root, "front-page-layout.txt");
+  const layoutBytes = new TextEncoder().encode("Lead story left, weather right.\n");
+  await writeFile(layoutPath, layoutBytes);
+  const channelDrafts = await runCauseEffect(source.mailbox.prepareAttachments([layoutPath]));
   await runCauseEffect(
     source.agents.channels.command(
       {
@@ -388,7 +568,7 @@ try {
         // To one member, so no routing turn runs.
         recipientAgentId: writer.id,
         replyToMessageId: null,
-        attachmentDraftIds: [],
+        attachmentDraftIds: channelDrafts.map((draft) => draft.id),
       },
       { id: "local", name: "You" },
     ),
@@ -439,20 +619,130 @@ try {
     },
   });
 
+  // --- Server preferences that differ from a new server's.
+  Object.assign(source.serverPreferences, {
+    timezone: "Europe/Warsaw",
+    personality: { responseStyle: "classic" },
+    busyMessageMode: { mode: "steer" },
+    agentDefaults: { ...DEFAULT_AGENT_DEFAULTS, commitCoAuthor: !DEFAULT_AGENT_DEFAULTS.commitCoAuthor },
+    memoryLimit: { limit: 256 },
+    memoryReview: { interval: 20 },
+    skillLearning: { mode: "ask" },
+    promptCacheTtl: "1h",
+    ownerNotificationLevel: "needs-me",
+    browsingMemory: { enabled: false },
+    claudeUserSetup: true,
+    claudeCompactWindow: 400_000,
+    // The member who gets the alerts belongs to the old server; the import gives them to the owner.
+    machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
+    modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],
+  } satisfies typeof source.serverPreferences);
+
+  // Shared skills that no agent has. The target already has one with the same name and other files.
+  const fflate = await import("fflate");
+  const skillBundle = (name: string, body: string) =>
+    fflate.zipSync({
+      "SKILL.md": fflate.strToU8(`---\nname: ${name}\ndescription: ${name} for the newsroom.\n---\n\n${body}\n`),
+    });
+  await runCauseEffect(source.library.createFromBundle(skillBundle("Style guide", "Use short headlines.")));
+  await runCauseEffect(source.library.createFromBundle(skillBundle("Fact check", "Check two sources.")));
+  await runCauseEffect(target.library.createFromBundle(skillBundle("Fact check", "Check one source.")));
+
+  // A logo for the source server: a 1×1 PNG.
+  const logoPath = join(root, "server-logo.png");
+  const logoBytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await writeFile(logoPath, logoBytes);
+  source.identity.logo = { path: logoPath, mimeType: "image/png" };
+
+  // Two members with their choices. Only the first one has joined the target server, with no choices yet.
+  source.members.set("account-ada", {
+    accountId: "account-ada",
+    server: "needs-me",
+    agents: [{ agentId: editor.id, level: "nothing" }],
+    pins: [
+      { kind: "agent", id: writer.id },
+      { kind: "channel", id: channel.id },
+    ],
+  });
+  source.members.set("account-bob", { accountId: "account-bob", server: "all", agents: [], pins: [] });
+  target.members.set("account-ada", { accountId: "account-ada", server: null, agents: [], pins: [] });
+
+  // --- The chats without the channel messages: each part is chosen on its own.
+  const chatsOnly = join(root, "chats-only.zip");
+  await runCauseEffect(
+    source.transfer.exportTo(chatsOnly, {
+      agentIds: [writer.id, editor.id],
+      includeFiles: false,
+      includeSettings: false,
+      includeHistory: true,
+      includeChannelMessages: false,
+    }),
+  );
+  {
+    const { unzipSync } = await import("fflate");
+    const entries = unzipSync(new Uint8Array(await readFile(chatsOnly)));
+    const chatsManifest: {
+      agents: { history?: string }[];
+      channels?: { messages?: string[] }[];
+      serverPreferences?: unknown;
+    } = JSON.parse(new TextDecoder().decode(entries[INSTANCE_TRANSFER_MANIFEST]));
+    pass(
+      "a file without channel messages keeps the chats and the channel",
+      chatsManifest.agents.some((agent) => agent.history) && (chatsManifest.channels?.length ?? 0) > 0,
+    );
+    pass(
+      "a file without channel messages has none",
+      (chatsManifest.channels ?? []).every((channel) => !channel.messages?.length) &&
+        !Object.keys(entries).some((name) => /^channels\/[^/]+\/messages-/u.test(name)),
+    );
+    pass("a file without server preferences has none", chatsManifest.serverPreferences === undefined);
+  }
+
   // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
     source.transfer.exportTo(file, {
-      agentIds: [writer.id, editor.id],
+      agentIds: [writer.id, editor.id, archivist.id, keeper.id],
       includeFiles: true,
       includeSettings: true,
       includeHistory: true,
+      includeChannelMessages: true,
+      includeServerPreferences: true,
     }),
   );
   report.exportWarnings = exported.warnings;
-  const { unzipSync } = await import("fflate");
+  const { unzipSync, zipSync } = await import("fflate");
   const archive = unzipSync(new Uint8Array(await readFile(file)));
   report.archiveEntries = Object.keys(archive).length;
+  const manifestBytes = archive[INSTANCE_TRANSFER_MANIFEST];
+  assert.ok(manifestBytes, "The file has no manifest.");
+  const manifest: {
+    agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[];
+    serverPreferences?: { timezone?: unknown; promptCacheTtl?: unknown; ownerNotificationLevel?: unknown };
+  } = JSON.parse(new TextDecoder().decode(manifestBytes));
+  pass(
+    "the file has the server preferences",
+    manifest.serverPreferences?.timezone === "Europe/Warsaw" &&
+      manifest.serverPreferences.ownerNotificationLevel === "needs-me",
+    JSON.stringify(manifest.serverPreferences),
+  );
+  // A value that this app does not accept is left out, and the other preferences are still saved.
+  if (manifest.serverPreferences) manifest.serverPreferences.promptCacheTtl = "9h";
+  const filePreferences = (name: string) => manifest.agents.find((agent) => agent.name === name)?.preferences;
+  pass(
+    "the file says that its hidden agents work",
+    ["Archivist", "Keeper"].every(
+      (name) => filePreferences(name)?.hidden === true && filePreferences(name)?.hiddenWorks === true,
+    ),
+    JSON.stringify([filePreferences("Archivist"), filePreferences("Keeper")]),
+  );
+  // An app that stopped a hidden agent wrote `hidden` only.
+  delete filePreferences("Archivist")?.hiddenWorks;
+  archive[INSTANCE_TRANSFER_MANIFEST] = new TextEncoder().encode(JSON.stringify(manifest));
+  await writeFile(file, zipSync(archive));
   pass(
     "Shared/Transfers is not copied as files",
     !Object.keys(archive).some((name) => name.toLowerCase().startsWith("shared/transfers/")),
@@ -460,7 +750,7 @@ try {
 
   // --- Import into the second profile.
   const preview = await runCauseEffect(target.transfer.stage(file));
-  pass("preview offers both agents", preview.agents.length === 2);
+  pass("preview offers each agent", preview.agents.length === 4);
   // The open views read a channel again on each change that the channel service publishes.
   const published: { channelId: string; revision: number }[] = [];
   target.agents.on("event", (event: AgentEvent) => {
@@ -471,16 +761,101 @@ try {
       token: preview.token,
       keys: preview.agents.map((agent) => agent.key),
       includeSettings: true,
+      includeServerPreferences: true,
     }),
   );
   report.importWarnings = result.warnings;
-  pass("both agents are imported", result.agents.length === 2 && result.skipped.length === 0);
+  const releasedPreview = await runCauseEffect(released.transfer.stage(file));
+  pass("the preview says that the file has server preferences", releasedPreview.hasServerPreferences === true);
+  const releasedResult = await runCauseEffect(
+    released.transfer.apply({
+      token: releasedPreview.token,
+      keys: releasedPreview.agents.filter((agent) => agent.name === "Editor").map((agent) => agent.key),
+      includeSettings: true,
+    }),
+  );
+  pass(
+    "an import without server preferences, as a released client sends, replaces none of them",
+    released.serverPreferences.timezone === null &&
+      released.serverPreferences.personality.responseStyle === "natural" &&
+      released.identity.saved.length === 0 &&
+      !released.identity.name.endsWith("source") &&
+      !releasedResult.warnings.some((warning) => warning.includes("server preference")),
+    JSON.stringify({ timezone: released.serverPreferences.timezone, saved: released.identity.saved.length }),
+  );
+  const { promptCacheTtl: _ttl, ...movedPreferences } = {
+    ...source.serverPreferences,
+    machineAlerts: { ...source.serverPreferences.machineAlerts, responsibleMemberId: null },
+  };
+  const { promptCacheTtl: targetTtl, ...arrivedPreferences } = target.serverPreferences;
+  pass(
+    "the server preferences arrive",
+    JSON.stringify(arrivedPreferences) === JSON.stringify(movedPreferences),
+    JSON.stringify(target.serverPreferences),
+  );
+  pass("a server preference that is not valid is left out", targetTtl === "5m", targetTtl);
+  const targetSkills = await runCauseEffect(target.library.list());
+  const factCheck = targetSkills.filter((skill) => skill.slug === "fact-check");
+  pass(
+    "a shared skill that no agent has moves",
+    targetSkills.some((skill) => skill.slug === "style-guide"),
+    JSON.stringify(targetSkills.map((skill) => skill.slug)),
+  );
+  pass(
+    "a shared skill with a name that is already here is not replaced",
+    factCheck.length === 1 &&
+      factCheck[0]?.version === 1 &&
+      factCheck[0].instructions.includes("one source") &&
+      result.warnings.some((warning) => warning.includes("Fact check")),
+    JSON.stringify(factCheck.map((skill) => ({ version: skill.version, instructions: skill.instructions }))),
+  );
+  const savedIdentity = target.identity.saved.at(-1);
+  pass(
+    "the server name and logo arrive through the save of Server settings",
+    target.identity.name === "Newsroom source" &&
+      savedIdentity?.logo?.mimeType === "image/png" &&
+      sha(savedIdentity.logo.bytes) === sha(logoBytes),
+    JSON.stringify({ name: target.identity.name, saved: target.identity.saved.length }),
+  );
+  pass(
+    "the import says that one server preference was left out",
+    result.warnings.some((warning) => warning.includes("1 server preference")),
+    JSON.stringify(result.warnings),
+  );
+  pass("each agent is imported", result.agents.length === 4 && result.skipped.length === 0);
   const byName = (name: string): AgentSummary => {
     const agent = target.agents.listAgents().find((candidate) => candidate.name === name);
     assert.ok(agent, `${name} is missing.`);
     return agent;
   };
   const newWriter = byName("Writer");
+  const newRoutine = target.agents.listRoutines(newWriter.id).find((item) => item.name === "Morning notes");
+  const newRuns = newRoutine
+    ? target.agents.listRoutineRuns({ agentId: newWriter.id, routineId: newRoutine.id }, true)
+    : [];
+  const movedRun = newRuns.find((run) => run.createdAt === finishedRun.createdAt);
+  pass(
+    "the run history of a routine moves as finished runs with their times",
+    movedRun !== undefined &&
+      movedRun.id !== finishedRun.id &&
+      movedRun.status === finishedRun.status &&
+      movedRun.source === "test" &&
+      movedRun.triggerId === null &&
+      movedRun.deliveryId === null,
+    JSON.stringify({ finishedRun, newRuns }),
+  );
+  const runMessages = target.agents
+    .readTransferHistory(newWriter.id)
+    .flatMap((thread) => thread.messages)
+    .filter((message) => message.routine);
+  pass(
+    "the chat names the imported run and routine",
+    runMessages.length > 0 &&
+      runMessages.every(
+        (message) => message.routine?.runId === movedRun?.id && message.routine?.routineId === newRoutine?.id,
+      ),
+    JSON.stringify(runMessages.map((message) => message.routine)),
+  );
   const newEditor = byName("Editor");
 
   pass(
@@ -490,6 +865,29 @@ try {
   pass(
     "routines move",
     target.agents.listRoutines(newWriter.id).some((item) => item.name === routine.name && item.active),
+  );
+  const newArchivist = byName("Archivist");
+  const newKeeper = byName("Keeper");
+  const hiddenIds = target.agents.listHiddenAgents().agents.map((agent) => agent.agentId);
+  pass(
+    "hidden agents stay hidden",
+    hiddenIds.includes(newArchivist.id) && hiddenIds.includes(newKeeper.id) && !hiddenIds.includes(newWriter.id),
+    JSON.stringify(hiddenIds),
+  );
+  pass(
+    "the routine of a hidden agent that worked stays on",
+    target.agents.listRoutines(newKeeper.id).some((item) => item.name === "Night backup" && item.active),
+  );
+  const archivistRoutines = [
+    ...target.agents.listRoutines(newArchivist.id),
+    ...(await runCauseEffect(target.events.listRoutines({ owner: { kind: "agent", id: newArchivist.id } }))).filter(
+      (item) => item.trigger.kind === "webhook",
+    ),
+  ];
+  pass(
+    "the routines of a hidden agent that an older app stopped are added turned off",
+    archivistRoutines.length === 2 && archivistRoutines.every((item) => !item.active),
+    JSON.stringify(archivistRoutines.map((item) => ({ name: item.name, active: item.active }))),
   );
   const newHooked = (
     await runCauseEffect(target.events.listRoutines({ owner: { kind: "agent", id: newWriter.id } }))
@@ -565,7 +963,29 @@ try {
     target.agents.listChannelRoutines(newChannel.id).some((item) => item.name === "Evening edition"),
   );
 
+  const ada = target.members.get("account-ada");
+  pass(
+    "a member's levels and pins go to the same account on the new server",
+    ada?.server === "needs-me" &&
+      ada.agents.length === 1 &&
+      ada.agents[0]?.agentId === newEditor.id &&
+      ada.agents[0]?.level === "nothing" &&
+      ada.pins.some((pin) => pin.kind === "agent" && pin.id === newWriter.id) &&
+      ada.pins.some((pin) => pin.kind === "channel" && pin.id === newChannel.id),
+    JSON.stringify(ada),
+  );
+  pass("a member who is not on the new server gets nothing", !target.members.has("account-bob"));
   const newChannelMessages = target.agents.channels.store.messages(newChannel.id);
+  const channelFile = newChannelMessages.flatMap((entry) => entry.message.attachments ?? []).at(0);
+  const sourceChannelFile = sourceChannelMessages.flatMap((entry) => entry.message.attachments ?? []).at(0);
+  const storedChannelFile = channelFile ? await runCauseEffect(target.mailbox.resolveAttachment(channelFile.id)) : null;
+  pass(
+    "the file of a channel message opens with the same bytes",
+    storedChannelFile !== null &&
+      channelFile?.id !== sourceChannelFile?.id &&
+      sha(new Uint8Array(await readFile(storedChannelFile.path))) === sha(layoutBytes),
+    JSON.stringify({ channelFile, sourceChannelFile }),
+  );
   pass(
     "channel messages move in order",
     JSON.stringify(newChannelMessages.map((entry) => entry.message.text)) ===
@@ -611,10 +1031,13 @@ try {
   // --- The chats.
   const page = await runCauseEffect(target.agents.readConversationPageFor(newWriter.id, "local"));
   const texts = (messages: readonly { text: string }[]) => messages.map((message) => message.text);
+  // The shown order of both chats: a message with no turn, such as a routine run's status, has its
+  // place by time there, and the stored order of the source can differ from it.
+  const sourcePage = await runCauseEffect(source.agents.readConversationPageFor(writer.id, "local"));
   pass(
     "the chat shows the same messages in order",
-    JSON.stringify(texts(page.messages)) === JSON.stringify(texts(sourceMain.messages)),
-    JSON.stringify({ source: texts(sourceMain.messages), target: texts(page.messages) }),
+    JSON.stringify(texts(page.messages)) === JSON.stringify(texts(sourcePage.messages)),
+    JSON.stringify({ source: texts(sourcePage.messages), target: texts(page.messages) }),
   );
   pass("the imported chat is not unread", page.readState?.unreadCount === 0, JSON.stringify(page.readState ?? null));
   const sourcePreview = source.agents.listAgents().find((agent) => agent.id === writer.id)?.preview;

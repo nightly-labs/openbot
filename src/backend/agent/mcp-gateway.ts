@@ -139,6 +139,7 @@ export class McpGateway {
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
+      signInEnded: (url) => !oauth?.signedIn(url),
       ...(credentials.appVersion
         ? {
             client: {
@@ -337,10 +338,11 @@ export class McpGateway {
 
   /**
    * Rows installed from the old catalog's `mcp-remote` bridge definitions reach their servers
-   * natively from here on. Exact matches only; anything the user changed stays as it is.
+   * natively from here on, and rows on a package version an earlier catalog pinned run the version
+   * it pins now. Exact matches only; anything the user changed stays as it is.
    */
-  migrateCatalogBridgesToHttp(): void {
-    this.#servers.migrateCatalogBridgesToHttp();
+  migrateCatalogRows(): void {
+    this.#servers.migrateCatalogRows();
   }
 
   /**
@@ -570,12 +572,24 @@ export class McpGateway {
    */
   enabled(): McpServerConfig[] {
     const configured = this.#servers.listEnabled();
+    return this.#handoff.record([...configured, ...this.#builtIn(configured)]);
+  }
+
+  /**
+   * The entries that `enabled` adds and no row holds. The agent's MCP tools list them, so the
+   * names they report are the names the agents get (#7088).
+   */
+  builtIn(): McpServerConfig[] {
+    return this.#builtIn(this.#servers.listEnabled());
+  }
+
+  #builtIn(configured: readonly McpServerConfig[]): McpServerConfig[] {
     const builtIn: McpServerConfig[] = [];
     const computerUse = this.#computerUseMcpServer();
     if (computerUse) builtIn.push(computerUse);
     const github = this.#githubConnector?.mcpServer() ?? null;
     if (github && !configured.some((config) => config.name === github.name)) builtIn.push(github);
-    return this.#handoff.record([...configured, ...builtIn]);
+    return builtIn;
   }
 
   /**

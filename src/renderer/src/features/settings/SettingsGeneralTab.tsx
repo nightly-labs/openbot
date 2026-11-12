@@ -28,14 +28,18 @@ import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
 import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
+import { FontSelect } from "@openbot/ui/features/settings/FontSelect";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
+import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { useText } from "@openbot/ui/text";
-import { Show } from "solid-js";
+import { createUniqueId, Show } from "solid-js";
+import { useInstalledFonts } from "../../app-fonts";
 import { useAppearanceChoice } from "../../appearance-choice";
 import { useI18n } from "../../i18n-context";
 import { useInterfaceSizeChoice } from "../../interface-size";
+import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
@@ -67,6 +71,10 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const appearance = useAppearanceChoice();
   const logoColor = useLogoColorChoice();
   const interfaceSize = useInterfaceSizeChoice();
+  const layout = useLayout();
+  const installedFonts = useInstalledFonts();
+  const interfaceFontTitleId = `settings-interface-font-${createUniqueId()}`;
+  const codeFontTitleId = `settings-code-font-${createUniqueId()}`;
   const { format, errorMessage } = useText();
   const saveChatColor = (color: AvatarColor | null) =>
     void props
@@ -140,6 +148,39 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               </Select>
             </ItemActions>
           </Item>
+          {/* Local only, on a joined server too: the list is the fonts of this computer. */}
+          <Item data-settings-row="settings.interfaceFont.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle id={interfaceFontTitleId}>{i18n.t("settings.interfaceFont.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.interfaceFont.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <FontSelect
+                kind="interface"
+                value={appearance.interfaceFont()}
+                onChange={appearance.changeInterfaceFont}
+                fonts={installedFonts()}
+                aria-labelledby={interfaceFontTitleId}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.codeFont.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle id={codeFontTitleId}>{i18n.t("settings.codeFont.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.codeFont.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <FontSelect
+                kind="code"
+                value={appearance.codeFont()}
+                onChange={appearance.changeCodeFont}
+                fonts={installedFonts()}
+                aria-labelledby={codeFontTitleId}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
           <Item data-settings-row="settings.logoColor.title" class="settings-modal-row settings-logo-color-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
@@ -192,6 +233,19 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                 value={props.value.sendShortcut}
                 onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
                 devicePlatform={props.platform ?? "darwin"}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="sidebar.order.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("sidebar.order.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatOrder.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SidebarChatOrderSelect
+                value={layout.sidebarChatOrder()}
+                onChange={layout.setSidebarChatOrder}
                 mount={props.selectMount}
               />
             </ItemActions>

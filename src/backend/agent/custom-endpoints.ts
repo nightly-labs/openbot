@@ -7,6 +7,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   defaultProviderModel,
   isCustomProviderHarness,
+  isReasoningEffort,
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -17,6 +18,7 @@ import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type ProviderPreference, startingModel } from "./model-choice";
+import { newestOfFamily } from "./provider-models";
 import type { ProviderRuntime } from "./provider-runtime";
 import { providerForAgent } from "./thread-items";
 
@@ -130,6 +132,22 @@ export class CustomEndpoints {
     const separator = modelId.indexOf("/");
     if (separator <= 0) return true;
     return !this.#released[provider].has(modelId.slice(0, separator));
+  }
+
+  /**
+   * Whether a saved endpoint of `harness` waits for a process that reads it. Its models stay out of
+   * the catalogue until then. A removed id does not count: no model of it is to come.
+   */
+  pending(harness: CustomProviderHarness): boolean {
+    for (const providerId of this.#released[harness].keys()) {
+      if (this.#hooks.endpointHarness(providerId) === harness) return true;
+    }
+    return false;
+  }
+
+  /** Whether the endpoint `providerId` of `harness` waits for a process that reads it. */
+  waits(harness: CustomProviderHarness, providerId: string): boolean {
+    return this.#released[harness].has(providerId);
   }
 
   /** The newest revision a spawning process can read, taken when a provider client starts. */
@@ -616,9 +634,11 @@ export class CustomEndpoints {
   }
 
   /**
-   * Moves each agent of `provider` whose model the provider no longer lists to the provider's default,
-   * or to the first model it lists when the default is gone too. A saved model that is a listed model
-   * with one of its efforts (`effortVariant`) moves to that model and effort instead.
+   * Moves each agent of `provider` whose model the provider no longer lists. A saved model that is a
+   * listed model with one of its efforts (`effortVariant`) moves to that model and effort. Else the
+   * agent moves to the newest listed model of the same family (`newestOfFamily`), so Claude Opus 4.6
+   * becomes Claude Opus 5.5 and keeps its effort when the new model has it. Else it moves to the
+   * provider's default, or to the first model it lists when the default is gone too.
    *
    * Only called with a catalogue the provider has just reported, because a stale one is no proof that
    * a model is gone. The provider stays the same, so the agent keeps its thread, and a running turn
@@ -641,17 +661,27 @@ export class CustomEndpoints {
       // lists `<agent>/default` for an agent that answered with an empty list, which a slow start
       // gives too, so that model is no proof that the saved one is gone.
       const variant = provider === "acp" ? null : effortVariant(models, agent.model);
+      const family = provider === "acp" || variant ? null : newestOfFamily(models, agent.model);
       const fallback =
         variant?.model ??
+        family ??
         (provider === "acp"
           ? models.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
           : providerFallback);
       if (!fallback) continue;
+      // The effort that the saved id names comes first: an id such as `gemini-3.1-pro-high` is from
+      // the time when OpenBot saved each effort as a model, and its stored effort can be another one.
+      const keptEffort =
+        family && family.reasoningEffortConfigurable !== false
+          ? ([effortInModelId(agent.model), agent.reasoningEffort].find(
+              (effort) => effort !== null && family.supportedReasoningEfforts.includes(effort),
+            ) ?? null)
+          : null;
       yield* this.#hooks
         .applyAgentUpdate({
           agentId: agent.id,
           model: fallback.id,
-          reasoningEffort: variant?.effort ?? fallback.defaultReasoningEffort,
+          reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
         })
         .pipe(toEndpointChangeFailed)
         .pipe(
@@ -709,6 +739,17 @@ function effortVariant(
     if (effort) return { model, effort };
   }
   return null;
+}
+
+/** The last part of a model id that names an effort, such as `high` for `gemini-3.1-pro-high`. */
+function effortInModelId(modelId: string): AgentReasoningEffort | null {
+  return (
+    modelId
+      .toLowerCase()
+      .split(/[-_]/u)
+      .reverse()
+      .find((part) => isReasoningEffort(part)) ?? null
+  );
 }
 
 export class EndpointChangeFailed extends Schema.TaggedError<EndpointChangeFailed>()("EndpointChangeFailed", {

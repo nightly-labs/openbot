@@ -252,7 +252,7 @@ export function MobileSearchResultRow({
       const last = channel.lastMessage;
       return (
         <SearchRow
-          leading={<ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} />}
+          leading={<ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />}
           title={channel.name}
           detail={last ? t("mobile.search.authorText", { author: last.authorName, text: last.text }) : channel.title}
           trailing={formatUpdatedAt(last?.at ?? null, format)}

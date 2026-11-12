@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, readFile, stat } from "node:fs/promises";
+import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -324,19 +324,12 @@ export const resolveOpencodeCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/** The file beside `bin/` that names the version of an Antigravity install. */
-export const ANTIGRAVITY_MANIFEST = "antigravity-package.json";
-
-export function antigravityHarnessName(target: string): "localharness_external" | "localharness_external.exe" {
-  return target.startsWith("win32") ? "localharness_external.exe" : "localharness_external";
-}
-
 /**
- * The Antigravity server is never looked for on `PATH`: the Antigravity IDE installs an
- * `antigravity` command that is an editor, not this server. Only the copy OpenBot downloaded, or the
- * path in `OPENBOT_ANTIGRAVITY_PATH`, is used. The server takes no `--version`, so the version comes
- * from the manifest two levels above the program, which a managed install writes. The server
- * still gets `cliLaunchPath`: the MCP servers that it starts are commands such as bare `node` (#3418).
+ * The Antigravity CLI is never looked for on `PATH`: the Antigravity IDE installs an `antigravity`
+ * command that is an editor, not this CLI. Only the copy OpenBot downloaded, or the path in
+ * `OPENBOT_ANTIGRAVITY_PATH`, is used. The CLI prints its version, such as `1.5.4`, with
+ * `--version`. It still gets `cliLaunchPath`: the MCP servers that it starts are commands such as
+ * bare `node` (#3418).
  *
  * A path the user set is the only candidate: when it cannot start, the error says so, and the
  * managed copy does not run in its place without a message.
@@ -361,14 +354,12 @@ export const resolveAntigravityCli: (input?: {
       found = true;
       const attempt = yield* Effect.result(
         Effect.gen(function* () {
-          const manifest = join(dirname(dirname(candidate.executable)), ANTIGRAVITY_MANIFEST);
-          const version = parseAntigravityVersion(yield* providerCall(() => readFile(manifest, "utf8")));
-          const launchPath = yield* cliLaunchPath(candidate.executable, candidate.source);
+          const { stdout, launch } = yield* readCliVersion(candidate, "antigravity");
           return {
             executable: candidate.executable,
-            version,
+            version: parseAntigravityVersion(stdout),
             source: candidate.source,
-            ...(launchPath ? { launchPath } : {}),
+            ...launch,
           };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
@@ -388,17 +379,10 @@ export const resolveAntigravityCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-export function parseAntigravityVersion(manifest: string): string {
-  let version: unknown = null;
-  try {
-    const value = JSON.parse(manifest);
-    if (isDynamicRecord(value)) version = value.version;
-  } catch {
-    /* Reported below. */
-  }
-  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/u.test(version)) {
-    throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
-  }
+/** Antigravity CLI 1.5.4 prints `1.5.4`. */
+function parseAntigravityVersion(output: string): string {
+  const version = /^\s*(\d+\.\d+\.\d+)\s*$/u.exec(output)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
   return version;
 }
 
@@ -755,19 +739,12 @@ export function claudeTakesPromptSnapshotFlag(version: string): boolean {
 }
 
 /**
- * Whether this Antigravity ACP server answers `/usage` itself, with no model turn. Checked in 1.4.1;
- * 1.3.0 sends the command to the model.
+ * Whether this Antigravity CLI takes `--gemini-dir` and `--app-data-dir`, so that an account after
+ * the first can have a folder of its own, and keeps its token in a file there when it sees
+ * `WSL_DISTRO_NAME`. Checked in 1.5.3 and 1.5.4.
  */
-export function antigravityAnswersUsageCommand(version: string): boolean {
-  return isMinimumVersion(version, [1, 4, 1]);
-}
-
-/**
- * Whether this Antigravity ACP server keeps its token and settings in `GEMINI_HOME`, so that an
- * account after the first can have a folder of its own. Checked in 1.4.0, 1.4.1 and 1.4.3.
- */
-export function antigravityReadsGeminiHome(version: string): boolean {
-  return isMinimumVersion(version, [1, 4, 0]);
+export function antigravityTakesStateFolders(version: string): boolean {
+  return isMinimumVersion(version, [1, 5, 3]);
 }
 
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
@@ -882,7 +859,7 @@ function parseMistralVersion(output: string): string {
 }
 
 /** The providers whose CLI is one native program that OpenBot can download. */
-type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral";
+type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
 /** The version parser of each native provider CLI. */
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
@@ -891,6 +868,7 @@ export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output:
   devin: parseDevinVersion,
   copilot: parseCopilotVersion,
   mistral: parseMistralVersion,
+  antigravity: parseAntigravityVersion,
 };
 
 export function isVersion(value: string): boolean {

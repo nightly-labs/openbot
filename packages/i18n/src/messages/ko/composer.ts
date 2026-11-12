@@ -74,6 +74,7 @@ export const messages = {
   "composer.placeholder.messageAgent": "에이전트에게 메시지 보내기",
   "composer.add.label": "프롬프트에 추가",
   "composer.add.files": "파일 첨부",
+  "composer.add.teach": "작업 가르치기",
   "composer.add.skill": "스킬 사용",
   "composer.upload.cancel": "업로드 취소",
   "composer.upload.uploading": "{name} 업로드 중",

@@ -304,8 +304,7 @@ export const messages = defineMessages("server", {
   "server.settings.generalTitle": "General",
   "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
   "server.settings.vaultTitle": "Vault",
-  "server.settings.vaultDescription":
-    "Save logins, cards and contact info that every agent on this server can fill in.",
+  "server.settings.vaultDescription": "Save logins, cards, contact info and API keys for the agents on this server.",
   "server.settings.membersTitle": "Members",
   "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
@@ -418,6 +417,8 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
     "New routines use this timezone when the message does not give the sender's timezone.",
@@ -438,6 +439,10 @@ export const messages = defineMessages("server", {
   "server.settings.skillLearningAsk": "Ask first",
   "server.settings.skillLearningOff": "Off",
   "server.settings.skillLearningLoadFailed": "Could not load the skill learning setting.",
+  "server.settings.browsingMemory": "Learn from my browsing",
+  "server.settings.browsingMemoryDescription":
+    "When you control an agent's browser, the agent learns how sites work from the pages and buttons you use. Typed text is not kept.",
+  "server.settings.browsingMemoryLoadFailed": "Could not load the browsing setting.",
   "server.settings.rolesTitle": "Permissions",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
@@ -463,7 +468,7 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyChanged": "Last change",
   // {date} is the date and time of the change.
   "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
-  "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
+  "server.settings.hostKeyOwnerOnly": "Only the owner can change the server key.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":
     "Remove this server from the account service for all members. Use this when its computer is no longer available.",

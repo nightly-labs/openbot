@@ -117,16 +117,17 @@ export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home
 }
 
 /**
- * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
- * the Gemini home, and hook scratch files in `artifacts`. The shared `config` folder, with the
- * global hooks, skills and MCP servers, is not in the list, so it stays read-only. `settings.json`
- * selects the sign-in and `trusted_workspaces.json` trusts folders for every other process.
+ * The Antigravity CLI keeps its sign-in, sessions and harness files in `antigravity-acp` under the
+ * Gemini home (`--app-data-dir`), hook scratch files in `artifacts`, and the state of each project in
+ * `config/projects`. The rest of the shared `config` folder, with the global hooks, skills, plugins
+ * and MCP servers, is not in the list, so it stays read-only. `settings.json` selects the sign-in and
+ * `trusted_workspaces.json` trusts folders for every other process.
  */
 export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const geminiHome = env.GEMINI_HOME?.trim() || join(home, ".gemini");
   const acp = join(geminiHome, "antigravity-acp");
   return {
-    writable: [acp, join(geminiHome, "artifacts")],
+    writable: [acp, join(geminiHome, "artifacts"), join(geminiHome, "config", "projects")],
     protected: [join(acp, "settings.json"), join(acp, "trusted_workspaces.json")],
   };
 }

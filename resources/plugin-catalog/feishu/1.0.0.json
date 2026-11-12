@@ -1,0 +1,33 @@
+{
+  "slug": "feishu",
+  "name": "Feishu",
+  "tagline": "Docs, messages, and groups",
+  "description": "Feishu lets agents read and edit cloud documents and read messages and groups in the signed-in Feishu account. Each user signs in to their own Feishu account through the browser.",
+  "category": "productivity",
+  "creatorName": "Feishu",
+  "iconUrl": "https://www.feishu.cn/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-doc-summary", "text": "Summarize the Feishu document about the Q3 launch plan." },
+    { "id": "prompt-group-catchup", "text": "What did the project group discuss today?" },
+    { "id": "prompt-draft-doc", "text": "Draft a Feishu document with the agenda for next week's team meeting." }
+  ],
+  "apps": [
+    {
+      "id": "app-feishu-mcp",
+      "name": "Feishu",
+      "description": "Cloud document, message, and group access, over Feishu's MCP server with browser sign-in.",
+      "iconUrl": "https://www.feishu.cn/favicon.ico",
+      "server": {
+        "name": "feishu",
+        "transport": "http",
+        "url": "https://mcp.feishu.cn/mcp",
+        "auth": [{ "id": "feishu-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.feishu.cn",
+  "privacyPolicyUrl": "https://www.feishu.cn/privacy",
+  "termsUrl": "https://www.feishu.cn/terms",
+  "skills": []
+}

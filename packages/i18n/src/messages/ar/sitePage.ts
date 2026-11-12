@@ -80,6 +80,9 @@ export const messages = {
   "sitePage.pricing.enterprise.title": "المؤسسات",
   "sitePage.pricing.enterprise.body": "خوادم أكبر، أو أكثر من {count} عضو، أو أي شيء آخر تحتاجه. مع دعم المؤسسات.",
   "sitePage.pricing.enterprise.contact": "التواصل مع المبيعات",
+  "sitePage.pricing.consent.statement": "أقر بأنني أقبل {policy} و{terms}.",
+  "sitePage.pricing.consent.policy": "سياسة الخصوصية",
+  "sitePage.pricing.consent.terms": "الشروط وحق الانسحاب",
   "sitePage.marketplace.agents.title": "الوكلاء — متجر OpenBot",
   "sitePage.marketplace.agents.description":
     "وكلاء أنشأهم أشخاص في OpenBot. أضف واحدًا إلى OpenBot مع مهاراته ومهامه الدورية.",

@@ -260,7 +260,7 @@ export const messages = {
   "server.settings.generalDescription": "Zarządzaj nazwą, logo i ustawieniami serwera.",
   "server.settings.vaultTitle": "Sejf",
   "server.settings.vaultDescription":
-    "Zapisuj loginy, karty i dane kontaktowe, które każdy agent na tym serwerze może wpisywać na stronach.",
+    "Zapisuj loginy, karty, dane kontaktowe i klucze API dla agentów na tym serwerze.",
   "server.settings.membersTitle": "Członkowie",
   "server.settings.membersDescription": "Opublikuj serwer, zapraszaj osoby i zarządzaj dostępem.",
   "server.settings.desktopTitle": "Zdalny pulpit",
@@ -333,6 +333,8 @@ export const messages = {
   "server.settings.later": "Później",
   "server.settings.setUp": "Skonfiguruj",
   "server.settings.agents": "Agenci",
+  "server.settings.agentsDescription":
+    "Wybierz, co mogą robić agenci na tym serwerze, gdy nie ustawisz tego dla agenta.",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
     "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
@@ -359,6 +361,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Najpierw zapytaj",
   "server.settings.skillLearningOff": "Wyłączone",
   "server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "server.settings.browsingMemory": "Ucz się z mojego przeglądania",
+  "server.settings.browsingMemoryDescription":
+    "Gdy sterujesz przeglądarką agenta, agent uczy się działania stron z używanych przez Ciebie stron i przycisków. Wpisany tekst nie jest zapisywany.",
+  "server.settings.browsingMemoryLoadFailed": "Nie udało się wczytać ustawienia przeglądania.",
   "server.settings.rolesTitle": "Uprawnienia",
   "server.settings.rolesDescription":
     "Wybierz agentów, których mogą używać członkowie. Członek dostaje najwyższy dostęp spośród roli Wszyscy i swoich ról. Właściciele i administratorzy mogą używać wszystkich agentów.",
@@ -379,7 +385,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Zmieniono klucz serwera",
   "server.settings.hostKeyChanged": "Ostatnia zmiana",
   "server.settings.hostKeyChangedDescription": "{date}. Poprzedni i nowy klucz podpisały tę zmianę.",
-  "server.settings.hostKeyLocalOnly": "Tutaj klucz może zmienić tylko serwer na tym komputerze.",
+  "server.settings.hostKeyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
   "server.settings.removeTitle": "Usuń serwer",
   "server.settings.removeDescription":
     "Usuń ten serwer z usługi kont dla wszystkich członków. Użyj tej opcji, gdy jego komputer nie jest już dostępny.",

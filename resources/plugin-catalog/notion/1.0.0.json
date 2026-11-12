@@ -5,7 +5,7 @@
   "description": "Notion lets agents read and write pages, search the workspace, and keep meeting notes and specs where the team already works. Each user signs in to their own Notion account through the browser.",
   "category": "productivity",
   "creatorName": "Notion",
-  "iconUrl": "https://www.notion.so/images/favicon.ico",
+  "iconUrl": "https://www.notion.com/front-static/logo-ios.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-find-spec", "text": "Find the current launch spec and summarize the open questions." },
@@ -17,7 +17,7 @@
       "id": "app-notion-mcp",
       "name": "Notion",
       "description": "Page search, reading, writing, and workspace navigation, over Notion's MCP server with browser sign-in.",
-      "iconUrl": "https://www.notion.so/images/favicon.ico",
+      "iconUrl": "https://www.notion.com/front-static/logo-ios.png",
       "server": {
         "name": "notion",
         "transport": "http",

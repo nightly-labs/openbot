@@ -25,6 +25,7 @@ import {
   type AnalyticsPreference,
   type AppAppearancePreference,
   type AppBehaviorPreference,
+  type AppFontFamily,
   type AppInfo,
   type AppInterfaceSizePreference,
   type AppLanguagePreference,
@@ -67,6 +68,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAppAppearance,
+  isAppFontFamily,
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
@@ -263,6 +265,17 @@ function decodeChatBackground(value: unknown): ChatBackgroundColor | null {
   return value;
 }
 
+/** A font name becomes part of a CSS font list in the page, so only a name that can go there passes. */
+function decodeFontFamily(value: unknown): AppFontFamily | null {
+  if (value !== null && !isAppFontFamily(value)) throw new Error("Invalid font.");
+  return value;
+}
+
+export function decodeInstalledFonts(value: unknown): AppFontFamily[] {
+  if (!Array.isArray(value) || !value.every(isAppFontFamily)) throw new Error("Invalid installed fonts.");
+  return [...value];
+}
+
 export function decodeAppAppearancePreference(value: unknown): AppAppearancePreference {
   const preference = decodeRecord(value, "appearance preference");
   if (!isAppAppearance(preference.appearance)) throw new Error("Invalid appearance.");
@@ -277,6 +290,8 @@ export function decodeAppAppearancePreference(value: unknown): AppAppearancePref
     palettes,
     chatBackgroundLight: decodeChatBackground(preference.chatBackgroundLight),
     chatBackgroundDark: decodeChatBackground(preference.chatBackgroundDark),
+    interfaceFont: decodeFontFamily(preference.interfaceFont),
+    codeFont: decodeFontFamily(preference.codeFont),
   };
 }
 
@@ -418,12 +433,13 @@ export function decodeAccountSessions(value: unknown): AccountSession[] {
 
 export function decodeUpdateStatus(value: unknown): UpdateStatus {
   const status = decodeRecord(value, "update status");
-  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart } = status;
+  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart, stagedVersion } = status;
   if (!isOneOf(UPDATE_PHASES, phase)) throw new Error("Invalid phase.");
   if (errorCode !== null && !isOneOf(["check_failed", "download_failed", "install_failed"] as const, errorCode)) {
     throw new Error("Invalid errorCode.");
   }
   if (managedByHost !== undefined && !isBoolean(managedByHost)) throw new Error("Invalid managedByHost.");
+  if (stagedVersion !== undefined && !isString(stagedVersion)) throw new Error("Invalid stagedVersion.");
   return {
     phase,
     currentVersion: requiredString(status, "currentVersion"),
@@ -435,6 +451,7 @@ export function decodeUpdateStatus(value: unknown): UpdateStatus {
     ...(managedByHost === undefined ? {} : { managedByHost }),
     ...(scheduledRestart === undefined ? {} : { scheduledRestart: decodeScheduledUpdateRestart(scheduledRestart) }),
     ...(idleRestart === undefined ? {} : { idleRestart: decodeIdleRestart(idleRestart) }),
+    ...(stagedVersion === undefined ? {} : { stagedVersion }),
   };
 }
 

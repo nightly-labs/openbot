@@ -1,11 +1,15 @@
 import {
+  BILLING_BASE_CURRENCIES,
   BILLING_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
+  type BillingBaseCurrency,
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
   isBillingAmount,
+  isStorageGb,
   isStripeCheckoutUrl,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
@@ -115,6 +119,8 @@ export interface HostedServerSummary {
   error: HostedServerError | null;
   createdAt: string;
   updatedAt: string;
+  /** The storage of the server in GB. An account server from before this field sends none: see `serverStorageGb`. */
+  storageGb?: number;
 }
 
 /**
@@ -193,6 +199,8 @@ export function parseHostedServerSummary(value: unknown): HostedServerSummary | 
     error,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    // A value that this app cannot read is left out, so the server still shows with the storage of its plan.
+    ...(isStorageGb(value.storageGb) ? { storageGb: value.storageGb } : {}),
   };
 }
 
@@ -298,13 +306,20 @@ export interface HostedServerCheckout {
   checkoutUrl: string | null;
 }
 
+/**
+ * The prices of a plan. Every plan has the base currencies. An optional currency (BRL) is there only when the
+ * Stripe Price has it, and an account server before BRL never sends it.
+ */
+export type HostedServerPlanPrices = Record<BillingBaseCurrency, Record<BillingInterval, number>> &
+  Partial<Record<BillingCurrency, Record<BillingInterval, number>>>;
+
 /** One plan as the create dialog shows it. Amounts are in the minor unit of the currency. */
 export interface HostedServerCatalogPlan {
   id: BillingPlanId;
   diskGb: number;
   memberLimit: number;
   relativeSpeed: number;
-  prices: Record<BillingCurrency, Record<BillingInterval, number>>;
+  prices: HostedServerPlanPrices;
   /** No new server can take this plan. Older account servers do not send it. */
   soldOut?: boolean;
 }
@@ -360,16 +375,37 @@ export function parseHostedServerCheckout(value: unknown): HostedServerCheckout 
   return { server, checkoutUrl: value.checkoutUrl };
 }
 
-function parsePlanPrices(value: unknown): HostedServerCatalogPlan["prices"] | null {
+function parsePlanPrice(value: unknown): Record<BillingInterval, number> | null {
+  if (!isDynamicRecord(value) || !isBillingAmount(value.month) || !isBillingAmount(value.year)) return null;
+  return { month: value.month, year: value.year };
+}
+
+/** A plan needs the base currencies. An optional currency that is missing or not valid is left out. */
+function parsePlanPrices(value: unknown): HostedServerPlanPrices | null {
   if (!isDynamicRecord(value)) return null;
-  const prices: Partial<HostedServerCatalogPlan["prices"]> = {};
-  for (const currency of BILLING_CURRENCIES) {
-    const entry = value[currency];
-    if (!isDynamicRecord(entry) || !isBillingAmount(entry.month) || !isBillingAmount(entry.year)) return null;
-    prices[currency] = { month: entry.month, year: entry.year };
+  const eur = parsePlanPrice(value.eur);
+  const usd = parsePlanPrice(value.usd);
+  const pln = parsePlanPrice(value.pln);
+  if (!eur || !usd || !pln) return null;
+  const prices: HostedServerPlanPrices = { eur, usd, pln };
+  for (const currency of BILLING_OPTIONAL_CURRENCIES) {
+    const price = parsePlanPrice(value[currency]);
+    if (price) prices[currency] = price;
   }
-  const { eur, usd, pln } = prices;
-  return eur && usd && pln ? { eur, usd, pln } : null;
+  return prices;
+}
+
+/**
+ * The currencies that an order of these plans can use: the base currencies, and each optional currency that
+ * every plan has. With no plans, only the base currencies.
+ */
+export function catalogCurrencies(plans: readonly HostedServerCatalogPlan[]): BillingCurrency[] {
+  const optional = BILLING_OPTIONAL_CURRENCIES.filter(
+    (currency) => plans.length > 0 && plans.every((plan) => plan.prices[currency] !== undefined),
+  );
+  return BILLING_CURRENCIES.filter(
+    (currency) => isOneOf(BILLING_BASE_CURRENCIES, currency) || isOneOf(optional, currency),
+  );
 }
 
 /** Returns null for a value that is not a plan catalog. A plan that this app cannot read is left out. */

@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Schema, Semaphore } from "effect";
+import { Effect, Result, Schema, Semaphore } from "effect";
 import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -42,20 +42,42 @@ export class LocalSkillLibrary {
     return join(this.root, id);
   }
 
+  /**
+   * The requested revision, or the latest when none is requested. A skill or revision that the library
+   * does not have fails with text that names it, so an agent can correct its call (#7193).
+   */
   private revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number, LocalSkillFailure> {
-      if (requested !== undefined) {
-        if (!Number.isSafeInteger(requested) || requested < 1)
-          return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
-        return requested;
-      }
-      const entries = yield* localIO(() => readdir(this.directory(id), { withFileTypes: true }));
-      const revisions = entries
-        .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
-        .map((entry) => Number(entry.name));
+      if (requested !== undefined && (!Number.isSafeInteger(requested) || requested < 1))
+        return yield* new LocalSkillFailure({ cause: new Error("Invalid skill revision.") });
+      const revisions = yield* this.revisions(id);
       if (!revisions.length)
         return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNoRevisions")) });
-      return Math.max(...revisions);
+      const latest = Math.max(...revisions);
+      if (requested === undefined) return latest;
+      if (!revisions.includes(requested))
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            sourceText("error.skill.localRevisionNotFound", { revision: String(requested), latest: String(latest) }),
+          ),
+        });
+      return requested;
+    });
+  }
+
+  /** Every saved revision of a skill. */
+  revisions(id: string): Effect.Effect<number[], LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<number[], LocalSkillFailure> {
+      const listed = yield* Effect.result(localIO(() => readdir(this.directory(id), { withFileTypes: true })));
+      if (Result.isFailure(listed)) {
+        const error = listed.failure.cause;
+        if (isDynamicRecord(error) && error.code === "ENOENT")
+          return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNotFound")) });
+        return yield* listed.failure;
+      }
+      return listed.success
+        .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
+        .map((entry) => Number(entry.name));
     });
   }
 
@@ -273,10 +295,16 @@ function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
   const files = normalizedFiles(bytes);
   const skillFile = files["SKILL.md"];
   if (!skillFile) return bytes;
+  const quoted = quotedSkillMarkdown(skillFile);
+  return quoted ? zipSync({ ...files, "SKILL.md": quoted }, { level: 6 }) : bytes;
+}
+
+/** The `SKILL.md` as `withQuotedFrontmatter` saves it, or null when a save keeps it unchanged. */
+export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
   const match = SKILL_FRONTMATTER.exec(text);
   const frontmatter = match?.[1];
-  if (!match || frontmatter === undefined || parsesAsYaml(frontmatter)) return bytes;
+  if (!match || frontmatter === undefined || parsesAsYaml(frontmatter)) return null;
   const quoted = frontmatter
     .split("\n")
     .map((line) => {
@@ -288,12 +316,9 @@ function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
       return `${key}: ${JSON.stringify(plain)}`;
     })
     .join("\n");
-  if (!parsesAsYaml(quoted)) return bytes;
+  if (!parsesAsYaml(quoted)) return null;
   const head = match[0].replace(frontmatter, () => quoted);
-  return zipSync(
-    { ...files, "SKILL.md": new TextEncoder().encode(`${head}${text.slice(match[0].length)}`) },
-    { level: 6 },
-  );
+  return new TextEncoder().encode(`${head}${text.slice(match[0].length)}`);
 }
 
 const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string, path: string) {

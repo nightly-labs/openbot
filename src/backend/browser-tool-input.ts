@@ -61,8 +61,18 @@ function refTarget(ref: string): DynamicRecord {
   return { kind: "ref", ref, revision: Number(ref.split(":", 1)[0]) };
 }
 
+/** `a.delete >> nth=1`: Playwright's index of one match, which a target gives as `nth`. */
+const CSS_NTH = /^(.+?)\s*>>\s*nth=(\d+)$/su;
+
 /** The target that `value` names, or undefined when it is no form that this file knows. */
 function repairTarget(value: unknown): DynamicRecord | undefined {
+  const target = targetForm(value);
+  if (target?.kind !== "css" || typeof target.selector !== "string" || target.nth !== undefined) return target;
+  const nth = CSS_NTH.exec(target.selector.trim());
+  return nth ? { ...target, selector: nth[1], nth: Number(nth[2]) } : target;
+}
+
+function targetForm(value: unknown): DynamicRecord | undefined {
   if (typeof value === "string") {
     const text = value.trim();
     if (REF.test(text)) return refTarget(text);

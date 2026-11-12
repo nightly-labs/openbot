@@ -53,7 +53,8 @@ waits for the answer of such a run (`quietRoutineRun`). The run history stores w
 run in `run_source` (`test`, `script` or `webhook`); a manual run from before migration 35 has none
 and is read as a Test run. The agent calls the
 `routine_no_update` tool, which the run prompt names, or the user asks in the routine task
-for an answer of only `[[no-update]]`. Models often write a short sentence instead of an exact
+for an answer of only `[[no-update]]`. An answer of only `[SILENT]`, the Hermes Agent cron token
+that the Hermes import copies, is also the marker. Models often write a short sentence instead of an exact
 token, so the tool is the main path. There is no setting. The tool and the marker do not
 depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
 held in memory until the turn completes; the history import finds it again by the tool name, as
@@ -68,6 +69,14 @@ and its `turn-completed`
 event has `quiet: true`, which stops the desktop notification and the completion sound. The run
 marker and the run history stay. A marker inside a longer answer is a report and is shown. A Test run
 is never quiet.
+
+A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
+that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
+turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
+write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
+of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
+path and in the history import. The desktop chat shows its quiet answers under the marker of the
+last update of the turn, which starts closed (`teammateUpdateAnswers`).
 
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
@@ -132,11 +141,13 @@ routine result destinations and local scripts read the answer of a run with
 `readTurnAssistantMessages(agentId, turnId)`: the `projection_turns` row names the thread that ran the
 turn, so the answer of a run in a routine thread is found. A turn in a routine thread sends no
 `turn-completed` event outside `AgentTasks`, as for other side threads, so the chat keeps its turn
-state. When the run is not quiet, `AgentTasks` sends the local-only `routine-thread-turn-completed`
-event (`taskId` and the inner `turn`). The desktop notification, the phone push and the completion
-sound use it as a `turn-completed`, read the answer from the routine thread (`readTask`), and a click
-opens the routine thread. The Team API adapters drop this event, so a remote client gets no
-notification for a run in a routine thread. The released `agent-tasks-v1` routes do not send
+state. When the turn of a side thread is not quiet, `AgentTasks` sends the local-only
+`thread-turn-completed` event (`taskId`, `routine` and the inner `turn`). For a routine thread
+(`routine: true`), the desktop notification, the phone push and the completion sound use it as a
+`turn-completed`, read the answer from the routine thread (`readTask`), and a click opens the routine
+thread. For another side thread, only the phone push uses it (see
+[side thread notifications](channels-and-messaging.md#side-thread-notifications)). The Team API
+adapters drop this event, so a remote client gets no notification for a turn in a side thread. The released `agent-tasks-v1` routes do not send
 `routineId`; only this computer's IPC list has it.
 
 A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
@@ -330,23 +341,41 @@ changed, on this computer and on a joined host.
 
 ## Hidden agents
 
-A user hides an agent from its sidebar menu in place of a delete. The agent keeps its thread, files,
-memories, settings, pin and section. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`,
-so the state needs no SQL migration and a duplicate does not copy it. The host refuses new messages
-to a hidden agent with `error.backend.recipientHidden`, on IPC, channels, MCP `send_message`, the
-automation server and external messaging. Its routines do not run, and its queued messages wait
-behind the drain hold `"hidden"`. A turn that runs at the hide finishes. A hidden agent is not in
-`list_agents`, the teammates prompt, the mention picker, the counts or "Needs you". A hidden lead does not
-route channel requests, and `ChannelService.releaseAgent` gives the queued and starting channel
-assignments of the agent back to their channels.
+A user hides an agent from its sidebar menu to take it out of the list. The agent keeps its thread,
+files, memories, settings, pin and section, and it keeps working: it gets messages on each path
+(IPC, channels, MCP `send_message`, the automation server and external messaging), its routines run,
+its queue drains, it routes and does channel work, and other agents see it in `list_agents`, the
+teammates prompt and mentions. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`, so the
+state needs no SQL migration and a duplicate does not copy it. The host reads the flag only to list
+the hidden agents and to lower their notifications. A hide or a restore changes no routine and no
+queue.
 
-Restore marks the missed routine runs as skipped before it clears the flag, so the timer does not
-run a backlog. Then it arms the routines and drains the queue. IPC `agent:hidden:list` and
-`agent:hidden:set` change the state, and the event `hidden-agents-changed` carries the whole list.
-A joined desktop, the web client and the mobile app use the optional `agent-hidden-v1` capability
+A client keeps a hidden agent in the collapsed "Hidden" group of the sidebar, and out of the dock and
+the ⌘1-9 order. It stays in the mention picker, and its unread replies count for "Mark all read". A
+hidden agent that waits for the user (a question, an approval or a browser
+handoff) shows in "Needs you". When the server level is "all" and the user set no level for the
+agent, a hidden agent notifies at "needs-me" (`agentNotificationLevel`), on the desktop, the web
+client and the host's push to a phone. A failed turn does not notify at that level.
+
+Up to version 0.68.0 a hide stopped the agent: the host refused its messages with
+`error.backend.recipientHidden`, held its queue and did not run its routines. The first start of a
+later version turns off, one time, each active routine of an agent that is hidden then
+(`AgentRoutineStore.pauseForAgentsHiddenBeforeWork`, with the command receipt
+`routine:hidden-agent-pause:v1`), so the update starts no routine that the user stopped. The user
+turns each one on again. The queued messages and channel tasks of such an agent run at the update.
+A transfer file from such a version has `preferences.hidden` and no `preferences.hiddenWorks`; the
+import then adds the routines of that agent turned off (`hiddenAgentWasStopped`).
+
+IPC `agent:hidden:list` and `agent:hidden:set` change the state, and the event
+`hidden-agents-changed` carries the whole list. A joined desktop, the web client and the mobile app
+use the optional `agent-hidden-v1` capability
 (`packages/contracts/src/team-protocol/agent-hidden-v1.ts`). Any member reads the list; only an
-owner or an admin hides or restores an agent on a host.
-`/v1/agents` and the released agent codecs do not carry `hiddenAt`.
+owner or an admin hides or restores an agent on a host. `/v1/agents` and the released agent codecs
+do not carry `hiddenAt`. A host that keeps a hidden agent at work also advertises the optional
+marker capability `agent-hidden-work` on protocol 9. It adds no route. Without it, a client shows a
+hidden agent as paused ("Paused since"), keeps it out of "Needs you" and the mention picker, and does
+not lower its notifications, because that host stops the agent. `scripts/agent-hide-restore-e2e.ts` checks the
+routes, a message and a routine run of a hidden agent, and the one-time step.
 
 ## New agent welcome
 
@@ -740,12 +769,48 @@ When the last copy ends, the waiting answers start in one turn, and the prompt n
 whose copy ended with no answer. A message from the person does not wait: it starts at once and
 takes the answers that are already in. Each end of a copy schedules a drain for the requester.
 
-A message from another agent follows the recipient's busy-message mode, as a message from the
-person does. When the mode is "steer", the provider steers natively and the recipient runs a chat
-turn, `send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). Channel, messaging and task work, and each answer to a request
-that went to two or more teammates, stay queued (`MailboxStore.steersChatTurn`), so those answers
-still start together. A message from an agent that cannot steer gets no fallback reason on its row.
+Nothing else wakes the requester, so a turn of teammate results that ends with no answer and no
+step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
+with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
+(a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
+by the user. The error waits for the end
+of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
+error. With no backup, a turn that only teammate results started runs once more on the same model;
+the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
+shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+
+A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
+running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
+Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
+reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
+"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
+modes.
+
+A steered message joins work that the model already does, and a model that gets it as plain user
+text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block
+(`steerNote` in `src/backend/agent/developer-instructions.ts`) in front of a message from the person
+or a teammate: the message adds to the current work, a question gets a short answer first, a
+correction applies from this point, and the unfinished work continues unless the message stops it.
+The block is a text item of its own, as the turn context blocks are, so the history readers remove
+it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
+with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
+block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
+block.
+
+A message from another agent that only gives information follows the recipient's busy-message mode,
+as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
+When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
+`send_message` and the result relay take the message into that turn
+(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
+turn automatically, in each mode: it asks for work and a result, and in a running turn that result
+and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
+tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
+Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
+messaging and task work, and each answer to a request that went to two or more teammates, stay
+queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
+agent that cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.
@@ -983,7 +1048,7 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
 ## Agent import
 
 Server Settings > Import moves agents from a `.zip` export into the local host, or into a remote host
-that serves `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
+that serves `agent-import-v2` or `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
 The format is `openbot-import.json` plus `agents/<key>/`
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change
@@ -1049,7 +1114,8 @@ chat history.
 Fields added after version 1 shipped are optional, so an older app ignores them:
 
 - `agents[].preferences` (`src/main/instance-transfer-preferences.ts`): access, Computer Use, the agent
-  defaults, fast mode, backup models, hidden state, and the owner's notification level, pin and
+  defaults, fast mode, backup models, hidden state (`hidden`, with `hiddenWorks` from an app that keeps
+  a hidden agent at work), and the owner's notification level, pin and
   approval choice, plus the names of the agent's API keys and the count of its outside folders. A file
   can come from anywhere, so the import applies only values that keep the agent at or below a new
   agent's permissions (`workspace` access, Computer Use off, a setting off, "ask first"). "Local

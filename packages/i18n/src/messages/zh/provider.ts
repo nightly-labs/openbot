@@ -137,6 +137,8 @@ export const messages = {
   "provider.picker.customEmpty":
     "添加一个兼容 OpenAI 的端点 —— 可以是这台电脑上的模型服务，也可以是任何提供 base URL 和密钥的服务。",
   "provider.picker.customPending": "端点的模型尚未加载。当前任务结束后服务商会读取这些模型。",
+  "provider.picker.customUnlisted": "{name} 未列出你的端点的模型。",
+  "provider.picker.editEndpoints": "编辑端点",
   "provider.picker.defaultModelLabel": "{name}，默认",
   "provider.picker.usageLimit": "已达用量上限",
   "provider.picker.usageLimitWindow": "{window}上限",
@@ -228,6 +230,15 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} 没有剩余的用量重置次数。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} 的这次重置机会已被使用。",
   "provider.account.resetUsageFailed": "无法重置 {name} 的用量。",
+  "provider.account.pool": "账号池",
+  "provider.account.poolDescription": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "provider.account.inUse": "使用中",
+  "provider.account.notInPool": "不在池中",
+  "provider.account.leaveOutOfPool": "移出账号池",
+  "provider.account.putBackInPool": "放回账号池",
+  "provider.account.poolChip": "账号池",
+  "provider.account.poolCount": "{accounts}的账号池",
+  "provider.account.poolInUse": "{pool} · 正在使用 {name}",
 
   // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "已连接",
@@ -248,6 +259,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "新助手的默认选项 · {use}",
   "provider.settings.accounts": "账号",
   "provider.settings.accountsDescription": "{count} / {max}。每个助手使用一个账号。",
+  "provider.settings.accountsPooledDescription": "{count} / {max}。助手共享这些账号。",
   "provider.settings.accountBlocked": "重新登录之前，{agents} 无法运行。",
   "provider.settings.removeTitle": "移除 {name}？",
   "provider.settings.removeMoves": "{agents} 将改用 {name}。",
@@ -266,6 +278,8 @@ export const messages = {
   "provider.settings.keyOptional": "可选。添加密钥后可使用付费模型。",
   "provider.settings.keyAlternative": "或粘贴 {name} API 密钥。",
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -286,7 +300,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":
     "智能体会从 ~/.claude 加载你的 CLAUDE.md、技能、智能体、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "代理会从服务器上的 ~/.claude 加载 CLAUDE.md、技能、代理、钩子和插件。关闭后，每轮发送的提示更短。工作区文件仍会加载。",
   "provider.settings.claudeUserSetupLoadFailed": "无法加载 Claude Code 设置。",
+  "provider.settings.context": "上下文",
+  "provider.settings.compactWindow": "压缩聊天的大小",
+  "provider.settings.compactWindowDescription":
+    "当聊天达到此大小时，Claude Code 会总结较早的轮次。较低可使轮次更快、更便宜。较高会保留更多细节。窗口较小的模型会在其自身上限处压缩。",
+  "provider.settings.compactWindowDefault": "Claude Code 默认",
+  "provider.settings.compactWindowTokens": "{size} 个 token",
+  "provider.settings.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
   "provider.settings.models": "模型",
   "provider.settings.modelsDescription": {
     one: "{count} 个模型中有 {shown} 个显示在模型选择器中。",
@@ -313,4 +336,6 @@ export const messages = {
   "provider.settings.endpoints": "端点",
   "provider.settings.noEndpoints": "没有端点。",
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
 } as const satisfies PartialTranslation<typeof source>;

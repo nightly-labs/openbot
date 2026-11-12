@@ -1,4 +1,9 @@
-import type { AgentDockDisplay, AgentDockDisplayInfo, AgentDockEdge } from "@openbot/contracts/ipc";
+import {
+  AGENT_DOCK_SIZE_LIMITS,
+  type AgentDockDisplay,
+  type AgentDockDisplayInfo,
+  type AgentDockEdge,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Item,
@@ -14,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
   SettingsSection,
+  SliderField,
   Switch,
   SwitchField,
 } from "@openbot/ui";
@@ -146,6 +152,20 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
               />
             </ItemActions>
           </Item>
+          {/* The dock above the other apps changes size while the user drags, so the user sees the size to pick. */}
+          <div data-settings-row="settings.agentDock.size.title" class="settings-agent-dock-size">
+            <SliderField
+              label={i18n.t("settings.agentDock.size.title")}
+              description={i18n.t("settings.agentDock.size.description")}
+              value={preference().sizePercent}
+              minValue={AGENT_DOCK_SIZE_LIMITS.min}
+              maxValue={AGENT_DOCK_SIZE_LIMITS.max}
+              step={AGENT_DOCK_SIZE_LIMITS.step}
+              disabled={!aboveApps()}
+              formatValue={(value) => `${value}%`}
+              onChange={(sizePercent) => setAgentDockPreference({ sizePercent })}
+            />
+          </div>
           <SwitchField
             data-settings-row="settings.agentDock.autoHide.title"
             checked={preference().autoHide}
@@ -153,6 +173,14 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
             onChange={(autoHide) => setAgentDockPreference({ autoHide })}
             label={i18n.t("settings.agentDock.autoHide.title")}
             description={i18n.t("settings.agentDock.autoHide.description")}
+          />
+          <SwitchField
+            data-settings-row="settings.agentDock.edgeStrip.title"
+            checked={preference().edgeStrip}
+            disabled={!aboveApps() || !preference().autoHide}
+            onChange={(edgeStrip) => setAgentDockPreference({ edgeStrip })}
+            label={i18n.t("settings.agentDock.edgeStrip.title")}
+            description={i18n.t("settings.agentDock.edgeStrip.description")}
           />
           <SwitchField
             data-settings-row="settings.agentDock.results.title"

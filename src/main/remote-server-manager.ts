@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { basename } from "node:path";
+import { open } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
@@ -54,7 +55,9 @@ import type {
 import {
   type AgentNotificationLevelsSnapshot,
   type BrowserComputerSharing,
+  type Channel,
   decodeBrowserProxyComputer,
+  decodeChannel,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
   EMPTY_AGENT_NOTIFICATION_LEVELS,
@@ -62,17 +65,27 @@ import {
   REMOTE_DESKTOP_SETUP_CAPABILITY,
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
+  AGENT_IMPORT_V2_CHUNK_BYTES,
+  AGENT_IMPORT_V2_ROUTES,
+  agentImportV2ChunkPath,
+} from "@openbot/contracts/team-protocol/agent-import-v2";
+import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_PICTURE_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_COLORS_CAPABILITY, CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -85,6 +98,14 @@ import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protoco
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  decodeThreadMessageSearchResponse,
+  THREAD_MESSAGE_SEARCH_CAPABILITY,
+  THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+  THREAD_MESSAGE_SEARCH_ROUTES,
+  type ThreadMessageSearchRequest,
+} from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
@@ -127,6 +148,7 @@ import {
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
 import { acceptEmpty, decodeComputerActivityReply, decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
+import { type RemotePicture, RemotePictureCache } from "./remote-picture-cache";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
@@ -281,6 +303,8 @@ const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 // host that is not back by then is offline, as any other host. A hosted server restarts its whole
 // machine and restores its disk; one took 18 minutes.
 const HOST_RESTART_RETRY_MS = 30 * 60_000;
+/** Beside the server list, in the app's data directory. */
+const REMOTE_PICTURES_DIRECTORY = "remote-pictures";
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #platform: Layer.Layer<RemoteRequest>;
@@ -294,6 +318,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The agent and channel pictures of joined servers, on disk, so they show while a host is offline. */
+  readonly #pictures: RemotePictureCache;
   /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
   readonly #attachmentStops = new Map<string, Deferred.Deferred<never, RemoteWorkflowError>>();
   readonly #localLevels: LocalNotificationLevels | null;
@@ -360,6 +386,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ) {
     super();
     this.#store = new RemoteServerStore({ path, cipher });
+    this.#pictures = new RemotePictureCache(join(dirname(path), REMOTE_PICTURES_DIRECTORY));
     this.#appVersion = options.appVersion ?? null;
     this.#connections = new RemoteServerConnections({
       appVersion: this.#appVersion,
@@ -428,6 +455,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onMemberChatColors: (serverId) => {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
+      hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -537,9 +565,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).
-    this.#webrtcTransport?.on("connectFailed", (serverId) => {
+    // The failure says why, so a host that is online on Signal does not read as "not reachable" (#6873).
+    this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
-      this.#connections.reportUnreachable(serverId, "transport/connect_failed");
+      this.#connections.reportConnectFailure(serverId, failure);
       this.#emitChanged();
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
@@ -589,6 +618,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   #suspendServer(serverId: string): void {
     this.#events.suspendReconnect(serverId);
+    // The host ended this member's access, so its pictures must not stay on this computer.
+    if (this.#connections.statusFor(serverId).issue?.code === "authentication_required")
+      this.#background(this.#owned(this.#pictures.forget(serverId)));
     if (this.#store.find(serverId)?.transport !== "webrtc-v2") return;
     const transport = this.#webrtcTransport;
     if (transport) this.#background(this.#owned(transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void))));
@@ -1301,6 +1333,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!current) return;
       this.#clearServerConnectionState(serverId);
       if (forget) {
+        this.#forgetPictures(serverId);
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
@@ -1539,6 +1572,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.request(serverId, path, decodeVoid, { method: "POST" }).pipe(Effect.catch(() => Effect.void));
       }
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
       yield* this.#store.remove(serverId);
       this.#emitChanged();
     },
@@ -1764,6 +1798,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#attachments.forget(serverId);
   }
 
+  /**
+   * Deletes the picture copies of a server that leaves the list. A server that stops or changes its
+   * transport keeps them: they show its agents while it is offline.
+   */
+  #forgetPictures(serverId: string): void {
+    this.#background(this.#owned(this.#pictures.forget(serverId)));
+  }
+
   // The server comes first because every caller knows which one it means, and the decoder sits next
   // to the path it decodes. `init` is last and optional, so a plain GET reads as three arguments.
 
@@ -1842,7 +1884,22 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     cursor?: string,
     limit = 100,
     serverId = this.#store.activeServerId,
+    includeSideThreads = false,
   ): Effect.Effect<ConversationSearchPage, RemoteWorkflowError> {
+    // Only `thread-message-search-v1` names the side thread of a result. An older host searches the
+    // agents' own chats.
+    if (includeSideThreads && this.supportsCapability(serverId, THREAD_MESSAGE_SEARCH_CAPABILITY)) {
+      const body: ThreadMessageSearchRequest = {
+        query,
+        agentId: agentId ?? null,
+        cursor: cursor ?? null,
+        limit: Math.min(Math.max(limit, 1), THREAD_MESSAGE_SEARCH_PAGE_LIMIT),
+      };
+      return this.request(serverId, THREAD_MESSAGE_SEARCH_ROUTES.search, decodeThreadMessageSearchResponse, {
+        method: "POST",
+        body,
+      });
+    }
     const parameters = new URLSearchParams({ q: query, limit: String(limit) });
     // A query parameter never reaches the JSON adapters, so it keeps the released spelling.
     if (agentId) parameters.set("botId", agentId);
@@ -2214,6 +2271,59 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * Sends a Grok Bot export of any size to the host in parts with `agent-import-v2`, and answers its
+   * preview. The file is read one part at a time.
+   */
+  readonly stageAgentImportInParts = Effect.fn("RemoteManager.stageAgentImportInParts")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      path: string,
+      size: number,
+    ): Effect.fn.Return<AgentImportPreview, RemoteWorkflowError, RemoteRequest> {
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const post = (route: string, contentType: string, body: string | Buffer<ArrayBuffer>) =>
+        Effect.gen({ self: this }, function* () {
+          const url = new URL(route, server.apiUrl);
+          const response = yield* this.#client.fetch(
+            server,
+            url,
+            { method: "POST", headers: { "Content-Type": contentType }, body },
+            true,
+            AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+          );
+          yield* this.#rejectHostError(response, url);
+          return yield* remoteCall(() => response.json());
+        });
+      const opened = yield* post(AGENT_IMPORT_V2_ROUTES.open, "application/json", JSON.stringify({ size }));
+      const uploadId = yield* remoteDecode(() => {
+        if (!isDynamicRecord(opened) || typeof opened.uploadId !== "string")
+          throw new Error("The server answered an invalid upload.");
+        return opened.uploadId;
+      });
+      yield* Effect.acquireUseRelease(
+        remoteCall(() => open(path, "r")),
+        (file) =>
+          Effect.gen(function* () {
+            for (let offset = 0; offset < size; ) {
+              const part = Buffer.alloc(Math.min(AGENT_IMPORT_V2_CHUNK_BYTES, size - offset));
+              const { bytesRead } = yield* remoteCall(() => file.read(part, 0, part.length, offset));
+              // The file became shorter after it was chosen.
+              if (bytesRead === 0)
+                return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.import.exportChanged")) });
+              yield* post(agentImportV2ChunkPath(uploadId, offset), "application/zip", part.subarray(0, bytesRead));
+              offset += bytesRead;
+            }
+          }),
+        (file) => remoteCall(() => file.close()).pipe(Effect.ignore),
+      );
+      const value = yield* post(AGENT_IMPORT_V2_ROUTES.stage, "application/json", JSON.stringify({ uploadId }));
+      return yield* remoteDecode(() => decodeRemoteAgentImportPreview(value));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   /** Sends an OpenBot transfer file to the host with `instance-transfer-v1` and answers its preview. */
   readonly stageInstanceTransfer = Effect.fn("RemoteManager.stageInstanceTransfer")(
     function* (
@@ -2344,24 +2454,157 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * The bytes of an agent's picture. A picture with a version comes from this computer's copy when
+   * it has one, so it shows while the host is offline.
+   */
   readonly downloadAgentAvatar = Effect.fn("RemoteManager.downloadAgentAvatar")(
     function* (
       this: RemoteServerManager,
       agentId: string,
       serverId = this.#store.activeServerId,
       version?: string,
-    ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
+    ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
-      if (version) url.searchParams.set("v", version);
-      const response = yield* this.#client.fetch(server, url);
-      return {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-        mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-      };
+      const download = Effect.gen({ self: this }, function* () {
+        const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
+        if (version) url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        return {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() || "application/octet-stream",
+        };
+      });
+      return version ? yield* this.#savedPicture(server.id, "agent", agentId, version, download) : yield* download;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /**
+   * A picture from this computer's copy, or from `download`, which then becomes the copy. With no
+   * signed-in account there is no copy: a copy belongs to one account.
+   */
+  readonly #savedPicture = Effect.fn("RemoteManager.savedPicture")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    kind: "agent" | "channel",
+    id: string,
+    version: string,
+    download: Effect.Effect<RemotePicture, RemoteWorkflowError, RemoteRequest>,
+  ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
+    const account = yield* remoteDecode(() => this.#centralAccount.getEmail().trim().toLowerCase()).pipe(
+      Effect.catch(() => Effect.succeed("")),
+    );
+    if (!account) return yield* download;
+    const key = { account, serverId, kind, id, version };
+    const saved = yield* this.#pictures.read(key);
+    if (saved) return saved;
+    const token = this.#pictures.token(serverId);
+    const picture = yield* download;
+    yield* this.#pictures.write(key, picture, token);
+    return picture;
+  });
+
+  /**
+   * Sets or removes the image of a channel of a server with `channel-picture-v1`: `PUT
+   * /v1/channels/image` sends the bytes, and `DELETE` removes them. The host answers the channel.
+   */
+  readonly setChannelImage = Effect.fn("RemoteManager.setChannelImage")(
+    function* (
+      this: RemoteServerManager,
+      channelId: string,
+      image: AvatarImageInput | null,
+      serverId: string,
+    ): Effect.fn.Return<Channel, RemoteWorkflowError, RemoteRequest> {
+      if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const url = this.#channelImageUrl(server.apiUrl, channelId);
+      const method = image ? "PUT" : "DELETE";
+      const headers = new Headers();
+      if (image) headers.set("Content-Type", image.mimeType);
+      const response = yield* this.#client.fetch(server, url, {
+        method,
+        headers,
+        ...(image ? { body: Buffer.from(image.bytes) } : {}),
+      });
+      const path = `${url.pathname}${url.search}`;
+      const json = yield* remoteCall(() => response.json());
+      const value = yield* remoteDecode(() =>
+        teamSideRouteCodec(path)?.response(path, response.status, json, {
+          channelIsolation: true,
+          channelPicture: true,
+          channelBrowser: true,
+        }),
+      );
+      if (!response.ok) {
+        const error = isDynamicRecord(value) && isString(value.error) ? value.error : null;
+        const code = isDynamicRecord(value) && isString(value.code) ? value.code : null;
+        return yield* new RemoteWorkflowError({
+          cause: new RemoteRequestError(
+            response.status,
+            error ?? sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            code,
+          ),
+        });
+      }
+      return addRemotePreviewUrls(yield* remoteDecode(() => decodeChannel(value)), server.id);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * The bytes of a channel image of a server with `channel-picture-v1`, by the version in its URL
+   * (`GET /v1/channels/image`). The bytes are checked as an avatar image before the renderer gets them.
+   */
+  readonly downloadChannelImage = Effect.fn("RemoteManager.downloadChannelImage")(
+    function* (
+      this: RemoteServerManager,
+      channelId: string,
+      serverId: string,
+      version: string,
+    ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
+      if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
+      const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const download = Effect.gen({ self: this }, function* () {
+        const url = this.#channelImageUrl(server.apiUrl, channelId);
+        url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        const picture = {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
+        };
+        if (!isValidAvatarImage(picture.mimeType, picture.bytes))
+          return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
+        return picture;
+      });
+      return yield* this.#savedPicture(server.id, "channel", channelId, version, download);
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  #channelImageUrl(apiUrl: string, channelId: string): URL {
+    const url = new URL(CHANNEL_PICTURE_ROUTES.image, apiUrl);
+    url.searchParams.set("channelId", channelId);
+    return url;
+  }
 
   readonly downloadServerLogo = Effect.fn("RemoteManager.downloadServerLogo")(
     function* (
@@ -2556,12 +2799,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#webrtcTransport?.hasActiveTransfers() ?? false;
   }
 
+  /** Deletes the picture copies of every server. A signed-out app keeps none. */
+  forgetSavedPictures(): Effect.Effect<void> {
+    return this.#pictures.clear();
+  }
+
   readonly disconnectRemoteSessions = Effect.fn("RemoteManager.disconnectRemoteSessions")(
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;
 
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
+      yield* this.#pictures.clear();
       if (!transport) return;
       // First: a session kept for the next run belongs to the account that leaves.
       yield* transport.forgetStoredSessions();
@@ -2620,6 +2869,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
     }
     // Before the store changes, because after it `ensure` answers for the new entry: it branches on
     // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,

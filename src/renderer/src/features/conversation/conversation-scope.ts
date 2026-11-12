@@ -35,6 +35,7 @@ import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
+import { codexLiveAccess } from "../speech/codex-live-access";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
@@ -62,6 +63,7 @@ import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
+import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -90,6 +92,8 @@ const handledSettingsRequests = new WeakSet<AgentSettingsRequest>();
  * mounts again, after a channel or another page, must not scroll back to the message that was picked before.
  */
 const handledMessageFocusRequests = new WeakSet<NonNullable<ConversationProps["messageFocusRequest"]>>();
+/** How many frames a message focus request waits for the virtualized row of its message to be drawn. */
+const MESSAGE_FOCUS_ROW_FRAMES = 4;
 
 /** An http or https page that the built-in browser can show. A relayed sign-in page needs this computer's browser. */
 function builtInBrowserPage(url: string): boolean {
@@ -428,6 +432,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   /** The page that fixes the account behind the shown error (#2419). */
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
+  /** The provider's text behind a general sentence, for the user to copy (#6410). */
+  const currentChatErrorDetails = () => currentChatErrorEntry()?.details ?? null;
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
@@ -520,11 +526,15 @@ export function createConversationViewScope(props: ConversationProps) {
     providerOffline,
   } = activity;
   // A sent message makes room for the working agent's line at once. The chat then moves one time,
-  // with the message, and not again when the line shows.
+  // with the message, and not again when the line shows. The value names the chat, so that a switch
+  // between two chats that both send makes the room again after the activity store resets it.
   createEffect(
-    () => !channel && currentPendingSends().length > 0,
-    (sending) => {
-      if (sending) setAgentActivitySpaceReserved(true);
+    () =>
+      !channel && currentPendingSends().length > 0
+        ? agentConversationKey(props.server?.id ?? "local", props.agent?.id ?? "")
+        : undefined,
+    (sendingChat) => {
+      if (sendingChat) setAgentActivitySpaceReserved(true);
     },
   );
   /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
@@ -577,6 +587,12 @@ export function createConversationViewScope(props: ConversationProps) {
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,
+    browserTeach,
+    canTeachBrowserTask,
+    openBrowserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
   } = browser;
   function showBrowserPanel() {
     setActiveRightPanel("browser");
@@ -865,6 +881,7 @@ export function createConversationViewScope(props: ConversationProps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
@@ -964,6 +981,7 @@ export function createConversationViewScope(props: ConversationProps) {
     draftLocked: threadQueue.draftLocked,
     keepsAttachment: threadQueue.keepsAttachment,
   });
+  const messagePins = createMessagePinsStore({ props });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
   const voice = createVoiceStore({
@@ -1182,6 +1200,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     retryPendingSend,
     editPendingSend,
     dismissPendingSend,
@@ -1705,32 +1724,51 @@ export function createConversationViewScope(props: ConversationProps) {
       agentId: props.agent?.id,
       loaded: props.loaded,
       messageIds: props.messages.map((message) => message.id).join("\u0000"),
+      index: props.messageFocusRequest ? timelineIndexById().get(props.messageFocusRequest.messageId) : undefined,
     }),
-    ({ request, agentId, loaded }) => {
+    ({ request, agentId, loaded, index }) => {
       if (!request || request.agentId !== agentId || !loaded || handledMessageFocusRequests.has(request)) return;
-      requestAnimationFrame(() => {
-        // A message in a group of agent messages has no row of its own, so the group row is the target.
-        const messageId = CSS.escape(request.messageId);
-        const target = scrollElement?.querySelector<HTMLElement>(
-          `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
-        );
-        if (!target) return;
-        handledMessageFocusRequests.add(request);
-        // The message the user picked replaces the opening at the unread divider.
-        unreadOpening = { ...unreadOpening, pending: false, holding: false };
-        stickToLatest = false;
-        // A page that loaded just before the request queued a scroll to the latest message. That scroll
-        // must not move the transcript away from the message the user picked, so it is cancelled and
-        // its other updates run here.
-        if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
-        if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
-        latestScrollFrame = undefined;
-        latestScrollSettleFrame = undefined;
-        updateVirtualScrollMargin();
-        target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-        updateScrollFade();
-        updateUnreadDividerVisibility();
-      });
+      const focus = (frame: number) =>
+        requestAnimationFrame(() => {
+          if (handledMessageFocusRequests.has(request)) return;
+          // A message in a group of agent messages has no row of its own, so the group row is the target.
+          const messageId = CSS.escape(request.messageId);
+          const target = scrollElement?.querySelector<HTMLElement>(
+            `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
+          );
+          if (!target) {
+            // A virtualized chat draws only the rows near the view, as after a tab opens at the latest
+            // message. The row of the message is drawn first, then found in a later frame.
+            if (index === undefined || frame >= MESSAGE_FOCUS_ROW_FRAMES) return;
+            messageVirtualizer.scrollToIndex(index);
+            focus(frame + 1);
+            return;
+          }
+          handledMessageFocusRequests.add(request);
+          // The message the user picked replaces the opening at the unread divider.
+          unreadOpening = { ...unreadOpening, pending: false, holding: false };
+          stickToLatest = false;
+          // A page that loaded just before the request queued a scroll to the latest message. That scroll
+          // must not move the transcript away from the message the user picked, so it is cancelled and
+          // its other updates run here.
+          if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
+          if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
+          latestScrollFrame = undefined;
+          latestScrollSettleFrame = undefined;
+          // A glide to the bottom that started before, as when a tab opens, also stops.
+          stopChatGlides();
+          updateVirtualScrollMargin();
+          target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+          updateScrollFade();
+          updateUnreadDividerVisibility();
+          // The rows above the message measure after this scroll, so the message centres again once.
+          requestAnimationFrame(() => {
+            if (stickToLatest || !target.isConnected) return;
+            target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+            updateScrollFade();
+          });
+        });
+      focus(0);
     },
   );
 
@@ -1863,7 +1901,6 @@ export function createConversationViewScope(props: ConversationProps) {
         if (lastConversationIdentity !== undefined) closeChatSearch(false);
         lastConversationIdentity = conversationIdentity;
         setStickToLatest(true);
-        setAgentActivitySpaceReserved(false);
         holdChatGlides();
       }
       if (loaded !== lastLoaded) {
@@ -2436,10 +2473,15 @@ export function createConversationViewScope(props: ConversationProps) {
     attachmentPicker = element;
   };
   /**
-   * A voice conversation hears and speaks on this computer, so it needs its speech models. A remote
-   * server gets the text only.
+   * A transcribed voice conversation hears and speaks on this computer with its speech models, so a
+   * browser cannot run it, and dictation stays on this computer for the same reason. Codex live voice
+   * runs in the Codex of the host and sends the audio from this page to OpenAI, so a browser has it
+   * when the host serves it, the user turned it on, and the host's Codex has a ChatGPT sign-in.
    */
-  const voiceConversationAvailable = () => !channel && !props.runtime;
+  const voiceConversationAvailable = () =>
+    !channel &&
+    (!props.runtime ||
+      (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
   // A transcribed conversation sends its turns through this view, so it ends with the view.
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
@@ -2470,6 +2512,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
+    messagePins,
     voiceConversationAvailable,
     startVoiceConversation,
     sideQuestionAvailable,
@@ -2530,6 +2573,12 @@ export function createConversationViewScope(props: ConversationProps) {
     closeBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,
+    browserTeach,
+    canTeachBrowserTask,
+    openBrowserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
     closeChatSearch,
     clearNewMessages,
     closeShownSidePanelFile,
@@ -2539,6 +2588,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
@@ -2599,6 +2649,7 @@ export function createConversationViewScope(props: ConversationProps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     moveChatSearch,
@@ -2665,6 +2716,7 @@ export function createConversationViewScope(props: ConversationProps) {
     selectAndConfirmReasoning,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     saveSkillSuggestion,
     quoteRequest,
     quoteSelection,

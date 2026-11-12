@@ -143,6 +143,8 @@ export const messages = {
     "Добавьте эндпоинт, совместимый с OpenAI: сервер моделей на этом компьютере или любой сервис с базовым URL и ключом.",
   "provider.picker.customPending":
     "Модели ваших эндпоинтов ещё не загружены. Провайдер прочитает их, когда завершится текущая задача.",
+  "provider.picker.customUnlisted": "{name} не показывает модели ваших эндпоинтов.",
+  "provider.picker.editEndpoints": "Изменить эндпоинты",
   "provider.picker.defaultModelLabel": "{name}, по умолчанию",
   "provider.picker.usageLimit": "Лимит использования исчерпан",
   "provider.picker.usageLimitWindow": "Лимит ({window})",
@@ -246,11 +248,24 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "У {name} не осталось кредитов сброса использования.",
   "provider.account.resetUsageAlreadyRedeemed": "Этот кредит сброса {name} уже использован.",
   "provider.account.resetUsageFailed": "Не удалось сбросить использование {name}.",
+  "provider.account.pool": "Объединить аккаунты",
+  "provider.account.poolDescription":
+    "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "provider.account.inUse": "Используется",
+  "provider.account.notInPool": "Вне пула",
+  "provider.account.leaveOutOfPool": "Исключить из пула",
+  "provider.account.putBackInPool": "Вернуть в пул",
+  "provider.account.poolChip": "Пул",
+  "provider.account.poolCount": "Пул: {accounts}",
+  "provider.account.poolInUse": "{pool} · используется {name}",
+  "provider.settings.accountsPooledDescription": "{count} из {max}. Агенты используют эти аккаунты вместе.",
   "provider.settings.disconnectTitle": "Отключить {name}?",
   "provider.settings.disconnectOthers": "Другие аккаунты {provider} ждут, пока вы снова не подключите {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.cache": "Кэш",
@@ -263,7 +278,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Агенты загружают ваш CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude. Если выключить, каждый ход отправляет более короткий промпт. Файлы рабочей области загружаются по-прежнему.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Агенты загружают CLAUDE.md, навыки, агентов, хуки и плагины из ~/.claude на сервере. Если выключено, каждый ход отправляет более короткий промпт. Файлы рабочей области по-прежнему загружаются.",
   "provider.settings.claudeUserSetupLoadFailed": "Не удалось загрузить настройку Claude Code.",
+  "provider.settings.context": "Контекст",
+  "provider.settings.compactWindow": "Сжимать чаты при",
+  "provider.settings.compactWindowDescription":
+    "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
+  "provider.settings.compactWindowDefault": "По умолчанию Claude Code",
+  "provider.settings.compactWindowTokens": "{size} токенов",
+  "provider.settings.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",
@@ -284,4 +308,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,4 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { webContents } from "electron";
+import { z } from "zod";
 import type { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
@@ -11,11 +13,27 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
   if (!seedContents) throw new Error("Missing authentication fixture session.");
   const protocol = seedContents.session.protocol;
+  /** While true, the sign-in page of the takeover view case does not load. */
+  let stuckPageFails = false;
+  let mirroredPageLoads = 0;
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
+    if (url.pathname === "/stuck" && stuckPageFails) return Response.error();
     if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
     if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
+    if (url.pathname === "/mirrored") {
+      mirroredPageLoads += 1;
+      // A single-page sign-in as React renders it: the field's value is copied to its value attribute,
+      // and the answer shows in the same document.
+      return new Response(
+        `<!doctype html><body>
+        <label>Password<input id="password" type="password" oninput="this.setAttribute('value', this.value)"></label>
+        <button id="submit" onclick="document.querySelector('#answer').textContent = 'Wrong password'">Sign in</button>
+        <p id="answer"></p></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    }
     const html =
       url.pathname === "/complete"
         ? "<h1>Signed in</h1>"
@@ -286,6 +304,135 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       } finally {
         await runCauseEffect(browser.close(wrongTab.id));
       }
+    }
+    // A sign-in that answers in the same document keeps its answer: OpenBot empties the field and its
+    // value attribute, and does not load the page again (#7564).
+    const mirroredTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/mirrored", "secret-thread", "secret-agent"),
+    );
+    try {
+      const mirroredContents = webContents.getAllWebContents().find((item) => item.getURL() === mirroredTab.url);
+      if (!mirroredContents) throw new Error("Missing mirrored value fixture.");
+      await waitForPresentedFrame(mirroredContents);
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "mirrored-value",
+          arguments: {
+            tabId: mirroredTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#submit" },
+          },
+        }),
+      );
+      const secret = "fixture-password-385617";
+      const submission = await runCauseEffect(handoff.submit(secret, false));
+      const page = z
+        .object({ answer: z.string(), value: z.string(), attribute: z.string().nullable() })
+        .parse(
+          await mirroredContents.executeJavaScript(
+            "({ answer: document.querySelector('#answer').textContent, value: document.querySelector('#password').value, attribute: document.querySelector('#password').getAttribute('value') })",
+            true,
+          ),
+        );
+      const snapshot = JSON.stringify(await runCauseEffect(browser.snapshot(mirroredTab.id)));
+      const report = {
+        status:
+          submission === "submitted" &&
+          mirroredPageLoads === 1 &&
+          page.answer === "Wrong password" &&
+          page.value === "" &&
+          !page.attribute &&
+          !snapshot.includes(secret)
+            ? "passed"
+            : "issues_found",
+        submission,
+        pageLoads: mirroredPageLoads,
+        answerKept: page.answer === "Wrong password",
+        fieldEmpty: page.value === "" && !page.attribute,
+        snapshotHasValue: snapshot.includes(secret),
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-mirrored-value.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`A same-document sign-in lost its answer: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(mirroredTab.id));
+    }
+    // A submission that leaves the value in the page, and a reload that fails, keep the tab protected.
+    // The live view of its takeover loads the page again, so a person on another computer can sign in
+    // by hand and never sees the value.
+    const stuckTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/stuck", "secret-thread", "secret-agent"),
+    );
+    try {
+      const stuckContents = webContents.getAllWebContents().find((item) => item.getURL() === stuckTab.url);
+      if (!stuckContents) throw new Error("Missing takeover view fixture.");
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "takeover-view",
+          arguments: {
+            tabId: stuckTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      const secret = "fixture-password-640271";
+      stuckPageFails = true;
+      const submission = await runCauseEffect(handoff.submit(secret, false)).catch(() => "failed" as const);
+      stuckPageFails = false;
+      const refused = await runCauseEffect(browser.startView(stuckTab.id, () => {})).then(
+        async (stop) => {
+          await runCauseEffect(stop());
+          return false;
+        },
+        () => true,
+      );
+      await runCauseEffect(browser.beginTakeover(stuckTab.id));
+      let frames = 0;
+      const stopView = await runCauseEffect(
+        browser.startView(stuckTab.id, () => {
+          frames += 1;
+        }),
+      );
+      try {
+        const deadline = Date.now() + 10_000;
+        while (frames === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+      } finally {
+        await runCauseEffect(stopView());
+      }
+      const page = await stuckContents.executeJavaScript(
+        "JSON.stringify([document.title, document.querySelector('#password')?.value ?? null, document.body.innerText])",
+        true,
+      );
+      browser.endTakeover(stuckTab.id);
+      const report = {
+        status:
+          submission !== "submitted" && refused && frames > 0 && !page.includes(secret) ? "passed" : "issues_found",
+        submission,
+        viewRefusedBeforeTakeover: refused,
+        takeoverViewFrames: frames > 0,
+        secretInPage: page.includes(secret),
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-takeover-view.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`The takeover view of a protected tab is wrong: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(stuckTab.id));
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

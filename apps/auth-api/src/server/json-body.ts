@@ -13,8 +13,11 @@ export class JsonBodyError extends Error {
   }
 }
 
-export const readJsonObject = Effect.fn("JsonBody.readJsonObject")(function* (request: Request) {
-  const bytes = yield* readRequestBytes(request, JSON_BODY_LIMIT);
+export const readJsonObject = Effect.fn("JsonBody.readJsonObject")(function* (
+  request: Request,
+  limit: number = JSON_BODY_LIMIT,
+) {
+  const bytes = yield* readRequestBytes(request, limit);
   const value = yield* Effect.try({ try: () => JSON.parse(new TextDecoder().decode(bytes)), catch: invalidJson });
   if (!isDynamicRecord(value)) return yield* Effect.fail(invalidJson());
   return value;
