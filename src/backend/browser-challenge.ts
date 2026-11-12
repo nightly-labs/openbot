@@ -125,7 +125,8 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   if (short && frame(/_Incapsula_Resource/)) return found("imperva", "interactive", "incapsula-frame");
   if (/^access denied/i.test(title) && /reference #\s*\d+\.[0-9a-f]+/i.test(text))
     return found("akamai", "block", "akamai-reference");
-  if (has("#sec-if-cpt-container, #sec-cpt-if") || (short && has("#sec-container")))
+  // Akamai can leave its check elements, hidden, on the normal page after the check passed.
+  if (short && has("#sec-if-cpt-container, #sec-cpt-if, #sec-container"))
     return found("akamai", "non-interactive", "akamai-sec-cpt");
   // Sites that use the AWS WAF integration SDK load its scripts on each page. Only the interstitial
   // counts: the script in the head and its container as a direct child of the body.
