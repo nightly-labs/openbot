@@ -323,7 +323,7 @@ export type TeamApiMachine = Pick<
 >;
 /**
  * `background-processes-v1`: the programs that the host's agents left running. The routes are
- * admin-only. The list redacts each command line, as Settings > Agents on this computer does.
+ * admin-only. The list redacts each command line, as Server Settings > Storage on this computer does.
  */
 export interface TeamApiBackgroundProcesses {
   list(): ReturnType<typeof listBackgroundProcesses>;

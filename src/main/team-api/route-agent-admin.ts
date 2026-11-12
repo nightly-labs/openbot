@@ -346,7 +346,7 @@ export async function routeAgentSpeed(
 }
 
 /**
- * Settings › Agents of this computer, changed from a joined server: the agent defaults, the default
+ * Server Settings › Agents of this computer, changed from a joined server: the agent defaults, the default
  * for a message sent to a busy agent, and which agents follow them. They decide what the agents may
  * do on this computer, so only an owner or admin can read or change them. A hidden agent is not
  * listed and cannot be named. Frozen by `agent-defaults-v1`.

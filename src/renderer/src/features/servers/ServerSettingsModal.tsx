@@ -291,8 +291,8 @@ export interface ServerSettingsModalProps {
    */
   serverAudit?: ServerAuditOptions | undefined;
   /**
-   * The Agents section appears only when a caller supplies this, and only for a remote host with
-   * `agent-defaults-v1` that this member administers. This computer uses Settings > Agents.
+   * The Agents section appears only when a caller supplies this: for this computer, and for an online
+   * remote host with `agent-defaults-v1` that this member administers.
    */
   agentDefaults?: ServerAgentDefaultsOptions | undefined;
   /**

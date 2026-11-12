@@ -7,7 +7,6 @@ import {
   type OpenBotDesktopApi,
   type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { Alert, AlertContent, AlertDescription } from "@openbot/ui";
 import type { RoleAgent } from "@openbot/ui/features/servers/ServerRoles";
 import {
@@ -19,7 +18,7 @@ import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { serverCanAdminister } from "./server-capabilities";
+import { serverHasAgentDefaults } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 /** The agent default calls of one server's host. The desktop reaches them through main. */
@@ -85,7 +84,7 @@ export function createServerAgentsSection(
   visible: () => boolean,
 ): ServerAgentsSection {
   const { t } = useText();
-  const { props, local, actionsAvailable } = host;
+  const { props, local } = host;
   const calls = (): HostAgentDefaultsCalls => props.agentDefaults?.calls ?? window.openbot.agent;
   const [state, setState] = createStore<AgentsState>({
     overview: null,
@@ -102,8 +101,7 @@ export function createServerAgentsSection(
   /** A change failed while another was in flight: read again when the last one ends. */
   let reloadAfterWrites = false;
 
-  const available = () =>
-    Boolean(props.agentDefaults) && actionsAvailable() && serverCanAdminister(props.server, AGENT_DEFAULTS_CAPABILITY);
+  const available = () => Boolean(props.agentDefaults) && serverHasAgentDefaults(props.server);
 
   function load(serverId: string): void {
     const options = props.agentDefaults;

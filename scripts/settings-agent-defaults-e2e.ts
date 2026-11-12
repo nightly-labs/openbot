@@ -154,6 +154,9 @@ async function chooseOtherOption(trigger: ReturnType<Page["getByRole"]>): Promis
 }
 
 mkdirSync(OUT, { recursive: true });
+// The script reads and restores the defaults of this computer, so the settings it opens must be this computer's.
+const activeServer = (await page.evaluate(() => window.openbot.servers.list())).find((server) => server.active);
+assert.equal(activeServer?.kind, "local", "Select this computer in the server list, then run the script again.");
 const originalDefaults = await savedDefaults();
 const originalSteer = await savedOn("busyMessageMode");
 const steps: Array<{ setting: string; action: string; responseMs: number }> = [];

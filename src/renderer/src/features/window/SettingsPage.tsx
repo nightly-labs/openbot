@@ -4,6 +4,7 @@ import { createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { useAuth } from "../account/account-context";
+import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage-usage";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import {
   activeServerHasProviderSettings,
@@ -130,7 +131,9 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       ...(activeServerHasProviderSettings(server) ? [PROVIDERS_ROW] : []),
       ...(serverSupportsCapability(server, "agent-import-v1") ? [IMPORT_ROW] : []),
       ...(serverHasAgentDefaults(server) ? AGENTS_ROWS : []),
-      ...(server.kind === "local" || serverSupportsCapability(server, "background-processes-v1")
+      ...(serverHasBackgroundProcesses(server) &&
+      canManageStorage(server) &&
+      (server.kind === "local" || server.state === "online")
         ? [BACKGROUND_PROCESSES_ROW]
         : []),
     ];
