@@ -4,7 +4,8 @@ import { ConfirmDialog } from "@openbot/ui";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
 import { useText } from "@openbot/ui/text";
-import { createEffect, Show } from "solid-js";
+import { createEffect, onCleanup, Show } from "solid-js";
+import { useLayout } from "../../layout";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { agentFolderCalls } from "./agent-folders-port";
 import { ConversationComposer } from "./ConversationComposer";
@@ -46,6 +47,14 @@ export function ConversationView(props: ConversationProps) {
     cancelFastModeConfirmation,
   } = scope;
   const { t } = useText();
+  const layout = useLayout();
+  // The open right panel takes its width from the chat. The sidebar gives way before the chat header
+  // is squeezed, and the room comes back when the panel closes or the view leaves.
+  createEffect(
+    () => (sidePanelOpen() ? (settingsOpen() ? settingsPanelWidth() : browserPanelWidth()) : 0),
+    (width) => layout.setRightPanelWidth(width),
+  );
+  onCleanup(() => layout.setRightPanelWidth(0));
   /** Each view of the side panel has the width of the browser panel, except Agent settings, which has its own. */
   const sidePanelUsesBrowserWidth = () => {
     const mode = activeRightPanel();

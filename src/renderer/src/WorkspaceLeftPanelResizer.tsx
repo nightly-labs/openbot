@@ -7,7 +7,6 @@ import {
   LEFT_PANEL_COMPACT,
   LEFT_PANEL_DEFAULT,
   LEFT_PANEL_EXPAND_THRESHOLD,
-  LEFT_PANEL_MAX,
   LEFT_PANEL_MIN,
   LEFT_PANEL_STORAGE_KEY,
 } from "./layout-constants";
@@ -28,10 +27,10 @@ export function WorkspaceLeftPanelResizer() {
       label={t("app.leftPanel.resize")}
       controls="agent-sidebar"
       direction="left"
-      value={layout.leftPanelWidth()}
+      value={layout.leftPanelShownWidth()}
       defaultValue={LEFT_PANEL_DEFAULT}
       min={LEFT_PANEL_MIN}
-      max={LEFT_PANEL_MAX}
+      max={layout.leftPanelMaxWidth()}
       onResize={layout.setLeftPanelWidth}
       onResizeEnd={(value) => savePanelWidth(LEFT_PANEL_STORAGE_KEY, value)}
       snap={{

@@ -63,8 +63,9 @@
 .provider-model-trigger {
   display: flex;
   width: max-content;
-  /* Room for the effort after the model name. The model name shortens first. */
-  max-width: 240px;
+  /* Room for the effort after the model name. The model name shortens first. The trigger never
+     grows past its picker, which shrinks when the header is narrow. */
+  max-width: min(240px, 100%);
   height: 28px;
   align-items: center;
   gap: 6px;
@@ -180,7 +181,7 @@
    keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
    still wins. */
 .provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
-  max-width: 296px;
+  max-width: min(296px, 100%);
 }
 
 .provider-model-trigger-fast svg {
