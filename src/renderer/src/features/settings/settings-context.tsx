@@ -550,11 +550,12 @@ const Settings = createSimpleContext({
           ...islandSettings(preference),
         }));
       });
-      // An owner or admin can change the agent defaults of this computer from a phone or the web client.
-      // The host then sends `agents-changed`. Main answers in the order of the calls, so a read that
-      // starts before a change of this window does not come after the answer of that change.
+      // Server Settings > Agents of this computer, a phone or the web client change the agent defaults of
+      // this computer. The host then sends `agents-changed`, and new chats here read the defaults from
+      // these settings. Main answers in the order of the calls, so a read that starts before a change
+      // does not come after the answer of that change.
       const unsubscribeAgentDefaults = settingsPort().agent.onScopedEvent(({ serverId, event }) => {
-        if (serverId !== LOCAL_SERVER_ID || event.type !== "agents-changed" || !appSettingsOpen()) return;
+        if (serverId !== LOCAL_SERVER_ID || event.type !== "agents-changed") return;
         void settingsPort()
           .getAgentDefaults()
           .then((defaults) => {

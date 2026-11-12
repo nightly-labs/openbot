@@ -77,8 +77,8 @@ function showSaveFailure(error: unknown): void {
 }
 
 /**
- * Server Settings > Agents (`agent-defaults-v1`): the agent defaults of a joined server, and each
- * agent's own value. An owner or admin changes them. This computer uses Settings > Agents.
+ * Server Settings > Agents: the agent defaults of this computer or of a joined server
+ * (`agent-defaults-v1`), and each agent's own value. An owner or admin of a joined server changes them.
  */
 export function createServerAgentsSection(
   host: ServerSettingsSectionHost,
@@ -103,10 +103,7 @@ export function createServerAgentsSection(
   let reloadAfterWrites = false;
 
   const available = () =>
-    Boolean(props.agentDefaults) &&
-    !local() &&
-    actionsAvailable() &&
-    serverCanAdminister(props.server, AGENT_DEFAULTS_CAPABILITY);
+    Boolean(props.agentDefaults) && actionsAvailable() && serverCanAdminister(props.server, AGENT_DEFAULTS_CAPABILITY);
 
   function load(serverId: string): void {
     const options = props.agentDefaults;
@@ -231,6 +228,9 @@ export function createServerAgentsSection(
     );
   }
 
+  /** Where the agents run, for the text of the local script limit. */
+  const scope = () => (local() ? "computer" : "server");
+
   function Panel() {
     return (
       <Show
@@ -247,7 +247,7 @@ export function createServerAgentsSection(
       >
         {(overview) => (
           <SettingsAgentsTab
-            scope="server"
+            scope={scope()}
             agents={agents()}
             loadFailed={state.loadFailed}
             defaults={overview().defaults}

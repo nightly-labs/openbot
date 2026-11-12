@@ -248,7 +248,7 @@ export function ServerSettingsOverlay(
                 ...props.storage,
                 canManage: canManageStorage(props.server),
                 backgroundProcesses:
-                  props.server.kind === "remote" &&
+                  props.server.kind === "local" ||
                   serverSupportsCapability(props.server, BACKGROUND_PROCESSES_CAPABILITY),
               }
             : undefined

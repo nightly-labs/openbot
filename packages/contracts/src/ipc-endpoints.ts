@@ -2134,7 +2134,7 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
-    // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
+    // Server Settings › Agents: the agent defaults of this computer. `agent-defaults-v1` on a joined server.
     getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
     updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
       "agent:admin:update-agent-defaults",
