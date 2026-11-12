@@ -288,9 +288,14 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
   // The plus button opens the plans and the account's hosted servers when the account can have
   // hosted servers and the feature flag of this build is on. A development build can override both.
+  // With the flag off, an account that has hosted servers still opens the sheet to manage them; it
+  // then shows no plans.
   const accountHasPlans = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  const ownsHostedServers = useHostedServerAvailability(
+    (state) => state.userId === session.user.id && state.ownsServers,
+  );
   const cloudServersOn = useMobileFeature(session.apiUrl, "cloudServers");
-  const showsPlans = devFeatureOverride("cloudServers") ?? (accountHasPlans && cloudServersOn);
+  const showsPlans = (devFeatureOverride("cloudServers") ?? (accountHasPlans && cloudServersOn)) || ownsHostedServers;
   useEffect(() => {
     if (!open) return;
     void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
