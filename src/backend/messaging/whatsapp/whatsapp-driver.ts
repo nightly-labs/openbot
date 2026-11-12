@@ -191,6 +191,13 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   });
 
+  /** Deletes a status post for everyone, so a quiet answer leaves no "finished" text in the chat. */
+  readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {
+    yield* this.#session().send(target.platformChannelId, { delete: this.#ownKey(target, messageId) });
+    this.#handle.chats.forgetMenu(messageId);
+    this.#sentAt.delete(messageId);
+  });
+
   /** WhatsApp has no message that only one person sees, so the text is a reply in the chat. */
   postPrivate(target: MessageTarget, _userId: string, text: string): Effect.Effect<void, MessagingAdapterError> {
     return this.post(target, { text }).pipe(Effect.asVoid);
