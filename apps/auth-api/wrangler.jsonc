@@ -20,7 +20,7 @@
   // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
   // stops 15 to 20 minutes after its last use.
   "triggers": {
-    // The second cron runs only the Signal entry check (`signal-entry-failover.ts`), each minute.
+    // The second cron runs only the Signal entry check (`signal-entry-failover.ts`) and the pool snapshot, each minute.
     "crons": ["*/5 * * * *", "*/1 * * * *"]
   },
   "routes": [

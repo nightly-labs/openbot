@@ -288,7 +288,8 @@ and only a loopback `http:` origin is accepted.
     `scripts/openpanel-sql.ts`.
 13. Ops, "Server pool": `hosted_pool_snapshot` (`account_api` generation 16 and later). The last
     value of `free`, `free_in_7d` and `free_in_30d` for `location = all`, the same counts by
-    `location` and `product`, and `free` by `location` per hour.
+    `location` and `product`, and `free` by `location` per minute. The Worker sends one snapshot each
+    minute, so each report uses the minute interval: a longer interval adds up more than one snapshot.
 
 Every dashboard must filter by the intended `surface` and that surface's current
 `event_schema_version`. Website bounce
