@@ -97,7 +97,11 @@ async function runCase(
     afterComposition,
     pickerStayedOpen,
     passed:
-      afterFirstKey === prefix && duringComposition === expected && afterComposition === expected && pickerStayedOpen,
+      firstKeyPrevented &&
+      afterFirstKey === prefix &&
+      duringComposition === expected &&
+      afterComposition === expected &&
+      pickerStayedOpen,
   };
 }
 
