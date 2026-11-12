@@ -1,6 +1,7 @@
 import {
   type CodexLiveVoice,
   type DictationKeyProvider,
+  type EdgeTtsVoice,
   ELEVENLABS_VOICE_MODEL_ID,
   type ElevenLabsSpeechVoice,
   isSpeechLanguage,
@@ -376,6 +377,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
     removeDictationApiKey: (provider: DictationKeyProvider) => setDictationApiKey(provider, null),
     setElevenLabsVoice: (elevenLabsVoice: ElevenLabsSpeechVoice) => void saveSpeech({ elevenLabsVoice }),
     setXaiVoice: (xaiVoice: XaiSpeechVoice) => void saveSpeech({ xaiVoice }),
+    setEdgeTtsVoice: (edgeTtsVoice: EdgeTtsVoice) => void saveSpeech({ edgeTtsVoice }),
     setReadReplies,
     setCodexLive,
     setCodexLiveVoice,
