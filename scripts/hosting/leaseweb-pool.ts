@@ -374,8 +374,17 @@ class Pool {
     if (!VPS_ID_PATTERN.test(id)) throw new Error(`Not a VPS ID: ${id}`);
     const known = this.#found.get(id);
     const accounts = known ? this.#keys.filter(({ key }) => key === known.key) : this.#keys;
+    const slow: string[] = [];
     for (const account of accounts) {
-      const response = await this.#leaseweb(account.key, `/${id}`);
+      let response: Response;
+      try {
+        response = await this.#leaseweb(account.key, `/${id}`, {}, 60_000);
+      } catch (error) {
+        // The API of one account can be slow (2026-11-12): the VPS can be on another account.
+        if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
+        slow.push(account.name);
+        continue;
+      }
       // A key that Leaseweb refuses (401) must not stop the work on the machines of the other accounts.
       if (response.status === 401 || response.status === 403 || response.status === 404) continue;
       if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for VPS ${id} (${account.name}).`);
@@ -383,6 +392,7 @@ class Pool {
       this.#found.set(id, machine);
       return machine;
     }
+    if (slow.length > 0) throw new Error(`Leaseweb did not answer for ${slow.join(", ")}. Run the command again.`);
     throw new Error(`No Leaseweb key in the environment has VPS ${id}.`);
   }
 
@@ -1022,7 +1032,8 @@ hostnamectl set-hostname ${hostname}
 ${
   install
     ? `${writeFileCommand(`${MACHINE_HOSTING}/install-server.sh`, readFileSync(join(ROOT, "scripts/install-server.sh"), "utf8"))}
-{ printf 'OPENBOT_CLAIM=%s\\n' '${claim}'; cat ${MACHINE_HOSTING}/install-server.sh; } | bash -s -- --name '${options.name}'${authApi}`
+{ printf 'OPENBOT_CLAIM=%s\\n' '${claim}'; cat ${MACHINE_HOSTING}/install-server.sh; } | bash -s -- --name '${options.name}'${authApi} 2>&1 |
+  sed -u 's/[^[:space:]]*@[^[:space:]]*/<email>/g'`
     : ""
 }
 bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
@@ -1034,6 +1045,8 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     );
     this.#remote(machine, "bash -s", { input: script, password });
 
+    // `openbot login` and `openbot status` show the email, so the install output goes through sed, and
+    // pipefail keeps the exit code of the install.
     // A new bootstrap writes GRUB again, and a new hostname needs a new start of OpenBot.
     const restart = install || !before.bootstrapped || before.hostname !== hostname;
     logger.info(`VPS ${id}: check the bootstrap${restart ? " and restart the machine" : ""}.`);
