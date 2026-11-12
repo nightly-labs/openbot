@@ -137,18 +137,17 @@ export interface BrowserDockGlass {
 }
 
 /**
- * The dock is at the bottom corner on `side` of the page: the box, or the tab when the user hid the box.
- * `width` is the space that it needs from that side, in CSS pixels.
+ * The dock is at the bottom centre of the page: the box, or the tab when the user hid the box. `width` is
+ * the space that it needs, centred on the page, in CSS pixels.
  */
 export interface BrowserDockAnchor {
-  side: "left" | "right";
   width: number;
 }
 
 /**
  * The space that the dock needs at the bottom of the page, in CSS pixels, and its glass shapes. `seq`
  * increases with each frame, so main ignores a frame that arrives late. Without `anchor`, the overlay is
- * at the bottom right of the page with its first width.
+ * at the bottom centre of the page with its first width.
  */
 export interface BrowserDockFrame {
   seq: number;
@@ -224,7 +223,7 @@ export function isBrowserDockFrame(value: unknown): value is BrowserDockFrame {
 }
 
 function isAnchor(value: unknown): value is BrowserDockAnchor {
-  return isDynamicRecord(value) && (value.side === "left" || value.side === "right") && isSize(value.width);
+  return isDynamicRecord(value) && isSize(value.width);
 }
 
 function isGlass(value: unknown): value is BrowserDockGlass {

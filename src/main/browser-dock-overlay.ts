@@ -51,8 +51,8 @@ export interface BrowserDockLayout {
 }
 
 /**
- * Where the overlay and its glass go over `page`. The overlay is at the bottom centre of the page, or at
- * the bottom corner on the side of the dock, and no part of it or of a glass shape is outside the page.
+ * Where the overlay and its glass go over `page`. The overlay is at the bottom centre of the page, with the
+ * width of the dock, and no part of it or of a glass shape is outside the page.
  */
 export function browserDockLayout(
   page: BrowserMainPage,
@@ -64,17 +64,16 @@ export function browserDockLayout(
   const wanted = Math.round((anchor?.width ?? BROWSER_DOCK_OVERLAY_WIDTH) * zoom);
   const width = Math.min(wanted, page.bounds.width);
   const overlayHeight = Math.min(Math.round(height * zoom), page.bounds.height);
-  const space = page.bounds.width - width;
   const overlay = {
-    x: page.bounds.x + (anchor?.side === "left" ? 0 : space),
+    x: page.bounds.x + Math.round((page.bounds.width - width) / 2),
     y: page.bounds.y + page.bounds.height - overlayHeight,
     width,
     height: overlayHeight,
   };
   const bottom = overlay.y + overlay.height;
-  // The glass is measured in an overlay of the width that the frame asks for. A dock at the right edge keeps
-  // its distance from that edge when the page is narrower than that width.
-  const origin = anchor?.side === "left" ? overlay.x : overlay.x + overlay.width - wanted;
+  // The glass is measured in an overlay of the width that the frame asks for, centred on the page. The dock
+  // stays at the centre when the page is narrower than that width.
+  const origin = overlay.x + (overlay.width - wanted) / 2;
   const shapes: BrowserDockLayout["glass"] = [];
   for (const shape of glass) {
     const left = Math.max(overlay.x, Math.round(origin + shape.left * zoom));
@@ -111,7 +110,7 @@ export class BrowserDockOverlay {
   /** The height that the overlay has, in CSS pixels, and the glass of its last frame. */
   #height = INITIAL_HEIGHT;
   #glass: BrowserDockGlass[] = [];
-  /** The corner and the width of the dock. They change at once, so the page gets its clicks back. */
+  /** The width of the dock. It changes at once, so the page gets its clicks back. */
   #anchor: BrowserDockAnchor | null = null;
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
