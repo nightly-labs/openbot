@@ -614,6 +614,29 @@ try {
     !notInRequest.success && notInRequest.text.includes("request_api_key") && vaultKey("CHANNEL_TOKEN") === pastedKey,
     notInRequest.text,
   );
+  // Another member's words could pick a word or a part of a key from the request: only a whole token
+  // of 8 or more characters counts. The escaped key is only the start of the token in the notes.
+  const partOfToken = await fromChannel(
+    "save a part of a token in the request",
+    "save_api_key",
+    {},
+    PERSON,
+    '{"__tool":"save_api_key","name":"CHANNEL_TOKEN","key":"e2e-chann\\u0065l-key","notes":"from e2e-channel-key-6369-zz"}',
+  );
+  const shortKey = await fromChannel(
+    "save a short word of the request",
+    "save_api_key",
+    { name: "CHANNEL_TOKEN", key: "short" },
+    PERSON,
+  );
+  pass(
+    "A part of a token or a short word of the user's channel request is refused",
+    !partOfToken.success &&
+      !shortKey.success &&
+      shortKey.text.includes("request_api_key") &&
+      vaultKey("CHANNEL_TOKEN") === pastedKey,
+    `${partOfToken.text}\n${shortKey.text}`,
+  );
   const memberKey = await fromChannel(
     "save a key from a team member's channel request",
     "save_api_key",
