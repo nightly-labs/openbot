@@ -885,7 +885,32 @@ The Worker makes no Leaseweb server: boat is the provider of each new hosted ser
 runs all the time, so it has no stop and no resume. An operator can move one hosted server at a time
 from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the record and the steps.
 For a server that never was on boat, the VPS is a [self-hosted server](self-hosted-server.md) that
-an operator sets up for the customer:
+an operator sets up for the customer. The customer is the owner: the server signs in with a
+[server claim](self-hosted-server.md#sign-in-with-a-server-claim) for the customer's email, never
+with the account of an operator. One command does all the steps below:
+
+```sh
+ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
+bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
+  bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+    --name=<server name> --keys=operator-keys --apply
+```
+
+- With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
+  the hosted pool.
+- It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
+  highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
+- It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
+  operator keys sign in, so `--keys` must have a key of this computer.
+- It makes the claim just before the install, because a claim works for 15 minutes.
+- At the end it runs `leaseweb-bootstrap-e2e.ts`, which restarts the server, and then checks that
+  OpenBot is online and that D1 shows the owner as the active owner of the server.
+- A run that stops can run again with the same arguments: it continues with the same reference,
+  does not install again when the owner is signed in, and stops when another account is signed in.
+- Its output has no email and no key. The report of the checks is in
+  `.openbot-build/leaseweb-bootstrap/`.
+
+The steps of the command:
 
 1. Order a VPS with Ubuntu 24.04 or 26.04. The order takes no SSH key and no user data. The root password
    comes from `GET /publicCloud/v1/vps/{id}/credentials`.
@@ -944,7 +969,7 @@ Leaseweb accounts use one scheme:
 | None (no reference, or an empty one) | Not used. **Only a VPS with no reference can be taken for a new use.** | |
 | `pool-free` | In the hosted pool, with no server. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use it. | `pool-free` |
 | `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. | `jane@example.com 1a2b3c4d` |
-| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number on all accounts; a number is never used again. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
+| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
 
