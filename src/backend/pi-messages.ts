@@ -66,9 +66,9 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   return items;
 }
 
-const CODE_SPANS = /```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`/gu;
-const TOOL_CALL_MARKUP =
-  /<tool_call>\s*(?:<function=|\{\s*"name"\s*:)[\s\S]*?<\/tool_call>|<function=[^\s>]+>[\s\S]*?<\/function>/u;
+// Fenced code (also when not closed), inline code, and indented code lines.
+const CODE_SPANS = /```[\s\S]*?(?:```|(?![\s\S]))|~~~[\s\S]*?(?:~~~|(?![\s\S]))|`[^`\n]*`|^(?: {4}|\t).*$/gmu;
+const TOOL_CALL_MARKUP = /<tool_call>\s*(?:<function=|\{)[\s\S]*?<\/tool_call>|<function=[^\s>]+>[\s\S]*?<\/function>/u;
 
 /**
  * True when an assistant message ends the run with a complete tool call written as text, such as
