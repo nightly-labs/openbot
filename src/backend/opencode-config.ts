@@ -177,9 +177,10 @@ function anthropicBaseUrl(baseUrl: string): string | null {
  * the key as a bearer token, so the OpenAI adapter works unchanged. `@ai-sdk/azure` is no fix: it
  * builds `/deployments/<model>/responses`, which a v1 resource answers with 404.
  *
- * Only with a key: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the environment
- * that OpenCode inherits, and would send the user's OpenAI key to Azure. A keyless endpoint, such as
- * one with an Entra ID `Authorization` header, keeps the OpenAI-compatible adapter.
+ * Only with a key, on both hosts: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the
+ * environment that OpenCode inherits, and would send a key that the user did not give this endpoint,
+ * to Azure or to OpenAI. A keyless endpoint, such as one with an Entra ID or a gateway
+ * `Authorization` header, keeps the OpenAI-compatible adapter.
  */
 function usesResponsesApi(provider: CustomProviderConfig): boolean {
   const url = URL.parse(provider.baseUrl);

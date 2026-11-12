@@ -1,6 +1,6 @@
 // Checks that a custom provider on an Azure OpenAI or Foundry v1 endpoint (#3460), or on OpenAI's own
 // v1 API (#7476), calls the Responses API. Builds the OpenCode config layer with `openCodeConfigEnv` for each endpoint, then runs the
-// real OpenCode CLI with that layer against a fake Azure server on loopback (only the base URL
+// real OpenCode CLI with that layer against a fake server on loopback (only the base URL
 // changes), and reads the requests that OpenCode sends. `--standalone` (OpenCode 2) keeps each run
 // off the shared background service. Cases: Azure OpenAI and Foundry hosts, which must use the OpenAI
 // adapter and reach `/openai/v1/responses` with the endpoint key and `store: false`, and the OpenAI host,
