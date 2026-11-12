@@ -137,7 +137,11 @@ const Layout = createSimpleContext({
     });
     // The width the open right panel takes beside the chat, or 0 when it is closed. The conversation sets it.
     const [rightPanelWidth, setRightPanelWidthSignal] = createSignal(0);
+    // The user asked for the sidebar while there is no room. It opens at the smallest width until the
+    // right panel changes, so the toggle always works (for example, to switch servers).
+    const [leftPanelForcedOpen, setLeftPanelForcedOpen] = createSignal(false);
     function setRightPanelWidth(width: number): void {
+      setLeftPanelForcedOpen(false);
       setRightPanelWidthSignal(width);
     }
     const [windowWidth, setWindowWidth] = createSignal(window.innerWidth);
@@ -148,8 +152,8 @@ const Layout = createSimpleContext({
     const leftPanelShownWidth = createMemo(() => Math.max(LEFT_PANEL_MIN, Math.min(leftPanelWidth(), sidebarRoom())));
     /** The widest the user can drag the sidebar now. It shrinks when the right panel opens. */
     const leftPanelMaxWidth = createMemo(() => Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, sidebarRoom())));
-    /** Even the smallest sidebar does not fit beside the chat, so the sidebar is compact. */
-    const leftPanelAutoCompact = createMemo(() => sidebarRoom() < LEFT_PANEL_MIN);
+    /** Even the smallest sidebar does not fit beside the chat, so the sidebar is compact unless the user opened it. */
+    const leftPanelAutoCompact = createMemo(() => sidebarRoom() < LEFT_PANEL_MIN && !leftPanelForcedOpen());
     // A closed sidebar shows no agent list. A window with no page rail has no room to close it, so
     // there the styles show it compact; that is why closed is also compact.
     const [sidebarClosed, setSidebarClosedSignal] = createSignal(
@@ -230,6 +234,7 @@ const Layout = createSimpleContext({
     function expandSidebar(): void {
       setSidebarClosed(false);
       setSidebarCollapsed(false);
+      setLeftPanelForcedOpen(true);
     }
 
     return {
