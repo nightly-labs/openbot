@@ -102,8 +102,8 @@ export function ShareScreen() {
     return () => {
       mounted.current = false;
       stopTaking();
-      // A sent message keeps its files in the outbox, so the copies of the share can go in all cases.
-      if (received.current) discardIncomingShare(received.current);
+      // A send in progress still reads the copies. It deletes them when the read ends.
+      if (received.current && !sendingRef.current) discardIncomingShare(received.current);
       // The chat took the place of the sheet. A share that came during the send gets a new sheet.
       if (nextShareWaits.current) openShareSheet();
     };
@@ -156,7 +156,10 @@ export function ShareScreen() {
     });
     attachments.clear();
     // The user closed the sheet during the read: nothing is sent.
-    if (!mounted.current) return;
+    if (!mounted.current) {
+      discardIncomingShare(share);
+      return;
+    }
     if (refused) {
       sendingRef.current = false;
       setSending(false);
@@ -170,6 +173,8 @@ export function ShareScreen() {
     const text = [message.trim(), sharedText.trim()].filter(Boolean).join("\n\n");
     // The outbox keeps the message on this phone and sends it while the server is online.
     outbox.add({ kind: "agent", ...target }, { text, replyToMessageId: null, files: items });
+    // The outbox keeps the files, so the copies of the share can go.
+    discardIncomingShare(share);
     if (apiUrl && userId) void saveLastShareTarget(apiUrl, userId, target);
     // The chat takes the place of the sheet, over the chat list, and shows the message as it goes.
     sheetStack.dispatch(StackActions.replace(CHAT_ROUTE, { agentId: target.agentId }));
