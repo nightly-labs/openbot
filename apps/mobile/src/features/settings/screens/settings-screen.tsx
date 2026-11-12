@@ -1,3 +1,4 @@
+import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import Bell from "lucide-react-native/icons/bell";
@@ -11,16 +12,33 @@ import Palette from "lucide-react-native/icons/palette";
 import Shield from "lucide-react-native/icons/shield";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import WandSparkles from "lucide-react-native/icons/wand-sparkles";
+import { useState } from "react";
+import { useUniwind } from "uniwind";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { fileLimitText, MOBILE_LARGE_FILE_BYTES } from "@/features/chat/model/large-files";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
+import { saveLargeFilePreference, useLargeFilePreference } from "@/features/settings/model/large-files";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
-  const { t } = useText();
+  const text = useText();
+  const { t } = text;
+  const { theme } = useUniwind();
+  const largeFiles = useLargeFilePreference();
+  const [largeFilesError, setLargeFilesError] = useState<string | null>(null);
+  function saveLargeFiles(automatic: boolean) {
+    setLargeFilesError(null);
+    void saveLargeFilePreference(automatic).catch(() => {
+      setLargeFilesError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
+    });
+  }
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
   return (
     <SettingsContent>
@@ -67,9 +85,27 @@ export function SettingsScreen() {
           <Typography.Paragraph>{t("mobile.appLock.title")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      <SettingsSection title={t("mobile.settings.conversations.title")}>
+      <SettingsSection
+        title={t("mobile.settings.conversations.title")}
+        footer={
+          largeFilesError ??
+          t("mobile.settings.conversations.largeFilesFooter", {
+            small: fileLimitText(text, MOBILE_ATTACHMENT_BYTES),
+            large: fileLimitText(text, MOBILE_LARGE_FILE_BYTES),
+          })
+        }
+      >
         <SettingsRow leading={<RowIcon icon={EyeOff} />} onPress={() => router.push("/settings/hidden-chats")}>
           <Typography.Paragraph>{t("mobile.settings.conversations.hiddenChats")}</Typography.Paragraph>
+        </SettingsRow>
+        <SettingsRow>
+          <SettingsSwitch
+            value={largeFiles.automatic}
+            disabled={!largeFiles.ready || largeFiles.saving}
+            label={t("mobile.settings.conversations.largeFiles")}
+            dark={theme === "dark"}
+            onValueChange={saveLargeFiles}
+          />
         </SettingsRow>
       </SettingsSection>
       <SettingsSection>

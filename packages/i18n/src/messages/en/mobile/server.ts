@@ -425,6 +425,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.invite": "Invite people",
   "mobile.server.route.member": "Member",
   "mobile.server.route.timezone": "Timezone",
+  "mobile.server.route.personality": "Agent personality",
   "mobile.server.settings.storage": "Storage",
   "mobile.server.route.storage": "Storage",
   "mobile.server.route.storageFiles": "All files",
@@ -545,6 +546,15 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
   "mobile.server.settings.memoryLimitSaveFailed": "Could not save the memory limit. Try again.",
   "mobile.server.settings.memoryLimitUnsupported": "Update OpenBot on this server to change its memory limit here.",
+  "mobile.server.settings.responseStyleDescription":
+    "Natural: agents send short updates while they work, and the chat shows them. Classic: agents answer once, when they are done.",
+  "mobile.server.settings.responseStyleNatural": "Natural",
+  "mobile.server.settings.responseStyleClassic": "Classic",
+  "mobile.server.settings.personalityLoadFailed": "Could not load the server personality.",
+  "mobile.server.settings.personalitySaveFailed": "Could not save the response style. Try again.",
+  "mobile.server.settings.personalityUnsupported": "Update OpenBot on this server to change its response style here.",
+  "mobile.server.settings.personalityUnavailable":
+    "Connect to this server as an owner or admin to change its agent personality.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
   "mobile.server.route.browserProfiles": "Browser profiles",

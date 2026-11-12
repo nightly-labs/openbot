@@ -48,6 +48,7 @@ import type { AgentChatTarget } from "@/features/chat/model/chat-target";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
+import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
@@ -197,9 +198,13 @@ function AgentTaskChat({
   // The reader's membership marks their own messages, which they can delete, and names the other members.
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
+  const progressUpdates = useProgressUpdates(serverId, serverAgents, agentId);
   const messages = useMemo(
-    () => (conversation.data ? projectChatMessages(conversation.data.messages, memberId, accountUserId) : NO_MESSAGES),
-    [conversation.data, memberId, accountUserId],
+    () =>
+      conversation.data
+        ? projectChatMessages(conversation.data.messages, memberId, accountUserId, progressUpdates)
+        : NO_MESSAGES,
+    [conversation.data, memberId, accountUserId, progressUpdates],
   );
   const activeTurnId = task?.activeTurnId ?? null;
   const branching = useBranchThread({

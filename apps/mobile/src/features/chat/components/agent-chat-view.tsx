@@ -27,6 +27,7 @@ import { requestComposerFocus, requestComposerText } from "../model/composer-req
 import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionReferences } from "../model/use-agent-mention-references";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
+import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
@@ -83,9 +84,10 @@ export function MobileChatView({
   const mentionAgents = useMemo(() => serverAgents.filter((item) => item.id !== agent.id), [serverAgents, agent.id]);
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
+  const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
   const projected = useMemo(
-    () => projectChatMessages(conversation?.messages ?? [], memberId, accountUserId),
-    [conversation?.messages, memberId, accountUserId],
+    () => projectChatMessages(conversation?.messages ?? [], memberId, accountUserId, progressUpdates),
+    [conversation?.messages, memberId, accountUserId, progressUpdates],
   );
   const references = useMemo(
     () => projectChatMessages(Object.values(conversation?.references ?? {}), memberId, accountUserId),

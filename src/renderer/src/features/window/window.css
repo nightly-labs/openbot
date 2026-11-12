@@ -711,6 +711,12 @@
     pointer-events: none;
   }
 
+  /* The pricing page (`HostedPricingPage`) of the add-server flow shows in the card, as the usage page does. Its
+   * mount does not make a box of its own. */
+  .app-frame-edge > .window-page > .window-page-portal {
+    display: contents;
+  }
+
   .app-frame-edge.app-frame-with-server-rail:not([data-window-page-kind="agents"]) > .window-page {
     inset-inline-start: calc(var(--server-rail-width) + 1px);
   }
@@ -744,7 +750,8 @@
       .routine-planner-empty,
       .routine-planner-error,
       .marketplace-nav,
-      .skills-marketplace-body
+      .skills-marketplace-body,
+      .hosted-pricing-scroll
     ) {
     pointer-events: auto;
   }
