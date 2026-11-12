@@ -1539,6 +1539,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(INSTANCE_TRANSFER_CAPABILITY) &&
     canAdministerServer(workspace.state.host?.role);
   // A named function, not a ternary in the prop: the settings read the prop in a tracked effect.
+  // No copy to another server: the browser client connects to one host, and only the desktop app
+  // holds the connections of two servers at the same time.
   const instanceTransferSettings = () => (instanceTransferEnabled() ? { calls: instanceTransferCalls } : undefined);
   const memberUpdateAccess = () => !serverRoleCanAdminister(server());
   const hostUpdateCalls: HostUpdateCalls = {

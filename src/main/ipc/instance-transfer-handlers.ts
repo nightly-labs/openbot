@@ -2,17 +2,24 @@
 // A joined server that also has `instance-transfer-chunks-v1` moves the file in parts, so it can be
 // larger than 100 MB. Main opens both file dialogs and moves the file, so the renderer never names a
 // path, and only main can reveal the saved file.
+//
+// `copy` joins the two: it exports agents from one server to a temporary file and imports that file
+// at another, with the same routes, so a host needs no new route.
 
-import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import {
   type ApplyInstanceTransferInput,
+  type CopyInstanceAgentsInput,
   decodeRemoteInstanceTransferResult,
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
   type InstanceExportResult,
   type InstanceTransferPreview,
+  type InstanceTransferResult,
+  LOCAL_SERVER_ID,
   parseApplyInstanceTransferInput,
+  parseCopyInstanceAgentsInput,
   parseExportInstanceInput,
   resolveRemoteInstanceTransferResult,
 } from "@openbot/contracts/ipc";
@@ -32,7 +39,9 @@ import type { InstanceTransferService } from "../instance-transfer-service";
 import { decodeAgentSummaries } from "../remote-agent-decoding";
 import { downloadTransferInParts, uploadTransferInParts } from "../remote-instance-transfer-chunks";
 import { AGENT_IMPORT_UPLOAD_TIMEOUT_MS, type RemoteServerManager } from "../remote-server-manager";
-import { handler, type IpcGroupHandlers } from "./define-ipc-group";
+import { agentRequest } from "./agent-inputs";
+import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { routeToServer } from "./route-to-server";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { stringPayload } from "./validation";
 
@@ -153,6 +162,79 @@ export function instanceTransferIpcHandlers({
     );
   };
 
+  /** Writes the source server's agents to `path`, with their files and without chats or settings. */
+  const exportTo = async (serverId: string, agentIds: string[], path: string) => {
+    const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: false };
+    if (serverId === LOCAL_SERVER_ID) {
+      const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
+      await runCauseEffect(prepared.write(path));
+      return;
+    }
+    requireRemote(serverId);
+    if (inParts(serverId)) {
+      await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      return;
+    }
+    await writeFile(path, await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, input)));
+  };
+
+  /** Reads the file at the destination server and returns its token. */
+  const stageAt = (serverId: string, path: string) =>
+    routeToServer(serverId, {
+      // The local stage reads the file again at apply, so the file stays until `copy` ends.
+      local: () => runCauseEffect(instanceTransfer.stage(path)),
+      remote: async (target) => {
+        requireRemote(target);
+        if (inParts(target)) return runCauseEffect(uploadTransferInParts(remoteServers, target, path));
+        const bytes = await readFile(path);
+        if (bytes.byteLength > INSTANCE_TRANSFER_REMOTE_BYTES)
+          throw new Error(sourceText("error.import.transferRemoteTooLarge"));
+        return runCauseEffect(remoteServers.stageInstanceTransfer(target, new Uint8Array(bytes)));
+      },
+    });
+
+  const discardAt = (serverId: string, token: string) =>
+    routeToServer(serverId, {
+      local: () => Effect.runPromise(instanceTransfer.discard(token)),
+      remote: (target) =>
+        runCauseEffect(
+          remoteServers.request(target, INSTANCE_TRANSFER_ROUTES.discard, () => undefined, {
+            method: "POST",
+            body: { token },
+          }),
+        ),
+    });
+
+  const copy = async (
+    { fromServerId, agentIds }: CopyInstanceAgentsInput,
+    serverId: string,
+  ): Promise<InstanceTransferResult> => {
+    if (fromServerId === serverId) throw new Error("Invalid copy request: the servers are the same.");
+    const directory = await mkdtemp(join(app.getPath("temp"), "openbot-copy-"));
+    try {
+      const path = join(directory, "agents.zip");
+      await exportTo(fromServerId, agentIds, path);
+      const preview = await stageAt(serverId, path);
+      const input: ApplyInstanceTransferInput = {
+        token: preview.token,
+        keys: preview.agents.map((agent) => agent.key),
+        includeSettings: false,
+      };
+      try {
+        return await routeToServer(serverId, {
+          local: () => runCauseEffect(instanceTransfer.apply(input)),
+          remote: (target) => applyRemote(input, target),
+        });
+      } catch (error) {
+        // A failed apply keeps the token. Release it, so the file does not wait for its expiry.
+        await discardAt(serverId, input.token).catch(() => undefined);
+        throw error;
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  };
+
   return {
     instanceTransfer: {
       summary: scopedQueryHandler({
@@ -194,6 +276,10 @@ export function instanceTransferIpcHandlers({
           );
         },
       }),
+      // The destination is the server scope; the source is in the payload. Both can be joined servers.
+      copy: payloadHandler(agentRequest(parseCopyInstanceAgentsInput), ({ serverId, payload }) =>
+        copy(payload, serverId),
+      ),
     },
   };
 }

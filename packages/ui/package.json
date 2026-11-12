@@ -419,6 +419,7 @@
     "./features/import/AgentImportSources": "./src/features/import/AgentImportSources.tsx",
     "./features/import/AgentImportView": "./src/features/import/AgentImportView.tsx",
     "./features/import/HermesImportView": "./src/features/import/HermesImportView.tsx",
+    "./features/transfer/CopyAgentsDialog": "./src/features/transfer/CopyAgentsDialog.tsx",
     "./features/transfer/InstanceTransferView": "./src/features/transfer/InstanceTransferView.tsx",
     "./components/GlobalSearch": "./src/components/GlobalSearch.tsx",
     "./components/ProviderCodeLoginDialog": "./src/components/ProviderCodeLoginDialog.tsx",
