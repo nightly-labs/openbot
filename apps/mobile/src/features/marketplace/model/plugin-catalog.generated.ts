@@ -1529,6 +1529,38 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "trypost",
+    name: "TryPost",
+    tagline: "Social media scheduling",
+    description:
+      "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "TryPost",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+      { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+    ],
+    websiteUrl: "https://trypost.it",
+    privacyPolicyUrl: "https://trypost.it/en/privacy",
+    termsUrl: "https://trypost.it/en/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-trypost-mcp",
+        name: "TryPost",
+        description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+        server: {
+          name: "trypost",
+          transport: "http",
+          url: "https://app.trypost.it/mcp/trypost",
+          auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "composio",
     name: "Composio",
     tagline: "Gmail, Slack, GitHub and 1,000+ more apps",

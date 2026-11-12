@@ -378,6 +378,13 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
   "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
   "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.tagline": "社交媒体排程",
+  "marketplace.plugin.trypost.description":
+    "TryPost 让智能体列出你已连接的频道，并在 X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest 等平台起草、排程、加入队列和发布帖子。智能体还可以查看分析数据、管理想法和审批，并设置发布时间。在浏览器中登录你的 TryPost 账户并选择一个工作区。智能体可以立即发布帖子，因此请在批准前检查每篇帖子。",
+  "marketplace.plugin.trypost.app": "通过 TryPost 的 MCP 服务器和浏览器登录，管理频道、帖子、队列、想法和分析。",
+  "marketplace.plugin.trypost.prompt.week": "本周排程了哪些帖子？",
+  "marketplace.plugin.trypost.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.prompt.analytics": "上个月我的哪些帖子互动最多？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",

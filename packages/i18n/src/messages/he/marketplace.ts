@@ -403,6 +403,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "אילו ערוצי רשתות חברתיות מחוברים ל-Postiz?",
   "marketplace.plugin.postiz.prompt.week": "אילו פוסטים מתוזמנים לשבוע הבא?",
   "marketplace.plugin.postiz.prompt.draft": "כתוב טיוטת פוסט ל-LinkedIn על הגרסה החדשה שלנו, אבל אל תתזמן אותו.",
+  "marketplace.plugin.trypost.tagline": "תזמון רשתות חברתיות",
+  "marketplace.plugin.trypost.description":
+    "TryPost מאפשר לסוכנים להציג את הערוצים המחוברים שלך, ולנסח, לתזמן, להוסיף לתור ולפרסם פוסטים ב-X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest ועוד. הסוכנים יכולים גם לקרוא נתוני ניתוח, לנהל רעיונות ואישורים ולהגדיר זמני פרסום. התחבר לחשבון TryPost שלך דרך הדפדפן ובחר סביבת עבודה. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שאתה מאשר אותו.",
+  "marketplace.plugin.trypost.app":
+    "ערוצים, פוסטים, תור, רעיונות וניתוח נתונים, דרך שרת ה-MCP של TryPost עם התחברות בדפדפן.",
+  "marketplace.plugin.trypost.prompt.week": "אילו פוסטים מתוזמנים לשבוע הזה?",
+  "marketplace.plugin.trypost.prompt.draft": "נסח פוסט ל-LinkedIn על הגרסה החדשה שלנו, אבל אל תתזמן אותו.",
+  "marketplace.plugin.trypost.prompt.analytics": "אילו מהפוסטים שלי מהחודש שעבר קיבלו הכי הרבה מעורבות?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ועוד יותר מ-1,000 אפליקציות",
   "marketplace.plugin.composio.description":
     "Composio מחבר את הסוכנים שלך ל-Gmail, Slack, GitHub ולעוד יותר מ-1,000 אפליקציות אחרות דרך שרת MCP אחד. יש להתחבר עם חשבון Composio שלך. כשסוכן צריך אפליקציה, הוא מבקש ממך לחבר אותה.",
