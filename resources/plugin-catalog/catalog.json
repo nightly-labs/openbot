@@ -219,6 +219,12 @@
       "detailSha256": "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24"
     },
     {
+      "slug": "chatwork",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "f3aede5534a5057f25d550b23ef23a4ef273561e5dfc0d1cc933f446a7e71428"
+    },
+    {
       "slug": "omnisend",
       "version": "1.0.0",
       "featured": false,
