@@ -4,7 +4,8 @@
 // `?quality=<value>` to the remote desktop viewer address (`TEAM_API_ROUTES.remoteScreen.viewer`), and
 // the host's viewer page sets the stream to the preset of that value before Moonlight starts it.
 // Moonlight reads the stream settings only at the start, so a client opens a new session to change
-// the quality. Without the parameter, or with a value outside the list, the page changes nothing.
+// the quality. Without the parameter, or with a value outside the list, the page writes nothing, and
+// the stream uses the settings that the viewer's origin saved before.
 // The values and their presets do not follow app changes; a new value or preset needs a second
 // capability string.
 

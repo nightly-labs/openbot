@@ -39,11 +39,12 @@ import { remoteDesktopPort } from "./remote-desktop-port";
  * - `remoteDesktopViewerFailed` is the viewer's last word on the stream. A
  *   session whose stream failed has nothing to resume, so hiding the workspace
  *   ends it instead of keeping it, and the header no longer shows it as active.
- * - `remoteDesktopQuality` is the quality of the next stream, for this app run, as on the phone.
- *   `remoteDesktopServerQualities` is the quality that each server's last connect asked for. It is set
- *   before the request, because main announces the new session before the request answers, and a
- *   viewer address that changed after the frame opened would reuse the one-time grant. Only a host
- *   with `remote-desktop-quality-v1` gets a quality.
+ * - `remoteDesktopChosenQualities` is the quality that the user chose for each server, for this app
+ *   run, as on the phone; the menu shows it. `remoteDesktopStartedQualities` is the quality that each
+ *   server's last connect asked for, and the viewer address uses it. It is set before the request,
+ *   because main announces the new session before the request answers, and it does not change while
+ *   the session lives: an address that changed after the frame opened would reuse the one-time grant.
+ *   Only a host with `remote-desktop-quality-v1` gets a quality.
  */
 const RemoteDesktop = createSimpleContext({
   name: "Remote desktop",
@@ -59,8 +60,10 @@ const RemoteDesktop = createSimpleContext({
       createSignal<RemoteDesktopErrorCode | null>(null);
     const [remoteDesktopSessionEstablished, setRemoteDesktopSessionEstablished] = createSignal(false);
     const [remoteDesktopViewerFailed, setRemoteDesktopViewerFailed] = createSignal(false);
-    const [remoteDesktopQuality, setRemoteDesktopQuality] = createSignal<RemoteDesktopQuality>("smooth");
-    const remoteDesktopServerQualities = new Map<string, RemoteDesktopQuality>();
+    const [remoteDesktopChosenQualities, setRemoteDesktopChosenQualities] = createSignal<
+      Readonly<Record<string, RemoteDesktopQuality>>
+    >({});
+    const remoteDesktopStartedQualities = new Map<string, RemoteDesktopQuality>();
     let remoteDesktopRestoreTarget: HTMLElement | null = null;
     let remoteDesktopConnectPromise: Promise<RemoteDesktopSession | undefined> | null = null;
     /** Bumped by every open, retry and disconnect, so a late connect cannot revive a closed workspace. */
@@ -78,11 +81,15 @@ const RemoteDesktop = createSimpleContext({
       );
     }
 
+    function chosenRemoteDesktopQuality(serverId: string): RemoteDesktopQuality {
+      return remoteDesktopChosenQualities()[serverId] ?? "smooth";
+    }
+
     async function connectRemoteDesktop(serverId: string): Promise<RemoteDesktopConnectResult> {
       const analytics = desktopAnalytics.scope();
       if (serverChoosesRemoteDesktopQuality(serverId))
-        remoteDesktopServerQualities.set(serverId, remoteDesktopQuality());
-      else remoteDesktopServerQualities.delete(serverId);
+        remoteDesktopStartedQualities.set(serverId, chosenRemoteDesktopQuality(serverId));
+      else remoteDesktopStartedQualities.delete(serverId);
       try {
         const result = await remoteDesktopPort().remoteDesktop.connect({ serverId });
         if (result.status === "refused") {
@@ -260,9 +267,18 @@ const RemoteDesktop = createSimpleContext({
 
     /** Moonlight reads the stream settings only when a stream starts, so a new quality needs a new session. */
     async function selectRemoteDesktopQuality(quality: RemoteDesktopQuality): Promise<void> {
-      if (quality === remoteDesktopQuality()) return;
-      setRemoteDesktopQuality(quality);
-      await retryRemoteDesktopWorkspace();
+      const serverId = remoteDesktopWorkspaceServerId();
+      if (!serverId) return;
+      const previous = chosenRemoteDesktopQuality(serverId);
+      if (quality === previous) return;
+      setRemoteDesktopChosenQualities((current) => ({ ...current, [serverId]: quality }));
+      try {
+        await retryRemoteDesktopWorkspace();
+      } catch (error) {
+        // The old session could not end, so it still streams at the old quality.
+        setRemoteDesktopChosenQualities((current) => ({ ...current, [serverId]: previous }));
+        throw error;
+      }
     }
 
     async function disconnectRemoteDesktopWorkspace(restoreFocus = true): Promise<void> {
@@ -295,7 +311,7 @@ const RemoteDesktop = createSimpleContext({
     const remoteDesktopWorkspaceSession = createMemo(() => {
       const serverId = remoteDesktopWorkspaceServerId();
       const session = serverId ? latestRemoteDesktopSession(serverId) : undefined;
-      const quality = session ? remoteDesktopServerQualities.get(session.serverId) : undefined;
+      const quality = session ? remoteDesktopStartedQualities.get(session.serverId) : undefined;
       return session && quality
         ? { ...session, viewerUrl: remoteDesktopViewerUrlWithQuality(session.viewerUrl, quality) }
         : session;
@@ -303,7 +319,7 @@ const RemoteDesktop = createSimpleContext({
     /** The quality choice of the workspace, or undefined when its host cannot change the quality. */
     const remoteDesktopWorkspaceQuality = createMemo(() => {
       const serverId = remoteDesktopWorkspaceServerId();
-      return serverId && serverChoosesRemoteDesktopQuality(serverId) ? remoteDesktopQuality() : undefined;
+      return serverId && serverChoosesRemoteDesktopQuality(serverId) ? chosenRemoteDesktopQuality(serverId) : undefined;
     });
 
     createEffect(
