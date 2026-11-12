@@ -180,9 +180,8 @@ export function nextActions(
       actions.push({ nodeId, action: "skip" });
       continue;
     }
-    const kind = kinds.get(nodeId);
-    const join = isJoin(kind, before.get(nodeId) ?? [], loops);
-    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, textEdges(kind, edges), reasons) });
+    const join = isJoin(kinds.get(nodeId), before.get(nodeId) ?? [], loops);
+    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, textEdges(kinds, edges), reasons) });
   }
   return actions;
 }
@@ -193,16 +192,29 @@ export function soloInputs(
   nodeId: string,
   answered: ReadonlyMap<string, StoredWorkflowStep>,
 ): string[] {
-  const kind = graph.nodes.find((node) => node.id === nodeId)?.kind;
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
   const before = incoming(graph.edges);
   const edges = before.get(nodeId) ?? [];
-  return edgeInputs(isJoin(kind, edges, loops), textEdges(kind, edges), { before, loops, latest: answered });
+  return edgeInputs(isJoin(kinds.get(nodeId), edges, loops), textEdges(kinds, edges), {
+    before,
+    loops,
+    latest: answered,
+  });
 }
 
-/** An image step reads the pictures of its `image` edges as files (`mediaInputs`), not as text. */
-function textEdges(kind: WorkflowNode["kind"] | undefined, edges: readonly WorkflowEdge[]): readonly WorkflowEdge[] {
-  return kind === "image" ? edges.filter((edge) => edge.type !== "image") : edges;
+/**
+ * The edges that give text. The answer of an image or an asset step is the id of an attachment: an
+ * image step reads it as a file (`mediaInputs`), and no other step gets the id as text.
+ */
+function textEdges(
+  kinds: ReadonlyMap<string, WorkflowNode["kind"]>,
+  edges: readonly WorkflowEdge[],
+): readonly WorkflowEdge[] {
+  return edges.filter((edge) => {
+    const kind = kinds.get(edge.from);
+    return kind !== "image" && kind !== "asset";
+  });
 }
 
 /** A picture that an image step reads: the image or asset node it comes from and the attachment of its file. */

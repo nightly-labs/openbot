@@ -49,7 +49,13 @@ export class GrokAgentClient extends AcpAgentClient {
       argv: [
         "--no-auto-update",
         ...(profileGeneration === "media"
-          ? ["--no-subagents", "--disable-web-search", ...GROK_NON_MEDIA_TOOLS.flatMap((tool) => ["--deny", tool])]
+          ? [
+              "--no-subagents",
+              "--disable-web-search",
+              ...GROK_NON_MEDIA_TOOLS.flatMap((tool) => ["--deny", tool]),
+              "--deny",
+              "mcp__*",
+            ]
           : profileGeneration
             ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"]
             : []),
@@ -76,8 +82,8 @@ export class GrokAgentClient extends AcpAgentClient {
 
 /**
  * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`GROK_MEDIA_TOOLS`). A
- * media client denies each by name: a deny rule wins over an allow rule, so `--deny *` would also
- * refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
+ * media client denies each by name, and every MCP tool with `mcp__*`: a deny rule wins over an allow
+ * rule, so `--deny *` would also refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
  * (`AcpAgentOptions.mediaGeneration`).
  */
 const GROK_NON_MEDIA_TOOLS = [
