@@ -276,6 +276,9 @@ export const messages = {
     "Ein schmaler Streifen bleibt dort, wo das Dock verschwindet. Beweg den Zeiger in seine Nähe, um das Dock zu zeigen. Wenn ein Agent dich etwas fragt, läuft eine Farbwelle über den Streifen.",
   "settings.agentDock.results.title": "Erledigte Arbeit zeigen",
   "settings.agentDock.results.description": "Ergebnisse der Agenten erscheinen kurz neben dem Dock.",
+  "settings.agentDock.activeSeats.title": "Agenten mit Neuem zeigen",
+  "settings.agentDock.activeSeats.description":
+    "Ein Agent oder Kanal, der nicht im Dock ist, erscheint dort, solange er eine neue Nachricht hat oder auf dich wartet.",
   "settings.agentDock.agents.title": "Agenten im Dock",
   "settings.agentDock.agents.description": "Die Agenten von {server}. Jeder Server hat sein eigenes Dock.",
   "settings.agentDock.agents.empty": "Dieser Server hat noch keine Agenten.",

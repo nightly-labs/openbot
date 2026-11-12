@@ -274,6 +274,9 @@ export const messages = {
     "Cienki pasek zostaje tam, gdzie chowa się dok. Zbliż do niego wskaźnik, aby pokazać dok. Gdy agent o coś pyta, przez pasek przechodzi fala kolorów.",
   "settings.agentDock.results.title": "Pokazuj ukończoną pracę",
   "settings.agentDock.results.description": "Wyniki agentów pojawiają się na chwilę obok doku.",
+  "settings.agentDock.activeSeats.title": "Pokazuj agentów z nowościami",
+  "settings.agentDock.activeSeats.description":
+    "Agent lub kanał spoza doku pojawia się w nim, dopóki ma nową wiadomość lub czeka na ciebie.",
   "settings.agentDock.agents.title": "Agenci w doku",
   "settings.agentDock.agents.description": "Agenci serwera {server}. Każdy serwer ma własny dok.",
   "settings.agentDock.agents.empty": "Ten serwer nie ma jeszcze agentów.",
