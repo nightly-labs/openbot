@@ -250,7 +250,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "trypost",
       version: "1.0.0",
       featured: false,
-      detailSha256: "0d25c76e1e3fb85fd265d7c588b9e494af646178ff893cead65a51b9ec0b8354",
+      detailSha256: "40186389eb51e85f38b15016392f2c2ef7993c80b035cab8ca98aad5f0a95669",
     },
     {
       slug: "composio",
@@ -3068,7 +3068,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
     category: "automation",
     creatorName: "TryPost",
-    iconUrl: "https://app.trypost.it/apple-touch-icon.png",
+    iconUrl: "https://app.trypost.it/images/trypost/icon.png",
     version: "1.0.0",
     prompts: [
       { id: "prompt-week", text: "Which posts are scheduled for this week?" },
@@ -3080,7 +3080,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-trypost-mcp",
         name: "TryPost",
         description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
-        iconUrl: "https://app.trypost.it/apple-touch-icon.png",
+        iconUrl: "https://app.trypost.it/images/trypost/icon.png",
         server: {
           name: "trypost",
           transport: "http",
