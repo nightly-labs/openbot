@@ -1171,7 +1171,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Weitergegebene Variable {position}",
   "mobile.server.mcp.removePassthrough": "Weitergegebene Variable {position} entfernen",
   "mobile.server.mcp.workingDirectory": "Arbeitsverzeichnis",
-  "mobile.server.mcp.workingDirectoryHint": "Optional. Lass es leer, um diesen MCP-Server jedem Anbieter zu geben.",
+  "mobile.server.mcp.workingDirectoryHint": "Optional. Agenten starten diesen MCP-Server in diesem Verzeichnis.",
   "mobile.server.mcp.url": "Server-URL",
   "mobile.server.mcp.urlInvalid": "Gib eine http- oder https-Adresse ein.",
   "mobile.server.mcp.headers": "Header",

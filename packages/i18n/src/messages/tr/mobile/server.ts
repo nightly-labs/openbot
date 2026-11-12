@@ -1141,7 +1141,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Aktarılan değişken {position}",
   "mobile.server.mcp.removePassthrough": "Aktarılan değişken {position} kaldır",
   "mobile.server.mcp.workingDirectory": "Çalışma dizini",
-  "mobile.server.mcp.workingDirectoryHint": "İsteğe bağlı. Bu MCP sunucusunu her sağlayıcıya vermek için boş bırakın.",
+  "mobile.server.mcp.workingDirectoryHint": "İsteğe bağlı. Ajanlar bu MCP sunucusunu bu dizinde başlatır.",
   "mobile.server.mcp.url": "Sunucu URL'si",
   "mobile.server.mcp.urlInvalid": "Bir http veya https adresi girin.",
   "mobile.server.mcp.headers": "Başlıklar",

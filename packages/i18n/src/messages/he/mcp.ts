@@ -80,8 +80,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "משתנה מועבר {position}",
   "mcp.panel.removePassthroughVariable": "הסרת משתנה מועבר {position}",
   "mcp.panel.workingDirectory": "ספריית עבודה",
-  "mcp.panel.workingDirectoryDescription":
-    "סוכני Claude ו-Codex ובדיקת החיבור מפעילים את השרת כאן. אם משאירים ריק, השרת ניתן לכל הספקים: הספקים האחרים לא יכולים להגדיר ספרייה, ולכן הם מדלגים על שרת שמציין אחת.",
+  "mcp.panel.workingDirectoryDescription": "אופציונלי. הסוכנים ובדיקת החיבור מפעילים את השרת בספרייה הזו.",
   "mcp.panel.endpointTitle": "נקודת קצה",
   "mcp.panel.endpointDescription": "כל ספק יכול להשתמש בשרת MCP של HTTP.",
   "mcp.panel.serverUrl": "URL של השרת",

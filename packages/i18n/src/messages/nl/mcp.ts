@@ -82,8 +82,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "Doorgegeven variabele {position}",
   "mcp.panel.removePassthroughVariable": "Doorgegeven variabele {position} verwijderen",
   "mcp.panel.workingDirectory": "Werkmap",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude- en Codex-agents en de verbindingstest starten de server hier. Laat dit leeg om deze server aan elke aanbieder te geven: de andere aanbieders kunnen geen map instellen, dus die slaan een server met een map over.",
+  "mcp.panel.workingDirectoryDescription": "Optioneel. Agents en de verbindingstest starten de server in deze map.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Elke aanbieder kan een HTTP-MCP-server gebruiken.",
   "mcp.panel.serverUrl": "Server-URL",

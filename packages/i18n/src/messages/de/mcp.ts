@@ -86,7 +86,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Weitergegebene Variable {position} entfernen",
   "mcp.panel.workingDirectory": "Arbeitsverzeichnis",
   "mcp.panel.workingDirectoryDescription":
-    "Claude- und Codex-Agenten und der Verbindungstest starten den Server hier. Lass das Feld leer, um diesen Server allen Anbietern bereitzustellen. Die anderen Anbieter können kein Verzeichnis festlegen und überspringen deshalb Server, die eines angeben.",
+    "Optional. Agenten und der Verbindungstest starten den Server in diesem Verzeichnis.",
   "mcp.panel.endpointTitle": "Endpunkt",
   "mcp.panel.endpointDescription": "Jeder Anbieter kann einen HTTP-MCP-Server verwenden.",
   "mcp.panel.serverUrl": "Server-URL",

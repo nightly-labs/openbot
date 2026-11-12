@@ -87,8 +87,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "متغير التمرير {position}",
   "mcp.panel.removePassthroughVariable": "إزالة متغير التمرير {position}",
   "mcp.panel.workingDirectory": "دليل العمل",
-  "mcp.panel.workingDirectoryDescription":
-    "يبدأ وكلاء Claude وCodex واختبار الاتصال الخادمَ هنا. اتركه فارغًا لمنح هذا الخادم لكل مزوّد: لا يمكن للمزوّدين الآخرين تعيين دليل، لذا يتخطّون الخادم الذي يحدد دليلًا.",
+  "mcp.panel.workingDirectoryDescription": "اختياري. يبدأ الوكلاء واختبار الاتصال الخادمَ في هذا الدليل.",
   "mcp.panel.endpointTitle": "نقطة النهاية",
   "mcp.panel.endpointDescription": "يمكن لكل مزوّد استخدام خادم MCP عبر HTTP.",
   "mcp.panel.serverUrl": "URL الخادم",

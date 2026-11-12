@@ -1117,7 +1117,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "引き継ぐ変数 {position}",
   "mobile.server.mcp.removePassthrough": "引き継ぐ変数 {position} を削除",
   "mobile.server.mcp.workingDirectory": "作業ディレクトリ",
-  "mobile.server.mcp.workingDirectoryHint": "任意。空にすると、この MCP サーバーをすべてのプロバイダーに渡します。",
+  "mobile.server.mcp.workingDirectoryHint": "任意。エージェントは、この MCP サーバーをこのディレクトリで起動します。",
   "mobile.server.mcp.url": "サーバー URL",
   "mobile.server.mcp.urlInvalid": "http または https のアドレスを入力してください。",
   "mobile.server.mcp.headers": "ヘッダー",

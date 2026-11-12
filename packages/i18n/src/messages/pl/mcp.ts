@@ -87,8 +87,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "Przekazywana zmienna {position}",
   "mcp.panel.removePassthroughVariable": "Usuń przekazywaną zmienną {position}",
   "mcp.panel.workingDirectory": "Katalog roboczy",
-  "mcp.panel.workingDirectoryDescription":
-    "Agenci Claude i Codex oraz test połączenia uruchamiają serwer tutaj. Zostaw puste, aby przekazać ten serwer każdemu dostawcy: inni dostawcy nie mogą ustawić katalogu, więc pomijają serwer, który go wskazuje.",
+  "mcp.panel.workingDirectoryDescription": "Opcjonalnie. Agenci i test połączenia uruchamiają serwer w tym katalogu.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Każdy dostawca może używać serwera MCP przez HTTP.",
   "mcp.panel.serverUrl": "URL serwera",

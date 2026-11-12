@@ -1569,7 +1569,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "متغير التمرير {position}",
   "mobile.server.mcp.removePassthrough": "إزالة متغير التمرير {position}",
   "mobile.server.mcp.workingDirectory": "دليل العمل",
-  "mobile.server.mcp.workingDirectoryHint": "اختياري. اتركه فارغًا لإعطاء خادم MCP هذا لكل مزوّد.",
+  "mobile.server.mcp.workingDirectoryHint": "اختياري. يبدأ الوكلاء خادم MCP هذا في هذا الدليل.",
   "mobile.server.mcp.url": "عنوان URL للخادم",
   "mobile.server.mcp.urlInvalid": "أدخل عنوان http أو https.",
   "mobile.server.mcp.headers": "الترويسات",

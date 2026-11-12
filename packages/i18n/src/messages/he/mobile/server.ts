@@ -1563,7 +1563,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "משתנה להעברה {position}",
   "mobile.server.mcp.removePassthrough": "הסרת משתנה להעברה {position}",
   "mobile.server.mcp.workingDirectory": "ספריית עבודה",
-  "mobile.server.mcp.workingDirectoryHint": "אופציונלי. אם השדה ריק, שרת ה-MCP הזה ניתן לכל ספק.",
+  "mobile.server.mcp.workingDirectoryHint": "אופציונלי. הסוכנים מפעילים את שרת ה-MCP הזה בספרייה הזו.",
   "mobile.server.mcp.url": "כתובת השרת",
   "mobile.server.mcp.urlInvalid": "יש להזין כתובת http או https.",
   "mobile.server.mcp.headers": "כותרות",

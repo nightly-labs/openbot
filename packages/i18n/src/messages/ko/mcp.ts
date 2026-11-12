@@ -82,8 +82,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "전달 변수 {position}",
   "mcp.panel.removePassthroughVariable": "전달 변수 {position} 삭제",
   "mcp.panel.workingDirectory": "작업 디렉터리",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude 및 Codex 에이전트와 연결 테스트는 이 위치에서 서버를 시작해요. 비워 두면 모든 제공자에게 이 서버를 제공해요. 다른 제공자는 디렉터리를 지정할 수 없어서 디렉터리가 있는 서버는 건너뛰어요.",
+  "mcp.panel.workingDirectoryDescription": "선택 사항이에요. 에이전트와 연결 테스트는 이 디렉터리에서 서버를 시작해요.",
   "mcp.panel.endpointTitle": "엔드포인트",
   "mcp.panel.endpointDescription": "모든 제공자가 HTTP MCP 서버를 사용할 수 있어요.",
   "mcp.panel.serverUrl": "서버 URL",

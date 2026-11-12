@@ -1252,8 +1252,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Передаваемая переменная {position}",
   "mobile.server.mcp.removePassthrough": "Удалить передаваемую переменную {position}",
   "mobile.server.mcp.workingDirectory": "Рабочая папка",
-  "mobile.server.mcp.workingDirectoryHint":
-    "Необязательно. Оставьте пустым, чтобы дать этот сервер MCP всем провайдерам.",
+  "mobile.server.mcp.workingDirectoryHint": "Необязательно. Агенты запускают этот сервер MCP в этой папке.",
   "mobile.server.mcp.url": "URL сервера",
   "mobile.server.mcp.urlInvalid": "Введите адрес http или https.",
   "mobile.server.mcp.headers": "Заголовки",

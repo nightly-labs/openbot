@@ -1061,7 +1061,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "透传变量 {position}",
   "mobile.server.mcp.removePassthrough": "移除透传变量 {position}",
   "mobile.server.mcp.workingDirectory": "工作目录",
-  "mobile.server.mcp.workingDirectoryHint": "可选。留空则把该 MCP 服务器提供给所有服务商。",
+  "mobile.server.mcp.workingDirectoryHint": "可选。助手会在该目录启动这个 MCP 服务器。",
   "mobile.server.mcp.url": "服务器 URL",
   "mobile.server.mcp.urlInvalid": "请输入 http 或 https 地址。",
   "mobile.server.mcp.headers": "请求头",

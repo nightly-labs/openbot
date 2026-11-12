@@ -86,7 +86,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Eliminar variable transferida {position}",
   "mcp.panel.workingDirectory": "Directorio de trabajo",
   "mcp.panel.workingDirectoryDescription":
-    "Los agentes de Claude y Codex y la prueba de conexión inician el servidor aquí. Déjalo vacío para proporcionar este servidor a todos los proveedores: los demás proveedores no pueden establecer un directorio, por lo que omiten los servidores que indican uno.",
+    "Opcional. Los agentes y la prueba de conexión inician el servidor en este directorio.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Todos los proveedores pueden usar un servidor MCP HTTP.",
   "mcp.panel.serverUrl": "URL del servidor",

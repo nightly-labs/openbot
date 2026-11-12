@@ -83,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Rimuovi variabile inoltrata {position}",
   "mcp.panel.workingDirectory": "Cartella di lavoro",
   "mcp.panel.workingDirectoryDescription":
-    "Gli agenti Claude e Codex e il test di connessione avviano il server qui. Lascia vuoto per dare questo server a ogni provider: gli altri provider non possono impostare una cartella, quindi saltano un server che ne indica una.",
+    "Facoltativa. Gli agenti e il test di connessione avviano il server in questa cartella.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Ogni provider può usare un server MCP HTTP.",
   "mcp.panel.serverUrl": "URL del server",

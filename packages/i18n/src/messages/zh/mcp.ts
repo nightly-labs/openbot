@@ -76,8 +76,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "透传变量 {position}",
   "mcp.panel.removePassthroughVariable": "移除透传变量 {position}",
   "mcp.panel.workingDirectory": "工作目录",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude 和 Codex 助手和连接测试会在该目录启动服务器。留空可把该服务器提供给所有服务商：其他服务商无法设置目录，所以会跳过指定了目录的服务器。",
+  "mcp.panel.workingDirectoryDescription": "可选。助手和连接测试会在该目录启动服务器。",
   "mcp.panel.endpointTitle": "端点",
   "mcp.panel.endpointDescription": "所有服务商都可以使用 HTTP MCP 服务器。",
   "mcp.panel.serverUrl": "服务器 URL",

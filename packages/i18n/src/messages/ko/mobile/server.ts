@@ -1094,7 +1094,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "전달 변수 {position}",
   "mobile.server.mcp.removePassthrough": "전달 변수 {position} 삭제",
   "mobile.server.mcp.workingDirectory": "작업 디렉터리",
-  "mobile.server.mcp.workingDirectoryHint": "선택 사항이에요. 모든 제공자에게 이 MCP 서버를 제공하려면 비워 두세요.",
+  "mobile.server.mcp.workingDirectoryHint": "선택 사항이에요. 에이전트는 이 디렉터리에서 이 MCP 서버를 시작해요.",
   "mobile.server.mcp.url": "서버 URL",
   "mobile.server.mcp.urlInvalid": "http 또는 https 주소를 입력해 주세요.",
   "mobile.server.mcp.headers": "헤더",

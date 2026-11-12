@@ -88,7 +88,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Удалить пробрасываемую переменную {position}",
   "mcp.panel.workingDirectory": "Рабочая папка",
   "mcp.panel.workingDirectoryDescription":
-    "Агенты Claude и Codex и проверка подключения запускают сервер здесь. Оставьте поле пустым, чтобы передать этот сервер всем провайдерам: другие провайдеры не могут задать папку, поэтому пропускают сервер, у которого она указана.",
+    "Необязательно. Агенты и проверка подключения запускают сервер в этой папке.",
   "mcp.panel.endpointTitle": "Эндпоинт",
   "mcp.panel.endpointDescription": "Любой провайдер может использовать сервер MCP по HTTP.",
   "mcp.panel.serverUrl": "URL сервера",

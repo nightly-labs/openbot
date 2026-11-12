@@ -1542,7 +1542,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.passthroughVariable": "Passthrough variable {position}",
   "mobile.server.mcp.removePassthrough": "Remove passthrough variable {position}",
   "mobile.server.mcp.workingDirectory": "Working directory",
-  "mobile.server.mcp.workingDirectoryHint": "Optional. Leave it empty to give this MCP server to every provider.",
+  "mobile.server.mcp.workingDirectoryHint": "Optional. Agents start this MCP server in this directory.",
   "mobile.server.mcp.url": "Server URL",
   "mobile.server.mcp.urlInvalid": "Enter an http or https address.",
   "mobile.server.mcp.headers": "Headers",
