@@ -7,6 +7,7 @@ import {
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
+  parseUpdateAgentSpeedInput,
   parseUpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -28,6 +29,7 @@ import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -292,7 +294,51 @@ export async function routeAgentFastMode(
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid fast mode setting.");
     }
-    return json(200, await runCauseEffect(settings.updateFastMode(input)));
+    // The frozen route sets only Fast. A change of it turns Ultrafast off, as a Fast choice in the picker.
+    return json(
+      200,
+      await runCauseEffect(settings.updateFastMode({ agentId: input.agentId, fastMode: input.fastMode })),
+    );
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * The speed of one agent (standard, fast or ultrafast), and the models of this computer that have a
+ * fast tier, with their Ultrafast tiers and the Claude models. The access is that of
+ * `agent-fast-mode-v1`. Frozen by `agent-speed-v1`.
+ */
+export async function routeAgentSpeed(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  const models = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.models;
+  const read = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.update;
+  if (!models && !read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_SPEED_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  // `readJson` has already run the body through the agent-speed wire codec.
+  const body = await readJson(request);
+  if (models) return json(200, { models: settings.listSpeedModels() });
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  const agentId = stringField(body, "agentId");
+  // The level of the released agent route: reading needs view, a change needs manage.
+  requireAgentLevel(context, agentId, read ? "view" : "manage");
+  try {
+    if (read) return json(200, settings.readSpeed(agentId));
+    let input: ReturnType<typeof parseUpdateAgentSpeedInput>;
+    try {
+      input = parseUpdateAgentSpeedInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid speed setting.");
+    }
+    return json(200, await runCauseEffect(settings.updateSpeed(input)));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

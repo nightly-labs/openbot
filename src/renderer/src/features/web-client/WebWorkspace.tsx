@@ -10,6 +10,7 @@ import {
   type AgentWaitsSnapshot,
   type AppInfo,
   type AvatarColor,
+  agentFastModeSettings,
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelSummary,
@@ -21,6 +22,7 @@ import {
   decodeAgentHostSettings,
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
+  decodeAgentSpeedSettings,
   decodeAgentTaskLimitSettings,
   LEGACY_RESPONSE_STYLE,
   type RoutineFields,
@@ -40,6 +42,7 @@ import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
@@ -1137,13 +1140,27 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           quickAcknowledgement,
         }),
-      getAgentFastMode: (agentId, serverId) =>
-        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }),
-      updateAgentFastMode: ({ agentId, fastMode }, serverId) =>
-        hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, {
+      // `agent-speed-v1` carries Ultrafast; an older host keeps `agent-fast-mode-v1`, which has only Fast.
+      getAgentFastMode: async (agentId, serverId) =>
+        workspace.state.capabilities.includes(AGENT_SPEED_CAPABILITY)
+          ? agentFastModeSettings(
+              await hostRequest(serverId)("POST", AGENT_SPEED_ROUTES.settings, decodeAgentSpeedSettings, { agentId }),
+            )
+          : hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }),
+      updateAgentFastMode: async ({ agentId, fastMode, ultrafast }, serverId) => {
+        if (workspace.state.capabilities.includes(AGENT_SPEED_CAPABILITY))
+          return agentFastModeSettings(
+            await hostRequest(serverId)("POST", AGENT_SPEED_ROUTES.update, decodeAgentSpeedSettings, {
+              agentId,
+              speed: fastMode ? (ultrafast ? "ultrafast" : "fast") : "standard",
+            }),
+          );
+        if (ultrafast) throw new Error(t("error.agent.settingsLocalOnly"));
+        return hostRequest(serverId)("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, {
           agentId,
           fastMode,
-        }),
+        });
+      },
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
           getAgentAdminSettings(hostRequest(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
@@ -1167,6 +1184,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     const fastMode = remoteAgentAdmin.fastMode();
+    const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
     const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
@@ -1179,7 +1197,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
-          ...(typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(computerUse === undefined ? {} : { computerUse }),
           ...(allowNewChat === undefined ? {} : { allowNewChat }),
         }

@@ -685,9 +685,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Gebruiken",
   "mobile.agent.folders.notAddedTitle": "Map niet toegevoegd",
   "mobile.agent.folders.notExcludedTitle": "Map niet uitgesloten",
-  "mobile.agent.fastMode.label": "Snelle modus",
   "mobile.agent.fastMode.footer":
     "De agent vraagt zijn provider om snellere antwoorden. Een wijziging geldt vanaf de volgende beurt.",
+  "mobile.agent.fastMode.speed": "Snelheid",
+  "mobile.agent.fastMode.standard": "Standaard",
+  "mobile.agent.fastMode.fast": "Snel",
+  "mobile.agent.fastMode.ultrafast": "Ultrasnel",
+  "mobile.agent.fastMode.confirmTitle": "Snelle modus inschakelen?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude antwoordt sneller, maar elk token kost meer. Met een Claude-abonnement gebruikt de snelle modus altijd gebruikstegoed, ook als je abonnement nog gebruik over heeft.",
+  "mobile.agent.fastMode.confirm": "Inschakelen",
   "mobile.agent.compact.title": "Context comprimeren",
   "mobile.agent.compact.compacting": "Comprimeren starten…",
   "mobile.agent.compact.footer": "De provider maakt de context van deze chat korter. De berichten blijven.",

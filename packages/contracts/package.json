@@ -222,6 +222,7 @@
     "./team-protocol/conversation-unread-from-v1": "./src/team-protocol/conversation-unread-from-v1.ts",
     "./team-protocol/agent-threads-v1": "./src/team-protocol/agent-threads-v1.ts",
     "./team-protocol/agent-session-settings-v1": "./src/team-protocol/agent-session-settings-v1.ts",
+    "./team-protocol/agent-speed-v1": "./src/team-protocol/agent-speed-v1.ts",
     "./team-protocol/browser-profiles-events-v1": "./src/team-protocol/browser-profiles-events-v1.ts",
     "./team-protocol/browser-profiles-v1": "./src/team-protocol/browser-profiles-v1.ts",
     "./team-protocol/browser-egress-v1": "./src/team-protocol/browser-egress-v1.ts",

@@ -20,6 +20,7 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
+import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
@@ -274,8 +275,7 @@ export function createRemoteAgentAdmin(
   // Any member can change fast mode, as the model and effort, so this key needs no admin role.
   const fastModeKey = createMemo(() => {
     const current = target();
-    if (current?.server.kind !== "remote" || !serverSupportsCapability(current.server, AGENT_FAST_MODE_CAPABILITY))
-      return null;
+    if (current?.server.kind !== "remote" || !serverHasFastMode(current.server)) return null;
     return JSON.stringify([current.server.id, current.agentId]);
   });
   function acceptFastMode(requestKey: string, settings: AgentFastModeSettings): void {
@@ -404,11 +404,17 @@ export function createRemoteAgentAdmin(
     /** Undefined for a local agent, before the host answers, and without the capability. Null: never set. */
     fastMode: (): boolean | null | undefined =>
       state.fastModeKey !== null && state.fastModeKey === fastModeKey() ? state.fastMode?.fastMode : undefined,
-    async updateFastMode(agentId: string, fastMode: boolean): Promise<void> {
+    /** With `fastMode`, the Ultrafast tier. Only a host with `agent-speed-v1` reports it. */
+    ultrafast: (): boolean =>
+      state.fastModeKey !== null && state.fastModeKey === fastModeKey() && state.fastMode?.ultrafast === true,
+    async updateFastMode(agentId: string, fastMode: boolean, ultrafast = false): Promise<void> {
       const server = target()?.server;
-      if (server?.kind !== "remote" || !serverSupportsCapability(server, AGENT_FAST_MODE_CAPABILITY))
+      if (server?.kind !== "remote" || !serverHasFastMode(server))
         throw new Error(currentText().t("error.agent.settingsLocalOnly"));
-      const settings = await calls().updateAgentFastMode({ agentId, fastMode }, server.id);
+      const settings = await calls().updateAgentFastMode(
+        { agentId, fastMode, ...(fastMode && ultrafast ? { ultrafast: true } : {}) },
+        server.id,
+      );
       if (fastModeKey() === JSON.stringify([server.id, agentId])) fastModeReadGeneration += 1;
       acceptFastMode(JSON.stringify([server.id, agentId]), settings);
     },
@@ -463,8 +469,9 @@ export async function updateRemoteAgent(
     allowNewChat,
     quickAcknowledgement,
     fastMode,
-    // `agent-fast-mode-v1` sets only Fast; a remote picker does not offer Ultrafast.
-    ultrafast: _ultrafast,
+    // A host with `agent-speed-v1` lists Ultrafast tiers; an older host lists none, so the picker
+    // does not offer it there.
+    ultrafast,
     agentId,
     ...fields
   } = input;
@@ -487,8 +494,16 @@ export async function updateRemoteAgent(
   if (taskLimit !== undefined) await admin.updateTaskLimit(agentId, taskLimit);
   if (allowNewChat !== undefined) await admin.updateNewChat(agentId, allowNewChat);
   if (quickAcknowledgement !== undefined) await admin.updatePlanCard(agentId, quickAcknowledgement);
-  if (fastMode !== undefined) await admin.updateFastMode(agentId, fastMode);
+  if (fastMode !== undefined) await admin.updateFastMode(agentId, fastMode, ultrafast === true);
   if (Object.keys(fields).length) await updateProfile({ agentId, ...fields });
 }
 
 export type RemoteAgentAdmin = ReturnType<typeof createRemoteAgentAdmin>;
+
+/** A joined server that keeps the fast mode of an agent: `agent-speed-v1`, or the older `agent-fast-mode-v1`. */
+function serverHasFastMode(server: Parameters<typeof serverSupportsCapability>[0]): boolean {
+  return (
+    serverSupportsCapability(server, AGENT_SPEED_CAPABILITY) ||
+    serverSupportsCapability(server, AGENT_FAST_MODE_CAPABILITY)
+  );
+}

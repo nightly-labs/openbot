@@ -691,9 +691,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Verwenden",
   "mobile.agent.folders.notAddedTitle": "Ordner nicht hinzugefügt",
   "mobile.agent.folders.notExcludedTitle": "Ordner nicht ausgeschlossen",
-  "mobile.agent.fastMode.label": "Schnellmodus",
   "mobile.agent.fastMode.footer":
     "Der Agent fordert bei seinem Anbieter schnellere Antworten an. Eine Änderung gilt ab dem nächsten Durchgang.",
+  "mobile.agent.fastMode.speed": "Geschwindigkeit",
+  "mobile.agent.fastMode.standard": "Standard",
+  "mobile.agent.fastMode.fast": "Schnell",
+  "mobile.agent.fastMode.ultrafast": "Ultraschnell",
+  "mobile.agent.fastMode.confirmTitle": "Schnellmodus einschalten?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude antwortet schneller, aber jeder Token kostet mehr. Mit einem Claude-Abo nutzt der Schnellmodus immer Nutzungsguthaben, auch wenn dein Plan noch Nutzung übrig hat.",
+  "mobile.agent.fastMode.confirm": "Einschalten",
   "mobile.agent.compact.title": "Kontext komprimieren",
   "mobile.agent.compact.compacting": "Komprimierung wird gestartet…",
   "mobile.agent.compact.footer": "Der Anbieter kürzt den Kontext dieses Chats. Die Nachrichten bleiben erhalten.",
