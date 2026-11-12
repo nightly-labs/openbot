@@ -17,6 +17,7 @@ import {
 import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
+import { withUsageEventTertiary } from "./usage-tertiary-v1";
 import {
   decodeTeamProtocolV8BaseEvent,
   decodeTeamProtocolV8BaseHttpRequest,
@@ -47,14 +48,18 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
     current = withEventPromptMultiSelect(
       withEventConversationPlans(
         restoreBrowserTakeoverReason(
-          restoreBrowserSecretMetadata(toCurrentAgentKeys(withRuntimeSnapshotContextUsage(decodedValue, value)), value),
+          restoreBrowserSecretMetadata(
+            toCurrentAgentKeys(withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value)),
+            value,
+          ),
           value,
         ),
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
         // video request only under video-generation-v1, a multi-select flag only under
-        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, and context states only
-        // under context-usage-v1, so a present one is always kept.
+        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, context states only
+        // under context-usage-v1, and a third usage window only under usage-tertiary-v1, so a present one
+        // is always kept.
         value,
         value,
         value,
@@ -80,6 +85,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     contextUsage?: boolean;
+    usageTertiary?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
@@ -96,6 +102,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
+  if (encoded && options.usageTertiary === true && event.type === "usage-changed")
+    return JSON.stringify(withUsageEventTertiary(JSON.parse(encoded), wireValue, true));
   if (
     !encoded ||
     (!options.preserveBrowserSecrets &&

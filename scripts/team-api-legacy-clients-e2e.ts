@@ -15,6 +15,8 @@
 //   client gets the released runtime snapshot (#3584).
 // - reasoning-efforts-v1: a protocol 9 client that asks for it gets `none`, `minimal` and `ultra`; a
 //   protocol 7 or 8 client gets the nearest released level, and the frozen v7 decoder reads it.
+// - usage-tertiary-v1: a protocol 9 client that asks for it gets the third usage window on the usage
+//   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -24,6 +26,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  type AccountUsage,
   type AgentContextState,
   type AgentModelOption,
   BROWSER_SECRET_RESPONSE_PATH,
@@ -62,10 +65,12 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { TEAM_USAGE_TERTIARY_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_REASONING_EFFORTS,
   TEAM_REASONING_EFFORTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
 import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import {
@@ -915,6 +920,132 @@ try {
   } finally {
     hostAgents.listModels = listModels;
     hostAgents.listAgents = listAgents;
+  }
+
+  // --- usage-tertiary-v1 ---
+
+  // No provider runs here, so the host reports what OpenCode Go would have reported: a 5-hour, a weekly
+  // and a monthly window. The second limit has a third window that the v1 shape cannot describe.
+  const monthly = { usedPercent: 12, windowDurationMins: 43_200, resetsAt: 1_795_000_000 };
+  const reading: AccountUsage = {
+    limits: [
+      {
+        id: "opencode",
+        primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1_793_000_000 },
+        secondary: { usedPercent: 70, windowDurationMins: 10_080, resetsAt: 1_793_500_000 },
+        tertiary: monthly,
+      },
+      {
+        id: "cursor",
+        primary: { usedPercent: 5, windowDurationMins: null, resetsAt: null },
+        secondary: null,
+        tertiary: { usedPercent: Number.NaN, windowDurationMins: null, resetsAt: null },
+      },
+    ],
+  };
+  const getUsage = hostAgents.getUsage;
+  Object.defineProperty(hostAgents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+  const usagePath = `/v1/agents/${source.id}/usage`;
+  const withoutTertiary = (protocol: number) =>
+    teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
+
+  /** The first `usage-changed` event on the event socket of a current client that declares `capabilities`. */
+  async function currentUsageEvent(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    // The host sends the runtime snapshot when it has read the scope, so the event after it is for this scope.
+    const scoped = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      await scoped;
+      const usage = nextMessage(opened, (value) => (isRecord(value) && value.type === "usage-changed" ? value : null));
+      hostAgents.emit("event", { type: "usage-changed", usage: reading });
+      return await usage;
+    } finally {
+      opened.close();
+    }
+  }
+
+  try {
+    await step("usage-tertiary-v1: a protocol 9 client that asks for it gets the third window", async () => {
+      const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+      assert.ok(capabilities.includes(TEAM_USAGE_TERTIARY_CAPABILITY), "A v9 client does not ask for it.");
+      const got = await current(TEAM_PROTOCOL_V9, capabilities, usagePath);
+      assert.equal(got.status, 200, `GET ${usagePath}: ${JSON.stringify(got.body)}.`);
+      const limits = record(got.body, "usage").limits;
+      assert.ok(Array.isArray(limits) && limits.length === 2);
+      assert.deepEqual(record(limits[0], "opencode").tertiary, monthly);
+      assert.ok(!Object.hasOwn(record(limits[1], "cursor"), "tertiary"), "The host sent a window outside v1.");
+      const decoded = record(decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, got.body), "decoded");
+      assert.ok(Array.isArray(decoded.limits));
+      assert.deepEqual(record(decoded.limits[0], "decoded opencode").tertiary, monthly);
+      // A released protocol 8 or 9 client reads the same body with its frozen decoder, on the frozen path.
+      const frozen = record(decodeTeamProtocolV8HttpResponse("GET", "/v1/agents/usage", 200, got.body), "frozen");
+      assert.ok(Array.isArray(frozen.limits));
+      assert.ok(!Object.hasOwn(record(frozen.limits[0], "frozen opencode"), "tertiary"));
+      return { limits: limits.map((limit) => Object.keys(record(limit, "limit")).sort()) };
+    });
+
+    await step("usage-tertiary-v1: a client without it gets the released usage limits", async () => {
+      assert.ok(
+        !teamCapabilitiesForProtocol(8).includes(TEAM_USAGE_TERTIARY_CAPABILITY),
+        "A protocol 8 client asks for usage-tertiary-v1.",
+      );
+      const results: { protocol: number; keys: string[] }[] = [];
+      for (const protocol of [TEAM_PROTOCOL_V7, 8, TEAM_PROTOCOL_V9]) {
+        const got = await current(protocol, withoutTertiary(protocol), usagePath);
+        assert.equal(got.status, 200, `Protocol ${protocol}: ${JSON.stringify(got.body)}.`);
+        const limits = record(got.body, "usage").limits;
+        assert.ok(Array.isArray(limits));
+        const first = record(limits[0], "opencode");
+        assert.ok(!Object.hasOwn(first, "tertiary"), `Protocol ${protocol} got tertiary.`);
+        results.push({ protocol, keys: Object.keys(first).sort() });
+      }
+      return results;
+    });
+
+    await step("usage-tertiary-v1: the usage-changed event follows the capability", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+      assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+      assert.deepEqual(decoded.event.usage.limits[0]?.tertiary, monthly);
+      assert.equal(decoded.event.usage.limits[1]?.tertiary, undefined);
+      const without = await currentUsageEvent(withoutTertiary(TEAM_PROTOCOL_V9));
+      assert.ok(!JSON.stringify(without).includes("tertiary"), "A client without it got tertiary.");
+      return { withCapability: "tertiary", without: "released" };
+    });
+
+    await step("usage-tertiary-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageTertiary: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[0]?.tertiary, monthly);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("tertiary"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const bad = { ...record(usage.limits[0], "opencode"), tertiary: { usedPercent: "12" } };
+      const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+      assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+  } finally {
+    Object.defineProperty(hostAgents, "getUsage", { value: getUsage, configurable: true });
   }
 
   // --- v2 over WebRTC frames ---

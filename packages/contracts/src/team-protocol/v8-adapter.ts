@@ -52,6 +52,7 @@ import {
 } from "./remote-desktop-setup-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
+import { withUsageTertiary } from "./usage-tertiary-v1";
 import { decodeTeamProtocolV8HttpRequest, decodeTeamProtocolV8HttpResponse } from "./v8";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
 import {
@@ -216,7 +217,9 @@ export function decodeTeamProtocolV8CurrentHttpRequest(
  * capability: only then does a conversation message carry its `subagents`. `promptMultiSelect` is the
  * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
  * `videoGeneration` is the negotiated video-generation-v1 capability: only then does a conversation
- * message carry its `videoGeneration`. Without them the output is the released projection.
+ * message carry its `videoGeneration`. `usageTertiary` is the negotiated usage-tertiary-v1 capability:
+ * only then does a usage limit carry its `tertiary` window. Without them the output is the released
+ * projection.
  */
 export function encodeTeamProtocolV8CurrentHttpResponse(
   method: string,
@@ -230,11 +233,14 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    usageTertiary?: boolean;
   } = {},
 ): string {
-  const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, ...frozen } = options;
+  const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, usageTertiary, ...frozen } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
+  if (usageTertiary && scopedUsageRoute(method, path))
+    return JSON.stringify(withUsageTertiary(JSON.parse(encoded), value, true));
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
   const withSubagents = subagents && isConversationRoute(method, path);
@@ -312,8 +318,9 @@ function encodeFrozenResponse(
 
 /**
  * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
- * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, and
- * a video request only under video-generation-v1, so a present one is always kept.
+ * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, a
+ * video request only under video-generation-v1, and a third usage window only under
+ * usage-tertiary-v1, so a present one is always kept.
  */
 export function decodeTeamProtocolV8CurrentHttpResponse(
   method: string,
@@ -323,6 +330,7 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
 ): TeamProtocolV8BaseJsonValue {
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
+  if (scopedUsageRoute(method, path)) return withUsageTertiary(decoded, value);
   // The conversation page route carries all three.
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(decoded, value) : decoded;
   if (!isConversationRoute(method, path)) return withExtent;
