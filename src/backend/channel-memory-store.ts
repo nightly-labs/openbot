@@ -58,15 +58,19 @@ export class ChannelMemoryStore extends MemoryStore {
   deleteByText(channelId: string, text: string): boolean {
     const target = text.trim();
     const entries = this.list(channelId);
-    const exact = entries.find((entry) => entry.text === target);
-    const folded = foldMemoryText(target);
-    const similar = entries.filter((entry) => foldMemoryText(entry.text) === folded);
     const memory =
-      exact ??
+      entries.find((entry) => entry.text === target) ??
       entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase()) ??
-      (similar.length === 1 ? similar[0] : undefined);
+      onlySimilar(entries, target);
     return memory ? this.delete(channelId, memory.id) : false;
   }
+}
+
+/** The one entry whose folded text is the folded target, or nothing when none or several match. */
+function onlySimilar(entries: ChannelMemory[], target: string): ChannelMemory | undefined {
+  const folded = foldMemoryText(target);
+  const similar = entries.filter((entry) => foldMemoryText(entry.text) === folded);
+  return similar.length === 1 ? similar[0] : undefined;
 }
 
 /** Compatibility forms (full-width punctuation, `…`), quote and dash styles, whitespace, and case. */

@@ -3476,7 +3476,9 @@ export class ChannelService {
       // The packet lists each memory as `[memoryId] text`. The text stays a fallback for a session
       // that still has the earlier list without ids. A memory text did not match when the packet had
       // changed it, such as a memory with a line break that looked like two memories (#7428).
-      const memoryId = isString(args.memoryId) ? args.memoryId.trim().replace(/^\[(.*)\]$/su, "$1") : "";
+      // A model can copy the brackets, or the whole `[memoryId] text` line, as the id.
+      const givenId = isString(args.memoryId) ? args.memoryId.trim() : "";
+      const memoryId = /^\[([^\]\s]+)\]/u.exec(givenId)?.[1] ?? givenId;
       const text = isString(args.text) ? args.text : "";
       if (!memoryId && !text.trim()) return yield* channelFailure(new Error("Provide the memoryId of the memory."));
       const deleted = yield* channelSync(
