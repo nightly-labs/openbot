@@ -990,10 +990,10 @@ export class OpenBotToolRouter {
       return yield* apiKeys.remove(agentId, name).pipe(
         Effect.map((removed) => {
           if (removed) return openBotToolResult({ status: "removed", name });
-          // Agents cannot delete a Vault key: every agent reads it.
-          if (this.#vaultItems?.apiKeys().some((key) => key.name === name))
+          // Agents cannot delete a Vault key that is not for them only: other agents can read it.
+          if (this.#vaultItems?.apiKeys(agentId).some((key) => key.name === name))
             return openBotToolFailure(
-              `${name} is in the Vault, which every agent uses. Only the user can delete it, in Server settings > Vault.`,
+              `${name} is in the Vault, and other agents can use it. Only the user can delete it, in Server settings > Vault.`,
             );
           return openBotToolResult({ status: "not_found", name });
         }),
@@ -1053,7 +1053,7 @@ export class OpenBotToolRouter {
     const vault = this.#vaultItems;
     if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
     const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
-    const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, agentName));
+    const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, { id: agentId, name: agentName }, false));
     if (Result.isFailure(saved)) {
       // The Vault's own errors are user text with no secret in them. A file error gets a fixed text.
       const { cause } = saved.failure;
@@ -1070,7 +1070,7 @@ export class OpenBotToolRouter {
         name: saved.success.name,
       }),
     );
-    // The agent's own key of this name wins over the Vault key, so the older value goes.
+    // A plain key file of this agent wins over the Vault key, so the older value goes.
     const removed = yield* Effect.result(apiKeys.remove(agentId, name));
     if (Result.isFailure(removed)) {
       logger.warn("Unable to delete an agent's own API key after a Vault save", {

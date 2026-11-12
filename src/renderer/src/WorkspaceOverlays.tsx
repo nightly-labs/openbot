@@ -660,6 +660,7 @@ function ServerSettings() {
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
   /**

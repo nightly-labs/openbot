@@ -157,6 +157,7 @@ import {
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  VAULT_V4_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -2535,6 +2536,7 @@ export class TeamApiServer {
           if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_V2_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_V3_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === VAULT_V4_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
           if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;

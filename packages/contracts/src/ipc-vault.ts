@@ -21,6 +21,29 @@ export interface VaultItemOrigin {
   addedBy?: string;
 }
 
+/**
+ * The agents that can use an item, by id. Absent when every agent can. A host before `vault-v4` keeps
+ * no such list, so each of its items is for every agent.
+ */
+export interface VaultItemScope {
+  agents?: string[];
+}
+
+/** The agents to give an item when it is saved: null for every agent. Omitted keeps the saved choice. */
+export interface VaultSaveScope {
+  agents?: string[] | null | undefined;
+}
+
+/** The most agents that one item names. */
+export const VAULT_AGENT_SCOPE_LIMIT = 1_000;
+/** The longest agent id that a scope keeps. */
+export const VAULT_AGENT_ID_LIMIT = 128;
+
+/** Whether the agent `agentId` can use an item with this scope. */
+export function vaultItemAllows(item: { readonly agents?: readonly string[] | undefined }, agentId: string): boolean {
+  return item.agents === undefined || item.agents.includes(agentId);
+}
+
 export type VaultCardBrand = "visa" | "mastercard" | "amex" | "discover";
 export const VAULT_CARD_BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
 
@@ -41,7 +64,7 @@ export function cardBrand(number: string): VaultCardBrand | null {
 /** A value that the list never returns. */
 export type VaultSecretField = "password" | "number" | "securityCode" | "key";
 
-export interface VaultLoginSummary extends VaultItemOrigin {
+export interface VaultLoginSummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "login";
   /** An `https:` address or a host name, as the user typed it. */
@@ -53,7 +76,7 @@ export interface VaultLoginSummary extends VaultItemOrigin {
   hasTwoStep: boolean;
 }
 
-export interface VaultCardSummary extends VaultItemOrigin {
+export interface VaultCardSummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "card";
   label: string;
@@ -83,15 +106,18 @@ export interface VaultContactFields {
   email: string;
 }
 
-export interface VaultContactSummary extends VaultContactFields, VaultItemOrigin {
+export interface VaultContactSummary extends VaultContactFields, VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "contact";
 }
 
-export interface VaultApiKeySummary extends VaultItemOrigin {
+export interface VaultApiKeySummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "apiKey";
-  /** The environment variable that a program reads, such as `OPENAI_API_KEY`. Unique in the Vault. */
+  /**
+   * The environment variable that a program reads, such as `OPENAI_API_KEY`. Unique among the keys for
+   * every agent. Keys for chosen agents can share a name when they share no agent.
+   */
   name: string;
   notes: string;
   hasKey: boolean;
@@ -109,10 +135,12 @@ export type VaultStatus = "ready" | "unavailable" | "unreadable";
 export interface VaultState {
   status: VaultStatus;
   items: VaultItemSummary[];
+  /** The Vault keeps the agents of each item: this computer, or a host with `vault-v4`. */
+  agentScope?: boolean;
 }
 
 /** A new item when `id` is null. A null secret keeps the saved value. */
-export type VaultSaveInput =
+export type VaultSaveInput = (
   | {
       kind: "login";
       id: string | null;
@@ -137,7 +165,9 @@ export type VaultSaveInput =
       fillSites?: string[] | undefined;
     }
   | ({ kind: "contact"; id: string | null } & VaultContactFields)
-  | { kind: "apiKey"; id: string | null; name: string; notes: string; key: string | null };
+  | { kind: "apiKey"; id: string | null; name: string; notes: string; key: string | null }
+) &
+  VaultSaveScope;
 
 export interface VaultSecretRequest {
   id: string;
@@ -442,7 +472,20 @@ function hostAddedBy(item: DynamicRecord): VaultItemOrigin {
   return { addedBy: item.addedBy };
 }
 
+/** Only `vault-v4` sends it. An item of an older host is for every agent. */
+function hostScope(item: DynamicRecord): VaultItemScope {
+  if (item.agents === undefined) return {};
+  const { agents } = item;
+  if (!Array.isArray(agents) || agents.length > VAULT_AGENT_SCOPE_LIMIT || !agents.every(isString))
+    throw new Error("Invalid Vault response.");
+  return { agents: [...agents] };
+}
+
 function hostVaultItem(item: DynamicRecord): VaultItemSummary {
+  return { ...hostVaultItemFields(item), ...hostScope(item) };
+}
+
+function hostVaultItemFields(item: DynamicRecord): VaultItemSummary {
   if (VAULT_SECRET_KEYS.some((key) => key in item)) throw new Error("Invalid Vault response.");
   const id = requiredString(item, "id");
   switch (item.kind) {
@@ -508,11 +551,18 @@ function hostVaultItem(item: DynamicRecord): VaultItemSummary {
   }
 }
 
-/** The Vault of a joined server (`vault-v3`, `vault-v2` or `vault-v1`). Throws for an item that carries a secret. */
-export function decodeHostVaultState(value: unknown): VaultState {
+/**
+ * The Vault of a joined server (`vault-v4`, `vault-v3`, `vault-v2` or `vault-v1`). Throws for an item
+ * that carries a secret. `agentScope` is true only for `vault-v4`, which keeps the agents of each item.
+ */
+export function decodeHostVaultState(value: unknown, agentScope = false): VaultState {
   const state = decodeRecord(value, "Vault response");
   if (!isOneOf(VAULT_STATUSES, state.status)) throw new Error("Invalid Vault response.");
-  return { status: state.status, items: decodeList(state.items, "Vault item", hostVaultItem) };
+  return {
+    status: state.status,
+    items: decodeList(state.items, "Vault item", hostVaultItem),
+    ...(agentScope ? { agentScope: true } : {}),
+  };
 }
 
 /** The counts that a joined server answers to a CSV import (`vault-import-v1`). */

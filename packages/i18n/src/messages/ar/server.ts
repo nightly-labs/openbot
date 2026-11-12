@@ -283,7 +283,7 @@ export const messages = {
   "server.settings.generalDescription": "أدِر اسم هذا الخادم وشعاره وتفضيلاته.",
   "server.settings.vaultTitle": "الخزنة",
   "server.settings.vaultDescription":
-    "احفظ بيانات تسجيل الدخول والبطاقات ومعلومات الاتصال التي يمكن لكل وكيل على هذا الخادم تعبئتها.",
+    "احفظ بيانات تسجيل الدخول والبطاقات ومعلومات الاتصال ومفاتيح API للوكلاء على هذا الخادم.",
   "server.settings.membersTitle": "الأعضاء",
   "server.settings.membersDescription": "انشر هذا الخادم، وادعُ الأشخاص، وأدِر الوصول.",
   "server.settings.desktopTitle": "سطح المكتب البعيد",
