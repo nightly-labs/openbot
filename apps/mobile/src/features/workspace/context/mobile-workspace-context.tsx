@@ -42,6 +42,7 @@ import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/h
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -2447,6 +2448,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canCreateLocalServers: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
+        canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),

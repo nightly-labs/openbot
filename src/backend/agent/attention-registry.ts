@@ -380,6 +380,8 @@ interface PendingBrowserTakeover {
   vaultLoginId?: string;
   /** Why OpenBot did not fill a saved login, so the agent can tell the user and correct its call. */
   vaultSkipped?: string;
+  /** The person selected Done after they used the page. A secret that OpenBot entered is not this. */
+  personCompleted?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -420,7 +422,7 @@ export interface AttentionBrowserHost {
   prepareSecret?(params: DynamicToolCallParams): Effect.Effect<PreparedBrowserSecret, BrowserOperationError>;
   listTabs(): BrowserTab[];
   beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
-  endTakeover(tabId: string): void;
+  endTakeover(tabId: string, completed?: boolean): void;
 }
 
 /** What the registry reads of the conversation runtime, so a test can give it a small one. */
@@ -882,6 +884,7 @@ export class AttentionRegistry {
         if (pending.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
         pending.secret?.cancel();
         this.#routines.markRunningForTurn(pending.request.turnId);
+        if (input.decision === "complete") pending.personCompleted = true;
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -2178,7 +2181,7 @@ export class AttentionRegistry {
     // `surfaceBrowserTakeover` refuses a second request for the same tab, so this is belt and braces --
     // but returning control while another request still waits on the tab would be the worse mistake.
     if (![...this.#takeovers.values()].some((candidate) => candidate.request.tabId === pending.request.tabId)) {
-      this.#browser.endTakeover(pending.request.tabId);
+      this.#browser.endTakeover(pending.request.tabId, pending.personCompleted === true);
     }
     this.#emit({
       type: "browser-takeover-resolved",

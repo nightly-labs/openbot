@@ -27,6 +27,10 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -117,12 +121,16 @@ export function instanceTransferIpcHandlers({
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
     if (inParts(serverId)) {
-      const { warnings } = await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      const fullCopy = remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
+      const { warnings } = await runCauseEffect(
+        downloadTransferInParts(remoteServers, serverId, input, path, fullCopy),
+      );
       lastExport = path;
       return { saved: true, fileName: basename(path), warnings };
     }
-    // `instance-transfer-v1` carries no chat history.
-    const { includeHistory: _history, ...v1 } = input;
+    // `instance-transfer-v1` carries no chat history, channel messages or server preferences.
+    const { agentIds, includeFiles, includeSettings } = input;
+    const v1 = { agentIds, includeFiles, includeSettings };
     const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, v1));
     // The file appears only when it is complete, as a local export does.
     const part = `${path}.part`;
@@ -155,12 +163,29 @@ export function instanceTransferIpcHandlers({
 
   const applyRemote = async (input: ApplyInstanceTransferInput, serverId: string) => {
     requireRemote(serverId);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Only `instance-transfer-full-copy-v1` replaces the server preferences; the v1 apply never does.
+    const fullCopy = remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
+    const { token, keys, includeSettings } = input;
     const result = await runCauseEffect(
-      remoteServers.request(serverId, INSTANCE_TRANSFER_ROUTES.apply, decodeRemoteInstanceTransferResult, {
-        method: "POST",
-        body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
-      }),
+      remoteServers.request(
+        serverId,
+        fullCopy ? INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply : INSTANCE_TRANSFER_ROUTES.apply,
+        decodeRemoteInstanceTransferResult,
+        {
+          method: "POST",
+          body: fullCopy
+            ? {
+                token,
+                keys,
+                includeSettings,
+                includeServerPreferences: input.includeServerPreferences === true,
+                timezone,
+              }
+            : { token, keys, includeSettings, timezone },
+          timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+        },
+      ),
     );
     return resolveRemoteInstanceTransferResult(
       result,

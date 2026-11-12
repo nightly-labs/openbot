@@ -257,6 +257,7 @@ export const messages = {
     "De server stopt en start opnieuw. Dit duurt ongeveer een minuut. Lopende agentbeurten stoppen en leden verliezen de verbinding tot de server terug is. Bestanden en chats blijven bewaard.",
   "mobile.server.settings.restartConfirm": "Herstarten",
   "mobile.server.settings.restarted": "{name} wordt herstart",
+  "mobile.server.settings.restartUnsupported": "Werk OpenBot bij op deze server om hem hier te herstarten.",
   "mobile.server.settings.leaveTitle": "{name} verlaten?",
   "mobile.server.settings.leaveBody": "Je hebt een nieuwe uitnodiging nodig om weer lid te worden.",
   "mobile.server.settings.leave": "Server verlaten",

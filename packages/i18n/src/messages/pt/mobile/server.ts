@@ -258,6 +258,7 @@ export const messages = {
     "O servidor para e inicia novamente. Isso leva cerca de um minuto. Os turnos de agentes em andamento param, e os membros perdem a conexão até o servidor voltar. Arquivos e chats são mantidos.",
   "mobile.server.settings.restartConfirm": "Reiniciar",
   "mobile.server.settings.restarted": "{name} está reiniciando",
+  "mobile.server.settings.restartUnsupported": "Atualize o OpenBot neste servidor para reiniciá-lo aqui.",
   "mobile.server.settings.leaveTitle": "Sair de {name}?",
   "mobile.server.settings.leaveBody": "Você precisará de outro convite para entrar novamente.",
   "mobile.server.settings.leave": "Sair do servidor",

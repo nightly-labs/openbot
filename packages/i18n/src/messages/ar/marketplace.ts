@@ -568,6 +568,13 @@ export const messages = {
   "marketplace.skills.origin.local": "أُنشئت على هذا الحاسوب",
   "marketplace.skills.origin.workspace": "في مجلد هذا الوكيل",
   "marketplace.skills.origin.marketplace": "من المتجر · الإصدار {version}",
+  "marketplace.skills.origin.github": "من GitHub · {repository}",
+  "marketplace.skills.github.search": "ابحث أو الصق رابط GitHub",
+  "marketplace.skills.github.reading": "جارٍ البحث عن مهارات في المستودع",
+  "marketplace.skills.github.trust": "لم يراجع OpenBot المهارات من GitHub. اقرأ المهارة قبل إضافتها.",
+  "marketplace.skills.github.source": "GitHub · {repository} عند {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "فتح {repository} على GitHub",
   "marketplace.skills.status.notAdded": "غير مضافة",
   "marketplace.skills.status.on": "على {agents}",
   "marketplace.skills.agentCount": {

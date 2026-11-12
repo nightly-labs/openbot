@@ -2488,6 +2488,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       installAgentSkill: (input) => mockSkills.skills.install(input),
       uninstallAgentSkill: (input) => mockSkills.skills.uninstall(input),
       setAgentSkillEnabled: (input) => mockSkills.skills.setEnabled(input),
+      readGithubSkills: (link) => mockSkills.readGithub(link),
       addMarketplaceAgent: async (input) => {
         const { agent } = await api.marketplaceAgents.install(input);
         return { id: agent.id, name: agent.name };
@@ -3632,6 +3633,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       rotateHostKey: async () => {
         await mockTeam.host.rotateIdentityKey();
       },
+      // Preview has no self-hosted server to restart.
+      restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
       ...createMockHostPersonality(),

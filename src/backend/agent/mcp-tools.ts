@@ -271,6 +271,17 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const reason = servers.redact(sourceText(key, { name: config.name, target: serverTarget(config) }));
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
+      // A server that is off goes to no agent, so it is saved without a test. A test starts another
+      // copy of a stdio server, which a server that allows one copy refuses while an agent runs it (#7531).
+      if (!config.enabled) {
+        yield* servers.save(config);
+        const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
+        return openBotToolResult({
+          status: "disabled",
+          server: describeServer(saved, servers.signIns()),
+          appliesFrom: "the next turn of each agent",
+        });
+      }
       // A server that does not answer is not saved, so no agent is given a broken entry. A server that
       // needs a sign-in or a key is saved: the sign-in and the key belong to a saved row.
       const outcome = yield* servers.inspect(config);

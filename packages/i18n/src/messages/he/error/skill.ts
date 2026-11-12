@@ -56,4 +56,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "תיקיית המיומנות דורשת SKILL.md בשורש שלה.",
   "error.skill.pathSymlink": "נתיבי מיומנות אינם יכולים להכיל קישורים סמליים.",
   "error.skill.folderNotRead": "{provider} אינו קורא את {folder}. יש להעתיק את התיקייה הזו אל {target}.",
+  "error.skill.githubLinkInvalid": "יש להדביק קישור למאגר או לתיקייה ב-GitHub.",
+  "error.skill.githubNotFound": "OpenBot לא יכול לפתוח את {repository}. המאגר פרטי או שהוא לא קיים.",
+  "error.skill.githubNoSkills": "אין SKILL.md בתיקייה {folder}.",
+  "error.skill.githubUnavailable": "OpenBot לא יכול לקרוא את GitHub כרגע. יש לנסות שוב מאוחר יותר.",
+  "error.skill.githubRateLimited":
+    "GitHub מגביל את מספר הפעמים ש-OpenBot יכול לקרוא אותו בלי חשבון. יש לנסות שוב בעוד שעה.",
+  "error.skill.githubTooLarge": "OpenBot לא יכול לקרוא את כל הקבצים של {repository}. המאגר גדול מדי.",
+  "error.skill.githubHostTooOld": "יש לעדכן את השרת הזה כדי להוסיף מיומנויות מ-GitHub.",
+  "error.skill.publishGithub": "{name} מגיעה מ-GitHub. אפשר לפרסם רק מיומנויות שיצרת.",
 } as const satisfies PartialTranslation<typeof source>;

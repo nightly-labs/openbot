@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Los agentes ocultos siguen trabajando. OpenBot desactivó las rutinas de los agentes que ocultaste antes de esta versión, así que activa las rutinas que quieras."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Fija un mensaje en el chat de un agente: haz clic derecho en él y selecciona Fijar. El botón de mensajes fijados del encabezado del chat muestra los mensajes fijados de todos los chats del agente.",
+          "La Biblioteca tiene carpetas y tres vistas. Un agente también puede guardar los archivos que adjunta en una carpeta que tú nombres.",
+          "Enseñar una tarea: selecciona Enseñar una tarea en el menú +, y luego realiza la tarea en el navegador del agente. El agente guarda los pasos como una habilidad.",
+          "Agrupa las cuentas de un proveedor en Ajustes. Los agentes usan una cuenta hasta que se acerca a un límite de uso, y luego la siguiente.",
+          "Añade habilidades desde GitHub: pega el enlace de un repositorio público en la búsqueda de habilidades del Marketplace.",
+          "Ajustes del servidor → Transferir puede exportar una copia completa de un servidor y copiar agentes a otro servidor en un solo paso.",
+          "Silencia un agente desde su menú en la barra lateral. Un agente silenciado no envía notificaciones ni reproduce sonidos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un mensaje que envías a un agente mientras trabaja ahora orienta el turno en curso. Para ponerlo en cola como antes, desactiva Orientar a los agentes mientras trabajan en Ajustes → Agentes.",
+          "Un agente oculto sigue trabajando. Ejecuta sus rutinas y aparece en Te necesita cuando espera tu respuesta.",
+          "El servidor abierto aparece como logotipo en la parte inferior de la barra de páginas. El botón Nuevo está al final del campo de búsqueda de la barra lateral.",
+          "OpenBot usa Electron 45.3.0 con Chromium 156, y más sitios con una comprobación de bots se cargan en el navegador del agente."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot arranca más rápido, sobre todo en Windows, y un equipo lento sigue respondiendo después del inicio.",
+          "OpenBot sigue respondiendo después de un reinicio cuando tienes muchas tareas o hilos.",
+          "En Linux y Windows, OpenBot completa su cierre cuando cierras la ventana principal.",
+          "Las rutinas se ejecutan a su hora después de corregir el reloj del equipo.",
+          "El texto que copias de un chat ya no tiene líneas vacías al principio ni al final."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

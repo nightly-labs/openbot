@@ -474,11 +474,17 @@ const ServerSettings = createSimpleContext({
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /** Restarts the hosted server, or the server on this computer, that the confirmation from the server menu asks about. */
+    /**
+     * Restarts the server that the confirmation from the server menu asks about: a server on this computer
+     * through its supervisor, a hosted server through the account service, and a self-hosted server
+     * through its own host (`host-restart-v1`).
+     */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       if (server.thisComputer) await serversPort().localServers.restart(server.id);
+      else if (server.hosted !== true && serverSupportsCapability(server, "host-restart-v1"))
+        await serversPort().hostAdmin.restartHost(server.id);
       else await serversPort().hostedServers.restart(server.id);
     }
 

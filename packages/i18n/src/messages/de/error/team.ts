@@ -119,6 +119,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Diese Verbindung unterstützt keine Änderungen der Serveridentität.",
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
+  "error.team.hostRestartUnsupported": "Diese Verbindung unterstützt keinen Neustart des Servers.",
   "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
   "error.team.localServersUnsupported": "Diese Verbindung unterstützt keine Server auf diesem Computer.",
   "error.team.routineResultsUnsupported": "Diese Verbindung unterstützt keine Ziele für Routinen.",

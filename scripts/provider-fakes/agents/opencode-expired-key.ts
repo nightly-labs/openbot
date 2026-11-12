@@ -30,6 +30,7 @@ logEntry({
   configKey,
   baseURL: config.provider?.["opencode-go"]?.options?.baseURL ?? null,
   zenKey: config.provider?.opencode?.options?.apiKey ?? null,
+  envKey: process.env.OPENCODE_API_KEY ?? null,
 });
 
 let count = 0;

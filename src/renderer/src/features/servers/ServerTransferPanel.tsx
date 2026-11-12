@@ -18,6 +18,8 @@ export interface ServerTransferOptions {
   onSignIn?: ((provider: AgentProviderId) => void) | undefined;
   /** The server can put the chat history in the file. */
   history?: boolean;
+  /** The server chooses the channel messages apart from the chats, and has server preferences to export. */
+  fullCopy?: boolean;
   calls?: ServerTransferCalls;
   /** Copy to another server. Absent when the user has no other server to copy to. */
   copy?: ServerCopyOptions | undefined;
@@ -43,6 +45,7 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
         exportError={store.state.exportError}
         onExport={(options) => store.exportFile(options)}
         historyAvailable={props.history}
+        fullCopyAvailable={props.fullCopy}
         onShowExport={store.showExport}
         onExportAgain={() => store.exportAgain()}
         importPhase={store.state.importPhase}
@@ -50,7 +53,9 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
         result={store.state.result}
         importError={store.state.importError}
         onChoose={() => store.choose()}
-        onImport={(keys, includeSettings) => store.importFile(keys, includeSettings)}
+        onImport={(keys, includeSettings, includeServerPreferences) =>
+          store.importFile(keys, includeSettings, includeServerPreferences)
+        }
         onCancelImport={() => store.cancelImport()}
         onImportDone={() => store.importDone()}
         onSignIn={props.onSignIn}
