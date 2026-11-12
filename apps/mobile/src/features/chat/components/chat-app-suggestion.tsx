@@ -1,3 +1,4 @@
+import { canAdministerServer } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -11,9 +12,10 @@ import { appListings, CONNECTOR_TAGLINES } from "@/features/marketplace/model/ma
 import { pluginConnectMethod, pluginInstalled } from "@/features/marketplace/model/plugin-connect";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId, type MobileConnectorId } from "@/features/servers/model/connectors";
-import { useConnectorRows } from "@/features/servers/model/use-connector-rows";
+import { useConnectorRowState } from "@/features/servers/model/use-connector-rows";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -46,11 +48,32 @@ export function ChatAppSuggestion({
   return <PluginSuggestion serverId={serverId} messageId={messageId} slug={appId} />;
 }
 
+/**
+ * Who reads the card, apart from the permission to act: the permission is also false while the server is
+ * offline or when the host lacks the capability, and then the members-only text would be false.
+ */
+function useServerAccess(serverId: string) {
+  const online = useMobileWorkspaceSelector((workspace) =>
+    showsOnline(workspace.servers.find((server) => server.id === serverId)),
+  );
+  const administers = useMobileWorkspaceSelector((workspace) =>
+    canAdministerServer(workspace.servers.find((server) => server.id === serverId)?.role),
+  );
+  return { online, administers };
+}
+
+/** The state when the user cannot act now: offline waits, an owner's host lacks the feature, a member may not. */
+function blockedState(access: { online: boolean; administers: boolean }): SuggestionState {
+  if (!access.online) return "pending";
+  return access.administers ? "unavailable" : "notAllowed";
+}
+
 function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; messageId: string; slug: string }) {
   const { session } = useMobileSession();
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   // A member reads no MCP list, so the app shows as not connected; the card then says who can connect it.
   const { canManage, list: mcpServers } = useMcpServerList(serverId);
+  const access = useServerAccess(serverId);
   const apiUrl = session?.apiUrl;
   const listing = useMemo(
     () => (apiUrl ? appListings(apiUrl).find((item) => item.id === slug) : undefined),
@@ -61,7 +84,7 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
   const app = plugin.apps[0] ?? null;
   const method = app ? pluginConnectMethod(app, canRelay) : null;
   const state: SuggestionState = !canManage
-    ? "notAllowed"
+    ? blockedState(access)
     : mcpServers.data
       ? pluginInstalled(plugin, mcpServers.data)
         ? "connected"
@@ -102,20 +125,27 @@ function ConnectorSuggestion({
 }) {
   const { t } = useText();
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageConnectors(serverId));
-  // An owner or admin has no row while the status loads, or when the host does not run the connector.
-  const row = useConnectorRows(serverId).find((item) => item.id === connector);
+  const access = useServerAccess(serverId);
+  const rows = useConnectorRowState(serverId);
+  const row = rows.rows.find((item) => item.id === connector);
+  // No row and no load in progress: the host cannot run this connector.
+  const loading = rows.loading.includes(connector);
   const name = t(CONNECTOR_TITLE_KEYS[connector]);
   const tagline = t(CONNECTOR_TAGLINES[connector]);
   const state: SuggestionState = !canManage
-    ? "notAllowed"
-    : !row || row.status === "connecting"
-      ? "pending"
-      : row.status === "unavailable"
-        ? "unavailable"
-        : row.status === "connected"
-          ? "connected"
-          : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
-            "available";
+    ? blockedState(access)
+    : !row
+      ? loading
+        ? "pending"
+        : "unavailable"
+      : row.status === "connecting"
+        ? "pending"
+        : row.status === "unavailable"
+          ? "unavailable"
+          : row.status === "connected"
+            ? "connected"
+            : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
+              "available";
   return (
     <SuggestionCard
       messageId={messageId}
