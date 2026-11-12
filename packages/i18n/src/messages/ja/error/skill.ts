@@ -30,6 +30,8 @@ export const messages = {
   "error.skill.replaceModified": "このスキルにはローカルの変更があります。続けるには置き換えを確認してください。",
   "error.skill.removeModified": "このスキルにはローカルの変更があります。変更を削除するには削除を確認してください。",
   "error.skill.notFound": "スキルが見つかりません。",
+  "error.skill.folderSkillToggle":
+    "このスキルは OpenBot がインストールしたものではないため、有効・無効を切り替えられません。{location} で編集または削除してください。",
   "error.skill.disableModified":
     "このスキルにはローカルの変更があります。無効にする前に、両方のプロバイダーのコピーを保存するか一致させてください。",
   "error.skill.disableNeedsRepair": "このスキルを無効にするには、先に修復が必要です。",

@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "במיומנות הזו יש שינויים מקומיים. יש לאשר את ההחלפה כדי להמשיך.",
   "error.skill.removeModified": "במיומנות הזו יש שינויים מקומיים. יש לאשר את ההסרה כדי למחוק אותם.",
   "error.skill.notFound": "המיומנות לא נמצאה.",
+  "error.skill.folderSkillToggle":
+    "OpenBot לא התקין את המיומנות הזאת, ולכן אין לו אפשרות להפעיל או לכבות אותה. אפשר לערוך או להסיר אותה ב-{location}.",
   "error.skill.disableModified": "במיומנות הזו יש שינויים מקומיים. יש לשמור או ליישב את שני עותקי הספק לפני ההשבתה.",
   "error.skill.disableNeedsRepair": "המיומנות הזו דורשת תיקון לפני שאפשר להשבית אותה.",
   "error.skill.enableNeedsRepair": "המיומנות הזו דורשת תיקון לפני שאפשר להפעיל אותה.",

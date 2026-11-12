@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "Esta habilidade tem alterações locais. Confirme a substituição para continuar.",
   "error.skill.removeModified": "Esta habilidade tem alterações locais. Confirme a remoção para excluí-las.",
   "error.skill.notFound": "Habilidade não encontrada.",
+  "error.skill.folderSkillToggle":
+    "O OpenBot não instalou esta habilidade, então não pode ativá-la nem desativá-la. Edite ou remova em {location}.",
   "error.skill.disableModified":
     "Esta habilidade tem alterações locais. Salve ou concilie as duas cópias dos provedores antes de desativá-la.",
   "error.skill.disableNeedsRepair": "Esta habilidade precisa ser reparada antes de ser desativada.",

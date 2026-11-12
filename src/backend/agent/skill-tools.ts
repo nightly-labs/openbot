@@ -82,7 +82,7 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "set_skill_enabled",
     description:
-      "Turn an installed skill on or off for yourself or another local agent. Omit agentId for yourself. Get the skillId from read_agent. Refuses to turn off a skill whose files were changed.",
+      "Turn an installed skill on or off for yourself or another local agent. Omit agentId for yourself. Get the skillId from read_agent. Refuses to turn off a skill whose files were changed. Cannot change a workspace folder skill.",
     shape: setSkillEnabledSchema.shape,
   },
   {
@@ -163,6 +163,17 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     case "set_skill_enabled": {
       const input = yield* toolStep(() => setSkillEnabledSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
+      // A workspace folder skill is not in the lock file, so the service would say that it does not exist.
+      const folderSkill = (yield* api.listInstalled(target)).find(
+        (skill) => skill.skillId === input.skillId && skill.origin === "workspace",
+      );
+      if (folderSkill) {
+        return yield* new ToolOperationFailed({
+          cause: new Error(
+            sourceText("error.skill.folderSkillToggle", { location: folderSkill.location ?? folderSkill.slug }),
+          ),
+        });
+      }
       return yield* api.setEnabled({ ...input, agentId: target });
     }
     case "uninstall_skill": {
