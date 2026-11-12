@@ -9,6 +9,7 @@ import {
   type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
+  type AgentTaskWindow,
   type AgentWaitsSnapshot,
   type AttachmentDownloadProgress,
   type AttachmentImportProgress,
@@ -25,6 +26,7 @@ import {
   isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAgentWaitsSnapshot,
   isAttachmentSummary,
   isConversationMessage,
@@ -33,8 +35,10 @@ import {
   isConversationWithReadState,
   isFilePreviewKind,
   isFilePreviewPageUrl,
+  isPinnedMessagesSnapshot,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
@@ -201,6 +205,13 @@ export function decodeWaits(value: unknown): AgentWaitsSnapshot {
   return value;
 }
 
+export function decodePinnedMessages(value: unknown): PinnedMessagesSnapshot {
+  if (!isPinnedMessagesSnapshot(value)) {
+    throw new Error("Invalid pinned messages response.");
+  }
+  return value;
+}
+
 export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
   if (!isAgentTaskReadState(value)) {
     throw new Error("Invalid thread read state.");
@@ -239,6 +250,13 @@ export function decodeTaskConversation(value: unknown): ConversationSnapshot {
 export function decodeTaskPage(value: unknown): AgentTaskPage {
   if (!isAgentTaskPage(value)) {
     throw new Error("Invalid task page response.");
+  }
+  return value;
+}
+
+export function decodeTaskWindow(value: unknown): AgentTaskWindow {
+  if (!isAgentTaskWindow(value)) {
+    throw new Error("Invalid task part response.");
   }
   return value;
 }

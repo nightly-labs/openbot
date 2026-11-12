@@ -145,6 +145,16 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
+/** Waits until `path` is removed. False when it is still there after 10 s. */
+async function gone(path: string): Promise<boolean> {
+  const deadline = Date.now() + 10_000;
+  while (await exists(path)) {
+    if (Date.now() > deadline) return false;
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  return true;
+}
+
 async function refusal(provider: ManagedProviderId): Promise<string> {
   const error = await runCauseEffect(manager.removeDownload(provider)).then(
     () => null,
@@ -183,7 +193,8 @@ try {
   assert.equal(report.offStampedAtStart, false, "a provider that is off is not stamped");
   report.readyPhase = manager.getStatus().providers[READY].phase;
   assert.equal(report.readyPhase, "ready", "the verified version is what the provider runs");
-  report.readyBackupCollected = !(await exists(readyBackup));
+  // The start does not wait for the removal, so the window is not held by it.
+  report.readyBackupCollected = await gone(readyBackup);
   assert.ok(report.readyBackupCollected, "a verified version keeps no older one to fall back on");
 
   // A version run within the window stays, and this instance does not stamp it again.

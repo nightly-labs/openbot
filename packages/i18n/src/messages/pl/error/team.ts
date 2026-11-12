@@ -79,6 +79,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
+  "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "error.team.sidebarPinsUnsupported":
@@ -159,6 +160,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Ten klient nie obsługuje bezpiecznego uwierzytelniania.",
   "error.team.agentSettingsUnsupported": "To połączenie nie obsługuje ustawień agentów.",
   "error.team.adminRequired": "Wymagany jest dostęp administratora.",
+  "error.team.mcpAccessStale": "Ktoś zmienił dostęp do tego serwera MCP. Wprowadź zmianę ponownie.",
   "error.team.mcpServerNotYours": "Ten serwer MCP może zmienić tylko osoba, która go dodała, albo administrator.",
   "error.team.ownerRequired": "Tylko właściciel tego serwera może to zrobić.",
   "error.team.requestTooLarge": "Treść żądania jest za duża.",
@@ -173,6 +175,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
   "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
+  "error.team.messagePinsUnsupported": "To połączenie nie obsługuje przypiętych wiadomości.",
   "error.team.queuedMessageThreadUnsupported":
     "To połączenie nie obsługuje uruchamiania wiadomości z kolejki jako nowego wątku.",
   "error.team.backgroundProcessesUnsupported": "To połączenie nie obsługuje procesów w tle.",

@@ -14,6 +14,8 @@ export const messages = {
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
   "error.provider.acpMcpNotLoaded":
     "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider}가 MCP 서버 {name}을(를) 시작하지 못해 응답이 중단되었습니다. 이 서버는 OpenBot이 아니라 사용자의 {provider} 설정에 있습니다. 그곳에서 서버를 제거하거나 고친 다음 새 채팅을 시작하세요.",
   "error.provider.endpointsReadOnly":
     "저장된 엔드포인트가 더 새로운 버전의 OpenBot에서 작성되었거나 파일을 읽을 수 없어요. 변경하려면 OpenBot을 업데이트하세요.",
   "error.provider.endpointNoSecureStorage":
@@ -193,6 +195,8 @@ export const messages = {
     'OpenCode에 모델 제공자 "{provider}"의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode에 이 모델 제공자의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode가 이 무료 모델을 거부했어요. 일부 무료 모델은 국가에 따라 사용할 수 없어요. 무료 라벨이 있는 다른 모델을 선택하거나, OpenCode 설정에 OpenCode Go 키를 붙여넣고 OpenCode Go 모델을 선택하세요.",
   "error.provider.customEndpointKeyRefused":
     '엔드포인트 "{provider}"이(가) API 키 또는 헤더를 거부했어요. 서버 설정 → 제공자에서 다시 입력한 다음 다시 시도해 주세요.',
   "error.provider.customEndpointKeyMissing":
@@ -213,6 +217,8 @@ export const messages = {
     "OpenCode 무료 모델이 사용 한도에 도달했어요. 모든 무료 모델이 이 한도를 함께 사용해요. 계속하려면 OpenCode 설정에 OpenCode Go 키를 붙여넣거나 다른 제공자의 모델을 선택하세요.",
   "error.provider.opencodeProviderFailed":
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
@@ -221,6 +227,8 @@ export const messages = {
     "다른 Codex 앱(Codex 데스크톱 앱, Codex CLI, IDE 확장 프로그램 등)이 이 채팅을 열어 두었어요. Codex 채팅에는 한 번에 하나의 앱만 쓸 수 있어요. 그 앱에서 채팅을 닫은 후 메시지를 다시 보내 주세요.",
   "error.provider.realtimeLimitZero":
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
+  "error.provider.cpuUnsupported":
+    "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
   "error.provider.opencodeDatabaseNewer":
     "더 새로운 OpenCode 버전이 데이터베이스를 변경해서 OpenCode가 데이터베이스를 열 수 없었어요. OpenCode를 버전 2 이상으로 업데이트한 후 다시 시도해 주세요.",
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
@@ -251,6 +259,8 @@ export const messages = {
     "Gemini가 지금은 이 모델을 사용할 수 없어요. 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -299,6 +309,8 @@ export const messages = {
     "이미지가 너무 작아서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooLarge":
     "이미지가 너무 커서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.imageCountLimit":
+    "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
   "error.provider.museMcpStartupFault":

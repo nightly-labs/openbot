@@ -225,6 +225,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name}에 남은 사용량 초기화 크레딧이 없어요.",
   "provider.account.resetUsageAlreadyRedeemed": "{name}의 이 초기화 크레딧은 이미 사용되었어요.",
   "provider.account.resetUsageFailed": "{name}의 사용량을 초기화할 수 없어요.",
+  "provider.account.pool": "계정 풀 사용",
+  "provider.account.poolDescription":
+    "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "provider.account.inUse": "사용 중",
+  "provider.account.notInPool": "풀 제외",
+  "provider.account.leaveOutOfPool": "풀에서 제외",
+  "provider.account.putBackInPool": "풀에 다시 추가",
+  "provider.account.poolChip": "풀",
+  "provider.account.poolCount": "{accounts} 풀",
+  "provider.account.poolInUse": "{pool} · {name} 사용 중",
 
   "provider.settings.connected": "연결됨",
   "provider.settings.other": "다른 제공자",
@@ -246,6 +256,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "새 에이전트 기본값 · {use}",
   "provider.settings.accounts": "계정",
   "provider.settings.accountsDescription": "{max}개 중 {count}개. 에이전트마다 계정 하나를 사용해요.",
+  "provider.settings.accountsPooledDescription": "{max}개 중 {count}개. 에이전트가 이 계정을 함께 사용해요.",
   "provider.settings.accountBlocked": "다시 로그인할 때까지 {agents}을(를) 실행할 수 없어요.",
   "provider.settings.removeTitle": "{name}을(를) 제거할까요?",
   "provider.settings.removeMoves": "{agents}이(가) {name}을(를) 사용하게 돼요.",
@@ -266,6 +277,8 @@ export const messages = {
   "provider.settings.keyAlternative": "또는 {name} API 키를 붙여넣으세요.",
   "provider.settings.geminiKeyInUse":
     "Gemini가 Google AI 요금제가 아닌 이 키를 사용해요. 요금제의 사용량은 표시되지 않아요.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "저장된 Gemini API 키가 Google 로그인 대신 사용돼요. Google 요금제와 그 모델을 사용하려면 키를 삭제하세요.",
   "provider.settings.claudeKeyInUse":
     "Anthropic은 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.settings.addKey": "키 추가",
@@ -316,4 +329,6 @@ export const messages = {
   "provider.settings.endpoints": "엔드포인트",
   "provider.settings.noEndpoints": "엔드포인트가 없어요.",
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
 } as const satisfies PartialTranslation<typeof source>;

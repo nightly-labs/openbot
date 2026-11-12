@@ -255,7 +255,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const editing = () => host.state.editing;
   const editDraft = () => {
     const provider = editing();
-    return provider ? savedCustomProviderDraft(provider) : undefined;
+    return provider ? savedCustomProviderDraft(provider, i18n.format) : undefined;
   };
 
   return (

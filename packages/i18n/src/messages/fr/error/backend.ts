@@ -48,6 +48,10 @@ export const messages = {
     "Cet hôte distant ne prend pas en charge la navigation par la barre d’adresse dans un onglet existant.",
   "error.backend.browserUserControlBusy":
     "Cet onglet du navigateur attend un secret. Répondez d’abord à la demande de secret.",
+  "error.backend.browserTeachBusy":
+    "Une autre personne contrôle cet onglet du navigateur. Réessayez quand elle aura terminé.",
+  "error.backend.browserTeachUnavailable": "Cet onglet du navigateur n’a aucun agent qui peut apprendre une tâche.",
+  "error.backend.browserTeachUnsupported": "Cet hôte distant ne prend pas en charge l’enregistrement d’une tâche.",
   "error.backend.browserUserControlUnsupported":
     "Cet hôte distant ne permet pas de prendre le contrôle d’un onglet du navigateur.",
   "error.backend.browserSignInUnsupported":
@@ -164,6 +168,10 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Le destinataire est en cours de suppression. Réessayez une fois la suppression terminée.",
   "error.backend.recipientHidden": "Cet agent est masqué. Restaurez-le pour envoyer des messages.",
+  "error.backend.agentIdUnknown":
+    "Aucun agent n’a l’identifiant {id}. Obtenez les identifiants avec openbot.list_agents, puis réessayez.",
+  "error.backend.agentIdNear":
+    "Aucun agent n’a l’identifiant {id}. L’agent {name} a l’identifiant {nearId}, presque identique. S’il s’agit de cet agent, réessayez avec son identifiant.",
   "error.backend.attachBetween": "Joignez entre 1 et {limit} fichiers.",
   "error.backend.attachmentNotFile": "La pièce jointe n’est pas un fichier : {path}",
   "error.backend.generatedImageTooLarge": "L’image générée dépasse la limite de 100 Mo.",
@@ -228,6 +236,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Ce message n’est pas dans le chat.",
   "error.backend.messageDeleteBusy": "Ce message fait partie d’un tour en cours. Supprimez-le à la fin du tour.",
   "error.backend.messageDeleteForbidden": "Vous ne pouvez supprimer que les messages que vous avez envoyés.",
+  "error.backend.messagePinNotFound": "Ce message n’est pas dans la discussion.",
+  "error.backend.messagePinLimit":
+    "Cette discussion contient 50 messages épinglés. Désépinglez-en un avant d’en épingler un autre.",
   "error.backend.routineFlowHandoffFailed": "La routine n’a pas pu transmettre le travail à cet agent.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",
@@ -260,6 +271,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Son outil {tool} a un format d’entrée que ce fournisseur ne peut pas lire. Les agents des autres fournisseurs reçoivent toujours le serveur.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} n’a pas pu utiliser le serveur MCP {name}, car ce serveur demande une connexion. Ouvrez les réglages MCP et choisissez Se connecter.",
   "error.backend.mcpServerFailedForProvider":
@@ -293,6 +306,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Le nom de la section est trop long.",
   "error.backend.sidebarFolderTooDeep": "Les dossiers ne peuvent avoir que trois niveaux.",
   "error.backend.sidebarFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
+  "error.backend.libraryFolderName": "Le nom d’un dossier doit comporter de 1 à {limit} caractères.",
+  "error.backend.libraryFolderLimit": "Un serveur peut avoir jusqu’à {limit} dossiers de la Bibliothèque.",
+  "error.backend.libraryFolderFileLimit": "Il y a trop de fichiers dans les dossiers de la Bibliothèque.",
+  "error.backend.libraryFolderTooDeep": "Les dossiers de la Bibliothèque ne peuvent avoir que {limit} niveaux.",
+  "error.backend.libraryFolderGone": "Le dossier n’existe pas ou a déjà été supprimé.",
+  "error.backend.libraryFolderOtherAgent": "Un fichier ne peut aller que dans un dossier de son agent.",
+  "error.backend.libraryFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
   "error.backend.sectionNameDuplicate": "Les noms de section doivent être uniques.",
   "error.backend.directMessageRequired": "Écrivez d’abord un message.",
   "error.backend.directMessageTooLong": "Un message direct peut contenir jusqu’à {limit} caractères.",

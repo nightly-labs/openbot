@@ -14,6 +14,8 @@ export const messages = {
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
   "error.provider.acpMcpNotLoaded":
     "{provider} n’a pas chargé les outils d’OpenBot : cet agent ne peut donc ni les utiliser ni joindre ses coéquipiers. Une règle d’équipe {provider} peut bloquer les serveurs MCP locaux. Demandez à l’administrateur de votre équipe de les autoriser, puis réessayez.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, la réponse s’est donc arrêtée. Ce serveur est dans vos propres réglages de {provider}, pas dans OpenBot. Supprimez-le ou réparez-le à cet endroit, puis démarrez une nouvelle conversation.",
   "error.provider.endpointsReadOnly":
     "Les points de terminaison enregistrés ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
   "error.provider.endpointNoSecureStorage":
@@ -210,6 +212,8 @@ export const messages = {
     "OpenCode n’a pas de connexion pour le fournisseur de modèle « {provider} ». Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode n’a pas de connexion pour le fournisseur de ce modèle. Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode a refusé ce modèle gratuit. Certains modèles gratuits ne sont pas disponibles dans tous les pays. Choisissez un autre modèle avec l’étiquette Gratuit, ou collez une clé OpenCode Go dans les réglages d’OpenCode et choisissez un modèle OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Le point de terminaison « {provider} » a refusé sa clé d’API ou ses en-têtes. Saisissez-les de nouveau dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.customEndpointKeyMissing":
@@ -230,6 +234,8 @@ export const messages = {
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":
@@ -238,6 +244,8 @@ export const messages = {
     "Une autre application Codex a ouvert cette conversation, par exemple l'application de bureau Codex, Codex CLI ou une extension d'IDE. Une seule application à la fois peut écrire dans une conversation Codex. Fermez la conversation dans cette application, puis renvoyez votre message.",
   "error.provider.realtimeLimitZero":
     "Linux a arrêté le fournisseur, car OpenBot a une limite de CPU en temps réel de 0. Cette limite vient de votre système. Installez et démarrez rtkit (`rtkit-daemon`), exécutez `systemctl --user restart xdg-desktop-portal`, puis redémarrez OpenBot. Redémarrer seulement xdg-desktop-portal ne suffit pas tant que rtkit est absent.",
+  "error.provider.cpuUnsupported":
+    "Le processeur de cet ordinateur ne peut pas exécuter ce fournisseur. Utilisez un autre fournisseur.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode n’a pas pu ouvrir sa base de données, car une version plus récente d’OpenCode l’a modifiée. Mettez OpenCode à jour vers la version 2 ou ultérieure, puis réessayez.",
   "error.provider.opencodeNoAnswer":
@@ -271,6 +279,8 @@ export const messages = {
     "Gemini ne peut pas utiliser ce modèle pour le moment. Choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -322,6 +332,8 @@ export const messages = {
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooLarge":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageCountLimit":
+    "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.museMcpStartupFault":

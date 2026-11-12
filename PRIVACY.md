@@ -124,6 +124,10 @@ except a side thread of the same agent that the agent names by its task id.
 A user can tag a browser tab or a side thread of the agent in a message. When OpenBot delivers the
 message, it sends the provider the tab's title and address, or the thread's title, state, and the start
 of its last answer. Card numbers and known secrets are removed first.
+When a user selects "Teach a task" and saves the recording, OpenBot sends the agent's provider a
+message with the steps in an attached text file: the host, path and title of each page, and the role and name of each control
+that the user clicked. The steps have no query, no typed text and no field value. A discarded
+recording is sent to nobody.
 Channel history keeps its existing membership and task checks. Messaging history stays within its
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.
@@ -469,6 +473,13 @@ Settings → General → Fast connection to servers turns this off. Off, the app
 once, keeps nothing on disk, and ends each session when it quits. Turned on during a run, it keeps the
 sessions that are open at that time. The setting is on by default and is stored
 in `openbot-remote-session-reuse-preference-v1.json`.
+
+The desktop app and the web client keep a copy of the agent and channel pictures that they loaded
+from a joined server, so that the agent pictures show while the server is offline, for example during its
+restart for an update. The desktop app keeps the copies in the `remote-pictures` folder of its data
+folder; the web client keeps the agent pictures in the Cache storage of openbot.run in your browser.
+The copies stay on that computer or in that browser. They are deleted when you sign out, when
+another account signs in, when the server leaves your list, and when the server ends your access.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
@@ -1649,8 +1660,9 @@ apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
-and asks Google's Code Assist service (`cloudcode-pa.googleapis.com`) for the account's project and
-quota, as the CLI does. The requests carry that token and a User-Agent with the CLI's version, your
+and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
+`daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
+The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
 operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.

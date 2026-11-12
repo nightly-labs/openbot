@@ -344,7 +344,9 @@ must not hold the request until a person acts. `channel_result` is refused while
 task waits for its answer. `channel_reply` refuses, with
 `accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
 a person or of the caller, to a streaming message, to a member that takes no work, and over the
-limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. The
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. Claude
+gets a refusal of `channel_result` or `channel_reply` as a failed tool call, so Claude Code asks for
+an answer when the turn then ends empty (see [Providers](providers.md)). The
 reply text is agent text that reaches another agent, so its assignment starts with a line that
 names the sender and says it is not the user, and a reply turn only answers: it cannot use
 `channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
@@ -471,6 +473,23 @@ the person asks for another member or for help, or when a part clearly needs ano
   channel facts with a rule line, and a line when a person turns it off. A save without the field
   keeps the stored value, so a client from before it does not turn it off. The agent import archive
   (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
+- The Browser setting of a channel (`Channel.browser`, in `channel_json`, so no migration) says which
+  members can use the browser there (#4135): every member (absent, or `{ kind: "members" }`), one
+  member (`{ kind: "member", agentId }`), or no member (`{ kind: "none" }`). `OpenBotToolRouter`
+  refuses an `openbot_browser` call of a channel thread that the setting forbids, and the answer tells
+  the agent to give the browser step to the browser member with `channel_assign`. The packet gives
+  `browser` in the channel facts with a rule line for each member, and a line when a person gives the
+  browser to every member again. A save without the field keeps the stored value. A value that this
+  version cannot read, or that names an agent that is not a member, reads as no member: the setting
+  limits access, so it fails closed. A save that removes the browser member also sets no member
+  (`withBrowserMember`), and no other member gets the browser in its place.
+- The channel side panel has the Settings, Browser and Files panes. The Browser pane shows the tabs
+  that the members' channel threads own (`ChannelSummary.threads`). A new tab opens for the browser
+  member's channel thread (else the lead's, else the first member's), so that member can use it under
+  the host's thread rule for tabs. When no member can use the browser, or the member has no channel
+  thread yet, the pane shows only the tabs that exist. The Files pane reads the `channel` storage
+  scope: the files of the channel's messages, as the chat Files pane reads one conversation. Voice and
+  the side question stay in agent chats.
 - After a turn, a channel starts one background summary. `prepare` waits for it only when its own
   budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
   messages again. A deleted channel stops the summary. It does not start when it would take the
@@ -544,6 +563,13 @@ On a host with `channel-isolation-v1`, each channel record and the draft of a `s
 the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
 server or the browser client shows the switch only when the host advertises the capability (#5380).
 A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
+On a host with `channel-browser-v1`, each channel record and the draft of a `save` carry `browser`, in
+the same way. A joined server or the browser client shows the Browser select only when the host
+advertises the capability. The phone does not show the setting, and its saves do not change it. On a
+host with `storage-channel-v1`, `POST /v1/storage/channel-files` answers the file rows of one channel
+for the Files pane. Every member who sees the channel can read them; a hidden channel gets 404, as
+`POST /v1/channels/read` does.
 
 On a host with `channel-picture-v1`, each channel record carries its picture: `icon` and the
 `openbot-avatar://channel/` `imageUrl`, which names only the image version. A `save` draft can carry
@@ -693,6 +719,12 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
+  A `messaging_history` call that names a connection and a place goes the same way
+  (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
+  `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
+  turn with a delivery that has a `messaging` origin or a `messagingReturn`, or that an agent sent
+  from such a turn (`MailboxStore.turnServesExternalChat` follows the chain of requests), so a
+  person in an external chat cannot make an agent or a teammate in the chain read a different place.
   A Slack post with live user mentions (`slackPingedUsers`) stores one `projection_messaging_pings`
   row for each person, with the calling agent and the redacted post, unless a person's mention opened
   the thread. In a thread with pings, a reply without a mention counts only from a pinged person,

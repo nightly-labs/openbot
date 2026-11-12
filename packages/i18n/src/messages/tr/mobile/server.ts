@@ -837,6 +837,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Kişisel numara",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+  "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",
@@ -1014,6 +1017,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.pool": "Hesapları havuzla",
+  "mobile.server.providers.poolHint":
+    "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "mobile.server.providers.accountsPooledHint":
+    "Ajanlar bu hesapları paylaşır. Yeni bir hesap bu telefonda kendi sayfasından oturum açar.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Ajanlar bu hesapları paylaşır. Hesap eklemek için bir bilgisayarda OpenBot'u kullanın.",
+  "mobile.server.providers.inUse": "Kullanımda",
+  "mobile.server.providers.notInPool": "Havuz dışı",
+  "mobile.server.providers.leaveOutOfPool": "Havuzdan çıkar",
+  "mobile.server.providers.putBackInPool": "Havuza geri koy",
   "mobile.server.providers.models": "Modeller",
   "mobile.server.providers.modelsCount": "{shown} / {total}",
   "mobile.server.providers.modelsTitle": "{name} modelleri",

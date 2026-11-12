@@ -20,6 +20,7 @@ import {
   decodeAppLanguagePreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingState,
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCustomAgentResult,
@@ -27,6 +28,7 @@ import {
   decodeCustomAgentUsage,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
+  decodeHostedServer,
   decodeInstalledFonts,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
@@ -320,6 +322,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
   ],
   ["update status", decodeUpdateStatus, updateStatus],
   ["host-managed update status", decodeUpdateStatus, { ...updateStatus, managedByHost: true } satisfies UpdateStatus],
+  [
+    "update status with a staged release",
+    decodeUpdateStatus,
+    { ...updateStatus, phase: "up-to-date", stagedVersion: "0.68.0" } satisfies UpdateStatus,
+  ],
   ["update preference", decodeUpdatePreference, { autoDownload: true, allowRemoteUpdates: true, autoInstall: false }],
   ["notification preference", decodeNotificationPreference, { desktopNotifications: true, messagePreview: false }],
   [
@@ -520,6 +527,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["account sessions that are not a list", decodeAccountSessions, { sessionId: "s" }],
   ["update status in an unknown phase", decodeUpdateStatus, { ...updateStatus, phase: "done" }],
   ["update status with an unknown failure", decodeUpdateStatus, { ...updateStatus, errorCode: "boom" }],
+  ["update status with a staged release that is not text", decodeUpdateStatus, { ...updateStatus, stagedVersion: 68 }],
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],
@@ -617,5 +625,63 @@ describe("pending Marketplace listing", () => {
     ["an id that is not text", { kind: "agent", id: 42 }],
   ])("refuses %s", (_name, value) => {
     expect(decodePendingMarketplaceListing(value)).toBeNull();
+  });
+});
+
+// The storage of a hosted server comes from the account server, and a client shows it as a number of
+// GB. Only a whole number of 1 or more reaches the renderer. Another value is left out, so the server
+// and its plan still show, with the storage of the plan table.
+describe("server storage", () => {
+  const server = {
+    deletionScheduledAt: null,
+    serverId: "server-1",
+    name: "Server",
+    size: "small",
+    plan: "starter",
+    interval: "month",
+    currency: "eur",
+    state: "running",
+    error: null,
+    createdAt: "2026-11-11T12:00:00.000Z",
+    updatedAt: "2026-11-11T12:00:00.000Z",
+  };
+  const plan = {
+    subscriptionId: "sub_1",
+    serverId: "server-1",
+    serverName: "Server",
+    plan: "starter",
+    interval: "month",
+    currency: "eur",
+    amount: 900,
+    status: "active",
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+  };
+  const state = (storageGb?: unknown) => ({
+    available: true,
+    hasCustomer: true,
+    servers: [storageGb === undefined ? plan : { ...plan, storageGb }],
+  });
+
+  it("keeps the storage of a hosted server and of a plan", () => {
+    expect(decodeHostedServer({ ...server, storageGb: 25 })).toEqual({ ...server, storageGb: 25 });
+    expect(decodeBillingState(state(25))).toEqual(state(25));
+  });
+
+  it("keeps a server and a plan from an account server that sends no storage", () => {
+    expect(decodeHostedServer(server)).toEqual(server);
+    expect(decodeBillingState(state())).toEqual(state());
+  });
+
+  it.each([
+    ["zero", 0],
+    ["a negative number", -25],
+    ["a fraction", 25.5],
+    ["text", "25"],
+    ["null", null],
+    ["a number that is not safe", 2 ** 60],
+  ])("leaves out a storage that is %s", (_name, storageGb) => {
+    expect(decodeHostedServer({ ...server, storageGb })).toEqual(server);
+    expect(decodeBillingState(state(storageGb))).toEqual(state());
   });
 });

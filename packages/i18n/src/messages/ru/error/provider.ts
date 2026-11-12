@@ -14,6 +14,8 @@ export const messages = {
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} не загрузил инструменты OpenBot, поэтому этот агент не может ими пользоваться и связываться с коллегами. Политика команды {provider} может блокировать локальные MCP-серверы. Попросите администратора команды разрешить их и повторите попытку.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} не удалось запустить MCP-сервер {name}, поэтому ответ остановлен. Этот сервер находится в ваших собственных настройках {provider}, а не в OpenBot. Удалите или исправьте его там, затем начните новый чат.",
   "error.provider.endpointsReadOnly":
     "Сохранённые эндпоинты записаны более новой версией OpenBot, либо файл не читается. Чтобы изменить их, обновите OpenBot.",
   "error.provider.endpointNoSecureStorage":
@@ -189,6 +191,8 @@ export const messages = {
     "OpenCode не выполнил вход у провайдера модели «{provider}». Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode не выполнил вход у провайдера этой модели. Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode отклонил эту бесплатную модель. Некоторые бесплатные модели доступны не во всех странах. Выберите другую модель с меткой «Бесплатно» или вставьте ключ OpenCode Go в настройках OpenCode и выберите модель OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Эндпоинт «{provider}» отклонил свой API-ключ или заголовки. Введите их снова в разделе «Настройки сервера → Провайдеры», затем повторите попытку.",
   "error.provider.customEndpointKeyMissing":
@@ -209,6 +213,8 @@ export const messages = {
     "Бесплатные модели OpenCode исчерпали лимит использования. Этот лимит общий для всех бесплатных моделей. Чтобы продолжить, вставьте ключ OpenCode Go в настройках OpenCode или выберите модель другого провайдера.",
   "error.provider.opencodeProviderFailed":
     "У провайдера моделей произошёл сбой на его стороне. Дело не в вашем соединении. Повторите попытку позже или выберите другую модель.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Ответ модели оборвался или был некорректным. Отправьте сообщение ещё раз или выберите другую модель.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode не смог подключиться к провайдеру моделей. Проверьте сетевое подключение компьютера, где работает OpenBot, и повторите попытку.\n{detail}",
   "error.provider.codexStateBusy":
@@ -217,6 +223,8 @@ export const messages = {
     "Этот чат открыт в другом приложении Codex, например в приложении Codex для компьютера, Codex CLI или расширении IDE. Писать в чат Codex может только одно приложение одновременно. Закройте чат в том приложении, затем отправьте сообщение ещё раз.",
   "error.provider.realtimeLimitZero":
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
+  "error.provider.cpuUnsupported":
+    "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
   "error.provider.opencodeNoAnswer":
@@ -248,6 +256,8 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -296,6 +306,8 @@ export const messages = {
     "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooLarge":
     "Модель не приняла изображение в этом чате, потому что изображение слишком большое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.imageCountLimit":
+    "Модель не приняла этот чат, потому что в нем слишком много изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
   "error.provider.museMcpStartupFault":

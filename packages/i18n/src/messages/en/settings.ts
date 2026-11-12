@@ -99,6 +99,8 @@ export const messages = defineMessages("settings", {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
+  "settings.chatOrder.description":
+    "Choose where the sidebar shows unread chats on this device. Manual turns off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",
@@ -261,6 +263,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.edge.description": "Drag the dock up or down to move it along the edge.",
   "settings.agentDock.edge.right": "Right",
   "settings.agentDock.edge.left": "Left",
+  "settings.agentDock.size.title": "Dock size",
+  "settings.agentDock.size.description":
+    "Drag to change the size of the dock above the other apps. In the main window, the dock follows the interface size.",
   "settings.agentDock.autoHide.title": "Hide when not in use",
   "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
   "settings.agentDock.edgeStrip.title": "Show a strip at the edge",
@@ -525,6 +530,7 @@ export const messages = defineMessages("settings", {
   "settings.updates.status.ready": "{target} is ready. Restart to apply.",
   "settings.updates.status.installing": "Restarting to apply {target}…",
   "settings.updates.status.upToDate": "OpenBot is up to date on the Stable track.",
+  "settings.updates.status.staged": "{target} is rolling out to some computers. Check for updates to get it now.",
   "settings.updates.status.checkFailed": "OpenBot could not check for updates. Try again.",
   "settings.updates.status.unsupported": "Updates are unavailable in this build.",
   "settings.updates.actionFailed": "Could not update OpenBot.",

@@ -74,8 +74,8 @@ interface TeamWebRtcClientTransportEvents {
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
-  /** An attempt to connect failed. A cancelled or replaced attempt does not count. */
-  connectFailed: [hostId: string];
+  /** An attempt to connect failed, with its failure. A cancelled or replaced attempt does not count. */
+  connectFailed: [hostId: string, failure: unknown];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
 
@@ -538,7 +538,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               body: binary
                 ? null
                 : sideRoute
-                  ? sideRoute.request(path, init.body, { channelIsolation: true, channelPicture: true })
+                  ? sideRoute.request(path, init.body, {
+                      channelIsolation: true,
+                      channelPicture: true,
+                      channelBrowser: true,
+                    })
                   : encodeTeamProtocolV8WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
                         ? {}
@@ -607,6 +611,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     agentTaskUiBlocks: true,
                     channelIsolation: true,
                     channelPicture: true,
+                    channelBrowser: true,
                     mcpManyServers: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
@@ -897,7 +902,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             CONNECT_RETRY_START_MILLISECONDS * 2 ** (failures - 1),
           );
           this.#connectRetries.set(hostId, { failure, failures, retryAt: Date.now() + delay });
-          this.emit("connectFailed", hostId);
+          this.emit("connectFailed", hostId, failure.cause);
         }),
       ),
       Effect.onExit((exit) => Deferred.done(done, exit)),
@@ -1051,9 +1056,19 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         cleanup();
         reject(cause);
       };
+      // Signal said ready: both ends are on Signal, and the direct path comes next.
+      let signalReady = false;
       const timeOut = () => {
         cleanup();
-        reject(new Error(sourceText("error.remote.hostDidNotConnect")));
+        // The code names the step that did not finish (#6873). Only after Signal said ready and before
+        // a data channel opened is it the direct path, which a firewall, VPN or proxy can block.
+        const stage = active.authentication?.started ? "auth" : signalReady ? "ice" : "signal";
+        reject(
+          new TeamWebRtcConnectError(
+            `connect_timeout_${stage}`,
+            sourceText(stage === "ice" ? "error.remote.iceFailed" : "error.remote.hostDidNotConnect"),
+          ),
+        );
       };
       let timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
       let hostWaited = false;
@@ -1070,7 +1085,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       // The host connected to Signal. The connection has the usual time from now.
       const onSignalReady = (readyHostId: string) => {
-        if (readyHostId !== hostId || !hostWaited) return;
+        if (readyHostId !== hostId) return;
+        signalReady = true;
+        if (!hostWaited) return;
         hostWaited = false;
         clearTimeout(timer);
         timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
@@ -1087,10 +1104,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       this.on("connected", onConnected);
       this.on("error", onError);
-      if (waitForHost) {
-        bridge.on("hostWaiting", onHostWaiting);
-        bridge.on("signalReady", onSignalReady);
-      }
+      bridge.on("signalReady", onSignalReady);
+      if (waitForHost) bridge.on("hostWaiting", onHostWaiting);
     }
     active.authentication = {
       ticket: bootstrap.ticket,
@@ -1550,7 +1565,10 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
   }
 }
 
-/** The connection failed before the host answered. The code is the Signal or the bridge code. */
+/**
+ * The connection failed before the host answered. The code is the Signal or the bridge code, or
+ * `connect_timeout_<step>` for the step that did not finish in time: `signal`, `ice` or `auth`.
+ */
 class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
   code: Schema.String,
   message: Schema.String,

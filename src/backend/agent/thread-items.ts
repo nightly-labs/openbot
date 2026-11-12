@@ -28,7 +28,7 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
-import { isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
+import { isImageCountDiagnostic, isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
@@ -41,7 +41,16 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // Codex sends this on each thread start when the user turned on a feature such as
     // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
     // the text has the config path, so the banner replaced it with "could not continue".
-    message.startsWith("Under-development features enabled:")
+    message.startsWith("Under-development features enabled:") ||
+    // Codex sends this on each session start when its config asks for a tier, such as `priority`,
+    // that the model does not list (`codex-rs/core/src/session/mod.rs`). Codex leaves the tier out
+    // and the turn continues at the standard speed, so the banner showed a false error (#6827).
+    message.startsWith("Configured service tier ") ||
+    // Codex sends this once at start when it cannot update a marketplace from `config.toml`, such as
+    // a Git source on a computer without Git (`codex-rs/core-plugins/src/manager.rs`). It has no
+    // thread, the chat works, and the plugins stay at their version, so it showed a false
+    // "Provider error" toast (#6976). The text covers `marketplace `name`:` and `marketplaces:`.
+    message.startsWith("Codex could not update marketplace")
   );
 }
 
@@ -123,10 +132,15 @@ function isForeignReasoningError(message: string): boolean {
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
- * (#2351). Only a new session, given the OpenBot transcript, recovers.
+ * (#2351). Venice answers "Invalid request parameters", and OpenCode keeps only that text of its
+ * reply, also when the session holds more images than Venice accepts (#6702). Only a new session,
+ * given the OpenBot transcript, recovers.
  */
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
-  return provider === "opencode" && /\bthe request contains invalid parameters\b/i.test(message);
+  return (
+    provider === "opencode" &&
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b/i.test(message)
+  );
 }
 
 /**
@@ -166,6 +180,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
+  if (isImageCountDiagnostic(message))
+    return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");

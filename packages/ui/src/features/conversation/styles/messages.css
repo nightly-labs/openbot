@@ -18,7 +18,8 @@
 /* Keep the face beside the bubble, independent of the author name and footer height. The face is a
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
-.message-author-gutter {
+.message-author-gutter,
+.chat-visual-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
@@ -1364,11 +1365,6 @@ button.chat-action-target:active,
   max-width: var(--message-wide-bubble-width);
 }
 
-.message-entry-agent .ui-bubble:has(.choice-card) {
-  width: min(500px, 100%);
-  max-width: min(500px, 100%);
-}
-
 /* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
 .message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
@@ -1381,9 +1377,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(
-    :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
-  )
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .image-gallery, .message-code-block, .message-data-table-scroll))
   > .ui-bubble-content {
   width: 100%;
 }

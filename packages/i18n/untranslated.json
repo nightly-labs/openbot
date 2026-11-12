@@ -95,6 +95,7 @@
   "dialog.chooseHermesFolder": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "dialog.chooseVaultCsv": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "dialog.filter.csv": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
+  "error.agent.mcpServerBuiltIn": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerDeclined": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerKeysMove": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerNotSaved": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
@@ -143,6 +144,22 @@
     "zh"
   ],
   "error.backend.browserTypingSubmitSkipped": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.mcpOAuthRequestRefused": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.backend.replyReferenceRequests": [
     "ar",
     "de",

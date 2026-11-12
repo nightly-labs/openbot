@@ -51,6 +51,7 @@ import {
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-default-v1";
@@ -102,7 +103,7 @@ import {
   type HostProviderDefault,
   listCustomAgents,
   listCustomProviders,
-  listProviderAccounts,
+  listProviderAccountsWithModels,
   providerUsageResets,
   removeProviderAccount,
   renameProviderAccount,
@@ -113,6 +114,7 @@ import {
   setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostProviderDefault,
+  setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
   signOutProvider,
@@ -220,6 +222,7 @@ const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = [
   "devin",
   "copilot",
   "mistral",
+  "antigravity",
 ];
 
 /** Whether the phone can sign the host's own sign-in of the provider out. A saved key keeps it connected. */
@@ -365,7 +368,8 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1` and `provider-usage-reset-v1`), with the newest
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1` and
+ * `provider-account-pool-v1`), with the newest
  * route set that the host serves. The
  * host checks the role on every route.
  */
@@ -455,11 +459,21 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     /**
      * The accounts of the host's providers (`provider-accounts-v1`), or null when the host has none. A
      * new account signs in on the page that the host relays (`provider-account-relay-v1` or `-v2`); the
-     * released `sign-in-relay-v1` routes then run the flow, as Connect does.
+     * released `sign-in-relay-v1` routes then run the flow, as Connect does. With
+     * `provider-account-pool-v1`, the list also has the pools that are on.
      */
     accounts: has(PROVIDER_ACCOUNTS_CAPABILITY)
       ? {
-          list: (): Promise<HostProviderAccounts> => runTeamRequest(listProviderAccounts(request)),
+          list: (): Promise<HostProviderAccounts> =>
+            runTeamRequest(listProviderAccountsWithModels(request, false, has(PROVIDER_ACCOUNT_POOL_CAPABILITY))),
+          /**
+           * Turns the pool of the provider's accounts on or off (`provider-account-pool-v1`), or null on
+           * an older host. `leftOut` is the full list of the accounts that the pool does not use.
+           */
+          setPool: has(PROVIDER_ACCOUNT_POOL_CAPABILITY)
+            ? (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]): Promise<void> =>
+                runTeamRequest(setProviderAccountPool(request, { provider, enabled, leftOut: [...leftOut] }))
+            : null,
           rename: (provider: AgentProviderId, accountId: string, label: string | null): Promise<void> =>
             runTeamRequest(renameProviderAccount(request, { provider, accountId, label })),
           remove: (provider: AgentProviderId, accountId: string): Promise<void> =>

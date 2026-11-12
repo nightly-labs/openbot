@@ -75,23 +75,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "Une clé est enregistrée. Laissez ce champ vide pour la conserver.",
   "customProvider.models": "Modèles",
   "customProvider.model.id": "ID du modèle {number}",
+  "customProvider.model.idColumn": "ID du modèle",
   "customProvider.model.name": "Nom d’affichage du modèle {number}",
   "customProvider.model.namePlaceholder": "Nom d’affichage",
   "customProvider.model.contextWindow": "Fenêtre de contexte du modèle {number}",
   "customProvider.model.contextWindowPlaceholder": "Jetons",
+  "customProvider.model.contextWindowColumn": "Fenêtre de contexte",
   "customProvider.model.maxOutput": "Sortie maximale du modèle {number}",
   "customProvider.model.maxOutputPlaceholder": "Jetons",
+  "customProvider.model.maxOutputColumn": "Sortie max.",
   "customProvider.model.efforts": "Effort du modèle {number}",
   "customProvider.model.effortsLabel": "Effort",
-  "customProvider.model.effortsHintOpenCode":
-    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, OpenCode propose Faible, Moyen et Élevé.",
-  "customProvider.model.effortsHintPi":
-    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, le modèle ne raisonne pas.",
+  "customProvider.model.effortsDefault": "Par défaut",
+  "customProvider.model.effortsNone": "Sans raisonnement",
   "customProvider.model.inputs": "Entrées du modèle {number}",
   "customProvider.model.inputsLabel": "Accepte",
   "customProvider.model.inputImage": "Images",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "Sélectionnez ce que chaque modèle peut lire en plus du texte.",
+  "customProvider.model.inputsNone": "Texte seul",
   "customProvider.model.foundValuesHint":
     "Certaines valeurs viennent du point de terminaison. Vous pouvez les modifier.",
   "customProvider.model.remove": "Supprimer le modèle {number}",
@@ -113,7 +114,11 @@ export const messages = {
   },
   "customProvider.discovery.empty":
     "Le point de terminaison ne liste aucun modèle. Ajoutez vous-même les ID de modèle.",
-  "customProvider.discovery.label": "Modèles listés par le point de terminaison",
+  "customProvider.discovery.choose": "Choisir des modèles",
+  "customProvider.discovery.search": "Rechercher des modèles",
+  "customProvider.discovery.selectAll": "Tout sélectionner",
+  "customProvider.discovery.deselectAll": "Tout désélectionner",
+  "customProvider.discovery.noMatch": "Aucun modèle ne correspond à votre recherche.",
 
   "customProvider.preset.title": "Ajouter un fournisseur ou un agent",
   "customProvider.preset.description":

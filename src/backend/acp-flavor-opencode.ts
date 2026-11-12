@@ -1,8 +1,10 @@
 import { RequestError } from "@agentclientprotocol/sdk";
+import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
+  isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
   isUsageLimitDiagnostic,
@@ -47,6 +49,11 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
  * OpenCode sign-in sent the user to the wrong place.
+ *
+ * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
+ * user's country: `opencode run` shows "This model is not available in your country". A free model
+ * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
+ * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
  */
 function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
@@ -55,6 +62,8 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
       endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
+  if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
+    return sourceText("error.provider.opencodeFreeModelRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -116,13 +125,18 @@ function openCodeRequestFailure(
   // A spent usage limit shows in OpenCode's own words, which the turn also reads for a plan window.
   if (isUsageLimitDiagnostic(reason)) return redact(reason);
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
-  if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason)) return redact(reason);
+  if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
+    return redact(reason);
   // The part stays in the session, so each turn on this model fails until the user picks another.
   // The provider's text says nothing more to the user; it goes to the log.
   if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
     return sourceText("error.provider.opencodeUnreadableContent");
   }
+  // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
+  // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
+  if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
+    return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
@@ -207,6 +221,12 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.0 sends updates only for the execution that a prompt starts. The turn that a
   // finished background subagent starts reaches only its store, so the chat never showed it (#3406).
   unsentBackgroundTurns: true,
+  // OpenCode 2.2.7 sends `usage_update` and has no ACP method that compacts. It compacts by itself
+  // only when the context is full, so a long chat sent an almost full context with each request (#7171).
+  contextCompaction: "handoff",
+  // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
+  // added one more copy of the instructions to a long chat (#7171).
+  reopenKeepsPrompts: true,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A

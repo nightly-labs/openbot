@@ -80,6 +80,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
   "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
+  "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.sidebarPinsUnsupported":
@@ -160,6 +161,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Этот клиент не поддерживает безопасную аутентификацию.",
   "error.team.agentSettingsUnsupported": "Это подключение не поддерживает настройки агентов.",
   "error.team.adminRequired": "Требуется доступ администратора.",
+  "error.team.mcpAccessStale": "Кто-то изменил доступ к этому MCP-серверу. Внесите изменение ещё раз.",
   "error.team.mcpServerNotYours": "Изменить этот MCP-сервер может только тот, кто его добавил, или администратор.",
   "error.team.ownerRequired": "Это может сделать только владелец сервера.",
   "error.team.requestTooLarge": "Тело запроса слишком большое.",
@@ -173,6 +175,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ни один агент на этом сервере не показывал эту ссылку для входа.",
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
+  "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":
     "Это подключение не поддерживает запуск сообщения из очереди в новой ветке.",
   "error.team.backgroundProcessesUnsupported": "Это подключение не поддерживает фоновые процессы.",

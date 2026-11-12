@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { join } from "node:path";
-import { agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
@@ -25,6 +25,7 @@ import type {
   AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  AgentTaskWindow,
   AgentWaitsSnapshot,
   AskSideQuestionInput,
   AttachmentDataInput,
@@ -72,10 +73,13 @@ import type {
   McpSignInAppState,
   McpSignInState,
   McpTestResult,
+  MessagePinner,
+  PinnedMessagesSnapshot,
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RemoveMcpServerInput,
   ReorderQueueInput,
@@ -97,6 +101,7 @@ import type {
   SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
   SetMcpServerEnabledInput,
+  SetMessagePinnedInput,
   SetMessageReactionInput,
   SharedTable,
   SidebarLayoutSnapshot,
@@ -180,6 +185,7 @@ import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
+import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
@@ -189,6 +195,7 @@ import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
 import type { ReviewSkill } from "./agent/memory-review-prompt";
 import { MessageDeletion } from "./agent/message-deletion";
+import { MessagePins } from "./agent/message-pins";
 import {
   creationModel,
   developmentDefaultsApply,
@@ -214,6 +221,7 @@ import {
   ProfileGenerationFailed,
 } from "./agent/profile-generation";
 import { ProfileSave, standingProfileChanged, toProfileSaveFailed } from "./agent/profile-save";
+import { pickPoolAccount } from "./agent/provider-account-pool";
 import type { ProviderAccountStore } from "./agent/provider-account-store";
 import { isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
@@ -237,6 +245,7 @@ import {
 } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
+import { TurnContext } from "./agent/turn-context";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
@@ -275,6 +284,7 @@ import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
+import type { MessagePinRefused } from "./message-pins";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
@@ -362,6 +372,11 @@ export interface AgentServiceOptions {
    * runtimes a stdio command may need. Without it the test runs with what this machine holds.
    */
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
+  /**
+   * Whether an agent gets an MCP server (`mcp-access-v1`). `null` is a session with no known agent.
+   * Absent, each agent gets each enabled server.
+   */
+  mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   /** The saved server that a Marketplace app installs, for an agent that suggests the app. */
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   /** This build's version and system, which `send_feedback` adds to a bug report or an idea. */
@@ -371,6 +386,8 @@ export interface AgentServiceOptions {
   /** Makes one-time claims for `create_server_install_command` with the account session. */
   serverClaims?: AgentServerClaims | null;
   sidebarLayout?: AgentSidebar | null;
+  /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
+  libraryFolders?: AgentLibraryFolders | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
    * endpoints. The main process owns both, because they carry secrets that must not reach the
@@ -552,6 +569,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #tasks: AgentTasks;
   readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
+  readonly #messagePins: MessagePins;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
@@ -559,6 +577,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Agent and channel routines of every trigger kind, with their webhook routes. */
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
+  readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
   readonly #endpoints: CustomEndpoints;
@@ -586,6 +605,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #removal: AgentRemoval;
   readonly #tools: OpenBotToolRouter;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
@@ -598,11 +618,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #requestedNewChats = new Set<string>();
   /** A turn that ends with open plan steps runs again, at most 3 times for one request. */
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
+  /** When the service last asked for each pool's usage, in epoch milliseconds, and the pools whose read runs. */
+  readonly #poolReads = new Map<AgentProvider, number>();
+  readonly #poolReading = new Set<AgentProvider>();
   #initialized = false;
   #stopping = false;
 
   constructor(options: AgentServiceOptions) {
     super();
+    this.#mcpAgentAccess = options.mcpAgentAccess;
     const {
       store,
       mailbox,
@@ -615,6 +639,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       prepareAgentWorkspace = () => Effect.void,
       hostedSites = null,
       sidebarLayout = null,
+      libraryFolders = null,
       credentials = NO_PROVIDER_CREDENTIALS,
       localSkillTools,
       routineFlowTools,
@@ -647,6 +672,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.#sidebarLayout = sidebarLayout;
+    this.#libraryFolders = libraryFolders;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure, sender) =>
         this.createAgent(
@@ -721,6 +747,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       conversation: this.#conversation,
       tasks: this.#tasks,
+    });
+    this.#messagePins = new MessagePins({
+      store,
+      tasks: this.#tasks,
+      changed: (agentId) => this.#emit({ type: "message-pins-changed", agentId }),
     });
     this.#tables = options.tables ?? null;
     this.#memories = new AgentMemories({
@@ -825,9 +856,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         awaitDrain: (agentId) => this.#drain.taskFor(agentId)?.pipe(toRoutineOperationFailed),
         syncMailboxMessages: (snapshot) => this.#mailboxSync.syncMailboxMessages(snapshot),
         listAgents: () => this.listAgents(),
-        // A hidden agent keeps its routines, but they do not run until the user restores it.
-        excludedAgents: () =>
-          new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting(), ...this.#hiddenAgentIds()]),
+        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
         usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
@@ -849,6 +878,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hostedSites,
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       isStopping: () => this.#stopping,
+      redact: (text) => this.#mcp.redact(text),
     });
     this.#providers = new ProviderRuntime({
       offProviders: options.offProviders ?? [],
@@ -1057,10 +1087,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         // Of the clients that read this, only OpenCode runs custom endpoints.
         servesModel: (modelId) => this.#endpoints.serves(modelId, "opencode"),
+        // One for the service, not for each client: the idle release replaces the Codex client, and
+        // its threads hold the blocks that they were sent (#6963).
+        codexTurnContext: new TurnContext(),
         // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.
-        mcpServers: () => this.#mcp.record(credentials.mcpServers()),
+        mcpServers: (agentId) => this.#mcp.record(this.#mcpServersFor(credentials.mcpServers(), agentId)),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
         mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       },
@@ -1213,6 +1246,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailbox,
       sharedRoot: store.sharedRoot,
+      libraryFolders,
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -1230,7 +1264,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       memories: this.#memories,
       compaction: this.#compaction,
-      mcpServers: () => this.#mcp.enabled(),
+      mcpServers: (agentId) => this.#mcpServersFor(this.#mcp.enabled(), agentId),
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpEndpoint: (config, agentId) => this.#mcp.endpoint(config, agentId).pipe(toMcpOperationError),
       mcpProxyFingerprint: (configs) => this.#mcp.proxyFingerprint(configs).pipe(toMcpOperationError),
@@ -1303,7 +1337,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.channels = new ChannelService(store.database, mailbox, new ChannelImages(store.channelImagesRoot), {
       agents: () => this.listAgents(),
-      hidden: (agentId) => this.#store.isHidden(agentId),
       generate: (lead, prompt, fallbacks = [], background = false) =>
         Effect.gen({ self: this }, function* () {
           const modelOf = (agent: AgentSummary) =>
@@ -1380,6 +1413,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return session ? this.#compaction.contextInputCharacters(session.externalSessionId) : 120_000;
       },
       reportsCompactions: (agentId) => this.#reportsCompactions(agentId),
+      quietTurn: (turnId) => this.#turn.quietChannelTurn(turnId),
       provisionalAnswers: (agentId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         return (agent ? this.#providers.clientForAgent(agent)?.provisionalAnswers : undefined) === true;
@@ -1403,9 +1437,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       usageLimited: (agentId) => this.#channelHeld(agentId),
       retry: (agentId) => this.#usageLimits.retry(agentId),
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
-      usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
+      quietRoutineRequest: (requestMessageId) => this.#channelRoutines.quietRun(requestMessageId),
+      usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
       steer: (agentId, threadId, turnId, messageId, text) =>
         Effect.gen({ self: this }, function* () {
+          // A person's correction joins the turn and waits for its answer.
+          this.#turn.keepChannelTurnAnswers(turnId);
           const agent = this.#store.list().find((item) => item.id === agentId);
           const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
           const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -1541,7 +1578,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }).pipe(
             Effect.andThen(
               this.#settleHeldQueues(
-                agentIds.filter((agentId) => !this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId))),
+                agentIds.filter(
+                  (agentId) =>
+                    !this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId)) && !this.#poolBackup(agentId),
+                ),
               ),
             ),
             Effect.catch((failure) => Effect.sync(() => this.#emitError("usage_limit_hold_failed", failure.cause))),
@@ -1596,24 +1636,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
-        startRequestedNewChat: (agentId) => this.#startRequestedNewChat(agentId),
+        startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
         dropRequestedNewChat: (agentId) => {
           if (this.#requestedNewChats.delete(agentId))
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
         },
+        followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
         followUsageLimit: (agentId) => {
-          if (this.#pendingRuntimeDue(agentId)) {
-            Effect.runFork(
-              this.#followPendingRuntime(agentId).pipe(
-                // A change that is gone, applied or dropped, lets the next drain make a due usage-limit move.
-                Effect.andThen((moved) =>
-                  Effect.sync(() => this.#drain.scheduleDrain(agentId, moved || !this.#pendingRuntimeDue(agentId))),
-                ),
-                Effect.forkIn(this.#scope, { startImmediately: true }),
-              ),
-            );
-            return true;
-          }
+          if (this.#startPendingRuntime(agentId)) return true;
           if (!this.#usageLimitMove(agentId)) return false;
           Effect.runFork(
             this.#followUsageLimit(agentId).pipe(
@@ -1727,11 +1757,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
-        mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined,
+        mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
-        takeRoutinePreview: (deliveryId) => this.#routines.takePreviewBeforeRun(deliveryId),
         closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
@@ -1797,9 +1826,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }).pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
         cancelMemoryReview: (agentId) => this.#memoryReview.cancel(agentId),
         stopAgentProcess: (agentId) =>
-          this.#providers
-            .stopAgentProcess(agentId)
-            .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
+          Effect.gen({ self: this }, function* () {
+            yield* this.#providers
+              .stopAgentProcess(agentId)
+              .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
+            if (process.platform !== "win32") return;
+            const release = yield* Effect.try({
+              try: () => this.#releasesSharedOpenCode(agentId),
+              catch: (cause) => new AgentRemovalFailed({ cause }),
+            });
+            if (release) yield* this.#providers.releaseSharedProcess("opencode");
+          }),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
         // Both moves run under this lock and check the deletion there.
@@ -1823,9 +1860,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       memories: this.#memories,
       waits: this.#waits,
       tasks: this.#tasks,
+      messagePins: this.#messagePins,
       drain: this.#drain,
       tables: this.#tables,
       sidebarLayout: this.#sidebarLayout,
+      libraryFolders: this.#libraryFolders,
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
@@ -1864,7 +1903,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         updateAgent: (input, initiatingAgentId) =>
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
-        enabledMcpServers: () => this.enabledMcpServers(),
+        enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         redactMcpForAgent: (text) => this.#mcp.redactForAgent(text),
@@ -1875,8 +1914,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
-        requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
-        reportRoutineFailure: (agentId, turnId, reason) => this.#turn.reportRoutineFailure(agentId, turnId, reason),
+        requestNoUpdate: (agentId, threadId, turnId, channelRun) =>
+          this.#turn.requestNoUpdate(agentId, threadId, turnId, channelRun),
+        reportRoutineFailure: (agentId, turnId, reason, channelRun) =>
+          this.#turn.reportRoutineFailure(agentId, turnId, reason, channelRun),
         requestNewChat: (agentId) => {
           this.#requestedNewChats.add(agentId);
         },
@@ -2000,11 +2041,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       return index === -1 ? Number.MAX_SAFE_INTEGER : index;
     };
     const members = this.listAgents()
-      // A hidden agent takes no new messages, so it is not offered as a teammate.
-      .filter(
-        (agent) =>
-          agent.id !== agentId && agent.hiddenAt === undefined && layout.agentAssignments[agent.id] === section.id,
-      )
+      // A hidden agent works as each other agent does, so it stays a teammate.
+      .filter((agent) => agent.id !== agentId && layout.agentAssignments[agent.id] === section.id)
       .sort((a, b) => rank(a.id) - rank(b.id))
       .slice(0, MAX_SECTION_TEAMMATES)
       .map((agent) => ({ id: agent.id, name: agent.name, title: agent.title }));
@@ -2454,8 +2492,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  enabledMcpServers(): McpServerConfig[] {
-    return this.#mcp.enabled();
+  /** The enabled MCP servers. With an agent, only the servers that the agent gets. */
+  enabledMcpServers(agentId?: string | null): McpServerConfig[] {
+    return this.#mcpServersFor(this.#mcp.enabled(), agentId);
+  }
+
+  /**
+   * Only a saved row has an access entry. A server that OpenBot adds itself, such as Computer Use, goes
+   * to each agent: nothing in Settings can open it again if an entry closed it.
+   */
+  #mcpServersFor(configs: readonly McpServerConfig[], agentId: string | null | undefined): McpServerConfig[] {
+    const allows = this.#mcpAgentAccess;
+    if (agentId === undefined || !allows) return [...configs];
+    const saved = new Set(this.#mcp.list().map((server) => server.id));
+    return configs.filter((config) => !saved.has(config.id) || allows(config.id, agentId));
   }
 
   /**
@@ -3034,18 +3084,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
-  #hiddenAgentIds(): string[] {
-    return this.#store
-      .list()
-      .filter((agent) => agent.hiddenAt !== undefined)
-      .map((agent) => agent.id);
-  }
-
   /**
-   * Hides or restores an agent. A request that does not change the state answers the same list. A
-   * hidden agent keeps all of its data. A turn that runs finishes, and its queued messages wait. On
-   * restore, the routine occurrences that came due while it was hidden are skipped, and its queue
-   * drains again.
+   * Hides or restores an agent. A request that does not change the state answers the same list. The
+   * hide changes only where clients show the agent: it keeps all of its data, its routines run, and
+   * it receives messages as each other agent does.
    */
   readonly setAgentHidden = Effect.fn("AgentService.setAgentHidden")(function* (
     this: AgentService,
@@ -3056,36 +3098,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
       }
       if (this.#store.isHidden(input.agentId) === input.hidden) return false;
-      const now = new Date();
-      // While the agent is still hidden, so the timer cannot fire an occurrence that this skips.
-      if (!input.hidden) this.#routines.skipMissedFor(input.agentId, now);
-      this.#store.setHidden(input.agentId, input.hidden ? now.toISOString() : null);
+      this.#store.setHidden(input.agentId, input.hidden ? new Date().toISOString() : null);
       return true;
     });
     const snapshot = this.listHiddenAgents();
     if (!changed) return snapshot;
-    this.#routines.arm();
-    if (input.hidden) {
-      // The channel work that waits in its queue goes back to the channel, so it holds nothing.
-      yield* this.channels
-        .releaseAgent(input.agentId)
-        .pipe(
-          Effect.catch((failure) => Effect.sync(() => this.#emitError("channel_coordination_failed", failure.cause))),
-        );
-    } else {
-      // The queue event also wakes the channels whose task waits for this agent.
-      this.#mailboxSync.emitQueue(input.agentId);
-      this.#drain.scheduleDrain(input.agentId);
-    }
     this.#emit({ type: "hidden-agents-changed", agents: snapshot.agents });
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     return snapshot;
   }).bind(this);
-
-  /** Refuses new work for a hidden agent. A turn that already runs is not affected. */
-  #requireNotHidden(agentId: string): void {
-    if (this.#store.isHidden(agentId)) throw new Error(sourceText("error.backend.recipientHidden"));
-  }
 
   setMarketplaceSource(agentId: string, source: NonNullable<AgentSummary["marketplaceSource"]>): AgentSummary {
     const agent = this.#store.setMarketplaceSource(agentId, source);
@@ -3537,7 +3558,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #usageLimitMove(agentId: string): { input: UpdateAgentInput; move: ModelMove | null } | null {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    if (!agent || (!agent.usageLimitReturn && !agent.backupModels)) return null;
+    if (!agent) return null;
+    // A pooled provider moves the agent to the account its pool picks before the next work starts.
+    const pooled =
+      this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId) || !this.#hasWaitingWork(agentId)
+        ? null
+        : this.#poolMove(agent);
+    if (pooled)
+      return {
+        input: {
+          agentId,
+          provider: pooled.provider,
+          model: pooled.model,
+          providerAccountId: pooled.providerAccountId ?? null,
+        },
+        move: "next-turn",
+      };
+    if (!agent.usageLimitReturn && !agent.backupModels) return null;
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
     // The agent keeps its reasoning effort where the other model has it. It goes back with the effort it left.
     const move = (choice: AgentModelChoice, reasoningEffort = agent.reasoningEffort) => {
@@ -3565,16 +3602,117 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         move: "return",
       };
     const limited = !this.#usageLimits.mayDrain(agentId);
+    // A message from the user tries the held model first: the limit can have ended outside OpenBot.
+    // A refused try holds the agent again, and the drain after it moves (#7068).
+    if (limited && this.#usageLimits.mayTry(agentId) && this.#modelChoiceReady(agentModelChoice(agent))) return null;
     const failed = !limited && this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent)));
     if (!limited && !failed) return null;
-    const taskWork = () =>
-      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
-        this.#mailbox.nextQueued(agentId, laneId),
-      );
     // A channel task that the limit refused went back to its channel, so the queue can be empty.
-    if (!this.#mailbox.nextQueued(agentId) && !taskWork() && !this.channels.ownsWaitingWork(agentId)) return null;
+    if (!this.#hasWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
+  }
+
+  /** Whether work waits for the agent: in its chat, a task, a channel lane, or a channel. */
+  #hasWaitingWork(agentId: string): boolean {
+    return (
+      Boolean(this.#mailbox.nextQueued(agentId)) ||
+      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
+        this.#mailbox.nextQueued(agentId, laneId),
+      ) ||
+      this.channels.ownsWaitingWork(agentId)
+    );
+  }
+
+  /**
+   * The account of a pooled provider that the agent moves to before its next work, or null when it
+   * stays. The pick also shows as the pool's account in use.
+   */
+  #poolMove(agent: AgentSummary): AgentModelChoice | null {
+    const choice = agentModelChoice(agent);
+    if (!this.#pooled(choice)) return null;
+    this.#readPoolWhenStale(choice.provider);
+    const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    const pick = this.#poolPick(choice.provider, choice.model, current);
+    if (pick !== null) this.#providers.setPoolInUse(choice.provider, pick);
+    if (pick === null || pick === current) return null;
+    return {
+      provider: choice.provider,
+      model: choice.model,
+      ...(pick === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: pick }),
+    };
+  }
+
+  /** Whether the agent's pooled provider has another account to move to now. */
+  #poolBackup(agentId: string): boolean {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    const choice = agentModelChoice(agent);
+    if (!this.#pooled(choice)) return false;
+    const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    const pick = this.#poolPick(choice.provider, choice.model, current);
+    return pick !== null && pick !== current;
+  }
+
+  /**
+   * Whether the pool chooses the account of the agent. An agent that the user put on the Claude API
+   * key stays on it: the key is not in the pool.
+   */
+  #pooled(choice: AgentModelChoice): boolean {
+    if (choice.provider === "claude" && choice.providerAccountId === CLAUDE_API_KEY_ACCOUNT_ID) return false;
+    return this.#providers.accountPool(choice.provider) !== null;
+  }
+
+  /**
+   * The account that the provider's pool uses for the model now, or null. Only accounts that are
+   * ready for the model and not at a limit or after a provider error count. With no model, as for a
+   * pool that no agent uses yet, each account in the pool counts.
+   */
+  #poolPick(provider: AgentProvider, model: string | null, current: string | null): string | null {
+    const members = this.#providers.poolMembers(provider, model ?? "").filter(
+      (member) =>
+        model === null ||
+        this.#usageLimitReady({
+          provider,
+          model,
+          ...(member.accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: member.accountId }),
+        }),
+    );
+    return pickPoolAccount(members, current, Date.now() / 1000);
+  }
+
+  /** Shows the pool's pick for the model of the provider's first agent in the provider's row. */
+  #refreshPoolInUse(provider: AgentProvider): void {
+    const pool = this.#providers.accountPool(provider);
+    if (!pool) return;
+    const model = this.#store.list().find((agent) => agentModelChoice(agent).provider === provider)?.model ?? null;
+    this.#providers.setPoolInUse(provider, this.#poolPick(provider, model, pool.inUse));
+  }
+
+  /**
+   * Reads the usage of the pool's accounts again when the last read is older than the interval of
+   * the rail. The work does not wait for the read: the buffer of each window covers a reading that is
+   * some minutes old. When the read ends, the agents with work are checked again.
+   */
+  #readPoolWhenStale(provider: AgentProvider): void {
+    const now = Date.now();
+    if (this.#poolReading.has(provider) || now - (this.#poolReads.get(provider) ?? 0) < POOL_READ_INTERVAL_MS) return;
+    this.#poolReads.set(provider, now);
+    this.#poolReading.add(provider);
+    Effect.runFork(
+      this.#providers.readPoolUsage(provider).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#poolReading.delete(provider);
+            this.#refreshPoolInUse(provider);
+            for (const agent of this.#store.list())
+              if (agentModelChoice(agent).provider === provider && this.#hasWaitingWork(agent.id))
+                this.#drain.scheduleDrain(agent.id);
+          }),
+        ),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
   }
 
   /** Whether a spent plan holds this agent's channel work: it is held, and no person's message gave it a try. */
@@ -3606,7 +3744,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #mayContinueStoppedWork(agentId: string): boolean {
     const returnTo = this.#store.list().find((candidate) => candidate.id === agentId)?.usageLimitReturn;
-    return Boolean(returnTo && this.#usageLimitReady(returnTo)) || this.#usageLimitBackup(agentId, true) !== undefined;
+    return (
+      Boolean(returnTo && this.#usageLimitReady(returnTo)) ||
+      this.#usageLimitBackup(agentId, true) !== undefined ||
+      this.#poolBackup(agentId)
+    );
   }
 
   /**
@@ -3663,6 +3805,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #pendingRuntimeDue(agentId: string): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return Boolean(agent?.pendingRuntime) && !this.#runtimeHandoverBusy(agentId);
+  }
+
+  /** Starts `#followPendingRuntime` when the queued change is due. True when it started. */
+  #startPendingRuntime(agentId: string): boolean {
+    if (!this.#pendingRuntimeDue(agentId)) return false;
+    Effect.runFork(
+      this.#followPendingRuntime(agentId).pipe(
+        // A change that is gone, applied or dropped, lets the next drain make a due usage-limit move.
+        Effect.andThen((moved) =>
+          Effect.sync(() => this.#drain.scheduleDrain(agentId, moved || !this.#pendingRuntimeDue(agentId))),
+        ),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
+    return true;
   }
 
   /** Applies `pendingRuntime` once the agent is idle. True when the agent moved. */
@@ -3827,6 +3984,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly clearAgentContext = Effect.fn("AgentService.clearAgentContext")(function* (
     this: AgentService,
     agentId: string,
+    /** Queued routine runs in their own session that start in the new chat, so they do not hold it. */
+    queuedRuns: readonly string[] = [],
   ) {
     // A new chat ends the automatic plan continuation of the agent's own chat.
     yield* this.#drain.endPlanContinuation(agentId, null);
@@ -3837,7 +3996,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null);
       if (
         activeTurn ||
-        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), queuedRuns) ||
         this.#threads.mainContextBusy(agent)
       ) {
         throw new ContextResetBusyError(sourceText("error.agent.waitBeforeClearContext"));
@@ -3932,6 +4091,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
+    // "Delete history" removed the pins of the chat.
+    this.#messagePins.messagesDeleted(agentId);
     yield* this.#threads.endThreadContext(target.threadId);
     yield* this.#memoryReview.chatCleared(agentId);
   }, Effect.uninterruptible).bind(this);
@@ -4081,17 +4242,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's
    * own chat has nothing to start. A turn of a task or a compaction can still run; the request then
-   * waits for the next drain, unless a turn in the agent's own chat starts first. The user can turn
-   * the setting off while the request waits.
+   * waits for the next drain, unless a turn in the agent's own chat starts first. Queued routine runs in
+   * their own session do not end it: it starts before them, and their answers stay above its marker.
+   * The user can turn the setting off while the request waits.
    */
-  #startRequestedNewChat(agentId: string): Effect.Effect<void> {
+  #startRequestedNewChat(agentId: string, queuedRuns: readonly string[] = []): Effect.Effect<void> {
     if (!this.#requestedNewChats.has(agentId)) return Effect.void;
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent || !agentNewChatAllowed(agent, this.#store.agentDefaults())) {
       this.#requestedNewChats.delete(agentId);
       return Effect.void;
     }
-    return this.clearAgentContext(agentId).pipe(
+    return this.clearAgentContext(agentId, queuedRuns).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           this.#requestedNewChats.delete(agentId);
@@ -4246,7 +4408,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
-      this.#mcp.migrateCatalogBridgesToHttp();
+      this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
     });
@@ -4260,6 +4422,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* lifecycleStep("recover agent state", () => {
       this.#boot.recoverPersistedTurns();
       this.#hostedSites.restore();
+      // Before the timer reads the due routines, so an agent hidden by an earlier version starts none.
+      const paused = this.#routines.pauseForAgentsHiddenBeforeWork();
+      if (paused > 0)
+        logger.info("Routines of agents hidden by an earlier version were turned off.", { count: paused });
       this.#routines.skipMissed(new Date(), options.heldRoutines);
       this.#channelRoutines.skipMissed(new Date(), options.heldRoutines);
       this.#initialized = true;
@@ -4416,6 +4582,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "renameProviderAccount", cause: failure.cause }),
         ),
       );
+  }
+
+  /**
+   * Turns the pool of a provider's accounts on or off. The provider's agents move to the pool's
+   * account before their next work.
+   */
+  setProviderAccountPool(
+    provider: AgentProvider,
+    enabled: boolean,
+    leftOut: readonly string[],
+  ): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers.setProviderAccountPool(provider, enabled, leftOut).pipe(
+      Effect.map(() => {
+        this.#poolReads.delete(provider);
+        this.#refreshPoolInUse(provider);
+        if (enabled) this.#readPoolWhenStale(provider);
+        return this.getStatus();
+      }),
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "setProviderAccountPool", cause: failure.cause }),
+      ),
+    );
   }
 
   /** The usage reset credits of each connected account of a provider. An account that has no count is left out. */
@@ -4789,6 +4977,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #runsTurn(agentId: string): boolean {
     return this.#conversation.anyWorkingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId);
+  }
+
+  /**
+   * Whether the delete stops the shared OpenCode process, which can have worked in this agent's folder: the agent is set to it or
+   * has a session on it. False while another OpenCode agent's session settings are read: that read uses the process.
+   */
+  #releasesSharedOpenCode(agentId: string): boolean {
+    const agents = this.#store.list();
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    if (
+      agents.some(
+        (candidate) => providerForAgent(candidate) === "opencode" && this.#drain.holdsSessionSettings(candidate.id),
+      )
+    )
+      return false;
+    if (providerForAgent(agent) === "opencode") return true;
+    return agent.threadId
+      ? this.#store.database.listProviderSessions(agent.threadId).some((session) => session.provider === "opencode")
+      : false;
   }
 
   /** Whether this provider reports a CLI that is installed, current, and signed in. */
@@ -5203,6 +5411,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
+  /**
+   * The messages of a task around one of its messages, so its panel opens at that message without the
+   * pages between. A message that the thread does not hold, or that `exclusions` leave out, has none.
+   */
+  readTaskAround(input: ReadAgentTaskAroundInput, exclusions: ConversationMarkerExclusions = {}): AgentTaskWindow {
+    const { threadId } = this.#tasks.require(input.agentId, input.taskId);
+    const database = this.#store.database;
+    const page = database.readConversationPage(
+      input.agentId,
+      threadId,
+      { type: "around", messageId: input.messageId },
+      input.limit,
+      exclusions,
+    );
+    const last = page.messages.at(-1);
+    return {
+      conversation: {
+        agentId: input.agentId,
+        threadId,
+        activeTurnId: page.activeTurnId,
+        revision: page.revision,
+        messages: page.messages,
+      },
+      hasOlder: page.pageInfo.hasOlder,
+      hasNewer: last ? database.conversationHasAfter(threadId, last.id, exclusions) : false,
+    };
+  }
+
   /** Starts a task of the agent with its first message. The task runs beside the agent's own chat. */
   readonly startTask = Effect.fn("AgentService.startTask")(function* (
     this: AgentService,
@@ -5213,7 +5449,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const task = yield* lifecycleStep("start task", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
-      this.#requireNotHidden(input.agentId);
       // A start with files and no text takes its title from the first file.
       const firstDraft = input.attachmentDraftIds?.[0];
       const titleText = input.text.trim() || (firstDraft ? (this.#mailbox.draftName(firstDraft) ?? "") : "");
@@ -5289,7 +5524,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* lifecycleStep("find agent", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
         throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
-      this.#requireNotHidden(input.agentId);
     });
     const task = yield* this.#tasks.branch(input);
     const through = task.branch?.throughMessageId;
@@ -5440,6 +5674,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.backend.threadStillRunning"));
       this.#tasks.delete(task);
     });
+    // The pins of the thread went with it.
+    this.#messagePins.messagesDeleted(task.agentId);
     this.#browser.unshareThread(task.threadId);
     this.#drain.scheduleDrain(task.agentId);
   }).bind(this);
@@ -5453,11 +5689,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: DeleteConversationMessageInput,
     access: MessageDeleteAccess,
   ): Effect.Effect<void, MessageDeleteRefused | AgentLifecycleFailed> {
-    return this.#messageDeletion
-      .delete(input, access)
+    return this.#messageDeletion.delete(input, access).pipe(
+      // The delete removed the pin of the message, if it had one.
+      Effect.tap(() => Effect.sync(() => this.#messagePins.messagesDeleted(input.agentId))),
+      Effect.catchTag("StoredStateFailure", ({ cause }) =>
+        Effect.fail(new AgentLifecycleFailed({ operation: "deleteConversationMessage", cause })),
+      ),
+    );
+  }
+
+  /** The pinned messages of all chats of the agent: its own chat and its side threads. The newest pin is first. */
+  listPinnedMessages(agentId: string): PinnedMessagesSnapshot {
+    return this.#messagePins.list(agentId);
+  }
+
+  /** Pins or unpins one shown message for a person, and answers the pins of the agent after the change. */
+  setMessagePinned(
+    input: SetMessagePinnedInput,
+    pinner: Extract<MessagePinner, { kind: "person" }>,
+  ): Effect.Effect<PinnedMessagesSnapshot, MessagePinRefused | AgentLifecycleFailed> {
+    return this.#messagePins
+      .set(input, pinner)
       .pipe(
         Effect.catchTag("StoredStateFailure", ({ cause }) =>
-          Effect.fail(new AgentLifecycleFailed({ operation: "deleteConversationMessage", cause })),
+          Effect.fail(new AgentLifecycleFailed({ operation: "setMessagePinned", cause })),
         ),
       );
   }
@@ -5560,14 +5815,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   steerQueuedMessage(input: SteerQueuedMessageInput): Effect.Effect<void, AgentLifecycleFailed> {
-    // A steer gives a queued message to the running turn. The queue of a hidden agent waits.
-    if (this.#store.isHidden(input.agentId))
-      return Effect.fail(
-        new AgentLifecycleFailed({
-          operation: "steerQueuedMessage",
-          cause: new Error(sourceText("error.backend.recipientHidden")),
-        }),
-      );
     return this.#queue
       .steer(input)
       .pipe(
@@ -5626,7 +5873,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         operation: "send message",
         cause: new Error(sourceText("error.agent.unknown", { id: input.agentId })),
       });
-    yield* lifecycleStep("send message", () => this.#requireNotHidden(input.agentId));
     const agent = yield* this.#store
       .getOrCreate(input.agentId)
       .pipe(
@@ -5641,11 +5887,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
         ),
       );
-    yield* lifecycleStep("validate message recipient", () => {
-      validateRecipient();
-      // The provider start can wait, and the user can hide the agent in that time.
-      this.#requireNotHidden(input.agentId);
-    });
+    yield* lifecycleStep("validate message recipient", validateRecipient);
     // A message to a task runs in the task's own thread and lane, beside the agent's own chat.
     const taskId = input.taskId;
     const task = taskId
@@ -5774,9 +6016,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     explain: boolean,
     wait: boolean,
   ): Effect.fn.Return<AgentMessageSteer> {
-    // A turn the user stopped is ending, and a message steered into it would end with it.
-    const stoppedTurnId = this.#stoppedTurn(agent.id, task?.taskId ?? null);
-    const steerTurnId = snapshot.activeTurnId !== stoppedTurnId ? snapshot.activeTurnId : null;
+    const steerTurnId = this.#turnToSteer(agent.id, task?.taskId ?? null, snapshot);
     if (!steerTurnId) return null;
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
@@ -5799,17 +6039,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   });
 
   /**
-   * A message from another agent follows the recipient's busy-message mode, as a message from the
-   * user does. Only a message for the recipient's own chat can go into its running turn. The person
-   * did not send it, so a message that cannot steer waits with no reason on its row. With `wait`,
-   * the sender learns if the message joined the running turn, or why it waits (#6475).
+   * The running turn that a new message can join. A turn the user stopped is ending, and a message
+   * steered into it would end with it.
+   */
+  #turnToSteer(agentId: string, taskId: string | null, snapshot: ConversationSnapshot): string | null {
+    return snapshot.activeTurnId !== this.#stoppedTurn(agentId, taskId) ? snapshot.activeTurnId : null;
+  }
+
+  /**
+   * An answer, a requested result or a notice from another agent follows the recipient's
+   * busy-message mode, as a message from the user does. A request does not: it waits for a turn of
+   * its own in each mode (`MailboxStore.chatTurnSteer`). Only a message for the recipient's own chat
+   * can go into its running turn. The person did not send it, so a message that cannot steer waits
+   * with no reason on its row. With `wait`, the sender learns if the message joined the running
+   * turn, or why it waits (#6475).
    */
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.list().find((item) => item.id === recipientAgentId);
     // A recipient with no loaded chat runs no turn, so its page is not read for this.
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || this.#store.isHidden(agent.id) || !this.#mailbox.steersChatTurn(deliveryId))
-      return Effect.succeed(null);
+    const steer = this.#mailbox.chatTurnSteer(deliveryId);
+    if (!agent || !snapshot || !steer) return Effect.succeed(null);
+    if (steer === "own-turn") return Effect.succeed(this.#turnToSteer(agent.id, null, snapshot) ? "own-turn" : null);
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 
@@ -6153,6 +6404,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
+    // The account in use is not saved: a new reading, as at start, sets it again.
+    if (event.type === "usage-changed") for (const provider of AGENT_PROVIDERS) this.#refreshPoolInUse(provider);
     this.#liveVoice?.observe(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
     this.emit("event", event, memberId);
@@ -6191,6 +6444,9 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/** How often a pool reads the usage of its accounts again while its agents work: the interval of the rail. */
+const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
 /** Why `#usageLimitMove` changes an agent's model, when it is not the switch for a usage limit. */
 type ModelMove = "return" | "provider-error" | "next-turn";

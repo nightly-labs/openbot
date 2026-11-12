@@ -385,6 +385,25 @@ welcome turn starts. The agent answers it, and that answer shows as usual. A cli
 a host that advertises the capability; an older host still gets the released role text, which stays
 a visible user message there.
 
+The optional `message-pins-v1` capability (protocol 9 only) adds `POST /v1/message-pins/list`
+(`agentId`) and `POST /v1/message-pins/set` (`agentId`, `taskId` as a string or `null` for the
+agent's own chat, `messageId`, `pinned`). The list holds the pins of all chats of the agent (its own
+chat and its side threads, archived ones too), at most 200, the newest pin first. Each pin has its
+side thread and title, the first 1,000 characters of its message, and who pinned it: a person (`null`
+for the user of the host computer) or the agent. The agent pins with its `pin_message` tool. Both
+routes answer the list after the request. A member needs the `chat` level on the agent. A hidden or
+unknown agent gets 404, a message that is not in the chat gets 404, and a pin over the limit of 50
+for one chat gets 409. All members see the same pins. The host sends `message-pins-changed` with the
+agent id after each change, and the client reads the list again. A client opens a pin of another
+chat in the tab of that chat, or in the side panel when the thread is open there. When the thread
+view does not hold the message, `POST /v1/message-pins/read-thread` (`agentId`, `taskId`,
+`messageId`, `limit` 1 to 100) reads one part of the thread around it, oldest first, in the
+`agent-tasks-v1` conversation shape, with `hasOlder` and `hasNewer`. A message that the thread does
+not hold gives no messages. While the view holds a part with `hasNewer`, it skips live deltas and
+read marks, and shows the way to the latest message; a send reads the latest messages first. A host
+without the capability gets no part read: the client opens the newest messages. Channels have no
+pins. `src/main/team-api/route-message-pins.ts` owns the routes.
+
 The optional `agent-waits-v1` capability (protocol 9 only) adds `POST /v1/agent-waits/list`
 (`agentId`) and `POST /v1/agent-waits/cancel` (`agentId`, `waitId`). They show the open waits of an
 agent in the composer of a joined server, with Cancel. `src/main/team-api/route-agent-waits.ts` owns
@@ -538,6 +557,14 @@ not change; the main process reads that URL with `GET /v1/channels/image`. The w
 bytes into a data URL. Over WebRTC, a `PUT` body and a `GET` answer go as file transfers, as for agent
 avatars. Without the capability a client hides the picture control for that host, and the channel
 shows its member faces.
+
+The optional `channel-browser-v1` capability (protocol 9 only) adds `browser` to the channel side
+routes and to a `save` draft (#4135): `{ kind: "members" }`, `{ kind: "none" }` or
+`{ kind: "member", agentId }`. Absent on a draft keeps the stored value; absent on a record is every
+member. A present value that a client cannot read reads as `none`. The host adds and reads the key only
+for a request that advertises the capability, so released peers see the same `channels-v1` wire, and a
+save from such a peer keeps the setting. Without the capability a client hides the Browser select for
+that host.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

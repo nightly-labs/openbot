@@ -47,6 +47,10 @@ export const messages = {
     "このリモートホストは、既存のタブでのアドレスバーによる移動に対応していません。",
   "error.backend.browserUserControlBusy":
     "このブラウザーのタブはシークレットを待っています。先にシークレットの要求に応答してください。",
+  "error.backend.browserTeachBusy":
+    "別のユーザーがこのブラウザーのタブを操作しています。操作が終わってからもう一度お試しください。",
+  "error.backend.browserTeachUnavailable": "このブラウザーのタブには、タスクを学習できるエージェントがありません。",
+  "error.backend.browserTeachUnsupported": "このリモートホストは、タスクの記録に対応していません。",
   "error.backend.browserUserControlUnsupported":
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
@@ -160,6 +164,10 @@ export const messages = {
     "メールボックスの状態が破損しているか、新しいバージョンの OpenBot のものです。上書きしません。",
   "error.backend.recipientDeleting": "受信者を削除中です。削除が終わってから再試行してください。",
   "error.backend.recipientHidden": "このエージェントは非表示です。メッセージを送るには元に戻してください。",
+  "error.backend.agentIdUnknown":
+    "ID {id} のエージェントはありません。openbot.list_agents で ID を取得してから、もう一度お試しください。",
+  "error.backend.agentIdNear":
+    "ID {id} のエージェントはありません。エージェント {name} の ID {nearId} がほぼ同じです。このエージェントのことなら、その ID でもう一度お試しください。",
   "error.backend.attachBetween": "1 〜 {limit} 個のファイルを添付してください。",
   "error.backend.attachmentNotFile": "添付ファイルがファイルではありません: {path}",
   "error.backend.generatedImageTooLarge": "生成された画像が 100 MB の上限を超えています。",
@@ -224,6 +232,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
   "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
   "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
+  "error.backend.messagePinNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messagePinLimit":
+    "このチャットにはピン留めしたメッセージが50件あります。別のメッセージをピン留めする前に、1件解除してください。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
@@ -256,6 +267,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。MCP 設定を開いて「サインイン」を選択してください。",
   "error.backend.mcpServerFailedForProvider":
@@ -288,6 +301,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "セクション名が長すぎます。",
   "error.backend.sidebarFolderTooDeep": "フォルダーは3階層までです。",
   "error.backend.sidebarFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
+  "error.backend.libraryFolderName": "フォルダー名は 1〜{limit} 文字にしてください。",
+  "error.backend.libraryFolderLimit": "1 つのサーバーに置けるライブラリのフォルダーは {limit} 個までです。",
+  "error.backend.libraryFolderFileLimit": "ライブラリのフォルダーにあるファイルが多すぎます。",
+  "error.backend.libraryFolderTooDeep": "ライブラリのフォルダーは {limit} 階層までです。",
+  "error.backend.libraryFolderGone": "フォルダーが存在しないか、すでに削除されています。",
+  "error.backend.libraryFolderOtherAgent": "ファイルは、そのエージェントのフォルダーにのみ入れられます。",
+  "error.backend.libraryFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",

@@ -126,6 +126,7 @@ import type {
   RemoveProviderAccountInput,
   RenameProviderAccountInput,
   ResetProviderUsageInput,
+  SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
   SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
@@ -135,8 +136,10 @@ import type {
   AgentTaskPage,
   AgentTaskReadState,
   AgentTasksSnapshot,
+  AgentTaskWindow,
   BranchAgentTaskInput,
   MarkAgentTaskReadInput,
+  ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RenameAgentTaskInput,
   RunQueuedMessageAsTaskInput,
@@ -232,6 +235,8 @@ import type {
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
+  BrowserTeachStopInput,
   BrowserVisibilityInput,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
@@ -367,6 +372,7 @@ import type {
   InstanceTransferResult,
   InstanceTransferSummary,
 } from "./ipc-instance-transfer";
+import type { LibraryFolderAction, LibraryFoldersSnapshot } from "./ipc-library-folders";
 import type { LinkAccountStatus } from "./ipc-link-account";
 import type { MachineAlertSettings, MachineMetrics } from "./ipc-machine-resources";
 import type {
@@ -379,6 +385,7 @@ import type {
   MarketplaceAgentQuery,
   SubmitMarketplaceAgentInput,
 } from "./ipc-marketplace-agents";
+import type { McpAccessSnapshot, SetMcpAccessInput } from "./ipc-mcp-access";
 import type {
   CancelMcpSignInInput,
   CompleteMcpSignInRelayInput,
@@ -395,6 +402,7 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
   AddMessagingOrchestratorResult,
@@ -421,6 +429,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppWorkingMessageInput,
   SlackOverview,
   SlackWorkspaceInput,
   StartWhatsAppLinkInput,
@@ -885,6 +894,8 @@ export const IPC_ENDPOINTS = {
     ),
     renameProviderAccount: request<RenameProviderAccountInput, AgentStatus>()("app:rename-provider-account"),
     removeProviderAccount: request<RemoveProviderAccountInput, AgentStatus>()("app:remove-provider-account"),
+    /** Turns the pool of a provider's accounts on or off. The provider's agents then use its pick. */
+    setProviderAccountPool: request<SetProviderAccountPoolInput, AgentStatus>()("app:set-provider-account-pool"),
     /** Signs the provider's own sign-in out, in the home folder that a terminal CLI shares. */
     signOutProvider: request<AgentProviderId, AgentStatus>()("app:sign-out-provider"),
     /** The usage reset credits of each connected account of a provider. It reads the usage of each. */
@@ -1171,6 +1182,8 @@ export const IPC_ENDPOINTS = {
     ),
     renameAccount: scopedRequest<RenameProviderAccountInput, void, "required">()("provider-admin:rename-account"),
     removeAccount: scopedRequest<RemoveProviderAccountInput, void, "required">()("provider-admin:remove-account"),
+    // The pool of a joined server's host's accounts (`provider-account-pool-v1`).
+    setAccountPool: scopedRequest<SetProviderAccountPoolInput, void, "required">()("provider-admin:set-account-pool"),
     // The usage reset credits of a joined server's host's accounts, and the reset that spends one
     // (`provider-usage-reset-v1`).
     usageResets: scopedRequest<AgentProviderId, ProviderUsageResets[], "required">()("provider-admin:usage-resets"),
@@ -1281,6 +1294,9 @@ export const IPC_ENDPOINTS = {
     removeWhatsAppSender: request<RemoveWhatsAppSenderInput, void>()("messaging:remove-whatsapp-sender"),
     answerWhatsAppRequest: request<AnswerWhatsAppRequestInput, void>()("messaging:answer-whatsapp-request"),
     setWhatsAppOwnNumber: request<SetWhatsAppOwnNumberInput, void>()("messaging:set-whatsapp-own-number"),
+    setWhatsAppWorkingMessage: request<SetWhatsAppWorkingMessageInput, void>()(
+      "messaging:set-whatsapp-working-message",
+    ),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1335,6 +1351,10 @@ export const IPC_ENDPOINTS = {
     ),
     hostSetWhatsAppOwnNumber: scopedRequest<SetWhatsAppOwnNumberInput, void, "required">()(
       "messaging:host-set-whatsapp-own-number",
+    ),
+    // A joined server needs `whatsapp-working-message-v1`. Its numbers carry `workingMessage` only then.
+    hostSetWhatsAppWorkingMessage: scopedRequest<SetWhatsAppWorkingMessageInput, void, "required">()(
+      "messaging:host-set-whatsapp-working-message",
     ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
@@ -1753,11 +1773,16 @@ export const IPC_ENDPOINTS = {
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
+    // The pins of all chats of an agent. A joined server takes both through `message-pins-v1`.
+    listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
+    setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     // A joined server takes this through `agent-thread-pages-v1`.
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
+    // A joined server takes this through `message-pins-v1`: it opens a pin of a side thread at its message.
+    readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
     startTask: scopedRequest<StartAgentTaskInput, AgentTask>()("agent:tasks:start"),
     runQueuedMessageAsTask: scopedRequest<RunQueuedMessageAsTaskInput, AgentTask>()("agent:tasks:run-queued-message"),
     // A joined server takes this through `agent-thread-branches-v1`.
@@ -1969,6 +1994,10 @@ export const IPC_ENDPOINTS = {
     close: request<string, void>()("browser:close"),
     takeControl: request<string, void>()("browser:take-control"),
     releaseControl: request<string, void>()("browser:release-control"),
+    // A person shows a task in an agent's tab (`browser-teach-v1`). Start takes the tab; stop gives
+    // it back and, with `save`, answers the recorded steps.
+    startTeach: request<string, void>()("browser:teach-start"),
+    stopTeach: request<BrowserTeachStopInput, BrowserTeachStep[]>()("browser:teach-stop"),
     listTabs: request<undefined, BrowserTab[]>()("browser:list-tabs"),
     getDisplayState: request<undefined, BrowserDisplayState>()("browser:get-display-state"),
     getControlState: request<undefined, BrowserControlState>()("browser:get-control-state"),
@@ -2156,6 +2185,10 @@ export const IPC_ENDPOINTS = {
     removeMcpSignInApp: scopedRequest<McpSignInAppInput, McpSignInAppState, "required">()(
       "servers:mcp:remove-sign-in-app",
     ),
+    // Which agents get an MCP server, and the level of each role for it (`mcp-access-v1`). A set
+    // replaces the entry of one MCP server and answers with the whole snapshot.
+    getMcpAccess: scopedQuery<McpAccessSnapshot, "required">()("servers:mcp:get-access"),
+    setMcpAccess: scopedRequest<SetMcpAccessInput, McpAccessSnapshot, "required">()("servers:mcp:set-access"),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {
@@ -2168,6 +2201,12 @@ export const IPC_ENDPOINTS = {
     clear: scopedRequest<ClearStorageInput, void, "required">()("storage:clear"),
     openFile: scopedRequest<OpenStoredFileInput, void, "required">()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
+    // The folders of the Library. Null before `library-folders-v1`: the Library then shows no folders.
+    getLibraryFolders: scopedQuery<LibraryFoldersSnapshot | null, "required">()("storage:get-library-folders"),
+    /** Applies one folder change and answers the new snapshot. */
+    changeLibraryFolders: scopedRequest<LibraryFolderAction, LibraryFoldersSnapshot, "required">()(
+      "storage:change-library-folders",
+    ),
     // Local only, like `openLocation`: a server removes its own old provider CLI versions.
     getRemovableRuntimes: request<undefined, RemovableRuntimes>()("storage:get-removable-runtimes"),
     /** Removes the old versions no instance uses now and the downloads it named, and answers what is left. */

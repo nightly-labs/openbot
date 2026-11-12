@@ -98,6 +98,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "El enlace se abrió en el navegador habitual.",
   "settings.sendShortcut.title": "Atajo para enviar",
   "settings.sendShortcut.description": "Elige las teclas para enviar mensajes en este dispositivo y navegador.",
+  "settings.chatOrder.description":
+    "Elige dónde muestra la barra lateral los chats no leídos en este dispositivo. Manual desactiva el grupo No leídos.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",
@@ -261,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Arrastra el dock hacia arriba o abajo para moverlo por el borde.",
   "settings.agentDock.edge.right": "Derecha",
   "settings.agentDock.edge.left": "Izquierda",
+  "settings.agentDock.size.title": "Tamaño del dock",
+  "settings.agentDock.size.description":
+    "Arrastra para cambiar el tamaño del dock sobre las demás apps. En la ventana principal, el dock sigue el tamaño de la interfaz.",
   "settings.agentDock.autoHide.title": "Ocultar cuando no se usa",
   "settings.agentDock.autoHide.description":
     "El dock se desliza dentro del borde. Lleva el puntero al borde para mostrarlo.",
@@ -519,6 +524,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} está listo. Reinicia para aplicarlo.",
   "settings.updates.status.installing": "Reiniciando para aplicar {target}…",
   "settings.updates.status.upToDate": "OpenBot está actualizado en el canal estable.",
+  "settings.updates.status.staged":
+    "{target} se está distribuyendo por fases. Busca actualizaciones para obtenerlo ahora.",
   "settings.updates.status.checkFailed": "OpenBot no pudo buscar actualizaciones. Vuelve a intentarlo.",
   "settings.updates.status.unsupported": "Las actualizaciones no están disponibles en esta compilación.",
   "settings.updates.actionFailed": "No se pudo actualizar OpenBot.",

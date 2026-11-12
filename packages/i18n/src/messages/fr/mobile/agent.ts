@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Cette action supprime l’agent de ce serveur.",
   "mobile.agent.menu.markRead": "Marquer comme lu",
   "mobile.agent.menu.markUnread": "Marquer comme non lu",
+  "mobile.agent.menu.mute": "Mettre en sourdine",
+  "mobile.agent.menu.unmute": "Réactiver le son",
   "mobile.agent.menu.hide": "Masquer",
   "mobile.agent.menu.info": "Infos",
   "mobile.agent.menu.more": "Plus",
@@ -587,6 +589,8 @@ export const messages = {
     "Les discussions masquées continuent de fonctionner. Elles ne s’affichent simplement pas sur l’écran d’accueil.",
   "mobile.agent.hidden.bodySynced":
     "Une discussion masquée garde son historique. Son agent n’exécute pas de routines et ne reçoit pas de nouveaux messages. Tous les appareils de ce serveur la masquent.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Une discussion masquée continue de fonctionner. Tous les appareils de ce serveur la masquent.",
   "mobile.agent.hidden.showNamed": "Afficher {name}",
   "mobile.agent.hidden.show": "Afficher",
   "mobile.agent.hidden.showFailed": "Impossible d’afficher l’agent",

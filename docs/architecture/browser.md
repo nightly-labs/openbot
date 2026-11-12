@@ -117,14 +117,22 @@ because a frame in another process can keep its active element after the page ta
 `bun run test:browser --scenario=typing-focus` covers it and writes
 `.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
-tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
+tokens. They keep the installed Chromium major version and host platform, and give the other version
+parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
+Electron sends. The `Accept-Language` header adds the base language of each regional language
+(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
 loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
 be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
 chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
-It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
+It preserves hints supplied by Chromium. As Chrome does, it adds a high-entropy hint (full version,
+platform version, architecture, bitness, model, form factor) only after the response of a page load
+of that origin asks for it with `Accept-CH`, and only on requests from a page of that origin. Each
+value is the one that `getHighEntropyValues()` gives the page. The record is in memory, so the first
+load after a restart is as a first visit. Windows sends no platform version: the page reads a
+contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
@@ -239,6 +247,24 @@ each change). Turning the setting off deletes the file, and deleting an agent de
 the review reads the steps; the agent has no tool to search them. Browsing alone does not start a
 review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
 covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
+
+"Teach a task" (composer `+` menu, `browser-teach-v1`) uses the same step recorder for a task that a
+person shows on purpose. It does not depend on the setting above. The menu item opens the full view
+with a teach bar above the page (`BrowserTeachBar`) and no dock; "Start recording" in the bar calls
+`startTeach`. `BrowserHost.startTeach` gives the
+agent's tab to the person and keeps the steps in memory for that tab, not in `UserBrowsingLog`: at
+most 200 steps and 10 minutes, with the same rules for a page and a press. The bar then shows the
+time on a button that saves the recording, a discard button, and a frame around the page. `stopTeach` gives the tab back; only the
+holder that started the recording can end it, and it gets the steps only with `save`. The recording
+also ends, with no steps, when the control of the tab ends. On Save the client sends a short
+user message that asks for a skill and a plain answer, with the numbered steps in an attached text
+file `recorded-task.txt` (`browser-teach-message.ts`, `sendCardFile`), and closes the full view so that
+the chat shows. The request is in the message, not in the file: an agent does not obey a file. A
+recording with no step after its first page sends nothing and shows a toast. When the chat cannot
+send, the steps go to the draft as text. The host stores no step. The
+menu item is not in a channel and not on mobile: a task of many steps on a web page does not fit a
+phone. `bun scripts/browser-user-control-e2e.ts` covers the recording, and
+`bun run test:team-api-routes` covers the routes.
 
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers

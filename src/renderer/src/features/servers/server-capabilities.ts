@@ -29,6 +29,7 @@ export function serverSupportsCapability(
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||
       capability === "channel-isolation-v1" ||
+      capability === "channel-browser-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
@@ -41,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-sign-in-app-v1" ||
       capability === "mcp-accounts-v1" ||
       capability === "mcp-member-access-v1" ||
+      capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||
@@ -86,6 +88,7 @@ export function serverSupportsCapability(
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
       capability === "browsing-memory-v1" ||
+      capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
@@ -93,8 +96,10 @@ export function serverSupportsCapability(
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
+      capability === "library-folders-v1" ||
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
+      capability === "whatsapp-working-message-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
@@ -106,6 +111,7 @@ export function serverSupportsCapability(
       capability === "instance-transfer-v1" ||
       capability === "instance-transfer-chunks-v1" ||
       capability === "agent-hidden-v1" ||
+      capability === "agent-hidden-work" ||
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
@@ -123,6 +129,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||
       capability === "conversation-file-search-v1" ||

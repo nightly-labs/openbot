@@ -405,6 +405,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-embeds
 
+      - name: Run the place history E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-place-history
+
       - name: Run the Telegram answer mentions E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-telegram-mentions
@@ -477,6 +481,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
 
+      - name: Run the Codex warning banner E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-warning-banner
+
       - name: Run the usage read pacing E2E test
         if: ${{ !cancelled() }}
         run: bun run test:usage-read-pacing
@@ -501,9 +509,21 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-channel-create
 
+      - name: Run the Library folders agent tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:library-folders
+
       - name: Run the agent workflow gate E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-workflow-gate
+
+      - name: Run the pinned message agent tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:pinned-message-agent-tool
+
+      - name: Run the messaging owner card E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-owner-card
 
       - name: Run the agent profile accounts E2E test
         if: ${{ !cancelled() }}
@@ -536,6 +556,10 @@ jobs:
       - name: Run the backup model failover E2E test
         if: ${{ !cancelled() }}
         run: bun run test:backup-model-failover
+
+      - name: Run the Codex empty lead turn E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-empty-lead-turn
 
       - name: Run the ZIP attachment E2E test
         if: ${{ !cancelled() }}
@@ -653,6 +677,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:pi-sign-in-watch
 
+      - name: Run the provider launch order E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:provider-launch-order
+
       - name: Run the agent API key E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-api-keys
@@ -694,6 +722,7 @@ jobs:
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
+            .openbot-build/messaging-place-history-e2e/
             .openbot-build/messaging-telegram-mentions-e2e/
             .openbot-build/messaging-slack-ping-reply-e2e/
             .openbot-build/turn-input-e2e/
@@ -717,7 +746,10 @@ jobs:
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
             .openbot-build/agent-channel-create-e2e/
+            .openbot-build/library-folders-e2e/
             .openbot-build/agent-workflow-gate-e2e/
+            .openbot-build/pinned-message-agent-tool-e2e/
+            .openbot-build/messaging-owner-card-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
@@ -726,6 +758,7 @@ jobs:
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
+            .openbot-build/codex-empty-lead-turn-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
             .openbot-build/svg-attachment-e2e/
@@ -751,6 +784,7 @@ jobs:
             .openbot-build/cursor-usage-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
+            .openbot-build/provider-launch-order-e2e/
             .openbot-build/agent-api-keys-e2e/
             .openbot-build/remote-connect-analytics-e2e/
             .openbot-build/memory-review-e2e/
@@ -836,6 +870,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
 
+      - name: Run the Grok question E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:grok-question
+
       - name: Run the Grok partial model list E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-partial-model-list
@@ -913,6 +951,7 @@ jobs:
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
+            .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/pi-idle-release-e2e/

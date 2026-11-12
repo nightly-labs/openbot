@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Option, Schema, Semaphore } from "effect";
-import { BrowserWindow, session as electronSession, type Session } from "electron";
+import { BrowserWindow, session as electronSession, net, type Session } from "electron";
 import {
   type VideoReaderHost,
   VideoReadFailed,
@@ -443,7 +443,8 @@ export class VideoReader implements VideoReaderHost {
     if (installed) return executable;
     logger.info(`Installing yt-dlp ${YT_DLP_VERSION} for video reading.`);
     const staging = join(folder, `.download-${randomBytes(8).toString("hex")}`);
-    const unavailable = "OpenBot could not get its video tool. Check the internet connection and try again.";
+    const unavailable =
+      "OpenBot could not download its video tool from github.com. Make sure that this computer can open github.com, then try again.";
     return yield* Effect.tryPromise({
       try: async (signal) => {
         await mkdir(folder, { recursive: true });
@@ -453,7 +454,8 @@ export class VideoReader implements VideoReaderHost {
             archive: staging,
             failed: unavailable,
             signal,
-            fetch: (url, init) => fetch(url, init),
+            // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+            fetch: (url, init) => net.fetch(url, init),
           });
           if (sha256 !== release.sha256) throw new Error("The yt-dlp download does not match its pinned hash.");
           await chmod(staging, 0o755);

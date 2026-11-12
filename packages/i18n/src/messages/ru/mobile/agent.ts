@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Агент будет удалён с этого сервера.",
   "mobile.agent.menu.markRead": "Прочитано",
   "mobile.agent.menu.markUnread": "Не прочитано",
+  "mobile.agent.menu.mute": "Отключить уведомления",
+  "mobile.agent.menu.unmute": "Включить уведомления",
   "mobile.agent.menu.hide": "Скрыть",
   "mobile.agent.menu.info": "Информация",
   "mobile.agent.menu.more": "Ещё",
@@ -624,6 +626,8 @@ export const messages = {
   "mobile.agent.hidden.body": "Скрытые чаты продолжают работать. Они просто не показываются на главном экране.",
   "mobile.agent.hidden.bodySynced":
     "Скрытый чат сохраняет историю. Его агент не выполняет регулярные задачи и не получает новые сообщения. Чат скрыт на всех устройствах этого сервера.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Скрытый чат продолжает работать. Чат скрыт на всех устройствах этого сервера.",
   "mobile.agent.hidden.showNamed": "Показать: {name}",
   "mobile.agent.hidden.show": "Показать",
   "mobile.agent.hidden.showFailed": "Не удалось показать агента",

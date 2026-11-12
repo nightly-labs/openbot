@@ -48,6 +48,9 @@ export const messages = {
     "Ten zdalny host nie obsługuje nawigacji z paska adresu w istniejącej karcie.",
   "error.backend.browserUserControlBusy":
     "Ta karta przeglądarki czeka na sekret. Najpierw odpowiedz na prośbę o sekret.",
+  "error.backend.browserTeachBusy": "Inna osoba steruje tą kartą przeglądarki. Spróbuj ponownie, gdy skończy.",
+  "error.backend.browserTeachUnavailable": "Ta karta przeglądarki nie ma agenta, który może nauczyć się zadania.",
+  "error.backend.browserTeachUnsupported": "Ten zdalny host nie obsługuje nagrywania zadania.",
   "error.backend.browserUserControlUnsupported":
     "Ten zdalny host nie obsługuje przejmowania kontroli nad kartą przeglądarki.",
   "error.backend.browserSignInUnsupported": "Ten zdalny host nie może przyjąć logowania z tego komputera.",
@@ -156,6 +159,10 @@ export const messages = {
     "Stan skrzynki jest uszkodzony lub pochodzi z nowszej wersji OpenBot; odmowa nadpisania.",
   "error.backend.recipientDeleting": "Odbiorca jest usuwany. Spróbuj ponownie po zakończeniu usuwania.",
   "error.backend.recipientHidden": "Ten agent jest ukryty. Przywróć go, aby wysyłać wiadomości.",
+  "error.backend.agentIdUnknown":
+    "Żaden agent nie ma identyfikatora {id}. Pobierz identyfikatory z openbot.list_agents i spróbuj ponownie.",
+  "error.backend.agentIdNear":
+    "Żaden agent nie ma identyfikatora {id}. Agent {name} ma prawie taki sam identyfikator {nearId}. Jeśli chodzi o tego agenta, spróbuj ponownie z jego identyfikatorem.",
   "error.backend.attachBetween": "Załącz od 1 do {limit} plików.",
   "error.backend.attachmentNotFile": "Załącznik nie jest plikiem: {path}",
   "error.backend.generatedImageTooLarge": "Wygenerowany obraz przekracza limit 100 MB.",
@@ -217,6 +224,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
   "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
   "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
+  "error.backend.messagePinNotFound": "Tej wiadomości nie ma na czacie.",
+  "error.backend.messagePinLimit": "Ten czat ma 50 przypiętych wiadomości. Odepnij jedną, zanim przypniesz kolejną.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
@@ -248,6 +257,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz ustawienia MCP i wybierz Zaloguj się.",
   "error.backend.mcpServerFailedForProvider":
@@ -280,6 +291,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
   "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
   "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.libraryFolderName": "Nazwa folderu musi mieć od 1 do {limit} znaków.",
+  "error.backend.libraryFolderLimit": "Serwer może mieć maksymalnie {limit} folderów Biblioteki.",
+  "error.backend.libraryFolderFileLimit": "W folderach Biblioteki jest za dużo plików.",
+  "error.backend.libraryFolderTooDeep": "Foldery Biblioteki mogą mieć maksymalnie {limit} poziomów.",
+  "error.backend.libraryFolderGone": "Folder nie istnieje lub został już usunięty.",
+  "error.backend.libraryFolderOtherAgent": "Plik można przenieść tylko do folderu jego agenta.",
+  "error.backend.libraryFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",

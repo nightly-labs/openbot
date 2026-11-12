@@ -37,6 +37,7 @@ import {
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
   isWhatsAppGroupList,
+  isWhatsAppWorkingMessageList,
   type MessagingWorkspaceInput,
   type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
@@ -49,6 +50,7 @@ import {
   type SetMessagingEnabledInput,
   type SetOwnServerNotificationLevelInput,
   type SetWhatsAppOwnNumberInput,
+  type SetWhatsAppWorkingMessageInput,
   type SidebarPin,
   type SidebarPinsSnapshot,
   type StartWhatsAppLinkInput,
@@ -56,6 +58,7 @@ import {
   type WhatsAppLinkState,
   type WhatsAppOverview,
   type WhatsAppSenderInput,
+  type WhatsAppWorkingMessageList,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -93,6 +96,7 @@ import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
@@ -141,6 +145,7 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
+  decodeChannelStorageUsage,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
   decodeCustomProviderResult,
@@ -160,6 +165,7 @@ import {
   decodeHostPasswordManagerStatus,
   decodeHostPersonality,
   decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
@@ -169,6 +175,7 @@ import {
   decodeHostVaultImport,
   decodeHostVaultState,
   decodeInstalledSkills,
+  decodeMcpAccessSnapshot,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
   decodeMcpSignInStates,
@@ -215,6 +222,7 @@ import {
   isAgentModel,
   isAgentStatus,
   isSharedTable,
+  type McpAccessSnapshot,
   type McpServerConfig,
   type McpSignInAppInput,
   type McpSignInAppState,
@@ -252,7 +260,9 @@ import {
   type SetAgentProviderAccountInput,
   type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
+  type SetMcpAccessInput,
   type SetMcpServerEnabledInput,
+  type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
   type SetRoutineResultDestinationInput,
   type SharedTable,
@@ -314,12 +324,14 @@ import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
@@ -344,6 +356,7 @@ import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-aud
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
@@ -1063,6 +1076,28 @@ export function setMcpServerEnabled(
   return adminCall(() => request("POST", MCP_ROUTES.toggle, decodeMcpServerConfigs, { ...input }));
 }
 
+/** Who gets each MCP server of the host (`mcp-access-v1`). A member reads only `mine`. */
+export function getHostMcpAccess(request: TeamApiRequest): Effect.Effect<McpAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() => request("POST", MCP_ACCESS_ROUTES.read, decodeMcpAccessSnapshot, {}));
+}
+
+/**
+ * A full replace of the access of one MCP server. The host answers only an owner or admin, and refuses
+ * a revision other than the one it holds with 409.
+ */
+export function setHostMcpAccess(
+  request: TeamApiRequest,
+  input: SetMcpAccessInput,
+): Effect.Effect<McpAccessSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MCP_ACCESS_ROUTES.set, decodeMcpAccessSnapshot, {
+      revision: input.revision,
+      mcpServerId: input.mcpServerId,
+      access: { agents: input.access.agents, everyone: input.access.everyone, roles: { ...input.access.roles } },
+    }),
+  );
+}
+
 /** The host makes the connection with its own stored credentials, and opens no browser. */
 export function testMcpServer(
   request: TeamApiRequest,
@@ -1202,7 +1237,16 @@ export const getStorageUsage = Effect.fn("TeamAdmin.getStorageUsage")(function* 
   request: TeamApiRequest,
   input: GetStorageUsageInput,
 ) {
-  const result = yield* adminCall(() => request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, { ...input }));
+  // The channel scope has its own route, `storage-channel-v1`; the storage-v1 wire does not carry it.
+  const { channelId, force } = input;
+  const result = yield* adminCall(() =>
+    input.scope === "channel"
+      ? request("POST", STORAGE_CHANNEL_ROUTES.files, decodeChannelStorageUsage, {
+          channelId: channelId ?? "",
+          ...(force === undefined ? {} : { force }),
+        })
+      : request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, { ...input }),
+  );
   return yield* Effect.try({
     try: () => assertStorageUsageScope(result, input),
     catch: (cause) => new TeamAdminRequestError({ cause }),
@@ -1339,23 +1383,45 @@ export function listProviderAccounts(
 
 /**
  * `listProviderAccounts` with, on a host with `provider-account-models-v1`, the models that each
- * account after the first serves and the provider's own sign-in does not. When that read fails, the
- * accounts come without them, as from an older host.
+ * account after the first serves and the provider's own sign-in does not, and on a host with
+ * `provider-account-pool-v1`, the pools that are on. When one of these reads fails, the accounts come
+ * without it, as from an older host.
  */
 export function listProviderAccountsWithModels(
   request: TeamApiRequest,
   withModels: boolean,
+  withPools: boolean,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
-  if (!withModels) return listProviderAccounts(request);
+  if (!withModels && !withPools) return listProviderAccounts(request);
   return Effect.all(
     [
       listProviderAccounts(request),
-      adminCall(() => request("POST", PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {})).pipe(
-        Effect.orElseSucceed(() => null),
-      ),
+      withModels
+        ? adminCall(() =>
+            request("POST", PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {}),
+          ).pipe(Effect.orElseSucceed(() => null))
+        : Effect.succeed(null),
+      withPools
+        ? adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {})).pipe(
+            Effect.orElseSucceed(() => null),
+          )
+        : Effect.succeed(null),
     ],
     { concurrency: "unbounded" },
-  ).pipe(Effect.map(([accounts, models]) => (models ? withHostProviderAccountModels(accounts, models) : accounts)));
+  ).pipe(
+    Effect.map(([accounts, models, pools]) => {
+      const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
+      return pools ? { ...withAccountModels, pools } : withAccountModels;
+    }),
+  );
+}
+
+/** `provider-account-pool-v1`: turns the pool of a provider's accounts on the host on or off. */
+export function setProviderAccountPool(
+  request: TeamApiRequest,
+  input: SetProviderAccountPoolInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, ignoreResponse, { ...input }));
 }
 
 /** The readings of the accounts after the first. */
@@ -2274,4 +2340,31 @@ export function whatsappConnectorSetOwnNumber(
   input: SetWhatsAppOwnNumberInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WHATSAPP_CONNECTOR_ROUTES.ownNumber, ignoreResponse, { ...input }));
+}
+
+/**
+ * The "Working on it…" setting of each WhatsApp number of the host (`whatsapp-working-message-v1`).
+ * Merge it into the overview with `withWhatsAppWorkingMessages`.
+ */
+export function whatsappConnectorWorkingMessages(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppWorkingMessageList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_WORKING_MESSAGE_ROUTES.list,
+      (value) => {
+        if (!isWhatsAppWorkingMessageList(value)) throw new Error("Invalid WhatsApp working message response.");
+        return value;
+      },
+      {},
+    ),
+  );
+}
+
+export function whatsappConnectorSetWorkingMessage(
+  request: TeamApiRequest,
+  input: SetWhatsAppWorkingMessageInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_WORKING_MESSAGE_ROUTES.update, ignoreResponse, { ...input }));
 }

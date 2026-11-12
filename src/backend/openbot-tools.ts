@@ -17,11 +17,12 @@ import { API_KEY_NAME_PATTERN, CONNECTOR_IDS, VAULT_API_KEY_LIMIT, VAULT_NOTES_L
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
-import { ADVERTISE_AS_UNION, advertisedJsonSchema } from "./agent/advertised-json-schema";
+import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
+import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
@@ -143,31 +144,6 @@ const uiActionSchema = z.strictObject({
     ),
 });
 const uiStringOptionsSchema = (max: number) => z.array(uiLabelSchema).min(1).max(max);
-const uiFormFieldBase = { id: uiBlockIdSchema, required: z.boolean().optional() };
-const uiFormTextField = (kind: "text" | "textarea") =>
-  z.strictObject({
-    ...uiFormFieldBase,
-    kind: z.literal(kind),
-    label: uiLabelSchema,
-    placeholder: uiLabelSchema.optional(),
-    value: z.string().max(UI_BLOCK_LIMITS.fieldValue).optional(),
-    ...(kind === "text"
-      ? {
-          secret: z
-            .boolean()
-            .optional()
-            .describe("A password or a key: the app hides it and does not store it. Do not give a value."),
-        }
-      : {}),
-  });
-const uiFormOptionsField = (kind: "select" | "segmented", max: number) =>
-  z.strictObject({
-    ...uiFormFieldBase,
-    kind: z.literal(kind),
-    label: uiLabelSchema.optional(),
-    options: uiStringOptionsSchema(max),
-    value: uiLabelSchema.optional().describe("One of options."),
-  });
 
 export const routineReportFailureToolSchema = z.object({
   reason: z
@@ -201,77 +177,34 @@ export const acknowledgeRequestToolSchema = z.object({
     .describe("A smaller option that the user may prefer, such as Only find the cause."),
 });
 
+/**
+ * Agents get only the confirm block: an approval, such as of a draft in its preview. A question with
+ * options goes to `ask_user`, which costs less context in each request. The choice and form blocks
+ * stay in the contract: OpenBot makes forms itself, and older chats show both.
+ */
 export const askUiToolSchema = z.object({
   blockId: uiBlockIdSchema.optional().describe("Your id for this block. OpenBot makes one when you omit it."),
-  // Each type has its own fields: one merged object would offer `preview` to a form, which then fails.
-  block: z
-    .discriminatedUnion("type", [
-      z.strictObject({
-        type: z.literal("confirm"),
-        title: uiTextSchema(UI_BLOCK_LIMITS.title),
-        danger: z.boolean().optional().describe("Draw the block as dangerous; its primary button is held to press."),
-        confirmHold: z.number().int().min(UI_BLOCK_LIMITS.holdMinMs).max(UI_BLOCK_LIMITS.holdMaxMs).optional(),
-        fields: z
-          .array(
-            z.union([
-              z.strictObject({ label: uiLabelSchema, value: z.string().max(UI_BLOCK_LIMITS.text) }),
-              z.strictObject({
-                label: uiLabelSchema,
-                select: uiBlockIdSchema.describe("The key of the chosen option in values. Not action."),
-                options: uiStringOptionsSchema(UI_BLOCK_LIMITS.selectOptions).describe("The first one is the default."),
-              }),
-            ]),
-          )
-          .max(UI_BLOCK_LIMITS.confirmFields)
-          .optional(),
-        preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
-        actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
-      }),
-      z.strictObject({
-        type: z.literal("choice"),
-        title: uiTextSchema(UI_BLOCK_LIMITS.title),
-        multiple: z.boolean().optional(),
-        options: z
-          .array(
-            z.strictObject({
-              id: uiBlockIdSchema,
-              label: uiLabelSchema,
-              meta: uiTextSchema(UI_BLOCK_LIMITS.meta).optional(),
-              selected: z.boolean().optional(),
-            }),
-          )
-          .min(1)
-          .max(UI_BLOCK_LIMITS.choiceOptions),
-        submit: uiLabelSchema.optional().describe("The submit button label."),
-      }),
-      z.strictObject({
-        type: z.literal("form"),
-        title: uiTextSchema(UI_BLOCK_LIMITS.title),
-        fields: z
-          .array(
-            z.discriminatedUnion("kind", [
-              uiFormTextField("text"),
-              uiFormTextField("textarea"),
-              uiFormOptionsField("select", UI_BLOCK_LIMITS.selectOptions),
-              uiFormOptionsField("segmented", UI_BLOCK_LIMITS.segmentedOptions),
-              z.strictObject({
-                ...uiFormFieldBase,
-                kind: z.literal("date"),
-                label: uiLabelSchema,
-                value: z
-                  .string()
-                  .regex(/^\d{4}-\d{2}-\d{2}$/)
-                  .optional()
-                  .describe("YYYY-MM-DD."),
-              }),
-            ]),
-          )
-          .min(1)
-          .max(UI_BLOCK_LIMITS.formFields),
-        submit: uiLabelSchema.optional().describe("The submit button label."),
-      }),
-    ])
-    .meta(ADVERTISE_AS_UNION),
+  block: z.strictObject({
+    type: z.literal("confirm"),
+    title: uiTextSchema(UI_BLOCK_LIMITS.title),
+    danger: z.boolean().optional().describe("Draw the block as dangerous; its primary button is held to press."),
+    confirmHold: z.number().int().min(UI_BLOCK_LIMITS.holdMinMs).max(UI_BLOCK_LIMITS.holdMaxMs).optional(),
+    fields: z
+      .array(
+        z.union([
+          z.strictObject({ label: uiLabelSchema, value: z.string().max(UI_BLOCK_LIMITS.text) }),
+          z.strictObject({
+            label: uiLabelSchema,
+            select: uiBlockIdSchema.describe("The key of the chosen option in values. Not action."),
+            options: uiStringOptionsSchema(UI_BLOCK_LIMITS.selectOptions).describe("The first one is the default."),
+          }),
+        ]),
+      )
+      .max(UI_BLOCK_LIMITS.confirmFields)
+      .optional(),
+    preview: uiTextSchema(UI_BLOCK_LIMITS.preview).optional().describe("Markdown, such as the body of a letter."),
+    actions: z.array(uiActionSchema).min(1).max(UI_BLOCK_LIMITS.actions),
+  }),
 });
 
 const apiKeyNameSchema = z
@@ -375,8 +308,17 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "attach_files_to_response",
     description:
-      "Attach existing local files, such as screenshots, charts, reports or ZIP archives, to the current response for the user. OpenBot copies each file and shows image previews in the conversation.",
-    shape: { paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments) },
+      'Attach existing local files, such as screenshots, charts, reports or ZIP archives, to the current response for the user. OpenBot copies each file and shows image previews in the conversation. Pass folder, such as "Reports/2026", only when the user or your instructions name a Library folder; a missing folder is made.',
+    shape: {
+      paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),
+      folder: libraryFolderArgument.optional(),
+    },
+  },
+  {
+    name: "list_library_folders",
+    description:
+      "List your Library folders by path, with the id, name and stored path of each file in them, and the count of your files in no folder. Pass folder to list one folder and the folders in it. To put a file in a folder, pass folder to attach_files_to_response.",
+    shape: listLibraryFoldersToolSchema.shape,
   },
   {
     name: "html_preview",
@@ -514,7 +456,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "start_new_chat",
     description:
-      "Start a new chat for yourself when this chat is long and its earlier messages no longer matter, or when a routine asks for it. Each message then sends less context. Before you call it, keep what you need: use remember, or write notes to a file in your workspace. The user still sees the earlier messages; you do not. The new chat starts when this turn ends and your queue is empty. When a queued message runs in this chat first, the request ends; call it again if you still need it. It works only in your own chat, and only when the user allows it in your settings.",
+      "Start a new chat for yourself when this chat is long and its earlier messages no longer matter, or when a routine asks for it. Each message then sends less context. Before you call it, keep what you need: use remember, or write notes to a file in your workspace. The user still sees the earlier messages; you do not. The new chat starts when this turn ends and your queue is empty or holds only routine runs. When another queued message runs first, the request ends; call it again. It works only in your own chat, and only when the user allows it in your settings.",
     shape: {},
   },
   {
@@ -716,15 +658,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "ask_ui",
     description: [
-      "Show the user an interactive block in this conversation and wait for the answer.",
-      "Types: confirm (details, an optional preview, up to 4 buttons), choice (one option, or several with multiple), form (a few text, select, segmented or date fields).",
-      "A text field with secret: true asks for a password or a key: you get the value, OpenBot does not store it with the block, and you never repeat it. For an API key or token that a command uses, use request_api_key.",
-      'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button or option id, or "submit" for choice and form; values has the option ids under "selected" or the form values by field id;',
+      "Show the user a confirm card in this conversation and wait for the answer: an approval of an action or of a draft in its preview, with up to 4 buttons. For a question or a choice, use ask_user.",
+      'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button id; values has the option of each select field by its select key;',
       'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',
       "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information, not a permission: provider approvals still apply.",
       "Ids: letters, digits and _ . : -, up to 64 characters, not starting with _. Write every field as plain text. In a channel, each member who reads the channel sees it.",
       'Example: {"block":{"type":"confirm","title":"Send the letter to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"cancel","label":"Cancel"}]}}.',
-      'Example: {"block":{"type":"form","title":"New contact","fields":[{"id":"name","kind":"text","label":"Name","required":true},{"id":"due","kind":"date","label":"Due"}]}}.',
     ].join(" "),
     shape: askUiToolSchema.shape,
   },
@@ -822,6 +761,22 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Add one emoji reaction to the current user message for a clear emotional moment, such as a win, affection, gratitude, humor, sadness, disappointment or frustration. An emoji in the written answer is not a reaction.",
     shape: { emoji: z.string().min(1).max(64).describe("Exactly one complete Unicode emoji.") },
+  },
+  {
+    name: "pin_message",
+    description:
+      "Pin or unpin one finished message of this chat in the pin list of the chat header. You cannot unpin a person's pin.",
+    shape: {
+      quote: z
+        .string()
+        .min(1)
+        .max(500)
+        .describe(
+          "Exact part of the message text; the newest message that contains it is the target. Omit for the current user message.",
+        )
+        .optional(),
+      pinned: z.boolean().describe("False to unpin. Default true.").optional(),
+    },
   },
   {
     name: "send_message",

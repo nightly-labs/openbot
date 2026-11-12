@@ -13,6 +13,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":
     "{provider} 没有加载 OpenBot 的工具，因此此智能体无法使用这些工具，也无法联系队友。{provider} 的团队策略可能会阻止本地 MCP 服务器。请让团队管理员允许它们，然后重试。",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} 无法启动 MCP 服务器 {name}，因此回复已停止。此服务器位于你自己的 {provider} 设置中，而不在 OpenBot 中。请在那里移除或修复该服务器，然后开始新的聊天。",
   "error.provider.endpointsReadOnly":
     "已保存的端点由更新版本的 OpenBot 写入，或文件无法读取。请更新 OpenBot 后再修改。",
   "error.provider.endpointNoSecureStorage":
@@ -170,6 +172,8 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":
     "端点“{provider}”拒绝了它的 API 密钥或请求头。请在“服务器设置 → 服务商”中重新输入，然后重试。",
   "error.provider.customEndpointKeyMissing":
@@ -190,6 +194,7 @@ export const messages = {
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
+  "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
@@ -197,6 +202,7 @@ export const messages = {
     "另一个 Codex 应用（例如 Codex 桌面应用、Codex CLI 或 IDE 扩展）打开了此聊天。同一时间只有一个应用可以写入 Codex 聊天。请在该应用中关闭此聊天，然后重新发送消息。",
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
+  "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
@@ -224,6 +230,8 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
@@ -269,6 +277,8 @@ export const messages = {
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageCountLimit":
+    "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.museMcpStartupFault":

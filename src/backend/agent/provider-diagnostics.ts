@@ -280,7 +280,8 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 
 /**
  * Whether a provider says that a plan window is spent, a limit that resets by itself: "You've hit
- * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM.",
+ * your session limit · resets 8:40pm", "You've hit your 5-hour limit · resets 8:40pm" (#6906),
+ * "You've hit your usage limit. Try again at 10:34 AM.",
  * "You've reached your weekly usage limit for your plan. Your limit resets at …". The OpenCode Go
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
  * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
@@ -295,7 +296,7 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
@@ -358,4 +359,18 @@ export function isImageTooSmallDiagnostic(message: string): boolean {
  */
 export function isImageTooLargeDiagnostic(message: string): boolean {
   return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
+}
+
+/**
+ * Whether a model endpoint refused the request because it holds more images than the endpoint
+ * accepts in one request. The provider session sends each image of the chat again on each turn, so
+ * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
+ * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
+ * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
+ * request". A daily quota of images is not a count in one request, so it does not match.
+ */
+export function isImageCountDiagnostic(message: string): boolean {
+  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b/iu.test(
+    message,
+  );
 }

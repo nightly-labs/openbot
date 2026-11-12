@@ -2690,11 +2690,35 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
       action();
     };
-    /** Space held turns a drag into a pan, as on other canvases. */
+    /** A pointer press sets it, and a key other than Space clears it. */
+    let pointed = false;
+    const onPoint = () => {
+      pointed = true;
+    };
+    /**
+     * A button of a node that has the focus from a click, such as a menu or Run. A button that the
+     * keyboard went to keeps Space, to press it.
+     */
+    const clickedButton = (element: Element | null) =>
+      pointed &&
+      element instanceof HTMLButtonElement &&
+      area.contains(element) &&
+      element.closest("[data-node-id]") !== null;
+    /**
+     * Space held turns a drag into a pan, as on other canvases, also after a click on a button of a node.
+     * The listener captures the key, because a menu button takes Space before the document gets it.
+     */
     const onSpace = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || isEditable(document.activeElement)) return;
-      if (event.type === "keydown" && !onCanvas(document.activeElement)) return;
+      if (event.code !== "Space") {
+        if (event.type === "keydown") pointed = false;
+        return;
+      }
+      if (isEditable(document.activeElement)) return;
+      const clicked = clickedButton(document.activeElement);
+      if (event.type === "keydown" && !clicked && !onCanvas(document.activeElement)) return;
       space = event.type === "keydown";
+      // The button does not open its menu or run its step.
+      if (space && clicked) event.stopPropagation();
       if (space) {
         event.preventDefault();
         area.dataset.space = "";
@@ -2706,8 +2730,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     document.addEventListener("copy", onCopy);
     document.addEventListener("cut", onCopy);
     document.addEventListener("paste", onPaste);
-    document.addEventListener("keydown", onSpace);
-    document.addEventListener("keyup", onSpace);
+    document.addEventListener("pointerdown", onPoint, { capture: true });
+    document.addEventListener("keydown", onSpace, { capture: true });
+    document.addEventListener("keyup", onSpace, { capture: true });
     onResize.observe(area);
     return () => {
       area.removeEventListener("wheel", onWheel);
@@ -2720,8 +2745,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("cut", onCopy);
       document.removeEventListener("paste", onPaste);
-      document.removeEventListener("keydown", onSpace);
-      document.removeEventListener("keyup", onSpace);
+      document.removeEventListener("pointerdown", onPoint, { capture: true });
+      document.removeEventListener("keydown", onSpace, { capture: true });
+      document.removeEventListener("keyup", onSpace, { capture: true });
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);

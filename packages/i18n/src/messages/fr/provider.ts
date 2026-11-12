@@ -235,11 +235,24 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} n’a plus de crédits de réinitialisation d’usage.",
   "provider.account.resetUsageAlreadyRedeemed": "Ce crédit de réinitialisation de {name} a déjà été utilisé.",
   "provider.account.resetUsageFailed": "Impossible de réinitialiser l’usage de {name}.",
+  "provider.account.pool": "Regrouper les comptes",
+  "provider.account.poolDescription":
+    "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
+  "provider.account.inUse": "Utilisé",
+  "provider.account.notInPool": "Hors du groupe",
+  "provider.account.leaveOutOfPool": "Retirer du groupe",
+  "provider.account.putBackInPool": "Remettre dans le groupe",
+  "provider.account.poolChip": "Groupe",
+  "provider.account.poolCount": "Groupe de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} utilisé",
+  "provider.settings.accountsPooledDescription": "{count} sur {max}. Les agents partagent ces comptes.",
   "provider.settings.disconnectTitle": "Déconnecter {name} ?",
   "provider.settings.disconnectOthers": "Les autres comptes {provider} attendent que vous reconnectiez {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.cache": "Cache",
@@ -281,4 +294,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Supprime la CLI qu'OpenBot a téléchargée pour {name} ({size}). Les comptes, les connexions et les agents restent.",
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal garde sa propre connexion.",
 } as const satisfies PartialTranslation<typeof source>;

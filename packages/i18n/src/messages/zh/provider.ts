@@ -230,6 +230,15 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} 没有剩余的用量重置次数。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} 的这次重置机会已被使用。",
   "provider.account.resetUsageFailed": "无法重置 {name} 的用量。",
+  "provider.account.pool": "账号池",
+  "provider.account.poolDescription": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "provider.account.inUse": "使用中",
+  "provider.account.notInPool": "不在池中",
+  "provider.account.leaveOutOfPool": "移出账号池",
+  "provider.account.putBackInPool": "放回账号池",
+  "provider.account.poolChip": "账号池",
+  "provider.account.poolCount": "{accounts}的账号池",
+  "provider.account.poolInUse": "{pool} · 正在使用 {name}",
 
   // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "已连接",
@@ -250,6 +259,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "新助手的默认选项 · {use}",
   "provider.settings.accounts": "账号",
   "provider.settings.accountsDescription": "{count} / {max}。每个助手使用一个账号。",
+  "provider.settings.accountsPooledDescription": "{count} / {max}。助手共享这些账号。",
   "provider.settings.accountBlocked": "重新登录之前，{agents} 无法运行。",
   "provider.settings.removeTitle": "移除 {name}？",
   "provider.settings.removeMoves": "{agents} 将改用 {name}。",
@@ -268,6 +278,8 @@ export const messages = {
   "provider.settings.keyOptional": "可选。添加密钥后可使用付费模型。",
   "provider.settings.keyAlternative": "或粘贴 {name} API 密钥。",
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -324,4 +336,6 @@ export const messages = {
   "provider.settings.endpoints": "端点",
   "provider.settings.noEndpoints": "没有端点。",
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -25,6 +25,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
@@ -238,6 +239,9 @@ export function AgentDockChat(props: {
     fades.measure();
     placeThumb();
   });
+  const draftRows = createComposerRowsResize(() =>
+    props.seat.kind === "agent" ? props.seat.agent.id : props.seat.channel.id,
+  );
   onCleanup(() => {
     sizes.disconnect();
     clearTimeout(hideTimer);
@@ -405,14 +409,16 @@ export function AgentDockChat(props: {
       {/* The mention picker hangs from the composer inside its `.composer-wrap`. */}
       <div class="composer-wrap agent-dock-composer-wrap">
         <form
+          ref={draftRows.form}
           class="composer agent-dock-composer"
           data-compact=""
+          data-small=""
           onSubmit={(event: SubmitEvent) => {
             event.preventDefault();
             submit();
           }}
         >
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={undefined}
               agents={props.agents}

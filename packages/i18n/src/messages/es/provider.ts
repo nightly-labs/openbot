@@ -228,12 +228,25 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} no tiene más créditos de restablecimiento de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de restablecimiento de {name} ya se usó.",
   "provider.account.resetUsageFailed": "No se pudo restablecer el uso de {name}.",
+  "provider.account.pool": "Agrupar cuentas",
+  "provider.account.poolDescription":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "provider.account.inUse": "En uso",
+  "provider.account.notInPool": "Fuera del grupo",
+  "provider.account.leaveOutOfPool": "Sacar del grupo",
+  "provider.account.putBackInPool": "Volver al grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} en uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Los agentes comparten estas cuentas.",
   "provider.settings.disconnectTitle": "¿Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "Las otras cuentas de {provider} esperan hasta que vuelvas a conectar {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.cache": "Caché",
@@ -275,4 +288,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Elimina la CLI que OpenBot descargó para {name} ({size}). Las cuentas, los inicios de sesión y los agentes se mantienen.",
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
 } as const satisfies PartialTranslation<typeof source>;

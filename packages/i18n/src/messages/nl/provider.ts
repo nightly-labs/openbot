@@ -218,6 +218,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} heeft geen resettegoed meer.",
   "provider.account.resetUsageAlreadyRedeemed": "Dit resettegoed van {name} is al gebruikt.",
   "provider.account.resetUsageFailed": "Kan het gebruik van {name} niet resetten.",
+  "provider.account.pool": "Accounts bundelen",
+  "provider.account.poolDescription":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "provider.account.inUse": "In gebruik",
+  "provider.account.notInPool": "Niet in pool",
+  "provider.account.leaveOutOfPool": "Uit pool halen",
+  "provider.account.putBackInPool": "Terug in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool van {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in gebruik",
   "provider.settings.connected": "Verbonden",
   "provider.settings.other": "Andere aanbieders",
   "provider.settings.search": "Aanbieders zoeken",
@@ -239,6 +249,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "Standaard voor nieuwe agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} van {max}. Elke agent gebruikt één account.",
+  "provider.settings.accountsPooledDescription": "{count} van {max}. Agents delen deze accounts.",
   "provider.settings.accountBlocked": "{agents} kan niet draaien tot je opnieuw inlogt.",
   "provider.settings.removeTitle": "{name} verwijderen?",
   "provider.settings.removeMoves": "{agents} gaat {name} gebruiken.",
@@ -259,6 +270,8 @@ export const messages = {
   "provider.settings.keyAlternative": "Of plak een {name}-API-sleutel.",
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",
@@ -319,4 +332,6 @@ export const messages = {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
 } as const satisfies PartialTranslation<typeof source>;

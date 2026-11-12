@@ -158,14 +158,6 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
-  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
-  const tasksAgentsHidden = () =>
-    middlePane() === "tasks" &&
-    !windowPage.tasksAgentsOpen() &&
-    scope.loaded() &&
-    !scope.connection.panelsFailed &&
-    !blockedRemoteServer();
-
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
@@ -364,7 +356,6 @@ export function WorkspaceShell(props: {
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
           windowPage={windowPage.page()}
-          sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
@@ -388,8 +379,6 @@ export function WorkspaceShell(props: {
                 serverId={serverId()}
                 hostName={servers().find((server) => server.id === serverId())?.name ?? t("app.page.serverFallback")}
                 onBack={usage.closeUsage}
-                agentsOpen={!tasksAgentsHidden()}
-                onToggleAgents={() => windowPage.setTasksAgentsOpen(tasksAgentsHidden())}
               />
             )}
           </Show>

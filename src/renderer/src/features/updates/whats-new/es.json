@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Los ajustes del canal tienen un ajuste de Navegador. Elige si todos los miembros, un miembro o nadie pueden usar el navegador en el canal.",
+          "El panel lateral del canal tiene un panel Navegador y un panel Archivos. Muestran las pestañas de los miembros del canal y los archivos enviados en el canal.",
+          "Haz clic derecho en la Dynamic Island o en el dock de agentes para ocultarlo. También puedes arrastrar un agente a un nuevo lugar del dock y cambiar el tamaño del dock en Ajustes.",
+          "Puedes desactivar el grupo No leídos en la barra lateral. Haz clic derecho en el título No leídos o cambia Ordenar chats a Manual.",
+          "Cuando una nueva versión no puede iniciarse 3 veces seguidas, se abre una ventana de recuperación. Puedes reintentar, descargar la versión anterior o exportar el diagnóstico."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una nueva versión llega ahora primero a aproximadamente 1 de cada 10 equipos, y a todos los equipos alrededor de un día después. Para recibirla de inmediato, selecciona Buscar actualizaciones.",
+          "Los agentes hacen preguntas con opciones en el cuadro de preguntas. Las tarjetas con botones son solo para aprobaciones."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un chat que has leído ya no se queda en el grupo No leídos. Los hilos secundarios sin leer, como el hilo de una rutina, ya no mantienen a un agente en ese grupo.",
+          "En Windows, el dock de agentes y la Dynamic Island ya no hacen lento el puntero en todas las apps mientras trabajan muchos agentes.",
+          "Un equipo ya no se detiene cuando el líder del equipo termina su turno sin respuesta, después de que sus compañeros informan.",
+          "Un chat de Claude que se hizo demasiado largo ahora empieza una sesión nueva con el historial del chat. Antes, cada mensaje fallaba con «Prompt is too long».",
+          "Cuando una cuenta de Claude llega a su límite de 5 horas, el agente pasa a su modelo de respaldo o espera al reinicio del límite.",
+          "Un agente puede guardar una captura de pantalla del navegador como archivo y adjuntarla a su respuesta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

@@ -38,7 +38,7 @@ export interface SettingsPort {
   backgroundProcesses: OpenBotDesktopApi["backgroundProcesses"];
   dynamicIsland: Pick<
     OpenBotDesktopApi["dynamicIsland"],
-    "getBuiltInDisplayGeometry" | "getPreference" | "setPreference" | "setXWayland"
+    "getBuiltInDisplayGeometry" | "getPreference" | "onPreference" | "setPreference" | "setXWayland"
   >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "getPreference" | "openSettings" | "setPreference" | "test">;
   update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;

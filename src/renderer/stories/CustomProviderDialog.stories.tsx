@@ -48,7 +48,8 @@ export const DialogContextWindows: Story = {
         {
           id: "qwen3-coder:30b",
           name: "Qwen3 Coder 30B",
-          contextWindow: "262144",
+          contextWindow: "262,144",
+          maxOutput: "65,536",
           reasoningEfforts: ["low", "high", "max"],
           inputs: ["image"],
         },
@@ -59,6 +60,45 @@ export const DialogContextWindows: Story = {
 };
 
 /** This computer: the endpoint can run on each provider that can run it now. */
+/** Models of a large endpoint, with the limits that the model catalog gives for them. */
+const MANY_MODELS: readonly (readonly [string, string, string, string])[] = [
+  ["relace/relace-search", "Relace Search", "256,000", "128,000"],
+  ["moondream/moondream3-preview", "Moondream 3 Preview", "32,000", "4,096"],
+  ["z-ai/glm-5", "GLM-5", "204,800", "131,072"],
+  ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "Nemotron 3 Nano Omni (free)", "256,000", "65,536"],
+  ["sao10k/l3-lunaris-8b", "Llama 3 8B Lunaris", "8,192", "7,372"],
+  ["openrouter/fusion", "Fusion", "1,000,000", "128,000"],
+  ["bytedance/ui-tars-1.5-7b", "UI-TARS 7B", "128,000", "2,048"],
+  ["openai/gpt-5.1-codex-mini", "GPT-5.1 Codex mini", "400,000", "128,000"],
+  ["openai/gpt-5.4-pro", "GPT-5.4 Pro", "1,050,000", "128,000"],
+  ["openai/gpt-chat-latest", "GPT Chat Latest", "400,000", "128,000"],
+  ["openai/gpt-4o-mini-2024-07-18", "GPT-4o-mini (2024-07-18)", "128,000", "16,384"],
+  ["mistralai/ministral-3b-2512", "Ministral 3 3B 2512", "131,072", "104,857"],
+  ["anthropic/claude-fable-5.1", "Claude Fable 5.1", "1,000,000", "128,000"],
+  ["anthropic/claude-opus-4.5", "Claude Opus 4.5 (latest)", "200,000", "64,000"],
+  ["gryphe/mythomax-l2-13b", "MythoMax L2 13B", "8,192", "3,686"],
+  ["perplexity/sonar", "Sonar", "127,072", "114,364"],
+  ["morph/morph-v3-fast", "Morph V3 Fast", "262,144", "131,072"],
+  ["qwen/qwen-plus", "Qwen Plus", "1,000,000", "32,768"],
+  ["qwen/qwen3-235b-a22b-2507", "Qwen3 235B A22B Instruct 2507", "262,144", "117,964"],
+  ["qwen/qwen3-14b", "Qwen3 14B", "40,960", "36,864"],
+  ["google/gemini-3.7-flash", "Gemini 3.7 Flash", "1,048,576", "65,536"],
+  ["google/gemini-3.6-flash", "Gemini 3.6 Flash", "1,048,576", "65,536"],
+  ["deepseek/deepseek-v4-flash-0731", "DeepSeek V4 Flash 0731", "1,048,576", "943,718"],
+  ["bytedance-seed/seed-2.0-lite", "Seed 2.0 Lite", "262,144", "131,072"],
+];
+
+/** The model table with many models: the rows scroll and the footer stays in view. */
+export const DialogContextWindowsMany: Story = {
+  args: {
+    contextWindows: true,
+    draft: {
+      ...localEndpoint,
+      models: MANY_MODELS.map(([id, name, contextWindow, maxOutput]) => ({ id, name, contextWindow, maxOutput })),
+    },
+  },
+};
+
 export const DialogRunsOn: Story = {
   args: {
     contextWindows: true,
@@ -195,6 +235,20 @@ export const DiscoveryFound: Story = {
   },
 };
 
+/** An endpoint that lists more models than one endpoint can hold: the search narrows what Select all adds. */
+export const DiscoveryFoundMany: Story = {
+  args: {
+    draft: ollama,
+    onDiscoverModels: fn(),
+    discovery: {
+      status: "found",
+      models: ["qwen3-coder", "gpt-oss", "devstral", "llama3.3", "mistral-small", "gemma3"].flatMap((family) =>
+        Array.from({ length: 20 }, (_, index) => ({ id: `${family}:${index + 1}b` })),
+      ),
+    },
+  },
+};
+
 /**
  * After Find models, the list gives a window, a max output and input kinds (#3946): they fill the empty
  * fields of the rows that it names, and a line says where they come from.
@@ -205,8 +259,8 @@ export const DiscoveryFoundValues: Story = {
     draft: {
       ...ollama,
       models: [
-        { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B", contextWindow: "262144", maxOutput: "65536", inputs: [] },
-        { id: "gpt-oss:120b", name: "GPT-OSS 120B", contextWindow: "131072" },
+        { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B", contextWindow: "262,144", maxOutput: "65,536", inputs: [] },
+        { id: "gpt-oss:120b", name: "GPT-OSS 120B", contextWindow: "131,072" },
       ],
     },
     onDiscoverModels: fn(),

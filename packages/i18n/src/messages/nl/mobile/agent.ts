@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Hiermee verwijder je de agent van deze server.",
   "mobile.agent.menu.markRead": "Markeer als gelezen",
   "mobile.agent.menu.markUnread": "Markeer als ongelezen",
+  "mobile.agent.menu.mute": "Dempen",
+  "mobile.agent.menu.unmute": "Niet meer dempen",
   "mobile.agent.menu.hide": "Verbergen",
   "mobile.agent.menu.info": "Info",
   "mobile.agent.menu.more": "Meer",
@@ -577,6 +579,8 @@ export const messages = {
   "mobile.agent.hidden.body": "Verborgen chats blijven werken. Ze worden alleen niet op het beginscherm getoond.",
   "mobile.agent.hidden.bodySynced":
     "Een verborgen chat behoudt zijn geschiedenis. De agent voert geen routines uit en krijgt geen nieuwe berichten. Elk apparaat op deze server verbergt de chat.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Een verborgen chat blijft werken. Elk apparaat op deze server verbergt de chat.",
   "mobile.agent.hidden.showNamed": "{name} tonen",
   "mobile.agent.hidden.show": "Tonen",
   "mobile.agent.hidden.showFailed": "Kan agent niet tonen",

@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Dadurch wird der Agent von diesem Server entfernt.",
   "mobile.agent.menu.markRead": "Als gelesen markieren",
   "mobile.agent.menu.markUnread": "Als ungelesen markieren",
+  "mobile.agent.menu.mute": "Stummschalten",
+  "mobile.agent.menu.unmute": "Stummschaltung aufheben",
   "mobile.agent.menu.hide": "Ausblenden",
   "mobile.agent.menu.info": "Info",
   "mobile.agent.menu.more": "Mehr",
@@ -583,6 +585,8 @@ export const messages = {
     "Ausgeblendete Chats arbeiten weiter. Sie werden nur nicht auf dem Startbildschirm angezeigt.",
   "mobile.agent.hidden.bodySynced":
     "Ein ausgeblendeter Chat behält seinen Verlauf. Sein Agent führt keine Routinen aus und erhält keine neuen Nachrichten. Jedes Gerät auf diesem Server blendet ihn aus.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Ein ausgeblendeter Chat arbeitet weiter. Jedes Gerät auf diesem Server blendet ihn aus.",
   "mobile.agent.hidden.showNamed": "{name} anzeigen",
   "mobile.agent.hidden.show": "Anzeigen",
   "mobile.agent.hidden.showFailed": "Agent konnte nicht angezeigt werden",

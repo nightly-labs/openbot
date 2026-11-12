@@ -173,12 +173,36 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   const [collapsedSectionIds, setCollapsedSectionIds] = createSignal(untrack(() => props.collapsedSectionIds));
   const [hiddenAgents, setHiddenAgents] = createSignal(untrack(() => props.userHiddenAgents ?? []));
   const [chatOrder, setChatOrder] = createSignal(untrack(() => props.chatOrder));
+  // Opening a chat reads it, as in the app, so the unread orders can be tried here.
+  const [activeAgentId, setActiveAgentId] = createSignal(untrack(() => props.activeAgentId));
+  const [readAgentIds, setReadAgentIds] = createSignal<ReadonlySet<string>>(new Set());
+  const [mutedAgentIds, setMutedAgentIds] = createSignal<ReadonlySet<string>>(new Set());
   const onHideAgent = untrack(() => props.onHideAgent);
   const onRestoreAgent = untrack(() => props.onRestoreAgent);
   return (
     <Sidebar
       {...props}
+      activeAgentId={activeAgentId()}
+      agentStates={Object.fromEntries(
+        Object.entries(props.agentStates).filter(
+          ([agentId, state]) => state.kind !== "unread" || !readAgentIds().has(agentId),
+        ),
+      )}
+      onSelectAgent={(agentId) => {
+        setActiveAgentId(agentId);
+        setReadAgentIds((current) => new Set(current).add(agentId));
+        props.onSelectAgent(agentId);
+      }}
       userHiddenAgents={hiddenAgents()}
+      mutedAgentIds={mutedAgentIds()}
+      onSetAgentMuted={(agentId, muted) =>
+        setMutedAgentIds((current) => {
+          const next = new Set(current);
+          if (muted) next.add(agentId);
+          else next.delete(agentId);
+          return next;
+        })
+      }
       onHideAgent={
         onHideAgent &&
         ((agentId) => {

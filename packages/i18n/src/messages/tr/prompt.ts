@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Girdi gerekiyor",
   "prompt.question.label": "Ajan soruları",
   "prompt.question.cancelled": "Sorular iptal edildi",
   "prompt.question.expired": "Soruların süresi doldu",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "İleri",
   "prompt.question.cancel": "Soruları iptal et",
   "prompt.question.privatePlaceholder": "Gizli bir yanıt girin",
-  "prompt.customPlaceholder": "Kendi yanıtınızı yazın",
   "prompt.question.customAnswerFor": "Şunun için özel yanıt: {question}",
   "prompt.question.skip": "Atla",
   "prompt.question.chooseAll": "Uygun olanların hepsini seçin.",
   "prompt.question.somethingElse": "Başka bir şey",
   "prompt.question.emptyTitle": "Bekleyen soru yok.",
   "prompt.question.emptyBody": "Ajan başka bir karara ihtiyaç duyduğunda devam edecektir.",
-  "prompt.choice.hint": "Uygun olanı seçin veya kendinizinkini yazın.",
-  "prompt.choice.customLabel": "Özel yanıt",
   "prompt.approval.answerFailed": "Bu onay yanıtlanamadı. Tekrar deneyin.",
   "prompt.approval.grantFailed": "Kalıcı onay kaydedilemedi. Tekrar deneyin.",
   "prompt.approval.label": "Ajan onayı",

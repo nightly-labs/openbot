@@ -53,6 +53,7 @@ import type {
   CentralAuthUser,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
+  McpAccessLevel,
   RemoteControlAccess,
   RoutineResultConnectionOption,
   RoutineResultDestination,
@@ -86,7 +87,9 @@ import type { HermesImportService } from "../hermes-import-service";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
+import type { LibraryFoldersService } from "../library-folders-service";
 import type { LiveActivityPushService } from "../live-activity-push";
+import type { McpAccessControl } from "../mcp-access-store";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { McpServerOwnersStore } from "../mcp-server-owners-store";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
@@ -166,6 +169,8 @@ type TeamApiAgentMethods = Pick<
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"
+  | "listPinnedMessages"
+  | "setMessagePinned"
   | "cancelQueuedMessage"
   | "listWaits"
   | "cancelWait"
@@ -207,7 +212,19 @@ export type TeamApiMcpServers = Pick<
  * Who added each MCP server. Its presence, beside `mcpServers`, is what `#protocolSupport` advertises
  * `mcp-member-access-v1` on.
  */
-export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove">;
+export type TeamApiMcpServerOwners = Pick<McpServerOwnersStore, "addedBy" | "add" | "remove"> & {
+  /**
+   * The level of a member for an MCP server (`mcp-access-v1`). Absent on a host without the access
+   * entries: a member then manages a server that the member added, and uses each other one.
+   */
+  level?(mcpServerId: string, memberId: string): McpAccessLevel;
+};
+
+/**
+ * Which agents get each MCP server, and the level of each role for it. Its presence, beside
+ * `mcpServers`, is what `#protocolSupport` advertises `mcp-access-v1` on.
+ */
+export type TeamApiMcpAccess = McpAccessControl;
 
 /** Its presence, beside `mcpServers`, is what `#protocolSupport` advertises `mcp-sign-in-v1` on. */
 export type TeamApiMcpSignIns = Pick<
@@ -252,6 +269,7 @@ export interface TeamApiConnectors {
     | "removeWhatsAppSender"
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
+    | "setWhatsAppWorkingMessage"
   >;
 }
 
@@ -275,6 +293,8 @@ export type TeamApiProviderAccounts = Pick<
   ProviderAccountsHost,
   | "list"
   | "models"
+  | "pools"
+  | "setPool"
   | "usage"
   | "startSignIn"
   | "signInStatus"
@@ -292,6 +312,8 @@ export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 /** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+/** Its presence is what `#protocolSupport` advertises `library-folders-v1` on. Each member reads and changes the folders. */
+export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,
@@ -358,6 +380,7 @@ export type TeamApiAgentTasks = Pick<
   | "listTasks"
   | "readTask"
   | "readTaskPage"
+  | "readTaskAround"
   | "startTask"
   | "sendMessage"
   | "stopTask"
@@ -629,6 +652,9 @@ export type TeamApiBrowser = Pick<
   | "takeUserControl"
   | "releaseUserControl"
   | "releaseUserControlHeldBy"
+  // A task that a person shows, behind `browser-teach-v1`.
+  | "startTeach"
+  | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
   // Behind `browser-sign-in`.
@@ -694,6 +720,7 @@ export interface TeamApiOptions {
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;
   mcpServerOwners?: TeamApiMcpServerOwners | undefined;
+  mcpAccess?: TeamApiMcpAccess | undefined;
   mcpSignIns?: TeamApiMcpSignIns | undefined;
   signInRelay?: TeamApiSignInRelay | undefined;
   connectors?: TeamApiConnectors | undefined;
@@ -708,6 +735,7 @@ export interface TeamApiOptions {
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
+  libraryFolders?: TeamApiLibraryFolders;
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;

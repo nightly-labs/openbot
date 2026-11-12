@@ -32,6 +32,7 @@ import {
   STORAGE_CAPABILITY,
   type TeamRole,
   withFastServiceTiers,
+  withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -132,6 +133,7 @@ import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contr
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -148,6 +150,7 @@ import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -262,7 +265,9 @@ import {
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
+  whatsappConnectorWorkingMessages,
 } from "@openbot/team-client/team-admin-requests";
 import {
   type AgentMemoriesRequest,
@@ -475,6 +480,7 @@ type HostRequestActions = Pick<
   | "removeWhatsAppSender"
   | "answerWhatsAppRequest"
   | "setWhatsAppOwnNumber"
+  | "setWhatsAppWorkingMessage"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -855,7 +861,19 @@ export function createHostRequestActions({
       runTeamRequest(messagingConnectorSetEnabled(connectorsAdmin(serverId), input)),
     addMessagingOrchestrator: async (input, serverId) =>
       runTeamRequest(messagingConnectorAddOrchestrator(connectorsAdmin(serverId), input)),
-    loadWhatsAppConnector: async (serverId) => runTeamRequest(whatsappConnectorOverview(whatsappAdmin(serverId))),
+    // `whatsapp-connector-v1` is frozen without the "Working on it…" setting: a second request reads
+    // it. The numbers of an older host carry no setting, and the page then shows no switch.
+    loadWhatsAppConnector: async (serverId) => {
+      const overview = whatsappConnectorOverview(whatsappAdmin(serverId));
+      if (!has(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)) return runTeamRequest(overview);
+      return runTeamRequest(
+        Effect.zipWith(
+          overview,
+          whatsappConnectorWorkingMessages(whatsappAdmin(serverId)),
+          withWhatsAppWorkingMessages,
+        ),
+      );
+    },
     startWhatsAppLink: async (input, serverId) =>
       runTeamRequest(whatsappConnectorStartLink(whatsappAdmin(serverId), input)),
     loadWhatsAppLinkState: async (serverId) => runTeamRequest(whatsappConnectorLinkState(whatsappAdmin(serverId))),
@@ -878,6 +896,13 @@ export function createHostRequestActions({
       runTeamRequest(whatsappConnectorAnswerRequest(whatsappAdmin(serverId), input)),
     setWhatsAppOwnNumber: async (input, serverId) =>
       runTeamRequest(whatsappConnectorSetOwnNumber(whatsappAdmin(serverId), input)),
+    setWhatsAppWorkingMessage: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetWorkingMessage(
+          capabilityApi(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
     loadServerUpdate: async (serverId, access) =>
       runTeamRequest(getHostUpdateStatus(updateApi(serverId, access), access === "member")),
     checkServerUpdate: async (serverId, access) =>
@@ -1265,7 +1290,11 @@ export function createHostRequestActions({
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
         ? runTeamRequest(
-            listProviderAccountsWithModels(teamApi(serverId), has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)),
+            listProviderAccountsWithModels(
+              teamApi(serverId),
+              has(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY),
+              has(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY),
+            ),
           )
         : null,
     loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),

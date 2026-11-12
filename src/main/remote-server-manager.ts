@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { open } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
@@ -148,6 +148,7 @@ import {
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
 import { acceptEmpty, decodeComputerActivityReply, decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
+import { type RemotePicture, RemotePictureCache } from "./remote-picture-cache";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
@@ -302,6 +303,8 @@ const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 // host that is not back by then is offline, as any other host. A hosted server restarts its whole
 // machine and restores its disk; one took 18 minutes.
 const HOST_RESTART_RETRY_MS = 30 * 60_000;
+/** Beside the server list, in the app's data directory. */
+const REMOTE_PICTURES_DIRECTORY = "remote-pictures";
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #platform: Layer.Layer<RemoteRequest>;
@@ -315,6 +318,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The agent and channel pictures of joined servers, on disk, so they show while a host is offline. */
+  readonly #pictures: RemotePictureCache;
   /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
   readonly #attachmentStops = new Map<string, Deferred.Deferred<never, RemoteWorkflowError>>();
   readonly #localLevels: LocalNotificationLevels | null;
@@ -381,6 +386,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ) {
     super();
     this.#store = new RemoteServerStore({ path, cipher });
+    this.#pictures = new RemotePictureCache(join(dirname(path), REMOTE_PICTURES_DIRECTORY));
     this.#appVersion = options.appVersion ?? null;
     this.#connections = new RemoteServerConnections({
       appVersion: this.#appVersion,
@@ -559,9 +565,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).
-    this.#webrtcTransport?.on("connectFailed", (serverId) => {
+    // The failure says why, so a host that is online on Signal does not read as "not reachable" (#6873).
+    this.#webrtcTransport?.on("connectFailed", (serverId, failure) => {
       if (!this.#store.has(serverId) || this.#connections.hasIssue(serverId)) return;
-      this.#connections.reportUnreachable(serverId, "transport/connect_failed");
+      this.#connections.reportConnectFailure(serverId, failure);
       this.#emitChanged();
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
@@ -611,6 +618,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   #suspendServer(serverId: string): void {
     this.#events.suspendReconnect(serverId);
+    // The host ended this member's access, so its pictures must not stay on this computer.
+    if (this.#connections.statusFor(serverId).issue?.code === "authentication_required")
+      this.#background(this.#owned(this.#pictures.forget(serverId)));
     if (this.#store.find(serverId)?.transport !== "webrtc-v2") return;
     const transport = this.#webrtcTransport;
     if (transport) this.#background(this.#owned(transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void))));
@@ -1323,6 +1333,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!current) return;
       this.#clearServerConnectionState(serverId);
       if (forget) {
+        this.#forgetPictures(serverId);
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
@@ -1561,6 +1572,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.request(serverId, path, decodeVoid, { method: "POST" }).pipe(Effect.catch(() => Effect.void));
       }
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
       yield* this.#store.remove(serverId);
       this.#emitChanged();
     },
@@ -1784,6 +1796,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#client.forget(serverId);
     this.#presence.forget(serverId);
     this.#attachments.forget(serverId);
+  }
+
+  /**
+   * Deletes the picture copies of a server that leaves the list. A server that stops or changes its
+   * transport keeps them: they show its agents while it is offline.
+   */
+  #forgetPictures(serverId: string): void {
+    this.#background(this.#owned(this.#pictures.forget(serverId)));
   }
 
   // The server comes first because every caller knows which one it means, and the decoder sits next
@@ -2434,24 +2454,64 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * The bytes of an agent's picture. A picture with a version comes from this computer's copy when
+   * it has one, so it shows while the host is offline.
+   */
   readonly downloadAgentAvatar = Effect.fn("RemoteManager.downloadAgentAvatar")(
     function* (
       this: RemoteServerManager,
       agentId: string,
       serverId = this.#store.activeServerId,
       version?: string,
-    ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
+    ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
-      if (version) url.searchParams.set("v", version);
-      const response = yield* this.#client.fetch(server, url);
-      return {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-        mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-      };
+      const download = Effect.gen({ self: this }, function* () {
+        const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
+        if (version) url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        return {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() || "application/octet-stream",
+        };
+      });
+      return version ? yield* this.#savedPicture(server.id, "agent", agentId, version, download) : yield* download;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /**
+   * A picture from this computer's copy, or from `download`, which then becomes the copy. With no
+   * signed-in account there is no copy: a copy belongs to one account.
+   */
+  readonly #savedPicture = Effect.fn("RemoteManager.savedPicture")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    kind: "agent" | "channel",
+    id: string,
+    version: string,
+    download: Effect.Effect<RemotePicture, RemoteWorkflowError, RemoteRequest>,
+  ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
+    const account = yield* remoteDecode(() => this.#centralAccount.getEmail().trim().toLowerCase()).pipe(
+      Effect.catch(() => Effect.succeed("")),
+    );
+    if (!account) return yield* download;
+    const key = { account, serverId, kind, id, version };
+    const saved = yield* this.#pictures.read(key);
+    if (saved) return saved;
+    const token = this.#pictures.token(serverId);
+    const picture = yield* download;
+    yield* this.#pictures.write(key, picture, token);
+    return picture;
+  });
 
   /**
    * Sets or removes the image of a channel of a server with `channel-picture-v1`: `PUT
@@ -2482,6 +2542,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         teamSideRouteCodec(path)?.response(path, response.status, json, {
           channelIsolation: true,
           channelPicture: true,
+          channelBrowser: true,
         }),
       );
       if (!response.ok) {
@@ -2514,24 +2575,27 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      const url = this.#channelImageUrl(server.apiUrl, channelId);
-      url.searchParams.set("v", version);
-      const response = yield* this.#client.fetch(server, url);
-      // The protocol handler answers 404 for any failure, so the host's error text is not read.
-      if (!response.ok)
-        return yield* new RemoteWorkflowError({
-          cause: new RemoteRequestError(
-            response.status,
-            sourceText("error.remote.requestFailedStatus", { status: response.status }),
-          ),
-        });
-      const picture = {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-        mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
-      };
-      if (!isValidAvatarImage(picture.mimeType, picture.bytes))
-        return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
-      return picture;
+      const download = Effect.gen({ self: this }, function* () {
+        const url = this.#channelImageUrl(server.apiUrl, channelId);
+        url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        const picture = {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
+        };
+        if (!isValidAvatarImage(picture.mimeType, picture.bytes))
+          return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
+        return picture;
+      });
+      return yield* this.#savedPicture(server.id, "channel", channelId, version, download);
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -2735,12 +2799,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#webrtcTransport?.hasActiveTransfers() ?? false;
   }
 
+  /** Deletes the picture copies of every server. A signed-out app keeps none. */
+  forgetSavedPictures(): Effect.Effect<void> {
+    return this.#pictures.clear();
+  }
+
   readonly disconnectRemoteSessions = Effect.fn("RemoteManager.disconnectRemoteSessions")(
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;
 
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
+      yield* this.#pictures.clear();
       if (!transport) return;
       // First: a session kept for the next run belongs to the account that leaves.
       yield* transport.forgetStoredSessions();
@@ -2799,6 +2869,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
     }
     // Before the store changes, because after it `ensure` answers for the new entry: it branches on
     // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,

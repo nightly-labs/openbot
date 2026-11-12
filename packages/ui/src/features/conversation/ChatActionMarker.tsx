@@ -546,6 +546,13 @@ function SingleChatActionMarker(
               />
             )}
           </Show>
+          <Show when={skillInstallCount(props.marker)}>
+            {(count) => (
+              <span class="chat-action-marker-label chat-action-run-group-count">
+                {t("chat.marker.agentCount", { count: count() })}
+              </span>
+            )}
+          </Show>
           <Show when={instructionsChange(props.marker, props.instructions)}>
             {(target) => (
               <InstructionsChangeActions
@@ -556,7 +563,14 @@ function SingleChatActionMarker(
               />
             )}
           </Show>
-          <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
+          <time
+            class={
+              skillInstallCount(props.marker)
+                ? "chat-action-marker-time chat-action-run-group-time"
+                : "chat-action-marker-time"
+            }
+            datetime={props.marker.timestamp}
+          >
             {formatMarkerTime(props.marker.timestamp, t, format)}
           </time>
           <Show when={props.marker.kind === "routine-run" && props.marker}>
@@ -1020,6 +1034,13 @@ const SKILL_ACTION_LABELS = {
   installed: "chat.marker.skill.installed",
 } as const satisfies Record<Extract<ChatActionMarkerModel, { kind: "skill-lifecycle" }>["action"], AppTextKey>;
 
+/** How many agents got the skill, when the row stands for more than one install. */
+function skillInstallCount(marker: SingleChatActionMarkerModel): number | undefined {
+  if (marker.kind !== "skill-lifecycle") return undefined;
+  const count = marker.installMessageIds?.length ?? 0;
+  return count > 1 ? count : undefined;
+}
+
 /** The change line of a local agent, which can show View and Undo. */
 function instructionsChange(marker: SingleChatActionMarkerModel, calls: AgentInstructionsFileCalls | undefined) {
   if (marker.kind !== "instructions-change" || !marker.agentId || !calls) return undefined;
@@ -1129,8 +1150,13 @@ function markerAccessibleLabel(
     marker.kind === "instructions-change"
   )
     return label;
-  if (marker.kind === "skill-lifecycle" || marker.kind === "skill-suggestion")
-    return t("chat.marker.accessible.named", { label, name: marker.skillName });
+  if (marker.kind === "skill-lifecycle") {
+    const count = skillInstallCount(marker);
+    const named = t("chat.marker.accessible.named", { label, name: marker.skillName });
+    if (!count) return named;
+    return t("chat.marker.accessible.named", { label: named, name: t("chat.marker.agentCount", { count }) });
+  }
+  if (marker.kind === "skill-suggestion") return t("chat.marker.accessible.named", { label, name: marker.skillName });
   const unavailable = t("chat.marker.unavailableAgent");
   if (marker.kind === "agent-message") {
     const agent = counterpartName(marker, agents, t);

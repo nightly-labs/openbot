@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "הפעולה מסירה את הסוכן מהשרת הזה.",
   "mobile.agent.menu.markRead": "סימון כנקרא",
   "mobile.agent.menu.markUnread": "סימון כלא נקרא",
+  "mobile.agent.menu.mute": "השתקה",
+  "mobile.agent.menu.unmute": "ביטול השתקה",
   "mobile.agent.menu.hide": "הסתרה",
   "mobile.agent.menu.info": "מידע",
   "mobile.agent.menu.more": "עוד",
@@ -572,6 +574,7 @@ export const messages = {
   "mobile.agent.hidden.body": "צ'אטים מוסתרים ממשיכים לעבוד. הם פשוט לא מוצגים במסך הבית.",
   "mobile.agent.hidden.bodySynced":
     "צ'אט מוסתר שומר את ההיסטוריה שלו. הסוכן שלו לא מריץ שגרות ולא מקבל הודעות חדשות. כל התקן בשרת הזה מסתיר אותו.",
+  "mobile.agent.hidden.bodySyncedWorking": "צ'אט מוסתר ממשיך לעבוד. כל התקן בשרת הזה מסתיר אותו.",
   "mobile.agent.hidden.showNamed": "הצגת {name}",
   "mobile.agent.hidden.show": "הצגה",
   "mobile.agent.hidden.showFailed": "לא ניתן להציג את הסוכן",

@@ -159,7 +159,7 @@ const LEGACY_AVATAR_COLORS = [
 
 const NEW_AGENT_PREVIEW = "No messages yet";
 /** The longest agent preview the store keeps; a longer text is cut to it. */
-export const AGENT_PREVIEW_MAX_LENGTH = 180;
+const AGENT_PREVIEW_MAX_LENGTH = 180;
 const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 // A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
@@ -2175,7 +2175,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
       ? value.pendingRuntime
       : reset("pendingRuntime", undefined);
   // A time this build cannot read keeps the agent hidden, at the time of the read: a user hid it,
-  // and showing it again would run its routines without a decision of the user.
+  // and only the user puts it back in the list.
   const hiddenAt =
     value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)
       ? value.hiddenAt

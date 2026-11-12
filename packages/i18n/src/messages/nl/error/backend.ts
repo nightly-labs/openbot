@@ -49,6 +49,10 @@ export const messages = {
     "Deze externe host ondersteunt geen navigatie via de adresbalk in een bestaand tabblad.",
   "error.backend.browserUserControlBusy":
     "Dit browsertabblad wacht op een geheim. Beantwoord eerst het verzoek om het geheim.",
+  "error.backend.browserTeachBusy":
+    "Iemand anders bestuurt dit browsertabblad. Probeer het opnieuw wanneer die persoon klaar is.",
+  "error.backend.browserTeachUnavailable": "Dit browsertabblad heeft geen agent die een taak kan leren.",
+  "error.backend.browserTeachUnsupported": "Deze externe host ondersteunt de opname van een taak niet.",
   "error.backend.browserUserControlUnsupported":
     "Deze externe host ondersteunt het overnemen van een browsertabblad niet.",
   "error.backend.browserSignInUnsupported": "Deze externe host kan geen inlog van deze computer overnemen.",
@@ -158,6 +162,10 @@ export const messages = {
     "De status van de postbus is beschadigd of komt van een nieuwere versie van OpenBot; OpenBot overschrijft deze niet.",
   "error.backend.recipientDeleting": "De ontvanger wordt verwijderd. Probeer het opnieuw als dit klaar is.",
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
+  "error.backend.agentIdUnknown":
+    "Geen agent heeft de id {id}. Haal de id's op met openbot.list_agents en probeer het opnieuw.",
+  "error.backend.agentIdNear":
+    "Geen agent heeft de id {id}. Agent {name} heeft de id {nearId}, die bijna gelijk is. Bedoel je die agent, probeer het dan opnieuw met die id.",
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
@@ -222,6 +230,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Dit bericht staat niet in de chat.",
   "error.backend.messageDeleteBusy": "Dit bericht hoort bij een lopende beurt. Verwijder het als de beurt klaar is.",
   "error.backend.messageDeleteForbidden": "Je kunt alleen berichten verwijderen die je zelf hebt verzonden.",
+  "error.backend.messagePinNotFound": "Dit bericht staat niet in de chat.",
+  "error.backend.messagePinLimit":
+    "Deze chat heeft 50 vastgemaakte berichten. Maak er één los voordat je een ander vastmaakt.",
   "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
@@ -253,6 +264,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
@@ -284,6 +297,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
   "error.backend.sidebarFolderTooDeep": "Mappen kunnen maar drie niveaus diep zijn.",
   "error.backend.sidebarFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
+  "error.backend.libraryFolderName": "Een mapnaam moet 1 tot {limit} tekens hebben.",
+  "error.backend.libraryFolderLimit": "Een server kan maximaal {limit} bibliotheekmappen hebben.",
+  "error.backend.libraryFolderFileLimit": "Er staan te veel bestanden in bibliotheekmappen.",
+  "error.backend.libraryFolderTooDeep": "Bibliotheekmappen kunnen maar {limit} niveaus diep gaan.",
+  "error.backend.libraryFolderGone": "De map bestaat niet of is al verwijderd.",
+  "error.backend.libraryFolderOtherAgent": "Een bestand kan alleen naar een map van zijn agent.",
+  "error.backend.libraryFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",

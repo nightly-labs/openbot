@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
 import {
@@ -24,7 +24,7 @@ import {
   KIMI_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
-import { ANTIGRAVITY_ACP_FLAVOR } from "./acp-flavor-antigravity";
+import { ANTIGRAVITY_ACP_FLAVOR, antigravityGeminiHome, GEMINI_DIR_FLAG } from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
@@ -34,9 +34,10 @@ import {
   modelsAfterOpenCodeDiscoveryFailure,
   serviceTierFields,
 } from "./agent/provider-models";
+import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
-import { readAntigravityQuota } from "./antigravity-usage";
+import { readAntigravityEmail, readAntigravityQuota } from "./antigravity-usage";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
@@ -72,6 +73,7 @@ import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntim
 import { MuseAgentClient } from "./muse-client";
 import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
+  CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
@@ -273,11 +275,6 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
  */
 const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
 
-/** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
-function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
-  return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
-}
-
 /** The CLI's app data folder, which holds the sign-in and the sessions. 1.4 kept them there too. */
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
@@ -293,7 +290,7 @@ function antigravityAppDataDir(env: Readonly<Record<string, string | undefined>>
  */
 const antigravityArgv = (env: Readonly<Record<string, string | undefined>>): readonly string[] => [
   "acp",
-  `--gemini-dir=${antigravityGeminiHome(env)}`,
+  `${GEMINI_DIR_FLAG}${antigravityGeminiHome(env)}`,
   `--app-data-dir=${ANTIGRAVITY_APP_DATA}`,
 ];
 
@@ -572,6 +569,12 @@ export interface ProviderClientContext {
    * leave Claude Code's own size for each model.
    */
   readonly claudeCompactWindow?: () => number | null;
+  /**
+   * What each Codex thread was sent with its turns, shared by every Codex client of this process. A
+   * client that replaces an idle one resumes threads that hold those blocks already (#6963). Optional
+   * for the same reason as `reportMcpDrops`: without it each client keeps its own.
+   */
+  readonly codexTurnContext?: TurnContext;
 }
 
 /** The agent environment with the account's home folder after it, so the account folder wins. */
@@ -873,11 +876,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     catalog: { paged: true, modelFields: serviceTierFields },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) =>
-      new CodexAppServerClient(cli.executable, requestTimeoutMs, {
-        ...cliPathEnvironment(cli),
-        ...context.serverEnvironment,
-        ...context.accountEnvironment,
-      }),
+      new CodexAppServerClient(
+        cli.executable,
+        requestTimeoutMs,
+        {
+          ...cliPathEnvironment(cli),
+          ...context.serverEnvironment,
+          ...context.accountEnvironment,
+        },
+        context.codexTurnContext,
+      ),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
     // An API-key login has no plan usage to read.
     validateAccount: (account) => {
@@ -1030,7 +1038,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
           return endpoint
-            ? { name: endpoint.name, hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0 }
+            ? {
+                name: endpoint.name,
+                hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
+                stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+              }
             : null;
         },
         servesModel: context.servesModel,
@@ -1074,6 +1086,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // A process started only to read usage would give no reading, so an idle account shows its last one.
       usageLeavesSession: true,
     },
+    // The CLI has no `logout` command; its ACP server has a `logout` method, which deletes the token
+    // file in the default Gemini home. An account after the first goes with its folder.
+    signOut: {
+      argv: antigravityArgv(process.env),
+      env: () => ({ ...ANTIGRAVITY_ENV }),
+      timeoutMs: 30_000,
+      acpLogout: true,
+    },
     // `model/list` opens a probe session and then probes the efforts of each model. On a busy
     // computer the two together pass 5 s, and the picker then had no Gemini models (#3546).
     // The Antigravity CLI 1.5.5 lists the plan's Gemini models first, best first: an Ultra plan gives
@@ -1100,6 +1120,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("antigravity"),
+        // A saved key signs in no Google account, so the row names none.
+        readAccount: () =>
+          context.apiKey("antigravity") && !context.accountEnvironment
+            ? Effect.succeed({ email: null })
+            : readAntigravityEmail(
+                join(antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }), ANTIGRAVITY_TOKEN_FILE),
+              ).pipe(Effect.map((email) => ({ email }))),
         // A saved key has no plan quota.
         readRateLimits: (_connection, model) =>
           context.apiKey("antigravity") && !context.accountEnvironment
@@ -1109,7 +1136,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                   antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
                   ANTIGRAVITY_TOKEN_FILE,
                 ),
-                version: cli.version,
                 model,
               }),
       }),

@@ -249,11 +249,24 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "Konto {name} nie ma już kredytów resetu użycia.",
   "provider.account.resetUsageAlreadyRedeemed": "Ten kredyt resetu konta {name} został już użyty.",
   "provider.account.resetUsageFailed": "Nie udało się zresetować użycia konta {name}.",
+  "provider.account.pool": "Łącz konta w pulę",
+  "provider.account.poolDescription":
+    "Agenci używają jednego konta, aż zbliży się do limitu użycia, a potem konta, którego limit odnowi się najwcześniej.",
+  "provider.account.inUse": "W użyciu",
+  "provider.account.notInPool": "Poza pulą",
+  "provider.account.leaveOutOfPool": "Wyłącz z puli",
+  "provider.account.putBackInPool": "Przywróć do puli",
+  "provider.account.poolChip": "Pula",
+  "provider.account.poolCount": "Pula: {accounts}",
+  "provider.account.poolInUse": "{pool} · w użyciu {name}",
+  "provider.settings.accountsPooledDescription": "{count} z {max}. Agenci dzielą te konta.",
   "provider.settings.disconnectTitle": "Odłączyć {name}?",
   "provider.settings.disconnectOthers": "Pozostałe konta {provider} czekają, aż ponownie połączysz {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot wyloguje {provider} na tym komputerze. CLI {provider} w terminalu również zostanie wylogowane.",
   "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Zapisany klucz API Gemini jest używany zamiast logowania przez Google. Aby używać planu Google i jego modeli, usuń klucz.",
   "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.cache": "Pamięć podręczna",
@@ -296,4 +309,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Usuwa CLI pobrane przez OpenBot dla {name} ({size}). Konta, logowania i agenci zostają.",
   "provider.settings.removeDownloadFailed": "Nie udało się usunąć pobranych plików.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot wylogowuje {provider} na tym komputerze. CLI {provider} w terminalu pozostaje zalogowane.",
 } as const satisfies PartialTranslation<typeof source>;

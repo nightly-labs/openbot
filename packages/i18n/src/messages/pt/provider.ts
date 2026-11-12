@@ -219,12 +219,25 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} não tem mais créditos de redefinição de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de redefinição de {name} já foi usado.",
   "provider.account.resetUsageFailed": "Não foi possível redefinir o uso de {name}.",
+  "provider.account.pool": "Agrupar contas",
+  "provider.account.poolDescription":
+    "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "provider.account.inUse": "Em uso",
+  "provider.account.notInPool": "Fora do grupo",
+  "provider.account.leaveOutOfPool": "Tirar do grupo",
+  "provider.account.putBackInPool": "Voltar ao grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} em uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Os agentes compartilham estas contas.",
   "provider.settings.disconnectTitle": "Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "As outras contas do {provider} esperam até você conectar o {provider} de novo.",
   "provider.settings.disconnectLocal":
     "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.cache": "Cache",
@@ -266,4 +279,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
+  "provider.settings.disconnectLocalOnly":
+    "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -82,6 +82,7 @@ export const messages = {
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
+  "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor no puede guardar tu propio nivel de notificaciones para cada agente. Actualiza OpenBot en el ordenador que lo ejecuta.",
   "error.team.sidebarPinsUnsupported":
@@ -162,6 +163,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente no admite autenticación segura.",
   "error.team.agentSettingsUnsupported": "Esta conexión no admite ajustes de agentes.",
   "error.team.adminRequired": "Se requiere acceso de administrador.",
+  "error.team.mcpAccessStale": "Alguien cambió el acceso a este servidor MCP. Haz tu cambio de nuevo.",
   "error.team.mcpServerNotYours": "Solo la persona que añadió este servidor MCP, o un administrador, puede cambiarlo.",
   "error.team.ownerRequired": "Solo el propietario de este servidor puede hacer esto.",
   "error.team.requestTooLarge": "El cuerpo de la solicitud es demasiado grande.",
@@ -177,6 +179,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
+  "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",
   "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",

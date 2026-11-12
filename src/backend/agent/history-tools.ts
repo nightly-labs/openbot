@@ -89,7 +89,14 @@ const readShape = {
   includeWorkSteps: z.boolean().optional(),
   workStepsOffset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 };
-const searchSchema = z.strictObject(searchShape);
+// A search cursor continues one query. Without a query, the cursor fits no call of this tool (#6995).
+const searchSchema = z
+  .strictObject(searchShape)
+  .refine((value) => value.cursor === undefined || value.query !== undefined, {
+    path: ["cursor"],
+    message:
+      "A cursor continues the call that gave it. Send a history_search cursor with the same query, and a history_read cursor to history_read as before.",
+  });
 const readSchema = z
   .strictObject(readShape)
   .refine(
@@ -105,6 +112,40 @@ const cursorSchema = z.strictObject({
   anchorMessageId: id,
   query: z.string().nullable(),
 });
+
+/**
+ * The thread that a cursor from an earlier answer continues, or null for text that is not a cursor.
+ * The cursor is not signed: the caller checks that the thread is one of the agent's own conversations.
+ */
+export function historyCursorThread(text: unknown): string | null {
+  if (typeof text !== "string" || !cursorText.safeParse(text).success) return null;
+  return readCursor(text)?.threadId ?? null;
+}
+
+/** The fields of a cursor from an earlier answer. Throws for text that is not a cursor. */
+function decodeCursor(text: string) {
+  return cursorSchema.parse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+}
+
+/** The fields of a cursor from an earlier answer, or null for text that is not a cursor. */
+function readCursor(text: string) {
+  try {
+    return decodeCursor(text);
+  } catch {
+    return null;
+  }
+}
+
+/** A `before` that is not a cursor is a message of the chat that is read. The error names the argument. */
+const beforeMessageSchema = (inChat: (messageId: string) => boolean) =>
+  z.object({
+    before: z
+      .string()
+      .refine(
+        inChat,
+        "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again.",
+      ),
+  });
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
@@ -123,7 +164,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text, or use before from an earlier response for older messages. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];
@@ -365,10 +406,20 @@ export class HistoryTools {
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
     const query = search?.query;
     const limit = search?.limit ?? read?.limit ?? (search ? 5 : 10);
-    const suppliedCursor = search?.cursor ?? read?.before;
-    const cursor = suppliedCursor
-      ? yield* toolStep(() => cursorSchema.parse(JSON.parse(Buffer.from(suppliedCursor, "base64url").toString("utf8"))))
-      : null;
+    const searchCursor = search?.cursor;
+    // A history_read `before` can also be a messageId of an earlier answer: models often send one (#7055).
+    const cursor = searchCursor
+      ? yield* toolStep(() => decodeCursor(searchCursor))
+      : read?.before
+        ? readCursor(read.before)
+        : null;
+    const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
+    if (beforeMessageId !== null)
+      yield* toolStep(() =>
+        beforeMessageSchema(
+          (messageId) => store.database.readConversationMessages(agentId, threadId, [messageId]).length === 1,
+        ).parse({ before: beforeMessageId }),
+      );
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
@@ -376,7 +427,7 @@ export class HistoryTools {
     const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
       limit: read?.messageId ? 1 : scanLimit + 1,
-      ...(cursor ? { before: cursor.anchorMessageId } : {}),
+      ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
     };
     const page = yield* toolStep(() => store.database.readAgentHistory(agentId, threadId, selection));

@@ -113,6 +113,22 @@ keeps it in memory only. `scripts/unclean-exit-e2e.ts` kills the dev app's main 
 it with SIGTERM, and checks the event and the marker on each start. `bun run dev:stop` sends SIGKILL
 to the process group after 3 s, so a dev stop can count as `quitting`.
 
+`start-attempts.ts` keeps `openbot-start-attempts-v1.json` beside the run marker. It counts the
+starts of one app version that did not finish. It writes `starting` before the database host and
+the migrations, and clears the attempt when the main window has loaded with the database open. A
+start error, an uncaught exception before that point, and a `starting` attempt with a new `.dmp`
+file in `crashDumps` count as a failure. A quit (`recordExit` writes `quitting`), an OS shutdown or
+restart (the `powerMonitor` event, or a boot time after the attempt) with no error and no dump, and a
+kill from outside (no dump) do not count and keep the count. A new version starts from zero. After 3 failures in a row,
+the desktop shows `start-recovery-window.ts` before the start continues. The window has its own
+in-memory session, no preload and no IPC: the page is a `data:` URL whose links go to fixed
+`https://openbot.invalid/recovery/<action>` URLs, and `will-navigate` stops each navigation and runs
+only an exact action URL. After a failed start, macOS gets the in-memory default
+`ApplePersistenceIgnoreState`: else AppKit asks with a modal alert, before `ready`, whether to reopen
+the windows, and the start waits for that answer. A server or a hosted server shows no window; it
+logs the loop and starts as before. `scripts/start-recovery-e2e.ts` forces crashes and a hang with
+`OPENBOT_E2E_FORCE_START_FAILURE`, which a packaged app ignores.
+
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
 current day and the last closed day; it is written at most every 15 minutes, at a day change and at

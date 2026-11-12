@@ -229,6 +229,17 @@
   transform: scale(1.12);
 }
 
+/* A dragged seat is lifted above the other seats, which make room for it. */
+.agent-dock-seat[data-dragging] {
+  z-index: 1;
+}
+
+.agent-dock-seat[data-dragging] .agent-dock-seat-button {
+  color: var(--openbot-text-primary);
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
 .agent-dock-seat-button .agent-avatar {
   /* The plush art sits low in its box. Every app surface lifts it by 14% of the face size. */
   --agent-avatar-optical-offset: calc(40px * -0.14);
@@ -631,12 +642,6 @@
 .agent-dock-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
-}
-
-/* Panel radius 24 = composer radius 12 + gap 12, so the corners are concentric. A focus halo would
-   make the gap 9 px at the corner; the border alone shows focus. */
-.agent-dock-composer.composer[data-compact]:focus-within {
-  box-shadow: none;
 }
 
 .agent-dock-composer.composer[data-compact] > .composer-input-label {

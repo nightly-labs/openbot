@@ -63,6 +63,7 @@ import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
+import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -91,6 +92,8 @@ const handledSettingsRequests = new WeakSet<AgentSettingsRequest>();
  * mounts again, after a channel or another page, must not scroll back to the message that was picked before.
  */
 const handledMessageFocusRequests = new WeakSet<NonNullable<ConversationProps["messageFocusRequest"]>>();
+/** How many frames a message focus request waits for the virtualized row of its message to be drawn. */
+const MESSAGE_FOCUS_ROW_FRAMES = 4;
 
 /** An http or https page that the built-in browser can show. A relayed sign-in page needs this computer's browser. */
 function builtInBrowserPage(url: string): boolean {
@@ -578,6 +581,12 @@ export function createConversationViewScope(props: ConversationProps) {
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,
+    browserTeach,
+    canTeachBrowserTask,
+    openBrowserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
   } = browser;
   function showBrowserPanel() {
     setActiveRightPanel("browser");
@@ -966,6 +975,7 @@ export function createConversationViewScope(props: ConversationProps) {
     draftLocked: threadQueue.draftLocked,
     keepsAttachment: threadQueue.keepsAttachment,
   });
+  const messagePins = createMessagePinsStore({ props });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
   const voice = createVoiceStore({
@@ -1184,6 +1194,7 @@ export function createConversationViewScope(props: ConversationProps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     retryPendingSend,
     editPendingSend,
     dismissPendingSend,
@@ -1707,32 +1718,51 @@ export function createConversationViewScope(props: ConversationProps) {
       agentId: props.agent?.id,
       loaded: props.loaded,
       messageIds: props.messages.map((message) => message.id).join("\u0000"),
+      index: props.messageFocusRequest ? timelineIndexById().get(props.messageFocusRequest.messageId) : undefined,
     }),
-    ({ request, agentId, loaded }) => {
+    ({ request, agentId, loaded, index }) => {
       if (!request || request.agentId !== agentId || !loaded || handledMessageFocusRequests.has(request)) return;
-      requestAnimationFrame(() => {
-        // A message in a group of agent messages has no row of its own, so the group row is the target.
-        const messageId = CSS.escape(request.messageId);
-        const target = scrollElement?.querySelector<HTMLElement>(
-          `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
-        );
-        if (!target) return;
-        handledMessageFocusRequests.add(request);
-        // The message the user picked replaces the opening at the unread divider.
-        unreadOpening = { ...unreadOpening, pending: false, holding: false };
-        stickToLatest = false;
-        // A page that loaded just before the request queued a scroll to the latest message. That scroll
-        // must not move the transcript away from the message the user picked, so it is cancelled and
-        // its other updates run here.
-        if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
-        if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
-        latestScrollFrame = undefined;
-        latestScrollSettleFrame = undefined;
-        updateVirtualScrollMargin();
-        target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-        updateScrollFade();
-        updateUnreadDividerVisibility();
-      });
+      const focus = (frame: number) =>
+        requestAnimationFrame(() => {
+          if (handledMessageFocusRequests.has(request)) return;
+          // A message in a group of agent messages has no row of its own, so the group row is the target.
+          const messageId = CSS.escape(request.messageId);
+          const target = scrollElement?.querySelector<HTMLElement>(
+            `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
+          );
+          if (!target) {
+            // A virtualized chat draws only the rows near the view, as after a tab opens at the latest
+            // message. The row of the message is drawn first, then found in a later frame.
+            if (index === undefined || frame >= MESSAGE_FOCUS_ROW_FRAMES) return;
+            messageVirtualizer.scrollToIndex(index);
+            focus(frame + 1);
+            return;
+          }
+          handledMessageFocusRequests.add(request);
+          // The message the user picked replaces the opening at the unread divider.
+          unreadOpening = { ...unreadOpening, pending: false, holding: false };
+          stickToLatest = false;
+          // A page that loaded just before the request queued a scroll to the latest message. That scroll
+          // must not move the transcript away from the message the user picked, so it is cancelled and
+          // its other updates run here.
+          if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
+          if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
+          latestScrollFrame = undefined;
+          latestScrollSettleFrame = undefined;
+          // A glide to the bottom that started before, as when a tab opens, also stops.
+          stopChatGlides();
+          updateVirtualScrollMargin();
+          target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+          updateScrollFade();
+          updateUnreadDividerVisibility();
+          // The rows above the message measure after this scroll, so the message centres again once.
+          requestAnimationFrame(() => {
+            if (stickToLatest || !target.isConnected) return;
+            target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+            updateScrollFade();
+          });
+        });
+      focus(0);
     },
   );
 
@@ -2477,6 +2507,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
+    messagePins,
     voiceConversationAvailable,
     startVoiceConversation,
     sideQuestionAvailable,
@@ -2537,6 +2568,12 @@ export function createConversationViewScope(props: ConversationProps) {
     closeBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,
+    browserTeach,
+    canTeachBrowserTask,
+    openBrowserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
     closeChatSearch,
     clearNewMessages,
     closeShownSidePanelFile,
@@ -2673,6 +2710,7 @@ export function createConversationViewScope(props: ConversationProps) {
     selectAndConfirmReasoning,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     saveSkillSuggestion,
     quoteRequest,
     quoteSelection,

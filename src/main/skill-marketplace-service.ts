@@ -30,14 +30,20 @@ import { sourceText } from "@openbot/i18n/source";
 import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
-import { writeFileAtomically } from "../backend/atomic-json-file";
+import { isHeldTargetError, writeFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
-import type { LocalSkillLibrary } from "./local-skill-library";
+import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
-import { archiveDirectory, inspectArchive, inspectSkillMarkdown, normalizedFiles } from "./skill-package";
+import {
+  archiveDirectory,
+  FINDER_METADATA_FILE,
+  inspectArchive,
+  inspectSkillMarkdown,
+  normalizedFiles,
+} from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
 /** How long `listInstalled` keeps the newest catalog version of a skill. */
@@ -411,6 +417,35 @@ export class SkillMarketplaceService {
     return this.serialize(agent.id, this.writeResolvedEffect(agent, detail, bundle, replaceModified));
   }
 
+  /**
+   * The files of each other saved revision of a local skill, by folder. A copy with the files of a
+   * revision that the library keeps has no edits that a replace loses (#7072). A revision that does
+   * not read proves nothing, so it is left out and the install refuses as before.
+   */
+  private savedRevisionFolders(
+    detail: MarketplaceSkillDetail,
+  ): Effect.Effect<Map<string, Record<string, Uint8Array>>[]> {
+    return Effect.gen({ self: this }, function* () {
+      const library = this.localLibrary;
+      if (!library || !detail.id.startsWith("local-skill-")) return [];
+      const revisions = yield* Effect.result(library.revisions(detail.id));
+      if (Result.isFailure(revisions)) return [];
+      const result: Map<string, Record<string, Uint8Array>>[] = [];
+      for (const revision of revisions.success) {
+        if (revision === detail.version) continue;
+        const files = yield* Effect.result(
+          library.bundle(detail.id, revision).pipe(
+            toSkillMarketplaceFailure,
+            Effect.flatMap((bundle) => skillSync(() => normalizedFiles(bundle))),
+          ),
+        );
+        if (Result.isSuccess(files))
+          result.push(skillFolders(detail.slug, files.success, packChildren(detail.slug, files.success)));
+      }
+      return result;
+    });
+  }
+
   private writeResolvedEffect(
     agent: AgentSummary,
     detail: MarketplaceSkillDetail,
@@ -442,7 +477,15 @@ export class SkillMarketplaceService {
       }
       if (existing) {
         const state = yield* installedState(agent.workspacePath, existing);
-        if (state === "modified" && !replaceModified && !(yield* onlyNewFiles(agent.workspacePath, existing, folders)))
+        if (
+          state === "modified" &&
+          !replaceModified &&
+          !(yield* onlyNewFiles(agent.workspacePath, existing, [folders])) &&
+          !(yield* onlyNewFiles(agent.workspacePath, existing, [
+            folders,
+            ...(yield* this.savedRevisionFolders(detail)),
+          ]))
+        )
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.replaceModified")) });
       }
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
@@ -781,6 +824,24 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
   return files;
 });
 
+/**
+ * The waits before each new rename of a skill folder when Windows answers `EPERM`, `EACCES` or `EBUSY`.
+ * Antivirus and the search indexer open the files just written to the stage for a moment, and Windows
+ * does not rename a folder that has an open file. One try failed the install (#6750). About 3 s in all,
+ * as for an attachment transfer, because the agent waits for the install.
+ */
+const HELD_SKILL_FOLDER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
+
+const renameSkillFolder = Effect.fn("SkillMarketplace.renameFolder")(function* (from: string, to: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    const renamed = yield* Effect.result(skillIO(() => rename(from, to)));
+    if (Result.isSuccess(renamed)) return;
+    const wait = HELD_SKILL_FOLDER_WAITS_MS[attempt];
+    if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+    yield* Effect.sleep(wait);
+  }
+});
+
 /** Writes every target, or on a failure puts back each one it already replaced. */
 const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
   writes: ReadonlyArray<{ target: string; files: Record<string, Uint8Array> }>,
@@ -792,13 +853,20 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
         yield* skillIO(() => mkdir(dirname(target), { recursive: true, mode: 0o700 }));
         const stage = `${target}.openbot-stage-${randomUUID()}`;
         const backup = (yield* pathExists(target)) ? `${target}.openbot-backup-${randomUUID()}` : null;
-        yield* writeFiles(stage, files);
-        if (backup) yield* skillIO(() => rename(target, backup));
-        const moved = yield* Effect.result(skillIO(() => rename(stage, target)));
-        if (Result.isFailure(moved)) {
-          if (backup) yield* skillIO(() => rename(backup, target));
-          return yield* moved.failure;
-        }
+        yield* Effect.gen(function* () {
+          yield* writeFiles(stage, files);
+          if (backup) yield* renameSkillFolder(target, backup);
+          const moved = yield* Effect.result(renameSkillFolder(stage, target));
+          if (Result.isFailure(moved)) {
+            if (backup) yield* renameSkillFolder(backup, target);
+            return yield* moved.failure;
+          }
+        }).pipe(
+          // A stage left beside the skill folder holds a SKILL.md, and a provider can load it as a skill.
+          Effect.onError(() =>
+            skillIO(() => rm(stage, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore),
+          ),
+        );
         completed.push({ target, backup });
       }
     }),
@@ -807,7 +875,7 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
     for (const item of completed.reverse()) {
       yield* skillIO(() => rm(item.target, { recursive: true, force: true }));
       const backup = item.backup;
-      if (backup) yield* skillIO(() => rename(backup, item.target)).pipe(Effect.catch(() => Effect.void));
+      if (backup) yield* renameSkillFolder(backup, item.target).pipe(Effect.catch(() => Effect.void));
     }
     return yield* outcome.failure;
   }
@@ -845,9 +913,10 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
         const path = join(directory, entry.name);
         const name = relative(root, path).replaceAll("\\", "/");
         if (entry.isSymbolicLink()) return true;
+        // A save leaves the Finder file out, so a copy that has it has no edit there (#7072).
         if (entry.isDirectory()) {
           if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (yield* visit(path))) return true;
-        } else if (!entry.isFile() || !(name in expected)) return true;
+        } else if (!entry.isFile() || (!(name in expected) && entry.name !== FINDER_METADATA_FILE)) return true;
       }
       return false;
     });
@@ -868,32 +937,38 @@ const installedState = Effect.fn("SkillMarketplace.installedState")(function* (
 });
 
 /**
- * True when each installed copy has the files of its lock entry or exactly the files of the install.
- * An agent that edits its copy and publishes that folder as a new revision changed nothing that the
- * install then loses.
+ * True when each installed copy has the files of its lock entry or exactly the files of one of
+ * `accepted`, such as the install. An agent that edits its copy and publishes that folder as a new
+ * revision changed nothing that the install then loses.
  */
 const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
   workspace: string,
   entry: LockEntry,
-  next: ReadonlyMap<string, Record<string, Uint8Array>>,
+  accepted: ReadonlyArray<ReadonlyMap<string, Record<string, Uint8Array>>>,
 ): Effect.fn.Return<boolean, SkillMarketplaceFailure> {
   const enabled = entry.enabled !== false;
   for (const [folder, files] of skillFolders(entry.slug, entry.files, entry.folders ?? [])) {
-    const nextFiles = next.get(folder);
-    const nextHashes = nextFiles
-      ? Object.fromEntries(Object.entries(nextFiles).map(([name, bytes]) => [name, sha256(bytes)]))
-      : null;
-    for (const target of enabled ? targetDirectories(workspace, folder) : [disabledDirectory(workspace, folder)]) {
+    const acceptedHashes = accepted.flatMap((folders) => {
+      const acceptedFiles = folders.get(folder);
+      return acceptedFiles
+        ? [Object.fromEntries(Object.entries(acceptedFiles).map(([name, bytes]) => [name, sha256(bytes)]))]
+        : [];
+    });
+    target: for (const target of enabled
+      ? targetDirectories(workspace, folder)
+      : [disabledDirectory(workspace, folder)]) {
       if (!(yield* pathExists(target))) continue;
-      if (yield* copyHas(target, files)) continue;
-      if (nextHashes && (yield* copyHas(target, nextHashes))) continue;
+      for (const hashes of [files, ...acceptedHashes]) if (yield* copyHas(target, hashes)) continue target;
       return false;
     }
   }
   return true;
 });
 
-/** True when the folder has exactly these files with these hashes. */
+/**
+ * True when the folder has exactly these files with these hashes. A `SKILL.md` also matches when it
+ * is the text that a save put quotes in: the copy that an agent saved from keeps the text before.
+ */
 const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   target: string,
   files: Record<string, string>,
@@ -902,7 +977,12 @@ const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   if (Result.isFailure(unexpected) || unexpected.success) return false;
   for (const [name, hash] of Object.entries(files)) {
     const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
-    if (Result.isFailure(content) || sha256(new Uint8Array(content.success)) !== hash) return false;
+    if (Result.isFailure(content)) return false;
+    const bytes = new Uint8Array(content.success);
+    if (sha256(bytes) === hash) continue;
+    if (name !== "SKILL.md") return false;
+    const quoted = yield* Effect.result(skillSync(() => quotedSkillMarkdown(bytes)));
+    if (Result.isFailure(quoted) || !quoted.success || sha256(quoted.success) !== hash) return false;
   }
   return true;
 });

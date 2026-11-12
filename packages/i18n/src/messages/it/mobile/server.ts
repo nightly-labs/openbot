@@ -831,6 +831,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Numero personale",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Possono scrivere solo la tua chat «Messaggio a te stesso» e le persone che autorizzi. Disattiva per un numero solo per OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Disattiva per inviare solo la risposta.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Questo agente riceve i messaggi per OpenBot da tutti i tuoi numeri collegati. Risponde da solo a quelli brevi, passa il resto all'agente giusto e risponde su WhatsApp.",
@@ -1013,6 +1016,17 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installato",
   "mobile.server.providers.status.notInstalled": "Non installato",
   "mobile.server.providers.status.checking": "Controllo",
+  "mobile.server.providers.pool": "Raggruppa account",
+  "mobile.server.providers.poolHint":
+    "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
+  "mobile.server.providers.accountsPooledHint":
+    "Gli agenti condividono questi account. Un nuovo account accede dalla sua pagina su questo telefono.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Gli agenti condividono questi account. Aggiungi un account in OpenBot su un computer.",
+  "mobile.server.providers.inUse": "In uso",
+  "mobile.server.providers.notInPool": "Fuori dal pool",
+  "mobile.server.providers.leaveOutOfPool": "Escludi dal pool",
+  "mobile.server.providers.putBackInPool": "Rimetti nel pool",
   "mobile.server.providers.models": "Modelli",
   "mobile.server.providers.modelsCount": "{shown} di {total}",
   "mobile.server.providers.modelsTitle": "Modelli di {name}",

@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Les réglages du canal ont un réglage Navigateur. Choisissez si tous les membres, un seul membre ou personne ne peut utiliser le navigateur dans le canal.",
+          "Le panneau latéral du canal a un volet Navigateur et un volet Fichiers. Ils affichent les onglets des membres du canal et les fichiers envoyés dans le canal.",
+          "Faites un clic droit sur l’îlot dynamique ou sur le dock des agents pour le masquer. Vous pouvez aussi faire glisser un agent vers un autre emplacement du dock et changer la taille du dock dans Réglages.",
+          "Vous pouvez désactiver le groupe Non lues dans la barre latérale. Faites un clic droit sur le titre Non lues, ou réglez Trier les discussions sur Manuel.",
+          "Quand une nouvelle version ne peut pas démarrer 3 fois de suite, une fenêtre de récupération s’ouvre. Vous pouvez réessayer, télécharger la version précédente ou exporter le diagnostic."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Une nouvelle version va d’abord à environ 1 ordinateur sur 10, puis à tous les ordinateurs environ un jour plus tard. Pour l’obtenir tout de suite, sélectionnez Rechercher des mises à jour.",
+          "Les agents posent des questions avec des options dans la fenêtre de questions. Les cartes avec des boutons ne servent qu’aux approbations."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Une discussion que vous avez lue ne reste plus dans le groupe Non lues. Les fils secondaires non lus, comme le fil d’une routine, ne gardent plus un agent dans ce groupe.",
+          "Sous Windows, le dock des agents et l’îlot dynamique ne ralentissent plus le pointeur dans toutes les apps quand beaucoup d’agents travaillent.",
+          "Une équipe ne s’arrête plus quand le responsable de l’équipe termine son tour sans réponse, après que ses coéquipiers ont fait leur rapport.",
+          "Une discussion Claude devenue trop longue démarre maintenant une nouvelle session avec l’historique de la discussion. Avant, chaque message échouait avec « Prompt is too long ».",
+          "Quand un compte Claude atteint sa limite de 5 heures, l’agent passe à son modèle de secours ou attend la réinitialisation.",
+          "Un agent peut enregistrer une capture d’écran du navigateur sous forme de fichier et la joindre à sa réponse."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

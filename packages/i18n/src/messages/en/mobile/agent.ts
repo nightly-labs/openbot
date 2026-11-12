@@ -57,6 +57,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.menu.deleteBody": "This removes the agent from this server.",
   "mobile.agent.menu.markRead": "Mark read",
   "mobile.agent.menu.markUnread": "Mark unread",
+  "mobile.agent.menu.mute": "Mute",
+  "mobile.agent.menu.unmute": "Unmute",
   "mobile.agent.menu.hide": "Hide",
   "mobile.agent.menu.info": "Info",
   "mobile.agent.menu.more": "More",
@@ -560,6 +562,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.hidden.body": "Hidden chats keep working. They're just not shown on the home screen.",
   "mobile.agent.hidden.bodySynced":
     "A hidden chat keeps its history. Its agent does not run routines or get new messages. Every device on this server hides it.",
+  "mobile.agent.hidden.bodySyncedWorking": "A hidden chat keeps working. Every device on this server hides it.",
   "mobile.agent.hidden.showNamed": "Show {name}",
   "mobile.agent.hidden.show": "Show",
   "mobile.agent.hidden.showFailed": "Could not show agent",

@@ -14,6 +14,8 @@ export const messages = {
     "{provider} zgłasza, że limit Twojego planu się wyczerpał. Wybierz inny model lub przejdź na wyższy plan {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} nie załadował narzędzi OpenBot, więc ten agent nie może ich używać ani kontaktować się z członkami zespołu. Zasady zespołu {provider} mogą blokować lokalne serwery MCP. Poproś administratora zespołu o ich dopuszczenie, a potem spróbuj ponownie.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} nie mógł uruchomić serwera MCP {name}, więc odpowiedź została przerwana. Ten serwer jest w Twoich ustawieniach {provider}, a nie w OpenBot. Usuń go tam lub napraw, a potem rozpocznij nowy czat.",
   "error.provider.endpointsReadOnly":
     "Zapisane endpointy zapisała nowsza wersja OpenBot albo nie można odczytać pliku. Zaktualizuj OpenBot, aby je zmienić.",
   "error.provider.endpointNoSecureStorage":
@@ -190,6 +192,8 @@ export const messages = {
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode odrzucił ten darmowy model. Niektóre darmowe modele nie są dostępne w każdym kraju. Wybierz inny model z etykietą Darmowy albo wklej klucz OpenCode Go w ustawieniach OpenCode i wybierz model OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Endpoint „{provider}” odrzucił swój klucz API lub nagłówki. Wpisz je ponownie w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.customEndpointKeyMissing":
@@ -210,6 +214,8 @@ export const messages = {
     "Darmowe modele OpenCode osiągnęły limit użycia. Wszystkie darmowe modele mają wspólny limit. Aby kontynuować, wklej klucz OpenCode Go w ustawieniach OpenCode albo wybierz model innego dostawcy.",
   "error.provider.opencodeProviderFailed":
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":
@@ -218,6 +224,7 @@ export const messages = {
     "Inna aplikacja Codex ma otwarty ten czat, na przykład aplikacja Codex na komputer, Codex CLI lub rozszerzenie IDE. Tylko jedna aplikacja naraz może pisać do czatu Codex. Zamknij czat w tamtej aplikacji, a potem wyślij wiadomość ponownie.",
   "error.provider.realtimeLimitZero":
     "Linux zatrzymał dostawcę, ponieważ OpenBot ma limit czasu procesora w czasie rzeczywistym równy 0. Ten limit pochodzi z Twojego systemu. Zainstaluj i uruchom rtkit (`rtkit-daemon`), uruchom `systemctl --user restart xdg-desktop-portal`, a potem uruchom ponownie OpenBot. Sam restart xdg-desktop-portal nie pomoże, dopóki brakuje rtkit.",
+  "error.provider.cpuUnsupported": "Procesor tego komputera nie może uruchomić tego dostawcy. Użyj innego dostawcy.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode nie może otworzyć swojej bazy danych, ponieważ zmieniła ją nowsza wersja OpenCode. Zaktualizuj OpenCode do wersji 2 lub nowszej, a potem spróbuj ponownie.",
   "error.provider.opencodeNoAnswer":
@@ -250,6 +257,8 @@ export const messages = {
     "Gemini nie może teraz użyć tego modelu. Wybierz inny model i spróbuj ponownie.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -297,6 +306,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.imageCountLimit":
+    "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
   "error.provider.museMcpStartupFault":

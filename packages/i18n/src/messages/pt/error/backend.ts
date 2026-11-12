@@ -50,6 +50,10 @@ export const messages = {
     "Este computador anfitrião remoto não oferece suporte à navegação pela barra de endereços em uma aba existente.",
   "error.backend.browserUserControlBusy":
     "Esta aba do navegador está esperando um segredo. Responda primeiro ao pedido do segredo.",
+  "error.backend.browserTeachBusy": "Outra pessoa controla esta aba do navegador. Tente novamente quando ela terminar.",
+  "error.backend.browserTeachUnavailable":
+    "Este separador do navegador não tem um agente que possa aprender uma tarefa.",
+  "error.backend.browserTeachUnsupported": "Este anfitrião remoto não suporta a gravação de uma tarefa.",
   "error.backend.browserUserControlUnsupported":
     "Este computador anfitrião remoto não oferece suporte para assumir o controle de uma aba do navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto não pode receber um início de sessão deste computador.",
@@ -161,6 +165,10 @@ export const messages = {
     "O estado da caixa de mensagens está corrompido ou é de uma versão mais recente do OpenBot; ele não será sobrescrito.",
   "error.backend.recipientDeleting": "O destinatário está sendo excluído. Tente novamente quando a exclusão terminar.",
   "error.backend.recipientHidden": "Este agente está oculto. Restaure-o para enviar mensagens.",
+  "error.backend.agentIdUnknown":
+    "Nenhum agente tem o ID {id}. Obtenha os IDs com openbot.list_agents e tente novamente.",
+  "error.backend.agentIdNear":
+    "Nenhum agente tem o ID {id}. O agente {name} tem o ID {nearId}, quase igual. Se você quer esse agente, tente novamente com o ID dele.",
   "error.backend.attachBetween": "Anexe de 1 a {limit} arquivos.",
   "error.backend.attachmentNotFile": "O anexo não é um arquivo: {path}",
   "error.backend.generatedImageTooLarge": "A imagem gerada excede o limite de 100 MB.",
@@ -225,6 +233,8 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Esta mensagem faz parte de um turno em andamento. Exclua-a quando o turno terminar.",
   "error.backend.messageDeleteForbidden": "Você só pode excluir as mensagens que enviou.",
+  "error.backend.messagePinNotFound": "Esta mensagem não está no chat.",
+  "error.backend.messagePinLimit": "Este chat tem 50 mensagens fixadas. Desafixe uma antes de fixar outra.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
@@ -256,6 +266,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra as configurações de MCP e escolha Entrar.",
   "error.backend.mcpServerFailedForProvider":
@@ -287,6 +299,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "O nome da seção é muito longo.",
   "error.backend.sidebarFolderTooDeep": "As pastas só podem ter três níveis.",
   "error.backend.sidebarFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
+  "error.backend.libraryFolderName": "O nome de uma pasta deve ter de 1 a {limit} caracteres.",
+  "error.backend.libraryFolderLimit": "Um servidor pode ter até {limit} pastas da Biblioteca.",
+  "error.backend.libraryFolderFileLimit": "Há arquivos demais nas pastas da Biblioteca.",
+  "error.backend.libraryFolderTooDeep": "As pastas da Biblioteca podem ter apenas {limit} níveis.",
+  "error.backend.libraryFolderGone": "A pasta não existe ou já foi excluída.",
+  "error.backend.libraryFolderOtherAgent": "Um arquivo só pode ir para uma pasta do seu agente.",
+  "error.backend.libraryFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
   "error.backend.sectionNameDuplicate": "Os nomes das seções devem ser exclusivos.",
   "error.backend.directMessageRequired": "Escreva uma mensagem primeiro.",
   "error.backend.directMessageTooLong": "Uma mensagem direta pode ter até {limit} caracteres.",

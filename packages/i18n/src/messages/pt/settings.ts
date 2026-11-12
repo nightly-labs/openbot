@@ -98,6 +98,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "O link abriu no navegador padrão.",
   "settings.sendShortcut.title": "Atalho de envio",
   "settings.sendShortcut.description": "Escolha as teclas que enviam uma mensagem neste dispositivo e navegador.",
+  "settings.chatOrder.description":
+    "Escolha onde a barra lateral mostra as conversas não lidas neste dispositivo. Manual desativa o grupo Não lidas.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",
@@ -259,6 +261,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Arraste o dock para cima ou para baixo para movê-lo pela borda.",
   "settings.agentDock.edge.right": "Direita",
   "settings.agentDock.edge.left": "Esquerda",
+  "settings.agentDock.size.title": "Tamanho do dock",
+  "settings.agentDock.size.description":
+    "Arraste para mudar o tamanho do dock sobre os outros apps. Na janela principal, o dock segue o tamanho da interface.",
   "settings.agentDock.autoHide.title": "Ocultar quando não estiver em uso",
   "settings.agentDock.autoHide.description":
     "O dock desliza para dentro da borda. Leve o ponteiro até a borda para mostrá-lo.",
@@ -518,6 +523,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} está pronta. Reinicie para aplicar.",
   "settings.updates.status.installing": "Reiniciando para aplicar {target}…",
   "settings.updates.status.upToDate": "O OpenBot está atualizado no canal Estável.",
+  "settings.updates.status.staged": "{target} está sendo liberado em etapas. Busque atualizações para obtê-lo agora.",
   "settings.updates.status.checkFailed": "O OpenBot não conseguiu buscar atualizações. Tente novamente.",
   "settings.updates.status.unsupported": "As atualizações estão indisponíveis nesta compilação.",
   "settings.updates.actionFailed": "Não foi possível atualizar o OpenBot.",

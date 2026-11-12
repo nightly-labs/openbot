@@ -10,6 +10,10 @@ export const messages = {
     "도구 검색 인수가 올바르지 않아요. 선언된 스키마와 원래의 정규화된 도구 이름을 사용하세요.",
   "error.agent.toolCallArgumentsNotObject":
     "도구가 실행되지 않았어요. tool_call의 arguments는 텍스트가 아니라 JSON 객체여야 해요. arguments를 객체로 바꿔 다시 호출하세요.",
+  "error.agent.toolCallDiscoveryTool":
+    "도구가 실행되지 않았어요. tool_call로는 openbot.tool_search나 openbot.tool_describe를 실행할 수 없어요. 같은 인수로 직접 호출하세요.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "루틴 일정이 올바르지 않아요: {detail} 일정을 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.approvalWhileDeleting": "에이전트를 삭제하는 중에는 승인할 수 없어요.",
   "error.agent.accessLocalOnly": "에이전트 접근 권한은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.duplicateCleanupFailed": "에이전트 복제에 실패했고 불완전한 사본을 제거할 수 없었어요.",
@@ -143,6 +147,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",
   "error.agent.mcpServerKeysMove":
     "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 서버 설정의 MCP에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
+  "error.agent.mcpServerBuiltIn":
+    "{name}은(는) OpenBot의 일부라서 MCP 도구로 테스트하거나 켜고 끄거나 제거할 수 없어요. 사용자가 OpenBot을 실행하는 컴퓨터에서 관리해요. GitHub 연결은 마켓플레이스, 앱, GitHub에서, 컴퓨터 제어는 설정, 컴퓨터 제어에서 관리해요.",
   "error.agent.mcpServerUnknown": "{name}(이)라는 MCP 서버가 없어요. list_mcp_servers를 호출해 이름을 확인하세요.",
   "error.agent.screenCaptureWindowMissing":
     "해당 창이 지금 열려 있지 않아요. list_capture_sources를 호출해 현재 창 ID를 확인하세요.",

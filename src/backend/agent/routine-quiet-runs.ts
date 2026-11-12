@@ -18,6 +18,12 @@ import { bridgedToolName, getString, type ThreadItem } from "../protocol";
 const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
 
 /**
+ * The quiet token of Hermes Agent cron jobs. The Hermes import copies job prompts as they are, and a
+ * model trained on Hermes writes it, so the whole answer `[SILENT]` is also the marker (#6909).
+ */
+const HERMES_SILENT_MARKER = "[silent]";
+
+/**
  * The OpenBot tool that a quiet routine run calls when it has nothing to report. A model often
  * writes a short sentence instead of the exact marker; a tool call does not depend on the wording or
  * the language. It has no arguments, so the provider history shows the decision by the tool name.
@@ -70,7 +76,8 @@ export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
 
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
-  return text.trim() === ROUTINE_NO_UPDATE_MARKER;
+  const answer = text.trim();
+  return answer === ROUTINE_NO_UPDATE_MARKER || answer.toLowerCase() === HERMES_SILENT_MARKER;
 }
 
 /**
@@ -110,6 +117,25 @@ export function settleQuietRoutineTurn(
     }
   }
   return !reported;
+}
+
+/**
+ * Settles the answers of a channel routine turn whose owner called the no-update tool (#7166). Each
+ * text answer becomes a quiet answer, which the channel shows as a step, so the run posts no message.
+ * Nothing goes: the channel already shows the turn's steps. A file, an image or a question is a
+ * report, and then nothing changes. Returns whether the turn is quiet.
+ */
+export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: string): boolean {
+  const answers = new Set(
+    snapshot.messages.filter(
+      (message) => message.author === "assistant" && message.turnId === turnId && !isWorkNote(message),
+    ),
+  );
+  if ([...answers].some((message) => !isTextAnswer(message))) return false;
+  for (const [index, message] of snapshot.messages.entries()) {
+    if (answers.has(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+  }
+  return true;
 }
 
 /** A text answer of a quiet turn that says more than the marker. */

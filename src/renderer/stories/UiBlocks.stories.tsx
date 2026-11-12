@@ -213,6 +213,27 @@ export const ConfirmLongPreview: Story = {
   ),
 };
 
+/** Skip and three long buttons do not fit on one row of a chat-wide card: the buttons fill both rows. */
+export const ConfirmManyActions: Story = {
+  render: (args) => (
+    <div style={{ "max-width": "540px" }}>
+      <LiveConfirm
+        spec={{
+          type: "confirm",
+          title: "Publish the release post?",
+          preview: "OpenBot 0.65 is out. Agents now ask questions in one prompt.",
+          actions: [
+            { id: "publish", label: "Publish on all channels", style: "primary" },
+            { id: "schedule", label: "Schedule for tomorrow" },
+            { id: "draft", label: "Save as a draft" },
+          ],
+        }}
+        onRespond={args.onRespond}
+      />
+    </div>
+  ),
+};
+
 /** Start counts down to the time the host answers. Cancel sits at the far end, and there is no Skip. */
 export const PlanCountdown: Story = {
   render: (args) => (

@@ -9,6 +9,10 @@ export const messages = {
   "error.agent.toolRequestInvalid": "工具发现参数无效。请使用声明的 schema 和原始的完整工具名。",
   "error.agent.toolCallArgumentsNotObject":
     "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
+  "error.agent.toolCallDiscoveryTool":
+    "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
@@ -125,6 +129,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerBuiltIn":
+    "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
   "error.agent.screenCaptureWindowMissing": "该窗口当前未打开，请调用 list_capture_sources 获取当前窗口 ID。",
   "error.agent.screenCaptureDisplayMissing": "该显示器当前未连接，请调用 list_capture_sources 获取当前显示器 ID。",

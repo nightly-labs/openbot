@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "这会从该服务器上移除该助手。",
   "mobile.agent.menu.markRead": "标为已读",
   "mobile.agent.menu.markUnread": "标为未读",
+  "mobile.agent.menu.mute": "静音",
+  "mobile.agent.menu.unmute": "取消静音",
   "mobile.agent.menu.hide": "隐藏",
   "mobile.agent.menu.info": "信息",
   "mobile.agent.menu.more": "更多",
@@ -545,6 +547,7 @@ export const messages = {
   "mobile.agent.hidden.body": "隐藏的对话仍会继续工作，只是不在首页显示。",
   "mobile.agent.hidden.bodySynced":
     "隐藏的对话会保留历史，但其助手不运行自动化任务，也收不到新消息。该服务器的所有设备都会隐藏它。",
+  "mobile.agent.hidden.bodySyncedWorking": "隐藏的对话仍会继续工作。该服务器的所有设备都会隐藏它。",
   "mobile.agent.hidden.showNamed": "显示 {name}",
   "mobile.agent.hidden.show": "显示",
   "mobile.agent.hidden.showFailed": "无法显示助手",

@@ -20,6 +20,7 @@ export const messages = {
   "menu.trayOpen": "打开 OpenBot",
   "menu.trayQuit": "退出 OpenBot",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "隐藏灵动岛",
   "menu.undo": "撤销",
   "menu.redo": "重做",
   "menu.cut": "剪切",

@@ -226,11 +226,25 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} には使用量リセットのクレジットが残っていません。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} のこのリセットのクレジットはすでに使われています。",
   "provider.account.resetUsageFailed": "{name} の使用量をリセットできませんでした。",
+  "provider.account.pool": "アカウントをプール",
+  "provider.account.poolDescription":
+    "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",
+  "provider.account.inUse": "使用中",
+  "provider.account.notInPool": "プール外",
+  "provider.account.leaveOutOfPool": "プールから外す",
+  "provider.account.putBackInPool": "プールに戻す",
+  "provider.account.poolChip": "プール",
+  "provider.account.poolCount": "{accounts}のプール",
+  "provider.account.poolInUse": "{pool} · {name} を使用中",
+  "provider.settings.accountsPooledDescription":
+    "{max} 件中 {count} 件。エージェントはこれらのアカウントを共有します。",
   "provider.settings.disconnectTitle": "{name} を切断しますか？",
   "provider.settings.disconnectOthers": "{provider} を再接続するまで、ほかの {provider} アカウントは待機します。",
   "provider.settings.disconnectLocal":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.cache": "キャッシュ",
@@ -269,4 +283,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot が {name} 用にダウンロードした CLI（{size}）を削除します。アカウント、サインイン、エージェントは残ります。",
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
 } as const satisfies PartialTranslation<typeof source>;

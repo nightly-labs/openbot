@@ -18,6 +18,7 @@ export const messages = {
   "menu.trayOpen": "OpenBot を開く",
   "menu.trayQuit": "OpenBot を終了",
   "menu.trayTooltip": "OpenBot",
+  "menu.hideDynamicIsland": "Dynamic Island を隠す",
   "menu.undo": "取り消す",
   "menu.redo": "やり直す",
   "menu.cut": "カット",

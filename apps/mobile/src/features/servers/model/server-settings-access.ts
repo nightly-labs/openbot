@@ -32,6 +32,7 @@ export function canRestartServer(server: MobileServer, hostedServerIds: Readonly
   return (
     server.kind === "remote" &&
     (server.role === "owner" || server.role === "admin") &&
+    server.restartAvailable !== false &&
     (server.hosted === true || Boolean(hostedServerIds?.has(server.id)))
   );
 }

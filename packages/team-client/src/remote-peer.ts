@@ -1790,6 +1790,7 @@ export function createRemoteTeamPeer(
                     agentTaskUiBlocks: true,
                     channelIsolation: true,
                     channelPicture: true,
+                    channelBrowser: true,
                     mcpManyServers: true,
                   }),
                 )
@@ -1954,7 +1955,9 @@ export function createRemoteTeamPeer(
         const payloadBody = upload
           ? null
           : sideRoute
-            ? yield* peerDecode(() => sideRoute.request(path, body, { channelIsolation: true, channelPicture: true }))
+            ? yield* peerDecode(() =>
+                sideRoute.request(path, body, { channelIsolation: true, channelPicture: true, channelBrowser: true }),
+              )
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>

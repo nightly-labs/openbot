@@ -59,6 +59,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "このサーバーからエージェントを削除します。",
   "mobile.agent.menu.markRead": "既読にする",
   "mobile.agent.menu.markUnread": "未読にする",
+  "mobile.agent.menu.mute": "ミュート",
+  "mobile.agent.menu.unmute": "ミュートを解除",
   "mobile.agent.menu.hide": "非表示",
   "mobile.agent.menu.info": "情報",
   "mobile.agent.menu.more": "その他",
@@ -573,6 +575,8 @@ export const messages = {
   "mobile.agent.hidden.body": "非表示のチャットも動作を続けます。ホーム画面に表示されないだけです。",
   "mobile.agent.hidden.bodySynced":
     "非表示のチャットは履歴を保持します。そのエージェントはルーティンを実行せず、新しいメッセージを受け取りません。このサーバーのすべてのデバイスで非表示になります。",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "非表示のチャットも動作を続けます。このサーバーのすべてのデバイスで非表示になります。",
   "mobile.agent.hidden.showNamed": "{name} を表示",
   "mobile.agent.hidden.show": "表示",
   "mobile.agent.hidden.showFailed": "エージェントを表示できませんでした",

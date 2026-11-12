@@ -229,6 +229,7 @@ export function ConversationTimeline() {
     shownSubagentId,
     toggleSubagentPanel,
     sideThreadOpen,
+    messagePins,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
@@ -263,6 +264,13 @@ export function ConversationTimeline() {
     return () => setDeleteTargetId(message.id);
   };
   const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
+  /** A finished message that the host stores can be pinned to the agent's chat. A channel has no pins yet. */
+  const pinAction = (message: AgentMessage) => {
+    if (!messagePins.available() || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (message.actionMarker) return;
+    const pinned = messagePins.isPinned(undefined, message.id);
+    return { pinned, onToggle: () => messagePins.set(undefined, message.id, !pinned) };
+  };
   /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
   const sendToChannelAction = (message: AgentMessage) => {
     const target = props.sendToChannel;
@@ -1427,7 +1435,11 @@ export function ConversationTimeline() {
                         <article
                           data-chat-search-message={message()?.id}
                           aria-label={(message() ?? initialMessage).body}
-                          class={{ "message-entry-animated": animateEntrance }}
+                          class={{
+                            "message-entry-animated": animateEntrance,
+                            // A channel shows agent faces, so the page starts after their column.
+                            "chat-visual-with-author": Boolean(channel) && author().kind === "agent",
+                          }}
                         >
                           <ChatVisual
                             src={pageUrl()}
@@ -1511,6 +1523,7 @@ export function ConversationTimeline() {
                   sendToChannel: sendToChannelAction(message() ?? initialMessage),
                   onBranch: branchAction(message() ?? initialMessage),
                   branchDisabled: Boolean(props.activeTurnId),
+                  pin: pinAction(message() ?? initialMessage),
                   onDelete: deleteAction(message() ?? initialMessage),
                 });
                 /*

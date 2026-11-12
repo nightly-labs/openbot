@@ -47,6 +47,10 @@ export const messages = {
     "Bu uzak ana makine mevcut bir sekmede adres çubuğuyla gezinmeyi desteklemiyor.",
   "error.backend.browserUserControlBusy":
     "Bu tarayıcı sekmesi bir gizli bilgi bekliyor. Önce gizli bilgi isteğini yanıtlayın.",
+  "error.backend.browserTeachBusy":
+    "Bu tarayıcı sekmesini başka bir kişi kontrol ediyor. O bitirdiğinde tekrar deneyin.",
+  "error.backend.browserTeachUnavailable": "Bu tarayıcı sekmesinde görev öğrenebilecek bir ajan yok.",
+  "error.backend.browserTeachUnsupported": "Bu uzak ana makine görev kaydını desteklemiyor.",
   "error.backend.browserUserControlUnsupported":
     "Bu uzak ana makine bir tarayıcı sekmesinin denetimini almayı desteklemiyor.",
   "error.backend.browserSignInUnsupported": "Bu uzak ana makine bu bilgisayardan oturum açma alamaz.",
@@ -151,6 +155,10 @@ export const messages = {
     "Posta kutusu durumu bozuk veya daha yeni bir OpenBot sürümünden; üzerine yazılması reddedildi.",
   "error.backend.recipientDeleting": "Alıcı siliniyor. Silme işlemi tamamlandıktan sonra tekrar deneyin.",
   "error.backend.recipientHidden": "Bu ajan gizli. Mesaj göndermek için onu geri yükleyin.",
+  "error.backend.agentIdUnknown":
+    "{id} kimliğine sahip bir ajan yok. Kimlikleri openbot.list_agents ile alın ve tekrar deneyin.",
+  "error.backend.agentIdNear":
+    "{id} kimliğine sahip bir ajan yok. {name} ajanının kimliği {nearId} ve neredeyse aynı. Bu ajanı kastediyorsanız onun kimliğiyle tekrar deneyin.",
   "error.backend.attachBetween": "1 ila {limit} dosya ekleyin.",
   "error.backend.attachmentNotFile": "Ek bir dosya değil: {path}",
   "error.backend.generatedImageTooLarge": "Oluşturulan görsel 100 MB sınırını aşıyor.",
@@ -209,6 +217,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Bu mesaj sohbette yok.",
   "error.backend.messageDeleteBusy": "Bu mesaj devam eden bir turun parçası. Tur bitince silin.",
   "error.backend.messageDeleteForbidden": "Yalnızca gönderdiğiniz mesajları silebilirsiniz.",
+  "error.backend.messagePinNotFound": "Bu mesaj sohbette değil.",
+  "error.backend.messagePinLimit":
+    "Bu sohbette 50 sabitlenmiş mesaj var. Başka bir mesaj sabitlemeden önce birini kaldırın.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
@@ -240,6 +251,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. MCP ayarlarını açın ve Oturum aç'ı seçin.",
   "error.backend.mcpServerFailedForProvider":
@@ -271,6 +284,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Bölüm adı çok uzun.",
   "error.backend.sidebarFolderTooDeep": "Klasörler en fazla üç seviye derinliğinde olabilir.",
   "error.backend.sidebarFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
+  "error.backend.libraryFolderName": "Klasör adı 1 ile {limit} karakter arasında olmalıdır.",
+  "error.backend.libraryFolderLimit": "Bir sunucuda en fazla {limit} Kitaplık klasörü olabilir.",
+  "error.backend.libraryFolderFileLimit": "Kitaplık klasörlerinde çok fazla dosya var.",
+  "error.backend.libraryFolderTooDeep": "Kitaplık klasörleri en fazla {limit} düzey derinliğinde olabilir.",
+  "error.backend.libraryFolderGone": "Klasör yok veya zaten silinmiş.",
+  "error.backend.libraryFolderOtherAgent": "Bir dosya yalnızca kendi ajanının klasörüne konabilir.",
+  "error.backend.libraryFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
   "error.backend.sectionNameDuplicate": "Bölüm adları benzersiz olmalıdır.",
   "error.backend.directMessageRequired": "Önce bir mesaj yazın.",
   "error.backend.directMessageTooLong": "Doğrudan mesaj en fazla {limit} karakter içerebilir.",

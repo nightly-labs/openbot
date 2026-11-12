@@ -47,6 +47,10 @@ export const messages = {
     "Dieser entfernte Host unterstützt die Navigation über die Adressleiste in einem vorhandenen Tab nicht.",
   "error.backend.browserUserControlBusy":
     "Dieser Browser-Tab wartet auf ein Geheimnis. Beantworte zuerst die Anfrage nach dem Geheimnis.",
+  "error.backend.browserTeachBusy":
+    "Eine andere Person steuert diesen Browser-Tab. Versuche es erneut, wenn sie fertig ist.",
+  "error.backend.browserTeachUnavailable": "Dieser Browser-Tab hat keinen Agenten, der eine Aufgabe lernen kann.",
+  "error.backend.browserTeachUnsupported": "Dieser Remote-Host unterstützt die Aufzeichnung einer Aufgabe nicht.",
   "error.backend.browserUserControlUnsupported":
     "Dieser entfernte Host unterstützt die Übernahme eines Browser-Tabs nicht.",
   "error.backend.browserSignInUnsupported":
@@ -165,6 +169,10 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Der Empfänger wird gelöscht. Versuche es nach Abschluss des Löschvorgangs erneut.",
   "error.backend.recipientHidden": "Dieser Agent ist ausgeblendet. Stelle ihn wieder her, um Nachrichten zu senden.",
+  "error.backend.agentIdUnknown":
+    "Kein Agent hat die ID {id}. Hole die IDs mit openbot.list_agents und versuche es erneut.",
+  "error.backend.agentIdNear":
+    "Kein Agent hat die ID {id}. Der Agent {name} hat die fast gleiche ID {nearId}. Wenn du diesen Agenten meinst, versuche es mit seiner ID erneut.",
   "error.backend.attachBetween": "Hänge zwischen 1 und {limit} Dateien an.",
   "error.backend.attachmentNotFile": "Der Anhang ist keine Datei: {path}",
   "error.backend.generatedImageTooLarge": "Das erstellte Bild überschreitet die Grenze von 100 MB.",
@@ -234,6 +242,9 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Diese Nachricht gehört zu einem laufenden Durchlauf. Lösche sie, wenn der Durchlauf endet.",
   "error.backend.messageDeleteForbidden": "Du kannst nur die Nachrichten löschen, die du gesendet hast.",
+  "error.backend.messagePinNotFound": "Diese Nachricht ist nicht im Chat.",
+  "error.backend.messagePinLimit":
+    "Dieser Chat hat 50 angeheftete Nachrichten. Löse eine, bevor du eine weitere anheftest.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",
@@ -266,6 +277,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne die MCP-Einstellungen und wähle Anmelden.",
   "error.backend.mcpServerFailedForProvider":
@@ -298,6 +311,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Der Abschnittsname ist zu lang.",
   "error.backend.sidebarFolderTooDeep": "Ordner können nur drei Ebenen tief sein.",
   "error.backend.sidebarFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
+  "error.backend.libraryFolderName": "Ein Ordnername muss 1 bis {limit} Zeichen haben.",
+  "error.backend.libraryFolderLimit": "Ein Server kann bis zu {limit} Bibliotheksordner haben.",
+  "error.backend.libraryFolderFileLimit": "In den Bibliotheksordnern sind zu viele Dateien.",
+  "error.backend.libraryFolderTooDeep": "Bibliotheksordner können nur {limit} Ebenen tief sein.",
+  "error.backend.libraryFolderGone": "Der Ordner existiert nicht oder wurde bereits gelöscht.",
+  "error.backend.libraryFolderOtherAgent": "Eine Datei kann nur in einen Ordner ihres Agenten verschoben werden.",
+  "error.backend.libraryFolderMoveInvalid": "Dieser Ordner kann nicht dorthin verschoben werden.",
   "error.backend.sectionNameDuplicate": "Abschnittsnamen müssen eindeutig sein.",
   "error.backend.directMessageRequired": "Schreibe zuerst eine Nachricht.",
   "error.backend.directMessageTooLong": "Eine Direktnachricht kann bis zu {limit} Zeichen haben.",

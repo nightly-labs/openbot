@@ -14,6 +14,8 @@ export const messages = {
     "{provider} מדווח שהתוכנית שלך נוצלה במלואה. יש לבחור מודל אחר או לשדרג את התוכנית של {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} לא טען את הכלים של OpenBot, ולכן הסוכן הזה לא יכול להשתמש בהם או להגיע לחברי הצוות שלו. מדיניות צוות של {provider} יכולה לחסום שרתי MCP מקומיים. יש לבקש ממנהל הצוות לאפשר אותם, ואז לנסות שוב.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, ולכן התשובה נעצרה. השרת הזה נמצא בהגדרות {provider} שלך, ולא ב-OpenBot. הסר את השרת משם או תקן אותו, ואז התחל צ׳אט חדש.",
   "error.provider.endpointsReadOnly":
     "נקודות הקצה השמורות נכתבו בגרסה חדשה יותר של OpenBot, או שלא ניתן לקרוא את הקובץ. יש לעדכן את OpenBot כדי לשנות אותן.",
   "error.provider.endpointNoSecureStorage":
@@ -179,6 +181,8 @@ export const messages = {
     "ל-OpenCode אין התחברות לספק המודלים ״{provider}״. יש לבחור מודל עם התווית Free, או לחבר את הספק: להדביק מפתח OpenCode Go בהגדרות OpenCode, או להריץ `opencode auth login` בטרמינל. לאחר מכן יש לנסות שוב.",
   "error.provider.opencodeAuthRequiredUnknown":
     "ל-OpenCode אין התחברות לספק של המודל הזה. יש לבחור מודל עם התווית Free, או לחבר את הספק: להדביק מפתח OpenCode Go בהגדרות OpenCode, או להריץ `opencode auth login` בטרמינל. לאחר מכן יש לנסות שוב.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode דחה את המודל החינמי הזה. חלק מהמודלים החינמיים אינם זמינים בכל מדינה. יש לבחור מודל אחר עם התווית Free, או להדביק מפתח OpenCode Go בהגדרות OpenCode ולבחור מודל של OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "נקודת הקצה ״{provider}״ דחתה את מפתח ה-API או את הכותרות שלה. יש להזין אותם שוב בהגדרות שרת ← ספקים, ואז לנסות שוב.",
   "error.provider.customEndpointKeyMissing":
@@ -199,6 +203,8 @@ export const messages = {
     "מודלי OpenCode החינמיים הגיעו למגבלת השימוש. כל המודלים החינמיים חולקים את המגבלה הזו. כדי להמשיך, יש להדביק מפתח OpenCode Go בהגדרות OpenCode, או לבחור מודל מספק אחר.",
   "error.provider.opencodeProviderFailed":
     "ספק המודלים נכשל מצדו. החיבור שלך אינו הסיבה. יש לנסות שוב מאוחר יותר או לבחור מודל אחר.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "התשובה של המודל נקטעה או שלא הייתה תקינה. יש לשלוח את ההודעה שוב או לבחור מודל אחר.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":
@@ -207,6 +213,7 @@ export const messages = {
     "אפליקציית Codex אחרת פתחה את הצ'אט הזה, למשל אפליקציית Codex למחשב, Codex CLI או תוסף IDE. רק אפליקציה אחת בכל פעם יכולה לכתוב לצ'אט של Codex. יש לסגור את הצ'אט באותה אפליקציה ואז לשלוח את ההודעה שוב.",
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
+  "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode לא הצליח לפתוח את מסד הנתונים שלו כי גרסה חדשה יותר של OpenCode שינתה אותו. יש לעדכן את OpenCode לגרסה 2 ומעלה ואז לנסות שוב.",
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
@@ -236,6 +243,8 @@ export const messages = {
     "Gemini לא יכול להשתמש במודל הזה כרגע. יש לבחור מודל אחר ואז לנסות שוב.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "במארח Windows, ‏Gemini פותח את דף Google במארח עצמו. יש לחבר את Gemini במחשב המארח.",
@@ -281,6 +290,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageCountLimit":
+    "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.museMcpStartupFault":

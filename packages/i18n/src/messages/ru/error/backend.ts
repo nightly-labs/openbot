@@ -47,6 +47,10 @@ export const messages = {
   "error.backend.browserNavigateUnsupported":
     "Этот удалённый хост не поддерживает переход через адресную строку в существующей вкладке.",
   "error.backend.browserUserControlBusy": "Эта вкладка браузера ждёт секрет. Сначала ответьте на запрос секрета.",
+  "error.backend.browserTeachBusy":
+    "Этой вкладкой браузера управляет другой человек. Повторите попытку, когда он закончит.",
+  "error.backend.browserTeachUnavailable": "У этой вкладки браузера нет агента, который может изучить задачу.",
+  "error.backend.browserTeachUnsupported": "Этот удалённый хост не поддерживает запись задачи.",
   "error.backend.browserUserControlUnsupported": "Этот удалённый хост не поддерживает управление вкладкой браузера.",
   "error.backend.browserSignInUnsupported": "Этот удалённый хост не может принять вход с этого компьютера.",
   "error.backend.browserSignInOpenFailed": "OpenBot не удалось открыть окно входа.",
@@ -153,6 +157,9 @@ export const messages = {
     "Состояние почтового ящика повреждено или создано более новой версией OpenBot; перезапись отклонена.",
   "error.backend.recipientDeleting": "Получатель удаляется. Повторите попытку, когда удаление завершится.",
   "error.backend.recipientHidden": "Этот агент скрыт. Восстановите его, чтобы отправлять сообщения.",
+  "error.backend.agentIdUnknown": "Нет агента с ID {id}. Получите ID через openbot.list_agents и повторите попытку.",
+  "error.backend.agentIdNear":
+    "Нет агента с ID {id}. У агента {name} почти такой же ID: {nearId}. Если вы имели в виду этого агента, повторите попытку с его ID.",
   "error.backend.attachBetween": "Прикрепите от 1 до {limit} файлов.",
   "error.backend.attachmentNotFile": "Вложение не является файлом: {path}",
   "error.backend.generatedImageTooLarge": "Созданное изображение превышает лимит 100 МБ.",
@@ -216,6 +223,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Этого сообщения нет в чате.",
   "error.backend.messageDeleteBusy": "Это сообщение входит в выполняемый ход. Удалите его, когда ход закончится.",
   "error.backend.messageDeleteForbidden": "Вы можете удалять только отправленные вами сообщения.",
+  "error.backend.messagePinNotFound": "Этого сообщения нет в чате.",
+  "error.backend.messagePinLimit":
+    "В этом чате 50 закреплённых сообщений. Открепите одно, прежде чем закрепить другое.",
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
@@ -246,6 +256,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте настройки MCP и выберите «Войти».",
   "error.backend.mcpServerFailedForProvider":
@@ -276,6 +288,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Название раздела слишком длинное.",
   "error.backend.sidebarFolderTooDeep": "Папки могут иметь только три уровня вложенности.",
   "error.backend.sidebarFolderMoveInvalid": "Эту папку нельзя туда переместить.",
+  "error.backend.libraryFolderName": "Название папки должно содержать от 1 до {limit} символов.",
+  "error.backend.libraryFolderLimit": "На сервере может быть не более {limit} папок Библиотеки.",
+  "error.backend.libraryFolderFileLimit": "В папках Библиотеки слишком много файлов.",
+  "error.backend.libraryFolderTooDeep": "У папок Библиотеки может быть не более {limit} уровней.",
+  "error.backend.libraryFolderGone": "Папка не существует или уже удалена.",
+  "error.backend.libraryFolderOtherAgent": "Файл можно поместить только в папку его агента.",
+  "error.backend.libraryFolderMoveInvalid": "Эту папку нельзя туда переместить.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",

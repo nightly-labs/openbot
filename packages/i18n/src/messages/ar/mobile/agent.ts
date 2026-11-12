@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "يؤدي هذا إلى إزالة الوكيل من هذا الخادم.",
   "mobile.agent.menu.markRead": "تعليم كمقروء",
   "mobile.agent.menu.markUnread": "تعليم كغير مقروء",
+  "mobile.agent.menu.mute": "كتم",
+  "mobile.agent.menu.unmute": "إلغاء الكتم",
   "mobile.agent.menu.hide": "إخفاء",
   "mobile.agent.menu.info": "معلومات",
   "mobile.agent.menu.more": "المزيد",
@@ -632,6 +634,7 @@ export const messages = {
   "mobile.agent.hidden.body": "تستمر الدردشات المخفية في العمل. هي فقط لا تظهر على الشاشة الرئيسية.",
   "mobile.agent.hidden.bodySynced":
     "تحتفظ الدردشة المخفية بسجلها. لا يشغّل وكيلها المهام الدورية ولا يتلقى رسائل جديدة. يخفيها كل جهاز على هذا الخادم.",
+  "mobile.agent.hidden.bodySyncedWorking": "تستمر الدردشة المخفية في العمل. يخفيها كل جهاز على هذا الخادم.",
   "mobile.agent.hidden.showNamed": "إظهار {name}",
   "mobile.agent.hidden.show": "إظهار",
   "mobile.agent.hidden.showFailed": "تعذّر إظهار الوكيل",

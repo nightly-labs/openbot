@@ -1,10 +1,12 @@
 import {
   AVATAR_HUES,
   type ClientAgentSummary,
+  DEFAULT_MCP_SERVER_ACCESS,
   type InstalledSkill,
   type MarketplaceAgentSummary,
   type MarketplaceSkillQuery,
   type MarketplaceSkillSummary,
+  type McpServerAccess,
   type McpServerConfig,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
@@ -166,6 +168,11 @@ const MORE_AGENTS = [
   "Vendor Review|Vendor analyst",
   "Incident Review|Postmortem writer",
   "Code Review|Reviewer",
+];
+
+const STORY_ROLES = [
+  { id: "role-engineering", name: "Engineering" },
+  { id: "role-support", name: "Support" },
 ];
 
 const MANY_AGENTS: readonly ClientAgentSummary[] = [
@@ -390,6 +397,7 @@ export function MarketplaceStory(props: StoryProps) {
     notice: "",
   });
   const [error, setError] = createSignal<string | null>(null);
+  const [access, setAccess] = createSignal<Record<string, McpServerAccess>>({});
   const [open, setOpen] = createSignal(true);
   const [askOnInstall, setAskOnInstall] = createSignal(true);
   /** The connect dialog on screen, as the Marketplace window opens it for an app's way in. */
@@ -634,6 +642,20 @@ export function MarketplaceStory(props: StoryProps) {
       });
       return true;
     },
+    mcpAccess: member
+      ? undefined
+      : {
+          entry: (id) => access()[id] ?? DEFAULT_MCP_SERVER_ACCESS,
+          roles: () => STORY_ROLES,
+          busy: () => false,
+          set: async (changes) => {
+            setAccess((held) => ({
+              ...held,
+              ...Object.fromEntries(changes.map((change) => [change.mcpServerId, change.access])),
+            }));
+            return true;
+          },
+        },
     addServer: member ? undefined : fn(),
     runPrompt: fn(),
     copyLink: fn(),

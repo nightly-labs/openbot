@@ -10,6 +10,10 @@ export const messages = {
     "Arguments de découverte d’outils non valides. Utilisez le schéma déclaré et un nom d’outil qualifié d’origine.",
   "error.agent.toolCallArgumentsNotObject":
     "L’outil ne s’est pas exécuté. Dans tool_call, arguments doit être un objet JSON, pas du texte. Renvoyez l’appel avec arguments sous forme d’objet.",
+  "error.agent.toolCallDiscoveryTool":
+    "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La planification de la routine n’est pas valide : {detail} Corrigez la planification et réessayez. openbot.tool_describe donne le schéma.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
   "error.agent.accessLocalOnly": "L’accès à l’agent ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.duplicateCleanupFailed":

@@ -3,6 +3,8 @@
 //
 // The source has two agents with memories, routines, a chat with a file, a side thread made by a
 // branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
+// It also has two hidden agents with active routines: one stays as written, and the file of the other
+// is changed to the file of an app that stopped a hidden agent, so its routines arrive turned off.
 // The export includes workspace files, server settings and chat history. The import goes into the
 // second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
 // messages in order with the file's bytes, the side thread, and that the first turn of an imported
@@ -37,6 +39,7 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { HISTORY_IMPORTED_EVENT } = await import("../src/backend/agent-history-transfer");
 const { InstanceTransferService } = await import("../src/main/instance-transfer-service");
+const { INSTANCE_TRANSFER_MANIFEST } = await import("../src/main/instance-transfer-manifest");
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
@@ -298,6 +301,31 @@ try {
     schedule: { kind: "daily", time: "08:00" },
   });
   await runCauseEffect(source.agents.updateAgent({ agentId: editor.id, computerUse: false, allowAutomation: true }));
+  // Two hidden agents with an active routine each. The file of the first one is changed below to the
+  // file of an app that stopped a hidden agent.
+  const archivist = await create("Archivist");
+  const keeper = await create("Keeper");
+  for (const agent of [archivist, keeper]) {
+    source.agents.createRoutine({
+      agentId: agent.id,
+      name: "Night backup",
+      instruction: "Back up the notes.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "daily", time: "02:00" },
+    });
+    await runCauseEffect(source.agents.setAgentHidden({ agentId: agent.id, hidden: true }));
+  }
+  await runCauseEffect(
+    source.events.saveRoutine({
+      owner: { kind: "agent", id: archivist.id },
+      name: "Backup alarm",
+      instruction: "Check the backup.",
+      active: true,
+      timezone: "UTC",
+      trigger: { kind: "webhook", eventType: "backup.failed", filters: [] },
+    }),
+  );
   source.pins.add(writer.id);
   source.levels.set(writer.id, "needs-me");
   source.approvals.set(editor.id, false);
@@ -443,16 +471,32 @@ try {
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
     source.transfer.exportTo(file, {
-      agentIds: [writer.id, editor.id],
+      agentIds: [writer.id, editor.id, archivist.id, keeper.id],
       includeFiles: true,
       includeSettings: true,
       includeHistory: true,
     }),
   );
   report.exportWarnings = exported.warnings;
-  const { unzipSync } = await import("fflate");
+  const { unzipSync, zipSync } = await import("fflate");
   const archive = unzipSync(new Uint8Array(await readFile(file)));
   report.archiveEntries = Object.keys(archive).length;
+  const manifestBytes = archive[INSTANCE_TRANSFER_MANIFEST];
+  assert.ok(manifestBytes, "The file has no manifest.");
+  const manifest: { agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[] } =
+    JSON.parse(new TextDecoder().decode(manifestBytes));
+  const filePreferences = (name: string) => manifest.agents.find((agent) => agent.name === name)?.preferences;
+  pass(
+    "the file says that its hidden agents work",
+    ["Archivist", "Keeper"].every(
+      (name) => filePreferences(name)?.hidden === true && filePreferences(name)?.hiddenWorks === true,
+    ),
+    JSON.stringify([filePreferences("Archivist"), filePreferences("Keeper")]),
+  );
+  // An app that stopped a hidden agent wrote `hidden` only.
+  delete filePreferences("Archivist")?.hiddenWorks;
+  archive[INSTANCE_TRANSFER_MANIFEST] = new TextEncoder().encode(JSON.stringify(manifest));
+  await writeFile(file, zipSync(archive));
   pass(
     "Shared/Transfers is not copied as files",
     !Object.keys(archive).some((name) => name.toLowerCase().startsWith("shared/transfers/")),
@@ -460,7 +504,7 @@ try {
 
   // --- Import into the second profile.
   const preview = await runCauseEffect(target.transfer.stage(file));
-  pass("preview offers both agents", preview.agents.length === 2);
+  pass("preview offers each agent", preview.agents.length === 4);
   // The open views read a channel again on each change that the channel service publishes.
   const published: { channelId: string; revision: number }[] = [];
   target.agents.on("event", (event: AgentEvent) => {
@@ -474,7 +518,7 @@ try {
     }),
   );
   report.importWarnings = result.warnings;
-  pass("both agents are imported", result.agents.length === 2 && result.skipped.length === 0);
+  pass("each agent is imported", result.agents.length === 4 && result.skipped.length === 0);
   const byName = (name: string): AgentSummary => {
     const agent = target.agents.listAgents().find((candidate) => candidate.name === name);
     assert.ok(agent, `${name} is missing.`);
@@ -490,6 +534,29 @@ try {
   pass(
     "routines move",
     target.agents.listRoutines(newWriter.id).some((item) => item.name === routine.name && item.active),
+  );
+  const newArchivist = byName("Archivist");
+  const newKeeper = byName("Keeper");
+  const hiddenIds = target.agents.listHiddenAgents().agents.map((agent) => agent.agentId);
+  pass(
+    "hidden agents stay hidden",
+    hiddenIds.includes(newArchivist.id) && hiddenIds.includes(newKeeper.id) && !hiddenIds.includes(newWriter.id),
+    JSON.stringify(hiddenIds),
+  );
+  pass(
+    "the routine of a hidden agent that worked stays on",
+    target.agents.listRoutines(newKeeper.id).some((item) => item.name === "Night backup" && item.active),
+  );
+  const archivistRoutines = [
+    ...target.agents.listRoutines(newArchivist.id),
+    ...(await runCauseEffect(target.events.listRoutines({ owner: { kind: "agent", id: newArchivist.id } }))).filter(
+      (item) => item.trigger.kind === "webhook",
+    ),
+  ];
+  pass(
+    "the routines of a hidden agent that an older app stopped are added turned off",
+    archivistRoutines.length === 2 && archivistRoutines.every((item) => !item.active),
+    JSON.stringify(archivistRoutines.map((item) => ({ name: item.name, active: item.active }))),
   );
   const newHooked = (
     await runCauseEffect(target.events.listRoutines({ owner: { kind: "agent", id: newWriter.id } }))

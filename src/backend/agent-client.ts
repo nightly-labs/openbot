@@ -168,6 +168,15 @@ export class MissingPiSessionError extends Error {
   }
 }
 
+/**
+ * The line that the Go runtime of a CLI writes before it stops with SIGILL on a processor without a
+ * feature that the CLI was built for, such as "This binary was compiled with aes enabled, but this
+ * feature is not available on this processor" (#7111). A SIGILL without it can have another cause,
+ * such as a crash bug or the CPU list of a container (`docs/docker.md`), that a different provider
+ * does not fix.
+ */
+export const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
+
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;
 

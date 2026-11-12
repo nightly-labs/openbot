@@ -23,6 +23,28 @@
     grid-row: 2;
     pointer-events: auto;
   }
+
+  /* With folders, the path and the tools of the Library are in the top row, after the sidebar width.
+     The start of that row stays free for the server menu, so the page lets clicks through there. */
+  .app-frame-edge[data-window-page-kind="titled"]
+    > .window-page
+    > .library-panel
+    > .library-panel-content[data-folders] {
+    --library-head-height: var(--left-header-height);
+    --library-side-row: 2;
+
+    grid-row: 1 / -1;
+    pointer-events: none;
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"]
+    > .window-page
+    > .library-panel
+    > .library-panel-content[data-folders]
+    :is(.library-side, .library-frame, .library-path, .library-path-tools) {
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
+  }
 }
 
 /* The window card shows through the viewer, so the viewer keeps the card's border and rounded corners.

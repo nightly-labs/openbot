@@ -16,6 +16,8 @@ import {
   Hash,
   Info,
   LoaderCircle,
+  Pin,
+  PinOff,
   Trash2,
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
@@ -505,9 +507,46 @@ export function MessageBody(props: {
       };
     },
   );
-  const standaloneImageAttachments = createMemo(() => standaloneAttachments().filter(isLightboxImage));
-  const standaloneFileAttachments = createMemo(() =>
-    standaloneAttachments().filter((attachment) => !isLightboxImage(attachment)),
+  /* The web client reads an image from the host when the chat shows it. A lone image keeps its place
+     while the file arrives, so the chat does not grow when the image shows. An image that does not
+     load shows as a card. */
+  const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
+  const arrivingImage = (attachment: AttachmentSummary) => {
+    const source = props.mediaSource;
+    return (
+      source !== undefined &&
+      attachment.previewKind === "image" &&
+      !attachment.previewUrl &&
+      attachment.size <= source.thumbnailLimit &&
+      !unloadedImages().has(attachment.id)
+    );
+  };
+  const standaloneImageAttachments = createMemo(() => {
+    const attachments = standaloneAttachments();
+    const images = attachments.filter(isLightboxImage);
+    // A gallery lays out its tiles from the loaded images, so only a lone image waits in its place.
+    const arriving = attachments.filter(arrivingImage);
+    return images.length + arriving.length === 1 ? [...images, ...arriving] : images;
+  });
+  const standaloneFileAttachments = createMemo(() => {
+    const images = new Set(standaloneImageAttachments());
+    return standaloneAttachments().filter((attachment) => !images.has(attachment));
+  });
+  createEffect(
+    () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
+    (arriving) => {
+      const source = props.mediaSource;
+      const unloaded = (attachment: AttachmentSummary) =>
+        setUnloadedImages((current) => new Set(current).add(attachment.id));
+      for (const attachment of arriving) {
+        void source?.load(attachment).then(
+          (shown) => {
+            if (!shown) unloaded(attachment);
+          },
+          () => unloaded(attachment),
+        );
+      }
+    },
   );
   const contentBlocks = createMemo<MessageContentBlock[]>((previous) => {
     const folded = longMessage() && !expanded() && props.showFull !== true;
@@ -638,6 +677,7 @@ export function MessageBody(props: {
                 prompt={attachment().name}
                 aspectRatio="square"
                 attachment={attachment()}
+                loading={!attachment().previewUrl}
                 onPreview={openAttachment}
                 onDownload={props.onDownload}
               />
@@ -1111,6 +1151,8 @@ export interface MessageMenuItemsProps {
   branchDisabled?: boolean | undefined;
   /** Opens a channel with this message in its composer. Without it, or with no channel, the menu has no such item. */
   sendToChannel?: { channels: { id: string; name: string }[]; onSend: (channelId: string) => void } | undefined;
+  /** Pins this message to its chat, or unpins it. Without it, the menu has no such item. */
+  pin?: { pinned: boolean; onToggle: () => void } | undefined;
   /** Asks to delete this message. Without it, the menu has no such item. */
   onDelete?: (() => void) | undefined;
 }
@@ -1205,8 +1247,16 @@ export function MessageMenuItems(props: MessageMenuItemsProps) {
           </ContextMenu.Sub>
         )}
       </Show>
-      <Show when={props.onBranch || props.onMarkUnread}>
+      <Show when={props.onBranch || props.onMarkUnread || props.pin}>
         <ContextMenu.Separator />
+      </Show>
+      <Show when={props.pin}>
+        {(pin) => (
+          <ContextMenu.Item onSelect={() => pin().onToggle()}>
+            {pin().pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+            <span>{pin().pinned ? t("chat.menu.unpin") : t("chat.menu.pin")}</span>
+          </ContextMenu.Item>
+        )}
       </Show>
       <Show when={props.onBranch}>
         {(onBranch) => (

@@ -313,6 +313,7 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
+      history: (connectionId, placeId, limit) => this.#outboundHistory(connectionId, placeId, limit),
       post: (connectionId, target, markdown, files, embeds) =>
         this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
@@ -455,6 +456,16 @@ export class MessagingService {
     yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
   }).bind(this);
 
+  /** Turns the "Working on it…" post of one WhatsApp number on or off. A request that runs keeps its post. */
+  readonly setWhatsAppWorkingMessage = Effect.fn("MessagingService.setWhatsAppWorkingMessage")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    workingMessage: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setWorkingMessage(workspaceId, workingMessage).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
   /**
    * Unlinks the device from the WhatsApp account (when its socket is open), deletes its keys and stops
    * the connection. As for Telegram, the last number takes the WhatsApp Orchestrator with it. The
@@ -509,6 +520,11 @@ export class MessagingService {
     const updated = this.#threads.store.connection(connectionId);
     if (updated) yield* this.#startConnection(updated);
   }, Effect.uninterruptible);
+
+  /** True for a WhatsApp number whose owner turned off the "Waiting" and "Working on it…" posts. */
+  #withoutStatusPost(live: LiveConnection): boolean {
+    return live.record.platform === "whatsapp" && this.#whatsapp?.workingMessage(live.record.connectionId) === false;
+  }
 
   #requireWhatsApp(): WhatsAppConnect {
     if (!this.#whatsapp) throw new Error(sourceText("error.messaging.whatsappUnsupported"));
@@ -1504,13 +1520,6 @@ export class MessagingService {
       yield* adapter.post(message.target, { text: sourceText(noAgent) }).pipe(toMessagingOperationFailed);
       return;
     }
-    // A hidden agent receives no new messages. The sender learns why, and nothing is queued.
-    if (this.#agents.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined)) {
-      yield* adapter
-        .post(message.target, { text: sourceText("error.backend.recipientHidden") })
-        .pipe(toMessagingOperationFailed);
-      return;
-    }
     const staging = join(this.#downloadsRoot, randomUUID());
     yield* Effect.acquireUseRelease(
       Effect.succeed(staging),
@@ -1583,7 +1592,7 @@ export class MessagingService {
             yield* this.#serial(
               result.link.linkId,
               Effect.gen({ self: this }, function* () {
-                if (this.#posts.has(key) || !this.#targets.has(key)) return;
+                if (this.#posts.has(key) || !this.#targets.has(key) || this.#withoutStatusPost(live)) return;
                 const messageId = yield* adapter
                   .post(message.target, { text: sourceText("status.messaging.queued") })
                   .pipe(toMessagingOperationFailed);
@@ -1710,6 +1719,35 @@ export class MessagingService {
     );
   });
 
+  /**
+   * The newest messages of a place that an agent names, for a `messaging_history` call from any turn.
+   * Only a place that `places` lists is read: a connection's adapter can reach more than its own places.
+   */
+  readonly #outboundHistory = Effect.fn("MessagingService.outboundHistory")(function* (
+    this: MessagingService,
+    connectionId: string,
+    placeId: string,
+    limit: number,
+  ) {
+    const live = this.#live.get(connectionId);
+    if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
+    const platform = live.record.platform;
+    return yield* Effect.gen(function* () {
+      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      if (!place)
+        return {
+          error:
+            "This connection has no place with that id. Call openbot.messaging_list_places with the connection for the ids.",
+        };
+      const messages = yield* live.adapter.recent(placeId, null, limit);
+      return { history: { platform, place: place.name, messages } };
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.succeed({ error: `${refusal(failure)} When the platform limits reads, try again in a minute.` }),
+      ),
+    );
+  });
+
   /** A post that an agent sends on its own initiative, for the agent's `messaging_post` tool. */
   readonly #outboundPost = Effect.fn("MessagingService.outboundPost")(function* (
     this: MessagingService,
@@ -1755,15 +1793,23 @@ export class MessagingService {
         }),
       ),
     );
-    if (!("posted" in posted) || !files.length) return posted;
+    if (!("posted" in posted)) return posted;
     // The text is in the place already, so a failed upload names the files and does not fail the post.
-    const skippedFiles = yield* live.adapter.upload(target, files).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          this.#warn(failure.cause);
-          return files.map((file) => file.name);
-        }),
-      ),
+    const skippedFiles = files.length
+      ? yield* live.adapter.upload(target, files).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#warn(failure.cause);
+              return files.map((file) => file.name);
+            }),
+          ),
+        )
+      : [];
+    const sentFiles = files.map((file) => file.name).filter((name) => !skippedFiles.includes(name));
+    live.adapter.rememberPost?.(
+      target,
+      posted.messageId,
+      sentFiles.length ? `${text}\nFiles: ${sentFiles.join(", ")}` : text,
     );
     return skippedFiles.length ? { ...posted, skippedFiles } : posted;
   });
@@ -1883,6 +1929,15 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
+      // The owner turned the post off for this WhatsApp number: the reaction shows that OpenBot read
+      // the message, the answer is the only post, and a reply of "stop" still stops the request.
+      if (!post?.messageId && this.#withoutStatusPost(live)) {
+        // The request is recorded without a post, so a request that a restart ends still gets its end.
+        this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
+        this.#status.restored.delete(key);
+        yield* this.#status.save();
+        return;
+      }
       const stopToken = token();
       this.#stops.set(stopToken, {
         linkId: activity.link.linkId,

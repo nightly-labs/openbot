@@ -113,6 +113,9 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * only it serves, never its email, its credentials or its folder. A provider that is on but lists no model until the user signs in,
  * updates or repairs it is in `unavailableProviders`, with the text of its settings row and where
  * that row is: without it, the agent could not tell the user why the provider is missing (#6053).
+ * A provider that the request names is there in each state in which it has no model, also when it is
+ * off or not downloaded: a CLI of the user's own on `PATH` does not make it available, and the agent
+ * got an empty list with no reason (#7647). A list of all providers leaves those rows out.
  */
 export function listModelsPayload(
   models: AgentModelOption[],
@@ -123,7 +126,14 @@ export function listModelsPayload(
 ): {
   preferredProvider: AgentProvider;
   providers: ProviderModels[];
-  unavailableProviders?: { provider: AgentProvider; state: AgentProviderState; message?: string; fixIn: string }[];
+  unavailableProviders?: {
+    provider: AgentProvider;
+    state: AgentProviderState;
+    /** True when the user turned the provider off in its settings row. */
+    off?: true;
+    message?: string;
+    fixIn: string;
+  }[];
 } {
   const words = request.query?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let resultRoom = QUERY_RESULT_LIMIT;
@@ -170,11 +180,17 @@ export function listModelsPayload(
     },
   );
   const unavailableProviders = statuses.flatMap((row) =>
-    !row.off &&
-    NEEDS_USER_STATES.has(row.state) &&
-    (request.provider === undefined || row.id === request.provider) &&
+    (request.provider === undefined ? !row.off && NEEDS_USER_STATES.has(row.state) : row.id === request.provider) &&
     !providers.some((listed) => listed.provider === row.id)
-      ? [{ provider: row.id, state: row.state, ...(row.message ? { message: row.message } : {}), fixIn: FIX_IN }]
+      ? [
+          {
+            provider: row.id,
+            state: row.state,
+            ...(row.off ? { off: true as const } : {}),
+            ...(row.message ? { message: row.message } : {}),
+            fixIn: FIX_IN,
+          },
+        ]
       : [],
   );
   return { preferredProvider, providers, ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}) };

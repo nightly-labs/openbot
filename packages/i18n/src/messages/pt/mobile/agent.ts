@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Isso remove o agente deste servidor.",
   "mobile.agent.menu.markRead": "Marcar como lido",
   "mobile.agent.menu.markUnread": "Marcar como não lido",
+  "mobile.agent.menu.mute": "Silenciar",
+  "mobile.agent.menu.unmute": "Reativar notificações",
   "mobile.agent.menu.hide": "Ocultar",
   "mobile.agent.menu.info": "Informações",
   "mobile.agent.menu.more": "Mais",
@@ -584,6 +586,8 @@ export const messages = {
   "mobile.agent.hidden.body": "Os chats ocultos continuam funcionando. Eles apenas não aparecem na tela inicial.",
   "mobile.agent.hidden.bodySynced":
     "Um chat oculto mantém o histórico. O agente dele não executa rotinas nem recebe novas mensagens. Todos os dispositivos deste servidor o ocultam.",
+  "mobile.agent.hidden.bodySyncedWorking":
+    "Um chat oculto continua funcionando. Todos os dispositivos deste servidor o ocultam.",
   "mobile.agent.hidden.showNamed": "Mostrar {name}",
   "mobile.agent.hidden.show": "Mostrar",
   "mobile.agent.hidden.showFailed": "Não foi possível mostrar o agente",

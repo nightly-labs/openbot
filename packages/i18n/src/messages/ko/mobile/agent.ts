@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "이 서버에서 에이전트가 제거돼요.",
   "mobile.agent.menu.markRead": "읽음으로 표시",
   "mobile.agent.menu.markUnread": "읽지 않음으로 표시",
+  "mobile.agent.menu.mute": "음소거",
+  "mobile.agent.menu.unmute": "음소거 해제",
   "mobile.agent.menu.hide": "숨기기",
   "mobile.agent.menu.info": "정보",
   "mobile.agent.menu.more": "더 보기",
@@ -563,6 +565,7 @@ export const messages = {
   "mobile.agent.hidden.body": "숨긴 채팅도 계속 작동해요. 홈 화면에만 표시되지 않을 뿐이에요.",
   "mobile.agent.hidden.bodySynced":
     "숨긴 채팅은 기록이 유지돼요. 해당 에이전트는 루틴을 실행하지 않고 새 메시지도 받지 않아요. 이 서버의 모든 기기에서 숨겨져요.",
+  "mobile.agent.hidden.bodySyncedWorking": "숨긴 채팅도 계속 작동해요. 이 서버의 모든 기기에서 숨겨져요.",
   "mobile.agent.hidden.showNamed": "{name} 표시",
   "mobile.agent.hidden.show": "표시",
   "mobile.agent.hidden.showFailed": "에이전트를 표시할 수 없어요",

@@ -46,7 +46,8 @@ const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
   // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
   if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
-  let hidden = node.hidden || node.inert || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
+  // The attributes, not the properties: a form control named "hidden" or "inert" replaces the form's property (#7187).
+  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || Element.prototype.hasAttribute.call(node, 'inert') || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0';

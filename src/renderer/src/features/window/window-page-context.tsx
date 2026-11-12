@@ -19,9 +19,9 @@ export type WindowPage =
   | "server-settings";
 
 /**
- * How a page sits in the window. The tasks page shows in the middle pane, as the agents do. The agent
- * list beside it is hidden until the user shows it. A settings page starts below the top row. The title of a schedule, workflows, usage,
- * Library or Marketplace page goes in the top row after the server menu.
+ * How a page sits in the window. The tasks page shows in the middle pane, as the agents do, with the
+ * agent list beside it. A settings page starts below the top row. The title of a schedule, workflows
+ * or usage page goes in the top row after the buttons of the frame.
  */
 export type WindowPageKind = "agents" | "settings" | "titled";
 
@@ -62,12 +62,6 @@ const context = createSimpleContext({
       if (settings.appSettingsOpen()) return "settings";
       if (settings.skillsMarketplaceOpen()) return "marketplace";
       return usage.state.serverId ? usage.state.view : "agents";
-    });
-
-    /** Whether the agent list shows beside the Tasks page. Each time the page opens, the list is hidden. */
-    const [tasksAgentsOpen, setTasksAgentsOpen] = createSignal(false);
-    createEffect(page, (next) => {
-      if (next !== "tasks") setTasksAgentsOpen(false);
     });
 
     // Opening the user settings closes the server settings, the Marketplace and the host pane.
@@ -138,8 +132,6 @@ const context = createSimpleContext({
       page,
       /** Whether a page other than the agents covers the conversation. A message there is not seen. */
       conversationCovered: () => page() !== "agents",
-      tasksAgentsOpen: () => page() === "tasks" && tasksAgentsOpen(),
-      setTasksAgentsOpen: (open: boolean) => setTasksAgentsOpen(open),
       setSettingsMounts,
       settingsPlacement,
       serverSettingsQuery,

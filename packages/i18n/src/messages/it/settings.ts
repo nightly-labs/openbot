@@ -97,6 +97,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Il link si è aperto nel browser predefinito.",
   "settings.sendShortcut.title": "Scorciatoia di invio",
   "settings.sendShortcut.description": "Scegli i tasti che inviano un messaggio su questo dispositivo e browser.",
+  "settings.chatOrder.description":
+    "Scegli dove la barra laterale mostra le chat non lette su questo dispositivo. Manuale disattiva il gruppo Non lette.",
   "settings.sendShortcut.enter": "Invio per inviare",
   "settings.sendShortcut.modEnterMac": "⌘Invio per inviare",
   "settings.sendShortcut.modEnterWin": "Ctrl+Invio per inviare",
@@ -261,6 +263,9 @@ export const messages = {
   "settings.agentDock.edge.description": "Trascina il dock in alto o in basso per spostarlo lungo il bordo.",
   "settings.agentDock.edge.right": "Destra",
   "settings.agentDock.edge.left": "Sinistra",
+  "settings.agentDock.size.title": "Dimensione del dock",
+  "settings.agentDock.size.description":
+    "Trascina per cambiare la dimensione del dock sopra le altre app. Nella finestra principale, il dock segue la dimensione dell'interfaccia.",
   "settings.agentDock.autoHide.title": "Nascondi quando non in uso",
   "settings.agentDock.autoHide.description": "Il dock scivola nel bordo. Porta il puntatore sul bordo per mostrarlo.",
   "settings.agentDock.edgeStrip.title": "Mostra una striscia sul bordo",
@@ -518,6 +523,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} è pronto. Riavvia per applicarlo.",
   "settings.updates.status.installing": "Riavvio per applicare {target}…",
   "settings.updates.status.upToDate": "OpenBot è aggiornato nel canale Stabile.",
+  "settings.updates.status.staged": "{target} è in distribuzione graduale. Cerca aggiornamenti per ottenerlo ora.",
   "settings.updates.status.checkFailed": "OpenBot non è riuscito a cercare aggiornamenti. Riprova.",
   "settings.updates.status.unsupported": "Gli aggiornamenti non sono disponibili in questa versione.",
   "settings.updates.actionFailed": "Impossibile aggiornare OpenBot.",

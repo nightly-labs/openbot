@@ -77,6 +77,7 @@ export const messages = {
   "composer.placeholder.answer": "回答を入力",
   "composer.add.label": "プロンプトに追加",
   "composer.add.files": "ファイルを添付",
+  "composer.add.teach": "タスクを教える",
   "composer.add.skill": "スキルを使う",
   "composer.upload.cancel": "アップロードをキャンセル",
   "composer.upload.uploading": "{name} をアップロード中",

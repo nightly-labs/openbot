@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Нужен ваш ответ",
   "prompt.question.label": "Вопросы агента",
   "prompt.question.cancelled": "Вопросы отменены",
   "prompt.question.expired": "Время вопросов истекло",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Далее",
   "prompt.question.cancel": "Отменить вопросы",
   "prompt.question.privatePlaceholder": "Введите личный ответ",
-  "prompt.customPlaceholder": "Введите свой ответ",
   "prompt.question.customAnswerFor": "Свой ответ на вопрос: {question}",
   "prompt.question.skip": "Пропустить",
   "prompt.question.chooseAll": "Выберите все подходящие варианты.",
   "prompt.question.somethingElse": "Другое",
   "prompt.question.emptyTitle": "Нет ожидающих вопросов.",
   "prompt.question.emptyBody": "Агент продолжит работу, когда ему понадобится ещё одно решение.",
-  "prompt.choice.hint": "Выберите подходящий вариант или введите свой.",
-  "prompt.choice.customLabel": "Свой ответ",
   "prompt.approval.answerFailed": "Не удалось ответить на это подтверждение. Повторите попытку.",
   "prompt.approval.grantFailed": "Не удалось сохранить постоянное подтверждение. Повторите попытку.",
   "prompt.approval.label": "Подтверждение агента",

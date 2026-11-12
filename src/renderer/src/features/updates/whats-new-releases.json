@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Channel settings have a Browser setting. Choose if every member, one member or no member can use the browser in the channel.",
+          "The channel side panel has a Browser pane and a Files pane. They show the tabs of the channel's members and the files sent in the channel.",
+          "Right-click the Dynamic Island or the agent dock to hide it. You can also drag an agent to a new place on the dock and change the dock size in Settings.",
+          "You can turn off the Unread group in the sidebar. Right-click the Unread heading, or set Sort chats to Manual.",
+          "When a new version cannot start 3 times in a row, a recovery window opens. You can try again, download the previous version or export diagnostics."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new version now goes to about 1 in 10 computers first, and to all computers about one day later. To get it at once, select Check for updates.",
+          "Agents ask questions with options in the question prompt. Cards with buttons are only for approvals."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A chat that you read no longer stays in the Unread group. Unread side threads, such as the thread of a routine, no longer keep an agent there.",
+          "On Windows, the agent dock and the Dynamic Island no longer make the pointer slow in all apps while many agents work.",
+          "A team no longer stops when the lead ends its turn with no answer after its teammates report back.",
+          "A Claude chat that got too long now starts a new session with the chat history. Before, each message failed with \"Prompt is too long\".",
+          "When a Claude account reaches its 5-hour limit, the agent moves to its backup model or waits for the reset.",
+          "An agent can save a browser screenshot as a file and attach it to its reply."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

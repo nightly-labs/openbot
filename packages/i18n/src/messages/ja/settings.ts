@@ -95,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "リンクは既定のブラウザーで開きました。",
   "settings.sendShortcut.title": "送信キー",
   "settings.sendShortcut.description": "このデバイスとこのブラウザーでメッセージを送信するキーを選びます。",
+  "settings.chatOrder.description":
+    "このデバイスのサイドバーで未読チャットを表示する場所を選びます。手動にすると未読グループはオフになります。",
   "settings.sendShortcut.enter": "Enter で送信",
   "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",
@@ -256,6 +258,9 @@ export const messages = {
   "settings.agentDock.edge.description": "ドックを上下にドラッグすると、端に沿って移動できます。",
   "settings.agentDock.edge.right": "右",
   "settings.agentDock.edge.left": "左",
+  "settings.agentDock.size.title": "ドックのサイズ",
+  "settings.agentDock.size.description":
+    "ドラッグして、他のアプリの上に表示するドックのサイズを変更します。メインウィンドウでは、ドックはインターフェイスのサイズに従います。",
   "settings.agentDock.autoHide.title": "使用していないときは隠す",
   "settings.agentDock.autoHide.description": "ドックが端に隠れます。ポインタを端に移動すると表示されます。",
   "settings.agentDock.edgeStrip.title": "端に細い帯を表示",
@@ -511,6 +516,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} の準備ができました。再起動して適用してください。",
   "settings.updates.status.installing": "{target} を適用するため再起動しています…",
   "settings.updates.status.upToDate": "OpenBot は Stable チャンネルで最新です。",
+  "settings.updates.status.staged":
+    "{target} は一部のコンピューターから順に配信中です。アップデートを確認すると今すぐ入手できます。",
   "settings.updates.status.checkFailed": "OpenBot はアップデートを確認できませんでした。もう一度お試しください。",
   "settings.updates.status.unsupported": "このビルドではアップデートを利用できません。",
   "settings.updates.actionFailed": "OpenBot をアップデートできませんでした。",

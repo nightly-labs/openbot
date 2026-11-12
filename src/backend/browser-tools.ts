@@ -49,7 +49,8 @@ const nth = z
   .exactOptional();
 
 const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+  // The advertised schema merges the target kinds and keeps only `kind` as required, so name this rule.
+  z.object({ kind: z.literal("ref"), ref: identifier, revision: revision.describe("Required for kind=ref.") }),
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
@@ -546,8 +547,8 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "screenshot",
     description:
-      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
-    shape: { tabId, ref: identifier.optional() },
+      "Capture the visible page as an image; with a ref, only that element, which costs less context. save: true also writes a PNG to your workspace and returns its path.",
+    shape: { tabId, ref: identifier.optional(), save: z.boolean().optional() },
   }),
   browserTool({
     name: "run_script",
@@ -572,7 +573,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "close_tab",
-    description: "Close a browser tab and clean up its CDP leases and recorder.",
+    description: "Close a browser tab.",
     shape: { tabId },
   }),
 ] as const;

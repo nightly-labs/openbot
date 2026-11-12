@@ -58,6 +58,8 @@ export const messages = {
   "mobile.agent.menu.deleteBody": "Bu işlem ajanı bu sunucudan kaldırır.",
   "mobile.agent.menu.markRead": "Okundu olarak işaretle",
   "mobile.agent.menu.markUnread": "Okunmadı olarak işaretle",
+  "mobile.agent.menu.mute": "Sessize al",
+  "mobile.agent.menu.unmute": "Sesi aç",
   "mobile.agent.menu.hide": "Gizle",
   "mobile.agent.menu.info": "Bilgi",
   "mobile.agent.menu.more": "Daha fazla",
@@ -588,6 +590,7 @@ export const messages = {
   "mobile.agent.hidden.body": "Gizli sohbetler çalışmaya devam eder. Yalnızca ana ekranda gösterilmezler.",
   "mobile.agent.hidden.bodySynced":
     "Gizli bir sohbet geçmişini korur. Ajanı rutin çalıştırmaz ve yeni mesaj almaz. Bu sunucudaki her cihaz onu gizler.",
+  "mobile.agent.hidden.bodySyncedWorking": "Gizli bir sohbet çalışmaya devam eder. Bu sunucudaki her cihaz onu gizler.",
   "mobile.agent.hidden.showNamed": "{name} sohbetini göster",
   "mobile.agent.hidden.show": "Göster",
   "mobile.agent.hidden.showFailed": "Ajan gösterilemedi",
