@@ -6,8 +6,8 @@
 // limit must reach the request as the model's budget (#4234). A model with saved efforts must list
 // exactly those efforts and send the effort of the turn; a model with none must not reason (#4154).
 // A model saved with image input must send an attached image to the endpoint; a text-only model
-// must not (#5332). A model with saved efforts must get the instructions in the `system` role, which
-// each OpenAI-compatible endpoint accepts, and not in `developer` (#7434).
+// must not (#5332). Each model, also one with saved efforts, must get the instructions in the `system`
+// role and never send a `developer` message, which many OpenAI-compatible servers refuse (#7434).
 // `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -54,8 +54,8 @@ interface Request {
   reasoningEffort: string | null;
   /** The `image_url` content parts of the request's messages. */
   images: number;
-  /** The role of the first message, which holds the instructions. */
-  instructionRole: string | null;
+  /** The role of each message, in order. */
+  roles: (string | null)[];
 }
 
 interface Report {
@@ -85,7 +85,7 @@ function header(request: IncomingMessage, name: string): string | null {
 /** The model that a chat completion request names, and the output budget that it asks for. */
 async function requestedModel(
   request: IncomingMessage,
-): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images" | "instructionRole">> {
+): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images" | "roles">> {
   const chunks: Buffer[] = [];
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
@@ -101,7 +101,7 @@ async function requestedModel(
     budget,
     reasoningEffort: getString(value, "reasoning_effort"),
     images,
-    instructionRole: getString(messages[0], "role"),
+    roles: messages.map((message) => getString(message, "role")),
   };
 }
 
@@ -264,7 +264,7 @@ try {
     assert.equal(effortTurn.error, null, `The turn at ${effort} failed: ${effortTurn.error}`);
     const last = report.requests.filter((request) => request.model === EFFORT_MODEL).at(-1);
     assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
-    assert.equal(last?.instructionRole, "system", "Pi must send the instructions of a custom model as system.");
+    assert.equal(last?.roles[0], "system", "Pi must send the instructions of a custom model as system.");
   }
 
   // #5332: an attached image reaches a model saved with image input, and not a text-only model.
@@ -310,6 +310,10 @@ try {
   for (const message of messages) {
     assert.ok(!message.includes("sk-e2e"), `A message holds the key: ${message}`);
     assert.ok(!message.includes(HEADER_VALUE), `A message holds the header value: ${message}`);
+  }
+
+  for (const request of report.requests) {
+    assert.ok(!request.roles.includes("developer"), `Pi sent a developer message to ${request.model}.`);
   }
 
   await stopClients(clients);
