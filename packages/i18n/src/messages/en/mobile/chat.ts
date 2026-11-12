@@ -122,6 +122,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.attachment.copyImageFailed": "Could not copy image",
   "mobile.chat.attachment.copyTextFailed": "Could not copy text",
   "mobile.chat.attachment.saveFilesFailed": "Could not save files",
+  "mobile.chat.attachment.shareFilesFailed": "Could not share files",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "Sharing many files needs the latest version of the app.",
   "mobile.chat.attachment.preview": "Preview {name}",
   "mobile.chat.attachment.displayFailed": "Could not display this image.",
   "mobile.chat.attachment.loadingImage": "Loading image",

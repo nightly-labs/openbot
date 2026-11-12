@@ -124,6 +124,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "Não foi possível copiar a imagem",
   "mobile.chat.attachment.copyTextFailed": "Não foi possível copiar o texto",
   "mobile.chat.attachment.saveFilesFailed": "Não foi possível salvar os arquivos",
+  "mobile.chat.attachment.shareFilesFailed": "Não foi possível compartilhar os arquivos",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "Compartilhar muitos arquivos requer a versão mais recente do app.",
   "mobile.chat.attachment.preview": "Visualizar {name}",
   "mobile.chat.attachment.displayFailed": "Não foi possível mostrar esta imagem.",
   "mobile.chat.attachment.loadingImage": "Carregando imagem",

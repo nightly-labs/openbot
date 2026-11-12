@@ -142,6 +142,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "تعذّر نسخ الصورة",
   "mobile.chat.attachment.copyTextFailed": "تعذّر نسخ النص",
   "mobile.chat.attachment.saveFilesFailed": "تعذّر حفظ الملفات",
+  "mobile.chat.attachment.shareFilesFailed": "تعذّرت مشاركة الملفات",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "تتطلب مشاركة ملفات كثيرة أحدث إصدار من التطبيق.",
   "mobile.chat.attachment.preview": "معاينة {name}",
   "mobile.chat.attachment.displayFailed": "تعذّر عرض هذه الصورة.",
   "mobile.chat.attachment.loadingImage": "جارٍ تحميل الصورة",

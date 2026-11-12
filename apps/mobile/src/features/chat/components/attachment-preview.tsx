@@ -161,6 +161,7 @@ function safeFileName(name: string) {
 /** The text of a downloaded text file. */
 async function fileText(data: RemoteFileUpload & { fileUri?: string }) {
   if (!data.base64 && data.fileUri) return new File(data.fileUri).text();
+  if (!data.base64) throw new Error(currentText().t("mobile.chat.attachment.unavailable"));
   const file = new File(Paths.cache, `${Date.now()}-copy.txt`);
   try {
     await file.write(data.base64, { encoding: "base64" });
@@ -183,9 +184,19 @@ async function writeToFolder(
   let candidate = name;
   // iOS does not replace a file that is there. Android gives a new name to a file that is there.
   for (let copy = 2; fileExists(folder, candidate); copy += 1) candidate = `${stem} ${copy}${extension}`;
+  const kept = data.base64 ? undefined : data.fileUri;
+  if (!data.base64 && !kept && attachment.size > 0)
+    throw new Error(currentText().t("mobile.chat.attachment.unavailable"));
+  if (kept) {
+    // A kept file copies natively, so a large file is not read into memory. A folder that cannot take
+    // a copy, such as an Android content URI, gets the bytes below.
+    try {
+      await new File(kept).copy(new File(folder, candidate));
+      return;
+    } catch {}
+  }
   const file = folder.createFile(candidate, data.mimeType);
-  const base64 = data.base64 || (data.fileUri ? await new File(data.fileUri).base64() : "");
-  await file.write(base64, { encoding: "base64" });
+  await file.write(kept ? await new File(kept).base64() : data.base64, { encoding: "base64" });
 }
 
 /** Whether a folder has a file with this name. A content URI folder on Android cannot say, and gives a new name itself. */
@@ -296,7 +307,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       const result = query.data ? { data: query.data, error: null } : await query.refetch();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
-      const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
+      const name = safeFileName(attachment.name);
       file = new File(Paths.cache, `${Date.now()}-${name}`);
       await writeFileData(file, result.data);
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
@@ -510,22 +521,33 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     const only = attachments.length === 1 ? attachments[0] : undefined;
     if (only) return shareFile(only);
     setBusy(true);
+    // A gallery has images only; a message can have other files, and its text says files.
+    const images = attachments.every(showsAsImage);
     try {
-      if (!shareFilesNative) throw new Error(t("mobile.chat.imageGallery.shareNeedsUpdate"));
+      if (!shareFilesNative)
+        throw new Error(
+          images ? t("mobile.chat.imageGallery.shareNeedsUpdate") : t("mobile.chat.attachment.shareFilesNeedsUpdate"),
+        );
       const uris: string[] = [];
       const types = new Set<string>();
       for (const attachment of attachments) {
         const data = await load(attachment);
         // The chat media folder holds the file with a safe name, and the next launch clears it.
         const uri = data.fileUri ?? keepFile(serverId, attachment, data);
-        if (!uri) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
+        if (!uri)
+          throw new Error(
+            images ? t("mobile.chat.attachment.imageUnavailable") : t("mobile.chat.attachment.unavailable"),
+          );
         types.add(data.mimeType);
         uris.push(uri);
       }
-      const images = [...types].every((type) => type.startsWith("image/"));
-      await shareFilesNative.shareAsync(uris, types.size === 1 ? ([...types][0] ?? "*/*") : images ? "image/*" : "*/*");
+      const imageTypes = [...types].every((type) => type.startsWith("image/"));
+      await shareFilesNative.shareAsync(
+        uris,
+        types.size === 1 ? ([...types][0] ?? "*/*") : imageTypes ? "image/*" : "*/*",
+      );
     } catch (error) {
-      fail(error, t("mobile.chat.imageGallery.shareFailed"));
+      fail(error, images ? t("mobile.chat.imageGallery.shareFailed") : t("mobile.chat.attachment.shareFilesFailed"));
     } finally {
       setBusy(false);
     }

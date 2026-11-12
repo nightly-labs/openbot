@@ -124,6 +124,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "Görsel kopyalanamadı",
   "mobile.chat.attachment.copyTextFailed": "Metin kopyalanamadı",
   "mobile.chat.attachment.saveFilesFailed": "Dosyalar kaydedilemedi",
+  "mobile.chat.attachment.shareFilesFailed": "Dosyalar paylaşılamadı",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "Birçok dosyayı paylaşmak için uygulamanın en son sürümü gerekir.",
   "mobile.chat.attachment.preview": "{name} önizlemesi",
   "mobile.chat.attachment.displayFailed": "Bu görsel görüntülenemedi.",
   "mobile.chat.attachment.loadingImage": "Görsel yükleniyor",

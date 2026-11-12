@@ -123,6 +123,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "이미지를 복사할 수 없습니다",
   "mobile.chat.attachment.copyTextFailed": "텍스트를 복사할 수 없습니다",
   "mobile.chat.attachment.saveFilesFailed": "파일을 저장할 수 없습니다",
+  "mobile.chat.attachment.shareFilesFailed": "파일을 공유할 수 없습니다",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "여러 파일을 공유하려면 최신 버전의 앱이 필요합니다.",
   "mobile.chat.attachment.preview": "{name} 미리보기",
   "mobile.chat.attachment.displayFailed": "이 이미지를 표시할 수 없어요.",
   "mobile.chat.attachment.loadingImage": "이미지를 불러오는 중",

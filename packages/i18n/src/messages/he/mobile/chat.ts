@@ -124,6 +124,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "לא ניתן להעתיק את התמונה",
   "mobile.chat.attachment.copyTextFailed": "לא ניתן להעתיק את הטקסט",
   "mobile.chat.attachment.saveFilesFailed": "לא ניתן לשמור את הקבצים",
+  "mobile.chat.attachment.shareFilesFailed": "לא ניתן לשתף את הקבצים",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "שיתוף קבצים רבים דורש את הגרסה העדכנית של האפליקציה.",
   "mobile.chat.attachment.preview": "תצוגה מקדימה של {name}",
   "mobile.chat.attachment.displayFailed": "לא ניתן להציג את התמונה הזו.",
   "mobile.chat.attachment.loadingImage": "טוען תמונה",

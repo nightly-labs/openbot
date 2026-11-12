@@ -124,6 +124,9 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "画像をコピーできませんでした",
   "mobile.chat.attachment.copyTextFailed": "テキストをコピーできませんでした",
   "mobile.chat.attachment.saveFilesFailed": "ファイルを保存できませんでした",
+  "mobile.chat.attachment.shareFilesFailed": "ファイルを共有できませんでした",
+  "mobile.chat.attachment.shareFilesNeedsUpdate":
+    "複数のファイルを共有するには、アプリを最新バージョンにしてください。",
   "mobile.chat.attachment.preview": "{name} のプレビュー",
   "mobile.chat.attachment.displayFailed": "この画像を表示できませんでした。",
   "mobile.chat.attachment.loadingImage": "画像を読み込み中",

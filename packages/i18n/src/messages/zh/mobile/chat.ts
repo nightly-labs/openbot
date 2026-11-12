@@ -120,6 +120,8 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "无法复制图片",
   "mobile.chat.attachment.copyTextFailed": "无法复制文本",
   "mobile.chat.attachment.saveFilesFailed": "无法保存文件",
+  "mobile.chat.attachment.shareFilesFailed": "无法分享文件",
+  "mobile.chat.attachment.shareFilesNeedsUpdate": "分享多个文件需要最新版本的应用。",
   "mobile.chat.attachment.preview": "预览 {name}",
   "mobile.chat.attachment.displayFailed": "无法显示该图片。",
   "mobile.chat.attachment.loadingImage": "正在加载图片",

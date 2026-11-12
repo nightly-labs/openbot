@@ -117,6 +117,9 @@ export const messages = {
   "mobile.chat.attachment.copyImageFailed": "Kan afbeelding niet kopiëren",
   "mobile.chat.attachment.copyTextFailed": "Kan tekst niet kopiëren",
   "mobile.chat.attachment.saveFilesFailed": "Kan bestanden niet bewaren",
+  "mobile.chat.attachment.shareFilesFailed": "Kan bestanden niet delen",
+  "mobile.chat.attachment.shareFilesNeedsUpdate":
+    "Voor het delen van veel bestanden is de nieuwste versie van de app nodig.",
   "mobile.chat.attachment.preview": "Bekijk {name}",
   "mobile.chat.attachment.displayFailed": "Kan deze afbeelding niet tonen.",
   "mobile.chat.attachment.loadingImage": "Afbeelding laden",
