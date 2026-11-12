@@ -581,12 +581,16 @@ export function acpMcpServerName(config: McpServerConfig, own: readonly string[]
  * macOS and Linux: `/bin/sh` changes to the directory and then `exec`s the server, so the server
  * replaces the shell, gets the provider's signals and pipes, and no extra process stays. The
  * directory, the command and each argument travel as their own arguments, so nothing is quoted.
+ * `CDPATH` is cleared and the output of `cd` is discarded: with `CDPATH` set, `cd` can change to
+ * another directory of the same name and write its path to stdout, which is the MCP channel.
  *
  * Windows has no `exec`, and `cmd.exe` cannot be used here: the provider quotes each argument for
  * the C runtime, which `cmd.exe` does not read. The managed Bun starts the server instead, with
  * its stdin, stdout and stderr, and it ends with the server's exit code. A `.cmd` wrapper such as
- * `npx.cmd` starts through `cliSpawnTarget`, as a provider CLI does. `--no-env-file`, because Bun
- * would otherwise add the variables of a `.env` file in the agent's workspace to the server.
+ * `npx.cmd` starts through `cliSpawnTarget`, as a provider CLI does. Bun starts in the working
+ * directory (`--cwd`), and the server inherits it. Thus Bun does not read the `bunfig.toml` of the
+ * agent's workspace, whose `preload` would otherwise run first and could write to stdout.
+ * `--no-env-file`, because Bun would otherwise add the variables of a `.env` file to the server.
  */
 export function workingDirectoryLaunch(
   server: ResolvedMcpServer,
@@ -596,21 +600,28 @@ export function workingDirectoryLaunch(
   if (platform !== "win32") {
     return {
       command: "/bin/sh",
-      args: ["-c", 'cd -- "$1" && shift && exec "$@"', "sh", server.workingDirectory, server.command, ...server.args],
+      args: [
+        "-c",
+        'CDPATH= cd -- "$1" >/dev/null && shift && exec "$@"',
+        "sh",
+        server.workingDirectory,
+        server.command,
+        ...server.args,
+      ],
     };
   }
   if (!bun) return null;
   const target = cliSpawnTarget(server.command, server.args, platform);
   return {
     command: bun,
-    args: ["--no-env-file", "-e", WINDOWS_LAUNCHER, "--", JSON.stringify({ ...target, cwd: server.workingDirectory })],
+    args: ["--no-env-file", `--cwd=${server.workingDirectory}`, "-e", WINDOWS_LAUNCHER, "--", JSON.stringify(target)],
   };
 }
 
 /** The Bun script of `workingDirectoryLaunch` on Windows. Its one argument is the spawn target as JSON. */
 const WINDOWS_LAUNCHER = [
   "const t = JSON.parse(process.argv[1]);",
-  'const child = require("node:child_process").spawn(t.command, t.args, { cwd: t.cwd, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: t.windowsVerbatimArguments });',
+  'const child = require("node:child_process").spawn(t.command, t.args, { stdio: "inherit", windowsHide: true, windowsVerbatimArguments: t.windowsVerbatimArguments });',
   'child.on("error", (error) => { console.error(error.message); process.exit(1); });',
   'child.on("exit", (code) => process.exit(code ?? 1));',
 ].join(" ");

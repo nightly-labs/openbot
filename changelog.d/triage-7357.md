@@ -4,4 +4,4 @@
   that has a working directory, and start it in that folder. Before, these agents did not get the
   server, although its test listed the tools. On Windows, the server starts after OpenBot has
   downloaded the runtime that it uses for MCP servers. The server settings no longer show the
-  "Claude and Codex only" note.
+  "Claude and Codex only" note. A joined server must also be on this version.
