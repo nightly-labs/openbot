@@ -385,6 +385,8 @@ interface ResubmitCase {
   evaluateBlocked: boolean;
   page: string;
   fieldAfter: "empty" | "filled" | null;
+  screenshotBlocked: boolean;
+  secretInAnyAddress: boolean;
 }
 
 /**
@@ -402,6 +404,8 @@ function confirmLoginFixture(path: string): Response {
         <button type="button" id="yes" onclick="document.querySelector('#form').submit()">Yes</button></div>
     </form>
     <label>Show password<input id="show" type="checkbox" onchange="document.querySelector('#password').type = this.checked ? 'text' : 'password'"></label>
+    <button type="button" id="copy" onclick="const copy = document.createElement('input'); copy.value = document.querySelector('#password').value; document.body.append(copy)">Copy</button>
+    <button type="button" id="yes-popup" onclick="const form = document.querySelector('#form'); form.target = '_blank'; form.submit()">Yes in a new window</button>
     </body>`,
     { headers: { "Content-Type": "text/html" } },
   );
@@ -429,7 +433,9 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
   for (const [path, action] of [
     ["/confirm", "yes"],
     ["/confirm", "show"],
+    ["/confirm", "copy"],
     ["/confirm-get", "yes"],
+    ["/confirm-get", "yes-popup"],
   ] as const) {
     const tab = await runCauseEffect(
       browser.open(`https://authentication.openbot.test${path}`, "secret-thread", "secret-agent"),
@@ -475,6 +481,7 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
           });
         });
       const after = await runCauseEffect(browser.snapshot(tab.id));
+      const screenshot = await call("screenshot", { tabId: tab.id });
       const fieldAfter =
         new URL(contents.getURL()).pathname === "/confirmed"
           ? null
@@ -491,16 +498,22 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
             ? "blank-password"
             : new URL(after.url).pathname,
         fieldAfter: fieldAfter === null ? null : fieldAfter === "" ? "empty" : "filled",
+        screenshotBlocked: !screenshot.success,
+        secretInAnyAddress: webContents.getAllWebContents().some((item) => item.getURL().includes("381904")),
       };
       cases.push(result);
       const expected =
         action === "show"
           ? result.fieldAfter === "empty"
-          : path === "/confirm"
-            ? result.page === "signed-in"
-            : result.page === "/confirm-get" && !after.url.includes("381904");
+          : action === "copy"
+            ? result.page === "/confirm"
+            : path === "/confirm"
+              ? result.page === "signed-in"
+              : result.page === "/confirm-get";
       if (
         !expected ||
+        result.screenshotBlocked !== (action === "copy") ||
+        result.secretInAnyAddress ||
         result.submission !== "submitted" ||
         !result.keptInField ||
         result.secretInSnapshots ||

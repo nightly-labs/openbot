@@ -925,6 +925,8 @@ export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
   #securityCodes = new Map<string, RegExp>();
   #passwords = new Map<string, RegExp>();
+  /** Counts the replaced documents, so that a password checked in one document is not added to the next. */
+  #documents = 0;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
@@ -958,6 +960,16 @@ export class CardValueScrub {
   endDocument(): void {
     this.#securityCodes = new Map();
     this.#passwords = new Map();
+    this.#documents += 1;
+  }
+
+  get documents(): number {
+    return this.#documents;
+  }
+
+  /** The passwords that stay in fields of the current document. */
+  get documentSecrets(): string[] {
+    return [...this.#passwords.keys()];
   }
 
   get active(): boolean {

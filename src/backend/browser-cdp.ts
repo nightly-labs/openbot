@@ -582,6 +582,7 @@ export class BrowserCdpEngine {
     const keep = (secret: string) =>
       this.#leaseEffect((send) =>
         Effect.gen({ self: this }, function* () {
+          const checkedDocument = this.#cardScrub.documents;
           const executionContextId = yield* automationContextId(send);
           const objectIds: string[] = [];
           const kept = yield* Effect.gen(function* () {
@@ -608,8 +609,10 @@ export class BrowserCdpEngine {
               }),
             ),
           );
-          if (kept) this.#cardScrub.addDocumentSecret(secret);
-          return kept;
+          // A new document that commits during the check does not hold the field.
+          if (!kept || checkedDocument !== this.#cardScrub.documents) return false;
+          this.#cardScrub.addDocumentSecret(secret);
+          return true;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
     return { enter, clear, keep, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
@@ -1991,6 +1994,28 @@ export class BrowserCdpEngine {
     this.#lastSnapshot = null;
   }
 
+  /**
+   * Whether a password that stays in a field of this document shows anywhere outside a password
+   * field, as when a "show password" control copies it to a text field. An image of the page would
+   * then show it. Snapshots hide it, as they do the card values.
+   */
+  readonly keptPasswordShown = Effect.fn("BrowserCdp.keptPasswordShown")(function* (this: BrowserCdpEngine) {
+    const passwords = this.#cardScrub.documentSecrets;
+    if (passwords.length === 0) return false;
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen(function* () {
+        const executionContextId = yield* automationContextId(send);
+        const result = yield* send("Runtime.callFunctionOn", {
+          executionContextId,
+          functionDeclaration: KEPT_PASSWORD_SHOWN_FUNCTION,
+          arguments: [{ value: passwords }],
+          returnByValue: true,
+        });
+        return Boolean(recordValue(result.exceptionDetails)) || recordValue(result.result)?.value !== false;
+      }),
+    ).pipe(Effect.catch(() => Effect.succeed(true)));
+  });
+
   /** `value` without the card values that `fillCard` typed in this tab, for a title or a URL. */
   scrubText(value: string): string {
     return this.#cardScrub.text(value);
@@ -2699,7 +2724,7 @@ export class BrowserCdpEngine {
     timeoutMs = WAIT_TIMEOUT_MS,
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#namesCardValue(condition.text, condition.url))
-      return yield* browserFailure(new Error("A wait cannot name a filled card value."));
+      return yield* browserFailure(new Error("A wait cannot name a hidden card value or password."));
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
@@ -2932,7 +2957,7 @@ export class BrowserCdpEngine {
         target.kind === "css" ? target.selector : undefined,
       )
     )
-      return yield* browserFailure(new Error("A target cannot name a filled card value."));
+      return yield* browserFailure(new Error("A target cannot name a hidden card value or password."));
     if (target.kind === "point") {
       const metrics = yield* send("Page.getLayoutMetrics");
       const viewport = recordValue(metrics.cssLayoutViewport);
@@ -3827,6 +3852,30 @@ const SECRET_SCAN_FUNCTION = `function(secret, ...skipped) {
       if ('value' in node && found(String(node.value))) return true;
       for (const attribute of node.attributes) if (found(attribute.value)) return true;
       if (node.shadowRoot && walk(node.shadowRoot)) return true;
+    }
+    return false;
+  };
+  return walk(document);
+}`;
+
+/**
+ * Runs in the automation world. Returns true when a text, an attribute, or the value of a field that
+ * is not a password field holds one of the passwords, so that an image of the page can show it.
+ */
+const KEPT_PASSWORD_SHOWN_FUNCTION = `function(passwords) {
+  const found = (value) => typeof value === 'string' && passwords.some((password) => value.includes(password));
+  const walk = (root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (found(node.data)) return true;
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if (node.shadowRoot && walk(node.shadowRoot)) return true;
+      if (node.localName === 'input' && node.type === 'password') continue;
+      if ('value' in node && found(String(node.value))) return true;
+      for (const attribute of node.attributes) if (found(attribute.value)) return true;
     }
     return false;
   };
