@@ -15,7 +15,7 @@ import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
 import { promptMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
-import type { MailboxStore } from "../mailbox-store";
+import { type MailboxStore, QUEUE_EDIT_HOLD_MS } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
@@ -148,9 +148,12 @@ export class QueueControls {
     }
     if (this.#hooks.channelAssignment(input.deliveryId))
       return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.useChannelTaskControls")) });
-    if (input.action === "begin")
+    if (input.action === "begin") {
       yield* queueStep(() => this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId));
-    else {
+      // An edit that nobody saves or cancels stops holding the queue at this time, also when no other
+      // change wakes the agent then.
+      setTimeout(() => this.#drain.scheduleDrain(agentId), QUEUE_EDIT_HOLD_MS + 1_000).unref();
+    } else {
       if (input.action === "retain-attachments")
         yield* queueStep(() =>
           this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds),
