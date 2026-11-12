@@ -713,16 +713,17 @@ export const messages = {
   "settings.transfer.part.settings": "Configurações do servidor",
   "settings.transfer.part.chats": "Histórico de chats",
   "settings.transfer.part.chatsDescription":
-    "Os chats e threads laterais, com os arquivos das mensagens. Os agentes continuam esses chats com o contexto deles.",
+    "Os chats e threads laterais com seus arquivos, e o histórico de execuções das rotinas. Os agentes continuam esses chats com o contexto deles.",
   "settings.transfer.part.channels": "Mensagens dos canais",
-  "settings.transfer.part.channelsDescription": "As mensagens dos canais em que os agentes exportados estão.",
+  "settings.transfer.part.channelsDescription":
+    "As mensagens dos canais em que os agentes exportados estão, com seus arquivos e o histórico de execuções das rotinas dos canais.",
   "settings.transfer.part.files": "Arquivos do espaço de trabalho",
   "settings.transfer.part.filesDescription": "Arquivos que seus agentes criaram e a pasta Shared.",
   "settings.transfer.part.preferences": "Preferências do servidor",
   "settings.transfer.part.preferencesDescription":
-    "Fuso horário, personalidade, padrões dos agentes, configurações de memória e habilidades, e seu nível de notificações.",
+    "Nome, logotipo, fuso horário, personalidade, padrões dos agentes, modelos escolhidos, configurações de memória e habilidades, e os níveis de notificações e itens fixados de cada pessoa.",
   "settings.transfer.export.settingsDescription":
-    "Servidores MCP, provedores de modelo personalizados, seções da barra lateral e fluxos de rotinas.",
+    "Servidores MCP, provedores de modelo personalizados, seções da barra lateral, fluxos de rotinas e habilidades compartilhadas.",
   "settings.transfer.export.chooseAgents": "Escolher agentes ({selected} de {total})",
   "settings.transfer.export.hideAgents": "Ocultar agentes",
   "settings.transfer.export.agentsLabel": "Agentes para exportar",
@@ -750,7 +751,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "Nome já usado",
   "settings.transfer.import.settings": "Importar configurações do servidor",
   "settings.transfer.import.settingsAndPreferences":
-    "Adiciona os servidores MCP, provedores de modelo personalizados e seções da barra lateral que este servidor não tem. As preferências do servidor no arquivo substituem as daqui.",
+    "Adiciona os servidores MCP, provedores de modelo personalizados, seções da barra lateral e habilidades compartilhadas que este servidor não tem. O nome, o logotipo e as preferências do servidor no arquivo substituem os daqui.",
   "settings.transfer.import.submit": { one: "Importar {count} agente", other: "Importar {count} agentes" },
   "settings.transfer.import.submitSettings": "Importar configurações",
   "settings.transfer.import.importing": "Importando…",

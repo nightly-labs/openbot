@@ -69,6 +69,11 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: il modello «{model}» non è ancora disponibile qui, quindi l'agente usa il modello predefinito. Scegli di nuovo il modello quando il suo provider è pronto.",
   "error.import.transferSettingSkipped": "Importazione di {name} saltata. {reason}",
+  "error.import.transferRunsSkipped":
+    "{name}: la cronologia delle esecuzioni della routine «{routine}» non viene importata.",
+  "error.import.transferSharedSkillsSkipped": "Impossibile leggere le skill condivise, quindi non sono nel file.",
+  "error.import.transferSharedSkillExists":
+    "Su questo server è già presente una skill condivisa con questo nome e file diversi.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} preferenza del server nel file non è valida qui, quindi non viene importata.",
     other: "{count} preferenze del server nel file non sono valide qui, quindi non vengono importate.",

@@ -70,6 +70,9 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: النموذج «{model}» غير متاح هنا بعد، لذا يستخدم الوكيل النموذج الافتراضي. اختر النموذج مرة أخرى عندما يصبح مزوّده جاهزًا.",
   "error.import.transferSettingSkipped": "لا يُستورد {name}. {reason}",
+  "error.import.transferRunsSkipped": "{name}: لا يُستورد سجل تشغيل المهمة الدورية «{routine}».",
+  "error.import.transferSharedSkillsSkipped": "تعذّرت قراءة المهارات المشتركة، لذا فهي ليست في الملف.",
+  "error.import.transferSharedSkillExists": "توجد على هذا الخادم مهارة مشتركة بهذا الاسم وبملفات أخرى.",
   "error.import.transferServerPreferencesSkipped": {
     zero: "{count} تفضيل للخادم في الملف غير صالح هنا، لذا لا تُستورد.",
     one: "تفضيل واحد للخادم في الملف غير صالح هنا، لذا لا يُستورد.",

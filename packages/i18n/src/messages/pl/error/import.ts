@@ -68,6 +68,10 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: model „{model}” nie jest tu jeszcze dostępny, więc agent używa modelu domyślnego. Wybierz model ponownie, gdy jego dostawca będzie gotowy.",
   "error.import.transferSettingSkipped": "Nie zaimportowano: {name}. {reason}",
+  "error.import.transferRunsSkipped": "{name}: nie zaimportowano historii uruchomień rutyny „{routine}”.",
+  "error.import.transferSharedSkillsSkipped": "Nie udało się odczytać wspólnych umiejętności, więc nie ma ich w pliku.",
+  "error.import.transferSharedSkillExists":
+    "Na tym serwerze jest już wspólna umiejętność o tej nazwie i innych plikach.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} preferencja serwera z pliku jest tu nieprawidłowa, więc nie zostanie zaimportowana.",
     few: "{count} preferencje serwera z pliku są tu nieprawidłowe, więc nie zostaną zaimportowane.",

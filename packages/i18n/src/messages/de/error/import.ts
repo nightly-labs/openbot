@@ -70,6 +70,11 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: Das Modell „{model}“ ist hier noch nicht verfügbar, daher verwendet der Agent das Standardmodell. Wähle das Modell erneut, sobald sein Anbieter bereit ist.",
   "error.import.transferSettingSkipped": "{name} wird nicht importiert. {reason}",
+  "error.import.transferRunsSkipped": "{name}: Der Ausführungsverlauf der Routine „{routine}“ wird nicht importiert.",
+  "error.import.transferSharedSkillsSkipped":
+    "Die gemeinsamen Fähigkeiten konnten nicht gelesen werden und sind daher nicht in der Datei.",
+  "error.import.transferSharedSkillExists":
+    "Auf diesem Server gibt es bereits eine gemeinsame Fähigkeit mit diesem Namen und anderen Dateien.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} Serverpräferenz in der Datei ist hier nicht gültig und wird daher nicht importiert.",
     other: "{count} Serverpräferenzen in der Datei sind hier nicht gültig und werden daher nicht importiert.",

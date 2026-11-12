@@ -706,17 +706,17 @@ export const messages = {
   "settings.transfer.part.settings": "サーバー設定",
   "settings.transfer.part.chats": "チャット履歴",
   "settings.transfer.part.chatsDescription":
-    "チャットとサイドスレッド、およびそのメッセージのファイルです。エージェントはコンテキストを保ったままこれらのチャットを続けます。",
+    "チャットとサイドスレッド、そのファイル、およびルーティンの実行履歴です。エージェントはコンテキストを保ったままこれらのチャットを続けます。",
   "settings.transfer.part.channels": "チャンネルのメッセージ",
   "settings.transfer.part.channelsDescription":
-    "エクスポートするエージェントが参加しているチャンネルのメッセージです。",
+    "エクスポートするエージェントが参加しているチャンネルのメッセージと、そのファイル、チャンネルのルーティンの実行履歴です。",
   "settings.transfer.part.files": "ワークスペースのファイル",
   "settings.transfer.part.filesDescription": "エージェントが作成したファイルと共有フォルダーです。",
   "settings.transfer.part.preferences": "サーバーの環境設定",
   "settings.transfer.part.preferencesDescription":
-    "タイムゾーン、パーソナリティ、エージェントのデフォルト、メモリーとスキルの設定、通知レベルです。",
+    "名前、ロゴ、タイムゾーン、パーソナリティ、エージェントのデフォルト、モデルの選択、メモリーとスキルの設定、各メンバーの通知レベルとピン留めです。",
   "settings.transfer.export.settingsDescription":
-    "MCP サーバー、カスタムプロバイダー、サイドバーのセクション、ルーティンフローです。",
+    "MCP サーバー、カスタムプロバイダー、サイドバーのセクション、ルーティンフロー、共有スキルです。",
   "settings.transfer.export.chooseAgents": "エージェントを選択 ({selected} / {total})",
   "settings.transfer.export.hideAgents": "エージェントを非表示",
   "settings.transfer.export.agentsLabel": "エクスポートするエージェント",
@@ -745,7 +745,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "名前が重複",
   "settings.transfer.import.settings": "サーバー設定をインポート",
   "settings.transfer.import.settingsAndPreferences":
-    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクションを追加します。ファイル内のサーバーの環境設定は、ここの設定を置き換えます。",
+    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクション、共有スキルを追加します。ファイル内のサーバー名、ロゴ、環境設定は、ここの設定を置き換えます。",
   "settings.transfer.import.submit": { other: "エージェント {count} 件をインポート" },
   "settings.transfer.import.submitSettings": "サーバー設定をインポート",
   "settings.transfer.import.importing": "インポート中…",

@@ -274,12 +274,6 @@ function ExportScreen(props: InstanceTransferViewProps) {
               </SlidingTabs.List>
             </SlidingTabs.Root>
           </div>
-          <div class="instance-transfer-meter-track" aria-hidden="true">
-            <span
-              class="instance-transfer-meter-fill"
-              style={{ transform: `scaleX(${allFileBytes() > 0 ? fileBytes() / allFileBytes() : 0})` }}
-            />
-          </div>
         </div>
         <ItemGroup class="settings-modal-card">
           <SwitchField

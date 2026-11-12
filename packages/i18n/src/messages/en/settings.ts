@@ -779,16 +779,17 @@ export const messages = defineMessages("settings", {
   "settings.transfer.part.settings": "Server settings",
   "settings.transfer.part.chats": "Chat history",
   "settings.transfer.part.chatsDescription":
-    "The chats and side threads, with the files of their messages. The agents continue these chats with their context.",
+    "The chats and side threads with their files, and the run history of the routines. The agents continue these chats with their context.",
   "settings.transfer.part.channels": "Channel messages",
-  "settings.transfer.part.channelsDescription": "The messages of the channels that the exported agents are in.",
+  "settings.transfer.part.channelsDescription":
+    "The messages of the channels that the exported agents are in, with their files and the run history of the channel routines.",
   "settings.transfer.part.files": "Workspace files",
   "settings.transfer.part.filesDescription": "Files your agents made, and the Shared folder.",
   "settings.transfer.part.preferences": "Server preferences",
   "settings.transfer.part.preferencesDescription":
-    "Time zone, personality, agent defaults, memory and skill settings, and your notification level.",
+    "Name, logo, time zone, personality, agent defaults, model choices, memory and skill settings, and the notification levels and pins of each person.",
   "settings.transfer.export.settingsDescription":
-    "MCP servers, custom model providers, sidebar sections, and routine flows.",
+    "MCP servers, custom model providers, sidebar sections, routine flows, and shared skills.",
   "settings.transfer.export.historyDescription":
     "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
@@ -818,7 +819,7 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
   "settings.transfer.import.settingsAndPreferences":
-    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have. Server preferences in the file replace the ones here.",
+    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have. The server name, logo, and preferences in the file replace the ones here.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",

@@ -1536,6 +1536,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     listAgents: () => workspace.runtime.listAgents(),
     saveFile,
     fullCopy: () => instanceTransferFullCopy(),
+    sendsParts: () => workspace.state.capabilities.includes(INSTANCE_TRANSFER_CHUNKS_CAPABILITY),
   });
   // The export in parts with each part chosen: chat history, channel messages, server preferences.
   const instanceTransferFullCopy = () =>

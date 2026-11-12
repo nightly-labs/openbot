@@ -181,34 +181,6 @@
   transition: opacity 150ms var(--openbot-ease-out);
 }
 
-.instance-transfer-meter-track {
-  position: relative;
-  height: 8px;
-  overflow: hidden;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control);
-}
-
-/* One fill, scaled to the share of the workspace files that goes into the file. */
-.instance-transfer-meter-fill {
-  position: absolute;
-  inset: 0;
-  background: var(--openbot-accent);
-  transform-origin: left center;
-  /* Longer than a control change: the bar travels up to its full width. */
-  transition: transform 280ms var(--openbot-ease-out);
-}
-
-.instance-transfer-meter-fill:dir(rtl) {
-  transform-origin: right center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .instance-transfer-meter-fill {
-    transition: none;
-  }
-}
-
 .instance-transfer-not-moved {
   display: flex;
   align-items: flex-start;

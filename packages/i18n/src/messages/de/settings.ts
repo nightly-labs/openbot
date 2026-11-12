@@ -729,16 +729,17 @@ export const messages = {
   "settings.transfer.part.settings": "Servereinstellungen",
   "settings.transfer.part.chats": "Chatverlauf",
   "settings.transfer.part.chatsDescription":
-    "Die Chats und Nebenthreads mit den Dateien ihrer Nachrichten. Die Agenten führen diese Chats mit ihrem Kontext fort.",
+    "Die Chats und Nebenthreads mit ihren Dateien sowie der Ausführungsverlauf der Routinen. Die Agenten führen diese Chats mit ihrem Kontext fort.",
   "settings.transfer.part.channels": "Kanalnachrichten",
-  "settings.transfer.part.channelsDescription": "Die Nachrichten der Kanäle, in denen die exportierten Agenten sind.",
+  "settings.transfer.part.channelsDescription":
+    "Die Nachrichten der Kanäle, in denen die exportierten Agenten sind, mit ihren Dateien und dem Ausführungsverlauf der Kanalroutinen.",
   "settings.transfer.part.files": "Dateien der Arbeitsbereiche",
   "settings.transfer.part.filesDescription": "Dateien, die deine Agenten erstellt haben, und der gemeinsame Ordner.",
   "settings.transfer.part.preferences": "Serverpräferenzen",
   "settings.transfer.part.preferencesDescription":
-    "Zeitzone, Persönlichkeit, Standardwerte für Agenten, Einstellungen für Erinnerungen und Fähigkeiten sowie deine Benachrichtigungsstufe.",
+    "Name, Logo, Zeitzone, Persönlichkeit, Standardwerte für Agenten, Modellauswahl, Einstellungen für Erinnerungen und Fähigkeiten sowie die Benachrichtigungsstufen und angehefteten Elemente jeder Person.",
   "settings.transfer.export.settingsDescription":
-    "MCP-Server, eigene Modellanbieter, Abschnitte der Seitenleiste und Routinenabläufe.",
+    "MCP-Server, eigene Modellanbieter, Abschnitte der Seitenleiste, Routinenabläufe und gemeinsame Fähigkeiten.",
   "settings.transfer.export.chooseAgents": "Agenten wählen ({selected} von {total})",
   "settings.transfer.export.hideAgents": "Agenten ausblenden",
   "settings.transfer.export.agentsLabel": "Zu exportierende Agenten",
@@ -766,7 +767,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "Name schon vergeben",
   "settings.transfer.import.settings": "Servereinstellungen importieren",
   "settings.transfer.import.settingsAndPreferences":
-    "Fügt die MCP-Server, eigenen Modellanbieter und Abschnitte der Seitenleiste hinzu, die dieser Server noch nicht hat. Serverpräferenzen aus der Datei ersetzen die hier vorhandenen.",
+    "Fügt die MCP-Server, eigenen Modellanbieter, Abschnitte der Seitenleiste und gemeinsamen Fähigkeiten hinzu, die dieser Server noch nicht hat. Servername, Logo und Serverpräferenzen aus der Datei ersetzen die hier vorhandenen.",
   "settings.transfer.import.submit": {
     one: "{count} Agenten importieren",
     other: "{count} Agenten importieren",

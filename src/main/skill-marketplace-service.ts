@@ -222,6 +222,14 @@ export class SkillMarketplaceService {
     });
   }
 
+  /** The ids of the skills in the agent's lock file, without reading the catalog. */
+  lockedSkillIds(agentId: string): Effect.Effect<string[], SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string[], SkillMarketplaceFailure> {
+      const agent = yield* skillSync(() => this.requireAgent(agentId));
+      return Object.keys((yield* readLock(agent.workspacePath)).skills);
+    });
+  }
+
   /** The revision of a skill in the agent's lock file, or null when the agent does not have it. */
   installedRevision(agentId: string, skillId: string): Effect.Effect<number | null, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number | null, SkillMarketplaceFailure> {

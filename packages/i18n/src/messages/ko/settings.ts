@@ -695,15 +695,17 @@ export const messages = {
   "settings.transfer.part.settings": "서버 설정",
   "settings.transfer.part.chats": "채팅 기록",
   "settings.transfer.part.chatsDescription":
-    "채팅과 사이드 스레드, 그리고 메시지의 파일이에요. 에이전트가 맥락을 유지한 채 이 채팅을 이어가요.",
+    "채팅과 사이드 스레드, 그 파일, 그리고 루틴의 실행 기록이에요. 에이전트가 맥락을 유지한 채 이 채팅을 이어가요.",
   "settings.transfer.part.channels": "채널 메시지",
-  "settings.transfer.part.channelsDescription": "내보내는 에이전트가 속한 채널의 메시지예요.",
+  "settings.transfer.part.channelsDescription":
+    "내보내는 에이전트가 속한 채널의 메시지와 그 파일, 채널 루틴의 실행 기록이에요.",
   "settings.transfer.part.files": "워크스페이스 파일",
   "settings.transfer.part.filesDescription": "에이전트가 만든 파일과 공유 폴더예요.",
   "settings.transfer.part.preferences": "서버 환경설정",
   "settings.transfer.part.preferencesDescription":
-    "시간대, 성격, 에이전트 기본값, 메모리 및 스킬 설정, 알림 수준이에요.",
-  "settings.transfer.export.settingsDescription": "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름이에요.",
+    "이름, 로고, 시간대, 성격, 에이전트 기본값, 모델 선택, 메모리 및 스킬 설정, 각 사용자의 알림 수준과 고정 항목이에요.",
+  "settings.transfer.export.settingsDescription":
+    "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름, 공유 스킬이에요.",
   "settings.transfer.export.chooseAgents": "에이전트 선택({total}개 중 {selected}개)",
   "settings.transfer.export.hideAgents": "에이전트 숨기기",
   "settings.transfer.export.agentsLabel": "내보낼 에이전트",
@@ -731,7 +733,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "이미 사용 중인 이름",
   "settings.transfer.import.settings": "서버 설정 가져오기",
   "settings.transfer.import.settingsAndPreferences":
-    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션을 추가해요. 파일에 있는 서버 환경설정이 여기 설정을 대체해요.",
+    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 공유 스킬을 추가해요. 파일에 있는 서버 이름, 로고, 환경설정이 여기 설정을 대체해요.",
   "settings.transfer.import.submit": { other: "에이전트 {count}개 가져오기" },
   "settings.transfer.import.submitSettings": "서버 설정 가져오기",
   "settings.transfer.import.importing": "가져오는 중…",

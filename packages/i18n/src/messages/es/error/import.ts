@@ -68,6 +68,11 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: el modelo «{model}» aún no está disponible aquí, así que el agente usa el modelo predeterminado. Vuelve a elegir el modelo cuando su proveedor esté listo.",
   "error.import.transferSettingSkipped": "{name} no se importa. {reason}",
+  "error.import.transferRunsSkipped": "{name}: no se importa el historial de ejecuciones de la rutina «{routine}».",
+  "error.import.transferSharedSkillsSkipped":
+    "No se pudieron leer las habilidades compartidas, así que no están en el archivo.",
+  "error.import.transferSharedSkillExists":
+    "Ya hay en este servidor una habilidad compartida con este nombre y otros archivos.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} preferencia del servidor del archivo no es válida aquí, así que no se importa.",
     other: "{count} preferencias del servidor del archivo no son válidas aquí, así que no se importan.",

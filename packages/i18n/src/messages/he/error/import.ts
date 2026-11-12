@@ -69,6 +69,9 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: המודל "{model}" עדיין אינו זמין כאן, ולכן הסוכן משתמש במודל ברירת המחדל. יש לבחור את המודל שוב כשהספק שלו יהיה מוכן.',
   "error.import.transferSettingSkipped": "{name} לא מיובא. {reason}",
+  "error.import.transferRunsSkipped": '{name}: היסטוריית הריצות של השגרה "{routine}" לא מיובאת.',
+  "error.import.transferSharedSkillsSkipped": "לא ניתן לקרוא את המיומנויות המשותפות, ולכן הן לא בקובץ.",
+  "error.import.transferSharedSkillExists": "מיומנות משותפת בשם הזה ועם קבצים אחרים כבר קיימת בשרת הזה.",
   "error.import.transferServerPreferencesSkipped": {
     one: "העדפת שרת אחת בקובץ אינה תקפה כאן, ולכן היא לא מיובאת.",
     two: "שתי העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",

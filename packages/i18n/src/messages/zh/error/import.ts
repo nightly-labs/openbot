@@ -69,6 +69,9 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}：模型“{model}”在此处暂不可用，助手将使用默认模型。待其服务商就绪后请重新选择该模型。",
   "error.import.transferSettingSkipped": "{name} 未导入。{reason}",
+  "error.import.transferRunsSkipped": "{name}：自动化任务“{routine}”的运行历史未导入。",
+  "error.import.transferSharedSkillsSkipped": "无法读取共享技能，因此文件中不包含它们。",
+  "error.import.transferSharedSkillExists": "该服务器上已有同名但文件不同的共享技能。",
   "error.import.transferServerPreferencesSkipped": {
     one: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
     other: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",

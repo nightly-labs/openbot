@@ -80,6 +80,11 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: het model “{model}” is hier nog niet beschikbaar, dus de agent gebruikt het standaardmodel. Kies het model opnieuw als de aanbieder klaar is.",
   "error.import.transferSettingSkipped": "{name} is niet geïmporteerd. {reason}",
+  "error.import.transferRunsSkipped": "{name}: de rungeschiedenis van routine “{routine}” is niet geïmporteerd.",
+  "error.import.transferSharedSkillsSkipped":
+    "De gedeelde vaardigheden konden niet worden gelezen, dus ze staan niet in het bestand.",
+  "error.import.transferSharedSkillExists":
+    "Er staat al een gedeelde vaardigheid met deze naam en andere bestanden op deze server.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} servervoorkeur in het bestand is hier niet geldig en wordt daarom niet geïmporteerd.",
     other: "{count} servervoorkeuren in het bestand zijn hier niet geldig en worden daarom niet geïmporteerd.",

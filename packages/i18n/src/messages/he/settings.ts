@@ -720,15 +720,17 @@ export const messages = {
   "settings.transfer.part.settings": "הגדרות שרת",
   "settings.transfer.part.chats": "היסטוריית צ'אטים",
   "settings.transfer.part.chatsDescription":
-    "הצ'אטים והשרשורים הצדדיים, עם הקבצים של ההודעות שלהם. הסוכנים ממשיכים את הצ'אטים האלה עם ההקשר שלהם.",
+    "הצ'אטים והשרשורים הצדדיים עם הקבצים שלהם, והיסטוריית הריצות של השגרות. הסוכנים ממשיכים את הצ'אטים האלה עם ההקשר שלהם.",
   "settings.transfer.part.channels": "הודעות ערוצים",
-  "settings.transfer.part.channelsDescription": "ההודעות של הערוצים שהסוכנים המיוצאים חברים בהם.",
+  "settings.transfer.part.channelsDescription":
+    "ההודעות של הערוצים שהסוכנים המיוצאים חברים בהם, עם הקבצים שלהן והיסטוריית הריצות של שגרות הערוצים.",
   "settings.transfer.part.files": "קבצי סביבת עבודה",
   "settings.transfer.part.filesDescription": "קבצים שהסוכנים יצרו, ותיקיית Shared.",
   "settings.transfer.part.preferences": "העדפות שרת",
   "settings.transfer.part.preferencesDescription":
-    "אזור זמן, אישיות, ברירות מחדל לסוכנים, הגדרות זיכרון ומיומנויות, ורמת ההתראות שלך.",
-  "settings.transfer.export.settingsDescription": "שרתי MCP, ספקי מודלים מותאמים אישית, מדורים בסרגל הצד וזרימות שגרה.",
+    "שם, לוגו, אזור זמן, אישיות, ברירות מחדל לסוכנים, בחירות מודלים, הגדרות זיכרון ומיומנויות, ורמות ההתראות והפריטים המוצמדים של כל אדם.",
+  "settings.transfer.export.settingsDescription":
+    "שרתי MCP, ספקי מודלים מותאמים אישית, מדורים בסרגל הצד, זרימות שגרה ומיומנויות משותפות.",
   "settings.transfer.export.chooseAgents": "בחירת סוכנים ({selected} מתוך {total})",
   "settings.transfer.export.hideAgents": "הסתרת סוכנים",
   "settings.transfer.export.agentsLabel": "סוכנים לייצוא",
@@ -755,7 +757,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "השם כבר בשימוש",
   "settings.transfer.import.settings": "ייבוא הגדרות שרת",
   "settings.transfer.import.settingsAndPreferences":
-    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית והמדורים בסרגל הצד שאין בשרת הזה. העדפות השרת מהקובץ מחליפות את ההעדפות כאן.",
+    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית, המדורים בסרגל הצד והמיומנויות המשותפות שאין בשרת הזה. שם השרת, הלוגו וההעדפות מהקובץ מחליפים את אלה שכאן.",
   "settings.transfer.import.submit": { one: "ייבוא סוכן אחד", two: "ייבוא שני סוכנים", other: "ייבוא {count} סוכנים" },
   "settings.transfer.import.submitSettings": "ייבוא הגדרות שרת",
   "settings.transfer.import.importing": "מייבא…",

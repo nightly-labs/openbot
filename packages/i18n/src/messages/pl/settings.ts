@@ -740,16 +740,17 @@ export const messages = {
   "settings.transfer.part.settings": "Ustawienia serwera",
   "settings.transfer.part.chats": "Historia czatów",
   "settings.transfer.part.chatsDescription":
-    "Czaty i wątki boczne wraz z plikami ich wiadomości. Agenci kontynuują te czaty z ich kontekstem.",
+    "Czaty i wątki boczne wraz z ich plikami oraz historia uruchomień rutyn. Agenci kontynuują te czaty z ich kontekstem.",
   "settings.transfer.part.channels": "Wiadomości kanałów",
-  "settings.transfer.part.channelsDescription": "Wiadomości z kanałów, w których są eksportowani agenci.",
+  "settings.transfer.part.channelsDescription":
+    "Wiadomości z kanałów, w których są eksportowani agenci, wraz z ich plikami i historią uruchomień rutyn kanałów.",
   "settings.transfer.part.files": "Pliki obszaru roboczego",
   "settings.transfer.part.filesDescription": "Pliki utworzone przez twoich agentów i folder współdzielony.",
   "settings.transfer.part.preferences": "Preferencje serwera",
   "settings.transfer.part.preferencesDescription":
-    "Strefa czasowa, osobowość, domyślne ustawienia agentów, ustawienia wspomnień i umiejętności oraz twój poziom powiadomień.",
+    "Nazwa, logo, strefa czasowa, osobowość, domyślne ustawienia agentów, wybór modeli, ustawienia wspomnień i umiejętności oraz poziomy powiadomień i przypięte elementy każdej osoby.",
   "settings.transfer.export.settingsDescription":
-    "Serwery MCP, własni dostawcy modeli, sekcje paska bocznego i przepływy rutyn.",
+    "Serwery MCP, własni dostawcy modeli, sekcje paska bocznego, przepływy rutyn i wspólne umiejętności.",
   "settings.transfer.export.chooseAgents": "Wybierz agentów ({selected} z {total})",
   "settings.transfer.export.hideAgents": "Ukryj agentów",
   "settings.transfer.export.agentsLabel": "Agenci do eksportu",
@@ -777,7 +778,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "Nazwa zajęta",
   "settings.transfer.import.settings": "Importuj ustawienia serwera",
   "settings.transfer.import.settingsAndPreferences":
-    "Dodaje serwery MCP, własnych dostawców modeli i sekcje paska bocznego, których ten serwer nie ma. Preferencje serwera z pliku zastępują te tutaj.",
+    "Dodaje serwery MCP, własnych dostawców modeli, sekcje paska bocznego i wspólne umiejętności, których ten serwer nie ma. Nazwa serwera, logo i preferencje z pliku zastępują te tutaj.",
   "settings.transfer.import.submit": {
     one: "Importuj {count} agenta",
     few: "Importuj {count} agentów",

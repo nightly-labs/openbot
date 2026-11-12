@@ -10,16 +10,19 @@ import {
   type AgentDefaults,
   type AgentMemoryLimitPreference,
   type BusyMessageModePreference,
+  decodeMachineAlertSettings,
   type HostPersonality,
+  isClaudeCompactWindowTokens,
   isPromptCacheTtl,
   isServerNotificationLevel,
   isSkillLearningMode,
+  type MachineAlertSettings,
   type MemoryReviewPreference,
   type PromptCacheTtl,
   type ServerNotificationLevel,
   type SkillLearningPreference,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import {
@@ -50,7 +53,19 @@ export interface TransferServerPreferencePort {
   promptCacheTtl: Preference<PromptCacheTtl>;
   /** The server notification level of the local owner. */
   ownerNotificationLevel: Preference<ServerNotificationLevel | null>;
+  browsingMemory: Preference<{ enabled: boolean }>;
+  /** The set sends the provider change event, as the Settings switch does. */
+  claudeUserSetup: Preference<boolean>;
+  /** The set sends the provider change event, as the Settings field does. */
+  claudeCompactWindow: Preference<number | null>;
+  /** The member who gets the alerts is left out: member ids belong to one server. Null is the owner. */
+  machineAlerts: Preference<MachineAlertSettings>;
+  /** The models that an admin turned off, for each provider. */
+  modelVisibility: Preference<HiddenModels>;
 }
+
+/** The models that an admin turned off, for each provider. */
+type HiddenModels = { provider: string; hidden: string[] }[];
 
 /** The preferences as the export writes them: each one as its store reads it. */
 export type TransferServerPreferences = {
@@ -82,6 +97,46 @@ function parseNotificationLevel(value: unknown): ServerNotificationLevel | null 
   return value;
 }
 
+function parseBrowsingMemory(value: unknown): { enabled: boolean } {
+  if (!isDynamicRecord(value) || !isBoolean(value.enabled)) throw new Error("Browsing memory is required.");
+  return { enabled: value.enabled };
+}
+
+function parseBoolean(value: unknown): boolean {
+  if (!isBoolean(value)) throw new Error("A switch value is required.");
+  return value;
+}
+
+function parseCompactWindow(value: unknown): number | null {
+  if (!isClaudeCompactWindowTokens(value)) throw new Error("Compact window size is required.");
+  return value;
+}
+
+/** The thresholds of the file; the alerts go to the owner of this server. */
+function parseMachineAlerts(value: unknown): MachineAlertSettings {
+  return { ...decodeMachineAlertSettings(value), responsibleMemberId: null };
+}
+
+const PROVIDER_LIMIT = 64;
+const isBoundedString = (value: unknown, maximum: number): value is string =>
+  isString(value) && value.length <= maximum;
+const MODEL_LIMIT = 2000;
+
+function parseHiddenModels(value: unknown): HiddenModels {
+  if (!Array.isArray(value) || value.length > PROVIDER_LIMIT) throw new Error("Model visibility is required.");
+  return value.map((entry) => {
+    if (
+      !isDynamicRecord(entry) ||
+      !isBoundedString(entry.provider, 128) ||
+      !Array.isArray(entry.hidden) ||
+      entry.hidden.length > MODEL_LIMIT ||
+      !entry.hidden.every((id) => isBoundedString(id, 256))
+    )
+      throw new Error("Model visibility is required.");
+    return { provider: entry.provider, hidden: entry.hidden };
+  });
+}
+
 /** Each key with the parser that the Settings screen of that preference uses, and its store. */
 function savers(
   port: TransferServerPreferencePort,
@@ -96,6 +151,11 @@ function savers(
     skillLearning: (value) => save(port.skillLearning, parseSkillLearning, value),
     promptCacheTtl: (value) => save(port.promptCacheTtl, parsePromptCacheTtl, value),
     ownerNotificationLevel: (value) => save(port.ownerNotificationLevel, parseNotificationLevel, value),
+    browsingMemory: (value) => save(port.browsingMemory, parseBrowsingMemory, value),
+    claudeUserSetup: (value) => save(port.claudeUserSetup, parseBoolean, value),
+    claudeCompactWindow: (value) => save(port.claudeCompactWindow, parseCompactWindow, value),
+    machineAlerts: (value) => save(port.machineAlerts, parseMachineAlerts, value),
+    modelVisibility: (value) => save(port.modelVisibility, parseHiddenModels, value),
   };
 }
 
@@ -109,6 +169,11 @@ const KEYS: readonly (keyof TransferServerPreferencePort)[] = [
   "skillLearning",
   "promptCacheTtl",
   "ownerNotificationLevel",
+  "browsingMemory",
+  "claudeUserSetup",
+  "claudeCompactWindow",
+  "machineAlerts",
+  "modelVisibility",
 ];
 
 /** What the export writes. The owner's notification level only when the owner exports. */
@@ -122,6 +187,11 @@ export function readServerPreferences(port: TransferServerPreferencePort, owner:
     memoryReview: port.memoryReview.get(),
     skillLearning: port.skillLearning.get(),
     promptCacheTtl: port.promptCacheTtl.get(),
+    browsingMemory: port.browsingMemory.get(),
+    claudeUserSetup: port.claudeUserSetup.get(),
+    claudeCompactWindow: port.claudeCompactWindow.get(),
+    machineAlerts: { ...port.machineAlerts.get(), responsibleMemberId: null },
+    modelVisibility: port.modelVisibility.get(),
     ...(owner ? { ownerNotificationLevel: port.ownerNotificationLevel.get() } : {}),
   };
 }

@@ -706,16 +706,17 @@ export const messages = {
   "settings.transfer.part.settings": "Serverinstellingen",
   "settings.transfer.part.chats": "Chatgeschiedenis",
   "settings.transfer.part.chatsDescription":
-    "De chats en zijthreads, met de bestanden van hun berichten. De agents zetten deze chats voort met hun context.",
+    "De chats en zijthreads met hun bestanden, en de rungeschiedenis van de routines. De agents zetten deze chats voort met hun context.",
   "settings.transfer.part.channels": "Kanaalberichten",
-  "settings.transfer.part.channelsDescription": "De berichten van de kanalen waarin de geëxporteerde agents zitten.",
+  "settings.transfer.part.channelsDescription":
+    "De berichten van de kanalen waarin de geëxporteerde agents zitten, met hun bestanden en de rungeschiedenis van de kanaalroutines.",
   "settings.transfer.part.files": "Werkruimtebestanden",
   "settings.transfer.part.filesDescription": "Bestanden die je agents hebben gemaakt, en de map Shared.",
   "settings.transfer.part.preferences": "Servervoorkeuren",
   "settings.transfer.part.preferencesDescription":
-    "Tijdzone, persoonlijkheid, standaarden voor agents, instellingen voor herinneringen en vaardigheden, en je meldingsniveau.",
+    "Naam, logo, tijdzone, persoonlijkheid, standaarden voor agents, modelkeuzes, instellingen voor herinneringen en vaardigheden, en de meldingsniveaus en vastgezette items van elke persoon.",
   "settings.transfer.export.settingsDescription":
-    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en routineflows.",
+    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen, routineflows en gedeelde vaardigheden.",
   "settings.transfer.export.chooseAgents": "Kies agents ({selected} van {total})",
   "settings.transfer.export.hideAgents": "Verberg agents",
   "settings.transfer.export.agentsLabel": "Agents om te exporteren",
@@ -744,7 +745,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "Naam al in gebruik",
   "settings.transfer.import.settings": "Importeer serverinstellingen",
   "settings.transfer.import.settingsAndPreferences":
-    "Voegt de MCP-servers, aangepaste modelaanbieders en zijbalkonderdelen toe die deze server nog niet heeft. Servervoorkeuren uit het bestand vervangen die van hier.",
+    "Voegt de MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en gedeelde vaardigheden toe die deze server nog niet heeft. De servernaam, het logo en de servervoorkeuren uit het bestand vervangen die van hier.",
   "settings.transfer.import.submit": { one: "Importeer {count} agent", other: "Importeer {count} agents" },
   "settings.transfer.import.submitSettings": "Importeer serverinstellingen",
   "settings.transfer.import.importing": "Importeren…",

@@ -688,14 +688,17 @@ export const messages = {
   "settings.transfer.part.agentsDescription": "{contents}。始终包含在文件中。",
   "settings.transfer.part.settings": "服务器设置",
   "settings.transfer.part.chats": "对话记录",
-  "settings.transfer.part.chatsDescription": "对话和侧边线程，以及其消息中的文件。助手会带着上下文继续这些对话。",
+  "settings.transfer.part.chatsDescription":
+    "对话和侧边线程及其文件，以及自动化任务的运行历史。助手会带着上下文继续这些对话。",
   "settings.transfer.part.channels": "频道消息",
-  "settings.transfer.part.channelsDescription": "导出的助手所在频道的消息。",
+  "settings.transfer.part.channelsDescription": "导出的助手所在频道的消息，以及其文件和频道自动化任务的运行历史。",
   "settings.transfer.part.files": "工作区文件",
   "settings.transfer.part.filesDescription": "助手生成的文件以及共享文件夹。",
   "settings.transfer.part.preferences": "服务器偏好",
-  "settings.transfer.part.preferencesDescription": "时区、个性、助手默认值、记忆和技能设置，以及你的通知级别。",
-  "settings.transfer.export.settingsDescription": "MCP 服务器、自定义模型服务商、侧边栏分组和自动化任务流程。",
+  "settings.transfer.part.preferencesDescription":
+    "名称、标志、时区、个性、助手默认值、模型选择、记忆和技能设置，以及每个人的通知级别和置顶项。",
+  "settings.transfer.export.settingsDescription":
+    "MCP 服务器、自定义模型服务商、侧边栏分组、自动化任务流程和共享技能。",
   "settings.transfer.export.chooseAgents": "选择助手（{selected} / {total}）",
   "settings.transfer.export.hideAgents": "隐藏助手",
   "settings.transfer.export.agentsLabel": "要导出的助手",
@@ -723,7 +726,7 @@ export const messages = {
   "settings.transfer.import.nameExists": "名称已被使用",
   "settings.transfer.import.settings": "导入服务器设置",
   "settings.transfer.import.settingsAndPreferences":
-    "添加该服务器还没有的 MCP 服务器、自定义模型服务商和侧边栏分组。文件中的服务器偏好会替换此处的偏好。",
+    "添加该服务器还没有的 MCP 服务器、自定义模型服务商、侧边栏分组和共享技能。文件中的服务器名称、标志和偏好会替换此处的设置。",
   "settings.transfer.import.submit": { one: "导入 {count} 个助手", other: "导入 {count} 个助手" },
   "settings.transfer.import.submitSettings": "导入服务器设置",
   "settings.transfer.import.importing": "正在导入…",

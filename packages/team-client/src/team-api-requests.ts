@@ -1,4 +1,6 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
+import { bytesToBase64 } from "./base64";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
@@ -105,7 +107,10 @@ import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-thr
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
-import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import {
+  INSTANCE_TRANSFER_CHUNK_BYTES,
+  INSTANCE_TRANSFER_CHUNKS_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
@@ -630,6 +635,69 @@ export const finishInstanceTransferExport = Effect.fn("TeamClient.finishInstance
   exportId: string,
 ): Effect.fn.Return<void, TeamRequestError> {
   yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, ignoreResponse, { exportId }));
+});
+
+/** A transfer file that the client reads in parts, so it never holds the whole file at once. */
+export interface TransferFileParts {
+  name: string;
+  size: number;
+  readBytes(offset: number, length: number): Promise<Uint8Array>;
+}
+
+const decodeUploadState = (value: unknown): { uploadId: string; chunkBytes: number; received: number[] } => {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.uploadId) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.received) ||
+    !value.received.every((index) => typeof index === "number" && Number.isSafeInteger(index) && index >= 0)
+  )
+    throw new Error("The host returned an invalid transfer upload.");
+  return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
+};
+
+const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/**
+ * Sends a transfer file to the host in parts and answers the preview of `instance-transfer-v1` stage.
+ * The whole file's SHA-256 is read first, in parts. A part that the host already has from an earlier
+ * try is not sent again. Send it only to a host that serves `instance-transfer-chunks-v1`.
+ */
+export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceTransferInParts")(function* (
+  request: TeamApiRequest,
+  file: TransferFileParts,
+): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
+  const whole = sha256.create();
+  for (let offset = 0; offset < file.size; offset += INSTANCE_TRANSFER_CHUNK_BYTES)
+    whole.update(
+      yield* teamCall(() => file.readBytes(offset, Math.min(INSTANCE_TRANSFER_CHUNK_BYTES, file.size - offset))),
+    );
+  const upload = yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, decodeUploadState, {
+      size: file.size,
+      sha256: hex(whole.digest()),
+    }),
+  );
+  const received = new Set(upload.received);
+  for (let index = 0; index * upload.chunkBytes < file.size; index++) {
+    if (received.has(index)) continue;
+    const offset = index * upload.chunkBytes;
+    const bytes = yield* teamCall(() => file.readBytes(offset, Math.min(upload.chunkBytes, file.size - offset)));
+    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: hex(sha256(bytes)) });
+    yield* teamCall(() =>
+      request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
+        name: file.name,
+        mimeType: "application/octet-stream",
+        base64: bytesToBase64(bytes),
+        maxBytes: upload.chunkBytes,
+      }),
+    );
+  }
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, decodeRemoteInstanceTransferPreview, {
+      uploadId: upload.uploadId,
+    }),
+  );
 });
 
 /** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */

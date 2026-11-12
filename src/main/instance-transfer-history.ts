@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  type AttachmentSummary,
   type Channel,
   type ChannelMessage,
   type ConversationMessage,
@@ -26,7 +27,8 @@ import type {
   HistoryThread,
   ImportHistoryThreadInput,
 } from "../backend/agent-history-transfer";
-import { messageFiles } from "../backend/agent-history-transfer";
+import { messageFiles, withRoutineCopies } from "../backend/agent-history-transfer";
+import type { MailboxStore } from "../backend/mailbox-store";
 import { type ArchiveFile, extractEntryEffect, readEntriesEffect, withArchive } from "./agent-archive";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 
@@ -150,6 +152,7 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
     prefix: string;
     agentIds: ReadonlyMap<string, string>;
     routineIds: ReadonlyMap<string, string>;
+    runIds: ReadonlyMap<string, string>;
     scratch: string;
     readerId: string;
   },
@@ -197,6 +200,7 @@ export const importHistory = Effect.fn("InstanceTransfer.importHistory")(functio
                     files,
                     agentIds: input.agentIds,
                     routineIds: input.routineIds,
+                    runIds: input.runIds,
                   },
                   input.readerId,
                 )
@@ -272,37 +276,76 @@ function parsed<T>(bytes: Uint8Array | undefined, decode: (value: unknown) => T,
   }
 }
 
-/** The channel operations that read and write channel messages. */
+/** The channel operations that read and write channel messages, as `ChannelService` offers them. */
 export interface TransferChannelHistory {
   store: {
     get(channelId: string): Channel;
     messages(channelId: string, before?: number, limit?: number): ChannelMessage[];
     update(channel: Channel, changes: { messages: ChannelMessage[] }, operationId?: string): Channel;
+    /** The thread of one agent in the channel. The files of imported messages belong to it. */
+    context(channelId: string, agentId: string): { threadId: string };
   };
+  /** Stores the files of imported messages, as the chat import does. */
+  mailbox: Pick<
+    MailboxStore,
+    "stageGeneratedCopy" | "persistGeneratedAttachmentsWith" | "discardStagedGeneratedAttachments"
+  >;
+}
+
+/** The files of a channel's messages in the file, as the manifest lists them. */
+export type ChannelFile = IndexFile;
+
+/** What `importChannelMessages` writes. */
+interface ImportChannelInput {
+  channelId: string;
+  parts: readonly string[];
+  files: readonly ChannelFile[];
+  prefix: string;
+  agentIds: ReadonlyMap<string, string>;
+  routineIds: ReadonlyMap<string, string>;
+  runIds: ReadonlyMap<string, string>;
+  exporter: string | null;
+  actor: { id: string; name: string };
+  /** An imported agent of the channel, which keeps the files of the people's messages. */
+  fileOwner: string | null;
+  scratch: string;
 }
 
 /**
- * Adds a channel's shown messages to the export, as JSON parts. An agent author is written as its key
- * in the file. Files of channel messages stay on the other computer: only their cards would travel.
+ * Adds a channel's shown messages to the export, as JSON parts, with the files of the messages in
+ * `<prefix>files/`. An agent author is written as its key in the file. A file that is gone keeps its
+ * card, as in a chat.
  */
-export function exportChannelMessages(
+export const exportChannelMessages = Effect.fn("InstanceTransfer.exportChannelMessages")(function* (
   channels: TransferChannelHistory,
+  resolveFile: TransferHistoryAgents["resolveTransferFile"],
   channelId: string,
   prefix: string,
   agentKeys: ReadonlyMap<string, string>,
   entries: HistoryEntry[],
-): { parts: string[]; bytes: number } {
+): Effect.fn.Return<{ parts: string[]; files: ChannelFile[]; bytes: number }> {
   const messages = channels.store.messages(channelId).flatMap((entry): ChannelMessage[] => {
     if (entry.author.kind === "agent") {
       const key = agentKeys.get(entry.author.id);
       if (!key) return [];
       entry = { ...entry, author: { ...entry.author, id: key } };
     }
-    const { attachments: _attachments, voiceRecording: _voice, ...message } = exportedMessage(entry.message, agentKeys);
-    return [{ ...entry, taskId: null, message }];
+    return [{ ...entry, taskId: null, message: exportedMessage(entry.message, agentKeys) }];
   });
-  const parts: string[] = [];
+  const files: ChannelFile[] = [];
+  const fileIds = new Set<string>();
   let bytes = 0;
+  for (const attachment of messages.flatMap((entry) => messageFiles(entry.message))) {
+    if (fileIds.has(attachment.id)) continue;
+    fileIds.add(attachment.id);
+    const file = yield* resolveFile(attachment.id).pipe(Effect.orElseSucceed(() => null));
+    if (!file) continue;
+    const path = `${prefix}files/${files.length + 1}`;
+    files.push({ id: attachment.id, path, name: file.name, mimeType: file.mimeType });
+    bytes += attachment.size;
+    entries.push({ name: path, read: () => readFile(file.path) });
+  }
+  const parts: string[] = [];
   for (let start = 0; start < messages.length; start += PART_MESSAGES) {
     const name = `${prefix}messages-${parts.length + 1}.json`;
     const part = jsonPart(messages.slice(start, start + PART_MESSAGES));
@@ -310,8 +353,8 @@ export function exportChannelMessages(
     parts.push(name);
     entries.push({ name, read: part.read });
   }
-  return { parts, bytes };
-}
+  return { parts, files, bytes };
+});
 
 /**
  * One JSON part of the file. The size is counted now, and the bytes are made again when the archive
@@ -328,19 +371,51 @@ function jsonPart(value: readonly unknown[]): { bytes: number; read: HistoryEntr
  * Writes the messages of an imported channel in batches of one part. Each message gets a new id and
  * no task. An agent author points to its copy, and a message of an agent that the user did not import
  * is left out. The person who exported is the person who imports.
+ *
+ * The files of the messages are copied out of the archive to `scratch`, which this removes at the
+ * end, and saved with each batch as files of an agent's thread in the channel: the author's, or for a
+ * person's message the thread of `fileOwner`. Deleting the channel removes them with that thread.
  */
 export const importChannelMessages = Effect.fn("InstanceTransfer.importChannelMessages")(function* (
   archive: ArchiveFile,
   channels: TransferChannelHistory,
-  input: {
-    channelId: string;
-    parts: readonly string[];
-    prefix: string;
-    agentIds: ReadonlyMap<string, string>;
-    exporter: string | null;
-    actor: { id: string; name: string };
-  },
-) {
+  input: ImportChannelInput,
+): Effect.fn.Return<void, ArchiveOperationError> {
+  const directory = join(input.scratch, randomUUID());
+  yield* Effect.acquireUseRelease(
+    archiveCall(() => mkdir(directory, { recursive: true, mode: 0o700 })),
+    () => importChannelParts(archive, channels, input, directory),
+    () => archiveCall(() => rm(directory, { recursive: true, force: true })).pipe(Effect.ignore),
+  );
+});
+
+const importChannelParts = Effect.fn("InstanceTransfer.importChannelParts")(function* (
+  archive: ArchiveFile,
+  channels: TransferChannelHistory,
+  input: ImportChannelInput,
+  directory: string,
+): Effect.fn.Return<void, ArchiveOperationError> {
+  const files = new Map<string, HistoryFile>();
+  yield* withArchive(archive.path, (handle) =>
+    Effect.gen(function* () {
+      for (const [number, file] of input.files.entries()) {
+        const entry = file.path.startsWith(input.prefix) ? archive.entries.get(file.path) : undefined;
+        if (!entry) continue;
+        const target = join(directory, String(number + 1));
+        const written = yield* Effect.result(extractEntryEffect(handle, entry, target, 0o600));
+        if (Result.isSuccess(written)) files.set(file.id, { path: target, name: file.name, mimeType: file.mimeType });
+      }
+    }),
+  );
+  const threads = new Map<string, string>();
+  const threadOf = (agentId: string) => {
+    let threadId = threads.get(agentId);
+    if (!threadId) {
+      threadId = channels.store.context(input.channelId, agentId).threadId;
+      threads.set(agentId, threadId);
+    }
+    return threadId;
+  };
   const ids = new Map<string, string>();
   for (const part of input.parts) {
     if (!part.startsWith(input.prefix) || part.includes("..")) continue;
@@ -365,7 +440,12 @@ export const importChannelMessages = Effect.fn("InstanceTransfer.importChannelMe
         } = entry.message;
         const senderAgentId = message.senderAgentId ? input.agentIds.get(message.senderAgentId) : undefined;
         const replyTo = message.replyToMessageId ? ids.get(message.replyToMessageId) : undefined;
-        const { senderAgentId: _sender, replyToMessageId: _reply, ...rest } = message;
+        // A routine and a run point to their copies here.
+        const {
+          senderAgentId: _sender,
+          replyToMessageId: _reply,
+          ...rest
+        } = withRoutineCopies(message, input.routineIds, input.runIds);
         return [
           {
             id,
@@ -386,8 +466,58 @@ export const importChannelMessages = Effect.fn("InstanceTransfer.importChannelMe
       },
     );
     if (batch.length === 0) continue;
-    yield* archiveCall(async () => {
-      channels.store.update(channels.store.get(input.channelId), { messages: batch });
-    });
+    const staged: string[] = [];
+    yield* Effect.gen(function* () {
+      const copies = new Map<string, AttachmentSummary>();
+      for (const entry of batch) {
+        const owner = entry.author.kind === "agent" ? entry.author.id : input.fileOwner;
+        if (!owner) continue;
+        for (const attachment of messageFiles(entry.message)) {
+          const file = files.get(attachment.id);
+          if (!file || copies.has(attachment.id)) continue;
+          const copy = yield* channels.mailbox
+            .stageGeneratedCopy({ ...file, sourcePath: file.path, ownerAgentId: owner, ownerThreadId: threadOf(owner) })
+            .pipe(Effect.mapError((failure) => archiveFailure(failure.cause)));
+          staged.push(copy.id);
+          copies.set(attachment.id, copy);
+        }
+      }
+      const written = batch.map((entry) => ({ ...entry, message: withMessageFiles(entry.message, copies) }));
+      yield* archiveCall(async () => {
+        channels.mailbox.persistGeneratedAttachmentsWith(staged, "attachment.history-imported", () =>
+          channels.store.update(channels.store.get(input.channelId), { messages: written }),
+        );
+      });
+    }).pipe(Effect.onError(() => channels.mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)));
   }
 });
+
+/** The message with each file that has a copy here pointing to the copy. A file with none keeps its card. */
+function withMessageFiles(
+  message: ConversationMessage,
+  copies: ReadonlyMap<string, AttachmentSummary>,
+): ConversationMessage {
+  if (copies.size === 0) return message;
+  const file = (attachment: AttachmentSummary) => copies.get(attachment.id) ?? attachment;
+  return {
+    ...message,
+    ...(message.attachments ? { attachments: message.attachments.map(file) } : {}),
+    ...(message.voiceRecording ? { voiceRecording: file(message.voiceRecording) } : {}),
+  };
+}
+
+/** The checked file list of a channel in the manifest: each path inside the channel's folder. */
+export function decodeChannelFiles(value: unknown, prefix: string): ChannelFile[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): ChannelFile[] =>
+    isDynamicRecord(item) &&
+    typeof item.id === "string" &&
+    typeof item.path === "string" &&
+    item.path.startsWith(`${prefix}files/`) &&
+    !item.path.includes("..") &&
+    typeof item.name === "string" &&
+    typeof item.mimeType === "string"
+      ? [{ id: item.id, path: item.path, name: item.name.slice(0, 255), mimeType: item.mimeType.slice(0, 255) }]
+      : [],
+  );
+}

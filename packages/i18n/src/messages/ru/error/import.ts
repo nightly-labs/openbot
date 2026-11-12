@@ -67,6 +67,9 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: модель «{model}» здесь пока недоступна, поэтому агент использует модель по умолчанию. Выберите модель снова, когда её провайдер будет готов.",
   "error.import.transferSettingSkipped": "{name}: не импортировано. {reason}",
+  "error.import.transferRunsSkipped": "{name}: история запусков регулярной задачи «{routine}» не импортирована.",
+  "error.import.transferSharedSkillsSkipped": "Не удалось прочитать общие навыки, поэтому их нет в файле.",
+  "error.import.transferSharedSkillExists": "На этом сервере уже есть общий навык с таким названием и другими файлами.",
   "error.import.transferServerPreferencesSkipped": {
     one: "{count} параметр сервера в файле здесь недопустим, поэтому он не импортируется.",
     few: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",

@@ -1,4 +1,8 @@
-import { type ClientAgentSummary, resolveRemoteInstanceTransferResult } from "@openbot/contracts/ipc";
+import {
+  type ClientAgentSummary,
+  INSTANCE_TRANSFER_LIMITS,
+  resolveRemoteInstanceTransferResult,
+} from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { base64ToBytes } from "@openbot/team-client/base64";
@@ -11,6 +15,7 @@ import {
   loadInstanceTransferSummary,
   readInstanceTransferExportPart,
   stageInstanceTransfer,
+  stageInstanceTransferInParts,
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
@@ -34,6 +39,8 @@ export function createWebInstanceTransferCalls(options: {
   saveFile: (file: { name: string; base64: string } | { name: string; blob: Blob }) => void;
   /** The host serves `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`. */
   fullCopy: (serverId: string) => boolean;
+  /** The host serves `instance-transfer-chunks-v1`: a file goes to it in parts. */
+  sendsParts: (serverId: string) => boolean;
 }): ServerTransferCalls {
   return {
     summary: (serverId) =>
@@ -56,6 +63,19 @@ export function createWebInstanceTransferCalls(options: {
       const [file] = await chooseFiles({ multiple: false, accept: ".zip,application/zip" });
       if (!file) return null;
       if (file.size === 0) throw new Error(currentText().t("error.import.chooseZip"));
+      // In parts, as the Grok Bot import sends them: up to the limit of a transfer file on the host.
+      if (options.sendsParts(serverId)) {
+        if (file.size > INSTANCE_TRANSFER_LIMITS.archiveBytes)
+          throw new Error(currentText().t("error.import.transferTooLarge"));
+        return runTeamEffect(
+          stageInstanceTransferInParts(request, {
+            name: file.name,
+            size: file.size,
+            readBytes: async (offset, length) =>
+              new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()),
+          }).pipe(Effect.mapError((error) => error.cause)),
+        );
+      }
       if (file.size > INSTANCE_TRANSFER_REMOTE_BYTES)
         throw new Error(currentText().t("error.import.transferRemoteTooLarge"));
       return runTeamEffect(
