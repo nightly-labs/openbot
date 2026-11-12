@@ -658,6 +658,9 @@ const MessageRow = memo(function MessageRow({
                   }
                 : undefined,
             readAloudId: bubble.author === "agent" ? bubble.id : undefined,
+            files: bubble.attachments?.length
+              ? { serverId: shared.serverId, attachments: bubble.attachments }
+              : undefined,
           }
         : null,
   );

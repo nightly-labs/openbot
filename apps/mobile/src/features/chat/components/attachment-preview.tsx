@@ -3,6 +3,7 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
 import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
@@ -139,6 +140,73 @@ function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileU
 async function writeFileData(file: File, data: RemoteFileUpload & { fileUri?: string }) {
   if (data.base64 || !data.fileUri) file.writeSync(data.base64, { encoding: "base64" });
   else await new File(data.fileUri).copy(file);
+}
+
+/** A text file up to this size goes on the clipboard as text. */
+const COPY_TEXT_BYTES = 1024 * 1024;
+
+/**
+ * A file that Copy puts on the clipboard: a raster image as a picture, or a text file as text. The
+ * clipboard does not hold other files.
+ */
+export function copiesToClipboard(attachment: Pick<AttachmentSummary, "kind" | "previewKind" | "size">): boolean {
+  return savesToPhotos(attachment) || (attachment.previewKind === "text" && attachment.size <= COPY_TEXT_BYTES);
+}
+
+/** A name that a folder takes: no path separators or control characters. */
+function safeFileName(name: string) {
+  return name.replace(/[/\\\p{Cc}]/gu, "_");
+}
+
+/** The text of a downloaded text file. */
+async function fileText(data: RemoteFileUpload & { fileUri?: string }) {
+  if (!data.base64 && data.fileUri) return new File(data.fileUri).text();
+  const file = new File(Paths.cache, `${Date.now()}-copy.txt`);
+  try {
+    await file.write(data.base64, { encoding: "base64" });
+    return await file.text();
+  } finally {
+    if (file.exists) file.delete();
+  }
+}
+
+/** Writes a downloaded file into a folder the user picked, under a name that is not in use there. */
+async function writeToFolder(
+  folder: Directory,
+  attachment: AttachmentSummary,
+  data: RemoteFileUpload & { fileUri?: string },
+) {
+  const name = safeFileName(attachment.name) || "file";
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : "";
+  let candidate = name;
+  // iOS does not replace a file that is there. Android gives a new name to a file that is there.
+  for (let copy = 2; fileExists(folder, candidate); copy += 1) candidate = `${stem} ${copy}${extension}`;
+  const file = folder.createFile(candidate, data.mimeType);
+  const base64 = data.base64 || (data.fileUri ? await new File(data.fileUri).base64() : "");
+  await file.write(base64, { encoding: "base64" });
+}
+
+/** Whether a folder has a file with this name. A content URI folder on Android cannot say, and gives a new name itself. */
+function fileExists(folder: Directory, name: string) {
+  try {
+    return new File(folder, name).exists;
+  } catch {
+    return false;
+  }
+}
+
+/** The user closed the folder picker without a folder. */
+function pickerCancelled(error: unknown) {
+  return error instanceof Error && /cancel/i.test(error.message);
+}
+
+/** Puts a downloaded image on the clipboard as a picture, as desktop does. */
+async function copyImageData(data: RemoteFileUpload & { fileUri?: string }) {
+  const base64 = data.base64 || (data.fileUri ? await new File(data.fileUri).base64() : "");
+  if (!base64) throw new Error(currentText().t("mobile.chat.attachment.imageUnavailable"));
+  await Clipboard.setImageAsync(base64);
 }
 
 type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
@@ -280,12 +348,36 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       setSharing(false);
     }
   }
+  /** Puts the image on the clipboard. It reports its own failure and returns whether it copied. */
+  async function copyImage(): Promise<boolean> {
+    requestLargeFile(serverId, attachment.id);
+    setSharing(true);
+    try {
+      const result = query.data ? { data: query.data, error: null } : await query.refetch();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
+      await copyImageData(result.data);
+      return true;
+    } catch (error) {
+      void haptics.notification("error");
+      showFailureAlert(
+        error,
+        "turn",
+        t("mobile.chat.attachment.copyImageFailed"),
+        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
+      );
+      return false;
+    } finally {
+      setSharing(false);
+    }
+  }
   return {
     pending,
     localUri,
     uri,
     dimensions,
     saveToPhotos,
+    copyImage,
     query,
     sharing,
     busy: sharing || query.isFetching,
@@ -294,8 +386,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
 }
 
 /**
- * The actions of a whole gallery: every image to the photo library, or every image to one share
- * sheet. Each image comes from the cache the chat filled, and downloads only when it is not there.
+ * The actions on the files of a message or a gallery: copy, share and save one file or all of them.
+ * Each file comes from the cache the chat filled, and downloads only when it is not there.
  */
 export function useAttachmentFiles(serverId: string, attachments: readonly AttachmentSummary[]) {
   const { downloadAttachment } = useMobileWorkspaceActions();
@@ -322,8 +414,11 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     );
   };
 
-  /** Saves every image that the photo library takes. It reports its own failure and returns whether all of them saved. */
-  async function saveAllToPhotos(): Promise<boolean> {
+  /**
+   * Saves the images, or every image of the files, that the photo library takes. It reports its own
+   * failure and returns whether all of them saved.
+   */
+  async function saveAllToPhotos(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
     setBusy(true);
     const folder = new Directory(Paths.cache, `gallery-save-${Date.now()}`);
     try {
@@ -333,7 +428,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         throw new Error(t("mobile.chat.imageGallery.photosPermission"));
       folder.create({ intermediates: true, idempotent: true });
       // One at a time, in chat order, so the library keeps the order of the message.
-      for (const [index, attachment] of attachments.filter(savesToPhotos).entries()) {
+      for (const [index, attachment] of only.filter(savesToPhotos).entries()) {
         const data = await load(attachment);
         const file = await writeCopy(folder, `${index}.${imageExtension(attachment, data.mimeType)}`, data);
         await MediaLibrary.Asset.create(file.uri);
@@ -348,8 +443,72 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     }
   }
 
-  /** Opens one share sheet with every image. */
+  /**
+   * Puts one file on the clipboard: an image as a picture, a text file as text. It reports its own
+   * failure and returns whether it copied.
+   */
+  async function copyFile(attachment: AttachmentSummary): Promise<boolean> {
+    setBusy(true);
+    const image = savesToPhotos(attachment);
+    try {
+      const data = await load(attachment);
+      if (image) await copyImageData(data);
+      else await Clipboard.setStringAsync(await fileText(data));
+      return true;
+    } catch (error) {
+      fail(error, image ? t("mobile.chat.attachment.copyImageFailed") : t("mobile.chat.attachment.copyTextFailed"));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Saves the files in a folder that the user picks in Files. It reports its own failure and returns
+   * whether all of them saved; a closed picker saves nothing and reports nothing.
+   */
+  async function saveToFiles(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
+    let folder: Directory;
+    try {
+      folder = await Directory.pickDirectoryAsync();
+    } catch (error) {
+      if (!pickerCancelled(error)) fail(error, t("mobile.chat.attachment.saveFilesFailed"));
+      return false;
+    }
+    setBusy(true);
+    try {
+      for (const attachment of only) await writeToFolder(folder, attachment, await load(attachment));
+      return true;
+    } catch (error) {
+      fail(error, t("mobile.chat.attachment.saveFilesFailed"));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Opens the share sheet with the one file. Its targets include Save to Files. */
+  async function shareFile(attachment: AttachmentSummary) {
+    setBusy(true);
+    let file: File | null = null;
+    try {
+      if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
+      const data = await load(attachment);
+      file = new File(Paths.cache, `${Date.now()}-${safeFileName(attachment.name)}`);
+      await writeFileData(file, data);
+      await Sharing.shareAsync(file.uri, { mimeType: data.mimeType, dialogTitle: attachment.name });
+    } catch (error) {
+      fail(error, t("mobile.chat.attachment.openFailed"));
+    } finally {
+      if (file?.exists) file.delete();
+      setBusy(false);
+    }
+  }
+
+  /** Opens one share sheet with every file. */
   async function shareAll() {
+    const only = attachments.length === 1 ? attachments[0] : undefined;
+    if (only) return shareFile(only);
     setBusy(true);
     try {
       if (!shareFilesNative) throw new Error(t("mobile.chat.imageGallery.shareNeedsUpdate"));
@@ -363,7 +522,8 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         types.add(data.mimeType);
         uris.push(uri);
       }
-      await shareFilesNative.shareAsync(uris, types.size === 1 ? ([...types][0] ?? "image/*") : "image/*");
+      const images = [...types].every((type) => type.startsWith("image/"));
+      await shareFilesNative.shareAsync(uris, types.size === 1 ? ([...types][0] ?? "*/*") : images ? "image/*" : "*/*");
     } catch (error) {
       fail(error, t("mobile.chat.imageGallery.shareFailed"));
     } finally {
@@ -371,7 +531,14 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     }
   }
 
-  return { busy, saveAllToPhotos, shareAll: () => void shareAll() };
+  return {
+    busy,
+    copyFile,
+    saveAllToPhotos,
+    saveToFiles,
+    shareFile: (attachment: AttachmentSummary) => void shareFile(attachment),
+    shareAll: () => void shareAll(),
+  };
 }
 
 /**
