@@ -2933,6 +2933,14 @@ export class ChannelService {
                   // that waits for its subtasks keeps the reason until its last turn (#6667).
                   (deliveryError ?? task.error),
         });
+        // A failed reply did not hold its caller (`settled`), so nothing waits for it when the run
+        // ends. It ends with the run, or its stopped-task card stayed with nothing to continue (#6417).
+        if (nextState === "completed" && task.rootTaskId === task.id)
+          updated.push(
+            ...tasks
+              .filter((item) => item.rootTaskId === task.id && item.state === "failed" && isReplyTask(item))
+              .map((item): ChannelTask => ({ ...item, state: "cancelled", error: null, revision: item.revision + 1 })),
+          );
       }
       updated.push(...releasedParent(tasks, task, state));
       yield* channelSync(() =>
@@ -3129,7 +3137,9 @@ export class ChannelService {
           return;
         }
         const root = tasks.find((item) => item.id === selected.rootTaskId);
-        if (!root || terminal(root)) {
+        // A run that ended can still hold a failed reply that an earlier version left (#6417).
+        const cancelled = root ? descendants(tasks, root.id) : [];
+        if (!root || !cancelled.length) {
           result = refuse("That run has already ended.", "run ended");
           return;
         }
@@ -3147,7 +3157,6 @@ export class ChannelService {
           );
           return;
         }
-        const cancelled = descendants(tasks, root.id);
         const ids = new Set(cancelled.map((item) => item.id));
         if (
           tasks.some(
