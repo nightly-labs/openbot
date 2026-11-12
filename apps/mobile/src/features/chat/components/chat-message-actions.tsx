@@ -8,7 +8,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
-import { type MessageChannelTargets, openMessageActions } from "../model/message-actions-sheet";
+import { type MessageChannelTargets, type MessageFiles, openMessageActions } from "../model/message-actions-sheet";
 
 /** A message that has actions: it is on the host and does not stream. */
 export interface MessageActionsInput {
@@ -31,6 +31,8 @@ export interface MessageActionsInput {
   onDelete?: () => Promise<void>;
   /** Marks the message and the messages after it unread for the reader. Unset where it cannot. */
   onMarkUnread?: () => void;
+  /** The files of the message on the host. Unset for a message without files. */
+  files?: MessageFiles;
 }
 
 /**
@@ -102,6 +104,7 @@ export function useMessageActions(input: MessageActionsInput | null) {
           onMarkUnread: input.onMarkUnread,
           sendToChannel: input.sendToChannel,
           onDelete: confirmDelete,
+          files: input.files,
         })
     : undefined;
   return { shown, react, open };
