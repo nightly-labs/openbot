@@ -130,17 +130,13 @@ export interface TargetChoice {
  * A point in a window is a pixel of that window's last screenshot. The driver acts on it as the
  * window's top-left corner plus the point scaled from the screenshot to the window's size: the
  * screenshot can be smaller than the window, and on macOS it is in pixels while the window is in
- * points. Without that window or its screenshot there is no cursor.
+ * points. The tap keeps that screenshot's width with the point; without the window there is no cursor.
  */
-export function pointerOnDesktop(
-  pointer: ObservedPointer,
-  windows: unknown,
-  screenshotWidth: number | null,
-): Point | null {
-  if (pointer.windowId === null) return { x: pointer.x, y: pointer.y };
+export function pointerOnDesktop(pointer: ObservedPointer, windows: unknown): Point | null {
+  if (pointer.windowId === null || pointer.screenshotWidth === null) return { x: pointer.x, y: pointer.y };
   const window = readWindows(windows).find((entry) => entry.windowId === pointer.windowId);
-  if (!window || screenshotWidth === null) return null;
-  const scale = window.bounds.width / screenshotWidth;
+  if (!window) return null;
+  const scale = window.bounds.width / pointer.screenshotWidth;
   return { x: window.bounds.x + pointer.x * scale, y: window.bounds.y + pointer.y * scale };
 }
 

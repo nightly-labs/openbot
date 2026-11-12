@@ -2028,9 +2028,7 @@ export async function createApplicationServices({
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
     readPointer: () => {
       const pointer = cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS);
-      if (!pointer) return null;
-      const width = pointer.windowId === null ? null : cuaDriver.screenshotWidth(pointer.windowId);
-      const point = pointerOnDesktop(pointer, computerUseWindows, width);
+      const point = pointer ? pointerOnDesktop(pointer, computerUseWindows) : null;
       return point ? computerUseDesktopPoint(point) : null;
     },
     readTarget: (previous) =>

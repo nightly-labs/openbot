@@ -109,6 +109,11 @@ export interface ObservedPointer {
    * agent worked on another one (#7511).
    */
   windowId: number | null;
+  /**
+   * The width of that window's last screenshot when the request passed, or `null` for a desktop
+   * point. Kept with the point, because a later screenshot of another size must not move it.
+   */
+  screenshotWidth: number | null;
   x: number;
   y: number;
   /** When the request passed through, from `Date.now()`. */
@@ -125,7 +130,8 @@ interface ObservedRequest {
   /** Whether the line asks for the tool list, whose answer loses the driver's cursor tools. */
   list: boolean;
   action: ObservedAction | null;
-  pointer: ObservedPointer | null;
+  /** The point, `"unplaced"` for a point that cannot be placed, or `null` when the line names none. */
+  pointer: ObservedPointer | "unplaced" | null;
 }
 
 const NOTHING: ObservedRequest = { tool: null, list: false, action: null, pointer: null };
@@ -160,7 +166,7 @@ const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
  * `y`. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
  * reports nothing rather than a guess.
  */
-function readRequest(line: string, at: number): ObservedRequest {
+function readRequest(line: string, at: number, screenshotWidth: (windowId: number) => number | null): ObservedRequest {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
@@ -172,7 +178,12 @@ function readRequest(line: string, at: number): ObservedRequest {
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { tool, list: false, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  return {
+    tool,
+    list: false,
+    action: readTarget(tool, args, at),
+    pointer: readPointer(tool, args, at, screenshotWidth),
+  };
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -183,7 +194,12 @@ function readTarget(tool: string, args: DynamicRecord, at: number): ObservedActi
   return { tool, pid, windowId, at };
 }
 
-function readPointer(tool: string, args: DynamicRecord, at: number): ObservedPointer | null {
+function readPointer(
+  tool: string,
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): ObservedPointer | "unplaced" | null {
   if (!POINTER_TOOLS.has(tool)) return null;
   const x = numberIn(args.x);
   const y = numberIn(args.y);
@@ -191,7 +207,10 @@ function readPointer(tool: string, args: DynamicRecord, at: number): ObservedPoi
   // accessibility route. There is nowhere to draw a cursor then, so none is drawn.
   if (x === null || y === null) return null;
   const windowId = pointerWindow(tool, args);
-  return windowId === undefined ? null : { tool, windowId, x, y, at };
+  if (windowId === undefined) return "unplaced";
+  if (windowId === null) return { tool, windowId, screenshotWidth: null, x, y, at };
+  const width = screenshotWidth(windowId);
+  return width === null ? "unplaced" : { tool, windowId, screenshotWidth: width, x, y, at };
 }
 
 /**
@@ -423,7 +442,7 @@ export class CuaDriverActionTap {
   }
 
   /** The width of the last screenshot of one window that an agent read, or `null` when none passed. */
-  screenshotWidth(windowId: number): number | null {
+  #screenshotWidth(windowId: number): number | null {
     return this.#screenshotWidths.get(windowId) ?? null;
   }
 
@@ -517,10 +536,11 @@ export class CuaDriverActionTap {
           answers.expect(null);
         } else {
           const at = this.#now();
-          const { tool, list, action, pointer } = readRequest(line, at);
+          const { tool, list, action, pointer } = readRequest(line, at, (windowId) => this.#screenshotWidth(windowId));
           answers.expect(list ? "list" : tool === null ? null : { tool, at });
           if (action) this.#action = action;
-          if (pointer) this.#pointer = pointer;
+          // A point that cannot be placed takes the cursor down: the old one is no longer where the agent works.
+          if (pointer) this.#pointer = pointer === "unplaced" ? null : pointer;
         }
         skipping = false;
         newline = pending.indexOf("\n");

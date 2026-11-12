@@ -361,11 +361,6 @@ export class CuaDriverRuntime {
     return this.#tap.lastPointer(maxAgeMs);
   }
 
-  /** The width of the last screenshot of one window that an agent read, which scales its clicks. */
-  screenshotWidth(windowId: number): number | null {
-    return this.#tap.screenshotWidth(windowId);
-  }
-
   /**
    * How to reach the running daemon over MCP, or `null` while there is nothing to reach.
    *
