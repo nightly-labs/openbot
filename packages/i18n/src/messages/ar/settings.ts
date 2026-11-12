@@ -145,6 +145,7 @@ export const messages = {
   "settings.planStart.set": "تعيين",
   "settings.automationLimit.sectionTitle": "الحد",
   "settings.automationLimit.sectionDescription": "ينطبق على كل الوكلاء على هذا الحاسوب.",
+  "settings.automationLimit.sectionDescriptionServer": "ينطبق على كل الوكلاء على هذا الخادم.",
   "settings.automationLimit.title": "الطلبات في الساعة",
   "settings.automationLimit.option": "{limit} في الساعة",
   "settings.automationLimit.note":

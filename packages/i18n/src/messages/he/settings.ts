@@ -144,6 +144,7 @@ export const messages = {
   "settings.planStart.set": "הגדרה",
   "settings.automationLimit.sectionTitle": "מגבלה",
   "settings.automationLimit.sectionDescription": "חלה על כל הסוכנים במחשב הזה.",
+  "settings.automationLimit.sectionDescriptionServer": "חלה על כל הסוכנים בשרת הזה.",
   "settings.automationLimit.title": "בקשות לשעה",
   "settings.automationLimit.option": "{limit} לשעה",
   "settings.automationLimit.note": "המספר המרבי של הודעות והרצות שגרה ששקריפטים מקומיים יכולים לשלוח לכל סוכן בשעה.",

@@ -152,6 +152,7 @@ export const messages = defineMessages("settings", {
   "settings.planStart.set": "Set",
   "settings.automationLimit.sectionTitle": "Limit",
   "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.sectionDescriptionServer": "It applies to all agents on this server.",
   "settings.automationLimit.title": "Requests an hour",
   "settings.automationLimit.option": "{limit} an hour",
   "settings.automationLimit.note":

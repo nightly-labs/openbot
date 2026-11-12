@@ -330,6 +330,8 @@ export const messages = {
   "server.settings.later": "Depois",
   "server.settings.setUp": "Configurar",
   "server.settings.agents": "Agentes",
+  "server.settings.agentsDescription":
+    "Escolha o que os agentes deste servidor podem fazer quando você não define isso para um agente.",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
     "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",

@@ -204,6 +204,7 @@
     "./team-protocol/agent-notification-levels-v1": "./src/team-protocol/agent-notification-levels-v1.ts",
     "./team-protocol/sidebar-pins-v1": "./src/team-protocol/sidebar-pins-v1.ts",
     "./team-protocol/agent-plan-card-v1": "./src/team-protocol/agent-plan-card-v1.ts",
+    "./team-protocol/agent-defaults-v1": "./src/team-protocol/agent-defaults-v1.ts",
     "./team-protocol/agent-welcome-v1": "./src/team-protocol/agent-welcome-v1.ts",
     "./team-protocol/ui-block-auto-answer-v1": "./src/team-protocol/ui-block-auto-answer-v1.ts",
     "./team-protocol/ui-block-vault-v1": "./src/team-protocol/ui-block-vault-v1.ts",

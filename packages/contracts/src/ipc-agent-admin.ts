@@ -9,17 +9,22 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isAgentModel } from "./ipc-agent-identity";
 import { isAgentTaskLimit } from "./ipc-agent-tasks";
 import {
+  AGENT_DEFAULT_KEYS,
   type AgentAccess,
   type AgentBackupModels,
+  type AgentDefaults,
   type AgentModelChoice,
   type AgentUsageLimitReturn,
   isAgentAccess,
   isAgentBackupModels,
+  isAgentDefaults,
   isAgentUsageLimitReturn,
+  isAutomationRunsPerHour,
+  isPlanStartAfterMs,
 } from "./ipc-agents";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
-import { isBoolean, isDynamicRecord } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
 export interface AgentAdminSettings {
   access: AgentAccess;
@@ -365,4 +370,130 @@ export function decodeAddedAgent(value: unknown): AddedAgent {
   if (!isDynamicRecord(value) || !isIdentifier(value.id) || typeof value.name !== "string")
     throw new Error("Invalid added agent response.");
   return { id: value.id, name: value.name };
+}
+
+/** A setting of Settings › Agents: the three agent defaults, and "Steer agents while they work". */
+export const AGENT_DEFAULT_SETTING_KEYS = [
+  "allowAutomation",
+  "allowNewChat",
+  "quickAcknowledgement",
+  "busyMessageMode",
+] as const;
+export type AgentDefaultSetting = (typeof AGENT_DEFAULT_SETTING_KEYS)[number];
+
+/** What one agent does for a setting: follow the default, or its own value. */
+export const AGENT_DEFAULT_CHOICES = ["default", "on", "off"] as const;
+export type AgentDefaultChoice = (typeof AGENT_DEFAULT_CHOICES)[number];
+
+/** The own values of one agent. Null: the agent follows the default. */
+export interface AgentDefaultsAgentValues {
+  agentId: string;
+  allowAutomation: boolean | null;
+  allowNewChat: boolean | null;
+  quickAcknowledgement: boolean | null;
+  busyMessageMode: BusyMessageMode | null;
+}
+
+/**
+ * Settings › Agents of one computer: its agent defaults, its default for a message sent to a busy
+ * agent, and the own values of its agents. An owner or admin of a joined server reads it on
+ * `agent-defaults-v1`.
+ */
+export interface AgentDefaultsOverview {
+  defaults: AgentDefaults;
+  busyMessageMode: BusyMessageMode;
+  agents: AgentDefaultsAgentValues[];
+}
+
+/** The defaults to change. An absent field keeps its value. */
+export type UpdateAgentDefaultsInput = Partial<AgentDefaults> & { busyMessageMode?: BusyMessageMode };
+
+/** Gives `choice` for `setting` to each agent of `agentIds`. */
+export interface SetAgentDefaultChoiceInput {
+  agentIds: string[];
+  setting: AgentDefaultSetting;
+  choice: AgentDefaultChoice;
+}
+
+function decodeOwnFlag(value: unknown): boolean | null {
+  if (value === null || isBoolean(value)) return value;
+  throw new Error("Invalid agent defaults.");
+}
+
+export function decodeAgentDefaultsOverview(value: unknown): AgentDefaultsOverview {
+  if (
+    !isDynamicRecord(value) ||
+    !isAgentDefaults(value.defaults) ||
+    !isBusyMessageMode(value.busyMessageMode) ||
+    !Array.isArray(value.agents)
+  )
+    throw new Error("Invalid agent defaults.");
+  const { defaults } = value;
+  return {
+    defaults: {
+      allowAutomation: defaults.allowAutomation,
+      allowNewChat: defaults.allowNewChat,
+      quickAcknowledgement: defaults.quickAcknowledgement,
+      planStartAfterMs: defaults.planStartAfterMs,
+      automationRunsPerHour: defaults.automationRunsPerHour,
+      commitCoAuthor: defaults.commitCoAuthor,
+    },
+    busyMessageMode: value.busyMessageMode,
+    agents: value.agents.map((agent: unknown) => {
+      if (
+        !isDynamicRecord(agent) ||
+        !isIdentifier(agent.agentId) ||
+        (agent.busyMessageMode !== null && !isBusyMessageMode(agent.busyMessageMode))
+      )
+        throw new Error("Invalid agent defaults.");
+      return {
+        agentId: agent.agentId,
+        allowAutomation: decodeOwnFlag(agent.allowAutomation),
+        allowNewChat: decodeOwnFlag(agent.allowNewChat),
+        quickAcknowledgement: decodeOwnFlag(agent.quickAcknowledgement),
+        busyMessageMode: agent.busyMessageMode,
+      };
+    }),
+  };
+}
+
+export function parseUpdateAgentDefaultsInput(value: unknown): UpdateAgentDefaultsInput {
+  if (!isDynamicRecord(value)) throw new Error("Invalid agent defaults.");
+  const input: UpdateAgentDefaultsInput = {};
+  for (const key of AGENT_DEFAULT_KEYS) {
+    const flag = value[key];
+    if (flag === undefined) continue;
+    if (!isBoolean(flag)) throw new Error("Invalid agent defaults.");
+    input[key] = flag;
+  }
+  if (value.planStartAfterMs !== undefined) {
+    if (!isPlanStartAfterMs(value.planStartAfterMs)) throw new Error("Invalid agent defaults.");
+    input.planStartAfterMs = value.planStartAfterMs;
+  }
+  if (value.automationRunsPerHour !== undefined) {
+    if (!isAutomationRunsPerHour(value.automationRunsPerHour)) throw new Error("Invalid agent defaults.");
+    input.automationRunsPerHour = value.automationRunsPerHour;
+  }
+  if (value.commitCoAuthor !== undefined) {
+    if (!isBoolean(value.commitCoAuthor)) throw new Error("Invalid agent defaults.");
+    input.commitCoAuthor = value.commitCoAuthor;
+  }
+  if (value.busyMessageMode !== undefined) {
+    if (!isBusyMessageMode(value.busyMessageMode)) throw new Error("Invalid agent defaults.");
+    input.busyMessageMode = value.busyMessageMode;
+  }
+  return input;
+}
+
+export function parseSetAgentDefaultChoiceInput(value: unknown): SetAgentDefaultChoiceInput {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.agentIds) ||
+    value.agentIds.length > 1_000 ||
+    !value.agentIds.every(isIdentifier) ||
+    !isOneOf(AGENT_DEFAULT_SETTING_KEYS, value.setting) ||
+    !isOneOf(AGENT_DEFAULT_CHOICES, value.choice)
+  )
+    throw new Error("Invalid agent default choice.");
+  return { agentIds: [...value.agentIds], setting: value.setting, choice: value.choice };
 }

@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "設定",
   "settings.automationLimit.sectionTitle": "上限",
   "settings.automationLimit.sectionDescription": "このコンピューターのすべてのエージェントに適用されます。",
+  "settings.automationLimit.sectionDescriptionServer": "このサーバーのすべてのエージェントに適用されます。",
   "settings.automationLimit.title": "1時間あたりのリクエスト",
   "settings.automationLimit.option": "1時間あたり{limit}件",
   "settings.automationLimit.note":

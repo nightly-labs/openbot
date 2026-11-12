@@ -253,9 +253,12 @@ export function appIpcHandlers({
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
-      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
-        runCauseEffect(busyMessageMode.set(parsed)),
-      ),
+      // The `agents-changed` event tells the open Server Settings of other devices to read the mode again.
+      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, async (parsed) => {
+        const saved = await runCauseEffect(busyMessageMode.set(parsed));
+        service.agentDefaultsChanged(agentDefaults.get());
+        return saved;
+      }),
       getAgentDefaults: handler(() => agentDefaults.get()),
       // The agents that follow a changed default get it at once: see `AgentService.agentDefaultsChanged`.
       setAgentDefaults: payloadHandler(parseAgentDefaults, async (parsed) => {

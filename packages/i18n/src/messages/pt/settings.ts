@@ -149,6 +149,7 @@ export const messages = {
   "settings.planStart.set": "Definir",
   "settings.automationLimit.sectionTitle": "Limite",
   "settings.automationLimit.sectionDescription": "Vale para todos os agentes neste computador.",
+  "settings.automationLimit.sectionDescriptionServer": "Vale para todos os agentes neste servidor.",
   "settings.automationLimit.title": "Pedidos por hora",
   "settings.automationLimit.option": "{limit} por hora",
   "settings.automationLimit.note":

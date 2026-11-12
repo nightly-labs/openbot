@@ -1,4 +1,10 @@
-import type { AgentDefaultKey, AgentDefaults, ClientAgentSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentDefaultChoice,
+  AgentDefaultKey,
+  AgentDefaultSetting,
+  AgentDefaults,
+  ClientAgentSummary,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -31,12 +37,6 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AutomationLimitRow } from "./AutomationLimitRow";
 import { PlanStartRow } from "./PlanStartRow";
-
-/** A setting of the Agents tab: the three account defaults, and "Steer agents while they work". */
-export type AgentDefaultSetting = AgentDefaultKey | "busyMessageMode";
-
-/** What one agent does for a setting: follow the default, or its own value. */
-export type AgentDefaultChoice = "default" | "on" | "off";
 
 const CHOICES: AgentDefaultChoice[] = ["default", "on", "off"];
 
@@ -129,6 +129,8 @@ export interface SettingsAgentsTabProps {
   steer: boolean;
   /** The open setting, or null for the list of settings. */
   setting: AgentDefaultSetting | null;
+  /** Where the agents run, for the text of the local script limit. Missing: this computer. */
+  scope?: "computer" | "server";
   /** The dialog element that the menus portal into. */
   menuMount: HTMLElement | undefined;
   onOpen: (setting: AgentDefaultSetting) => void;
@@ -353,7 +355,11 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
         <Show when={setting === "allowAutomation"}>
           <SettingsSection
             title={t("settings.automationLimit.sectionTitle")}
-            description={t("settings.automationLimit.sectionDescription")}
+            description={t(
+              props.scope === "server"
+                ? "settings.automationLimit.sectionDescriptionServer"
+                : "settings.automationLimit.sectionDescription",
+            )}
           >
             <ItemGroup class="settings-modal-card">
               <AutomationLimitRow

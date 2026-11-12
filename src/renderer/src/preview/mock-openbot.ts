@@ -2411,6 +2411,33 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
       },
+      getAgentDefaultsOverview: async () => ({
+        defaults: clone(agentDefaults),
+        busyMessageMode: busyMessageMode.mode,
+        agents: agents.map((agent) => ({
+          agentId: agent.id,
+          allowAutomation: agent.allowAutomation ?? null,
+          allowNewChat: agent.allowNewChat ?? null,
+          quickAcknowledgement: agent.quickAcknowledgement ?? null,
+          busyMessageMode: agent.busyMessageMode ?? null,
+        })),
+      }),
+      updateAgentDefaultsOverview: async ({ busyMessageMode: mode, ...changes }, serverId) => {
+        if (mode) busyMessageMode = { mode };
+        agentDefaults = { ...agentDefaults, ...changes };
+        return api.agent.getAgentDefaultsOverview(serverId);
+      },
+      setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {
+        for (const agentId of agentIds) {
+          if (setting === "busyMessageMode")
+            await api.agent.updateAgent({
+              agentId,
+              busyMessageMode: choice === "default" ? null : choice === "on" ? "steer" : "queue",
+            });
+          else await api.agent.updateAgent({ agentId, [setting]: choice === "default" ? null : choice === "on" });
+        }
+        return api.agent.getAgentDefaultsOverview(serverId);
+      },
       // The preview has no joined server, so no member shares a computer with it.
       listBrowserProxies: async () => ({ proxies: browserProxies, computers: [] }),
       getBrowserComputerSharing: async () => null,

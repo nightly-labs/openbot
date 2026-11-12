@@ -340,6 +340,8 @@ export const messages = {
   "server.settings.later": "Later",
   "server.settings.setUp": "Instellen",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Kies wat de agents op deze server mogen doen als je het niet per agent instelt.",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft.",

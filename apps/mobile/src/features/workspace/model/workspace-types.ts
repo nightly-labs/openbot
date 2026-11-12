@@ -10,6 +10,7 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentDefaultsOverview,
   AgentExclusionChange,
   AgentFastModeSettings,
   AgentFolderBrowse,
@@ -42,6 +43,7 @@ import type {
   AvatarColor,
   AvatarHue,
   AvatarImageInput,
+  BackgroundProcess,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
@@ -118,6 +120,7 @@ import type {
   SaveWorkflowGraphInput,
   ServerAuditLog,
   ServerNotificationLevel,
+  SetAgentDefaultChoiceInput,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
@@ -140,6 +143,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentDefaultsInput,
   UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
@@ -888,6 +892,26 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /** An owner or admin of an online host that serves `agent-defaults-v1`. The host checks the role again. */
+  canManageAgentDefaults: (serverId: string) => boolean;
+  /**
+   * Settings > Agents of the host: its agent defaults and the own value of each agent that this member
+   * sees. Null when the host does not advertise `agent-defaults-v1`. Owners and admins only.
+   */
+  loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
+  /** Changes the given defaults. Owners and admins only. Resolves with the overview the host saved. */
+  updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** Gives one choice for one setting to each named agent. Owners and admins only. */
+  setAgentDefaultChoice: (input: SetAgentDefaultChoiceInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** An owner or admin of an online host that serves `background-processes-v1`. The host checks the role again. */
+  canManageBackgroundProcesses: (serverId: string) => boolean;
+  /**
+   * The programs that the host's agents left running, such as a dev server. Null when the host cannot
+   * find them, as on Windows. Owners and admins only.
+   */
+  loadBackgroundProcesses: (serverId: string) => Promise<BackgroundProcess[] | null>;
+  /** Stops one of these programs with its children. A program that ended is not an error. Owners and admins only. */
+  stopBackgroundProcess: (id: string, serverId: string) => Promise<void>;
   /**
    * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
    * setting, and with manage access changes it, as the model. The host checks the access.
@@ -1224,6 +1248,8 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentDefaults"
+  | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"
   | "canPublishAgent"
   | "canManageProviderAccounts";

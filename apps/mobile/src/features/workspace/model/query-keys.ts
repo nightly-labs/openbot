@@ -40,6 +40,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "provider-accounts",
   "browser-profile",
   "folders",
+  "agent-defaults",
 ];
 
 /**
@@ -113,6 +114,13 @@ export const queryKeys = {
     agentId,
     path,
   ],
+  /**
+   * Settings > Agents of a server. Under the server's agent records and in `AGENT_SETTINGS_PARTS`, so
+   * the host's `agents-changed` event reads it again.
+   */
+  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
+  /** The programs that the agents of a server left running. No host event tells a change, so a page reads them on open. */
+  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
   /** Under the server's agent records, so the host's agent events refresh it. */
   sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
   /** The settings of a channel. Its memory and routine events invalidate the part they change. */

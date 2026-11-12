@@ -96,6 +96,7 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -357,6 +358,8 @@ import { RoutineResultError } from "../src/backend/routine-results/routine-resul
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import type { AgentAccessState } from "../src/main/agent-access-store";
+import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
+import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
@@ -366,6 +369,7 @@ import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
+import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
 import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
@@ -453,6 +457,9 @@ interface RecordedCall {
 
 mkdirSync(OUT, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "openbot-team-api-routes-"));
+const agentDefaultsPath = join(root, "agent-defaults.json");
+const agentDefaultsPreferences = createAgentDefaultsPreferenceStore(agentDefaultsPath);
+const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root, "busy-message-mode.json"));
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -2121,6 +2128,26 @@ try {
         },
         busyMessageMode: { get: () => ({ mode: "queue" }) },
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
+      }),
+      // The real preference files in the temporary folder, over agents that record each write.
+      agentDefaults: createAgentDefaultsSettings({
+        agents: {
+          listAgents: () => agents,
+          updateAgent: (input) =>
+            Effect.sync(() => {
+              record("updateAgent", input);
+              const target = agents.find((item) => item.id === input.agentId);
+              if (!target) throw new Error("Agent not found.");
+              if (input.allowAutomation === null) delete target.allowAutomation;
+              else if (input.allowAutomation !== undefined) target.allowAutomation = input.allowAutomation;
+              if (input.busyMessageMode === null) delete target.busyMessageMode;
+              else if (input.busyMessageMode !== undefined) target.busyMessageMode = input.busyMessageMode;
+              return target;
+            }),
+          agentDefaultsChanged: (previous) => record("agentDefaultsChanged", previous),
+        },
+        agentDefaults: agentDefaultsPreferences,
+        busyMessageMode: busyMessageModePreferences,
       }),
       memoryReview,
       skillLearning,
@@ -4268,6 +4295,173 @@ try {
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,
       [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Agent defaults (agent-defaults-v1) ----
+  {
+    const defaultsCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_DEFAULTS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-defaults-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_DEFAULTS_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the agent defaults routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: bobToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const memberUpdate = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: bobToken,
+      json: { allowAutomation: true },
+      capabilities: defaultsCapabilities,
+    });
+    const memberChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada"], setting: "allowAutomation", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "a member cannot read or change the agent defaults, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChoice, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes &&
+        !existsSync(agentDefaultsPath),
+      [summary(memberRead), summary(memberUpdate), summary(memberChoice)],
+    );
+    const adminRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const readAgents = list(field(adminRead.body, "agents"));
+    check(
+      "an admin reads the host defaults, the steer default and the own values of each agent",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(field(adminRead.body, "defaults"), DEFAULT_AGENT_DEFAULTS) &&
+        field(adminRead.body, "busyMessageMode") === "steer" &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-ada"),
+      summary(adminRead),
+    );
+    const hiddenRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "the read does not list an agent that the client protocol does not show",
+      hiddenRead.status === 200 &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-pi") &&
+        !list(field(hiddenRead.body, "agents")).some((agent) => field(agent, "agentId") === "agent-pi"),
+      summary(hiddenRead),
+    );
+    const invalid = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { planStartAfterMs: 1_234 },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the host refuses a plan start time outside the limits, and writes nothing",
+      invalid.status === 400 && !existsSync(agentDefaultsPath) && callsOf("agentDefaultsChanged").length === 0,
+      summary(invalid),
+    );
+    const update = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { allowAutomation: true, planStartAfterMs: null, automationRunsPerHour: 12, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    const stored = existsSync(agentDefaultsPath) ? JSON.parse(readFileSync(agentDefaultsPath, "utf8")) : null;
+    const expectedDefaults = {
+      ...DEFAULT_AGENT_DEFAULTS,
+      allowAutomation: true,
+      planStartAfterMs: null,
+      automationRunsPerHour: 12,
+    };
+    check(
+      "an admin changes the defaults; the host saves them, keeps the other values and tells the agents once",
+      update.status === 200 &&
+        isDeepStrictEqual(field(update.body, "defaults"), expectedDefaults) &&
+        field(update.body, "busyMessageMode") === "queue" &&
+        isDeepStrictEqual(stored, { version: 1, ...expectedDefaults }) &&
+        isDeepStrictEqual(busyMessageModePreferences.get(), { mode: "queue" }) &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS]]),
+      [summary(update), stored],
+    );
+    const limitOnly = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20 },
+      capabilities: defaultsCapabilities,
+    });
+    const sameMode = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "each change tells the agents and the open clients (agents-changed); a request that changes nothing does not",
+      limitOnly.status === 200 &&
+        field(limitOnly.body, "defaults", "automationRunsPerHour") === 20 &&
+        sameMode.status === 200 &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS], [expectedDefaults]]),
+      [summary(limitOnly), summary(sameMode)],
+    );
+    const steer = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    const ownAda = (body: Json | undefined) =>
+      list(field(body, "agents")).find((agent) => field(agent, "agentId") === "agent-ada");
+    check(
+      "an admin gives an agent its own steer value through the agent writer",
+      steer.status === 200 &&
+        field(ownAda(steer.body), "busyMessageMode") === "steer" &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: "steer" }]),
+      summary(steer),
+    );
+    const followDefault = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "default" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the default choice removes the own value, so the agent follows the default again",
+      followDefault.status === 200 &&
+        field(ownAda(followDefault.body), "busyMessageMode") === null &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: null }]),
+      summary(followDefault),
+    );
+    const before = callsOf("updateAgent").length;
+    const missing = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada", "agent-none"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+    });
+    const hiddenChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-pi"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a choice that names an unknown agent or an agent that the client protocol does not show gets 404 and writes nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenChoice, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === before,
+      [summary(missing), summary(hiddenChoice)],
     );
   }
 

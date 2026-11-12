@@ -376,6 +376,7 @@ export const messages = {
   "server.settings.later": "מאוחר יותר",
   "server.settings.setUp": "הגדרה",
   "server.settings.agents": "סוכנים",
+  "server.settings.agentsDescription": "בחרו מה הסוכנים בשרת הזה יכולים לעשות כשלא הגדרתם זאת לסוכן.",
   "server.settings.timezone": "אזור זמן",
   "server.settings.timezoneDescription":
     "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח.",

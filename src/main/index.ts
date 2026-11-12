@@ -761,6 +761,7 @@ function registerIpcHandlers({
   approvalAutomation,
   agentAdminSettings,
   agentHostSettings,
+  agentDefaultsSettings,
   agentFolders,
   agentInstructions,
   browserProfiles,
@@ -1011,6 +1012,7 @@ function registerIpcHandlers({
     ...agentAdminIpcHandlers({
       settings: agentAdminSettings,
       hostSettings: agentHostSettings,
+      defaultsSettings: agentDefaultsSettings,
       browserProfiles,
       skills,
       marketplaceAgents,

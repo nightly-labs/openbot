@@ -46,13 +46,16 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentDefaultsOverview,
   AgentFastModeSettings,
   AgentHostSettings,
   AgentNewChatSettings,
   AgentPlanCardSettings,
   AgentTaskLimitSettings,
+  SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentDefaultsInput,
   UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentNewChatInput,
@@ -2112,6 +2115,14 @@ export const IPC_ENDPOINTS = {
       "agent:admin:update-browser-profile",
     ),
     // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
+    // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
+    getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
+    updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
+      "agent:admin:update-agent-defaults",
+    ),
+    setAgentDefaultChoice: scopedRequest<SetAgentDefaultChoiceInput, AgentDefaultsOverview, "required">()(
+      "agent:admin:set-agent-default-choice",
+    ),
     listBrowserProxies: scopedQuery<BrowserProxyList | null>()("agent:admin:list-browser-proxies"),
     saveBrowserProxy: scopedRequest<SaveBrowserProxyInput, BrowserProxySummary>()("agent:admin:save-browser-proxy"),
     deleteBrowserProxy: scopedRequest<DeleteBrowserProxyInput, void>()("agent:admin:delete-browser-proxy"),
