@@ -478,12 +478,13 @@ try {
   // openbot.tool_call names one, and OpenBot runs it on the agent's saved row.
   const fallback = store.save({ ...calendar, id: "", name: "Product Hunt", url: servers.open.url });
   const agentTools = mcpServersFromGateway(gateway, undefined, () => [fallback]);
-  for (const name of ["Product_Hunt.get_leaderboard", "mcp_Product_Hunt_get_leaderboard"]) {
+  for (const name of ["Product_Hunt.get_leaderboard", "Product Hunt.get_leaderboard"]) {
     const found = findAgentMcpTool(agentTools.forAgent("agent"), name);
     assert.equal(found?.config.id, fallback.id, name);
     assert.equal(found?.tool, "get_leaderboard", name);
   }
   assert.equal(findAgentMcpTool([fallback], "other.get_leaderboard"), null, "another server's name");
+  assert.equal(findAgentMcpTool([fallback], "mcp_Product_Hunt_get_leaderboard"), null, "the ambiguous mcp_ form");
   const ran = await runCauseEffect(agentTools.callTool(fallback, "get_leaderboard", { limit: 3 }));
   assert.ok("result" in ran, "the tool runs on the saved row");
   assert.deepEqual(mcpToolCallResponse(ran.result), {

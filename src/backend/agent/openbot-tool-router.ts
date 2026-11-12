@@ -938,16 +938,16 @@ export class OpenBotToolRouter {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider === "opencode")
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
-    if (client.provider === "antigravity") {
-      const agentId = this.#conversation.agentForThread(threadId);
-      return agentId && (this.#mcpServers?.forAgent(agentId).length ?? 0) > 0 ? ANTIGRAVITY_DEFERRED_MCP_NOTE : null;
-    }
+    if (client.provider === "antigravity")
+      return this.#mcpServers?.list().some((config) => config.enabled && config.transport === "http")
+        ? ANTIGRAVITY_DEFERRED_MCP_NOTE
+        : null;
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
 
   /**
-   * A `tool_call` that names a tool of one of the agent's saved MCP servers. Antigravity 1.5 leaves the
+   * A `tool_call` that names a tool of one of the agent's saved http MCP servers. Antigravity 1.5 leaves the
    * tools over its schema budget out of the tool list, with no `call_mcp_tool` for them (#7427), so
    * OpenBot runs the tool itself, with the sign-in of the server's address. The user approves it as a
    * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
@@ -978,7 +978,10 @@ export class OpenBotToolRouter {
       })
       .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
-    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments));
+    // Stop cancels the call, as it cancels the provider's own MCP call.
+    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments)).pipe(
+      Effect.raceFirst(requestAborted(request.signal)),
+    );
     if (Result.isFailure(outcome))
       return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
     return "error" in outcome.success

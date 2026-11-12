@@ -115,7 +115,7 @@ export interface AgentMcpServers {
   offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled servers that the agent gets. */
+  /** The saved, enabled http servers that the agent gets. */
   forAgent(agentId: string): McpServerConfig[];
   /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
   callTool(
@@ -126,10 +126,11 @@ export interface AgentMcpServers {
 }
 
 /**
- * The saved server and the tool that a `tool_call` name gives: `<server>.<tool>`, or the provider's
- * own `mcp_<server>_<tool>`, with the server as the agent's instructions name it. A provider changes
- * a name such as "My Server" to `My_Server`, and Antigravity gets `openbot_<name>` when its own files
- * use the name, so each form matches. The longest server name wins.
+ * The saved server and the tool that a `tool_call` name gives: `<server>.<tool>`, with the server as
+ * the agent's instructions name it. A provider changes a name such as "My Server" to `My_Server`, and
+ * Antigravity gets `openbot_<name>` when its own files use the name, so each form matches. The
+ * provider's own `mcp_<server>_<tool>` is not read: with servers `foo` and `foo_bar` it names two
+ * tools. The longest server name wins.
  */
 export function findAgentMcpTool(
   configs: readonly McpServerConfig[],
@@ -139,11 +140,10 @@ export function findAgentMcpTool(
   for (const config of configs) {
     const provider = providerMcpServerName(config.name);
     for (const server of [config.name, provider, `openbot_${provider}`]) {
-      for (const prefix of [`${server}.`, `mcp_${server}_`, `mcp__${server}__`]) {
-        if (!name.startsWith(prefix) || name.length === prefix.length) continue;
-        if (!found || prefix.length > found.length)
-          found = { config, tool: name.slice(prefix.length), length: prefix.length };
-      }
+      const prefix = `${server}.`;
+      if (!name.startsWith(prefix) || name.length === prefix.length) continue;
+      if (!found || prefix.length > found.length)
+        found = { config, tool: name.slice(prefix.length), length: prefix.length };
     }
   }
   return found && { config: found.config, tool: found.tool };
@@ -196,12 +196,7 @@ export function mcpServersFromGateway(
     offersSignIn: (config) => gateway.offersSignIn(config),
     redact: (text) => gateway.redact(text),
     forAgent,
-    // A stdio server waits for its managed runtime, as its test does.
-    callTool: (config, name, args) =>
-      (prepareTest?.(config) ?? Effect.void).pipe(
-        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure)),
-      ),
+    callTool: (config, name, args) => gateway.callTool(config, name, args).pipe(toToolFailure),
   };
 }
 
