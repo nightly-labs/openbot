@@ -72,7 +72,12 @@ highlight controller add, resize, and remove display overlays without restarting
 changing provider sessions. The tap removes the driver's own cursor tools (`set_agent_cursor_*`
 and `get_agent_cursor_state`) from the tool list: with `--no-overlay` they change nothing on the
 screen, and on macOS they refuse. `move_cursor` stays, because OpenBot draws its cursor at the
-point of that call.
+point of that call. A `click` or a `scroll` aimed at a window names a pixel of that window's last
+`get_window_state` screenshot, not a desktop point. The tap keeps the `screenshot_width` of each
+window from that answer, and the cursor goes to the window's top-left corner plus the point times
+the window width divided by that screenshot width, as the driver computes it. Without that window
+in `list_windows` or its screenshot width, OpenBot draws no cursor. A click that names no window,
+or a point in a `zoom` image, does not move the cursor.
 
 ### Agent display on a server
 

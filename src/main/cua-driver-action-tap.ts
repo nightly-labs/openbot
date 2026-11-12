@@ -67,6 +67,9 @@ const NEWLINE = 0x0a;
  */
 const SLOW_CALL_MS = 5_000;
 
+/** How many windows keep the width of their last screenshot. An agent works in a few at a time. */
+const MAX_SCREENSHOT_WINDOWS = 32;
+
 const defaultLogger = createOpenBotLogger("cua-driver-tap");
 
 /**
@@ -97,7 +100,15 @@ export interface ObservedAction {
 export interface ObservedPointer {
   /** The driver tool that named the point, kept so a log can say why the cursor moved. */
   tool: string;
-  /** The desktop point, in the same units `list_windows` reports window bounds in. */
+  /**
+   * The window whose own last screenshot `x` and `y` are pixels of, or `null` when they are a
+   * desktop point in the units `list_windows` reports window bounds in.
+   *
+   * A click or a scroll aimed at a window names a pixel of that window's screenshot, which is the
+   * driver's default. Read as a desktop point, it put the cursor on the main display while the
+   * agent worked on another one (#7511).
+   */
+  windowId: number | null;
   x: number;
   y: number;
   /** When the request passed through, from `Date.now()`. */
@@ -179,7 +190,36 @@ function readPointer(tool: string, args: DynamicRecord, at: number): ObservedPoi
   // A click on an element names the element and no point at all, which is the driver's own
   // accessibility route. There is nowhere to draw a cursor then, so none is drawn.
   if (x === null || y === null) return null;
-  return { tool, x, y, at };
+  const windowId = pointerWindow(tool, args);
+  return windowId === undefined ? null : { tool, windowId, x, y, at };
+}
+
+/**
+ * The window whose screenshot pixels a point is in, `null` for a desktop point, or `undefined` when
+ * the request does not say enough to place it.
+ *
+ * `move_cursor` names a desktop point in each of its scopes. A click or a scroll names one only in
+ * the desktop frame, or when it names no application at all; otherwise the point is in the
+ * window's own screenshot. A point in a zoomed image, or in a window that the request does not
+ * name, has no place OpenBot can work out, and a cursor in the wrong place is worse than none.
+ */
+function pointerWindow(tool: string, args: DynamicRecord): number | null | undefined {
+  if (tool === "move_cursor") return null;
+  const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
+  if (args.scope === "desktop" || args.coordinate_frame === "desktop" || target.kind === "desktop") return null;
+  const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
+  if (windowId === null && numberIn(args.pid) === null && numberIn(target.pid) === null) return null;
+  if (windowId === null || args.from_zoom === true) return undefined;
+  return windowId;
+}
+
+/** The window and the width of a `get_window_state` screenshot, from its structured result. */
+function screenshotOf(answer: DynamicRecord): { windowId: number; width: number } | null {
+  const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
+  const structured = result && isDynamicRecord(result.structuredContent) ? result.structuredContent : null;
+  const windowId = numberIn(structured?.window_id);
+  const width = numberIn(structured?.screenshot_width);
+  return windowId !== null && width !== null && width > 0 ? { windowId, width } : null;
 }
 
 function numberIn(value: unknown): number | null {
@@ -222,11 +262,17 @@ class CallAnswerLines extends Transform {
   #held: Buffer[] = [];
   #heldBytes = 0;
   readonly #answered: (tool: string, ms: number) => void;
+  readonly #captured: (windowId: number, width: number) => void;
   readonly #now: () => number;
 
-  constructor(answered: (tool: string, ms: number) => void, now: () => number) {
+  constructor(
+    answered: (tool: string, ms: number) => void,
+    captured: (windowId: number, width: number) => void,
+    now: () => number,
+  ) {
     super();
     this.#answered = answered;
+    this.#captured = captured;
     this.#now = now;
   }
 
@@ -290,8 +336,15 @@ class CallAnswerLines extends Transform {
     this.#held = [];
     this.#heldBytes = 0;
     if (!whole) this.push(line);
-    else this.push(this.#answering === "list" ? withoutDriverCursorTools(line) : withCopy(line));
+    else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
+    else this.push(withCopy(line, this.#answering?.tool === "get_window_state" ? this.#readScreenshot : undefined));
   }
+
+  /** Keeps the width of a window screenshot, which scales the pixels a later click names. */
+  readonly #readScreenshot = (answer: DynamicRecord): void => {
+    const screenshot = screenshotOf(answer);
+    if (screenshot) this.#captured(screenshot.windowId, screenshot.width);
+  };
 }
 
 /** One whole tool list answer line, ending in its newline, less the tools in `DRIVER_CURSOR_TOOLS`. */
@@ -307,12 +360,18 @@ function withoutDriverCursorTools(line: Buffer): Buffer {
   return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
 }
 
-/** One whole answer line, ending in its newline, with the copy added when there is one to add. */
-function withCopy(line: Buffer): Buffer {
+/**
+ * One whole answer line, ending in its newline, with the copy added when there is one to add.
+ * `read` is given the parsed answer, so a field the tap keeps costs no second parse.
+ */
+function withCopy(line: Buffer, read?: (answer: DynamicRecord) => void): Buffer {
   // Most answers have no structured result and are no refusal or error, and this search costs far less than the parse.
   if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
     return line;
-  const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
+  const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
+  if (!parsed) return line;
+  read?.(parsed);
+  const rewritten = rewriteCallAnswer(parsed);
   return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
 }
 
@@ -322,6 +381,8 @@ export class CuaDriverActionTap {
   #sockets = new Set<Socket>();
   #action: ObservedAction | null = null;
   #pointer: ObservedPointer | null = null;
+  /** The width of each window's last screenshot, by window id, oldest first. */
+  #screenshotWidths = new Map<number, number>();
   #address: string | null = null;
   #now: () => number;
   #logger: Logger;
@@ -359,6 +420,11 @@ export class CuaDriverActionTap {
     const pointer = this.#pointer;
     if (!pointer) return null;
     return this.#now() - pointer.at <= maxAgeMs ? pointer : null;
+  }
+
+  /** The width of the last screenshot of one window that an agent read, or `null` when none passed. */
+  screenshotWidth(windowId: number): number | null {
+    return this.#screenshotWidths.get(windowId) ?? null;
   }
 
   listen = Effect.fn("CuaDriverActionTap.listen")(function* (
@@ -399,6 +465,7 @@ export class CuaDriverActionTap {
     this.#address = null;
     this.#action = null;
     this.#pointer = null;
+    this.#screenshotWidths.clear();
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     if (!server) return;
@@ -411,7 +478,11 @@ export class CuaDriverActionTap {
     const daemon = connect(upstream);
     this.#sockets.add(client);
     this.#sockets.add(daemon);
-    const answers = new CallAnswerLines((tool, ms) => this.#logAnswered(tool, ms), this.#now);
+    const answers = new CallAnswerLines(
+      (tool, ms) => this.#logAnswered(tool, ms),
+      (windowId, width) => this.#keepScreenshotWidth(windowId, width),
+      this.#now,
+    );
     const end = () => {
       // A call that hangs in the driver ends here, when the agent gives up and closes the connection.
       for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
@@ -459,6 +530,15 @@ export class CuaDriverActionTap {
         skipping = true;
       }
     });
+  }
+
+  /** Kept for the windows read last only, so a long session does not grow the map without end. */
+  #keepScreenshotWidth(windowId: number, width: number): void {
+    this.#screenshotWidths.delete(windowId);
+    this.#screenshotWidths.set(windowId, width);
+    const oldest = this.#screenshotWidths.keys().next();
+    if (this.#screenshotWidths.size > MAX_SCREENSHOT_WINDOWS && !oldest.done)
+      this.#screenshotWidths.delete(oldest.value);
   }
 
   /** The tool name and the time only: the arguments are the user's work and are never logged. */
