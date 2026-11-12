@@ -74,6 +74,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type VaultAgentChoice, type VaultAgentScope, VaultAgentsButton } from "./VaultAgents";
 import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
 import {
   createDraftTwoStepCode,
@@ -111,7 +112,14 @@ export interface VaultPanelProps {
   menuMount?: HTMLElement | undefined;
   /** The Link account of this computer, above the cards. Absent for a joined server. */
   link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
+  /**
+   * The agents of the server, so the user chooses the agents of each item. Absent while they did not
+   * load, or for a server that does not keep the agents of an item (`state.agentScope`).
+   */
+  agents?: readonly VaultAgentChoice[] | undefined;
 }
+
+export type { VaultAgentChoice };
 
 type Filter = VaultItemKind | "all";
 
@@ -312,8 +320,17 @@ function twoStepKeyInput(draft: LoginDraft): { twoStepKey?: string } {
   return draft.twoStepRemoved ? { twoStepKey: "" } : {};
 }
 
+/**
+ * The item with its agents. Undefined agents keep the saved choice: a server without `vault-v4`, or a
+ * request from the chat, which makes an item for every agent.
+ */
+function saveInput(draft: Draft, id: string | null, agents: VaultAgentScope | undefined): VaultSaveInput {
+  const item = itemInput(draft, id);
+  return agents === undefined ? item : { ...item, agents: agents === null ? null : [...agents] };
+}
+
 /** An empty secret field keeps the saved value. */
-function saveInput(draft: Draft, id: string | null): VaultSaveInput {
+function itemInput(draft: Draft, id: string | null): VaultSaveInput {
   if (draft.kind === "login")
     return {
       kind: "login",
@@ -436,6 +453,11 @@ export function VaultPanel(props: VaultPanelProps) {
   const visible = (kind: Filter) =>
     props.state.items.filter((item) => (kind === "all" || item.kind === kind) && itemMatches(item, query()));
   const empty = () => props.state.items.length === 0;
+  /** The agents to choose from, when the server keeps the agents of each item. */
+  const agentChoices = () => (props.state.agentScope && props.agents?.length ? props.agents : undefined);
+  /** Changes only the agents of a saved item: each other field and secret keeps its saved value. */
+  const saveAgents = (item: VaultItemSummary, agents: VaultAgentScope) =>
+    run(() => props.onSave(saveInput(draftOf(item.kind, item), item.id, agents)));
 
   /** Runs one change of a confirm dialog. A failure stays in the dialog. */
   async function run(action: () => Promise<void>, fallback: AppTextKey = "vault.failed"): Promise<boolean> {
@@ -532,7 +554,7 @@ export function VaultPanel(props: VaultPanelProps) {
         <SlidingTabs.Root value={filter()} onChange={(value) => isFilter(value) && setFilter(value)}>
           <SettingsSection
             title={t("vault.items.title")}
-            description={t("vault.items.description")}
+            description={t(props.state.agentScope ? "vault.items.scopedDescription" : "vault.items.description")}
             actions={
               <NewItemMenu
                 kinds={filters().flatMap((item) => (item.value === "all" ? [] : [item.value]))}
@@ -640,6 +662,18 @@ export function VaultPanel(props: VaultPanelProps) {
                                 <ItemDescription class="vault-truncate">{itemSummary(item)}</ItemDescription>
                               </ItemContent>
                               <ItemActions class="integrations-hub-actions">
+                                <Show when={agentChoices()}>
+                                  {(agents) => (
+                                    <VaultAgentsButton
+                                      name={itemTitle(item)}
+                                      agents={agents()}
+                                      scope={item.agents ?? null}
+                                      onChange={async (scope) => {
+                                        await saveAgents(item, scope);
+                                      }}
+                                    />
+                                  )}
+                                </Show>
                                 <Show when={twoStepCodes.code(item.id)}>
                                   {(code) => (
                                     <TwoStepRowCode
@@ -691,6 +725,7 @@ export function VaultPanel(props: VaultPanelProps) {
             contactLine={contactLine}
             title={editingTitle(editing())}
             twoStep={props.onCodes !== undefined}
+            agents={agentChoices()}
             savedCode={editingCode()}
             onCopyCode={copyCode}
             onSave={(input) => props.onSave(input)}
@@ -1089,6 +1124,8 @@ function ItemDialog(props: {
   fromChat?: boolean | undefined;
   /** The server keeps two-step keys, so a login offers one. */
   twoStep?: boolean | undefined;
+  /** The agents to choose from. Absent: the item keeps its agents, and a new item is for every agent. */
+  agents?: readonly VaultAgentChoice[] | undefined;
   /** The current code of the saved key, from main. */
   savedCode?: LiveTwoStepCode | undefined;
   onCopyCode?: ((code: string) => void) | undefined;
@@ -1102,6 +1139,8 @@ function ItemDialog(props: {
   );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
+  // A new item is for every agent; the user changes it here or later from its row.
+  const [scope, setScope] = createSignal<VaultAgentScope>(untrack(() => props.item?.agents ?? null));
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
   const loginDraft = () => {
     const current = draft();
@@ -1181,7 +1220,7 @@ function ItemDialog(props: {
     setSaving(true);
     setFailure(null);
     try {
-      await props.onSave(saveInput(draft(), props.item?.id ?? null));
+      await props.onSave(saveInput(draft(), props.item?.id ?? null, props.agents ? scope() : undefined));
       props.onClose();
     } catch (error) {
       setFailure(errorDetails(error, t("vault.failed")));
@@ -1189,6 +1228,16 @@ function ItemDialog(props: {
       setSaving(false);
     }
   }
+
+  const agentsField = () => (
+    <Show when={props.agents}>
+      {(agents) => (
+        <Field label={t("vault.agents.label")} class="vault-wide">
+          <VaultAgentsButton name={props.title} agents={agents()} scope={scope()} onChange={setScope} />
+        </Field>
+      )}
+    </Show>
+  );
 
   const fields = (): JSX.Element => (
     <Switch>
@@ -1240,6 +1289,7 @@ function ItemDialog(props: {
                 />
               </Field>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1328,6 +1378,7 @@ function ItemDialog(props: {
                 </ul>
               </fieldset>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1415,6 +1466,7 @@ function ItemDialog(props: {
                 onValueChange={(email) => set(contact(), { email })}
               />
             </Field>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1454,6 +1506,7 @@ function ItemDialog(props: {
                 onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
               />
             </Field>
+            {agentsField()}
           </div>
         )}
       </Match>

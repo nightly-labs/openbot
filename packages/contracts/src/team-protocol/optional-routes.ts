@@ -131,6 +131,7 @@ import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
+import { VAULT_V4_CODECS } from "./vault-v4";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
@@ -276,6 +277,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...VAULT_IMPORT_CODECS,
   ...VAULT_V2_CODECS,
   ...VAULT_V3_CODECS,
+  ...VAULT_V4_CODECS,
   ...INSTANCE_TRANSFER_CHUNKS_CODECS,
   ...INSTANCE_TRANSFER_FULL_COPY_CODECS,
 ]);

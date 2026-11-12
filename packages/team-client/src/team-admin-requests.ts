@@ -2014,13 +2014,20 @@ export function saveHostVaultItem(
   v2: boolean,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
   // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
-  // key, and an absent key keeps the saved one. JSON has no undefined, so an absent field stays out.
-  const { fillSites, twoStepKey, ...item } = { fillSites: undefined, twoStepKey: undefined, ...input };
+  // key, and an absent key keeps the saved one. Absent agents keep the saved agents. JSON has no
+  // undefined, so an absent field stays out.
+  const { fillSites, twoStepKey, agents, ...item } = {
+    fillSites: undefined,
+    twoStepKey: undefined,
+    agents: undefined,
+    ...input,
+  };
   return adminCall(() =>
     request("POST", vaultRoutes(v2).save, decodeHostVaultState, {
       ...item,
       ...(fillSites === undefined ? {} : { fillSites }),
       ...(twoStepKey === undefined ? {} : { twoStepKey }),
+      ...(agents === undefined ? {} : { agents }),
     }),
   );
 }

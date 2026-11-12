@@ -5,6 +5,13 @@ export const messages = {
   "vault.items.title": "Zapisane elementy",
   "vault.items.description":
     "Każdy agent na tym serwerze może używać tych elementów. OpenBot sam wpisuje na stronie hasła, numery kart i kody zabezpieczające, więc agenci nigdy ich nie widzą. Agenci odczytują klucze API z prywatnego pliku, a nie z czatu.",
+  "vault.items.scopedDescription":
+    "Każdy element jest dla wybranych przez Ciebie agentów. OpenBot sam wpisuje na stronie hasła, numery kart i kody zabezpieczające, więc agenci nigdy ich nie widzą. Agenci odczytują klucze API z pliku, a nie z czatu.",
+  "vault.agents.label": "Agenci",
+  "vault.agents.all": "Wszyscy agenci",
+  "vault.agents.some": "{chosen} z {total}",
+  "vault.agents.choose": "Wybierz agentów dla {name}: {agents}",
+  "vault.agents.list": "Agenci, którzy mogą używać {name}",
   "vault.newItem": "Nowy element",
   "vault.kind.login": "Login",
   "vault.kind.card": "Karta",

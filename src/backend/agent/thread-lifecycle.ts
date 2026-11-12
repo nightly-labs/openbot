@@ -202,7 +202,8 @@ export interface ThreadLifecycleOptions {
   /** Whether a password vault is connected, read at each start and resume of a session. */
   passwordVaultConnected?: () => boolean;
   /** What the Vault holds, read at each start and resume of a session. */
-  vaultItems?: () => VaultContents;
+  /** What the Vault holds for the agent with this id. */
+  vaultItems?: (agentId: string) => VaultContents;
   /** OpenBot runs on a server. The prompt then names the sign-in on the user's computer. */
   serverHost?: boolean;
   /** The plan storage in GB of a hosted server, read at each start and resume of a session. */
@@ -253,7 +254,7 @@ export class ThreadLifecycle {
   ) => Effect.Effect<string | null, McpOperationError>;
   readonly #agentEnvironment: () => Readonly<Record<string, string>>;
   readonly #passwordVaultConnected: () => boolean;
-  readonly #vaultItems: () => VaultContents;
+  readonly #vaultItems: (agentId: string) => VaultContents;
   readonly #serverHost: boolean;
   readonly #hostedStorageGb: () => number | null;
   readonly #agentCursorDrawn: boolean;
@@ -1408,7 +1409,7 @@ export class ThreadLifecycle {
         agentComputerUseEnabled(agent) && !mcpServers.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID),
       sideThread,
       passwordVault: this.#passwordVaultConnected(),
-      vaultItems: this.#vaultItems(),
+      vaultItems: this.#vaultItems(agent.id),
       serverHost: this.#serverHost,
       hostedStorageGb: this.#hostedStorageGb(),
       agentCursorDrawn: this.#agentCursorDrawn,

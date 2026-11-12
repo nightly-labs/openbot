@@ -265,7 +265,7 @@ export const messages = {
   "server.settings.generalTitle": "כללי",
   "server.settings.generalDescription": "ניהול השם, הלוגו וההעדפות של השרת הזה.",
   "server.settings.vaultTitle": "כספת",
-  "server.settings.vaultDescription": "שמירת התחברויות, כרטיסים ופרטי קשר שכל סוכן בשרת הזה יכול למלא.",
+  "server.settings.vaultDescription": "שמירת התחברויות, כרטיסים, פרטי קשר ומפתחות API עבור הסוכנים בשרת הזה.",
   "server.settings.membersTitle": "חברים",
   "server.settings.membersDescription": "פרסום השרת הזה, הזמנת אנשים וניהול גישה.",
   "server.settings.desktopTitle": "שולחן עבודה מרוחק",
