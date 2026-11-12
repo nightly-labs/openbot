@@ -29,12 +29,12 @@ function flush(): void {
 export function openShareSheet(): void {
   if (isAndroid) {
     if (requested) return;
+    requested = true;
     // A second sheet would delete the files of the first one when it reads its share.
     if (takeInOpenSheet) {
       takeInOpenSheet();
       return;
     }
-    requested = true;
   }
   pending = true;
   flush();

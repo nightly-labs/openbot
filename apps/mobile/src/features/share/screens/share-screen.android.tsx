@@ -93,8 +93,11 @@ export function ShareScreen() {
     takeShare();
     // A second sheet would delete the files of this one, so this sheet takes the next share.
     const stopTaking = setOpenShareSheet(() => {
-      if (sendingRef.current) nextShareWaits.current = true;
-      else takeShare();
+      if (sendingRef.current) {
+        nextShareWaits.current = true;
+        // The request ends here, so the sheet opens again for this share after the send.
+        endShareSheetRequest();
+      } else takeShare();
     });
     return () => {
       mounted.current = false;
