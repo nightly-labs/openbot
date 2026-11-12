@@ -235,7 +235,7 @@ export function parseProviderUseInput(value: unknown): { provider: AgentProvider
   return { provider, on: value.on };
 }
 
-export function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
+function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
   if (!isDynamicRecord(value) || typeof value.installed !== "boolean") throw new Error("Invalid provider CLI choice.");
   return { provider: parseManagedProviderId(value.provider), installed: value.installed };
 }
