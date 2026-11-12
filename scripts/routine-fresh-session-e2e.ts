@@ -9,8 +9,9 @@
 // second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
 // for each other. The second routine opens a wait, which a routine thread can do as the chat can.
 // A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
-// It also drives saved password and authenticator fills through the routine tool router, checks
-// the sign-in guidance, and checks that no secret reaches the provider. Each run keeps the agent's
+// It also drives saved password and authenticator fills, one at a time and together in one form,
+// through the routine tool router, checks the sign-in guidance, and checks that no secret reaches the
+// provider. Each run keeps the agent's
 // Computer Use, as the chat does: a scheduled run can drive a desktop app.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
@@ -151,9 +152,10 @@ const answer = (message) => {
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
       };
       const browserCall = (tool, args) => ({ tool: "tool_call", arguments: { name: "openbot_browser." + tool, arguments: args } });
-      const secret = (method) => browserCall("submit_secret", {
+      const secret = (method, withCode = false) => browserCall("submit_secret", {
         tabId: "routine-tab", loginId: ${JSON.stringify(VAULT_LOGIN)}, method, digits: 6,
-        targets: [{ kind: "css", selector: "#secret" }], submission: "click",
+        targets: [{ kind: "css", selector: "#secret" }, ...(withCode ? [{ kind: "css", selector: "#code" }] : [])],
+        submission: "click",
         submitTarget: { kind: "css", selector: "#submit" },
       });
       let held = false;
@@ -168,6 +170,8 @@ const answer = (message) => {
         browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
         browserCall("list_logins", { tabId: "routine-tab" }),
         secret("password"), secret("authenticator"),
+        // A form that asks for the password and the code together.
+        secret("password", true),
       ] : second ? [
         // A routine thread keeps the tools of the agent's own chat, as a routine run in the chat had.
         { tool: "await_event", arguments: { note: "Report when the docs change." } },
@@ -266,16 +270,22 @@ const browser: AgentBrowserHost = {
     Effect.sync(() => {
       assert.equal(params.ownerAgentId, tab?.ownerAgentId);
       assert.equal(params.threadId, tab?.ownerThreadId);
-      const method = getString(getRecord(params, "arguments"), "method");
+      const args = getRecord(params, "arguments");
+      const method = getString(args, "method");
       assert.ok(method === "password" || method === "authenticator");
+      const targets = args?.targets;
+      const withCode = method === "password" && Array.isArray(targets) && targets.length > 1;
       return {
         request: { method, origin: VAULT_ORIGIN, digits: 6 },
         agentScriptedOrigin: false,
         vaultFillable: true,
-        submit: (value) =>
+        withCode,
+        submit: (value, vault, code) =>
           Effect.sync(() => {
             assert.equal(value, method === "password" ? PASSWORD : CODE);
-            fills.push(method);
+            assert.equal(vault, true);
+            assert.equal(code, withCode ? CODE : undefined);
+            fills.push(withCode ? "password+code" : method);
             return "submitted" as const;
           }),
         cancel: () => {},
@@ -573,11 +583,11 @@ try {
   );
   pass(
     "Routine Vault tool calls succeed",
-    results.length === 10 && results.every((entry) => entry.result?.success && !entry.error),
+    results.length === 12 && results.every((entry) => entry.result?.success && !entry.error),
   );
   pass(
-    "Each routine fills its saved password and authenticator code",
-    fills.join() === "password,authenticator,password,authenticator",
+    "Each routine fills its saved password and authenticator code, also together in one form",
+    fills.join() === "password,authenticator,password+code,password,authenticator,password+code",
   );
   const listed = results.filter((entry) => entry.tool === "openbot_browser.list_logins");
   pass(

@@ -252,7 +252,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. With method=password and loginId, a form also asking for the authenticator code: the password field, then its code field(s). Fresh refs; no username fields.",
         ),
       digits: z
         .number()
@@ -261,7 +261,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+          "The code length, 4–12, from the page or the count of digit fields; do not assume six. For a password alone, omit it or use 0.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])

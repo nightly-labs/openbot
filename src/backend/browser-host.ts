@@ -466,10 +466,15 @@ export interface PreparedBrowserSecret {
    */
   vaultFillable: boolean;
   /**
+   * True when the request also has code fields of the same form. Only a saved login fills it: `submit`
+   * then takes the login's password and its current authenticator code, and no card can answer it.
+   */
+  withCode: boolean;
+  /**
    * `vault` is true for a value that no user typed. A navigation that would carry it in its URL, such as
    * a GET form submission, is then blocked, and the user finishes in the tab.
    */
-  submit(secret: string, vault: boolean): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
+  submit(secret: string, vault: boolean, code?: string): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
   cancel(): void;
 }
 
@@ -1597,11 +1602,23 @@ export class BrowserHost {
     if (url.protocol !== "https:")
       return yield* browserFailure(new Error(sourceText("error.backend.authHttpsRequired")));
     yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-    if (args.method !== "password" && args.digits < 4)
+    // A form that takes the password and an authenticator code in one submit gets both from one saved
+    // login, so no field is filled while the other waits for a second call. Its targets are the
+    // password field, then the code field or the digit fields.
+    const withCode = args.method === "password" && args.targets.length > 1;
+    const fieldTargets = withCode ? args.targets.slice(0, 1) : args.targets;
+    const codeTargets = withCode ? args.targets.slice(1) : [];
+    if (withCode && !args.loginId)
+      return yield* browserFailure(
+        new Error(
+          "Invalid authentication targets: method=password needs exactly one field target, or a loginId when the form also asks for the authenticator code.",
+        ),
+      );
+    if ((args.method !== "password" || withCode) && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
-      (args.method === "password" && args.targets.length !== 1) ||
-      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (fieldTargets.length !== 1 && fieldTargets.length !== args.digits) ||
+      (withCode && codeTargets.length !== 1 && codeTargets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
       return yield* browserFailure(
@@ -1610,8 +1627,8 @@ export class BrowserHost {
             ? "Invalid authentication targets: submission=click needs submitTarget."
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
-              : args.method === "password"
-                ? "Invalid authentication targets: method=password needs exactly one field target."
+              : withCode
+                ? `Invalid authentication targets: after the password field, use one target for the whole code, or ${args.digits} digit field targets.`
                 : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
@@ -1629,7 +1646,7 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(fieldTargets, url.origin, args.submission, args.submitTarget, codeTargets),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1641,10 +1658,12 @@ export class BrowserHost {
         // Password cards do not use digits; keep public metadata within its released bounds.
         request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
         agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
-        vaultFillable:
-          args.method === "password"
-            ? entry.fields.password
-            : args.method === "authenticator" && entry.fields.oneTimeCode,
+        vaultFillable: entry.kinds.every((kind, index) =>
+          args.method === "password" && index < fieldTargets.length
+            ? kind.password
+            : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
+        ),
+        withCode,
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
             tab.secret = undefined;
@@ -1652,14 +1671,26 @@ export class BrowserHost {
             this.#emitChanged();
           }
         },
-        submit: (secret: string, vault: boolean) =>
+        submit: (secret: string, vault: boolean, code?: string) =>
           Effect.gen({ self: this }, function* (): Effect.fn.Return<"submitted" | "takeover", BrowserOperationError> {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
             yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-            if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
+            const digits = new RegExp(`^[0-9]{${args.digits}}$`, "u");
+            if (
+              (args.method !== "password" && !digits.test(secret)) ||
+              (withCode && (!vault || code === undefined || !digits.test(code)))
+            )
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
+            const spread = (value: string, fields: number) => (fields === 1 ? [value] : [...value]);
+            // After the check above, a request with code fields always has its code.
+            const filledCode = withCode ? code : undefined;
+            const values = [
+              ...spread(secret, fieldTargets.length),
+              ...(filledCode === undefined ? [] : spread(filledCode, codeTargets.length)),
+            ];
+            const secrets = filledCode === undefined ? [secret] : [secret, filledCode];
             protection.submitted = true;
             this.#invalidateViews(tab);
             protection.running = true;
@@ -1670,7 +1701,7 @@ export class BrowserHost {
             let stopWaiting = () => {};
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
-              if (!urlCarriesSecret(event.url, secret)) return;
+              if (!secrets.some((value) => urlCarriesSecret(event.url, value))) return;
               leaked = true;
               event.preventDefault();
               stopWaiting();
@@ -1683,7 +1714,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(secret),
+                      entry.enter(values),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
@@ -1713,7 +1744,7 @@ export class BrowserHost {
                       // document when its fields are empty and nothing a snapshot reads shows the value.
                       const cleared = yield* boundEngineOperation(
                         tab,
-                        entry.clear(secret),
+                        entry.clear(secrets),
                         10_000,
                         "Authentication field cleanup timed out.",
                         keepQueueBlocked,

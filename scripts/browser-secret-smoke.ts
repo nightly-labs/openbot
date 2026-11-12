@@ -27,6 +27,12 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Password<input id="password" type="password"></label>
       <label>Code<input id="code" inputmode="numeric"></label>
       ${
+        url.pathname === "/combined"
+          ? `<label>Authenticator code<input id="combined-code" autocomplete="one-time-code" inputmode="numeric"></label>
+      <button id="combined-submit" onclick="if (document.querySelector('#password').value && /^[0-9]{6}$/.test(document.querySelector('#combined-code').value)) location.href = '/complete'">Sign in with code</button>`
+          : ""
+      }
+      ${
         url.pathname === "/login"
           ? `<form method="get" action="/search"><label>Search password<input id="get-password" name="password" type="password"></label></form>
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
@@ -111,6 +117,63 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    // A form that sends the password and the authenticator code in one submit gets both from one saved
+    // login. The page goes on only when both fields hold a value at the click, so a fill that empties
+    // the first field before the second one fails here.
+    const combinedPassword = "fixture-combined-password-418";
+    const combinedCode = "604213";
+    {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/combined", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing combined sign-in fixture.");
+        await waitForPresentedFrame(contents);
+        const params = ({ saved = true, codeSelector = "#combined-code" } = {}): DynamicToolCallParams => ({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "secret-combined",
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            ...(saved ? { loginId: "combined-login" } : {}),
+            targets: [
+              { kind: "css", selector: "#password" },
+              { kind: "css", selector: codeSelector },
+            ],
+            digits: 6,
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#combined-submit" },
+          },
+        });
+        // A password target with code fields needs a saved login, and a field that does not ask for a
+        // code is not a code field.
+        const refused = await runCauseEffect(browser.prepareSecret(params({ saved: false }))).then(
+          () => false,
+          () => true,
+        );
+        if (!refused) throw new Error("Password and code targets were accepted without a saved login.");
+        const wrongField = await runCauseEffect(browser.prepareSecret(params({ codeSelector: "#code" })));
+        wrongField.cancel();
+        if (wrongField.vaultFillable || !wrongField.withCode)
+          throw new Error("A field that does not ask for a code was classified as a code field.");
+        const handoff = await runCauseEffect(browser.prepareSecret(params()));
+        if (!handoff.vaultFillable || !handoff.withCode)
+          throw new Error("The password and code fields were classified wrongly for a vault fill.");
+        if ((await runCauseEffect(handoff.submit(combinedPassword, true, combinedCode))) !== "submitted")
+          throw new Error("The combined sign-in did not go on: a field was empty at the submit.");
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if ([combinedPassword, combinedCode].some((value) => JSON.stringify(snapshot).includes(value)))
+          throw new Error("A combined sign-in value reached a snapshot.");
+        if (!snapshot.url.endsWith("/complete")) throw new Error("Combined sign-in fixture did not complete.");
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
