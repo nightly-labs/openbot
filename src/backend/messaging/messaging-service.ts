@@ -1752,13 +1752,18 @@ export class MessagingService {
   readonly #outboundPost = Effect.fn("MessagingService.outboundPost")(function* (
     this: MessagingService,
     connectionId: string,
-    target: MessageTarget,
+    named: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[] = [],
     embeds: DiscordEmbed[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
+    // An agent can write a WhatsApp number as a person types it, not as the place id.
+    const target = {
+      ...named,
+      platformChannelId: live.adapter.placeId?.(named.platformChannelId) ?? named.platformChannelId,
+    };
     const postEmbeds = live.adapter.postEmbeds;
     if (embeds.length && !postEmbeds)
       return { error: "Only a Discord post can have embeds. Post the text alone.", failure: "refused" as const };
