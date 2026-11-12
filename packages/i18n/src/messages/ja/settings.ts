@@ -756,7 +756,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "このサーバーにはエージェントがありません。",
   "settings.transfer.copy.new": "新規",
   "settings.transfer.copy.notCopied":
-    "API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "settings.transfer.copy.submit": { other: "エージェント {count} 件をコピー" },
   "settings.transfer.copy.copying": "コピー中…",
   "settings.transfer.copy.done": { other: "エージェント {count} 件を {server} にコピーしました。" },

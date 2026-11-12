@@ -768,7 +768,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Bu sunucuda ajan yok.",
   "settings.transfer.copy.new": "Yeni",
   "settings.transfer.copy.notCopied":
-    "API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {

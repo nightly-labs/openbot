@@ -323,10 +323,12 @@ Server settings > Transfer > Copy to another server joins the two directions in 
 desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
 this computer's included. `instance-transfer:copy` is scoped to the destination and takes
 `{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
-without chat history or server settings to a temporary file, stages the file at the destination,
-applies all of its agents, and removes the file. Each side uses the routes above, in parts when its
-host has `instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
-`instance-transfer-v1` takes at most 100 MB. An agent whose name is already on the destination is
+without chat history or server settings to a temporary file. As in a file export, the file also has
+the channels that have a selected agent as a member and the Shared folder. Each apply adds the
+channels again as new channels. Main then stages the file at the destination, applies all of its
+agents, and removes the file. Each side uses the routes above, in parts when its host has
+`instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
+`instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
 
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,

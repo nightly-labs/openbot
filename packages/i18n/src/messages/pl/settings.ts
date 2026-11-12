@@ -803,7 +803,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ten serwer nie ma agentów.",
   "settings.transfer.copy.new": "Nowy",
   "settings.transfer.copy.notCopied":
-    "Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
   "settings.transfer.copy.submit": {
     one: "Kopiuj {count} agenta",
     few: "Kopiuj {count} agentów",

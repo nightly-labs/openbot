@@ -760,7 +760,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Questo server non ha agenti.",
   "settings.transfer.copy.new": "Nuovo",
   "settings.transfer.copy.notCopied":
-    "Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "settings.transfer.copy.submit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
   "settings.transfer.copy.copying": "Copia in corso…",
   "settings.transfer.copy.done": {

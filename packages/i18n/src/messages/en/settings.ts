@@ -831,7 +831,7 @@ export const messages = defineMessages("settings", {
   "settings.transfer.copy.noAgents": "This server has no agents.",
   "settings.transfer.copy.new": "New",
   "settings.transfer.copy.notCopied":
-    "API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
   "settings.transfer.copy.copying": "Copying…",
   "settings.transfer.copy.done": {

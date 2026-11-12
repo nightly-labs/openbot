@@ -829,7 +829,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "لا يوجد وكلاء على هذا الخادم.",
   "settings.transfer.copy.new": "جديد",
   "settings.transfer.copy.notCopied":
-    "لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
   "settings.transfer.copy.submit": {
     zero: "لا وكلاء للنسخ",
     one: "نسخ وكيل واحد",

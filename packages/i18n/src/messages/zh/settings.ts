@@ -733,7 +733,8 @@ export const messages = {
   "settings.transfer.copy.all": { one: "全部 {count} 个助手", other: "全部 {count} 个助手" },
   "settings.transfer.copy.noAgents": "此服务器没有助手。",
   "settings.transfer.copy.new": "新",
-  "settings.transfer.copy.notCopied": "API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+  "settings.transfer.copy.notCopied":
+    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "settings.transfer.copy.submit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
   "settings.transfer.copy.copying": "正在复制…",
   "settings.transfer.copy.done": {

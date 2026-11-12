@@ -742,7 +742,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "이 서버에는 에이전트가 없어요.",
   "settings.transfer.copy.new": "새로 추가",
   "settings.transfer.copy.notCopied":
-    "API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+    "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "settings.transfer.copy.submit": { other: "에이전트 {count}개 복사" },
   "settings.transfer.copy.copying": "복사하는 중…",
   "settings.transfer.copy.done": { other: "에이전트 {count}개를 {server}에 복사했어요." },

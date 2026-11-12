@@ -765,7 +765,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "אין סוכנים בשרת הזה.",
   "settings.transfer.copy.new": "חדש",
   "settings.transfer.copy.notCopied":
-    "מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+    "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "settings.transfer.copy.submit": { one: "העתקת סוכן אחד", two: "העתקת שני סוכנים", other: "העתקת {count} סוכנים" },
   "settings.transfer.copy.copying": "מעתיק…",
   "settings.transfer.copy.done": {

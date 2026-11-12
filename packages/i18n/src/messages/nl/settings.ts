@@ -756,7 +756,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Deze server heeft geen agents.",
   "settings.transfer.copy.new": "Nieuw",
   "settings.transfer.copy.notCopied":
-    "API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "settings.transfer.copy.submit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
   "settings.transfer.copy.copying": "Kopiëren…",
   "settings.transfer.copy.done": {
