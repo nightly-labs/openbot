@@ -20,6 +20,13 @@ export const messages = {
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
+  "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
+  "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
+  "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
+  "error.workflow.mediaInputMissing":
+    "Een afbeelding van een eerdere stap is niet beschikbaar. Voer die stap opnieuw uit.",
+  "error.workflow.mediaInputNotImage":
+    "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",
   "error.workflow.nodeMissing": "Deze stap staat niet in de workflow.",
   "error.workflow.runMissing": "Deze run bestaat niet meer.",

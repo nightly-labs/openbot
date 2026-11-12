@@ -26,8 +26,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isWorkflowStepKind,
+  WORKFLOW_VIDEO_DURATIONS,
+  WORKFLOW_VIDEO_VOICES,
   type WorkflowEdge,
+  type WorkflowFields,
   type WorkflowGraph,
+  type WorkflowMediaKind,
+  type WorkflowMediaModel,
   type WorkflowNode,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
@@ -37,7 +42,8 @@ import { isOpenStep, type StoredWorkflowStep } from "./workflow-run-store";
 
 /** Node kinds and settings that this version cannot run. The canvas does not offer them. */
 export function unsupportedNode(node: WorkflowNode): boolean {
-  if (node.kind === "image" || node.kind === "asset") return true;
+  // An asset runs only with a file of the library: its answer is the attachment id of the file.
+  if (node.kind === "asset") return fieldText(node, "fileId") === "";
   if (node.kind === "trigger") return node.fields.trigger === "message";
   if (node.kind === "output") return node.fields.target === "file";
   return false;
@@ -175,7 +181,7 @@ export function nextActions(
       continue;
     }
     const join = isJoin(kinds.get(nodeId), before.get(nodeId) ?? [], loops);
-    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, edges, reasons) });
+    actions.push({ nodeId, action: "run", inputs: edgeInputs(join, textEdges(kinds, edges), reasons) });
   }
   return actions;
 }
@@ -186,11 +192,90 @@ export function soloInputs(
   nodeId: string,
   answered: ReadonlyMap<string, StoredWorkflowStep>,
 ): string[] {
-  const kind = graph.nodes.find((node) => node.id === nodeId)?.kind;
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const loops = workflowLoopEdges(graph.nodes, graph.edges);
   const before = incoming(graph.edges);
   const edges = before.get(nodeId) ?? [];
-  return edgeInputs(isJoin(kind, edges, loops), edges, { before, loops, latest: answered });
+  return edgeInputs(isJoin(kinds.get(nodeId), edges, loops), textEdges(kinds, edges), {
+    before,
+    loops,
+    latest: answered,
+  });
+}
+
+/**
+ * The edges that give text. The answer of an image or an asset step is the id of an attachment: an
+ * image step reads it as a file (`mediaInputs`), and no other step gets the id as text.
+ */
+function textEdges(
+  kinds: ReadonlyMap<string, WorkflowNode["kind"]>,
+  edges: readonly WorkflowEdge[],
+): readonly WorkflowEdge[] {
+  return edges.filter((edge) => {
+    const kind = kinds.get(edge.from);
+    return kind !== "image" && kind !== "asset";
+  });
+}
+
+/** A picture that an image step reads: the image or asset node it comes from and the attachment of its file. */
+export interface MediaInput {
+  from: string;
+  attachmentId: string;
+}
+
+/**
+ * The pictures that come into an image step, in edge order: the newest file of each image node with
+ * an `image` edge into it, and the file of each asset node. A node before it with no file gives none.
+ */
+export function mediaInputs(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): MediaInput[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  return graph.edges.flatMap((edge) => {
+    const node = edge.to === nodeId && edge.type === "image" ? nodes.get(edge.from) : undefined;
+    // An asset gives its file also to a step that runs alone, before the asset ran in a run.
+    if (node?.kind === "asset") {
+      const attachmentId = fieldText(node, "fileId");
+      return attachmentId ? [{ from: edge.from, attachmentId }] : [];
+    }
+    if (node?.kind !== "image") return [];
+    const source = latest.get(edge.from);
+    return source?.status === "done" && source.output ? [{ from: edge.from, attachmentId: source.output }] : [];
+  });
+}
+
+/** How an image step uses a picture: the first or the last frame of a video, or a reference. */
+export type MediaImageRole = "first" | "last" | "reference";
+
+/**
+ * The pictures that an image step sends with its request. For a video, the nodes that `firstFrame`
+ * and `lastFrame` name give the first and the last frame; one node can give both, for a loop. Every
+ * other picture is a reference.
+ */
+export function mediaImages(
+  fields: WorkflowFields,
+  kind: WorkflowMediaKind,
+  inputs: readonly MediaInput[],
+): { role: MediaImageRole; attachmentId: string }[] {
+  const frame = (name: string) => (kind === "video" && typeof fields[name] === "string" ? fields[name] : null);
+  const first = frame("firstFrame");
+  const last = frame("lastFrame");
+  return inputs.flatMap((input) => {
+    const roles: MediaImageRole[] = [];
+    if (input.from === first) roles.push("first");
+    if (input.from === last) roles.push("last");
+    if (roles.length === 0) roles.push("reference");
+    return roles.map((role) => ({ role, attachmentId: input.attachmentId }));
+  });
+}
+
+/** The preset voice of a video step, or null when it has none or names a voice the host does not know. */
+export function mediaVoice(fields: WorkflowFields, kind: WorkflowMediaKind, model: WorkflowMediaModel): string | null {
+  const voice = fields.voice;
+  if (kind !== "video" || !model.voices || typeof voice !== "string") return null;
+  return WORKFLOW_VIDEO_VOICES.some((preset) => preset.id === voice) ? voice : null;
 }
 
 /** The longest error that a missing answer quotes, in characters, so a long error costs few tokens. */
@@ -353,6 +438,61 @@ export function agentStepText(workflowTitle: string, task: string, input: string
 /** The prompt of a model step: its own prompt, then the inputs. */
 export function modelStepPrompt(system: string, prompt: string, input: string): string {
   return [system.trim(), prompt.trim(), input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
+}
+
+/**
+ * The request of an image step: the frame and, for a video, its length and resolution, then the
+ * description and the text that comes in.
+ */
+export function mediaStepPrompt(fields: WorkflowFields, kind: WorkflowMediaKind, input: string): string {
+  const aspect = typeof fields.aspect === "string" && fields.aspect ? fields.aspect : "1:1";
+  const duration = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
+  const resolution = typeof fields.resolution === "string" && fields.resolution ? fields.resolution : "720p";
+  const ask =
+    kind === "video"
+      ? `Make one video of ${duration} seconds at ${resolution}, aspect ratio ${aspect}.`
+      : `Make one image, aspect ratio ${aspect}.`;
+  const description = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
+  return [ask, description, input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
+}
+
+/** The most reference pictures that Grok's `reference_to_video` tool takes (Grok CLI 1.0.77). */
+const GROK_VIDEO_REFERENCE_LIMIT = 14;
+
+/**
+ * How the model uses the pictures and the voice of an image step. Grok's tools take local paths, so
+ * the text names the tool and its inputs. Codex gets the pictures in the turn and reads them itself.
+ * A provider reads it, so the words stay English.
+ */
+export function mediaInputText(
+  provider: WorkflowMediaModel["provider"],
+  kind: WorkflowMediaKind,
+  images: readonly { role: MediaImageRole; path: string }[],
+  voice: string | null,
+): string {
+  const paths = (role: MediaImageRole) => images.filter((image) => image.role === role).map((image) => image.path);
+  const references = paths("reference");
+  if (provider === "codex")
+    return references.length > 0 ? "Use the attached pictures as references for the new image." : "";
+  if (kind === "image")
+    return references.length > 0
+      ? [
+          "Edit these pictures into the new image with the image_edit tool:",
+          ...references.map((path) => `- ${path}`),
+        ].join("\n")
+      : "";
+  if (images.length === 0 && !voice) return "";
+  const lines = ["Make the video with the reference_to_video tool and these inputs:"];
+  const first = paths("first")[0];
+  const last = paths("last")[0];
+  if (first) lines.push(`- first_frame: ${first}`);
+  if (last) lines.push(`- last_frame: ${last}`);
+  if (references.length > 0) {
+    lines.push("- images, in this order; refer to each in the prompt with its <IMAGE_n> tag:");
+    lines.push(...references.slice(0, GROK_VIDEO_REFERENCE_LIMIT).map((path) => `  - ${path}`));
+  }
+  if (voice) lines.push(`- voices: ["${voice}"]; the person who speaks is <AUDIO_1> in the prompt.`);
+  return lines.join("\n");
 }
 
 /** The prompt of a condition. The model must answer one word. */

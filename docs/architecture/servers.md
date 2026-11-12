@@ -388,6 +388,16 @@ Node kinds, port types, statuses, run sources, trigger types and version kinds c
 so a newer host can add one. A client shows a workflow with a node kind or a port type that it does
 not know as read-only (`needsNewerApp`), and keeps the node when it saves.
 
+`workflows-media-v1` lets the host run the `image` and `asset` nodes of `workflows-v1`. An image
+step makes a picture or a video with the subscription of the model's provider and keeps it as a
+generated attachment; a client fetches it through `GET /v1/attachments/:id`. An asset step names a
+picture of the host by its file id. The capability adds one route,
+`POST /v1/workflows/media/keep-picture { draftId }`: it keeps an attachment draft that the member
+sent through `POST /v1/attachments` as a picture of the host with no owner agent, and answers
+`{ fileId }`. Only a PNG, JPEG or WebP draft is kept (`refused`), and a draft that is not there
+answers `missing`. Each member who can use workflows can keep a picture, as each member can send a
+draft. A client without the capability does not offer image and asset steps.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

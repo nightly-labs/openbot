@@ -1,9 +1,12 @@
+import { WORKFLOW_MEDIA_MODELS } from "@openbot/contracts/ipc";
+import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import {
   WORKFLOW_FEATURES_V1,
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createWorkflowsController } from "./workflows-controller";
@@ -52,8 +55,37 @@ export function WorkflowsCanvas(props: {
     get channels() {
       return workflows.channels();
     },
-    imageModels: [],
-    files: [],
+    // Only the models of a provider that is on and signed in now. The host makes the file with that
+    // subscription, or with the provider's API key when it uses one.
+    get imageModels() {
+      if (!props.host.mediaSupported()) return [];
+      return WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+        if (providerTurnedOff(props.status, model.provider)) return [];
+        const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
+        if (status.state !== "available") return [];
+        return [{ ...model, ...(status.apiKeyInUse ? { apiKey: true } : {}) }];
+      });
+    },
+    get media() {
+      return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
+    },
+    // The Library pictures that an asset step can use. A picture with no preview address, as the
+    // browser gets, reads its file only when the canvas shows it.
+    get files() {
+      return workflows.pictures().map((file) =>
+        file.previewUrl
+          ? file
+          : {
+              ...file,
+              get previewUrl() {
+                return props.host.mediaUrl(file.id, "image") ?? null;
+              },
+            },
+      );
+    },
+    get upload() {
+      return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
+    },
     get self() {
       return props.self;
     },
@@ -77,8 +109,12 @@ export function WorkflowsCanvas(props: {
       ...(telegram ? (["telegram"] as const) : []),
       ...(slack ? (["slack"] as const) : []),
     ];
+    const media = props.host.mediaSupported();
     return {
       ...WORKFLOW_FEATURES_V1,
+      // An asset step uses a picture of the host's Library, or one that the person sends to the host.
+      kinds: media ? [...WORKFLOW_FEATURES_V1.kinds, "image", "asset"] : WORKFLOW_FEATURES_V1.kinds,
+      uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
     };

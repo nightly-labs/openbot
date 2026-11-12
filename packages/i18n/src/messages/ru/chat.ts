@@ -448,6 +448,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "Скачать видео",
   "chat.video.open": "Открыть видео",
+  "chat.video.mute": "Выключить звук видео",
+  "chat.video.unmute": "Включить звук видео",
   "chat.message.you": "Вы",
   "chat.message.agentFallback": "Агент",
   "chat.message.memberFallback": "Участник команды",

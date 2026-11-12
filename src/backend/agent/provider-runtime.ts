@@ -1051,6 +1051,15 @@ export class ProviderRuntime implements ProviderPort {
    * as the agent's own process does, so the generation does not spend the limit of the provider's own sign-in.
    */
   createProfileClient(provider: AgentProvider, accountId?: string): AgentClient {
+    return this.#sideClient(provider, accountId, "profile");
+  }
+
+  /** A client that makes one image or video with the provider's media tools, and runs no other tool. */
+  createMediaClient(provider: AgentProvider, accountId?: string): AgentClient {
+    return this.#sideClient(provider, accountId, "media");
+  }
+
+  #sideClient(provider: AgentProvider, accountId: string | undefined, purpose: "profile" | "media"): AgentClient {
     this.requireProviderOn(provider);
     if (provider === "acp" && this.#removingCustomRuntime)
       throw new Error(sourceText("error.provider.registryRemoveBusy"));
@@ -1064,6 +1073,8 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#clientFactory) return this.#clientFactory(provider, cli, undefined, accountEnvironment);
     const context = accountEnvironment ? { ...this.#credentials, accountEnvironment } : this.#credentials;
     const driver = requireProviderDriver(provider);
+    if (purpose === "media" && driver.createMediaClient)
+      return driver.createMediaClient(cli, this.#requestTimeoutMs, context);
     if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, context);
     return driver.createClient(cli, this.#requestTimeoutMs, context);
   }

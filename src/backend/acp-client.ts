@@ -464,6 +464,11 @@ export interface AcpProviderOptions {
    */
   redactValues?: () => readonly string[];
   profileGeneration?: boolean;
+  /**
+   * A profile-generation client that makes one image or video: it allows the provider's media tools
+   * (`AcpFlavor.mediaTools`) and refuses every other tool.
+   */
+  mediaGeneration?: boolean;
   argv: readonly string[];
   env: Record<string, string>;
   /**
@@ -3504,7 +3509,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     params: RequestPermissionRequest,
   ): Effect.fn.Return<RequestPermissionResponse, ProviderClientOperationError> {
-    if (this.options.profileGeneration) return { outcome: { outcome: "cancelled" } };
+    if (this.options.profileGeneration) {
+      const allow = params.options.find((candidate) => candidate.kind === "allow_once");
+      if (this.options.mediaGeneration && allow && this.#flavor.mediaTools?.permitted(params.toolCall))
+        return { outcome: { outcome: "selected", optionId: allow.optionId } };
+      return { outcome: { outcome: "cancelled" } };
+    }
     if (this.#historyReplays.has(params.sessionId)) return { outcome: { outcome: "cancelled" } };
     const thread = this.#threads.get(params.sessionId);
     // The user stopped this Antigravity session, and its harness can still run until the resume.

@@ -1,6 +1,7 @@
 import {
   type AgentAccessLevels,
   graphAgentIds,
+  type StoredFileRow,
   type WorkflowDetail,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubHistory,
@@ -117,6 +118,8 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
   const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
+  /** The Library pictures that an asset step can use. */
+  const [pictures, setPictures] = createSignal<readonly StoredFileRow[]>([]);
   /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
@@ -332,6 +335,9 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     }, report);
     host.slackWorkspaces().then((next) => {
       if (!disposed) setSlack(next);
+    }, report);
+    host.pictures().then((next) => {
+      if (!disposed) setPictures(next);
     }, report);
   };
 
@@ -568,6 +574,13 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     },
   };
 
+  /** Sends a picture to the host and puts it first in the Library. The toast shows why it failed. */
+  const uploadPicture = (file: File) =>
+    reported(host.uploadPicture(file)).then((row) => {
+      setPictures((list) => [row, ...list.filter((candidate) => candidate.id !== row.id)]);
+      return row;
+    });
+
   return {
     detail: () => stored()?.detail,
     places,
@@ -575,6 +588,8 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     discord,
     telegram,
     slack,
+    pictures,
+    uploadPicture,
     readOnly: () => lock() !== undefined,
     github,
     props,

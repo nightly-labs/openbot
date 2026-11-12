@@ -355,6 +355,7 @@ import {
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
   decodeWorkflowGraph,
+  decodeWorkflowPictureId,
   decodeWorkflowRunDetail,
   decodeWorkflowRunPage,
   decodeWorkflowSaveResult,
@@ -916,6 +917,7 @@ const openbotApi: OpenBotDesktopApi = {
     githubOptions: decodeWorkflowGitHubOptions,
     githubHistory: decodeWorkflowGitHubHistory,
     githubRunLastEvent: decodeWorkflowRunDetail,
+    keepPicture: decodeWorkflowPictureId,
   }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,

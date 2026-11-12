@@ -100,9 +100,80 @@ export type WorkflowFieldValue = string | number | boolean;
  *   emoji of `react`). For `chat-channel`: `channelId`. The result shows in the channel as a note; no
  *   task starts.
  * - prompt: `text`.
+ * - image: `media` (a `WorkflowMediaKind`, "image" when absent), `prompt`, `aspect` ("1:1", "16:9",
+ *   "9:16", …), `model` (an id of `WORKFLOW_MEDIA_MODELS`), and for a video `duration` (seconds),
+ *   `resolution` ("480p" or "720p"), `firstFrame` and `lastFrame` (the id of an image node that an
+ *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
+ *   `WORKFLOW_VIDEO_VOICES`). The pictures of the other image nodes with an `image` edge into it are
+ *   references. The output of its step is the id of the generated attachment.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
+
+export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
+export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
+
+/** A model that makes the image or the video of an `image` node, with the subscription of its provider. */
+export interface WorkflowMediaModel {
+  id: string;
+  /** The provider id whose subscription runs it. */
+  provider: "codex" | "grok";
+  name: string;
+  maker: string;
+  /** The name of the provider's subscription that pays for the file. */
+  subscription: string;
+  kinds: readonly WorkflowMediaKind[];
+  /** Whether a video can speak in a preset voice of `WORKFLOW_VIDEO_VOICES`. */
+  voices: boolean;
+}
+
+export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
+  {
+    id: "gpt-image",
+    provider: "codex",
+    name: "GPT Image",
+    maker: "OpenAI",
+    subscription: "ChatGPT",
+    kinds: ["image"],
+    voices: false,
+  },
+  {
+    id: "grok-imagine",
+    provider: "grok",
+    name: "Grok Imagine",
+    maker: "xAI",
+    subscription: "Grok",
+    kinds: ["image", "video"],
+    voices: true,
+  },
+];
+
+/** The picture types that an asset step keeps and that image and video steps take as input. */
+export const WORKFLOW_PICTURE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export const WORKFLOW_VIDEO_DURATIONS = [6, 10] as const;
+export const WORKFLOW_VIDEO_RESOLUTIONS = ["480p", "720p"] as const;
+
+/** The preset voices that a person in a Grok Imagine video can speak in (Grok CLI 1.0.77). */
+export const WORKFLOW_VIDEO_VOICES = [
+  { id: "ara", name: "Ara" },
+  { id: "eve", name: "Eve" },
+  { id: "leo", name: "Leo" },
+  { id: "rex", name: "Rex" },
+] as const;
+export type WorkflowVideoVoice = (typeof WORKFLOW_VIDEO_VOICES)[number]["id"];
+
+/** The media kind of an `image` node. */
+export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
+  return fields.media === "video" ? "video" : "image";
+}
+
+/** The model of an `image` node, or null when the node names a model the host does not know. */
+export function workflowMediaModel(fields: WorkflowFields): WorkflowMediaModel | null {
+  const kind = workflowMediaKind(fields);
+  const id = typeof fields.model === "string" && fields.model !== "" ? fields.model : null;
+  return WORKFLOW_MEDIA_MODELS.find((model) => (id === null || model.id === id) && model.kinds.includes(kind)) ?? null;
+}
 
 export interface WorkflowPoint {
   x: number;

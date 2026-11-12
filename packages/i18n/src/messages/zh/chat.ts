@@ -343,6 +343,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "下载视频",
   "chat.video.open": "打开视频",
+  "chat.video.mute": "将视频静音",
+  "chat.video.unmute": "取消视频静音",
   "chat.message.you": "你",
   "chat.message.agentFallback": "助手",
   "chat.message.memberFallback": "团队成员",
