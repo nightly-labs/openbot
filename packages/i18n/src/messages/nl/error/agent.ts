@@ -160,6 +160,7 @@ export const messages = {
   "error.agent.screenCaptureDeclined": "De gebruiker heeft deze schermopname niet toegestaan. Er is niets opgenomen.",
   "error.agent.mcpServerDeclined":
     "De gebruiker heeft deze wijziging van de MCP-server niet toegestaan. Er is niets gewijzigd.",
+  "error.agent.mcpToolDeclined": "De gebruiker heeft deze MCP-toolaanroep niet toegestaan. De tool is niet uitgevoerd.",
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
     "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Serverinstellingen, MCP.",

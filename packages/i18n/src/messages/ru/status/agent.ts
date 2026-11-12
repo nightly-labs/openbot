@@ -85,6 +85,7 @@ export const messages = {
   "status.agent.memoryChanges": "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
+  "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",

@@ -21,7 +21,14 @@ import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
 import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { hasCredentialHeader, inspectMcpServer, type McpProbeOutcome, type McpSignInPlace } from "../mcp-probe";
+import {
+  callMcpServerTool,
+  hasCredentialHeader,
+  inspectMcpServer,
+  type McpProbeOutcome,
+  type McpSignInPlace,
+  type McpToolArguments,
+} from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -433,6 +440,26 @@ export class McpGateway {
     );
     if (tested) yield* this.#refreshForTestedTools(normalized, outcome);
     return outcome;
+  });
+
+  /**
+   * One tool of a saved server, for an agent whose provider left the tool out. Silent like `inspect`:
+   * the sign-in of the row's address, which is also the token that the agent's own route spends.
+   */
+  readonly callTool = Effect.fnUntraced(function* (
+    this: McpGateway,
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ) {
+    const stored = this.#oauth;
+    return yield* callMcpServerTool(
+      config,
+      name,
+      args,
+      this.#toolRuntimes(),
+      stored ? { accessToken: (url) => stored.accessToken(url) } : undefined,
+    ).pipe(toMcpGatewayFailed);
   });
 
   /**

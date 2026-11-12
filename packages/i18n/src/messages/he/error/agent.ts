@@ -135,6 +135,7 @@ export const messages = {
     "צילום מסך לא פועל בשיחה ב-Slack, ב-Discord או ב-Telegram, כי אנשים אחרים מקבלים את הקבצים שלו.",
   "error.agent.screenCaptureDeclined": "המשתמש לא אישר את צילום המסך הזה. דבר לא צולם.",
   "error.agent.mcpServerDeclined": "המשתמש לא אישר את שינוי שרת ה-MCP הזה. דבר לא השתנה.",
+  "error.agent.mcpToolDeclined": "המשתמש לא אישר את הקריאה לכלי MCP הזה. הכלי לא הופעל.",
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בהגדרות השרת, MCP.",

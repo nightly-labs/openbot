@@ -1872,7 +1872,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
-      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their tools
+      // another way, and their bearer is the main process's.
+      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        const saved = new Set(this.#mcp.list().map((config) => config.id));
+        return this.enabledMcpServers(agentId).filter((config) => saved.has(config.id));
+      }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,

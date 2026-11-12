@@ -1,3 +1,4 @@
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   MCP_TRANSPORTS,
@@ -9,7 +10,9 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
-import type { McpProbeOutcome } from "../mcp-probe";
+import type { McpProbeOutcome, McpToolArguments, McpToolCallResult } from "../mcp-probe";
+import { providerMcpServerName } from "../mcp-provider-shapes";
+import type { DynamicToolResult } from "../protocol";
 import type { McpGateway, McpGatewayFailed } from "./mcp-gateway";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
@@ -112,6 +115,58 @@ export interface AgentMcpServers {
   offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
+  /** The saved, enabled servers that the agent gets. */
+  forAgent(agentId: string): McpServerConfig[];
+  /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
+  callTool(
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+/**
+ * The saved server and the tool that a `tool_call` name gives: `<server>.<tool>`, or the provider's
+ * own `mcp_<server>_<tool>`, with the server as the agent's instructions name it. A provider changes
+ * a name such as "My Server" to `My_Server`, and Antigravity gets `openbot_<name>` when its own files
+ * use the name, so each form matches. The longest server name wins.
+ */
+export function findAgentMcpTool(
+  configs: readonly McpServerConfig[],
+  name: string,
+): { config: McpServerConfig; tool: string } | null {
+  let found: { config: McpServerConfig; tool: string; length: number } | null = null;
+  for (const config of configs) {
+    const provider = providerMcpServerName(config.name);
+    for (const server of [config.name, provider, `openbot_${provider}`]) {
+      for (const prefix of [`${server}.`, `mcp_${server}_`, `mcp__${server}__`]) {
+        if (!name.startsWith(prefix) || name.length === prefix.length) continue;
+        if (!found || prefix.length > found.length)
+          found = { config, tool: name.slice(prefix.length), length: prefix.length };
+      }
+    }
+  }
+  return found && { config: found.config, tool: found.tool };
+}
+
+/**
+ * An MCP tool result as a dynamic tool result: text and images as they are, other content as JSON. The
+ * server's answer is decoded here; an answer in the old `toolResult` form is given as JSON.
+ */
+export function mcpToolCallResponse(answer: McpToolCallResult): DynamicToolResult {
+  const decoded = CallToolResultSchema.safeParse(answer);
+  if (!decoded.success) return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(answer) }] };
+  const result = decoded.data;
+  const contentItems: DynamicToolResult["contentItems"] = result.content.map((item) =>
+    item.type === "text"
+      ? { type: "inputText", text: item.text }
+      : item.type === "image"
+        ? { type: "inputImage", imageUrl: `data:${item.mimeType};base64,${item.data}` }
+        : { type: "inputText", text: JSON.stringify(item) },
+  );
+  if (contentItems.length === 0)
+    contentItems.push({ type: "inputText", text: JSON.stringify(result.structuredContent ?? {}) });
+  return { success: result.isError !== true, contentItems };
 }
 
 /**
@@ -121,6 +176,7 @@ export interface AgentMcpServers {
 export function mcpServersFromGateway(
   gateway: McpGateway,
   prepareTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>,
+  forAgent: (agentId: string) => McpServerConfig[] = () => [],
 ): AgentMcpServers {
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
@@ -139,6 +195,13 @@ export function mcpServersFromGateway(
       ),
     offersSignIn: (config) => gateway.offersSignIn(config),
     redact: (text) => gateway.redact(text),
+    forAgent,
+    // A stdio server waits for its managed runtime, as its test does.
+    callTool: (config, name, args) =>
+      (prepareTest?.(config) ?? Effect.void).pipe(
+        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
+        Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure)),
+      ),
   };
 }
 

@@ -125,10 +125,12 @@ import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSch
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
+  findAgentMcpTool,
   handleMcpServerTool,
   isMcpServerTool,
   type MarketplaceAppServer,
   marketplaceAppStatus,
+  mcpToolCallResponse,
   searchSignIns,
 } from "./mcp-tools";
 import type { AgentPinRefusal, MessagePins } from "./message-pins";
@@ -170,9 +172,11 @@ import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool }
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
+  ANTIGRAVITY_DEFERRED_MCP_NOTE,
   browserToolsPrimer,
   CODEX_DEFERRED_MCP_NOTE,
   DEFERRED_MCP_NOTE,
+  deferredCall,
   deferredCallArgumentsError,
   discoverTools,
   givesBrowserSchemas,
@@ -609,7 +613,13 @@ export class OpenBotToolRouter {
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
-                client.respond(request.id, openBotToolFailure(deferredCallArgumentsError(params) ?? invalid));
+                const mcpResult =
+                  client.provider === "antigravity" ? yield* this.#userMcpTool(client, request, params) : null;
+                if (request.signal?.aborted || !client.running) return;
+                client.respond(
+                  request.id,
+                  mcpResult ?? openBotToolFailure(deferredCallArgumentsError(params) ?? invalid),
+                );
                 return;
               }
               params = resolved;
@@ -928,9 +938,53 @@ export class OpenBotToolRouter {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider === "opencode")
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
+    if (client.provider === "antigravity") {
+      const agentId = this.#conversation.agentForThread(threadId);
+      return agentId && (this.#mcpServers?.forAgent(agentId).length ?? 0) > 0 ? ANTIGRAVITY_DEFERRED_MCP_NOTE : null;
+    }
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
+
+  /**
+   * A `tool_call` that names a tool of one of the agent's saved MCP servers. Antigravity 1.5 leaves the
+   * tools over its schema budget out of the tool list, with no `call_mcp_tool` for them (#7427), so
+   * OpenBot runs the tool itself, with the sign-in of the server's address. The user approves it as a
+   * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
+   */
+  readonly #userMcpTool = Effect.fn("OpenBotToolRouter.userMcpTool")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const servers = this.#mcpServers;
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    const call = deferredCall(params);
+    const found = servers && agentId && call ? findAgentMcpTool(servers.forAgent(agentId), call.name) : null;
+    if (!servers || !agentId || !call || !found) return null;
+    const decision = yield* this.#attention
+      .awaitToolApproval(client, request, {
+        requestId: request.id,
+        agentId,
+        threadId: this.#conversation.publicThreadId(agentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason: sourceText("status.agent.mcpToolCall", { tool: found.tool, name: found.config.name }),
+        grantRoot: null,
+        permissions: null,
+      })
+      .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
+    if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
+    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments));
+    if (Result.isFailure(outcome))
+      return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
+    return "error" in outcome.success
+      ? openBotToolFailure(servers.redact(outcome.success.error))
+      : mcpToolCallResponse(outcome.success.result);
+  });
 
   /**
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the

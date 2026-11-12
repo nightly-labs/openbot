@@ -156,6 +156,8 @@ export const messages = {
     "L'acquisizione dello schermo non funziona in una conversazione Slack, Discord o Telegram, perché altre persone ricevono i suoi file.",
   "error.agent.screenCaptureDeclined":
     "L'utente non ha permesso questa acquisizione dello schermo. Non è stato acquisito nulla.",
+  "error.agent.mcpToolDeclined":
+    "L'utente non ha permesso questa chiamata allo strumento MCP. Lo strumento non è stato eseguito.",
   "error.agent.screenCaptureWindowMissing":
     "Quella finestra ora non è aperta. Chiama list_capture_sources per ottenere gli id attuali delle finestre.",
   "error.agent.screenCaptureDisplayMissing":

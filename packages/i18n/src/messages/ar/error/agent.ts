@@ -136,6 +136,7 @@ export const messages = {
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
+  "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
     "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في إعدادات الخادم، MCP.",

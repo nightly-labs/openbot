@@ -3,7 +3,8 @@
 // recorded where the router would show them. No provider or account is used. It also checks what
 // suggest_marketplace_app answers for a Marketplace app that is already installed, and that a
 // startup moves an app installed from an earlier catalog pin to the current pin, and that the
-// built-in GitHub connection is listed as the agents get it (#7088).
+// built-in GitHub connection is listed as the agents get it (#7088), and that tool_call runs a tool that
+// Antigravity left out of the model's tool list on the agent's saved row (#7427).
 // bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,11 +16,13 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
 import {
+  findAgentMcpTool,
   handleMcpServerTool,
   type MarketplaceAppServer,
   type McpServerToolName,
   marketplaceAppStatus,
   mcpServersFromGateway,
+  mcpToolCallResponse,
 } from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { CATALOG_PIN_MOVES, McpServerStore } from "../src/backend/mcp-server-store";
@@ -57,7 +60,11 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
         response.writeHead(405).end();
         return;
       }
-      const message: { id?: number | string; method: string } = JSON.parse(await body(request));
+      const message: {
+        id?: number | string;
+        method: string;
+        params?: { name?: string; arguments?: unknown };
+      } = JSON.parse(await body(request));
       if (message.id === undefined) {
         response.writeHead(202).end();
         return;
@@ -78,6 +85,15 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
           jsonrpc: "2.0",
           id: message.id,
           result: { tools: [tool("search"), tool("read_page"), tool("create_page")] },
+        });
+      }
+      if (message.method === "tools/call") {
+        const name = message.params?.name ?? "";
+        const text = `${name} ${JSON.stringify(message.params?.arguments ?? {})}`;
+        return json(response, 200, {
+          jsonrpc: "2.0",
+          id: message.id,
+          result: { content: [{ type: "text", text }], isError: name === "missing" },
         });
       }
       return json(response, 200, { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "unknown" } });
@@ -457,6 +473,28 @@ try {
       for (const row of [installed, renamed, edited]) store.remove(row.id);
     }
   }
+
+  // Antigravity 1.5 leaves the tools over its schema budget out of the model's tool list (#7427).
+  // openbot.tool_call names one, and OpenBot runs it on the agent's saved row.
+  const fallback = store.save({ ...calendar, id: "", name: "Product Hunt", url: servers.open.url });
+  const agentTools = mcpServersFromGateway(gateway, undefined, () => [fallback]);
+  for (const name of ["Product_Hunt.get_leaderboard", "mcp_Product_Hunt_get_leaderboard"]) {
+    const found = findAgentMcpTool(agentTools.forAgent("agent"), name);
+    assert.equal(found?.config.id, fallback.id, name);
+    assert.equal(found?.tool, "get_leaderboard", name);
+  }
+  assert.equal(findAgentMcpTool([fallback], "other.get_leaderboard"), null, "another server's name");
+  const ran = await runCauseEffect(agentTools.callTool(fallback, "get_leaderboard", { limit: 3 }));
+  assert.ok("result" in ran, "the tool runs on the saved row");
+  assert.deepEqual(mcpToolCallResponse(ran.result), {
+    success: true,
+    contentItems: [{ type: "inputText", text: 'get_leaderboard {"limit":3}' }],
+  });
+  const failed = await runCauseEffect(agentTools.callTool(fallback, "missing", {}));
+  assert.ok("result" in failed && !mcpToolCallResponse(failed.result).success, "a tool error stays a failure");
+  const offline = store.save({ ...calendar, id: "", name: "offline", url: await closedUrl() });
+  const unreachable = await runCauseEffect(agentTools.callTool(offline, "get_leaderboard", {}));
+  assert.ok("error" in unreachable, "a server that is down is a sentence");
 
   // Nothing an agent reads names a key: not the query of an address, not a header value.
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));

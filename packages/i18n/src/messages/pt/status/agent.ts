@@ -84,6 +84,7 @@ export const messages = {
   "status.agent.memoryChanges": "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas.",
   "status.agent.memoryChangesWithConflicts":
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
+  "status.agent.mcpToolCall": "Executar a ferramenta {tool} do servidor MCP {name}.",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",

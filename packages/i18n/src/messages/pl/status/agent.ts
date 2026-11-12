@@ -86,6 +86,7 @@ export const messages = {
   "status.agent.memoryChanges": "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
+  "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",

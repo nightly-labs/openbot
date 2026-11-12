@@ -91,6 +91,7 @@ export const messages = {
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
+  "status.agent.mcpToolCall": "הפעלת הכלי {tool} של שרת MCP {name}.",
   "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",
