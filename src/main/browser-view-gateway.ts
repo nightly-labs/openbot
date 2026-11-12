@@ -54,6 +54,21 @@ const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
  * fewer frames, not old ones, and a client that stops drawing holds no more than these.
  */
 const MAX_FRAMES_IN_FLIGHT = 4;
+/**
+ * How long a held frame waits for the client to draw a frame. A client draws only the newest frame
+ * it has, and says nothing of a frame it skipped or could not decode. When the newest frames on the
+ * way are such frames, no word comes, and the view would keep an old picture of the page.
+ */
+const HELD_FRAME_DEADLINE_MS = 1_000;
+/**
+ * Frames kept after the one the client has drawn. A client that asked to name frames and then
+ * stops saying which one is on screen still gets a frame at each deadline, and would otherwise keep
+ * one entry per frame for the whole view. Past this the view is closed. The drawn frame is not
+ * dropped in place: that is what made a click land on the wrong page.
+ */
+const MAX_UNACKNOWLEDGED_FRAMES = 120;
+/** An acknowledgement is a few bytes. A message longer than this is other input. */
+const MAX_ACK_MESSAGE_BYTES = 128;
 
 /** Frames older than the one on the member's screen. The named frame itself stays, so a click on it still expands. */
 function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
@@ -131,6 +146,8 @@ interface ManagedViewSession {
   drawnSequence: number;
   /** The newest frame not sent because too many are on the way. The next drawn frame sends it. */
   heldFrame: BrowserScreencastFrame | null;
+  /** Sends the held frame when no frame is drawn in time. */
+  heldFrameTimer: ReturnType<typeof setTimeout> | null;
   /**
    * One input at a time, in the order the member sent them. A paste takes several CDP calls, and a
    * key typed after it must not land first.
@@ -186,6 +203,7 @@ export class BrowserViewGateway {
       rememberFrames: false,
       drawnSequence: 0,
       heldFrame: null,
+      heldFrameTimer: null,
       input: Semaphore.makeUnsafe(1),
       waiting: 0,
       heldMove: null,
@@ -268,12 +286,6 @@ export class BrowserViewGateway {
       socket.destroy();
       return;
     }
-    // A new socket is a new stream. Sizes from the previous one name frames this client never saw.
-    session.frameWidth = 0;
-    session.frameHeight = 0;
-    session.frameSizes.clear();
-    session.drawnSequence = 0;
-    session.heldFrame = null;
     session.rememberFrames = browserViewClientAcksFrames(url);
     session.reportCursor = browserViewClientWantsCursor(url);
     session.reportContextMenu = browserViewClientWantsContextMenu(url);
@@ -303,9 +315,17 @@ export class BrowserViewGateway {
   ): Effect.fn.Return<void, RemoteWorkflowError, BrowserViewPort> {
     if (session.socket) session.socket.close(1000, "The browser view moved to a new connection.");
     session.socket = client;
+    // A new socket is a new stream. Sizes from the previous one name frames this client never saw.
+    // This is reset with the socket: until then, the previous view still sends its frames.
+    session.frameWidth = 0;
+    session.frameHeight = 0;
+    session.frameSizes.clear();
+    session.drawnSequence = 0;
+    this.#forgetHeldFrame(session);
     recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
+      this.#noteDrawnFrame(session, client, data);
       session.waiting += 1;
       this.#dispatch(
         session.input.withPermits(1)(
@@ -331,7 +351,7 @@ export class BrowserViewGateway {
         (frame) => {
           if (session.socket !== client) return;
           if (session.rememberFrames && framesInFlight(session) >= MAX_FRAMES_IN_FLIGHT) {
-            session.heldFrame = frame;
+            this.#holdFrame(session, client, frame);
             return;
           }
           this.#sendFrame(session, client, frame);
@@ -380,12 +400,6 @@ export class BrowserViewGateway {
     if (input.type === "ack") {
       if (!session.frameSizes.has(input.sequence)) return;
       forgetFramesBefore(session.frameSizes, input.sequence);
-      session.drawnSequence = Math.max(session.drawnSequence, input.sequence);
-      const held = session.heldFrame;
-      if (held && session.socket && framesInFlight(session) < MAX_FRAMES_IN_FLIGHT) {
-        session.heldFrame = null;
-        this.#sendFrame(session, session.socket, held);
-      }
       return;
     }
     this.#options.onInput?.();
@@ -452,16 +466,69 @@ export class BrowserViewGateway {
     yield* browser.input(session.tabId, move).pipe(Effect.catch(() => Effect.void));
   });
 
-  #sendFrame(session: ManagedViewSession, client: Ws.WebSocket, frame: BrowserScreencastFrame): void {
-    if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+  /** False when the frame was not sent. */
+  #sendFrame(session: ManagedViewSession, client: Ws.WebSocket, frame: BrowserScreencastFrame): boolean {
+    if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return false;
     // A dropped frame is one the client never sees, so it cannot be the frame a fraction is a
     // fraction of. Recording its shape here would expand the client's next point with a size
     // only this side knows about, and the click would land somewhere the user never pointed.
-    if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
+    if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return false;
     client.send(encodeBrowserViewFrame(frame), { binary: true });
     session.frameWidth = frame.width;
     session.frameHeight = frame.height;
-    if (session.rememberFrames) session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+    if (session.rememberFrames) {
+      session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+      if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
+        this.#dispatch(this.#closeSession(session, "The live view fell too far behind."));
+      }
+    }
+    return true;
+  }
+
+  /** Keeps the newest frame until the client draws one, or until the deadline. */
+  #holdFrame(session: ManagedViewSession, client: Ws.WebSocket, frame: BrowserScreencastFrame): void {
+    session.heldFrame = frame;
+    if (session.heldFrameTimer) return;
+    session.heldFrameTimer = setTimeout(() => {
+      session.heldFrameTimer = null;
+      this.#releaseHeldFrame(session, client, true);
+    }, HELD_FRAME_DEADLINE_MS);
+    session.heldFrameTimer.unref?.();
+  }
+
+  /** Sends the held frame when the client has room for it, or when it waited past the deadline. */
+  #releaseHeldFrame(session: ManagedViewSession, client: Ws.WebSocket, overdue: boolean): void {
+    const held = session.heldFrame;
+    if (!held || session.socket !== client) return;
+    if (!overdue && framesInFlight(session) >= MAX_FRAMES_IN_FLIGHT) return;
+    this.#forgetHeldFrame(session);
+    // A full socket keeps the frame for the next deadline. It is the page as it is now, and a page
+    // that stopped changing sends no frame to replace it.
+    if (!this.#sendFrame(session, client, held)) this.#holdFrame(session, client, held);
+  }
+
+  #forgetHeldFrame(session: ManagedViewSession): void {
+    if (session.heldFrameTimer) clearTimeout(session.heldFrameTimer);
+    session.heldFrameTimer = null;
+    session.heldFrame = null;
+  }
+
+  /**
+   * The client has drawn a frame, so the next one may go. This runs when the message arrives, not
+   * in the input queue: a click on a busy page holds that queue, and the frames must not wait for
+   * it. The queue still handles the acknowledgement in order, which forgets the older frames.
+   */
+  #noteDrawnFrame(session: ManagedViewSession, client: Ws.WebSocket, data: Ws.RawData): void {
+    if (!session.rememberFrames || rawDataSize(data) > MAX_ACK_MESSAGE_BYTES) return;
+    let input: ReturnType<typeof decodeBrowserViewInput>;
+    try {
+      input = decodeBrowserViewInput(rawDataText(data));
+    } catch {
+      return;
+    }
+    if (input.type !== "ack" || !session.frameSizes.has(input.sequence)) return;
+    session.drawnSequence = Math.max(session.drawnSequence, input.sequence);
+    this.#releaseHeldFrame(session, client, false);
   }
 
   #send(session: ManagedViewSession, client: Ws.WebSocket, message: BrowserViewHostMessage): void {
@@ -477,6 +544,7 @@ export class BrowserViewGateway {
     if (session.socket !== client) return;
     this.#sessions.delete(session.id);
     session.socket = null;
+    this.#forgetHeldFrame(session);
     const stopView = session.stopView;
     session.stopView = null;
     if (stopView) yield* stopView().pipe(Effect.catch(() => Effect.void));
@@ -490,6 +558,7 @@ export class BrowserViewGateway {
     this.#sessions.delete(session.id);
     const client = session.socket;
     session.socket = null;
+    this.#forgetHeldFrame(session);
     const stopView = session.stopView;
     session.stopView = null;
     client?.close(1000, reason.slice(0, 120));
