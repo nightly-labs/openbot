@@ -19,6 +19,7 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import { forceActivateX11Window } from "./linux-x11-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -201,7 +202,11 @@ export class DynamicIslandWindowController {
     // activating the app, so the main window stays where it is.
     const wantsKeyboard = interactive && keyboard;
     window.setFocusable(wantsKeyboard);
-    if (wantsKeyboard && !window.isFocused()) window.focus();
+    if (wantsKeyboard && !window.isFocused()) {
+      window.focus();
+      // KWin of Plasma 6.3 and older does not focus a dock window for `focus()` or a click (#7415).
+      if (this.#options.windowKind === "x11") forceActivateX11Window(window);
+    }
     if (interactive || !bounds) return;
     this.#collapseTimers.set(
       displayId,
