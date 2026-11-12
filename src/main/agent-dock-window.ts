@@ -403,7 +403,10 @@ export class AgentDockWindowController {
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
         window.setHasShadow(false);
-        window.setAlwaysOnTop(true, "floating");
+        // On Windows, Electron puts a "floating" window behind the taskbar each time it becomes active. When
+        // the taskbar is not topmost, for example in front of a full-screen app, the window then loses
+        // "always on top" for good (#7452).
+        window.setAlwaysOnTop(true, this.#options.windowKind === "tool" ? "screen-saver" : "floating");
         // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
         // defined on Windows, so a call there throws.
         if (this.#options.windowKind === "panel") {
