@@ -38,7 +38,7 @@ export interface BrowserHostTab {
    * The passwords that stay in password fields of the current document, so that the page can send
    * its form again. A navigation or a popup that would carry one in its address is blocked.
    */
-  keptPasswords?: string[];
+  keptPasswords?: string[] | undefined;
   /**
    * `fill_card` typed a saved card into the current document. Its fields show the number and the
    * security code, and page code can read them, so screenshots, previews, evaluation and recording
