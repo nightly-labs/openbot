@@ -347,6 +347,17 @@ export function memorySitesForHost(hostname: string): string[] {
   return labels.slice(0, -1).map((_, index) => labels.slice(index).join("."));
 }
 
+/**
+ * One saved memory as one prompt line, after its `[memoryId]`: a memory with a line break must not
+ * look like two memories, and its text must not close the `block` that lists it.
+ */
+export function memoryPromptLine(text: string, block: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(new RegExp(`<\\s*/\\s*${block}`, "gi"), `< /${block}`)
+    .trim();
+}
+
 /** Two memories with the same normalized text are one memory: `save` folds the second into the first. */
 export function normalizeMemoryText(value: string): string {
   return value;

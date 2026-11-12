@@ -625,11 +625,11 @@ try {
     // 12. Saved channel memories go in a delta only when they changed. The delta says that the
     // session has them, and a changed memory list goes again in full.
     const remembered = "The release needs a signed build.";
-    channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
+    const memory = channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
     const withMemory = await send(channelId, lead.id, "Read the saved memory.");
     pass(
-      "A delta after a new memory gives the memories",
-      withMemory.includes(`<channel_memories>\n${remembered}\n</channel_memories>`),
+      "A delta after a new memory gives the memories, each after its id",
+      withMemory.includes(`<channel_memories>\n[${memory.id}] ${remembered}\n</channel_memories>`),
       blocks(withMemory).find((entry) => entry.includes("channel memories")),
     );
     const sameMemory = await send(channelId, lead.id, "Check the build again.");

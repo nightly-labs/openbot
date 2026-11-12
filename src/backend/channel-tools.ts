@@ -77,8 +77,11 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_forget_memory",
     description:
-      "Delete one saved channel memory when the user asks the channel to forget it. Give its text exactly as it is listed.",
-    shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
+      "Delete one saved channel memory when the user asks the channel to forget it. Give its memoryId: the id in brackets at the start of its line in the channel memories. Without a memoryId, give its text as it is listed.",
+    shape: {
+      memoryId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText).optional(),
+    },
   },
   {
     name: "channel_add_member",
