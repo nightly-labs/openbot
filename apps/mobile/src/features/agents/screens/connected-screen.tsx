@@ -279,6 +279,8 @@ function changeChatOrder(order: MobileChatOrder): void {
   void saveChatOrderPreference(order).catch(() => undefined);
 }
 
+const NO_CHAT_IDS: ReadonlySet<string> = new Set();
+
 function listItemKey(item: MobileSidebarItem) {
   return `${item.kind}:${item.id}`;
 }
@@ -406,7 +408,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     (serverDirectoryState === "loading" && servers.length === 0) ||
     (hasSelectedServer && activeServer.initialConnectionPending && channelAgents.size === 0);
   // The list comes in as the loader starts to roll up, so the two overlap instead of waiting in turn.
-  const listReady = !showLoader && !isLoaderPresent;
+  // The list also waits for the saved chat order, so that it does not show in one order and then move.
+  const chatOrderReady = useChatOrderPreference((state) => state.ready);
+  const listReady = !showLoader && !isLoaderPresent && chatOrderReady;
   // A new account gets the first-run flow in place of the empty home. The flow shows its own
   // connection state, so the loader does not cover it.
   const onboarding = useHomeOnboarding();
@@ -484,20 +488,29 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // This phone's own choice. "Unread in a group" takes the unread chats out of their sections, under
   // "Needs you"; "Unread first in folders" puts them first in each section. Neither changes the layout.
   const chatOrder = useChatOrderPreference((state) => state.order);
+  // The manual order does not read the unread state, so a read does not build the list again.
+  const unreadChatIds = useMemo(
+    () =>
+      chatOrder === "manual"
+        ? NO_CHAT_IDS
+        : new Set<string>([
+            ...unreadAgentIds,
+            ...openChannels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id),
+          ]),
+    [chatOrder, unreadAgentIds, openChannels],
+  );
+  const [dragging, setDragging] = useState(false);
+  // As on the desktop, an unread order holds still during a drag: a reply then does not move the rows
+  // under the finger. The list takes the new order when the drag ends.
+  const heldItems = useRef<MobileSidebarItem[] | null>(null);
   const items = useMemo(() => {
+    if (dragging && chatOrder !== "manual" && heldItems.current) return heldItems.current;
     const layout = sidebar?.layout ?? null;
     const listedAgents = unpinnedAgents.filter((agent) => !waitingAgentIds.has(agent.id));
     const listedChannels = openChannels.filter((channel) => !pinnedChannelIds.includes(channel.id));
-    const unread = new Set<string>(
-      chatOrder === "manual"
-        ? []
-        : [
-            ...unreadAgentIds,
-            ...listedChannels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id),
-          ],
-    );
+    const unread = unreadChatIds;
     const grouped = chatOrder === "unread-group";
-    return [
+    const next = [
       ...mobileWaitingItems(
         layout,
         unpinnedAgents.filter((agent) => waitingAgentIds.has(agent.id)),
@@ -509,16 +522,24 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
             listedChannels.filter((channel) => unread.has(channel.id)),
           )
         : []),
-      ...mobileSidebarItems(
-        layout,
-        grouped ? listedAgents.filter((agent) => !unread.has(agent.id)) : listedAgents,
-        grouped ? listedChannels.filter((channel) => !unread.has(channel.id)) : listedChannels,
-        undefined,
-        t,
-        chatOrder === "unread-first" ? unread : null,
-      ),
+      ...mobileSidebarItems(layout, listedAgents, listedChannels, undefined, t, {
+        unreadFirst: chatOrder === "unread-first" ? unread : null,
+        aside: grouped ? unread : null,
+      }),
     ];
-  }, [sidebar?.layout, unpinnedAgents, waitingAgentIds, openChannels, pinnedChannelIds, chatOrder, unreadAgentIds, t]);
+    heldItems.current = next;
+    return next;
+  }, [
+    sidebar?.layout,
+    unpinnedAgents,
+    waitingAgentIds,
+    openChannels,
+    pinnedChannelIds,
+    chatOrder,
+    unreadChatIds,
+    dragging,
+    t,
+  ]);
   const visibleSectionIds = useMemo(
     () => items.filter((item) => item.kind === "section").map((item) => item.id),
     [items],
@@ -694,7 +715,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       visibleSectionIds,
     ],
   );
-  const [dragging, setDragging] = useState(false);
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
   const dragScroll = useRef({ offset: 0, content: 0, viewport: 0 });

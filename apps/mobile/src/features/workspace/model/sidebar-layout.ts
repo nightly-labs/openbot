@@ -74,8 +74,10 @@ function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], 
 }
 
 /**
- * `unreadFirst`: the unread chats, for the `unread-first` order. Each section then shows them first and
- * then the other chats, both by last activity. Null keeps the saved order.
+ * `order.unreadFirst`: the unread chats, for the `unread-first` order. Each section then shows them
+ * first and then the other chats, both by last activity. Null keeps the saved order.
+ * `order.aside`: the chats that show in another group, such as "Unread". A folder leaves them out,
+ * but a folder that holds only such chats is not empty.
  */
 export function mobileSidebarItems(
   layout: SidebarLayoutSnapshot | null,
@@ -83,8 +85,9 @@ export function mobileSidebarItems(
   channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
-  unreadFirst: ReadonlySet<string> | null = null,
+  order: { unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
 ): MobileSidebarItem[] {
+  const { unreadFirst, aside } = order;
   const sorted = chatItems(layout, agents, channels);
   const chats = unreadFirst
     ? [
@@ -92,7 +95,7 @@ export function mobileSidebarItems(
         ...byRecent(sorted.filter((chat) => !unreadFirst.has(chat.id))),
       ]
     : sorted;
-  if (!layout) return chats;
+  if (!layout) return aside ? chats.filter((chat) => !aside.has(chat.id)) : chats;
   const names = new Map(layout.sections.map((section) => [section.id, section.name]));
   const groups = new Map<string, MobileSidebarItem[]>();
   for (const chat of chats) {
@@ -108,7 +111,8 @@ export function mobileSidebarItems(
   return layout.order.flatMap((id) => {
     const ancestorIds = sidebarFolderAncestors(parents, id);
     if (ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
-    const group = groups.get(id) ?? [];
+    const all = groups.get(id) ?? [];
+    const group = aside ? all.filter((chat) => !aside.has(chat.id)) : all;
     const custom = names.has(id);
     const title = custom
       ? names.get(id)
@@ -127,7 +131,7 @@ export function mobileSidebarItems(
         ancestorIds,
         custom,
         // An open folder with only folders in it is not empty.
-        empty: group.length === 0 && ![...parents.values()].includes(id),
+        empty: all.length === 0 && ![...parents.values()].includes(id),
       },
       ...(collapsedSectionIds.has(id) ? [] : group),
     ];

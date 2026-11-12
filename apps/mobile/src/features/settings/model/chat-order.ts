@@ -25,8 +25,13 @@ export async function loadChatOrderPreference(): Promise<void> {
   }
 }
 
-export async function saveChatOrderPreference(order: MobileChatOrder): Promise<void> {
+/** The writes run one after the other, so the last choice is the one that stays. */
+let writes: Promise<void> = Promise.resolve();
+
+export function saveChatOrderPreference(order: MobileChatOrder): Promise<void> {
   // Apply immediately, also when storage fails: the list then keeps the choice until the app restarts.
   useChatOrderPreference.setState({ order, ready: true });
-  await SecureStore.setItemAsync(key, order);
+  const write = writes.then(() => SecureStore.setItemAsync(key, order));
+  writes = write.catch(() => undefined);
+  return write;
 }
