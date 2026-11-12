@@ -1301,7 +1301,8 @@ const CLI_VERSION_TIMEOUT_MS = 10_000;
 /**
  * The Antigravity CLI 1.5.x is one program of about 220 MB. Its first start after a download waits
  * for the antivirus scan on Windows and the security check on macOS, which takes longer than 10 s
- * on a busy computer (#7257, #7569).
+ * on a busy computer (#7257, #7569). A retry does not replace this wait: each try stops the program
+ * at the limit, so a first start that takes longer than the limit fails at each try.
  */
 const ANTIGRAVITY_VERSION_TIMEOUT_MS = 90_000;
 
