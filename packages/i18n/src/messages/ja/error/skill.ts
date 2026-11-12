@@ -64,4 +64,12 @@ export const messages = {
   "error.skill.pathSymlink": "スキルのパスにシンボリックリンクを含めることはできません。",
   "error.skill.folderNotRead":
     "{provider} は {folder} を読み込みません。このフォルダーを {target} にコピーしてください。",
+  "error.skill.githubLinkInvalid": "GitHub のリポジトリかフォルダーへのリンクを貼り付けてください。",
+  "error.skill.githubNotFound": "OpenBot は {repository} を開けません。リポジトリが非公開か、存在しません。",
+  "error.skill.githubNoSkills": "{folder} に SKILL.md がありません。",
+  "error.skill.githubUnavailable": "OpenBot は現在 GitHub を読み込めません。しばらくしてからもう一度お試しください。",
+  "error.skill.githubRateLimited":
+    "GitHub はアカウントなしで OpenBot が読み込める回数を制限しています。1 時間後にもう一度お試しください。",
+  "error.skill.githubHostTooOld": "GitHub からスキルを追加するには、このサーバーを更新してください。",
+  "error.skill.publishGithub": "{name} は GitHub のスキルです。公開できるのは自分で作成したスキルだけです。",
 } as const satisfies PartialTranslation<typeof source>;

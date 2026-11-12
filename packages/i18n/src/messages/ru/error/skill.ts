@@ -59,4 +59,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "В корне папки навыка нужен SKILL.md.",
   "error.skill.pathSymlink": "Пути навыков не могут содержать символические ссылки.",
   "error.skill.folderNotRead": "{provider} не читает {folder}. Скопируйте эту папку в {target}.",
+  "error.skill.githubLinkInvalid": "Вставьте ссылку на репозиторий или папку GitHub.",
+  "error.skill.githubNotFound": "OpenBot не может открыть {repository}. Репозиторий закрыт или не существует.",
+  "error.skill.githubNoSkills": "В {folder} нет SKILL.md.",
+  "error.skill.githubUnavailable": "OpenBot сейчас не может прочитать GitHub. Повторите попытку позже.",
+  "error.skill.githubRateLimited":
+    "GitHub ограничивает, как часто OpenBot может читать его без аккаунта. Повторите попытку через час.",
+  "error.skill.githubHostTooOld": "Обновите этот сервер, чтобы добавлять навыки из GitHub.",
+  "error.skill.publishGithub": "{name} взят из GitHub. Публиковать можно только навыки, которые вы создали.",
 } as const satisfies PartialTranslation<typeof source>;

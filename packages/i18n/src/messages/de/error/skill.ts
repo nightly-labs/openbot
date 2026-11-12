@@ -67,4 +67,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Der Fähigkeitsordner benötigt SKILL.md in seinem Stammverzeichnis.",
   "error.skill.pathSymlink": "Fähigkeitspfade dürfen keine symbolischen Links enthalten.",
   "error.skill.folderNotRead": "{provider} liest {folder} nicht. Kopiere diesen Ordner nach {target}.",
+  "error.skill.githubLinkInvalid": "Füge einen Link zu einem GitHub-Repository oder -Ordner ein.",
+  "error.skill.githubNotFound":
+    "OpenBot kann {repository} nicht öffnen. Das Repository ist privat oder existiert nicht.",
+  "error.skill.githubNoSkills": "In {folder} gibt es keine SKILL.md.",
+  "error.skill.githubUnavailable": "OpenBot kann GitHub gerade nicht lesen. Versuche es später erneut.",
+  "error.skill.githubRateLimited":
+    "GitHub begrenzt, wie oft OpenBot es ohne Konto lesen kann. Versuche es in einer Stunde erneut.",
+  "error.skill.githubHostTooOld": "Aktualisiere diesen Server, um Fähigkeiten von GitHub hinzuzufügen.",
+  "error.skill.publishGithub":
+    "{name} stammt von GitHub. Du kannst nur Fähigkeiten veröffentlichen, die du selbst erstellt hast.",
 } as const satisfies PartialTranslation<typeof source>;

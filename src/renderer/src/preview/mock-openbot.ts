@@ -2488,6 +2488,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       installAgentSkill: (input) => mockSkills.skills.install(input),
       uninstallAgentSkill: (input) => mockSkills.skills.uninstall(input),
       setAgentSkillEnabled: (input) => mockSkills.skills.setEnabled(input),
+      readGithubSkills: (link) => mockSkills.readGithub(link),
       addMarketplaceAgent: async (input) => {
         const { agent } = await api.marketplaceAgents.install(input);
         return { id: agent.id, name: agent.name };

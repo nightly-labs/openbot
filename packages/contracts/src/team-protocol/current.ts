@@ -81,6 +81,7 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
+import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
@@ -583,6 +584,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  GITHUB_SKILLS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -793,7 +795,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_CHANNEL_CAPABILITY &&
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
-    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+    capability !== GITHUB_SKILLS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -880,6 +883,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  GITHUB_SKILLS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1049,6 +1053,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_CHANNEL_CAPABILITY &&
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
-      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+      capability !== GITHUB_SKILLS_CAPABILITY,
   );
 }

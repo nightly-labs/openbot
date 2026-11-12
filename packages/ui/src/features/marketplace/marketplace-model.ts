@@ -1,5 +1,6 @@
 import type {
   ClientAgentSummary,
+  GithubSkillSource,
   InstalledSkill,
   MarketplaceAgentDetail,
   MarketplaceAgentSummary,
@@ -41,6 +42,9 @@ export type AgentListingState = "add" | "added" | "update";
 
 /** How far the read of one agent's installed skills got. An empty list is an answer only when `loaded`. */
 export type SkillRead = "idle" | "loading" | "loaded" | "failed";
+
+/** The answer to a GitHub link: the skills under it, or why the server could not read it. */
+export type GithubSkillRead = { status: "found"; source: GithubSkillSource } | { status: "failed"; message: string };
 
 /** `connecting`: a sign-in started and waits, such as for a GitHub device code. */
 export type MarketplaceAppStatus = "connected" | "attention" | "connecting" | "idle";
@@ -235,6 +239,11 @@ export interface MarketplaceModel {
   setSkillEnabled: (agentId: string, skillId: string, on: boolean) => Promise<void>;
   /** Installs the newest version on each agent that has an older one. A changed copy asks first. */
   updateSkill: (skill: MarketplaceSkillRef, agentIds: readonly string[]) => Promise<void>;
+  /**
+   * Reads the skills under a link to a public GitHub repository or folder, at its newest commit.
+   * Absent while the server cannot read GitHub, or this user cannot add skills.
+   */
+  readGithubSkills?: ((link: string) => Promise<GithubSkillRead>) | undefined;
   /** Absent while no composer can take the request. Starts a chat that makes a new skill. */
   createSkill?: ((agentId: string) => void) | undefined;
   /** Absent while no composer can take the example. */

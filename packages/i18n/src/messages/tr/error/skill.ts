@@ -59,4 +59,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Beceri klasörü kök dizininde SKILL.md gerektirir.",
   "error.skill.pathSymlink": "Beceri yolları sembolik bağlantılar içeremez.",
   "error.skill.folderNotRead": "{provider}, {folder} klasörünü okumuyor. Bu klasörü {target} konumuna kopyalayın.",
+  "error.skill.githubLinkInvalid": "Bir GitHub deposunun veya klasörünün bağlantısını yapıştırın.",
+  "error.skill.githubNotFound": "OpenBot {repository} deposunu açamıyor. Depo özel ya da mevcut değil.",
+  "error.skill.githubNoSkills": "{folder} içinde SKILL.md yok.",
+  "error.skill.githubUnavailable": "OpenBot şu anda GitHub'ı okuyamıyor. Daha sonra yeniden deneyin.",
+  "error.skill.githubRateLimited":
+    "GitHub, OpenBot'un hesap olmadan ne sıklıkla okuyabileceğini sınırlıyor. Bir saat sonra yeniden deneyin.",
+  "error.skill.githubHostTooOld": "GitHub'dan beceri eklemek için bu sunucuyu güncelleyin.",
+  "error.skill.publishGithub":
+    "{name} GitHub'dan geliyor. Yalnızca kendi oluşturduğunuz becerileri yayımlayabilirsiniz.",
 } as const satisfies PartialTranslation<typeof source>;

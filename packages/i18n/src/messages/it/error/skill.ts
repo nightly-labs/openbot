@@ -59,4 +59,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "La cartella della skill richiede SKILL.md nella radice.",
   "error.skill.pathSymlink": "I percorsi delle skill non possono contenere link simbolici.",
   "error.skill.folderNotRead": "{provider} non legge {folder}. Copia questa cartella in {target}.",
+  "error.skill.githubLinkInvalid": "Incolla un link a un repository o a una cartella di GitHub.",
+  "error.skill.githubNotFound": "OpenBot non può aprire {repository}. Il repository è privato o non esiste.",
+  "error.skill.githubNoSkills": "Non c'è nessun SKILL.md in {folder}.",
+  "error.skill.githubUnavailable": "OpenBot non può leggere GitHub ora. Riprova più tardi.",
+  "error.skill.githubRateLimited":
+    "GitHub limita quanto spesso OpenBot può leggerlo senza un account. Riprova tra un'ora.",
+  "error.skill.githubHostTooOld": "Aggiorna questo server per aggiungere skill da GitHub.",
+  "error.skill.publishGithub": "{name} proviene da GitHub. Puoi pubblicare solo le skill che hai creato.",
 } as const satisfies PartialTranslation<typeof source>;

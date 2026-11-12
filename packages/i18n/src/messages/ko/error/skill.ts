@@ -60,4 +60,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "스킬 폴더의 루트에 SKILL.md가 필요해요.",
   "error.skill.pathSymlink": "스킬 경로에는 심볼릭 링크를 포함할 수 없어요.",
   "error.skill.folderNotRead": "{provider}은(는) {folder}을(를) 읽지 않아요. 이 폴더를 {target}(으)로 복사해 주세요.",
+  "error.skill.githubLinkInvalid": "GitHub 저장소나 폴더 링크를 붙여 넣어 주세요.",
+  "error.skill.githubNotFound": "OpenBot이 {repository}을(를) 열 수 없어요. 비공개 저장소이거나 존재하지 않아요.",
+  "error.skill.githubNoSkills": "{folder}에 SKILL.md가 없어요.",
+  "error.skill.githubUnavailable": "지금은 OpenBot이 GitHub를 읽을 수 없어요. 나중에 다시 시도해 주세요.",
+  "error.skill.githubRateLimited":
+    "GitHub는 계정 없이 OpenBot이 읽을 수 있는 횟수를 제한해요. 1시간 후에 다시 시도해 주세요.",
+  "error.skill.githubHostTooOld": "GitHub에서 스킬을 추가하려면 이 서버를 업데이트해 주세요.",
+  "error.skill.publishGithub": "{name}은(는) GitHub에서 가져온 스킬이에요. 직접 만든 스킬만 게시할 수 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -351,6 +351,7 @@ import type {
   ExternalLinkPreference,
 } from "./ipc-external-links";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
+import type { GithubSkillSource } from "./ipc-github-skills";
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
@@ -2135,6 +2136,8 @@ export const IPC_ENDPOINTS = {
     setAgentSkillEnabled: scopedRequest<SetEnabledSkillInput, InstalledSkill, "required">()(
       "agent:admin:set-skill-enabled",
     ),
+    // The skills under a link to a public GitHub repository, read by the computer that installs them.
+    readGithubSkills: scopedRequest<string, GithubSkillSource, "required">()("agent:admin:read-github-skills"),
     // A new agent from a marketplace listing or a shared template, added on the computer that runs
     // it. The `marketplaceAgents` and `agentTemplates` installs stay for this computer.
     addMarketplaceAgent: scopedRequest<InstallMarketplaceAgentInput, AddedAgent, "required">()(

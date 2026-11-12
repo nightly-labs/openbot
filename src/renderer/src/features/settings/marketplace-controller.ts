@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddedAgent,
   ClientAgentSummary,
+  GithubSkillSource,
   InstalledSkill,
   MacAutomationResult,
   MacAutomationTarget,
@@ -20,6 +21,8 @@ import type {
 import {
   assignedSkillCount,
   DEFAULT_MCP_SERVER_ACCESS,
+  githubSkillDetail,
+  isGithubSkillId,
   isRemovableSkill,
   isSkillEnabled,
   mcpConfigErrors,
@@ -35,6 +38,7 @@ import { isConnectorId } from "@openbot/ui/features/connectors/connectors";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import type {
   AgentListingState,
+  GithubSkillRead,
   MarketplaceApp,
   MarketplaceAppConnection,
   MarketplaceAppStatus,
@@ -123,6 +127,8 @@ export interface MarketplaceControllerProps {
   agentServerId?: string | undefined;
   /** The joined server in `hostServerId` when its host also updates an agent. */
   agentUpdateServerId?: string | undefined;
+  /** The host of the skills reads a GitHub link (`github-skills-v1`), and this account can add skills there. */
+  githubSkills?: boolean | undefined;
   onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   /** The connectors of the server. Each one that this account can connect is an app. */
   connectors?: ConnectorRegistry | undefined;
@@ -232,6 +238,9 @@ interface AddedRecord {
  * install, connect and uninstall flows are the flows of the previous Marketplace, with their
  * analytics.
  */
+/** A GitHub skill id names a repository and a folder. Analytics get the source only. */
+const skillSlug = (id: string) => (isGithubSkillId(id) ? "github" : id);
+
 export function createMarketplaceController(props: MarketplaceControllerProps) {
   const { t, format } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
@@ -593,7 +602,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "install",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "succeeded",
         });
       } catch (cause) {
@@ -603,7 +612,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "install",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "failed",
           failure_code: "install_failed",
         });
@@ -664,7 +673,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           analytics.track("marketplace_action", {
             entity: "skill",
             action: "uninstall",
-            listing_slug: skill.id,
+            listing_slug: skillSlug(skill.id),
             result: "succeeded",
           });
         } catch (cause) {
@@ -674,7 +683,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           analytics.track("marketplace_action", {
             entity: "skill",
             action: "uninstall",
-            listing_slug: skill.id,
+            listing_slug: skillSlug(skill.id),
             result: "failed",
             failure_code: "uninstall_failed",
           });
@@ -740,7 +749,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "update",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "succeeded",
         });
       } catch (cause) {
@@ -750,7 +759,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         analytics.track("marketplace_action", {
           entity: "skill",
           action: "update",
-          listing_slug: skill.id,
+          listing_slug: skillSlug(skill.id),
           result: "failed",
           failure_code: "update_failed",
         });
@@ -778,7 +787,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         const list = draft.installed[agentId];
         if (list) draft.installed[agentId] = list.map((item) => (item.skillId === skillId ? next : item));
       });
-      analytics.track("marketplace_action", { entity: "skill", action, listing_slug: skillId, result: "succeeded" });
+      analytics.track("marketplace_action", {
+        entity: "skill",
+        action,
+        listing_slug: skillSlug(skillId),
+        result: "succeeded",
+      });
     } catch (cause) {
       // The host refuses a changed copy and one that needs repair: `error.skill.disableModified` and
       // `error.skill.disableNeedsRepair`, in the reader's language.
@@ -786,7 +800,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       analytics.track("marketplace_action", {
         entity: "skill",
         action,
-        listing_slug: skillId,
+        listing_slug: skillSlug(skillId),
         result: "failed",
         failure_code: `${action}_failed`,
       });
@@ -794,13 +808,29 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, false);
   }
 
+  /* The skills of the GitHub links that this window read, by id: the skill page and the agents dialog
+     show them without a second read, which would use the GitHub limit again. */
+  const githubDetails = new Map<string, MarketplaceSkillDetail>();
+
+  async function readGithubSkills(link: string): Promise<GithubSkillRead> {
+    const read = skillCalls().readGithub;
+    if (!read) return { status: "failed", message: t("error.skill.githubHostTooOld") };
+    try {
+      const source: GithubSkillSource = await read(link);
+      for (const skill of source.skills) githubDetails.set(skill.id, githubSkillDetail(source, skill));
+      return { status: "found", source };
+    } catch (cause) {
+      return { status: "failed", message: marketplaceErrorMessage(cause) };
+    }
+  }
+
   async function loadSkill(id: string) {
     const analytics = desktopAnalytics.scope();
-    const value = await run(() => calls().skills.get(id));
+    const value = githubDetails.get(id) ?? (await run(() => calls().skills.get(id)));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
-      listing_slug: id,
+      listing_slug: skillSlug(id),
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
@@ -1627,10 +1657,16 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       return skillHomeCache(calls());
     },
     loadSkill,
-    skillListing: (id) =>
-      calls()
+    skillListing: (id) => {
+      const github = githubDetails.get(id);
+      if (github) return Promise.resolve(github);
+      /* Each GitHub read uses the limit of 60 an hour. Without a read in this window, the row opens
+         the page of an added skill, which names the repository. */
+      if (isGithubSkillId(id)) return Promise.resolve(undefined);
+      return calls()
         .skills.get(id)
-        .catch(() => undefined),
+        .catch(() => undefined);
+    },
     agents,
     activeAgentId,
     readSkills,
@@ -1641,6 +1677,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     changeSkill,
     setSkillEnabled,
     updateSkill,
+    get readGithubSkills() {
+      return props.githubSkills && skillCalls().readGithub ? readGithubSkills : undefined;
+    },
     get createSkill() {
       return props.onCreateSkill;
     },

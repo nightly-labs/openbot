@@ -67,4 +67,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Le dossier de la compétence doit contenir SKILL.md à sa racine.",
   "error.skill.pathSymlink": "Les chemins des compétences ne peuvent pas contenir de liens symboliques.",
   "error.skill.folderNotRead": "{provider} ne lit pas {folder}. Copiez ce dossier dans {target}.",
+  "error.skill.githubLinkInvalid": "Collez un lien vers un dépôt ou un dossier GitHub.",
+  "error.skill.githubNotFound": "OpenBot ne peut pas ouvrir {repository}. Le dépôt est privé ou n'existe pas.",
+  "error.skill.githubNoSkills": "Il n'y a pas de SKILL.md dans {folder}.",
+  "error.skill.githubUnavailable": "OpenBot ne peut pas lire GitHub pour le moment. Réessayez plus tard.",
+  "error.skill.githubRateLimited":
+    "GitHub limite la fréquence à laquelle OpenBot peut le lire sans compte. Réessayez dans une heure.",
+  "error.skill.githubHostTooOld": "Mettez à jour ce serveur pour ajouter des compétences depuis GitHub.",
+  "error.skill.publishGithub":
+    "{name} vient de GitHub. Vous pouvez publier uniquement les compétences que vous avez créées.",
 } as const satisfies PartialTranslation<typeof source>;
