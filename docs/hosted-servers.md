@@ -1390,7 +1390,7 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 | `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool-free` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
 | `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. |
-| `prepare <VPS ID>... --keys=<file>` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, and restarts each machine. It skips a machine that has OpenBot. |
+| `prepare <VPS ID>... --keys=<file>` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, and restarts each machine. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself. |
 | `move <server ID> <VPS ID> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. |
 
 `sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the

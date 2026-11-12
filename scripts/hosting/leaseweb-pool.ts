@@ -695,6 +695,15 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     await this.#restartMachine(machine);
   }
 
+  /** Installs a newer release on a prepared machine with no data. A disabled OpenBot does not update. */
+  #upgradeMachine(machine: Vps, release: Release) {
+    const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
+    const script = `${this.#hostingCopy()}
+bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha256} '${authApi}'
+`;
+    this.#remote(machine, "bash -s", { input: script });
+  }
+
   /** Restarts the machine one time after the bootstrap, as the docs say, and waits for the new boot. */
   async #restartMachine(machine: Vps) {
     const bootId = "cat /proc/sys/kernel/random/boot_id";
@@ -719,7 +728,12 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
       const machine = await this.#freeMachine(id);
       const state = this.#machineState(machine);
       if (state?.user) {
-        logger.info(`VPS ${id} has OpenBot ${state.version || "of no known version"} already.`);
+        if (state.data || !isOlder(state.version, release.version)) {
+          logger.info(`VPS ${id} has OpenBot ${state.version || "of no known version"} already.`);
+        } else {
+          logger.info(`VPS ${id}: install OpenBot ${release.version} over ${state.version}.`);
+          if (this.#apply) this.#upgradeMachine(machine, release);
+        }
         continue;
       }
       logger.info(`VPS ${id}: install OpenBot ${release.version}, run the bootstrap, and restart.`);
@@ -828,6 +842,10 @@ exit "$status"`;
     // 1. The machine, while the customer still uses the sandbox.
     if (!state?.user) {
       await this.#prepareMachine(machine, release);
+      state = this.#machineState(machine);
+    } else if (!state.data && isOlder(state.version, release.version)) {
+      logger.info(`Install OpenBot ${release.version} over ${state.version}.`);
+      this.#upgradeMachine(machine, release);
       state = this.#machineState(machine);
     } else {
       this.#remote(machine, "bash -s", { input: this.#hostingCopy() });
@@ -947,10 +965,16 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
         }
         if (status === "" && Date.now() - shown > 30_000) {
           shown = Date.now();
-          const size = this.#remote(machine, `stat -c %s ${MACHINE_ARCHIVE} 2>/dev/null || echo 0`, {
-            capture: true,
-          }).trim();
-          logger.info(`Export: ${Math.round(Number(size) / 1e6)} MB on the machine.`);
+          // Only a progress line: a failed read must not stop the move.
+          try {
+            const size = this.#remote(machine, `stat -c %s ${MACHINE_ARCHIVE} 2>/dev/null || echo 0`, {
+              capture: true,
+              quiet: true,
+            }).trim();
+            logger.info(`Export: ${Math.round(Number(size) / 1e6)} MB on the machine.`);
+          } catch {
+            logger.warn("The size of the archive on the machine is not available.");
+          }
         }
       }
       const log = await this.#sandboxRun(sandbox, `cat ${SANDBOX_MOVE}/export.log 2>/dev/null || true`);

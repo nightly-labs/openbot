@@ -8,6 +8,10 @@
 #       the service user with the IDs that it has in the sandbox (`id user` there), and installs
 #       OpenBot with provision.sh. OpenBot stays disabled, so a restart of the VPS does not start it.
 #
+#   move-from-boat.sh upgrade <appimage-url> <appimage-sha256> <auth-api-url>
+#       On a prepared VPS that has no data of a server. A disabled OpenBot does not update, so this
+#       installs a newer release with provision.sh, and OpenBot stays disabled.
+#
 #   move-from-boat.sh packages
 #       On the sandbox, while the customer still uses it. Prints the apt packages that the customer
 #       installed, for `install-packages`. It does not stop OpenBot.
@@ -372,6 +376,26 @@ prepare() {
   if openbot_runs; then fail "OpenBot runs. Stop it."; fi
   echo "Installed OpenBot $(installed_version) on $hostname for the user $SERVICE_USER ($uid:$gid). It is disabled."
   echo "Next: run leaseweb-bootstrap.sh, restart this machine one time, and then export the sandbox."
+}
+
+upgrade() {
+  [ "$#" -eq 3 ] || fail "usage: $0 upgrade <appimage-url> <appimage-sha256> <auth-api-url>"
+  local source copy
+  source=$(cd "$(dirname "$0")" && pwd)
+  [ -f "$source/provision.sh" ] || fail "Run this file from a copy of scripts/hosting."
+  is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
+  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$IMPORT_STATE" ] ||
+    fail "This machine has the data of a server. Do not upgrade it here."
+  if openbot_runs; then fail "OpenBot runs. Stop it."; fi
+  copy=$(mktemp -d /run/openbot-move.XXXXXX)
+  # shellcheck disable=SC2064 # The path is known now.
+  trap "rm -rf '$copy'" EXIT
+  cp -R "$source/." "$copy/"
+  chmod -R u=rwX,go=rX "$copy"
+  bash "$copy/provision.sh" "$SERVICE_USER" "$1" "$2" "$3"
+  systemctl disable --quiet openbot.service
+  if openbot_runs; then fail "OpenBot runs. Stop it."; fi
+  echo "Installed OpenBot $(installed_version). It is disabled."
 }
 
 # Prints the apt packages of the customer, as `install-packages` and the manifest read them.
@@ -863,11 +887,12 @@ command=${1:-}
 shift || true
 case $command in
   prepare) prepare "$@" ;;
+  upgrade) upgrade "$@" ;;
   packages) packages "$@" ;;
   install-packages) install_packages "$@" ;;
   export) export_data "$@" ;;
   import) import_data "$@" ;;
   start) start "$@" ;;
   discard) discard "$@" ;;
-  *) fail "usage: $0 prepare|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
+  *) fail "usage: $0 prepare|upgrade|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
 esac
