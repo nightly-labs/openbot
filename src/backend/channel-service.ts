@@ -3420,15 +3420,15 @@ export class ChannelService {
       if (!isString(args.text) || !args.text.trim() || args.text.length > 100_000)
         return yield* channelFailure(new Error("Provide a task result."));
       // A result before the answer to a reply is the bug that the wait fixes: the caller answered
-      // the person before the other member answered it.
+      // the person before the other member answered it. An assigned task is the same: the task waits
+      // for it and runs again, so a result posted now showed again after each subtask (#7788).
       const unanswered = tasks.find(
-        (item) =>
-          task.dependencies.includes(item.id) && isReplyTask(item) && !settled(item) && item.state !== "cancelled",
+        (item) => task.dependencies.includes(item.id) && !settled(item) && item.state !== "cancelled",
       );
       if (unanswered)
         return {
           accepted: false,
-          reason: `${this.memberName(unanswered.ownerAgentId ?? "")} has not answered your reply. End your turn now with no text: you continue this task with its answer. Do not mention this refusal.`,
+          reason: `${this.memberName(unanswered.ownerAgentId ?? "")} has not ${isReplyTask(unanswered) ? "answered your reply" : "returned the result of your task"}. End your turn now with no text: you continue this task with its ${isReplyTask(unanswered) ? "answer" : "result"}. Do not mention this refusal.`,
         };
       const name = this.hooks.agents().find((item) => item.id === agentId)?.name ?? agentId;
       const message = this.message(
