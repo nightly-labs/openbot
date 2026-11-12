@@ -1142,6 +1142,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "에이전트 없음",
   "mobile.server.mcp.access.someAgents": "{count}/{total}",
   "mobile.server.mcp.access.use": "사용 가능",
+  "mobile.server.mcp.access.fromEveryone": "모든 사람과 같음",
   "mobile.server.mcp.access.level": "{name}에 대한 {role}의 액세스",
   "mobile.server.mcp.access.hint":
     "멤버는 모든 사람과 자신의 역할 중 가장 높은 수준을 받습니다. 소유자, 관리자, 서버를 추가한 사람은 항상 관리할 수 있습니다.",

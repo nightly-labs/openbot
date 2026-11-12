@@ -1224,6 +1224,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "Keine Agenten",
   "mobile.server.mcp.access.someAgents": "{count} von {total}",
   "mobile.server.mcp.access.use": "Nutzen",
+  "mobile.server.mcp.access.fromEveryone": "Wie Alle",
   "mobile.server.mcp.access.level": "Zugriff von {role} auf {name}",
   "mobile.server.mcp.access.hint":
     "Ein Mitglied erhält die höchste Stufe von Alle und seinen Rollen. Inhaber, Admins und die Person, die den Server hinzugefügt hat, können ihn immer verwalten.",

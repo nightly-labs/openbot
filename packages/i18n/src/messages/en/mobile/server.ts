@@ -1591,6 +1591,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.access.noAgents": "No agents",
   "mobile.server.mcp.access.someAgents": "{count} of {total}",
   "mobile.server.mcp.access.use": "Can use",
+  "mobile.server.mcp.access.fromEveryone": "Same as Everyone",
   "mobile.server.mcp.access.level": "Access of {role} to {name}",
   "mobile.server.mcp.access.hint":
     "A member gets the highest level of Everyone and of their roles. Owners, admins and the person who added the server can always manage it.",

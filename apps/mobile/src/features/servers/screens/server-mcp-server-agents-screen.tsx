@@ -1,3 +1,4 @@
+import { canAdministerServer } from "@openbot/contracts/ipc";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
@@ -13,6 +14,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -35,12 +37,17 @@ export function ServerMcpServerAgentsScreen() {
       <SettingsContent>
         <SettingsNote>
           {!access.available
-            ? t("mobile.server.mcp.access.unavailable")
+            ? // An owner or admin of an online host that is too old for `mcp-access-v1`.
+              showsOnline(mcp.server) && canAdministerServer(mcp.server?.role)
+              ? t("mobile.server.mcp.accessUnsupported")
+              : t("mobile.server.mcp.access.unavailable")
             : snapshot.isError
               ? errorMessage(snapshot.error, t("mobile.server.mcp.access.loadFailed"))
-              : mcp.list.isPending || snapshot.isPending
-                ? t("mobile.server.mcp.loading")
-                : t("mobile.server.mcp.gone")}
+              : mcp.list.isError
+                ? errorMessage(mcp.list.error, t("mobile.server.mcp.access.loadFailed"))
+                : mcp.list.isPending || snapshot.isPending
+                  ? t("mobile.server.mcp.loading")
+                  : t("mobile.server.mcp.gone")}
         </SettingsNote>
       </SettingsContent>
     );

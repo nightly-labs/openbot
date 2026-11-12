@@ -1191,6 +1191,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "Ajan yok",
   "mobile.server.mcp.access.someAgents": "{count}/{total}",
   "mobile.server.mcp.access.use": "Kullanabilir",
+  "mobile.server.mcp.access.fromEveryone": "Herkes ile aynı",
   "mobile.server.mcp.access.level": "{role} rolünün {name} erişimi",
   "mobile.server.mcp.access.hint":
     "Bir üye, Herkes ve rollerinin en yüksek düzeyini alır. Sahipler, yöneticiler ve sunucuyu ekleyen kişi onu her zaman yönetebilir.",

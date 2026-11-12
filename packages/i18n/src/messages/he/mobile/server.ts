@@ -1607,6 +1607,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "אין סוכנים",
   "mobile.server.mcp.access.someAgents": "{count} מתוך {total}",
   "mobile.server.mcp.access.use": "יכול להשתמש",
+  "mobile.server.mcp.access.fromEveryone": "כמו כולם",
   "mobile.server.mcp.access.level": "הגישה של {role} אל {name}",
   "mobile.server.mcp.access.hint":
     "חבר מקבל את הרמה הגבוהה ביותר של כולם ושל התפקידים שלו. בעלים, מנהלים ומי שהוסיף את השרת תמיד יכולים לנהל אותו.",

@@ -2,13 +2,13 @@ import {
   copyMcpServerAccess,
   DEFAULT_MCP_SERVER_ACCESS,
   type McpAccessLevel,
+  type McpAccessSnapshot,
   type McpServerAccess,
   mcpAccessRank,
 } from "@openbot/contracts/ipc";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useServerRoles } from "@/features/servers/model/use-server-roles";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -52,8 +52,6 @@ export function mcpRoleLevel(access: McpServerAccess, roleId: string): McpAccess
 export function useMcpAccess(serverId: string, mcpServerId: string) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpAccess(serverId));
   const { loadMcpAccess, setMcpAccess } = useMobileWorkspaceActions();
-  // The names of the roles come from `agent-access-v1`. A host without roles still gives Everyone.
-  const roles = useServerRoles(serverId);
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const key = queryKeys.mcpAccess(queryScope, serverId);
@@ -90,12 +88,14 @@ export function useMcpAccess(serverId: string, mcpServerId: string) {
     snapshot,
     action,
     entry,
-    roles: roles.list ?? [],
     /** Runs one change at a time on a copy of the entry. Resolves true when it succeeds. */
     save(edit: (access: McpServerAccess) => McpServerAccess): Promise<boolean> {
-      if (locked.current || !data || !entry) return Promise.resolve(false);
+      // The cache, not this render: a change right after a save must name the newest revision.
+      const held = queryClient.getQueryData<McpAccessSnapshot>(key);
+      if (locked.current || !held) return Promise.resolve(false);
       locked.current = true;
-      return action.mutateAsync({ revision: data.revision, access: edit(entry) }).then(
+      const current = copyMcpServerAccess(held.servers?.[mcpServerId] ?? DEFAULT_MCP_SERVER_ACCESS);
+      return action.mutateAsync({ revision: held.revision, access: edit(current) }).then(
         () => true,
         () => false,
       );

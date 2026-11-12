@@ -1167,6 +1167,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "エージェントなし",
   "mobile.server.mcp.access.someAgents": "{count} / {total}",
   "mobile.server.mcp.access.use": "使用可能",
+  "mobile.server.mcp.access.fromEveryone": "全員と同じ",
   "mobile.server.mcp.access.level": "{name} への {role} のアクセス",
   "mobile.server.mcp.access.hint":
     "メンバーには、全員と自分のロールのうち最も高いレベルが適用されます。オーナー、管理者、サーバーを追加した人は常に管理できます。",

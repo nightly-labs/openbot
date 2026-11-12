@@ -1621,6 +1621,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "لا وكلاء",
   "mobile.server.mcp.access.someAgents": "{count} من {total}",
   "mobile.server.mcp.access.use": "يمكنه الاستخدام",
+  "mobile.server.mcp.access.fromEveryone": "مثل الجميع",
   "mobile.server.mcp.access.level": "وصول {role} إلى {name}",
   "mobile.server.mcp.access.hint":
     "يحصل العضو على أعلى مستوى من الجميع ومن أدواره. يمكن للمالكين والمسؤولين ومن أضاف الخادم إدارته دائمًا.",

@@ -11,6 +11,7 @@ import {
   withEveryoneLevel,
   withRoleLevel,
 } from "@/features/servers/model/use-mcp-access";
+import { useServerRoles } from "@/features/servers/model/use-server-roles";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -40,6 +41,8 @@ export function McpAccessSection({
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const access = useMcpAccess(serverId, mcpServerId);
+  // The names of the roles come from `agent-access-v1`. A host without roles still gives Everyone.
+  const roles = useServerRoles(serverId).list ?? [];
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
   const { entry, action, snapshot } = access;
@@ -51,7 +54,7 @@ export function McpAccessSection({
 
   const have = agents.filter((agent) => mcpAccessAllows(entry, agent.id)).length;
   const agentsSummary =
-    entry.agents === null || (agents.length > 0 && have === agents.length)
+    entry.agents === null
       ? t("mobile.server.mcp.access.allAgents")
       : have === 0
         ? t("mobile.server.mcp.access.noAgents")
@@ -100,12 +103,16 @@ export function McpAccessSection({
       >
         <Typography.Paragraph numberOfLines={1}>{t("mobile.server.roles.everyone")}</Typography.Paragraph>
       </SettingsRow>
-      {access.roles.map((role) => {
+      {roles.map((role) => {
         const level = mcpRoleLevel(entry, role.id);
         return (
           <SettingsRow
             key={role.id}
             disclosure={false}
+            // The role has no level of its own: a change of Everyone also changes it.
+            supportingText={
+              level === entry.everyone && level !== "none" ? t("mobile.server.mcp.access.fromEveryone") : undefined
+            }
             trailing={
               <SettingsPicker
                 value={level}

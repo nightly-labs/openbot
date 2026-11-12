@@ -1105,6 +1105,7 @@ export const messages = {
   "mobile.server.mcp.access.noAgents": "没有助手",
   "mobile.server.mcp.access.someAgents": "{count}/{total}",
   "mobile.server.mcp.access.use": "可使用",
+  "mobile.server.mcp.access.fromEveryone": "与所有人相同",
   "mobile.server.mcp.access.level": "{role} 对 {name} 的访问权限",
   "mobile.server.mcp.access.hint":
     "成员获得所有人与其角色中的最高级别。所有者、管理员和添加该服务器的人始终可以管理它。",
