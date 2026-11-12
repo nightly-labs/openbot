@@ -10,6 +10,8 @@ import {
   fetchLatestWaWebVersion,
   type GroupMetadata,
   generateMessageIDV2,
+  isLidUser,
+  isPnUser,
   jidNormalizedUser,
   type MiscMessageGenerationOptions,
   makeCacheableSignalKeyStore,
@@ -17,6 +19,7 @@ import {
   type SocketConfig,
   type UserFacingSocketConfig,
   type WAMessage,
+  type WAMessageKey,
   type WAVersion,
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
@@ -44,7 +47,12 @@ export interface WhatsAppSocket {
   groupMetadata(jid: string): Promise<GroupMetadata>;
   onWhatsApp(...phoneNumbers: string[]): Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   updateMediaMessage(message: WAMessage): Promise<WAMessage>;
-  signalRepository: { lidMapping: { getPNForLID(lid: string): Promise<string | null> } };
+  signalRepository: {
+    lidMapping: {
+      getPNForLID(lid: string): Promise<string | null>;
+      getLIDForPN(pn: string): Promise<string | null>;
+    };
+  };
 }
 
 /** The server's answer to a sent message. It has an `error` when the server refused the message. */
@@ -90,6 +98,8 @@ const SEND_DEADLINE_MS = 5 * 60_000;
  * this time the post counts as sent, as it did before OpenBot read acks.
  */
 const ACK_WAIT_MS = 10_000;
+/** How long a post to a contact waits for the contact's LID. Without it in this time, the post goes to the phone number. */
+const LID_WAIT_MS = 5_000;
 /** Posts to one chat keep at least this much time between them, plus up to half of it at random. */
 const CHAT_PACING_MS = 1_000;
 /** How long OpenBot remembers the ids of its own posts, so their echoes are not read as messages. */
@@ -534,6 +544,7 @@ export class WhatsAppSession {
 
   async #sendNow(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions): Promise<WAMessage> {
     const socket = await this.#openSocket();
+    const address = await this.#address(socket, jid);
     const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
     if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
     // The id is known before the send, so an echo that arrives first is already an own post.
@@ -542,7 +553,11 @@ export class WhatsAppSession {
     // Before the send: the ack can come before `sendMessage` returns.
     const ack = this.#ackOf(messageId);
     try {
-      const sent = await socket.sendMessage(jid, content, { ...options, messageId });
+      const sent = await socket.sendMessage(address, onAddress(content, jid, address), {
+        ...options,
+        ...(options?.quoted ? { quoted: { ...options.quoted, key: onKey(options.quoted.key, jid, address) } } : {}),
+        messageId,
+      });
       this.#lastSend.set(jid, this.#now());
       if (!sent?.key.id) throw new Error("no_message_id");
       // The server takes the message first and refuses it in its ack, so a refused post is not sent.
@@ -553,6 +568,22 @@ export class WhatsAppSession {
     } finally {
       ack.cancel();
     }
+  }
+
+  /**
+   * The chat that a post to a contact goes to. WhatsApp moved many contacts to a LID; it can take a post to
+   * the contact's phone number and never deliver it. The owner's own chat and groups keep their address.
+   */
+  async #address(socket: WhatsAppSocket, jid: string): Promise<string> {
+    if (!isPnUser(jid) || (socket.user && jidNormalizedUser(socket.user.id) === jid)) return jid;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const lid = await Promise.race([
+      socket.signalRepository.lidMapping.getLIDForPN(jid).catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), LID_WAIT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    return lid && isLidUser(lid) ? jidNormalizedUser(lid) : jid;
   }
 
   /** The error of the message's ack, or undefined when the ack has none or did not come in time. */
@@ -601,6 +632,20 @@ export class WhatsAppSession {
       this.#echoes.delete(id);
     }
   }
+}
+
+/** The content with its message key in the chat that the post goes to: an edit, a delete or a reaction. */
+function onAddress(content: AnyMessageContent, jid: string, address: string): AnyMessageContent {
+  if (address === jid) return content;
+  if ("edit" in content && content.edit) return { ...content, edit: onKey(content.edit, jid, address) };
+  if ("delete" in content) return { ...content, delete: onKey(content.delete, jid, address) };
+  if ("react" in content && content.react.key)
+    return { ...content, react: { ...content.react, key: onKey(content.react.key, jid, address) } };
+  return content;
+}
+
+function onKey<K extends WAMessageKey>(key: K, jid: string, address: string): K {
+  return key.remoteJid === jid ? { ...key, remoteJid: address } : key;
 }
 
 /** The version that WhatsApp Web's own server names, within a short time. */
