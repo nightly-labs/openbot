@@ -100,6 +100,15 @@ There is no configuration for a developer or for a packaged build:
   or a cancel), the next sign-in of that server registers the other name of the same listener.
   The record is kept in memory, for one attempt. A refusal of that name at registration gets the
   first name again. Sign-in apps and the client metadata document keep `127.0.0.1`.
+- Some firewalls block both loopback names (TradingView, #7230). After `localhost` gets no grant
+  back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
+  that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,
+  and then `localhost`.
+  A relayed sign-in, or one that an in-app tab shows, keeps the two loopback names: the deep link
+  opens only in the browser of the computer that runs OpenBot, and only while the operating system
+  opens `openbot://` in this app (`app.isDefaultProtocolClient`). The deep link is sent only in the
+  attempt that registered it, because builds before the loopback listener registered it too and
+  Canva refuses it at `/authorize`.
 
 ## Remote services and released protocols
 
