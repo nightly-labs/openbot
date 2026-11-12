@@ -3,8 +3,8 @@
  * computer, and the listener of a sign-in that this computer relays to a joined server.
  *
  * Every refusal that does not depend on the sign-in is here, so each listener makes the same checks:
- * the `Host` header names the loopback address, the method is GET or HEAD, and the path is the one
- * the sign-in sent. The page the browser is left on is a fixed catalog message. The code is in the
+ * the `Host` header names the loopback address, the method is GET or HEAD, and the path is one that
+ * the sign-in can send. The page the browser is left on is a fixed catalog message. The code is in the
  * request line, and a page that repeated it would put a credential in the browser's history.
  */
 
@@ -29,8 +29,8 @@ export interface LoopbackCallbackServer {
 }
 
 export interface LoopbackCallbackServerOptions {
-  /** The one path this listener answers. Everything else is a 404, including `/`. */
-  path: string;
+  /** The paths this listener answers. Everything else is a 404, including `/`. */
+  paths: readonly string[];
   /**
    * Answers a callback that passed the checks. It is synchronous, so the browser does not wait for
    * the network: the sign-in shows its own end in OpenBot.
@@ -61,7 +61,7 @@ export async function startLoopbackCallbackServer(
       answering.delete(socket);
       if (closing) socket.destroy();
     });
-    const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.path);
+    const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.paths);
     const answer = checked instanceof URL ? options.receive(checked) : checked;
     response
       .writeHead(answer.status, {
@@ -99,7 +99,7 @@ function checkCallbackRequest(
   method: string | undefined,
   target: string | undefined,
   host: string | undefined,
-  path: string,
+  paths: readonly string[],
 ): URL | CallbackAnswer {
   // A page on the web can point a name it controls at 127.0.0.1 and have the browser send a
   // request here believing it is talking to that site. It cannot read the answer, but it can
@@ -113,7 +113,7 @@ function checkCallbackRequest(
   } catch {
     return { status: 404, message: "error.mcp.redirectNotSignIn" };
   }
-  if (url.pathname !== path) return { status: 404, message: "error.mcp.redirectNotSignIn" };
+  if (!paths.includes(url.pathname)) return { status: 404, message: "error.mcp.redirectNotSignIn" };
   return url;
 }
 
