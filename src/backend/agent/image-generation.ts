@@ -1,5 +1,6 @@
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type ConversationMessage, isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { getRecord, getString, type ThreadItem } from "../protocol";
 
 export function isImageGenerationItem(item: ThreadItem): boolean {
@@ -66,10 +67,10 @@ export function generatedMediaInfo(
   return null;
 }
 
-export function generationInterruptedText(
-  kind: GeneratedMediaKind,
-): "Video generation was interrupted." | "Image generation was interrupted." {
-  return kind === "video" ? "Video generation was interrupted." : "Image generation was interrupted.";
+export function generationInterruptedText(kind: GeneratedMediaKind): string {
+  return kind === "video"
+    ? sourceText("error.backend.videoGenerationInterrupted")
+    : "Image generation was interrupted.";
 }
 
 export function markIncompleteMediaGeneration(
@@ -84,7 +85,9 @@ export function markIncompleteMediaGeneration(
   }
   if (!message.attachments?.length) {
     media.info.error ??=
-      media.kind === "video" ? "Video generation did not return a video." : "Image generation did not return an image.";
+      media.kind === "video"
+        ? sourceText("error.backend.videoGenerationNoVideo")
+        : "Image generation did not return an image.";
     if (status === "completed") message.status = "failed";
   }
 }

@@ -1,5 +1,6 @@
 import type { AttachmentSummary, ImageGenerationInfo, VideoGenerationInfo } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
@@ -209,7 +210,8 @@ export class ImageGenRuntime {
       message.imageGeneration = image;
       info = image;
     }
-    const failedText = kind === "video" ? "Video generation failed." : "Image generation failed.";
+    const failedText =
+      kind === "video" ? sourceText("error.backend.videoGenerationFailed") : "Image generation failed.";
     message.status = operation.interrupted ? "interrupted" : completed ? "completed" : "streaming";
     if (operation.interrupted) info.error ??= generationInterruptedText(kind);
     this.#hooks.trackItem(item.id, turnId);
@@ -235,7 +237,7 @@ export class ImageGenRuntime {
           return yield* new GeneratedImageFailed({
             cause: new Error(
               kind === "video"
-                ? "Video generation did not return a video."
+                ? sourceText("error.backend.videoGenerationNoVideo")
                 : "Image generation did not return an image.",
             ),
           });
@@ -255,6 +257,7 @@ export class ImageGenRuntime {
           this.#mailbox
             .storeGeneratedAttachment({
               sourcePath: savedPath,
+              kind,
               name: kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
               ownerAgentId: agentId,
               ownerThreadId: threadId,

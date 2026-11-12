@@ -6,14 +6,15 @@ import type {
   ConversationSnapshot,
   QueueDelivery,
 } from "@openbot/contracts/ipc";
-import {
-  AGENT_EXCHANGE_ITEM_TYPE,
-  isImageGenerationAspectRatio,
-  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
-} from "@openbot/contracts/ipc";
+import { AGENT_EXCHANGE_ITEM_TYPE, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
-import { imageGenerationFailure, isImageGenerationItem, isVideoGenerationItem } from "./agent/image-generation";
+import {
+  imageGenerationAspectRatio,
+  imageGenerationFailure,
+  isImageGenerationItem,
+  isVideoGenerationItem,
+} from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 
@@ -109,9 +110,13 @@ export function messagesFromThreadItems(
         status: failed ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "image_generation",
         imageGeneration: {
-          ...(isString(item.revised_prompt) ? { prompt: item.revised_prompt } : {}),
+          ...(isString(item.revised_prompt)
+            ? { prompt: item.revised_prompt }
+            : isString(item.prompt)
+              ? { prompt: item.prompt }
+              : {}),
           resolution: isString(item.resolution) ? item.resolution : "1024 × 1024",
-          aspectRatio: isImageGenerationAspectRatio(item.aspectRatio) ? item.aspectRatio : "square",
+          aspectRatio: imageGenerationAspectRatio(item) ?? "square",
           ...(failure ? { error: failure } : {}),
         },
       });
@@ -127,9 +132,12 @@ export function messagesFromThreadItems(
         createdAt,
         status: providerStatus === "failed" ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "video_generation",
+        // The same values as the live item (`image-gen-runtime.ts`), so a merge keeps them.
         videoGeneration: {
           ...(isString(item.prompt) ? { prompt: item.prompt } : {}),
-          aspectRatio: isImageGenerationAspectRatio(item.aspect_ratio) ? item.aspect_ratio : "square",
+          aspectRatio: imageGenerationAspectRatio(item) ?? "landscape",
+          ...(typeof item.duration === "number" && item.duration > 0 ? { durationSeconds: item.duration } : {}),
+          ...(isString(item.resolution) && item.resolution.length <= 40 ? { resolution: item.resolution } : {}),
           ...(failure ? { error: failure } : {}),
         },
       });

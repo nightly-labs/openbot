@@ -38,19 +38,18 @@ export function ChatVideoGeneration({
   const [base, accent, surface, muted] = useThemeColor(["muted", "accent", "surface-secondary", "muted"]);
   const ratio = requestedRatio(generation.aspectRatio);
   const frame = attachmentFrame(null, Math.min(MAX_FRAME_WIDTH, windowWidth - 80), ratio);
+  // The host marks the video completed, then copies its file. The copy ends with the file or with a
+  // failure, so the canvas stays until then.
   const video = status === "completed" ? attachment : undefined;
-  const unavailable = status === "completed" && !attachment;
-  const failed = status === "failed" || status === "interrupted" || unavailable;
-  const label = unavailable
-    ? t("mobile.chat.videoGeneration.unavailable")
-    : status === "failed"
+  const failed = status === "failed" || status === "interrupted";
+  const label =
+    status === "failed"
       ? t("mobile.chat.videoGeneration.failed")
       : status === "interrupted"
         ? t("mobile.chat.videoGeneration.interrupted")
         : t("mobile.chat.videoGeneration.generating");
-  const error = unavailable
-    ? t("mobile.chat.videoGeneration.previewUnavailable")
-    : status === "failed"
+  const error =
+    status === "failed"
       ? generation.error
         ? sourceText(generation.error)
         : t("mobile.chat.videoGeneration.didNotComplete")

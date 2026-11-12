@@ -66,7 +66,9 @@ export function grokMediaItem(kind: GeneratedMediaKind, call: ThreadItem, conten
   const status = call.status === "completed" || call.status === "failed" ? call.status : "in_progress";
   const ratio = aspectRatio(getString(input, "aspect_ratio"));
   const prompt = getString(input, "prompt");
-  const resolution = getString(input, "resolution_name");
+  // The message keeps a short name such as "720p" (`isVideoGenerationInfo`); a longer value is not one.
+  const resolutionName = getString(input, "resolution_name");
+  const resolution = resolutionName && resolutionName.length <= 40 ? resolutionName : null;
   const duration = typeof input.duration === "number" && input.duration > 0 ? input.duration : null;
   // A call that ends without a file, such as a plan that cannot make videos, says why in its text.
   const error = status === "failed" || (status === "completed" && !path) ? contentText(content) : null;

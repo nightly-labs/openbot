@@ -72,6 +72,9 @@ export function VideoGeneration(props: VideoGenerationProps) {
     return Boolean(attachment && !attachment.previewUrl && source && attachment.size <= source.mediaLimit);
   };
   const completed = () => props.status === "completed" && Boolean(props.attachment);
+  // The host marks the video completed, then copies its file. The copy ends with the file or with a
+  // failure, so the frame stays until then.
+  const generating = () => props.status === "generating" || (props.status === "completed" && !props.attachment);
   const unavailable = () => completed() && (player.failed || (!sourceUrl() && !canLoad()));
   const failed = () => props.status === "failed" || props.status === "interrupted" || unavailable();
   const ready = () => completed() && !unavailable();
@@ -102,7 +105,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
     return mediaRatioValue(props.aspectRatio, "video");
   };
   const label = () => {
-    if (props.status === "generating") return t("chat.video.generating");
+    if (generating()) return t("chat.video.generating");
     if (unavailable()) return t("chat.video.unavailable");
     if (props.status === "interrupted") return t("chat.video.interrupted");
     if (props.status === "failed") return t("chat.video.failed");
@@ -140,13 +143,13 @@ export function VideoGeneration(props: VideoGenerationProps) {
     <figure
       class="media-generation"
       data-kind="video"
-      data-status={props.status}
+      data-status={generating() ? "generating" : props.status}
       aria-label={t("chat.video.generation")}
-      aria-live={props.status === "generating" ? "polite" : undefined}
-      aria-busy={props.status === "generating" ? "true" : undefined}
+      aria-live={generating() ? "polite" : undefined}
+      aria-busy={generating() ? "true" : undefined}
     >
       <div class="media-generation-stage" style={{ "--media-generation-ratio": stageRatio() }}>
-        <Show when={props.status === "generating"}>
+        <Show when={generating()}>
           <MediaGenerationCanvas />
           <MediaGenerationSpecs class="media-generation-chip" values={[lengthText(), props.resolution]} />
         </Show>
@@ -298,7 +301,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
         </Show>
       </div>
       <figcaption class="media-generation-meta">
-        <span class="media-generation-label" data-shine={props.status === "generating" ? "" : undefined}>
+        <span class="media-generation-label" data-shine={generating() ? "" : undefined}>
           {label()}
           <Show when={ready()}>
             <MediaGenerationSpecs class="media-generation-specs" values={[lengthText(), size()]} />
