@@ -67,8 +67,9 @@ export interface CustomProviderModel {
   maxOutput?: number;
   /**
    * The reasoning efforts that the endpoint accepts for this model, in `CUSTOM_PROVIDER_REASONING_EFFORTS`
-   * order, never empty (#4154). Absent: OpenCode offers its own Low, Medium and High, and Pi offers no
-   * effort. This computer only, like `contextWindow`.
+   * order (#4154). Empty: the model takes no reasoning effort, and no request names one (#7500).
+   * Absent: the harness's own default, `CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS`. This computer only,
+   * like `contextWindow`.
    */
   reasoningEfforts?: CustomProviderReasoningEffort[];
   /**
@@ -121,6 +122,22 @@ export type CustomProviderReasoningEffort = (typeof CUSTOM_PROVIDER_REASONING_EF
 export function isCustomProviderReasoningEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
   return isOrderedSubset(CUSTOM_PROVIDER_REASONING_EFFORTS, value);
 }
+
+/**
+ * The saved efforts of a custom model: a list of efforts, or an empty list for a model that takes no
+ * effort. An endpoint such as xAI's refuses every request that names one for some models (#7500).
+ */
+export function isCustomProviderModelEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  return (Array.isArray(value) && value.length === 0) || isCustomProviderReasoningEfforts(value);
+}
+
+/**
+ * The efforts of a model with no saved `reasoningEfforts`. OpenCode 2.2.5 gives a configured model
+ * without `variants` its own Low, Medium and High; Pi gives a model without a thinking level map none.
+ */
+export const CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS: Readonly<
+  Record<CustomProviderHarness, readonly CustomProviderReasoningEffort[]>
+> = { opencode: ["low", "medium", "high"], pi: [] };
 
 /** A non-empty list of known values, each one time, in the order of `known`. */
 function isOrderedSubset(known: readonly unknown[], value: unknown): boolean {
@@ -299,7 +316,7 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
     (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
-    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts)) &&
+    (value.reasoningEfforts === undefined || isCustomProviderModelEfforts(value.reasoningEfforts)) &&
     (value.inputs === undefined || isCustomProviderInputs(value.inputs))
   );
 }

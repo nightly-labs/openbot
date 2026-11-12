@@ -87,7 +87,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.model.maxOutputColumn": "Max output",
   "customProvider.model.efforts": "Model {number} efforts",
   "customProvider.model.effortsLabel": "Efforts",
-  "customProvider.model.effortsDefault": "Default",
   "customProvider.model.effortsNone": "No reasoning",
   "customProvider.model.inputs": "Model {number} accepts",
   "customProvider.model.inputsLabel": "Accepts",

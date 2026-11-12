@@ -89,7 +89,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "En fazla çıktı",
   "customProvider.model.efforts": "Model {number} eforu",
   "customProvider.model.effortsLabel": "Efor",
-  "customProvider.model.effortsDefault": "Varsayılan",
   "customProvider.model.effortsNone": "Akıl yürütme yok",
   "customProvider.model.inputs": "Model {number} girdileri",
   "customProvider.model.inputsLabel": "Kabul eder",

@@ -210,6 +210,8 @@ export const messages = {
     "エンドポイント「{provider}」が API キーまたはヘッダーを拒否しました。サーバー設定 → プロバイダーでもう一度入力してから、もう一度お試しください。",
   "error.provider.customEndpointKeyMissing":
     "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
+  "error.provider.customEndpointEffortRefused":
+    "エンドポイント「{provider}」がこのモデルの推論の強さを拒否しました。サーバー設定 → プロバイダーで「{provider}」を編集してください。推論の強さでは、このモデルが受け付ける強さだけを残すか、すべて外して推論なしにしてください。そのあと、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeServiceFailure":

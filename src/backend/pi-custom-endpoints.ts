@@ -109,7 +109,8 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
         name: model.name,
         contextWindow,
         maxTokens: customModelOutputLimit(model, contextWindow),
-        ...(model.reasoningEfforts ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+        // An empty list is a model with no effort, as on Pi a model with no list is (#7500).
+        ...(model.reasoningEfforts?.length ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
         // Pi's model `input` is `("text" | "image")[]` (Pi 1.1.0 `packages/ai/src/types.ts`), so it has no PDF.
         input: model.inputs?.includes("image") ? ["text", "image"] : ["text"],
       };

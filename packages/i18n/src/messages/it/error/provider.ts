@@ -207,6 +207,8 @@ export const messages = {
     'L\'endpoint "{provider}" ha rifiutato la sua chiave API o le sue intestazioni. Inseriscile di nuovo in Impostazioni server → Provider, poi riprova.',
   "error.provider.customEndpointKeyMissing":
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointEffortRefused":
+    'L\'endpoint "{provider}" ha rifiutato l\'impegno di ragionamento di questo modello. In Impostazioni server → Provider, modifica "{provider}". In Impegno, lascia solo i livelli che questo modello accetta, oppure deselezionali tutti per Nessun ragionamento. Poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeServiceFailure":

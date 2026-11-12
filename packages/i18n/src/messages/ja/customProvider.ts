@@ -87,7 +87,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "最大出力",
   "customProvider.model.efforts": "モデル {number} の推論の強さ",
   "customProvider.model.effortsLabel": "推論の強さ",
-  "customProvider.model.effortsDefault": "デフォルト",
   "customProvider.model.effortsNone": "推論なし",
   "customProvider.model.inputs": "モデル {number} の入力",
   "customProvider.model.inputsLabel": "入力",

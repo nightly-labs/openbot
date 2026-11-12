@@ -9,6 +9,7 @@
 // 32,000, and a small window must get half the window.
 // One more model saves its efforts (#4154): OpenCode must list exactly those efforts, and a turn at
 // `max` must send `reasoning_effort: "max"`. A model with no saved efforts keeps OpenCode's own set.
+// A model saved with no efforts (#7500) must offer no effort, and a turn at `high` must send none.
 // Input kinds (#5332): a model with none saved keeps OpenCode's default and gets an attached image;
 // a model saved as text-only does not. The read tool gives a PDF to a model saved with PDF input,
 // and refuses it for the others.
@@ -47,6 +48,8 @@ const GUESSED_MODEL = "guessed-model";
 /** #4154: an endpoint that accepts Low, High and Max for this model, and no other effort. */
 const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
+/** #7500: an endpoint that refuses every request with `reasoning_effort` for this model. */
+const NO_EFFORT_MODEL = "no-effort-model";
 /** #5332: a vision model behind the endpoint, saved with image and PDF input. */
 const VISION_MODEL = "vision-model";
 /** An endpoint that refuses images for this model, saved as text-only. */
@@ -266,6 +269,7 @@ try {
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
       { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: NO_EFFORT_MODEL, name: "No effort model", reasoningEfforts: [] },
       { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
       { id: TEXT_MODEL, name: "Text model", inputs: [] },
     ],
@@ -337,6 +341,28 @@ try {
     assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
   }
 
+  // #7500: a model saved with no efforts offers no effort, and its turn sends none.
+  const noEffortModel = getArray(listed, "data").find(
+    (model) => getString(model, "model") === `${ENDPOINT}/${NO_EFFORT_MODEL}`,
+  );
+  assert.ok(
+    isRecord(noEffortModel) && noEffortModel.reasoningEffortConfigurable === false,
+    "A model saved with no efforts must offer no effort.",
+  );
+  const noEffortThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${NO_EFFORT_MODEL}` });
+  const noEffortTurn = await runTurn(client, noEffortThread, {
+    effort: "high",
+    text: "Say one word.",
+    timeoutMs: 120_000,
+  });
+  report.turns.push(noEffortTurn);
+  assert.equal(noEffortTurn.error, null, `The turn on ${NO_EFFORT_MODEL} failed: ${noEffortTurn.error}`);
+  const noEffortRequests = report.requests.filter((request) => request.model === NO_EFFORT_MODEL);
+  assert.ok(noEffortRequests.length > 0, `The endpoint got no request for ${NO_EFFORT_MODEL}.`);
+  for (const request of noEffortRequests) {
+    assert.equal(request.reasoningEffort, null, `${NO_EFFORT_MODEL} must send no effort.`);
+  }
+
   // #5332: an attached image reaches a model saved with image input, and not a text-only model.
   const image = join(workspace, "pixel.png");
   await writeFile(image, PNG);
@@ -390,7 +416,14 @@ try {
   );
 
   assert.ok(report.requests.length > 0, "The endpoint got no request.");
-  const known = new Set([AGENT_MODEL, EFFORT_MODEL, VISION_MODEL, TEXT_MODEL, ...budgets.map(([model]) => model)]);
+  const known = new Set([
+    AGENT_MODEL,
+    EFFORT_MODEL,
+    NO_EFFORT_MODEL,
+    VISION_MODEL,
+    TEXT_MODEL,
+    ...budgets.map(([model]) => model),
+  ]);
   const others = report.requests.filter(
     (request) => request.auth === undefined && request.model !== null && !known.has(request.model),
   );

@@ -214,6 +214,8 @@ export const messages = {
     "Der Endpunkt „{provider}“ hat seinen API-Schlüssel oder seine Header abgelehnt. Gib sie in Servereinstellungen → Anbieter erneut ein und versuche es dann erneut.",
   "error.provider.customEndpointKeyMissing":
     "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
+  "error.provider.customEndpointEffortRefused":
+    "Der Endpunkt „{provider}“ hat den Denkaufwand dieses Modells abgelehnt. Bearbeite „{provider}“ in Servereinstellungen → Anbieter. Behalte unter Denkaufwand nur die Stufen, die dieses Modell annimmt, oder entferne alle für Kein Nachdenken. Versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeServiceFailure":

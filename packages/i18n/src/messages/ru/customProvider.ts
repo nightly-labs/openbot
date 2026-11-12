@@ -85,7 +85,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "Макс. вывод",
   "customProvider.model.efforts": "Уровень усилий модели {number}",
   "customProvider.model.effortsLabel": "Уровень усилий",
-  "customProvider.model.effortsDefault": "По умолчанию",
   "customProvider.model.effortsNone": "Без рассуждений",
   "customProvider.model.inputs": "Входные данные модели {number}",
   "customProvider.model.inputsLabel": "Принимает",

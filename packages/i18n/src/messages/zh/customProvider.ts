@@ -85,7 +85,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "最大输出",
   "customProvider.model.efforts": "模型 {number} 的推理强度",
   "customProvider.model.effortsLabel": "推理强度",
-  "customProvider.model.effortsDefault": "默认",
   "customProvider.model.effortsNone": "不推理",
   "customProvider.model.inputs": "模型 {number} 的输入",
   "customProvider.model.inputsLabel": "接受",

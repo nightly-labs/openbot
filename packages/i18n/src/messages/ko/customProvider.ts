@@ -88,7 +88,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "최대 출력",
   "customProvider.model.efforts": "모델 {number} 추론 강도",
   "customProvider.model.effortsLabel": "추론 강도",
-  "customProvider.model.effortsDefault": "기본값",
   "customProvider.model.effortsNone": "추론 안 함",
   "customProvider.model.inputs": "모델 {number} 입력",
   "customProvider.model.inputsLabel": "입력",

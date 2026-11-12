@@ -1,6 +1,7 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
@@ -10,6 +11,8 @@ import {
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
+
+const logger = createOpenBotLogger("provider-runtime");
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -78,6 +81,20 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
  */
 const OPENCODE_UNREADABLE_CONTENT =
   /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
+
+/**
+ * An endpoint's refusal of the reasoning effort in a request. xAI answers "Model grok-4.20 does not
+ * support parameter reasoningEffort." (#7500); OpenAI-compatible servers name `reasoning_effort`.
+ */
+function isReasoningEffortRefusal(error: unknown): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32603) return false;
+  return (
+    /\breasoning[_ .]?effort\b/iu.test(error.message) &&
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|invalid|not allowed|not permitted)\b/iu.test(
+      error.message,
+    )
+  );
+}
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -195,6 +212,13 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       });
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
       return sourceText("error.provider.opencodeServiceFailure");
+    // Each turn on the model sends the effort again, so only the model's efforts in the endpoint
+    // settings fix it. The endpoint's text goes to the log file only: a `log` diagnostic shows as a
+    // second, technical error beside this text.
+    if (endpoint && isReasoningEffortRefusal(error)) {
+      logger.warn("A custom endpoint refused the reasoning effort.", { detail });
+      return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
+    }
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,

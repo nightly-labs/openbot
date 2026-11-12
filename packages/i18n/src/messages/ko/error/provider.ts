@@ -203,6 +203,8 @@ export const messages = {
     '엔드포인트 "{provider}"이(가) API 키 또는 헤더를 거부했어요. 서버 설정 → 제공자에서 다시 입력한 다음 다시 시도해 주세요.',
   "error.provider.customEndpointKeyMissing":
     '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointEffortRefused":
+    '엔드포인트 "{provider}"가 이 모델의 추론 강도를 거부했어요. 서버 설정 → 제공자에서 "{provider}"를 편집해 주세요. 추론 강도에서 이 모델이 받는 강도만 남기거나, 모두 해제해 추론 안 함으로 바꿔 주세요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":

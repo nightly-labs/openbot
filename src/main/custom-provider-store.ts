@@ -25,7 +25,7 @@ import {
   isCustomProviderContextWindow,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
-  isCustomProviderReasoningEfforts,
+  isCustomProviderModelEfforts,
   sameCustomProviderOrigin,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -57,10 +57,7 @@ const modelSchema = z.object({
   name: z.string(),
   contextWindow: z.number().refine(isCustomProviderContextWindow).optional().catch(undefined),
   maxOutput: z.number().refine(isCustomProviderMaxOutput).optional().catch(undefined),
-  reasoningEfforts: z
-    .custom<CustomProviderReasoningEffort[]>(isCustomProviderReasoningEfforts)
-    .optional()
-    .catch(undefined),
+  reasoningEfforts: z.custom<CustomProviderReasoningEffort[]>(isCustomProviderModelEfforts).optional().catch(undefined),
   inputs: z.custom<CustomProviderInputKind[]>(isCustomProviderInputs).optional().catch(undefined),
 });
 const headerSchema = z.object({ name: z.string(), value: z.string() });

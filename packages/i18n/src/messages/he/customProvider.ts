@@ -82,7 +82,6 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "פלט מרבי",
   "customProvider.model.efforts": "רמות מאמץ של מודל {number}",
   "customProvider.model.effortsLabel": "רמות מאמץ",
-  "customProvider.model.effortsDefault": "ברירת מחדל",
   "customProvider.model.effortsNone": "ללא הנמקה",
   "customProvider.model.inputs": "מודל {number} מקבל",
   "customProvider.model.inputsLabel": "מקבל",

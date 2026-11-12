@@ -73,6 +73,7 @@ import {
   type ConversationReadState,
   type ConversationSnapshot,
   type ConversationTurnTrace,
+  CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS,
   type CustomAgentSummary,
   type CustomProviderSummary,
   composedCustomModelId,
@@ -364,7 +365,7 @@ function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentM
   const harness = provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
   return provider.models.map((model) => {
     // As the harnesses do: saved efforts replace OpenCode's Low, Medium and High, and Pi has none without them.
-    const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
+    const efforts = model.reasoningEfforts ?? CUSTOM_PROVIDER_DEFAULT_REASONING_EFFORTS[harness];
     return {
       provider: harness,
       id: composedCustomModelId(provider.id, model.id),

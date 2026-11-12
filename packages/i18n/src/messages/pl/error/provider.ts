@@ -200,6 +200,8 @@ export const messages = {
     "Endpoint „{provider}” odrzucił swój klucz API lub nagłówki. Wpisz je ponownie w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.customEndpointKeyMissing":
     "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
+  "error.provider.customEndpointEffortRefused":
+    "Endpoint „{provider}” odrzucił wysiłek rozumowania tego modelu. W Ustawieniach serwera → Dostawcy edytuj „{provider}”. W polu Wysiłek zostaw tylko poziomy, które ten model przyjmuje, albo odznacz wszystkie, aby wybrać Bez rozumowania. Potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":
