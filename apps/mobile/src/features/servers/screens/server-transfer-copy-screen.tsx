@@ -40,8 +40,10 @@ export function ServerTransferCopyScreen() {
   const available = canTransferServer(serverId);
   const targets = servers.filter((server) => server.id !== serverId && canTransferServer(server.id));
   const [chosenTarget, setChosenTarget] = useState<string | null>(null);
-  // The first other server until the user chooses one. A server that goes offline leaves the list.
-  const target = targets.find((server) => server.id === chosenTarget) ?? targets[0] ?? null;
+  // The first other server until the user chooses one. When the chosen server goes offline, no server
+  // is chosen: the copy does not go to a server that the user did not choose.
+  const target =
+    chosenTarget === null ? (targets[0] ?? null) : (targets.find((server) => server.id === chosenTarget) ?? null);
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<number | null>(null);
@@ -68,19 +70,14 @@ export function ServerTransferCopyScreen() {
 
   // A token that the destination keeps when the page closes before the apply is released.
   const closed = useRef(false);
+  // A second tap before the next render does not start a second copy.
+  const running = useRef(false);
   useEffect(() => {
     closed.current = false;
     return () => {
       closed.current = true;
     };
   }, []);
-
-  if (!available)
-    return (
-      <SettingsContent>
-        <SettingsNote>{t("mobile.server.transfer.unavailable")}</SettingsNote>
-      </SettingsContent>
-    );
 
   if (result)
     return (
@@ -91,7 +88,14 @@ export function ServerTransferCopyScreen() {
       />
     );
 
-  if (targets.length === 0 || !target)
+  if (!available)
+    return (
+      <SettingsContent>
+        <SettingsNote>{t("mobile.server.transfer.unavailable")}</SettingsNote>
+      </SettingsContent>
+    );
+
+  if (targets.length === 0)
     return (
       <SettingsContent>
         <SettingsNote>{t("mobile.server.transfer.copyNoServer")}</SettingsNote>
@@ -122,6 +126,8 @@ export function ServerTransferCopyScreen() {
   const usedNames = new Set(destination.data?.agents.map((agent) => agent.name.toLowerCase()) ?? []);
 
   async function copy(to: { id: string; name: string }) {
+    if (running.current) return;
+    running.current = true;
     setPhase("exporting");
     setError(null);
     setProgress(null);
@@ -139,22 +145,24 @@ export function ServerTransferCopyScreen() {
       if (closed.current) return;
       setPhase("applying");
       setProgress(null);
-      // The apply releases the token and the staged file, also when it fails.
-      const applied = applyInstanceTransfer(
+      const done = await applyInstanceTransfer(
         { token, keys: preview.agents.map((agent) => agent.key), includeSettings: false },
         to.id,
       );
+      // The host releases the token and the staged file when the apply starts. A failed apply can stop
+      // before the host gets it, so the discard below runs then.
       token = null;
-      const done = await applied;
       // The stage can drop files and agents. Show why, as an import does.
       const warnings = [...new Set([...preview.warnings, ...done.warnings])].slice(0, AGENT_IMPORT_LIMITS.warnings);
       setResult({ server: to.name, value: { ...done, warnings } });
       void haptics.notification("success");
     } catch (caught) {
+      if (closed.current) return;
       setError(errorMessage(caught, t("mobile.server.transfer.copyFailed")));
       void haptics.notification("error");
     } finally {
       if (token) void discardInstanceTransfer(token, to.id).catch(() => undefined);
+      running.current = false;
       if (!closed.current) {
         setPhase("idle");
         setProgress(null);
@@ -164,7 +172,7 @@ export function ServerTransferCopyScreen() {
 
   const actionLabel =
     phase === "exporting"
-      ? t("mobile.server.transfer.loading")
+      ? t("mobile.server.transfer.copying")
       : phase === "sending"
         ? progress === null
           ? t("mobile.server.transfer.copying")
@@ -179,7 +187,7 @@ export function ServerTransferCopyScreen() {
         {targets.map((server) => (
           <SettingsRow
             key={server.id}
-            checked={server.id === target.id}
+            checked={server.id === target?.id}
             disabled={busy}
             onPress={() => {
               void haptics.selection();
@@ -221,8 +229,10 @@ export function ServerTransferCopyScreen() {
       <SettingsSection footer={error ?? undefined}>
         <SettingsRow
           disclosure={false}
-          disabled={busy || selected.length === 0}
-          onPress={() => void copy({ id: target.id, name: target.name })}
+          disabled={busy || selected.length === 0 || !target}
+          onPress={() => {
+            if (target) void copy({ id: target.id, name: target.name });
+          }}
         >
           <Typography.Paragraph className="text-accent">{actionLabel}</Typography.Paragraph>
         </SettingsRow>
