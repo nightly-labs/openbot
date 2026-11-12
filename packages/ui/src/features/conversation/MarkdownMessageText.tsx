@@ -916,7 +916,7 @@ function proseText(tokens: readonly Token[]): string {
       if (token.type === "br") return "\n";
       if (!isProseToken(token)) return " ";
       if ("tokens" in token && token.tokens) return proseText(token.tokens);
-      return "text" in token && typeof token.text === "string" ? token.text : "";
+      return "text" in token && typeof token.text === "string" ? token.text : " ";
     })
     .join("");
 }
