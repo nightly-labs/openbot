@@ -18,7 +18,8 @@
   "upload_source_maps": false,
   // The outbox, the hosted-site cleanup and the hosted server checks are retry paths: the request path
   // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
-  // stops 15 to 20 minutes after its last use.
+  // stops 15 to 20 minutes after its last use. The minute cron reads D1 only for the pool snapshot: one
+  // small indexed read for the "Server pool" dashboard.
   "triggers": {
     // The second cron runs only the Signal entry check (`signal-entry-failover.ts`) and the pool snapshot, each minute.
     "crons": ["*/5 * * * *", "*/1 * * * *"]

@@ -101,12 +101,12 @@ export function createWorkerHandler(
       const bindings = { ...workerBindings, DB: observedD1(workerBindings.DB) };
       if (controller.cron === SIGNAL_ENTRY_CRON) {
         // The pool snapshot runs each minute beside the entry check. The entry check can change DNS, so
-        // a failed snapshot fails the run only after the check ends.
-        const [, pool] = await Promise.allSettled([
+        // a failed snapshot fails the run only after the check ends. The first failure fails the run.
+        const results = await Promise.allSettled([
           runSignalEntryCheck(bindings),
           runApiEffect(tickHostedPool(bindings, controller.scheduledTime)),
         ]);
-        if (pool.status === "rejected") throw pool.reason;
+        for (const result of results) if (result.status === "rejected") throw result.reason;
         return;
       }
       const now = controller.scheduledTime;
