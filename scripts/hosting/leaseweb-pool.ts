@@ -5,6 +5,8 @@
 //
 //   bun scripts/hosting/leaseweb-pool.ts status
 //       Read only. The machines of each location and product, and the work that `sync` does.
+//   bun scripts/hosting/leaseweb-pool.ts free
+//       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
 //       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
 //       with no reference gets `pool-free`.
@@ -860,20 +862,56 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     if (missing.length > 0) throw new Error(`The environment has no LEASEWEB_API_KEY_${missing.join(", _")}.`);
     const pageSchema = z.object({
       _metadata: z.object({ totalCount: z.number() }),
-      vps: z.array(z.object({ id: z.string(), reference: z.string().nullable() })),
+      vps: z.array(
+        z.object({
+          id: z.string(),
+          reference: z.string().nullable(),
+          state: z.string(),
+          datacenter: z.string(),
+          pack: z.string(),
+          ips: z.array(ipSchema),
+        }),
+      ),
     });
-    const references: { id: string; reference: string }[] = [];
+    const references: {
+      id: string;
+      reference: string;
+      account: string;
+      state: string;
+      location: string;
+      product: string;
+      address: string;
+    }[] = [];
     for (const account of this.#keys) {
       for (let offset = 0; ; offset += 50) {
         // The list of the US and AU accounts can take more than 30 seconds (2026-11-12).
         const response = await this.#leaseweb(account.key, `?limit=50&offset=${offset}`, {}, 90_000);
         if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for the VPS of ${account.name}.`);
         const page = pageSchema.parse(await response.json());
-        for (const vps of page.vps) references.push({ id: vps.id, reference: vps.reference ?? "" });
+        for (const vps of page.vps)
+          references.push({
+            id: vps.id,
+            reference: vps.reference ?? "",
+            account: account.name.replace("LEASEWEB_API_KEY_", ""),
+            state: vps.state,
+            location: vps.datacenter,
+            product: vps.pack,
+            address: vps.ips.find((ip) => ip.version === 4 && ip.mainIp)?.ip ?? "",
+          });
         if (page.vps.length === 0 || offset + page.vps.length >= page._metadata.totalCount) break;
       }
     }
     return references;
+  }
+
+  /** Read only. Each VPS with no reference on all accounts: a new VPS that an operator can take. */
+  async free() {
+    const free = (await this.#allReferences()).filter(({ reference }) => reference === "");
+    if (free.length === 0) logger.info("No VPS on the four Leaseweb accounts is without a reference.");
+    for (const vps of free)
+      logger.info(
+        `VPS ${vps.id} has no reference: account ${vps.account}, ${vps.location}, ${vps.product}, ${vps.state}, address ${vps.address || "none"}.`,
+      );
   }
 
   /** The next `custom-<NN>`: one more than the highest number on all accounts. */
@@ -1393,7 +1431,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1401,6 +1439,7 @@ async function main(args: string[]) {
   const keys = option("keys");
   const pool = new Pool(args.includes("--apply"), args.includes("--env=test"), process.env, keys);
   if (command === "status") pool.status();
+  else if (command === "free") await pool.free();
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
   else if (command === "sync") await pool.sync();

@@ -887,14 +887,30 @@ from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the 
 For a server that never was on boat, the VPS is a [self-hosted server](self-hosted-server.md) that
 an operator sets up for the customer. The customer is the owner: the server signs in with a
 [server claim](self-hosted-server.md#sign-in-with-a-server-claim) for the customer's email, never
-with the account of an operator. One command does all the steps below:
+with the account of an operator. One command does all the steps below.
+
+Before you start, you need:
+
+- The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
+  gives the four Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+- An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
+- The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
+  that the customer sees (6 to 32 characters).
 
 ```sh
+env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
+# 1. Find the VPS just bought: each VPS with no reference on the four accounts.
+$env bun scripts/hosting/leaseweb-pool.ts free
+# 2. The public keys of the operators, which the bootstrap installs.
 ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
-bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
-  bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-    --name=<server name> --keys=operator-keys --apply
+# 3. See the plan, then do it.
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys --apply
 ```
+
+When it ends, the owner sees the server in the app, and can invite the other members.
 
 - With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
   the hosted pool.
