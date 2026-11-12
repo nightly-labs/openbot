@@ -49,7 +49,11 @@ export function withChannelSeenSubtasks(
       const original = tasks[index];
       const seen = isDynamicRecord(original) ? original.seenDependencies : undefined;
       if (seen === undefined || !isDynamicRecord(task)) return task;
-      return { ...task, seenDependencies: seenDependencies(seen) };
+      const ids = seenDependencies(seen);
+      const dependencies = Array.isArray(task.dependencies) ? task.dependencies : [];
+      if (task.state !== "waiting" || !ids.every((id) => dependencies.includes(id)))
+        throw new Error("Invalid channel seen dependencies.");
+      return { ...task, seenDependencies: ids };
     }),
   };
 }

@@ -431,16 +431,23 @@ export class ChannelStore {
    */
   withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
     if (!tasks.some((task) => task.state === "waiting")) return tasks;
-    const seen = new Map<string, Set<string>>();
-    for (const assignment of this.assignments(channelId)) {
-      const ids = seen.get(assignment.taskId) ?? new Set<string>();
-      for (const id of assignment.awaitedTaskIds) ids.add(id);
-      seen.set(assignment.taskId, ids);
-    }
+    // The rows are in the order the assignments started, because an update keeps its row.
+    const started = new Map<string, number>();
+    const readAt = new Map<string, Map<string, number>>();
+    this.assignments(channelId).forEach((assignment, order) => {
+      started.set(assignment.taskId, order);
+      const read = readAt.get(assignment.taskId) ?? new Map<string, number>();
+      for (const id of assignment.awaitedTaskIds) read.set(id, order);
+      readAt.set(assignment.taskId, read);
+    });
     return tasks.map((task) => {
-      const read = seen.get(task.id);
-      const seenDependencies = read ? task.dependencies.filter((id) => read.has(id)) : [];
-      return task.state === "waiting" && seenDependencies.length ? { ...task, seenDependencies } : task;
+      if (task.state !== "waiting") return task;
+      // A dependency that ran again after the turn that read it, as after Reassign, has a new result.
+      const seenDependencies = task.dependencies.filter((id) => {
+        const at = readAt.get(task.id)?.get(id);
+        return at !== undefined && (started.get(id) ?? -1) < at;
+      });
+      return seenDependencies.length ? { ...task, seenDependencies } : task;
     });
   }
 

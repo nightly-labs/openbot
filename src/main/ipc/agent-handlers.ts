@@ -605,6 +605,8 @@ export function agentIpcHandlers({
       readChannel: scopedHandler(parseChannelRead, {
         local: (input) => {
           const page = service.channels.store.page(input.channelId, input.beforeSequence);
+          // An older page adds only messages: the view keeps the tasks of the first page.
+          if (input.beforeSequence !== undefined) return page;
           return { ...page, tasks: service.channels.store.withSeenDependencies(input.channelId, page.tasks) };
         },
         remote: (input, serverId) =>

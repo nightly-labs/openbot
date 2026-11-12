@@ -1036,15 +1036,30 @@ try {
       // The released wire still reads with the frozen channels-v1 codec.
       channelResponse(CHANNEL_ROUTES.read, 200, released.body);
       const local = channels.store.withSeenDependencies(channel.id, channels.store.tasks(channel.id));
-      // The list above the composer leaves out a finished sub-task that its waiting lead has seen.
+      // This checks the data. The list above the composer (`channelAwaitingReplies`) reads it, and a
+      // script cannot load that renderer module, so the smoke test of the PR checks the list itself.
+      // A first-round sub-task that runs again after the lead read it, as after Reassign, is not seen.
+      channels.store.update(channels.store.get(channel.id), {
+        assignments: [{ ...secondTurn, id: randomUUID(), taskId: firstRound.id, awaitedTaskIds: [] }],
+      });
+      const reassigned = await read(V9_PEER_CAPABILITIES);
       const result = {
         released: leadOf(releasedPage.tasks)?.seenDependencies ?? null,
         current: leadOf(currentPage.tasks)?.seenDependencies ?? null,
         local: leadOf(local)?.seenDependencies ?? null,
         // Only a waiting task names what it has seen: the sub-tasks have nothing.
         subtasks: currentPage.tasks.filter((item) => item.parentTaskId === lead.id && item.seenDependencies).length,
+        reassigned:
+          leadOf(decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, reassigned.body, options)).tasks)
+            ?.seenDependencies ?? null,
       };
-      assert.deepEqual(result, { released: null, current: [firstRound.id], local: [firstRound.id], subtasks: 0 });
+      assert.deepEqual(result, {
+        released: null,
+        current: [firstRound.id],
+        local: [firstRound.id],
+        subtasks: 0,
+        reassigned: null,
+      });
       channels.store.update(channels.store.get(channel.id), {
         tasks: [lead, firstRound, secondRound].map((item) => ({ ...item, state: "completed" as const })),
       });
