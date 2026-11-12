@@ -751,7 +751,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "Ad zaten kullanılıyor",
   "settings.transfer.import.settings": "Sunucu ayarlarını içe aktar",
   "settings.transfer.import.settingsAndPreferences":
-    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını, kenar çubuğu bölümlerini ve paylaşılan becerileri ekler. Dosyadaki sunucu adı, logosu ve tercihleri buradakilerin yerini alır.",
+    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını, kenar çubuğu bölümlerini ve paylaşılan becerileri ekler.",
+  "settings.transfer.import.preferences": "Sunucu tercihlerini içe aktar",
+  "settings.transfer.import.preferencesDescription":
+    "Bu sunucunun adını, logosunu ve tercihlerini, ayrıca her kişinin bildirim düzeylerini ve sabitlenmiş öğelerini dosyadakilerle değiştirir.",
   "settings.transfer.import.submit": {
     one: "{count} ajanı içe aktar",
     other: "{count} ajanı içe aktar",

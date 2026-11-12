@@ -819,7 +819,10 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
   "settings.transfer.import.settingsAndPreferences":
-    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have. The server name, logo, and preferences in the file replace the ones here.",
+    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have.",
+  "settings.transfer.import.preferences": "Import server preferences",
+  "settings.transfer.import.preferencesDescription":
+    "Replaces the name, logo, and preferences of this server, and the notification levels and pins of each person, with the ones in the file.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",

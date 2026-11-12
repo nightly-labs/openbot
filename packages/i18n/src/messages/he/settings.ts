@@ -757,7 +757,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "השם כבר בשימוש",
   "settings.transfer.import.settings": "ייבוא הגדרות שרת",
   "settings.transfer.import.settingsAndPreferences":
-    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית, המדורים בסרגל הצד והמיומנויות המשותפות שאין בשרת הזה. שם השרת, הלוגו וההעדפות מהקובץ מחליפים את אלה שכאן.",
+    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית, המדורים בסרגל הצד והמיומנויות המשותפות שאין בשרת הזה.",
+  "settings.transfer.import.preferences": "ייבוא העדפות השרת",
+  "settings.transfer.import.preferencesDescription":
+    "מחליף את השם, הלוגו וההעדפות של השרת הזה, ואת רמות ההתראות והפריטים המוצמדים של כל אדם, באלה שבקובץ.",
   "settings.transfer.import.submit": { one: "ייבוא סוכן אחד", two: "ייבוא שני סוכנים", other: "ייבוא {count} סוכנים" },
   "settings.transfer.import.submitSettings": "ייבוא הגדרות שרת",
   "settings.transfer.import.importing": "מייבא…",

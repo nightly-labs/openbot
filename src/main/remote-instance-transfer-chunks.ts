@@ -20,6 +20,7 @@ import {
 import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { decodeInstanceTransferExportState, fullCopyExportBody } from "@openbot/team-client/team-api-requests";
 import { Effect, Schedule } from "effect";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 import { readFully, sha256Hex, writeFully } from "./instance-transfer-chunks";
@@ -48,8 +49,6 @@ interface ExportState {
   warnings: string[];
 }
 
-const SHA256 = /^[0-9a-f]{64}$/u;
-
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
@@ -76,31 +75,13 @@ function decodeUploadState(value: unknown): UploadState {
   return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
 }
 
+/** The team client's check of the answer, with the error of this module. */
 function decodeExportState(value: unknown): ExportState {
-  if (
-    !isDynamicRecord(value) ||
-    !isString(value.exportId) ||
-    !isCount(value.size) ||
-    value.size === 0 ||
-    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
-    !isString(value.sha256) ||
-    !SHA256.test(value.sha256) ||
-    !isPartSize(value.chunkBytes) ||
-    !Array.isArray(value.chunks) ||
-    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
-    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
-    !Array.isArray(value.warnings) ||
-    !value.warnings.every(isString)
-  )
+  try {
+    return decodeInstanceTransferExportState(value);
+  } catch {
     throw protocolError();
-  return {
-    exportId: value.exportId,
-    size: value.size,
-    sha256: value.sha256,
-    chunkBytes: value.chunkBytes,
-    chunks: value.chunks.filter(isString),
-    warnings: value.warnings.filter(isString),
-  };
+  }
 }
 
 /** A host that answers a request and refuses it gets the same request again only from the user. */
@@ -186,19 +167,9 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
  * follow `includeHistory`.
  */
 export function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
-  if (!fullCopy) return { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };
-  const includeHistory = input.includeHistory === true;
-  return {
-    route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin,
-    body: {
-      agentIds: input.agentIds,
-      includeFiles: input.includeFiles,
-      includeSettings: input.includeSettings,
-      includeHistory,
-      includeChannelMessages: input.includeChannelMessages ?? includeHistory,
-      includeServerPreferences: input.includeServerPreferences === true,
-    },
-  };
+  return fullCopy
+    ? { route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, body: fullCopyExportBody(input) }
+    : { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };
 }
 
 /** Writes the host's transfer file to `destination`. The file appears only when it is complete. */

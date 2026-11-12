@@ -53,7 +53,9 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
         result={store.state.result}
         importError={store.state.importError}
         onChoose={() => store.choose()}
-        onImport={(keys, includeSettings) => store.importFile(keys, includeSettings)}
+        onImport={(keys, includeSettings, includeServerPreferences) =>
+          store.importFile(keys, includeSettings, includeServerPreferences)
+        }
         onCancelImport={() => store.cancelImport()}
         onImportDone={() => store.importDone()}
         onSignIn={props.onSignIn}

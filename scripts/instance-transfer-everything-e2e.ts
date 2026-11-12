@@ -411,8 +411,11 @@ try {
   await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
   const source = profile("source");
   const target = profile("target");
+  // A server that a released client imports into: "Import server settings" without the new flag.
+  const released = profile("released");
   await runCauseEffect(source.agents.initialize());
   await runCauseEffect(target.agents.initialize());
+  await runCauseEffect(released.agents.initialize());
 
   // --- The source setup.
   const create = (name: string) =>
@@ -758,9 +761,28 @@ try {
       token: preview.token,
       keys: preview.agents.map((agent) => agent.key),
       includeSettings: true,
+      includeServerPreferences: true,
     }),
   );
   report.importWarnings = result.warnings;
+  const releasedPreview = await runCauseEffect(released.transfer.stage(file));
+  pass("the preview says that the file has server preferences", releasedPreview.hasServerPreferences === true);
+  const releasedResult = await runCauseEffect(
+    released.transfer.apply({
+      token: releasedPreview.token,
+      keys: releasedPreview.agents.filter((agent) => agent.name === "Editor").map((agent) => agent.key),
+      includeSettings: true,
+    }),
+  );
+  pass(
+    "an import without server preferences, as a released client sends, replaces none of them",
+    released.serverPreferences.timezone === null &&
+      released.serverPreferences.personality.responseStyle === "natural" &&
+      released.identity.saved.length === 0 &&
+      !released.identity.name.endsWith("source") &&
+      !releasedResult.warnings.some((warning) => warning.includes("server preference")),
+    JSON.stringify({ timezone: released.serverPreferences.timezone, saved: released.identity.saved.length }),
+  );
   const { promptCacheTtl: _ttl, ...movedPreferences } = {
     ...source.serverPreferences,
     machineAlerts: { ...source.serverPreferences.machineAlerts, responsibleMemberId: null },

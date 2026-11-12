@@ -777,7 +777,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "Имя уже занято",
   "settings.transfer.import.settings": "Импортировать настройки сервера",
   "settings.transfer.import.settingsAndPreferences":
-    "Добавляет серверы MCP, собственные провайдеры моделей, разделы боковой панели и общие навыки, которых нет на этом сервере. Название, логотип и параметры сервера из файла заменят здешние.",
+    "Добавляет серверы MCP, собственные провайдеры моделей, разделы боковой панели и общие навыки, которых нет на этом сервере.",
+  "settings.transfer.import.preferences": "Импортировать параметры сервера",
+  "settings.transfer.import.preferencesDescription":
+    "Заменяет название, логотип и параметры этого сервера, а также уровни уведомлений и закреплённые элементы каждого человека на те, что в файле.",
   "settings.transfer.import.submit": {
     one: "Импортировать {count} агента",
     few: "Импортировать {count} агентов",

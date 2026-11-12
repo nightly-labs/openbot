@@ -307,7 +307,8 @@ export interface InstanceTransferOptions {
    */
   memberPreferences?: {
     read(): MemberPreferences<string>[];
-    apply(preferences: MemberPreferences<string>): Effect.Effect<boolean, unknown>;
+    /** `owner`: the owner imports. Otherwise an entry of the owner's account changes nothing. */
+    apply(preferences: MemberPreferences<string>, owner: boolean): Effect.Effect<boolean, unknown>;
   };
   /** The server's name and logo, as Server settings > General saves them. Absent where there is no team. */
   serverIdentity?: {
@@ -954,6 +955,8 @@ export class InstanceTransferService {
     values: readonly unknown[],
     agentIds: ReadonlyMap<string, string>,
     channelIds: ReadonlyMap<string, string>,
+    /** The owner imports: only then can an entry of the owner's account change the owner's choices. */
+    owner: boolean,
     warnings: string[],
   ) {
     const port = this.options.memberPreferences;
@@ -964,18 +967,21 @@ export class InstanceTransferService {
       if (!member) continue;
       const idOf = (kind: SidebarPinKind, key: string) => (kind === "agent" ? agentIds : channelIds).get(key);
       const result = yield* Effect.result(
-        port.apply({
-          accountId: member.accountId,
-          server: member.server,
-          agents: member.agents.flatMap(({ agentId, level }) => {
-            const id = agentIds.get(agentId);
-            return id ? [{ agentId: id, level }] : [];
-          }),
-          pins: member.pins.flatMap(({ kind, id }) => {
-            const mapped = idOf(kind, id);
-            return mapped ? [{ kind, id: mapped }] : [];
-          }),
-        }),
+        port.apply(
+          {
+            accountId: member.accountId,
+            server: member.server,
+            agents: member.agents.flatMap(({ agentId, level }) => {
+              const id = agentIds.get(agentId);
+              return id ? [{ agentId: id, level }] : [];
+            }),
+            pins: member.pins.flatMap(({ kind, id }) => {
+              const mapped = idOf(kind, id);
+              return mapped ? [{ kind, id: mapped }] : [];
+            }),
+          },
+          owner,
+        ),
       );
       if (Result.isFailure(result)) failed += 1;
     }
@@ -1135,7 +1141,11 @@ export class InstanceTransferService {
           nameExists: existing.has(agent.name.toLowerCase()),
         };
       }),
-      hasSettings: manifest.settings !== null || manifest.serverPreferences !== null,
+      hasSettings: manifest.settings !== null,
+      hasServerPreferences:
+        manifest.serverPreferences !== null ||
+        manifest.serverIdentity !== null ||
+        manifest.memberPreferences.length > 0,
       warnings: bounded(warnings),
     };
   });
@@ -1282,16 +1292,24 @@ export class InstanceTransferService {
       yield* importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings);
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
     // A member who is not on this server yet gets nothing: their member id here is new.
-    if (input.includeSettings && staged.manifest.memberPreferences.length > 0)
-      yield* this.#importMemberPreferences(staged.manifest.memberPreferences, agentIds, channelIds, warnings);
+    if (input.includeServerPreferences && staged.manifest.memberPreferences.length > 0)
+      yield* this.#importMemberPreferences(
+        staged.manifest.memberPreferences,
+        agentIds,
+        channelIds,
+        this.#isOwner(staged.owner),
+        warnings,
+      );
     // After the agents, so a skill that an agent brought is already in the library.
     if (input.includeSettings && staged.manifest.sharedSkills.length > 0)
       yield* this.#importSharedSkills(archive, staged.manifest.sharedSkills, warnings);
     // With the settings, and only by the owner: the name is the one every member and the account see.
-    if (input.includeSettings && staged.manifest.serverIdentity && this.#isOwner(staged.owner))
+    if (input.includeServerPreferences && staged.manifest.serverIdentity && this.#isOwner(staged.owner))
       yield* this.#importServerIdentity(archive, staged.manifest.serverIdentity, warnings);
     // With the settings: the import into a new server sets it up as the old one was.
-    if (input.includeSettings && staged.manifest.serverPreferences && this.options.serverPreferences)
+    // Only on request: "Import server settings" of a released client adds what is missing, and
+    // replaces nothing (`instance-transfer-full-copy-v1`).
+    if (input.includeServerPreferences && staged.manifest.serverPreferences && this.options.serverPreferences)
       yield* applyServerPreferences(
         this.options.serverPreferences,
         staged.manifest.serverPreferences,

@@ -726,7 +726,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "名称已被使用",
   "settings.transfer.import.settings": "导入服务器设置",
   "settings.transfer.import.settingsAndPreferences":
-    "添加该服务器还没有的 MCP 服务器、自定义模型服务商、侧边栏分组和共享技能。文件中的服务器名称、标志和偏好会替换此处的设置。",
+    "添加该服务器还没有的 MCP 服务器、自定义模型服务商、侧边栏分组和共享技能。",
+  "settings.transfer.import.preferences": "导入服务器偏好",
+  "settings.transfer.import.preferencesDescription":
+    "用文件中的内容替换此服务器的名称、标志和偏好，以及每个人的通知级别和置顶项。",
   "settings.transfer.import.submit": { one: "导入 {count} 个助手", other: "导入 {count} 个助手" },
   "settings.transfer.import.submitSettings": "导入服务器设置",
   "settings.transfer.import.importing": "正在导入…",

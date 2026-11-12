@@ -745,7 +745,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "Naam al in gebruik",
   "settings.transfer.import.settings": "Importeer serverinstellingen",
   "settings.transfer.import.settingsAndPreferences":
-    "Voegt de MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en gedeelde vaardigheden toe die deze server nog niet heeft. De servernaam, het logo en de servervoorkeuren uit het bestand vervangen die van hier.",
+    "Voegt de MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en gedeelde vaardigheden toe die deze server nog niet heeft.",
+  "settings.transfer.import.preferences": "Servervoorkeuren importeren",
+  "settings.transfer.import.preferencesDescription":
+    "Vervangt de naam, het logo en de voorkeuren van deze server, en de meldingsniveaus en vastgezette items van elke persoon, door die uit het bestand.",
   "settings.transfer.import.submit": { one: "Importeer {count} agent", other: "Importeer {count} agents" },
   "settings.transfer.import.submitSettings": "Importeer serverinstellingen",
   "settings.transfer.import.importing": "Importeren…",

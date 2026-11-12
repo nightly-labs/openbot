@@ -3029,12 +3029,13 @@ export async function createApplicationServices({
             agents: [...agentNotificationLevels.levels(memberId)].map(([agentId, level]) => ({ agentId, level })),
             pins: sidebarPins.snapshot(memberId).items,
           })),
-      apply: (preferences) =>
+      apply: (preferences, owner) =>
         Effect.gen(function* () {
           const member = (teamStore.configured ? teamStore.memberAccounts() : []).find(
             (candidate) => candidate.accountId === preferences.accountId,
           );
-          if (!member) return false;
+          // Only the owner changes the owner's own choices.
+          if (!member || (member.owner && !owner)) return false;
           const levelKey = member.owner ? OWNER_NOTIFICATION_KEY : member.memberId;
           const pinKey = member.owner ? OWNER_PIN_KEY : member.memberId;
           if (preferences.server !== null) yield* agentNotificationLevels.setServer(levelKey, preferences.server);

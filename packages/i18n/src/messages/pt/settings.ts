@@ -751,7 +751,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "Nome já usado",
   "settings.transfer.import.settings": "Importar configurações do servidor",
   "settings.transfer.import.settingsAndPreferences":
-    "Adiciona os servidores MCP, provedores de modelo personalizados, seções da barra lateral e habilidades compartilhadas que este servidor não tem. O nome, o logotipo e as preferências do servidor no arquivo substituem os daqui.",
+    "Adiciona os servidores MCP, provedores de modelo personalizados, seções da barra lateral e habilidades compartilhadas que este servidor não tem.",
+  "settings.transfer.import.preferences": "Importar preferências do servidor",
+  "settings.transfer.import.preferencesDescription":
+    "Substitui o nome, o logo e as preferências deste servidor, e os níveis de notificação e itens fixados de cada pessoa, pelos do arquivo.",
   "settings.transfer.import.submit": { one: "Importar {count} agente", other: "Importar {count} agentes" },
   "settings.transfer.import.submitSettings": "Importar configurações",
   "settings.transfer.import.importing": "Importando…",

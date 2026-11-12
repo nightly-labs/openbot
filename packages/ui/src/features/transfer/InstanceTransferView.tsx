@@ -74,7 +74,8 @@ export interface InstanceTransferViewProps {
   result: InstanceTransferResult | null;
   importError: string | null;
   onChoose: () => void;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  /** `includeServerPreferences`: only where `fullCopyAvailable`; the file's preferences replace this server's. */
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancelImport: () => void;
   onImportDone: () => void;
   /** Absent for a joined server: its providers are signed in on that computer. */
@@ -457,6 +458,8 @@ function ImportScreen(props: InstanceTransferViewProps) {
         {(preview) => (
           <ImportReview
             preview={preview}
+            // A host that answers with the v1 preview does not say; then the switch shows.
+            preferencesAvailable={props.fullCopyAvailable === true && preview.hasServerPreferences !== false}
             importing={props.importPhase === "importing"}
             error={props.importError}
             onImport={props.onImport}
@@ -473,14 +476,17 @@ function ImportScreen(props: InstanceTransferViewProps) {
 
 function ImportReview(props: {
   preview: InstanceTransferPreview;
+  /** The server takes the file's preferences, name, logo and members' choices. */
+  preferencesAvailable: boolean;
   importing: boolean;
   error: string | null;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancel: () => void;
 }) {
   const { t, format } = useText();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [settings, setSettings] = createSignal(props.preview.hasSettings);
+  const [preferences, setPreferences] = createSignal(untrack(() => props.preferencesAvailable));
   const selected = createMemo(() => props.preview.agents.filter((agent) => !excluded().has(agent.key)));
   const totals = () => ({
     agents: selected().length,
@@ -540,16 +546,29 @@ function ImportReview(props: {
           />
         </ItemGroup>
       </Show>
+      <Show when={props.preferencesAvailable}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            class="settings-modal-row"
+            checked={preferences()}
+            disabled={props.importing}
+            onChange={setPreferences}
+            label={t("settings.transfer.import.preferences")}
+            description={t("settings.transfer.import.preferencesDescription")}
+          />
+        </ItemGroup>
+      </Show>
       <div class="agent-import-actions instance-transfer-start">
         <Button
           type="button"
-          disabled={selected().length === 0 && !settings()}
+          disabled={selected().length === 0 && !settings() && !(props.preferencesAvailable && preferences())}
           loading={props.importing}
           loadingLabel={t("settings.transfer.import.importing")}
           onClick={() =>
             props.onImport(
               selected().map((agent) => agent.key),
               settings(),
+              props.preferencesAvailable && preferences(),
             )
           }
         >

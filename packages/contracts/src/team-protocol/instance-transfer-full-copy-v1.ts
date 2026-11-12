@@ -12,8 +12,13 @@
 //   of the person who exports, when that person is the owner.
 //
 // The answer is the `export/begin` answer of `instance-transfer-chunks-v1`, and the client reads the
-// parts and ends the export with that capability's `export/chunk` and `export/done`. A host offers
-// this capability only with `instance-transfer-chunks-v1`. Widening any of it needs another
+// parts and ends the export with that capability's `export/chunk` and `export/done`.
+//
+// `apply` is the `instance-transfer-v1` apply with one more required field,
+// `includeServerPreferences`: only then does the import replace this server's preferences, name, logo
+// and the members' choices with the file's. The `instance-transfer-v1` apply never does, so a released
+// client's "Import server settings" keeps its meaning. A host offers this capability only with
+// `instance-transfer-v1` and `instance-transfer-chunks-v1`. Widening any of it needs another
 // capability string.
 import {
   type AdminDecoder,
@@ -26,11 +31,13 @@ import {
   type OptionalRouteCodec,
   string,
 } from "./admin-wire";
+import { INSTANCE_TRANSFER_RESULT } from "./instance-transfer-v1";
 
 export const INSTANCE_TRANSFER_FULL_COPY_CAPABILITY = "instance-transfer-full-copy-v1";
 
 export const INSTANCE_TRANSFER_FULL_COPY_ROUTES = {
   exportBegin: "/v1/instance-transfer-full-copy/export/begin",
+  apply: "/v1/instance-transfer-full-copy/apply",
 } as const;
 
 /** A SHA-256 as 64 lower-case hexadecimal digits, as `instance-transfer-chunks-v1` writes it. */
@@ -60,6 +67,19 @@ export const INSTANCE_TRANSFER_FULL_COPY_CODECS: ReadonlyMap<string, OptionalRou
         chunks: list(sha256, 256),
         warnings: list(string(500), 200),
       }),
+    ),
+  ],
+  [
+    INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply,
+    adminRoute(
+      fields({
+        token: identifier,
+        keys: list(string(64), 100),
+        includeSettings: boolean,
+        includeServerPreferences: boolean,
+        timezone: string(255),
+      }),
+      INSTANCE_TRANSFER_RESULT,
     ),
   ],
 ]);

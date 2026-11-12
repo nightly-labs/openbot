@@ -733,7 +733,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "이미 사용 중인 이름",
   "settings.transfer.import.settings": "서버 설정 가져오기",
   "settings.transfer.import.settingsAndPreferences":
-    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 공유 스킬을 추가해요. 파일에 있는 서버 이름, 로고, 환경설정이 여기 설정을 대체해요.",
+    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 공유 스킬을 추가해요.",
+  "settings.transfer.import.preferences": "서버 환경설정 가져오기",
+  "settings.transfer.import.preferencesDescription":
+    "이 서버의 이름, 로고, 환경설정과 각 사람의 알림 수준 및 고정 항목을 파일의 것으로 바꿔요.",
   "settings.transfer.import.submit": { other: "에이전트 {count}개 가져오기" },
   "settings.transfer.import.submitSettings": "서버 설정 가져오기",
   "settings.transfer.import.importing": "가져오는 중…",

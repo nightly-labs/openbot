@@ -798,7 +798,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "الاسم مستخدم بالفعل",
   "settings.transfer.import.settings": "استيراد إعدادات الخادم",
   "settings.transfer.import.settingsAndPreferences":
-    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي والمهارات المشتركة غير الموجودة في هذا الخادم. يحل اسم الخادم وشعاره وتفضيلاته الموجودة في الملف محل الحالية هنا.",
+    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي والمهارات المشتركة غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.preferences": "استيراد تفضيلات الخادم",
+  "settings.transfer.import.preferencesDescription":
+    "يستبدل اسم هذا الخادم وشعاره وتفضيلاته، ومستويات الإشعارات والعناصر المثبّتة لكل شخص، بتلك الموجودة في الملف.",
   "settings.transfer.import.submit": {
     zero: "لا وكلاء للاستيراد",
     one: "استيراد وكيل واحد",

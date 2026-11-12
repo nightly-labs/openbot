@@ -8,6 +8,7 @@ import { runTeamEffect } from "@openbot/team-client";
 import { base64ToBytes } from "@openbot/team-client/base64";
 import {
   applyInstanceTransfer,
+  applyInstanceTransferFullCopy,
   beginInstanceTransferFullCopy,
   discardInstanceTransfer,
   downloadInstanceTransfer,
@@ -89,8 +90,12 @@ export function createWebInstanceTransferCalls(options: {
     },
     async apply(input, serverId) {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const request = options.request(serverId);
       const result = await runTeamEffect(
-        applyInstanceTransfer(options.request(serverId), input, timezone).pipe(Effect.mapError((error) => error.cause)),
+        (options.fullCopy(serverId)
+          ? applyInstanceTransferFullCopy(request, input, timezone)
+          : applyInstanceTransfer(request, input, timezone)
+        ).pipe(Effect.mapError((error) => error.cause)),
       );
       return resolveRemoteInstanceTransferResult(result, await options.listAgents());
     },

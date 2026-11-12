@@ -745,7 +745,10 @@ export const messages = {
   "settings.transfer.import.nameExists": "名前が重複",
   "settings.transfer.import.settings": "サーバー設定をインポート",
   "settings.transfer.import.settingsAndPreferences":
-    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクション、共有スキルを追加します。ファイル内のサーバー名、ロゴ、環境設定は、ここの設定を置き換えます。",
+    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクション、共有スキルを追加します。",
+  "settings.transfer.import.preferences": "サーバーの環境設定をインポート",
+  "settings.transfer.import.preferencesDescription":
+    "このサーバーの名前、ロゴ、環境設定と、各メンバーの通知レベルとピン留めを、ファイル内のものに置き換えます。",
   "settings.transfer.import.submit": { other: "エージェント {count} 件をインポート" },
   "settings.transfer.import.submitSettings": "サーバー設定をインポート",
   "settings.transfer.import.importing": "インポート中…",

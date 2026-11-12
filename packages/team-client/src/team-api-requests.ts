@@ -602,7 +602,24 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const isPartBytes = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
 
-function decodeExportState(value: unknown): InstanceTransferExportState {
+/**
+ * The `export/begin` body of `instance-transfer-full-copy-v1`: every part as a field. The channel
+ * messages follow the chat history when the input does not name them, as they did before.
+ */
+export function fullCopyExportBody(input: ExportInstanceInput) {
+  const includeHistory = input.includeHistory === true;
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    includeHistory,
+    includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+    includeServerPreferences: input.includeServerPreferences === true,
+  };
+}
+
+/** The `export/begin` answer of `instance-transfer-chunks-v1`, checked against the file limits. */
+export function decodeInstanceTransferExportState(value: unknown): InstanceTransferExportState {
   if (
     !isDynamicRecord(value) ||
     !isString(value.exportId) ||
@@ -638,15 +655,9 @@ export const beginInstanceTransferFullCopy = Effect.fn("TeamClient.beginInstance
   request: TeamApiRequest,
   input: ExportInstanceInput,
 ): Effect.fn.Return<InstanceTransferExportState, TeamRequestError> {
-  const includeHistory = input.includeHistory === true;
   return yield* teamCall(() =>
-    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeExportState, {
-      agentIds: input.agentIds,
-      includeFiles: input.includeFiles,
-      includeSettings: input.includeSettings,
-      includeHistory,
-      includeChannelMessages: input.includeChannelMessages ?? includeHistory,
-      includeServerPreferences: input.includeServerPreferences === true,
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeInstanceTransferExportState, {
+      ...fullCopyExportBody(input),
     }),
   );
 });
@@ -744,6 +755,26 @@ export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer
     request("POST", INSTANCE_TRANSFER_ROUTES.stage, decodeRemoteInstanceTransferPreview, undefined, {
       ...upload,
       maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
+    }),
+  );
+});
+
+/**
+ * Imports a staged file and also replaces the server preferences when the input asks. Send it only to
+ * a host that serves `instance-transfer-full-copy-v1`.
+ */
+export const applyInstanceTransferFullCopy = Effect.fn("TeamClient.applyInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ApplyInstanceTransferInput,
+  timezone: string,
+): Effect.fn.Return<RemoteInstanceTransferResult, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, decodeRemoteInstanceTransferResult, {
+      token: input.token,
+      keys: input.keys,
+      includeSettings: input.includeSettings,
+      includeServerPreferences: input.includeServerPreferences === true,
+      timezone,
     }),
   );
 });

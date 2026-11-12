@@ -86,6 +86,11 @@ export interface InstanceTransferPreview {
   agents: AgentImportPreviewAgent[];
   /** The file carries app settings. */
   hasSettings: boolean;
+  /**
+   * The file carries server preferences (with the name, logo and members' choices). Absent from a
+   * host that answers with the `instance-transfer-v1` preview, which does not carry it.
+   */
+  hasServerPreferences?: boolean;
   warnings: string[];
 }
 
@@ -94,6 +99,11 @@ export interface ApplyInstanceTransferInput {
   /** May be empty when only the settings are imported. */
   keys: string[];
   includeSettings: boolean;
+  /**
+   * Replaces this server's preferences, name, logo and members' choices with the file's. Absent is
+   * off: the `instance-transfer-v1` apply does not carry it.
+   */
+  includeServerPreferences?: boolean;
 }
 
 /**
@@ -170,8 +180,16 @@ export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTr
   if (!isIdentifier(input.token)) invalid("import token");
   if (!isUniqueList(input.keys, INPUT_LIMITS.agents, isAgentImportKey)) invalid("agent selection");
   if (!isBoolean(input.includeSettings)) invalid("import request");
-  if (input.keys.length === 0 && !input.includeSettings) invalid("import request");
-  return { token: input.token, keys: input.keys, includeSettings: input.includeSettings };
+  if (input.includeServerPreferences !== undefined && !isBoolean(input.includeServerPreferences))
+    invalid("import request");
+  const includeServerPreferences = input.includeServerPreferences === true;
+  if (input.keys.length === 0 && !input.includeSettings && !includeServerPreferences) invalid("import request");
+  return {
+    token: input.token,
+    keys: input.keys,
+    includeSettings: input.includeSettings,
+    ...(includeServerPreferences ? { includeServerPreferences: true } : {}),
+  };
 }
 
 export function parseCopyInstanceAgentsInput(value: unknown): CopyInstanceAgentsInput {
@@ -238,6 +256,7 @@ export function decodeInstanceTransferPreview(value: unknown): InstanceTransferP
     exportedAt: preview.exportedAt,
     agents: preview.agents.map(decodeAgentImportPreviewAgent),
     hasSettings: preview.hasSettings,
+    ...(isBoolean(preview.hasServerPreferences) ? { hasServerPreferences: preview.hasServerPreferences } : {}),
     warnings: messages(preview.warnings, "transfer warnings"),
   };
 }
