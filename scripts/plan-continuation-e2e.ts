@@ -475,11 +475,6 @@ try {
       "I'll update you on the progress.",
       "Next, I'll implement it after your confirmation.",
       "Let me check with the team and get back to you.",
-      "Vou consultar o conector se você quiser.",
-      "Vou verificar depois da sua confirmação.",
-      "Vou rodar os testes amanhã.",
-      "Vou enviar o e-mail agora.",
-      "I'm running late.",
     ];
     // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
     for (const [index, answer] of answers.slice(0, 6).entries()) {
@@ -505,6 +500,31 @@ try {
     }
     const lines = continuationLines(agent.id);
     assert.equal(lines.length, 0);
+    return { answers: answers.length };
+  });
+
+  await check("Portuguese offers, later times, sends and reported problems do not continue", async () => {
+    // A new agent, so that the long chat of the check above does not start a memory turn here.
+    const agent = await createAgent("Cuidadoso");
+    const answers = [
+      "Vou consultar o conector se você quiser.",
+      "Vou verificar depois da sua confirmação.",
+      "Vou rodar os testes amanhã.",
+      "Vou enviar o e-mail agora.",
+      "I'm running late.",
+      "Vou consultar o conector se quiser.",
+      "Vou rodar os testes depois.",
+      "Vou verificar com o time e te retorno.",
+      "I'm running into a permission error.",
+      "I'm checking with the team.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    assert.equal(continuationLines(agent.id).length, 0);
     return { answers: answers.length };
   });
 
@@ -583,6 +603,7 @@ try {
       "Consultando o conector…",
       "I'm checking the connector now.",
       "Let me query the connector.",
+      "Deixa eu dar uma olhada no conector.",
     ];
     for (const answer of answers) {
       const mark = loggedTurns().length;

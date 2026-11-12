@@ -52,9 +52,13 @@ const NAMES_NEXT_STEP = new RegExp(
  * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
  * The continuation note does not approve a risky action in any case.
  */
-const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch|query|consult|fetch|retrieve|pull)`;
-/** The "-ing" form of work verbs, for "I'm checking the connector." "Looking forward …" and "running late" are not in it. */
-const WORK_GERUND = String.raw`(?:(?:re-?)?running(?!\s+(?:late|low|out|behind)\b)|checking|testing|fixing|updating|editing|writing|creating|adding|building|installing|opening|reading|looking\s+(?:at|into|up|for|through)|searching|inspecting|reviewing|verifying|trying|applying|implementing|refactoring|debugging|configuring|generating|downloading|compiling|patching|querying|consulting|fetching|retrieving|pulling)`;
+const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch|query|consult(?!\s+with\b)|fetch|retrieve|pull)`;
+/**
+ * The "-ing" form of work verbs, for "I'm checking the connector.". Phrases that report a problem or
+ * wait for someone, such as "running into …", "checking with the team" or "looking for your feedback",
+ * are not in it.
+ */
+const WORK_GERUND = String.raw`(?:(?:re-?)?running(?!\s+(?:late|low|out|behind|into)\b)|checking(?!\s+with\b)|testing|fixing|updating|editing|writing(?!\s+to\b)|creating|adding|building|installing|opening|reading|looking\s+(?:at|into|up|through|for(?!\s+your\b))|searching|inspecting|reviewing|verifying|trying(?!\s+(?:my|our)\b)|applying|implementing|refactoring|debugging|configuring|generating|downloading|compiling|patching|querying|consulting(?!\s+with\b)|fetching|retrieving|pulling)`;
 /** The start of the last sentence. */
 const SENTENCE_START = String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)`;
 /**
@@ -78,6 +82,9 @@ const STATES_WORK = new RegExp(
 
 /** Portuguese work verbs, as infinitives. Verbs that send, publish or delete are not in it. */
 const PT_WORK_VERBS = [
+  "ver",
+  "olhar",
+  "dar uma olhada",
   "rodar",
   "executar",
   "verificar",
@@ -125,15 +132,18 @@ const PT_WORK_VERBS = [
   "configurar",
   "gerar",
 ];
-const PT_WORK_VERB = `(?:${PT_WORK_VERBS.join("|")})(?!\\p{L})`;
-/** The gerund of each verb: "consultar" gives "consultando", "ler" gives "lendo". */
-const PT_WORK_GERUND = `(?:${PT_WORK_VERBS.map((verb) => verb.replace(/r$/, "ndo")).join("|")})(?!\\p{L})`;
+const ptPattern = (verbs: readonly string[]) =>
+  `(?:${verbs.map((verb) => verb.replaceAll(" ", "\\s+")).join("|")})(?!\\p{L})`;
+const PT_WORK_VERB = ptPattern(PT_WORK_VERBS);
+/** The gerund of each verb: "consultar" gives "consultando", "ler" "lendo", "dar uma olhada" "dando uma olhada". */
+const PT_WORK_GERUND = ptPattern(PT_WORK_VERBS.map((verb) => verb.replace(/r(?=\s|$)/, "ndo")));
 /**
- * The Portuguese form of `NOT_WAITING`: an offer to the user ("se você quiser"), the user's approval
- * ("sua confirmação"), or a later time ("mais tarde", "amanhã"). JavaScript's `\b` sees only ASCII
- * letters, so no `\b` follows an accented letter.
+ * The Portuguese form of `NOT_WAITING`: an offer to the user ("se você quiser", "caso queira"), the
+ * user's approval ("sua confirmação"), a later time ("mais tarde", "em breve", a closing "depois"), or
+ * another person ("te retorno"). JavaScript's `\b` sees only ASCII letters, so no `\b` follows an
+ * accented letter.
  */
-const PT_NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*(?:\b(?:se|quando|assim\s+que|depois\s+que|logo\s+que|caso)\s+(?:você|voce|vc|o\s+senhor|a\s+senhora)|\b(?:sua|tua)\s+(?:aprovação|aprovacao|confirmação|confirmacao|autorização|autorizacao|permissão|permissao|resposta)|\bmais\s+tarde|\bamanh|\bpróxima\s+(?:semana|vez)|\bdepois\s+(?:te|lhe)\s+(?:aviso|retorno|falo)|\b(?:retorno|volto)\s+(?:em|mais|depois)))`;
+const PT_NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*(?:\b(?:se|quando|assim\s+que|depois\s+que|logo\s+que|caso)\s+(?:você|voce|vc|o\s+senhor|a\s+senhora)|\b(?:se|caso|quando)\s+(?:quiser|queira|preferir|prefira|desejar|deseje|puder|possa|achar|ache|precisar|precise)(?!\p{L})|\b(?:sua|tua)\s+(?:aprovação|aprovacao|confirmação|confirmacao|autorização|autorizacao|permissão|permissao|resposta)|\bmais\s+tarde|\bem\s+breve|\bdaqui\s+a\s+pouco|\bdepois(?=\s*[.!…]*\s*$)|\bamanh|\bpróxima\s+(?:semana|vez)|\bdepois\s+(?:te|lhe)\s+(?:aviso|falo)|\b(?:te|lhe)\s+(?:retorno|dou\s+(?:um\s+)?retorno)|\b(?:retorno|volto)\s+(?:em|mais|depois)))`;
 /**
  * A Portuguese last sentence that announces the next work ("Vou consultar o conector agora."), says
  * that it runs now ("Estou consultando o conector."), or, with a closing ellipsis, only names it
