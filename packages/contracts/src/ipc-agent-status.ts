@@ -224,7 +224,7 @@ export interface AccountUsageWindow {
   resetsAt: number | null;
 }
 
-function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
+export function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
   return (
     isDynamicRecord(value) &&
     isFiniteNumber(value.usedPercent) &&

@@ -945,7 +945,8 @@ try {
   };
   const getUsage = hostAgents.getUsage;
   Object.defineProperty(hostAgents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
-  const usagePath = `/v1/agents/${source.id}/usage`;
+  // The plan limit screens read the first route; the model picker reads the second.
+  const usagePaths = ["/v1/agents/usage", `/v1/agents/${source.id}/usage`];
   const withoutTertiary = (protocol: number) =>
     teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
 
@@ -984,20 +985,24 @@ try {
     await step("usage-tertiary-v1: a protocol 9 client that asks for it gets the third window", async () => {
       const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
       assert.ok(capabilities.includes(TEAM_USAGE_TERTIARY_CAPABILITY), "A v9 client does not ask for it.");
-      const got = await current(TEAM_PROTOCOL_V9, capabilities, usagePath);
-      assert.equal(got.status, 200, `GET ${usagePath}: ${JSON.stringify(got.body)}.`);
-      const limits = record(got.body, "usage").limits;
-      assert.ok(Array.isArray(limits) && limits.length === 2);
-      assert.deepEqual(record(limits[0], "opencode").tertiary, monthly);
-      assert.ok(!Object.hasOwn(record(limits[1], "cursor"), "tertiary"), "The host sent a window outside v1.");
-      const decoded = record(decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, got.body), "decoded");
-      assert.ok(Array.isArray(decoded.limits));
-      assert.deepEqual(record(decoded.limits[0], "decoded opencode").tertiary, monthly);
-      // A released protocol 8 or 9 client reads the same body with its frozen decoder, on the frozen path.
-      const frozen = record(decodeTeamProtocolV8HttpResponse("GET", "/v1/agents/usage", 200, got.body), "frozen");
-      assert.ok(Array.isArray(frozen.limits));
-      assert.ok(!Object.hasOwn(record(frozen.limits[0], "frozen opencode"), "tertiary"));
-      return { limits: limits.map((limit) => Object.keys(record(limit, "limit")).sort()) };
+      const results: { path: string; limits: string[][] }[] = [];
+      for (const usagePath of usagePaths) {
+        const got = await current(TEAM_PROTOCOL_V9, capabilities, usagePath);
+        assert.equal(got.status, 200, `GET ${usagePath}: ${JSON.stringify(got.body)}.`);
+        const limits = record(got.body, "usage").limits;
+        assert.ok(Array.isArray(limits) && limits.length === 2);
+        assert.deepEqual(record(limits[0], "opencode").tertiary, monthly, `GET ${usagePath} has no tertiary.`);
+        assert.ok(!Object.hasOwn(record(limits[1], "cursor"), "tertiary"), "The host sent a window outside v1.");
+        const decoded = record(decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, got.body), "decoded");
+        assert.ok(Array.isArray(decoded.limits));
+        assert.deepEqual(record(decoded.limits[0], "decoded opencode").tertiary, monthly);
+        // A released protocol 8 or 9 client reads the same body with its frozen decoder, on the frozen path.
+        const frozen = record(decodeTeamProtocolV8HttpResponse("GET", "/v1/agents/usage", 200, got.body), "frozen");
+        assert.ok(Array.isArray(frozen.limits));
+        assert.ok(!Object.hasOwn(record(frozen.limits[0], "frozen opencode"), "tertiary"));
+        results.push({ path: usagePath, limits: limits.map((limit) => Object.keys(record(limit, "limit")).sort()) });
+      }
+      return results;
     });
 
     await step("usage-tertiary-v1: a client without it gets the released usage limits", async () => {
@@ -1005,15 +1010,17 @@ try {
         !teamCapabilitiesForProtocol(8).includes(TEAM_USAGE_TERTIARY_CAPABILITY),
         "A protocol 8 client asks for usage-tertiary-v1.",
       );
-      const results: { protocol: number; keys: string[] }[] = [];
+      const results: { protocol: number; path: string; keys: string[] }[] = [];
       for (const protocol of [TEAM_PROTOCOL_V7, 8, TEAM_PROTOCOL_V9]) {
-        const got = await current(protocol, withoutTertiary(protocol), usagePath);
-        assert.equal(got.status, 200, `Protocol ${protocol}: ${JSON.stringify(got.body)}.`);
-        const limits = record(got.body, "usage").limits;
-        assert.ok(Array.isArray(limits));
-        const first = record(limits[0], "opencode");
-        assert.ok(!Object.hasOwn(first, "tertiary"), `Protocol ${protocol} got tertiary.`);
-        results.push({ protocol, keys: Object.keys(first).sort() });
+        for (const usagePath of usagePaths) {
+          const got = await current(protocol, withoutTertiary(protocol), usagePath);
+          assert.equal(got.status, 200, `Protocol ${protocol}, ${usagePath}: ${JSON.stringify(got.body)}.`);
+          const limits = record(got.body, "usage").limits;
+          assert.ok(Array.isArray(limits));
+          const first = record(limits[0], "opencode");
+          assert.ok(!Object.hasOwn(first, "tertiary"), `Protocol ${protocol} got tertiary on ${usagePath}.`);
+          results.push({ protocol, path: usagePath, keys: Object.keys(first).sort() });
+        }
       }
       return results;
     });
@@ -1041,7 +1048,7 @@ try {
       const bad = { ...record(usage.limits[0], "opencode"), tertiary: { usedPercent: "12" } };
       const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
       assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
-      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, malformed.usage));
+      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
       return { relayed: relayed.status, malformed: "invalid" };
     });
   } finally {
@@ -1344,6 +1351,53 @@ try {
       "A protocol 8 peer got a protocol 9 capability.",
     );
     return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+  });
+
+  await step("usage-tertiary-v1 RPC: a WebRTC usage read follows the capability", async () => {
+    const reading: AccountUsage = {
+      limits: [
+        {
+          id: "opencode",
+          primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1_793_000_000 },
+          secondary: { usedPercent: 70, windowDurationMins: 10_080, resetsAt: 1_793_500_000 },
+          tertiary: { usedPercent: 12, windowDurationMins: 43_200, resetsAt: 1_795_000_000 },
+        },
+      ],
+    };
+    const usage = async (capabilities: readonly string[]) => {
+      const requestId = randomUUID();
+      const from = v2.bridge.sent.length;
+      v2.bridge.emit(
+        "data",
+        "peer-v2",
+        "rpc",
+        encodeTeamProtocolV2Frame(
+          createTeamProtocolV2Request(requestId, "http.request", {
+            method: "GET",
+            path: "/v1/agents/usage",
+            body: null,
+            capabilities: [...capabilities],
+          }),
+        ),
+      );
+      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      assert.ok("result" in frame, `The usage frame failed: ${JSON.stringify(frame)}.`);
+      const limits = record(record(frame.result, "RPC result").body, "usage").limits;
+      assert.ok(Array.isArray(limits));
+      return record(limits[0], "opencode");
+    };
+    const getUsage = agents?.getUsage;
+    assert.ok(agents && getUsage);
+    Object.defineProperty(agents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+    try {
+      const withCapability = await usage(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      assert.deepEqual(withCapability.tertiary, reading.limits[0]?.tertiary, "A protocol 9 peer got no tertiary.");
+      const without = await usage(teamCapabilitiesForProtocol(8));
+      assert.ok(!Object.hasOwn(without, "tertiary"), "A protocol 8 peer got tertiary.");
+      return { protocol9: Object.keys(withCapability).sort(), protocol8: Object.keys(without).sort() };
+    } finally {
+      Object.defineProperty(agents, "getUsage", { value: getUsage, configurable: true });
+    }
   });
 
   await step("v8 RPC: a secure authentication answer over WebRTC reaches the agent (#3949)", async () => {

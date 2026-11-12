@@ -52,7 +52,7 @@ import {
 } from "./remote-desktop-setup-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
-import { withUsageTertiary } from "./usage-tertiary-v1";
+import { isUsageRoute, withUsageTertiary } from "./usage-tertiary-v1";
 import { decodeTeamProtocolV8HttpRequest, decodeTeamProtocolV8HttpResponse } from "./v8";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
 import {
@@ -239,15 +239,15 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, usageTertiary, ...frozen } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
-  if (usageTertiary && scopedUsageRoute(method, path))
-    return JSON.stringify(withUsageTertiary(JSON.parse(encoded), value, true));
+  const withUsage = usageTertiary && isUsageRoute(method, path);
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
   const withSubagents = subagents && isConversationRoute(method, path);
   const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
   const withVideo = videoGeneration && isConversationRoute(method, path);
-  if (!withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo) return encoded;
+  if (!withUsage && !withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo) return encoded;
   let output: TeamProtocolV8BaseJsonValue = JSON.parse(encoded);
+  if (withUsage) output = withUsageTertiary(output, value, true);
   if (withExtent) output = withPageHistoryExtent(output, value);
   if (withBlocks) output = withConversationUiBlocks(output, value);
   if (withSubagents) output = withConversationSubagents(output, value);
@@ -330,9 +330,9 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
 ): TeamProtocolV8BaseJsonValue {
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
-  if (scopedUsageRoute(method, path)) return withUsageTertiary(decoded, value);
+  const withUsage = isUsageRoute(method, path) ? withUsageTertiary(decoded, value) : decoded;
   // The conversation page route carries all three.
-  const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(decoded, value) : decoded;
+  const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;
   if (!isConversationRoute(method, path)) return withExtent;
   return withConversationVideoGeneration(
     withConversationPromptMultiSelect(

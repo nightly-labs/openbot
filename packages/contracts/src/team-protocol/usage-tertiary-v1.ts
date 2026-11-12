@@ -1,11 +1,13 @@
-import { isDynamicRecord, isNumber } from "../runtime-values";
+import { isAccountUsageWindow } from "../ipc-agent-status";
+import { isDynamicRecord } from "../runtime-values";
+import { TEAM_API_ROUTES } from "../team-api-routes";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
 
 /**
  * Frozen optional usage-tertiary-v1 contract: the third window of a usage limit. It adds `tertiary`
  * beside the frozen `id`, `primary` and `secondary` of each limit in:
  *
- * - the response of `GET /v1/agents/:agentId/usage`;
+ * - the response of `GET /v1/agents/usage` and `GET /v1/agents/:agentId/usage`;
  * - the `usage` of a `usage-changed` event.
  *
  * `tertiary` has the keys of `primary`: `usedPercent`, `windowDurationMins` (a whole number or null)
@@ -20,17 +22,17 @@ import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "
  */
 export const TEAM_USAGE_TERTIARY_CAPABILITY = "usage-tertiary-v1";
 
+/** The two usage routes whose response is a usage reading. */
+export function isUsageRoute(method: string, path: string): boolean {
+  if (method !== "GET") return false;
+  const pathname = new URL(path, "http://openbot.invalid").pathname;
+  return pathname === TEAM_API_ROUTES.agents.usage || /^\/v1\/agents\/[^/]+\/usage$/u.test(pathname);
+}
+
 /** The window with only the v1 keys, or null for a value that the v1 shape cannot describe. */
 function v1Window(value: unknown): TeamProtocolV8BaseJsonObject | null {
-  if (!isDynamicRecord(value)) return null;
+  if (!isAccountUsageWindow(value)) return null;
   const { usedPercent, windowDurationMins, resetsAt } = value;
-  if (!isNumber(usedPercent) || !Number.isFinite(usedPercent)) return null;
-  if (
-    windowDurationMins !== null &&
-    !(isNumber(windowDurationMins) && Number.isInteger(windowDurationMins) && windowDurationMins >= 0)
-  )
-    return null;
-  if (resetsAt !== null && !(isNumber(resetsAt) && Number.isFinite(resetsAt))) return null;
   return { usedPercent, windowDurationMins, resetsAt };
 }
 

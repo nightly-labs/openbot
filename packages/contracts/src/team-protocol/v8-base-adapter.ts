@@ -102,15 +102,15 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
-  if (encoded && options.usageTertiary === true && event.type === "usage-changed")
-    return JSON.stringify(withUsageEventTertiary(JSON.parse(encoded), wireValue, true));
+  const usageTertiary = options.usageTertiary === true && event.type === "usage-changed";
   if (
     !encoded ||
     (!options.preserveBrowserSecrets &&
       !options.browserSignIn &&
       !eventConversationKey(event.type) &&
       !promptMultiSelect &&
-      !contextUsage)
+      !contextUsage &&
+      !usageTertiary)
   )
     return encoded;
   // The block, the subagents and the video request go as written: the key swap would rename a
@@ -123,7 +123,10 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     options.videoGeneration ? currentValue : null,
   );
   const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
-  const output = contextUsage ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true) : withMultiSelect;
+  const withContext = contextUsage
+    ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true)
+    : withMultiSelect;
+  const output = usageTertiary ? withUsageEventTertiary(withContext, wireValue, true) : withContext;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   return JSON.stringify(options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets);
 }
