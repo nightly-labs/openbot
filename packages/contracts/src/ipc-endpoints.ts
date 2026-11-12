@@ -751,11 +751,7 @@ export const IPC_ENDPOINTS = {
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
-    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
-      "app:set-busy-message-mode",
-    ),
     getAgentDefaults: request<undefined, AgentDefaults>()("app:get-agent-defaults"),
-    setAgentDefaults: request<AgentDefaults, AgentDefaults>()("app:set-agent-defaults"),
     getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
     // Server settings set the limit of this computer (`hostAdmin.setAgentMemoryLimit`), here or from a
     // joined admin, so main tells the window.
@@ -2134,7 +2130,7 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
-    // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
+    // Server Settings › Agents: the agent defaults of this computer. `agent-defaults-v1` on a joined server.
     getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
     updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
       "agent:admin:update-agent-defaults",

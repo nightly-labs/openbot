@@ -1381,7 +1381,7 @@ export async function createApplicationServices({
       : null;
   // Every provider process on a server gets the marker of leftover agent processes and the CPU limit
   // module for Node. The module must exist: Node does not start when a `--require` file is missing.
-  // On the desktop it gets the marker only, so Settings › Agents can list what agents left running.
+  // On the desktop it gets the marker only, so Server Settings › Storage can list what agents left running.
   const cpuLimitModule = app.isPackaged
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
@@ -3315,7 +3315,7 @@ export async function createApplicationServices({
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
     // Present, so the host advertises `background-processes-v1`. The routes are admin-only. A Windows
-    // host answers a null list, as Settings > Agents does there.
+    // host answers a null list, as this computer does there.
     backgroundProcesses: {
       list: () => listBackgroundProcesses(process.platform, service.listAgents()),
       stop: (id) => stopBackgroundProcess(process.platform, id),

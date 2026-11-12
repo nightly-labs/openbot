@@ -1365,16 +1365,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       remoteNetworkRoute = { ...remoteNetworkRoute, route };
       return clone(remoteNetworkRoute);
     },
-    setBusyMessageModePreference: async ({ mode }) => {
-      busyMessageMode = { mode };
-      return clone(busyMessageMode);
-    },
     getAgentDefaults: async () => clone(agentDefaults),
-    setAgentDefaults: async (next) => {
-      agentDefaults = { ...next };
-      emitAgentEvent({ type: "agents-changed", agents });
-      return clone(agentDefaults);
-    },
     getAgentMemoryLimitPreference: async () => clone(agentMemoryLimit),
     onAgentMemoryLimitPreference: (listener) => {
       agentMemoryLimitListeners.add(listener);
@@ -2438,6 +2429,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentDefaultsOverview: async ({ busyMessageMode: mode, ...changes }, serverId) => {
         if (mode) busyMessageMode = { mode };
         agentDefaults = { ...agentDefaults, ...changes };
+        // Main sends this after each change, and the settings of the window read the defaults again.
+        emitAgentEvent({ type: "agents-changed", agents });
         return api.agent.getAgentDefaultsOverview(serverId);
       },
       setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {

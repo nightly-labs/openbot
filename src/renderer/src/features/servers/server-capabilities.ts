@@ -317,6 +317,14 @@ export function activeServerHasProviderSettings(server: ServerSummary): boolean 
 }
 
 /**
+ * Server Settings > Agents shows: this computer, or an online joined server that this account
+ * administers and whose host serves `agent-defaults-v1`.
+ */
+export function serverHasAgentDefaults(server: ServerSummary): boolean {
+  return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
+}
+
+/**
  * Which side of a connection runs the older OpenBot release, so a version notice can say what to
  * update. Only the release numbers count. `null` when they are equal or one does not parse.
  */

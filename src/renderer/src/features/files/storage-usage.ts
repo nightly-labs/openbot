@@ -7,6 +7,7 @@ import {
   type StorageDisk,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -21,6 +22,17 @@ import { type FilesPort, filesPort } from "./files-port";
 /** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
 export function serverHasStorage(server: ServerSummary | undefined): server is ServerSummary {
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
+}
+
+/**
+ * Server Settings > Storage lists the programs that agents left running: this computer, or a joined
+ * server that serves `background-processes-v1`. Only an owner or admin sees the list.
+ */
+export function serverHasBackgroundProcesses(server: ServerSummary | undefined): server is ServerSummary {
+  return (
+    serverHasStorage(server) &&
+    (server.kind === "local" || serverSupportsCapability(server, BACKGROUND_PROCESSES_CAPABILITY))
+  );
 }
 
 /** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */

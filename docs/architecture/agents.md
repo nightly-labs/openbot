@@ -11,8 +11,8 @@ commands. The listener runs only while at least one agent has `allowAutomation`,
 `Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
 agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
 a script that loops cannot spend the user's quota. The value is an account default
-(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
-Local scripts.
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Server Settings ›
+Agents › Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
@@ -790,7 +790,7 @@ shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
-Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
 exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
 "queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
