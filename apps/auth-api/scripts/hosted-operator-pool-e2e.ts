@@ -5,8 +5,8 @@
 // when Stripe confirms that the subscription is cancelled, and the operator reinstalls the machine for the
 // next customer. A renewal in the 30 days keeps the server. An open subscription that Stripe still
 // retries (`unpaid`) keeps it too. A server on boat is never deleted by this rule. A plan that ended
-// under the Worker from before migration 0053 gets the date of the first check. The hourly snapshot
-// counts the machines of each location and product by state, and when they are free; the OpenPanel
+// under the Worker from before migration 0053 gets the date of the first check. The snapshot of each
+// minute counts the machines of each location and product by state, and when they are free; the OpenPanel
 // event keeps only safe values.
 //
 // Run: bun run test:hosted-operator-pool
@@ -20,6 +20,7 @@ import { ACCOUNT_ANALYTICS_SCHEMA_VERSION, createAccountAnalytics } from "../src
 import { BillingService } from "../src/server/billing-service";
 import { type HostedPoolGroup, readHostedPool } from "../src/server/hosted-pool-snapshot";
 import { HostedServerService, OPERATOR_HOST_DATA_KEPT_MS } from "../src/server/hosted-server-service";
+import { SIGNAL_ENTRY_CRON } from "../src/server/signal-entry-failover";
 import { createWorkerHandler } from "../src/server/worker-handler";
 import { sqliteD1 } from "./sqlite-d1";
 
@@ -28,6 +29,8 @@ const OUT = join(ROOT, ".openbot-build", "hosted-operator-pool-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const OWNER = { id: "owner", email: "owner@example.test" };
 const MINUTE = 60_000;
+/** The other cron of the production Worker (`wrangler.jsonc`). */
+const FIVE_MINUTE_CRON = "*/5 * * * *";
 const DAY = 24 * 60 * MINUTE;
 const FAR = 400 * DAY;
 
@@ -459,12 +462,12 @@ async function run() {
     bodies,
   );
 
-  // The scheduled handler of the Worker sends the snapshot at minute 0 of each hour, and only then.
-  const scheduledAt = t0 + OPERATOR_HOST_DATA_KEPT_MS;
-  const snapshots = await scheduledSnapshots(database, scheduledAt);
+  // The each-minute cron of the Worker sends the snapshot at each minute; the five-minute cron sends none.
+  const scheduledAt = t0 + OPERATOR_HOST_DATA_KEPT_MS + 7 * MINUTE;
+  const snapshots = await scheduledSnapshots(database, scheduledAt, SIGNAL_ENTRY_CRON);
   const expected = await pool(scheduledAt);
   check(
-    "the Worker cron sends one snapshot for each group at minute 0",
+    "the each-minute cron sends one snapshot for each group at a minute that is not on the hour",
     snapshots.length === expected.groups.length &&
       expected.groups.every((group) =>
         snapshots.some((body) =>
@@ -473,8 +476,8 @@ async function run() {
       ),
     { snapshots, expected: expected.groups },
   );
-  const notOnTheHour = await scheduledSnapshots(database, scheduledAt + MINUTE);
-  check("the Worker cron sends no snapshot at another minute", notOnTheHour.length === 0, notOnTheHour);
+  const fiveMinuteRun = await scheduledSnapshots(database, scheduledAt + 3 * MINUTE, FIVE_MINUTE_CRON);
+  check("the five-minute cron sends no snapshot", fiveMinuteRun.length === 0, fiveMinuteRun);
 
   // On reinstalled machines: a plan whose renewal page is still open, and a first payment that never came.
   const late = t0 + 40 * DAY;
@@ -501,7 +504,7 @@ async function run() {
 }
 
 /** The `hosted_pool_snapshot` request bodies that one run of the Worker cron sends to OpenPanel. */
-async function scheduledSnapshots(database: DatabaseSync, at: number): Promise<string[]> {
+async function scheduledSnapshots(database: DatabaseSync, at: number, cron: string): Promise<string[]> {
   const snapshots: string[] = [];
   const originalFetch = globalThis.fetch;
   const routedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -514,7 +517,7 @@ async function scheduledSnapshots(database: DatabaseSync, at: number): Promise<s
   globalThis.fetch = Object.assign(routedFetch, { preconnect: originalFetch.preconnect });
   try {
     await createWorkerHandler(() => new Response(null, { status: 404 })).scheduled(
-      { scheduledTime: at },
+      { scheduledTime: at, cron },
       { DB: sqliteD1(database), OPENPANEL_CLIENT_ID: "client", OPENPANEL_CLIENT_SECRET: "secret" },
     );
   } finally {
