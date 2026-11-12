@@ -208,7 +208,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         send({
           id: 2,
           method: "authenticate",
-          params: { methodId: options.methodId, ...(options.onSignInUrl ? { action: "start" } : {}) },
+          // Vibe 3.1.0 reads the arguments of its delegated sign-in from `_meta`, not from the params.
+          params: { methodId: options.methodId, ...(options.onSignInUrl ? { _meta: { action: "start" } } : {}) },
         });
       child.once("error", fail);
       const exited = () => signInFailed(sourceText("error.provider.acpSignInStopped"));
@@ -272,9 +273,15 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           // The page names the sign-in attempt. It is registered as a secret and never logged.
           registerSecretValue(page.toString());
           options.onSignInUrl(page.toString());
-          const params = { methodId: options.methodId, action: "complete", attemptId: attempt.attemptId };
+          const params = { methodId: options.methodId, _meta: { action: "complete", attemptId: attempt.attemptId } };
           send({ id: 4, method: "authenticate", params });
-        } else if (message.id === 2 || message.id === 4) {
+        } else if (message.id === 4) {
+          // Only a finished sign-in ends it. Another answer, such as a new attempt, is not one.
+          const result = isDynamicRecord(message.result) ? message.result : undefined;
+          const meta = isDynamicRecord(result?._meta) ? result._meta[options.methodId] : undefined;
+          if (isDynamicRecord(meta) && meta.status === "completed") settle(null);
+          else signInFailed(sourceText("error.provider.acpSignInFailed"));
+        } else if (message.id === 2) {
           settle(null);
         }
       });
