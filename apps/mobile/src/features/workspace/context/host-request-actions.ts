@@ -130,6 +130,7 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -185,6 +186,7 @@ import {
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostMcpAccess,
   getHostPersonality,
   getHostReleaseStatus,
   getHostTimezone,
@@ -241,6 +243,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowserProfileProxy,
+  setHostMcpAccess,
   setHostPersonality,
   setHostTimezone,
   setHostUpdateSettings,
@@ -508,6 +511,8 @@ type HostRequestActions = Pick<
   | "testMcpServer"
   | "listMcpSignIns"
   | "signOutMcpServer"
+  | "loadMcpAccess"
+  | "setMcpAccess"
   | "setAgentSessionSetting"
   | "resetAgentSessionSetting"
   | "listSharedTables"
@@ -715,6 +720,9 @@ export function createHostRequestActions({
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** Who gets each MCP server is an optional admin route set. */
+  const mcpAccessAdmin = (serverId: string) =>
+    capabilityApi(serverId, MCP_ACCESS_CAPABILITY, "mobile.server.mcp.accessUnsupported");
   /** The audit log of the access changes is an optional admin route set. */
   const auditAdmin = (serverId: string) =>
     capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
@@ -966,6 +974,8 @@ export function createHostRequestActions({
           mcpServerId,
         }),
       ),
+    loadMcpAccess: async (serverId) => runTeamRequest(getHostMcpAccess(mcpAccessAdmin(serverId))),
+    setMcpAccess: async (input, serverId) => runTeamRequest(setHostMcpAccess(mcpAccessAdmin(serverId), input)),
     loadAgentSessionSettings: async (agentId, serverId) =>
       has(serverId, AGENT_SESSION_SETTINGS_CAPABILITY)
         ? runTeamRequest(readAgentSessionSettings(sessionSettingsAdmin(serverId), agentId))

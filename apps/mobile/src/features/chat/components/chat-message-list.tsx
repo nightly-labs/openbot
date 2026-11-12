@@ -108,6 +108,7 @@ import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
+import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
 import { useReplyHaptics } from "./use-reply-haptics";
 
@@ -729,10 +730,11 @@ const MessageRow = memo(function MessageRow({
       ? shared.bubbleTone
       : undefined;
   const textColor = tone ? userForeground : foreground;
-  // A generation owns its first attachment, the image; any further files follow in order.
+  // A generation owns its first attachment, the image or the video; any further files follow in order.
   const files =
     message.kind === "message"
-      ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
+      ? ((message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
+        [])
       : [];
   // Two or more images in one message show together, as on desktop. A message that is still
   // sending shows the same stack at once, with the progress on each card, so it does not change
@@ -867,6 +869,14 @@ const MessageRow = memo(function MessageRow({
         {message.imageGeneration ? (
           <ChatImageGeneration
             generation={message.imageGeneration}
+            status={imageGenerationStatus(message.streaming, message.status)}
+            attachment={message.attachments?.[0]}
+            serverId={serverId}
+          />
+        ) : null}
+        {message.videoGeneration ? (
+          <ChatVideoGeneration
+            generation={message.videoGeneration}
             status={imageGenerationStatus(message.streaming, message.status)}
             attachment={message.attachments?.[0]}
             serverId={serverId}

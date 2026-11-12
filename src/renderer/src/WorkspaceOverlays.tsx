@@ -317,6 +317,7 @@ function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
   const { openAppSettings } = useSettings();
+  const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
     (() => {
@@ -336,6 +337,9 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      thisComputer
+      pricingPage={windowPage.pricing}
+      onOpenUrl={(url) => void appPort().openUrl(url)}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {

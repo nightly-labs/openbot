@@ -1142,6 +1142,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Aktualisiere OpenBot auf diesem Server, um seine MCP-Server hier zu verwalten.",
   "mobile.server.mcp.unavailable":
     "Verbinde dich als Inhaber oder Admin mit diesem Server, um seine MCP-Server zu verwalten.",
+  "mobile.server.mcp.accessUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um festzulegen, wer seine MCP-Server erhält.",
   "mobile.server.mcp.description":
     "MCP-Server geben den Agenten dieses Servers mehr Werkzeuge. Claude- und Codex-Agenten erhalten nur die Server in dieser Liste.",
   "mobile.server.mcp.loading": "MCP-Server werden geladen…",
@@ -1214,6 +1216,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Die Agenten dieses Servers erhalten seine Werkzeuge nicht mehr. Die Einstellungen werden nicht behalten.",
   "mobile.server.mcp.remove": "MCP-Server entfernen",
+  "mobile.server.mcp.access.title": "Zugriff",
+  "mobile.server.mcp.access.agents": "Agenten",
+  "mobile.server.mcp.access.agentsOf": "Agenten, die {name} nutzen können",
+  "mobile.server.mcp.access.allAgents": "Alle Agenten",
+  "mobile.server.mcp.access.allAgentsHint": "Alle Agenten umfasst auch jeden später hinzugefügten Agenten.",
+  "mobile.server.mcp.access.noAgents": "Keine Agenten",
+  "mobile.server.mcp.access.someAgents": "{count} von {total}",
+  "mobile.server.mcp.access.use": "Nutzen",
+  "mobile.server.mcp.access.fromEveryone": "Wie Alle",
+  "mobile.server.mcp.access.level": "Zugriff von {role} auf {name}",
+  "mobile.server.mcp.access.hint":
+    "Ein Mitglied erhält die höchste Stufe von Alle und seinen Rollen. Inhaber, Admins und die Person, die den Server hinzugefügt hat, können ihn immer verwalten.",
+  "mobile.server.mcp.access.loadFailed": "Zugriff auf diesen MCP-Server konnte nicht geladen werden.",
+  "mobile.server.mcp.access.unavailable":
+    "Nur ein Inhaber oder Admin eines Online-Servers kann festlegen, wer diesen MCP-Server erhält.",
   "mobile.server.usage.agents": "Agenten",
   "mobile.server.usage.agentLine": "{tokens} Token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "In diesem Zeitraum wurde keine Agentennutzung erfasst.",

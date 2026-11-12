@@ -473,6 +473,21 @@ through `clampConversationSubagents`, so only known keys go out, and the lists o
 wire budget, newest first. The task conversations of `agent-tasks-v1` do not carry it. The WebRTC
 host peer encodes the local response and the events again with the same option.
 
+### Video generation
+
+`video-generation-v1` (protocol 9 only) carries the request of a video that an agent made with a
+tool (see `VideoGenerationInfo` in `packages/contracts/src/ipc-conversation-messages.ts` and
+`team-protocol/video-generation-v1.ts`). It adds `videoGeneration` beside the frozen keys of a
+message in `GET /v1/agents/:id/conversation` and `conversation-page` (messages and references), and
+in the `conversation` and `conversation-page` events, as `subagents-v1` does. The host adds it only
+for a connection that advertises the capability. A released client reads the `video_generation`
+message as its fallback: the mp4 in `attachments`, with no prompt or aspect ratio. A host without
+the capability never sends `videoGeneration`, so a client keeps it whenever it is present, and a
+value that `isVideoGenerationInfo` refuses fails closed. Only known keys go out, and the values of
+one page share a wire budget, newest first. Channel messages and the task conversations of
+`agent-tasks-v1` do not carry it. The WebRTC host peer encodes the local response and the events
+again with the same option.
+
 ### Prompt multi-select
 
 `prompt-multi-select-v1` carries `multiSelect: true` on an agent question that takes more than one

@@ -26,6 +26,7 @@ import {
   type TeamProtocolV8BaseJsonObject,
   type TeamProtocolV8BaseJsonValue,
 } from "./v8-base";
+import { withConversationVideoGeneration } from "./video-generation-v1";
 
 export type TeamProtocolV8BaseCurrentEventDecodeResult =
   | { kind: "known"; event: AgentEvent | TeamRealtimeEvent }
@@ -51,9 +52,10 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
         ),
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // multi-select flag only under prompt-multi-select-v1, a takeover reason only under
-        // browser-sign-in, and context states only under context-usage-v1, so a present one is always
-        // kept.
+        // video request only under video-generation-v1, a multi-select flag only under
+        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, and context states only
+        // under context-usage-v1, so a present one is always kept.
+        value,
         value,
         value,
       ),
@@ -76,6 +78,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
+    videoGeneration?: boolean;
     contextUsage?: boolean;
   } = {},
 ): string | null {
@@ -102,13 +105,14 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
       !contextUsage)
   )
     return encoded;
-  // The block and the subagents go as written: the key swap would rename a response value under a
-  // field id such as `agentId`.
+  // The block, the subagents and the video request go as written: the key swap would rename a
+  // response value under a field id such as `agentId`.
   const withPlans = withEventConversationPlans(
     JSON.parse(encoded),
     wireValue,
     options.uiBlocks ? currentValue : null,
     options.subagents ? currentValue : null,
+    options.videoGeneration ? currentValue : null,
   );
   const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
   const output = contextUsage ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true) : withMultiSelect;
@@ -118,15 +122,17 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
 
 /**
  * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
- * of `uiBlockSource` when it is not null, and the subagents of `subagentSource` when it is not null.
- * See `withConversationPlans`, `withConversationSenders`, `withConversationUiBlocks` and
- * `withConversationSubagents`.
+ * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
+ * the video requests of `videoSource` when it is not null. See `withConversationPlans`,
+ * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
+ * `withConversationVideoGeneration`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV8BaseJsonValue,
   source: unknown,
   uiBlockSource: unknown,
   subagentSource: unknown,
+  videoSource: unknown,
 ): TeamProtocolV8BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
@@ -137,9 +143,14 @@ function withEventConversationPlans(
   const withBlocks = isDynamicRecord(uiBlockSource)
     ? withConversationUiBlocks(withPlans, uiBlockSource[key])
     : withPlans;
+  const withSubagents = isDynamicRecord(subagentSource)
+    ? withConversationSubagents(withBlocks, subagentSource[key])
+    : withBlocks;
   return {
     ...projected,
-    [key]: isDynamicRecord(subagentSource) ? withConversationSubagents(withBlocks, subagentSource[key]) : withBlocks,
+    [key]: isDynamicRecord(videoSource)
+      ? withConversationVideoGeneration(withSubagents, videoSource[key])
+      : withSubagents,
   };
 }
 
