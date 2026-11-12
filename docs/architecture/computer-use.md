@@ -246,3 +246,14 @@ When Computer Use is off for the agent or the driver is unavailable, the thread 
 entry disabled. A registration failure stops the thread with steps to repair the configuration or
 turn off Computer Use. The application-access questions from the driver still use their existing
 approval flow.
+
+### Codex's own Computer Use
+
+Codex loads its bundled Computer Use plugins by default (`computer-use@openai-bundled`, which starts
+`node_repl` and `cua_node`, and `unified-computer-use@openai-bundled`). A session without Computer
+Use sets `plugins.<id>.enabled = false` for both in the thread configuration: an agent with the
+setting off, or a task or channel thread beside the agent's own chat. The thread value wins over the
+user's own Codex file. Codex 0.160 does not read `features.computer_use`, so OpenBot does not use it.
+A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
+session without Computer Use. The next turn replaces a session from before, and a session whose
+setting changed, with the usual handoff.

@@ -1197,7 +1197,8 @@ export class ThreadLifecycle {
           ...(catalogCommands.length > 0 ? [["catalog-commands", ...catalogCommands]] : []),
           // A loaded session keeps the Codex plugins of its start: a session from before Codex's own
           // Computer Use was turned off goes on controlling the screen. Only a session without
-          // Computer Use adds a value, so it is replaced once, and when the setting changes.
+          // Computer Use adds a value: an agent with the setting off, or a task or channel thread
+          // beside the agent's own chat. Such a session is replaced once, and when the setting changes.
           ...(agentComputerUseEnabled(agent) ? [] : ["codex-computer-use-off"]),
         ]),
       )
