@@ -8,6 +8,7 @@ import type {
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
+  type ImportedRoutineRun,
   type OwnedRoutine,
   type OwnedRoutineRun,
   type ReceivedWebhookEvent,
@@ -51,6 +52,11 @@ export class ChannelRoutineStore extends RoutineStore {
   update(input: UpdateChannelRoutineInput, now = new Date()): ChannelRoutine {
     const { channelId, ...fields } = input;
     return toChannelRoutine(this.updateRoutine(channelId, fields, now));
+  }
+
+  /** Writes the finished runs that a server transfer brought for one of the channel's routines. */
+  importRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.importRunRows(routineId, channelId, runs);
   }
 
   listRuns(channelId: string, routineId: string, limit = 50, withSkipped = false): ChannelRoutineRun[] {

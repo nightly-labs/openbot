@@ -2488,6 +2488,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       installAgentSkill: (input) => mockSkills.skills.install(input),
       uninstallAgentSkill: (input) => mockSkills.skills.uninstall(input),
       setAgentSkillEnabled: (input) => mockSkills.skills.setEnabled(input),
+      readGithubSkills: (link) => mockSkills.readGithub(link),
       addMarketplaceAgent: async (input) => {
         const { agent } = await api.marketplaceAgents.install(input);
         return { id: agent.id, name: agent.name };
@@ -3821,6 +3822,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone({ agents: imported, skipped: [], signIn: ["claude"], warnings: [] });
       },
       discard: async () => undefined,
+      // The servers of the preview share one agent list, as `listAgents` does.
+      copy: async ({ agentIds }) => {
+        const copied = agents
+          .filter((agent) => agentIds.includes(agent.id))
+          .map((agent) => createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }));
+        agents = [...agents, ...copied];
+        emitAgentEvent({ type: "agents-changed", agents });
+        return clone({ agents: copied, skipped: [], signIn: ["claude"], warnings: [] });
+      },
     },
     remoteDesktop: mockTeam.remoteDesktop,
   };

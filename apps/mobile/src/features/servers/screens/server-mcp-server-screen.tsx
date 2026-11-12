@@ -10,6 +10,7 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { McpAccessSection } from "@/features/servers/components/mcp-access-section";
 import { ListField, PairField } from "@/features/servers/components/repeatable-fields";
 import {
   type McpServerDraft,
@@ -359,6 +360,7 @@ function McpServerForm({
           />
         </SettingsRow>
       </SettingsSection>
+      {saved ? <McpAccessSection serverId={serverId} mcpServerId={saved.id} name={saved.name} /> : null}
       <SettingsSection footer={test ? testMessage(test) : t("mobile.server.mcp.testDescription")}>
         <SettingsRow
           disclosure={false}

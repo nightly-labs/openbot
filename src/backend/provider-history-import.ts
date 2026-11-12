@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { isImageGenerationItem } from "./agent/image-generation";
+import { generatedMediaKind } from "./agent/image-generation";
 import {
   isNoUpdateAnswer,
   isNoUpdateToolCall,
@@ -318,7 +318,7 @@ function routineTurnAnswers(
           if (isNoUpdateAnswer(item.text)) markers += 1;
           else reported = true;
         }
-        if (isImageGenerationItem(item)) imageGenerated = true;
+        if (generatedMediaKind(item)) imageGenerated = true;
         if (isNoUpdateToolCall(item)) noUpdateCalled = true;
       }
       const last = page.at(-1);

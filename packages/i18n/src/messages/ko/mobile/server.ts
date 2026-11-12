@@ -314,6 +314,7 @@ export const messages = {
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
   "mobile.server.route.personality": "에이전트 성격",
+  "mobile.server.route.agents": "에이전트",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -429,6 +430,24 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.memoryReview": "메모리 검토",
+  "mobile.server.settings.memoryReviewDescription":
+    "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",
+  "mobile.server.settings.memoryReviewOff": "끄기",
+  "mobile.server.settings.memoryReviewTurns": { other: "{count}턴마다" },
+  "mobile.server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
+  "mobile.server.settings.skillLearning": "스킬 학습",
+  "mobile.server.settings.skillLearningDescription": "이 서버의 에이전트가 배운 내용을 스킬로 저장할지 여부입니다.",
+  "mobile.server.settings.skillLearningAutomatic": "자동",
+  "mobile.server.settings.skillLearningAsk": "먼저 묻기",
+  "mobile.server.settings.skillLearningOff": "끄기",
+  "mobile.server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
+  "mobile.server.settings.browsingMemory": "내 브라우징에서 학습",
+  "mobile.server.settings.browsingMemoryDescription":
+    "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
+  "mobile.server.settings.learningSaveFailed": "이 설정을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.learningUnsupported": "여기에서 이 설정을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.responseStyleDescription":
     "자연형: 에이전트가 작업 중에 짧은 업데이트를 보내고 채팅에 표시돼요. 클래식: 에이전트가 끝나면 한 번만 답해요.",
   "mobile.server.settings.responseStyleNatural": "자연형",
@@ -437,7 +456,7 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "응답 스타일을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.personalityUnsupported":
     "여기에서 응답 스타일을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
-  "mobile.server.settings.personalityUnavailable": "에이전트 성격을 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
+  "mobile.server.settings.agentsUnavailable": "에이전트 설정을 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.route.browserProfiles": "브라우저 프로필",
   "mobile.server.browserProfiles.unavailable": "온라인 서버의 소유자나 관리자만 브라우저 프로필을 관리할 수 있습니다.",
   "mobile.server.browserProfiles.unsupported":
@@ -1063,6 +1082,7 @@ export const messages = {
   "mobile.server.settings.mcpCount": { other: "서버 {count}개" },
   "mobile.server.mcp.unsupported": "여기에서 MCP 서버를 관리하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.unavailable": "MCP 서버를 관리하려면 소유자나 관리자로 이 서버에 연결하세요.",
+  "mobile.server.mcp.accessUnsupported": "MCP 서버를 받을 대상을 선택하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.description":
     "MCP 서버는 이 서버의 에이전트에게 더 많은 도구를 제공해요. Claude와 Codex 에이전트는 이 목록에 있는 서버만 사용해요.",
   "mobile.server.mcp.loading": "MCP 서버 불러오는 중…",
@@ -1133,6 +1153,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "이 서버의 에이전트가 더 이상 이 서버의 도구를 사용할 수 없어요. 설정은 저장되지 않아요.",
   "mobile.server.mcp.remove": "MCP 서버 삭제",
+  "mobile.server.mcp.access.title": "액세스",
+  "mobile.server.mcp.access.agents": "에이전트",
+  "mobile.server.mcp.access.agentsOf": "{name}을(를) 사용할 수 있는 에이전트",
+  "mobile.server.mcp.access.allAgents": "모든 에이전트",
+  "mobile.server.mcp.access.allAgentsHint": "모든 에이전트에는 나중에 추가되는 에이전트도 포함됩니다.",
+  "mobile.server.mcp.access.noAgents": "에이전트 없음",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "사용 가능",
+  "mobile.server.mcp.access.fromEveryone": "모든 사람과 같음",
+  "mobile.server.mcp.access.level": "{name}에 대한 {role}의 액세스",
+  "mobile.server.mcp.access.hint":
+    "멤버는 모든 사람과 자신의 역할 중 가장 높은 수준을 받습니다. 소유자, 관리자, 서버를 추가한 사람은 항상 관리할 수 있습니다.",
+  "mobile.server.mcp.access.loadFailed": "이 MCP 서버의 액세스를 불러오지 못했습니다.",
+  "mobile.server.mcp.access.unavailable":
+    "온라인 서버의 소유자나 관리자만 이 MCP 서버를 받을 대상을 선택할 수 있습니다.",
   "mobile.server.usage.agents": "에이전트",
   "mobile.server.usage.agentLine": "토큰 {tokens}개 · {cost} · {percent}",
   "mobile.server.usage.noAgents": "이 기간에 기록된 에이전트 사용량이 없어요.",
@@ -1288,6 +1323,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { other: "에이전트 {count}개" },
   "mobile.server.roles.memberCount": { other: "멤버 {count}명" },
   "mobile.server.roles.agentLevel": "{agent}에 대한 {role}의 접근 권한",
+  "mobile.server.roles.changeInEveryone": "모든 사람에서 변경",
+  "mobile.server.roles.setAll": "모두 설정",
+  "mobile.server.roles.setAllLabel": "모두 설정: 모든 에이전트에 대한 {role}의 액세스",
+  "mobile.server.roles.mixed": "혼합",
   "mobile.server.roles.delete": "역할 삭제",
   "mobile.server.roles.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.roles.deleteBody": "이 역할을 가진 멤버는 이 역할로 사용하던 에이전트에 접근할 수 없게 돼요.",

@@ -720,12 +720,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Keine Servereinstellungen",
   "settings.transfer.includeAgent": "{name} einschließen",
   "settings.transfer.export.title": "Diesen Server exportieren",
-  "settings.transfer.export.files": "Dateien der Arbeitsbereiche einschließen",
-  "settings.transfer.export.filesDescription":
-    "Dateien, die deine Agenten erstellt haben, und der gemeinsame Ordner. Deaktiviere dies für eine kleine Datei.",
-  "settings.transfer.export.settings": "Servereinstellungen einschließen",
+  "settings.transfer.preset.label": "Was in die Datei kommt",
+  "settings.transfer.preset.templates": "Vorlagen",
+  "settings.transfer.preset.everything": "Alles",
+  "settings.transfer.meter.files": "von {total} in Dateien der Arbeitsbereiche",
+  "settings.transfer.part.agents": "Agenten und ihre Einrichtung",
+  "settings.transfer.part.agentsDescription": "{contents}. Immer in der Datei.",
+  "settings.transfer.part.settings": "Servereinstellungen",
+  "settings.transfer.part.chats": "Chatverlauf",
+  "settings.transfer.part.chatsDescription":
+    "Die Chats und Nebenthreads mit ihren Dateien sowie der Ausführungsverlauf der Routinen. Die Agenten führen diese Chats mit ihrem Kontext fort.",
+  "settings.transfer.part.channels": "Kanalnachrichten",
+  "settings.transfer.part.channelsDescription":
+    "Die Nachrichten der Kanäle, in denen die exportierten Agenten sind, mit ihren Dateien und dem Ausführungsverlauf der Kanalroutinen.",
+  "settings.transfer.part.files": "Dateien der Arbeitsbereiche",
+  "settings.transfer.part.filesDescription": "Dateien, die deine Agenten erstellt haben, und der gemeinsame Ordner.",
+  "settings.transfer.part.preferences": "Serverpräferenzen",
+  "settings.transfer.part.preferencesDescription":
+    "Name, Logo, Zeitzone, Persönlichkeit, Standardwerte für Agenten, Modellauswahl, Einstellungen für Erinnerungen und Fähigkeiten sowie die Benachrichtigungsstufen und angehefteten Elemente jeder Person.",
   "settings.transfer.export.settingsDescription":
-    "MCP-Server, eigene Modellanbieter, Abschnitte der Seitenleiste und Routinenabläufe.",
+    "MCP-Server, eigene Modellanbieter, Abschnitte der Seitenleiste, Routinenabläufe und gemeinsame Fähigkeiten.",
   "settings.transfer.export.chooseAgents": "Agenten wählen ({selected} von {total})",
   "settings.transfer.export.hideAgents": "Agenten ausblenden",
   "settings.transfer.export.agentsLabel": "Zu exportierende Agenten",
@@ -752,8 +766,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agenten in der Datei",
   "settings.transfer.import.nameExists": "Name schon vergeben",
   "settings.transfer.import.settings": "Servereinstellungen importieren",
-  "settings.transfer.import.settingsDescription":
-    "Fügt die MCP-Server, eigenen Modellanbieter und Abschnitte der Seitenleiste hinzu, die dieser Server noch nicht hat.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Fügt die MCP-Server, eigenen Modellanbieter, Abschnitte der Seitenleiste und gemeinsamen Fähigkeiten hinzu, die dieser Server noch nicht hat.",
+  "settings.transfer.import.preferences": "Serverpräferenzen importieren",
+  "settings.transfer.import.preferencesDescription":
+    "Ersetzt Name, Logo und Präferenzen dieses Servers sowie die Benachrichtigungsstufen und angehefteten Elemente jeder Person durch die aus der Datei.",
   "settings.transfer.import.submit": {
     one: "{count} Agenten importieren",
     other: "{count} Agenten importieren",
@@ -772,4 +789,26 @@ export const messages = {
   "settings.transfer.result.signInButton": "Bei {provider} anmelden",
   "settings.transfer.result.notImported": "Nicht importiert",
   "settings.transfer.result.warnings": "Bitte prüfen",
+  "settings.transfer.copy.tileTitle": "Auf einen anderen Server kopieren",
+  "settings.transfer.copy.tileText": "Agenten an einen anderen deiner Server senden.",
+  "settings.transfer.copy.title": "Agenten auf einen anderen Server kopieren",
+  "settings.transfer.copy.from": "Von",
+  "settings.transfer.copy.to": "Nach",
+  "settings.transfer.copy.chooseServer": "Server wählen",
+  "settings.transfer.copy.search": "Agenten suchen",
+  "settings.transfer.copy.agentsOn": "Agenten auf {server}",
+  "settings.transfer.copy.all": { one: "Alle {count} Agenten", other: "Alle {count} Agenten" },
+  "settings.transfer.copy.noAgents": "Dieser Server hat keine Agenten.",
+  "settings.transfer.copy.new": "Neu",
+  "settings.transfer.copy.notCopied":
+    "Ihre Kanäle und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
+  "settings.transfer.copy.submit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
+  "settings.transfer.copy.copying": "Wird kopiert…",
+  "settings.transfer.copy.done": {
+    one: "{count} Agent auf {server} kopiert.",
+    other: "{count} Agenten auf {server} kopiert.",
+  },
+  "settings.transfer.copy.open": "{server} öffnen",
+  "settings.transfer.copy.loadFailed": "Die Agenten konnten nicht gelesen werden",
+  "settings.transfer.copy.failed": "Das Kopieren wurde nicht abgeschlossen",
 } as const satisfies PartialTranslation<typeof source>;

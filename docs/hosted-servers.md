@@ -933,18 +933,42 @@ The X authorization of the virtual display has the hostname in it. After a hostn
 program of a running OpenBot cannot open the display ("Authorization required") until OpenBot
 restarts.
 
-The names of a pool server follow one scheme:
+#### Leaseweb references
+
+The reference tells each operator and each agent which VPS has an owner. All VPS on all four
+Leaseweb accounts use one scheme:
+
+| Reference | Use | Example |
+| --- | --- | --- |
+| None (no reference, or an empty one) | Not used. **Only a VPS with no reference can be taken for a new use.** | |
+| `pool-free` | In the hosted pool, with no server. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use it. | `pool-free` |
+| `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. | `jane@example.com 1a2b3c4d` |
+| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number on all accounts; a number is never used again. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
+| `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
+| `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+
+To take a VPS:
+
+1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`) and select one with no
+   reference in the location you need.
+2. Set its reference at once, before any other work on it. Then read the VPS again: when the
+   reference is not yours, another operator took it, and you select another one.
+3. Never take a VPS that has a reference, also `pool-free`. A pool VPS leaves the pool only with
+   `leaseweb-pool.ts remove`, by a decision of the operator. `remove` keeps the reference
+   `pool-free`, so the operator then sets the new reference, or clears it with
+   `{"reference": ""}` when the VPS is not used.
+
+`leaseweb-pool.ts add` gives `pool-free` to a VPS with no reference, and refuses a VPS with another
+reference. For a pool VPS, the record of the account service, not the reference, decides which VPS
+is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must name that before a
+customer server gets one.
+
+A pool VPS and a custom VPS also use these names:
 
 | Name | Value | Example |
 | --- | --- | --- |
-| Leaseweb reference, free server | `pool-free` | `pool-free` |
-| Leaseweb reference, assigned server | `<owner email> <first 8 characters of the OpenBot server ID>` | `jane@example.com 1a2b3c4d` |
 | Linux hostname | `lsw-<Leaseweb VPS ID>`; it never changes | `lsw-12728110` |
 | OpenBot server name | The customer's choice | |
-
-The reference is a label for the operator. The record of the account service, not the reference,
-decides which server is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must
-name that before a customer server gets one.
 
 The operator keys are a file with one public key for each operator, in the format of
 `authorized_keys`, with no options. The fixed place of the list is `/root/.ssh/authorized_keys` of

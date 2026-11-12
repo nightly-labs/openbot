@@ -332,6 +332,7 @@ export const messages = {
   "mobile.server.route.member": "Mitglied",
   "mobile.server.route.timezone": "Zeitzone",
   "mobile.server.route.personality": "Agent-Persönlichkeit",
+  "mobile.server.route.agents": "Agenten",
   "mobile.server.settings.storage": "Speicher",
   "mobile.server.route.storage": "Speicher",
   "mobile.server.route.storageFiles": "Alle Dateien",
@@ -460,6 +461,27 @@ export const messages = {
     "Das Erinnerungslimit konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um sein Erinnerungslimit hier zu ändern.",
+  "mobile.server.settings.memoryReview": "Erinnerungsprüfung",
+  "mobile.server.settings.memoryReviewDescription":
+    "Wie oft Agenten auf diesem Server im Hintergrund dauerhafte Fakten aus ihren Chats speichern.",
+  "mobile.server.settings.memoryReviewOff": "Aus",
+  "mobile.server.settings.memoryReviewTurns": { one: "Alle {count} Runde", other: "Alle {count} Runden" },
+  "mobile.server.settings.memoryReviewLoadFailed":
+    "Die Einstellung für die Erinnerungsprüfung konnte nicht geladen werden.",
+  "mobile.server.settings.skillLearning": "Fähigkeiten lernen",
+  "mobile.server.settings.skillLearningDescription":
+    "Ob Agenten auf diesem Server das Gelernte als Fähigkeiten speichern.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatisch",
+  "mobile.server.settings.skillLearningAsk": "Zuerst fragen",
+  "mobile.server.settings.skillLearningOff": "Aus",
+  "mobile.server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "mobile.server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
+  "mobile.server.settings.learningSaveFailed": "Die Einstellung konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.learningUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um diese Einstellung hier zu ändern.",
   "mobile.server.settings.responseStyleDescription":
     "Natürlich: Agenten senden während der Arbeit kurze Updates, und der Chat zeigt sie. Klassisch: Agenten antworten einmal, wenn sie fertig sind.",
   "mobile.server.settings.responseStyleNatural": "Natürlich",
@@ -469,8 +491,8 @@ export const messages = {
     "Der Antwortstil konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.personalityUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Antwortstil hier zu ändern.",
-  "mobile.server.settings.personalityUnavailable":
-    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Agent-Persönlichkeit zu ändern.",
+  "mobile.server.settings.agentsUnavailable":
+    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Agent-Einstellungen zu ändern.",
   "mobile.server.route.browserProfiles": "Browser-Profile",
   "mobile.server.browserProfiles.unavailable":
     "Nur Besitzer oder Admins eines Online-Servers können seine Browser-Profile verwalten.",
@@ -1142,6 +1164,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Aktualisiere OpenBot auf diesem Server, um seine MCP-Server hier zu verwalten.",
   "mobile.server.mcp.unavailable":
     "Verbinde dich als Inhaber oder Admin mit diesem Server, um seine MCP-Server zu verwalten.",
+  "mobile.server.mcp.accessUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um festzulegen, wer seine MCP-Server erhält.",
   "mobile.server.mcp.description":
     "MCP-Server geben den Agenten dieses Servers mehr Werkzeuge. Claude- und Codex-Agenten erhalten nur die Server in dieser Liste.",
   "mobile.server.mcp.loading": "MCP-Server werden geladen…",
@@ -1214,6 +1238,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Die Agenten dieses Servers erhalten seine Werkzeuge nicht mehr. Die Einstellungen werden nicht behalten.",
   "mobile.server.mcp.remove": "MCP-Server entfernen",
+  "mobile.server.mcp.access.title": "Zugriff",
+  "mobile.server.mcp.access.agents": "Agenten",
+  "mobile.server.mcp.access.agentsOf": "Agenten, die {name} nutzen können",
+  "mobile.server.mcp.access.allAgents": "Alle Agenten",
+  "mobile.server.mcp.access.allAgentsHint": "Alle Agenten umfasst auch jeden später hinzugefügten Agenten.",
+  "mobile.server.mcp.access.noAgents": "Keine Agenten",
+  "mobile.server.mcp.access.someAgents": "{count} von {total}",
+  "mobile.server.mcp.access.use": "Nutzen",
+  "mobile.server.mcp.access.fromEveryone": "Wie Alle",
+  "mobile.server.mcp.access.level": "Zugriff von {role} auf {name}",
+  "mobile.server.mcp.access.hint":
+    "Ein Mitglied erhält die höchste Stufe von Alle und seinen Rollen. Inhaber, Admins und die Person, die den Server hinzugefügt hat, können ihn immer verwalten.",
+  "mobile.server.mcp.access.loadFailed": "Zugriff auf diesen MCP-Server konnte nicht geladen werden.",
+  "mobile.server.mcp.access.unavailable":
+    "Nur ein Inhaber oder Admin eines Online-Servers kann festlegen, wer diesen MCP-Server erhält.",
   "mobile.server.usage.agents": "Agenten",
   "mobile.server.usage.agentLine": "{tokens} Token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "In diesem Zeitraum wurde keine Agentennutzung erfasst.",
@@ -1376,6 +1415,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} Agent", other: "{count} Agenten" },
   "mobile.server.roles.memberCount": { one: "{count} Mitglied", other: "{count} Mitglieder" },
   "mobile.server.roles.agentLevel": "Zugriff von {role} auf {agent}",
+  "mobile.server.roles.changeInEveryone": "In Alle ändern",
+  "mobile.server.roles.setAll": "Alle setzen",
+  "mobile.server.roles.setAllLabel": "Alle setzen: Zugriff von {role} auf alle Agenten",
+  "mobile.server.roles.mixed": "Gemischt",
   "mobile.server.roles.delete": "Rolle löschen",
   "mobile.server.roles.deleteTitle": "{name} löschen?",
   "mobile.server.roles.deleteBody": "Mitglieder mit dieser Rolle verlieren die Agenten, die sie ihnen gibt.",

@@ -704,12 +704,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sunucu ayarı yok",
   "settings.transfer.includeAgent": "Dahil et: {name}",
   "settings.transfer.export.title": "Bu sunucuyu dışa aktar",
-  "settings.transfer.export.files": "Çalışma alanı dosyalarını dahil et",
-  "settings.transfer.export.filesDescription":
-    "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör. Küçük bir dosya için kapatın.",
-  "settings.transfer.export.settings": "Sunucu ayarlarını dahil et",
+  "settings.transfer.preset.label": "Dosyaya neler girer",
+  "settings.transfer.preset.templates": "Şablonlar",
+  "settings.transfer.preset.everything": "Tümü",
+  "settings.transfer.meter.files": "/ {total} (çalışma alanı dosyaları)",
+  "settings.transfer.part.agents": "Ajanlar ve kurulumları",
+  "settings.transfer.part.agentsDescription": "{contents}. Her zaman dosyada.",
+  "settings.transfer.part.settings": "Sunucu ayarları",
+  "settings.transfer.part.chats": "Sohbet geçmişi",
+  "settings.transfer.part.chatsDescription":
+    "Sohbetler ve yan ileti dizileri ile dosyaları, ayrıca rutinlerin çalıştırma geçmişi. Ajanlar bu sohbetlere bağlamlarıyla devam eder.",
+  "settings.transfer.part.channels": "Kanal mesajları",
+  "settings.transfer.part.channelsDescription":
+    "Dışa aktarılan ajanların bulunduğu kanalların mesajları, dosyaları ve kanal rutinlerinin çalıştırma geçmişiyle birlikte.",
+  "settings.transfer.part.files": "Çalışma alanı dosyaları",
+  "settings.transfer.part.filesDescription": "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör.",
+  "settings.transfer.part.preferences": "Sunucu tercihleri",
+  "settings.transfer.part.preferencesDescription":
+    "Ad, logo, saat dilimi, kişilik, ajan varsayılanları, model seçimleri, bellek ve beceri ayarları ile her kişinin bildirim düzeyleri ve sabitlemeleri.",
   "settings.transfer.export.settingsDescription":
-    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri ve rutin akışları.",
+    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri, rutin akışları ve paylaşılan beceriler.",
   "settings.transfer.export.chooseAgents": "Ajanları seç ({selected}/{total})",
   "settings.transfer.export.hideAgents": "Ajanları gizle",
   "settings.transfer.export.agentsLabel": "Dışa aktarılacak ajanlar",
@@ -736,8 +750,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Dosyadaki ajanlar",
   "settings.transfer.import.nameExists": "Ad zaten kullanılıyor",
   "settings.transfer.import.settings": "Sunucu ayarlarını içe aktar",
-  "settings.transfer.import.settingsDescription":
-    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını ve kenar çubuğu bölümlerini ekler.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını, kenar çubuğu bölümlerini ve paylaşılan becerileri ekler.",
+  "settings.transfer.import.preferences": "Sunucu tercihlerini içe aktar",
+  "settings.transfer.import.preferencesDescription":
+    "Bu sunucunun adını, logosunu ve tercihlerini, ayrıca her kişinin bildirim düzeylerini ve sabitlenmiş öğelerini dosyadakilerle değiştirir.",
   "settings.transfer.import.submit": {
     one: "{count} ajanı içe aktar",
     other: "{count} ajanı içe aktar",
@@ -756,4 +773,26 @@ export const messages = {
   "settings.transfer.result.signInButton": "{provider} sağlayıcısında oturum aç",
   "settings.transfer.result.notImported": "İçe aktarılmadı",
   "settings.transfer.result.warnings": "Bunları kontrol edin",
+  "settings.transfer.copy.tileTitle": "Başka bir sunucuya kopyala",
+  "settings.transfer.copy.tileText": "Ajanları sunucularınızdan birine gönderin.",
+  "settings.transfer.copy.title": "Ajanları başka bir sunucuya kopyala",
+  "settings.transfer.copy.from": "Kaynak",
+  "settings.transfer.copy.to": "Hedef",
+  "settings.transfer.copy.chooseServer": "Bir sunucu seçin",
+  "settings.transfer.copy.search": "Ajan ara",
+  "settings.transfer.copy.agentsOn": "{server} üzerindeki ajanlar",
+  "settings.transfer.copy.all": { one: "Tüm ajanlar ({count})", other: "Tüm ajanlar ({count})" },
+  "settings.transfer.copy.noAgents": "Bu sunucuda ajan yok.",
+  "settings.transfer.copy.new": "Yeni",
+  "settings.transfer.copy.notCopied":
+    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+  "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.copying": "Kopyalanıyor…",
+  "settings.transfer.copy.done": {
+    one: "{count} ajan {server} sunucusuna kopyalandı.",
+    other: "{count} ajan {server} sunucusuna kopyalandı.",
+  },
+  "settings.transfer.copy.open": "{server} sunucusunu aç",
+  "settings.transfer.copy.loadFailed": "Ajanlar okunamadı",
+  "settings.transfer.copy.failed": "Kopyalama tamamlanmadı",
 } as const satisfies PartialTranslation<typeof source>;

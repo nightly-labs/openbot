@@ -44,25 +44,71 @@ import { useText } from "../../text";
 export type HostedServerPlanId = BillingPlanId;
 export type HostedServerBilling = "monthly" | "yearly";
 
-export const HOSTED_CURRENCIES = ["EUR", "USD", "PLN"] as const;
+export const HOSTED_CURRENCIES = ["EUR", "USD", "PLN", "BRL"] as const;
 export type HostedCurrency = (typeof HOSTED_CURRENCIES)[number];
+/** The currencies of every plan. BRL is in a plan only when its Stripe Price has it. */
+type HostedBaseCurrency = Exclude<HostedCurrency, "BRL">;
+const HOSTED_BASE_CURRENCIES: readonly HostedBaseCurrency[] = ["EUR", "USD", "PLN"];
 
 /** The Stripe currency of each shown currency. */
 export const HOSTED_BILLING_CURRENCY = {
   EUR: "eur",
   USD: "usd",
   PLN: "pln",
+  BRL: "brl",
 } as const satisfies Record<HostedCurrency, BillingCurrency>;
+
+/** The time zones of Brazil in the IANA database. */
+const BRAZIL_TIME_ZONES = new Set([
+  "America/Araguaina",
+  "America/Bahia",
+  "America/Belem",
+  "America/Boa_Vista",
+  "America/Campo_Grande",
+  "America/Cuiaba",
+  "America/Eirunepe",
+  "America/Fortaleza",
+  "America/Maceio",
+  "America/Manaus",
+  "America/Noronha",
+  "America/Porto_Velho",
+  "America/Recife",
+  "America/Rio_Branco",
+  "America/Santarem",
+  "America/Sao_Paulo",
+  "Brazil/Acre",
+  "Brazil/DeNoronha",
+  "Brazil/East",
+  "Brazil/West",
+]);
 
 /**
  * A first guess of the currency from the computer's time zone, for when the consumer does not know
- * the user's country. It reads only local settings and sends nothing.
+ * the user's country. It reads only local settings and sends nothing. BRL is a guess only when
+ * `offered` has it: give the currencies of the plans, from `hostedCurrencies`.
  */
-export function guessHostedCurrency(timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): HostedCurrency {
+export function guessHostedCurrency(
+  offered: readonly HostedCurrency[] = HOSTED_BASE_CURRENCIES,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): HostedCurrency {
   if (timeZone === "Europe/Warsaw") return "PLN";
   if (timeZone.startsWith("Europe/")) return "EUR";
+  if (BRAZIL_TIME_ZONES.has(timeZone) && offered.includes("BRL")) return "BRL";
   return "USD";
 }
+
+/** The currencies that each plan has a price in: the base currencies, and BRL when every plan has it. */
+export function hostedCurrencies(plans: readonly HostedServerPlan[]): HostedCurrency[] {
+  const brl = plans.length > 0 && plans.every((plan) => plan.monthlyPrice.BRL !== undefined);
+  return HOSTED_CURRENCIES.filter((currency) => currency !== "BRL" || brl);
+}
+
+/** A set price of the plan in whole units, or 0 in a currency that the plan does not have. */
+function hostedPrice(plan: HostedServerPlan, interval: "month" | "year", currency: HostedCurrency): number {
+  return (interval === "month" ? plan.monthlyPrice[currency] : plan.yearlyPrice[currency]) ?? 0;
+}
+
+type HostedPrices = Record<HostedBaseCurrency, number> & Partial<Record<HostedCurrency, number>>;
 
 export interface HostedServerPlan {
   id: HostedServerPlanId;
@@ -70,9 +116,9 @@ export interface HostedServerPlan {
    * The price for one month on monthly billing, in each currency. These are set prices, not
    * conversions, so each one is a round number.
    */
-  monthlyPrice: Record<HostedCurrency, number>;
+  monthlyPrice: HostedPrices;
   /** The price for one year on yearly billing, in each currency. */
-  yearlyPrice: Record<HostedCurrency, number>;
+  yearlyPrice: HostedPrices;
   diskGb: number;
   /** The most active members of the server, the owner included. */
   memberLimit: number;
@@ -91,8 +137,8 @@ export interface HostedServerPlan {
 export function hostedYearlyDiscountPercent(plans: readonly HostedServerPlan[], currency: HostedCurrency): number {
   const discounts = plans.map((plan) => {
     // In cents, so that the division does not get a floating point error such as 19.999.
-    const twelveMonths = Math.round(plan.monthlyPrice[currency] * 100) * 12;
-    const year = Math.round(plan.yearlyPrice[currency] * 100);
+    const twelveMonths = Math.round(hostedPrice(plan, "month", currency) * 100) * 12;
+    const year = Math.round(hostedPrice(plan, "year", currency) * 100);
     return twelveMonths > 0 ? Math.floor(((twelveMonths - year) * 100) / twelveMonths) : 0;
   });
   return discounts.length === 0 ? 0 : Math.max(0, Math.min(...discounts));
@@ -104,7 +150,7 @@ export function hostedPlanMonthlyPrice(
   billing: HostedServerBilling,
   currency: HostedCurrency,
 ): number {
-  return billing === "yearly" ? plan.yearlyPrice[currency] / 12 : plan.monthlyPrice[currency];
+  return billing === "yearly" ? hostedPrice(plan, "year", currency) / 12 : hostedPrice(plan, "month", currency);
 }
 
 const BILLING_INTERVAL = { monthly: "month", yearly: "year" } as const satisfies Record<
@@ -128,7 +174,7 @@ export function hostedOrderMonthlyPrice(
   currency: HostedCurrency,
   people: number,
 ): HostedOrderPrice {
-  const regular = plan.monthlyPrice[currency];
+  const regular = hostedPrice(plan, "month", currency);
   const monthly = hostedPlanMonthlyPrice(plan, billing, currency);
   if (people === 0) return { regular, monthly };
   const license = licenseOrderFor(people);
@@ -190,11 +236,15 @@ export function hostedServerPlansFromCatalog(catalog: HostedServerCatalog): Host
   const amounts = (
     prices: HostedServerCatalog["plans"][number]["prices"],
     interval: "month" | "year",
-  ): Record<HostedCurrency, number> => ({
-    EUR: prices.eur[interval] / 100,
-    USD: prices.usd[interval] / 100,
-    PLN: prices.pln[interval] / 100,
-  });
+  ): HostedPrices => {
+    const result: HostedPrices = {
+      EUR: prices.eur[interval] / 100,
+      USD: prices.usd[interval] / 100,
+      PLN: prices.pln[interval] / 100,
+    };
+    if (prices.brl) result.BRL = prices.brl[interval] / 100;
+    return result;
+  };
   return catalog.plans.map((plan) => ({
     id: plan.id,
     monthlyPrice: amounts(plan.prices, "month"),
@@ -260,10 +310,9 @@ export function HostedBillingSwitch(props: HostedBillingSwitchProps) {
   );
 }
 
-/** Kobalte takes a mutable array. */
-const CURRENCY_OPTIONS: HostedCurrency[] = [...HOSTED_CURRENCIES];
-
 interface HostedCurrencySelectProps {
+  /** The currencies of the plans. Kobalte takes a mutable array; it changes only with the plans. */
+  options: HostedCurrency[];
   currency: HostedCurrency;
   onChange: (currency: HostedCurrency) => void;
   disabled?: boolean | undefined;
@@ -280,7 +329,7 @@ export function HostedCurrencySelect(props: HostedCurrencySelectProps) {
     <Show when={!props.locked} fallback={<span class="hosted-currency hosted-currency-locked">{props.currency}</span>}>
       <Select<HostedCurrency>
         class="hosted-currency"
-        options={CURRENCY_OPTIONS}
+        options={props.options}
         value={props.currency}
         disabled={props.disabled ?? false}
         onChange={(currency) => currency && props.onChange(currency)}
@@ -351,7 +400,7 @@ export function hostedPriceLength(
     0,
     ...plans.map(
       (plan) =>
-        formatHostedPrice(format, plan.monthlyPrice[currency], currency).length +
+        formatHostedPrice(format, hostedPrice(plan, "month", currency), currency).length +
         formatHostedPrice(format, hostedPlanMonthlyPrice(plan, "yearly", currency), currency).length,
     ),
   );

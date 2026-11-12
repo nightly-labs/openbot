@@ -31,7 +31,18 @@ import {
 } from "@openbot/ui";
 import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { createEffect, createSignal, For, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onSettled,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { useText } from "../../text";
 import {
   guessHostedCurrency,
@@ -44,6 +55,7 @@ import {
   type HostedServerPlanId,
   HostedServerPlans,
   HostedUseSwitch,
+  hostedCurrencies,
   hostedLongestOrderPrice,
   hostedPriceLength,
   hostedWorkYearlyDiscountPercent,
@@ -187,10 +199,20 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [step, setStep] = createSignal<Step>(untrack(() => props.resume) ? "progress" : "pricing");
   const order = untrack(() => props.order);
   const [billing, setBilling] = createSignal<HostedServerBilling>(order?.billing ?? "yearly");
-  const [currency, setCurrency] = createSignal<HostedCurrency>(
-    untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))) ??
-      guessHostedCurrency(),
+  const currencies = createMemo(() => hostedCurrencies(props.plans));
+  const [chosenCurrency, setCurrency] = createSignal<HostedCurrency | undefined>(
+    untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))),
   );
+  /**
+   * The chosen currency when the plans have it, else a guess from the time zone. A locked currency is the
+   * currency of the Stripe customer, so it stays: a guess only gets a refusal.
+   */
+  const currency = (): HostedCurrency => {
+    const chosen = chosenCurrency();
+    return chosen && (props.currencyLocked || currencies().includes(chosen))
+      ? chosen
+      : guessHostedCurrency(currencies());
+  };
   const [pendingPlan, setPendingPlan] = createSignal<HostedServerPlanId | null>(null);
   const [createError, setCreateError] = createSignal<UserErrorDetails | null>(null);
   const [created, setCreated] = createSignal<CreatedHostedServer | null>(untrack(() => props.resume) ?? null);
@@ -403,6 +425,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         <HostedUseSwitch work={work()} onChange={setWork} disabled={creating()} />
                       </Show>
                       <HostedCurrencySelect
+                        options={currencies().includes(currency()) ? currencies() : [...currencies(), currency()]}
                         currency={currency()}
                         onChange={(next) => {
                           setCurrency(next);
@@ -646,7 +669,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
 }
 
 /** The ways to add a server without a plan, in the corner across from the close button. */
-function AddServerOtherOptions(props: {
+export function AddServerOtherOptions(props: {
   disabled: boolean;
   onCreateLocal: (() => void) | undefined;
   onInstallServer: (() => void) | undefined;

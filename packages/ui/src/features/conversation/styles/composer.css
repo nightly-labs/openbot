@@ -33,35 +33,34 @@
   .image-generation-glow,
   .image-generation-canvas,
   .image-generation-preview,
-  .image-generation-label,
-  /* Matches the scoped shimmer above, which outranks the bare class on its own. */
-  .image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label,
+  .media-generation-label[data-shine],
   .agent-activity-label {
     animation: none;
     transition: none;
   }
 
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar,
+  .ui-button.media-generation-play,
+  .media-generation-seek-fill {
     transition: none;
   }
 }
 
 @media (hover: none), (pointer: coarse) {
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar {
     opacity: 1;
-    pointer-events: auto;
-    transform: none;
   }
 }
 
 @media (max-width: 620px) {
-  .message-entry-agent .ui-bubble:has(.image-generation) {
+  .message-entry-agent .ui-bubble:has(:is(.image-generation, .media-generation)) {
     width: 100%;
     max-width: 100%;
   }
 
-  .image-generation-stage,
-  .image-generation-meta {
+  .image-generation-stage {
     width: 100%;
   }
 }
