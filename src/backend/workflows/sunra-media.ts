@@ -41,6 +41,8 @@ const SUNRA_CALL_TIMEOUT_MS = 120_000;
 const SUNRA_CREDITS_DEADLINE = Duration.seconds(20);
 /** The longest time for one upload of an input picture, and for the download of the file. */
 const SUNRA_TRANSFER_DEADLINE = { upload: Duration.minutes(2), download: Duration.minutes(5) } as const;
+/** How many redirects the download of a file follows, each on Sunra's file hosts. */
+const SUNRA_DOWNLOAD_REDIRECTS = 3;
 /** How many `get_job` calls in a row can fail before the step fails. */
 const SUNRA_POLL_FAILURES = 3;
 /** The longest reason from Sunra that an error quotes. */
@@ -308,12 +310,25 @@ const download = Effect.fnUntraced(function* (url: string, kind: WorkflowMediaKi
       sourceText(kind === "video" ? "error.backend.generatedVideoTooLarge" : "error.backend.generatedImageTooLarge"),
     );
   const { response, bytes } = yield* Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: (signal) => fetch(url, { signal }),
-      catch: () => failed(),
-    });
-    // A redirect must stay on Sunra's file hosts.
-    if (!response.ok || !isSunraMedia(response.url || url)) return yield* failed();
+    // Each hop must be on Sunra's file hosts before OpenBot asks for it, so a redirect is followed here.
+    let address = url;
+    let response: Response | null = null;
+    for (let hop = 0; hop <= SUNRA_DOWNLOAD_REDIRECTS; hop += 1) {
+      if (!isSunraMedia(address)) return yield* failed();
+      const next = address;
+      const answer = yield* Effect.tryPromise({
+        try: (signal) => fetch(next, { signal, redirect: "manual" }),
+        catch: () => failed(),
+      });
+      const location = answer.status >= 300 && answer.status < 400 ? answer.headers.get("location") : null;
+      if (!location) {
+        response = answer;
+        break;
+      }
+      yield* Effect.promise(() => answer.body?.cancel().catch(() => undefined) ?? Promise.resolve());
+      address = URL.canParse(location, next) ? new URL(location, next).href : "";
+    }
+    if (!response?.ok) return yield* failed();
     const bytes = yield* readLimitedBody(response, ATTACHMENT_LIMITS.fileBytes, (reason) =>
       reason === "too-large" ? tooLarge() : failed(),
     );
