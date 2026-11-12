@@ -16,6 +16,7 @@ import type {
   QueueDelivery,
   RoutineConversationEventAction,
   RoutineRunStatus,
+  VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -99,6 +100,8 @@ export type ChatMessage =
       visual?: { height?: number };
       /** An image the agent is generating or generated. Its first attachment is the image. */
       imageGeneration?: ImageGenerationInfo;
+      /** A video the agent is generating or generated. Its first attachment is the video. */
+      videoGeneration?: VideoGenerationInfo;
       /** Why the turn of a failed user message stopped, as the host reported it. */
       failureReason?: string;
       /** When the host stored the message. A message that waits on the phone has none. */
@@ -481,9 +484,9 @@ export function projectChatMessages(
       );
       continue;
     }
-    // A generation has no text or attachment until its image arrives, and it still needs its placeholder.
+    // A generation has no text or attachment until its image or video arrives, and it still needs its placeholder.
     if (
-      (!message.text.trim() && !message.attachments?.length && !message.imageGeneration) ||
+      (!message.text.trim() && !message.attachments?.length && !message.imageGeneration && !message.videoGeneration) ||
       message.author === "system"
     )
       continue;
@@ -524,6 +527,7 @@ export function projectChatMessages(
           attachments: message.attachments,
           ...visualReply(message),
           imageGeneration: message.imageGeneration,
+          videoGeneration: message.videoGeneration,
           replyToMessageId: message.replyToMessageId,
           createdAt: message.createdAt,
           reactions: messageReactions(message),
@@ -887,6 +891,7 @@ function projectChannelMessage(
     attachments: entry.message.attachments,
     ...visualReply(entry.message),
     imageGeneration: entry.message.imageGeneration,
+    videoGeneration: entry.message.videoGeneration,
     createdAt: entry.message.createdAt,
   };
 }
@@ -911,6 +916,7 @@ export function projectChannelMessages(
       (entry) =>
         entry.message.questionPrompt ||
         entry.message.imageGeneration ||
+        entry.message.videoGeneration ||
         entry.message.text.trim() ||
         entry.message.attachments?.length,
     )
