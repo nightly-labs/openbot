@@ -474,10 +474,17 @@ export_data() {
   [ -s "$USER_HOME/.config/OpenBot/openbot.db" ] || fail "The home of $SERVICE_USER has no OpenBot database."
   [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ] ||
     fail "The server keyring or its password file is missing. The server could not sign in after the move."
-  # While boat restores the disk, a directory can show no files.
-  if [ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ]; then
-    fail "boat still restores the disk of this sandbox. Try again in some minutes."
-  fi
+  # While boat restores the disk, a directory can show no files. boat can start the restore some seconds
+  # after a resume (seen on 2026-11-12), so wait here: OpenBot still runs, and the customer sees no downtime.
+  local waited=0
+  while [ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ]; do
+    [ "$waited" -lt 1800 ] || fail "boat still restores the disk of this sandbox after 30 minutes. Try again later."
+    [ "$waited" -gt 0 ] || echo "boat restores the disk of this sandbox. Wait." >&2
+    sleep 10
+    waited=$((waited + 10))
+  done
+  # boat makes some entries local only when they are read, and tar fails on a directory that changes so.
+  [ "$waited" -eq 0 ] || find "$USER_HOME" -xdev -printf '' 2>/dev/null || true
   version=$(installed_version)
   [ -n "$version" ] || fail "The version of the installed OpenBot is not known."
 
