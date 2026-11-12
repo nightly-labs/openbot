@@ -22,6 +22,7 @@ import type { AboveAppsSupport } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
+import { xwaylandRestartCommand } from "./xwayland-restart-command";
 
 const logger = createOpenBotLogger("main");
 
@@ -148,14 +149,30 @@ function startOnX11(
   environment: NodeJS.ProcessEnv,
   reason: XWaylandRestartReason,
 ): Effect.Effect<void, WaylandProbeFailure> {
+  const command = xwaylandRestartCommand({
+    environment,
+    execPath: process.execPath,
+    argv: process.argv,
+    x11Argument: X11_ARGUMENT,
+    marker: RESTART_MARKER,
+    reason,
+  });
+  // This process becomes the new one, where Node can. A launcher that ends its children with itself, such
+  // as an AppImage runner in a bubblewrap sandbox on NixOS, ended a separate new process as soon as this
+  // one exited, so the app opened only now and then. `execve` returns only when it fails.
+  if (process.execve) {
+    try {
+      process.execve(command.file, command.argv, command.env);
+    } catch (error) {
+      logger.warn("Could not start OpenBot again in place on XWayland; it starts a new process:", toLogValue(error));
+    }
+  }
   return Effect.callback<void, WaylandProbeFailure>((resume) => {
-    // An AppImage mounts itself for each start, and the mount of this process goes away with it.
-    const executable = environment.APPIMAGE || process.execPath;
     // A terminal start keeps the output. The desktop app does not read its input.
-    const child = spawn(executable, [...process.argv.slice(1), X11_ARGUMENT], {
+    const child = spawn(command.file, command.argv.slice(1), {
       detached: true,
       stdio: ["ignore", "inherit", "inherit"],
-      env: { ...environment, [RESTART_MARKER]: reason },
+      env: command.env,
     });
     child.once("error", (cause) => resume(Effect.fail(new WaylandProbeFailure({ cause }))));
     child.once("spawn", () => {
