@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CHAT_VISUAL_MAX_HEIGHT,
   CHAT_VISUAL_MIN_HEIGHT,
+  type ChatVisualAppearance,
   chatVisualAppTheme,
   chatVisualFrameUrl,
 } from "@openbot/contracts/chat-visual";
@@ -67,7 +68,7 @@ function boundedPng(image: NativeImage): string {
 }
 
 export class ChatVisualPreviewer implements ChatVisualPreviewHost {
-  readonly #pages = new Map<string, Uint8Array>();
+  readonly #pages = new Map<string, { bytes: Uint8Array; appearance: ChatVisualAppearance }>();
   /** One page at a time: each one is a renderer process. */
   readonly #lock = Semaphore.makeUnsafe(1);
   #session: Session | null = null;
@@ -78,7 +79,11 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
     session.protocol.handle("openbot-visual", (request) => {
       const url = new URL(request.url);
       const page = url.hostname === PREVIEW_HOST ? this.#pages.get(url.pathname.slice(1)) : undefined;
-      return page ? chatVisualResponse(page) : new Response("Not found", { status: 404 });
+      // The page gets the colour scheme of the theme. A window, unlike a frame, has no chat behind the
+      // page, so in the dark scheme the browser paints a transparent page on a dark canvas.
+      return page
+        ? chatVisualResponse(page.bytes, { appearance: page.appearance })
+        : new Response("Not found", { status: 404 });
     });
     session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.setPermissionCheckHandler(() => false);
@@ -104,6 +109,8 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
               height: INITIAL_HEIGHT,
               useContentSize: true,
               enableLargerThanScreen: true,
+              // The canvas behind a transparent page: the chat background of the theme.
+              backgroundColor: chatVisualAppTheme(request.appearance)["--background"],
               webPreferences: {
                 sandbox: true,
                 contextIsolation: true,
@@ -113,7 +120,7 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
               },
             });
             const token = randomUUID();
-            this.#pages.set(token, new TextEncoder().encode(request.html));
+            this.#pages.set(token, { bytes: new TextEncoder().encode(request.html), appearance: request.appearance });
             return { token, window };
           },
           catch: () => previewFailure("OpenBot could not open a window to draw the page."),
