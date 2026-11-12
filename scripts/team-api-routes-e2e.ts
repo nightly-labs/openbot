@@ -2139,7 +2139,7 @@ try {
       },
       // A stand-in for the server-mode restart, which closes the app under its service manager. This
       // checks the gate and that a refused request never reaches the host.
-      restart: { request: () => record("restartHost") },
+      restart: { request: (memberId) => record("restartHost", memberId) },
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
       localServers: {
@@ -10781,13 +10781,16 @@ try {
       capabilities,
     });
     check(
-      "an admin and the owner each restart the server once, and the reply is empty",
+      "an admin and the owner each restart the server once, the host knows who asked, and the reply is empty",
       adminRestart.status === 200 &&
         isDeepStrictEqual(adminRestart.body, {}) &&
         ownerRestart.status === 200 &&
         isDeepStrictEqual(ownerRestart.body, {}) &&
-        restarts() === 2,
-      [summary(adminRestart), summary(ownerRestart), restarts()],
+        restarts() === 2 &&
+        callsOf("restartHost")[0]?.[0] === adaId &&
+        typeof callsOf("restartHost")[1]?.[0] === "string" &&
+        callsOf("restartHost")[1]?.[0] !== adaId,
+      [summary(adminRestart), summary(ownerRestart), callsOf("restartHost")],
     );
   }
 

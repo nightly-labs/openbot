@@ -1453,6 +1453,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return (
       !hostedServers.isHosted(serverId) &&
       server()?.id === serverId &&
+      workspace.state.status === "online" &&
       workspace.runtime.admin !== undefined &&
       workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
     );
@@ -1460,9 +1461,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
     if (!hostId) return;
-    if (restartsItself(hostId))
-      await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
-    else await hostedServers.calls.restart(hostId);
+    if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
+    else await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
   }
   createEffect(
     () => props.billingReturn,

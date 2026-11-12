@@ -143,13 +143,12 @@ export function useServerActions() {
     canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
     // A self-hosted server restarts itself when its host has `host-restart-v1`; an older host does not.
-    canRestart: (serverId) =>
-      hostedServerIds().has(serverId) ||
-      onThisComputer(serverId) ||
-      serverSupportsCapability(
-        servers().find((server) => server.id === serverId),
-        "host-restart-v1",
-      ),
+    // It must be online: an offline server keeps its last capabilities, but cannot get the request.
+    canRestart: (serverId) => {
+      if (hostedServerIds().has(serverId) || onThisComputer(serverId)) return true;
+      const server = servers().find((candidate) => candidate.id === serverId);
+      return server?.state === "online" && serverSupportsCapability(server, "host-restart-v1");
+    },
     onHide: (serverId) => void hideLocal(serverId),
     // Only beside another server: the list is never empty.
     canHide: () => remoteServers().length > 0,

@@ -545,7 +545,7 @@ export interface TeamApiAdmin {
    * `host-restart-v1`: restart this host now. Only a self-hosted server has it: its service manager
    * starts the app again after it quits. The host answers before it closes.
    */
-  restart?: { request(): void };
+  restart?: { request(memberId: string): void };
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   /** `host-personality-v1`: how the server's agents talk while they work. Any member reads it. */

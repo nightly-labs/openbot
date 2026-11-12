@@ -17,6 +17,6 @@ export async function routeHostRestart(
     throw new HttpError(400, sourceText("error.team.hostRestartUnsupported"));
   requireAdmin(member);
   await readJson(request);
-  restart.request();
+  restart.request(member.id);
   return json(200, {});
 }

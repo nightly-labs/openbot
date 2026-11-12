@@ -3259,8 +3259,8 @@ export async function createApplicationServices({
       ...(serverModeEnvironment
         ? {
             restart: {
-              request: () => {
-                logger.info("An owner or admin asked this server to restart.");
+              request: (memberId) => {
+                logger.info(`Member ${memberId} asked this server to restart.`);
                 // The answer leaves before the quit closes the connections.
                 setImmediate(() => app.quit());
               },
