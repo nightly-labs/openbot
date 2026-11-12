@@ -698,10 +698,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
     imeKeyDown = false;
     const lineBreak = event.inputType === "insertLineBreak" || event.inputType === "insertParagraph";
     if (!lineBreak && (event.inputType !== "insertText" || !event.data)) return;
-    // The composition types the kana; this first `insertText` carries only the raw key, so leave it
-    // to the browser instead of typing it here.
-    if (imeInsert) return;
     event.preventDefault();
+    // The composition types the kana; this first `insertText` carries only the raw key, so cancel
+    // it instead of typing it.
+    if (imeInsert) return;
     if (lineBreak) insertLineBreak(editor);
     else if (event.data) insertPlainText(editor, event.data);
     emitValue();
