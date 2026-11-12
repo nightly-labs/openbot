@@ -22,8 +22,6 @@ import {
   AGENT_TEMPLATE_LIMITS,
   decodeMarketplaceSkillDetail,
   decodeMarketplaceSkillPage,
-  githubSkillDetail,
-  githubSkillUrl,
   isGithubSkillId,
   isOtherGithubCommit,
   isSkillCategory,
@@ -135,13 +133,7 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
       if (skillId.startsWith("local-skill-"))
         return yield* this.requireLocalLibrary().get(skillId).pipe(toSkillMarketplaceFailure);
-      const address = parseGithubSkillId(skillId);
-      if (address) {
-        const source = yield* this.readGithub(githubSkillUrl(address));
-        const skill = source.skills.find((candidate) => candidate.id === skillId);
-        if (!skill) return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
-        return githubSkillDetail(source, skill);
-      }
+      /* The client keeps the detail of each GitHub skill from its read, and never asks for it here. */
       if (isGithubSkillId(skillId))
         return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
       const detail = yield* this.auth

@@ -207,11 +207,6 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
     list: async (query) => mockSkillPage(marketplaceSkills, query),
     get: async (skillId) => {
       if (skillId.startsWith("local-skill-")) return skills.localGet({ skillId });
-      if (isGithubSkillId(skillId)) {
-        const detail = mockGithubDetail(skillId);
-        if (!detail) throw new Error("Skill not found");
-        return clone(detail);
-      }
       const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];
       if (!detail) throw new Error("Skill not found");
       return clone(detail);
