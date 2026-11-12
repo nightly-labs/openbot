@@ -198,10 +198,12 @@ export function customProviderInput(draft: CustomProviderDraft): SaveCustomProvi
   };
 }
 
-/** Whether the endpoint has a saved header of this name. The host matches names without case. */
+/**
+ * Whether the endpoint has a saved header of this exact name. The host takes a kept value only for
+ * the same name (`mergeHeaders` in `src/main/custom-provider-store.ts`).
+ */
 function savedHeader(saved: CustomProviderSummary | undefined, name: string): boolean {
-  const lower = name.toLowerCase();
-  return saved?.headerNames?.some((header) => header.toLowerCase() === lower) ?? false;
+  return saved?.headerNames?.includes(name) ?? false;
 }
 
 /**
