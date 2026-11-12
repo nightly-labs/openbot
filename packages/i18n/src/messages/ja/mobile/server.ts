@@ -255,6 +255,7 @@ export const messages = {
     "サーバーを停止してから再び起動します。約 1 分かかります。実行中のエージェントのターンは停止し、サーバーが戻るまでメンバーの接続は切れます。ファイルとチャットは保持されます。",
   "mobile.server.settings.restartConfirm": "再起動",
   "mobile.server.settings.restarted": "{name} を再起動しています",
+  "mobile.server.settings.restartUnsupported": "ここから再起動するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.settings.leaveTitle": "{name} から退出しますか？",
   "mobile.server.settings.leaveBody": "再度参加するには新しい招待が必要です。",
   "mobile.server.settings.leave": "サーバーから退出",
@@ -320,6 +321,7 @@ export const messages = {
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
   "mobile.server.route.personality": "エージェントの性格",
+  "mobile.server.route.agents": "エージェント",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -443,6 +445,26 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.memoryReview": "メモリーの見直し",
+  "mobile.server.settings.memoryReviewDescription":
+    "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",
+  "mobile.server.settings.memoryReviewOff": "オフ",
+  "mobile.server.settings.memoryReviewTurns": { other: "{count} ターンごと" },
+  "mobile.server.settings.memoryReviewLoadFailed": "メモリーの見直しの設定を読み込めませんでした。",
+  "mobile.server.settings.skillLearning": "スキル学習",
+  "mobile.server.settings.skillLearningDescription":
+    "このサーバーのエージェントが学んだことをスキルとして保存するかどうか。",
+  "mobile.server.settings.skillLearningAutomatic": "自動",
+  "mobile.server.settings.skillLearningAsk": "先に確認",
+  "mobile.server.settings.skillLearningOff": "オフ",
+  "mobile.server.settings.skillLearningLoadFailed": "スキル学習の設定を読み込めませんでした。",
+  "mobile.server.settings.browsingMemory": "自分の閲覧から学習",
+  "mobile.server.settings.browsingMemoryDescription":
+    "エージェントのブラウザーを操作すると、使ったページとボタンからエージェントがサイトの使い方を学習します。入力したテキストは保存されません。",
+  "mobile.server.settings.browsingMemoryLoadFailed": "閲覧の設定を読み込めませんでした。",
+  "mobile.server.settings.learningSaveFailed": "この設定を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.learningUnsupported":
+    "ここでこの設定を変更するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.settings.responseStyleDescription":
     "ナチュラル: エージェントは作業中に短い進捗を送り、チャットに表示されます。クラシック: エージェントは完了時に一度だけ答えます。",
   "mobile.server.settings.responseStyleNatural": "ナチュラル",
@@ -451,8 +473,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "応答スタイルを保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.personalityUnsupported":
     "ここで応答スタイルを変更するには、このサーバーの OpenBot を更新してください。",
-  "mobile.server.settings.personalityUnavailable":
-    "エージェントの性格を変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.settings.agentsUnavailable":
+    "エージェントの設定を変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.route.browserProfiles": "ブラウザープロファイル",
   "mobile.server.browserProfiles.unavailable":
     "オンラインのサーバーのオーナーまたは管理者だけが、そのブラウザープロファイルを管理できます。",
@@ -1087,6 +1109,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "ここで MCP サーバーを管理するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.mcp.unavailable":
     "MCP サーバーを管理するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.mcp.accessUnsupported":
+    "MCP サーバーを受け取る相手を選ぶには、このサーバーの OpenBot を更新してください。",
   "mobile.server.mcp.description":
     "MCP サーバーは、このサーバーのエージェントにツールを追加します。Claude と Codex のエージェントは、このリストのサーバーだけを使います。",
   "mobile.server.mcp.loading": "MCP サーバーを読み込み中…",
@@ -1157,6 +1181,21 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "{name} を削除しますか？",
   "mobile.server.mcp.removeBody": "このサーバーのエージェントはそのツールを使えなくなります。設定は保持されません。",
   "mobile.server.mcp.remove": "MCP サーバーを削除",
+  "mobile.server.mcp.access.title": "アクセス",
+  "mobile.server.mcp.access.agents": "エージェント",
+  "mobile.server.mcp.access.agentsOf": "{name} を使用できるエージェント",
+  "mobile.server.mcp.access.allAgents": "すべてのエージェント",
+  "mobile.server.mcp.access.allAgentsHint": "すべてのエージェントには、後で追加されるエージェントも含まれます。",
+  "mobile.server.mcp.access.noAgents": "エージェントなし",
+  "mobile.server.mcp.access.someAgents": "{count} / {total}",
+  "mobile.server.mcp.access.use": "使用可能",
+  "mobile.server.mcp.access.fromEveryone": "全員と同じ",
+  "mobile.server.mcp.access.level": "{name} への {role} のアクセス",
+  "mobile.server.mcp.access.hint":
+    "メンバーには、全員と自分のロールのうち最も高いレベルが適用されます。オーナー、管理者、サーバーを追加した人は常に管理できます。",
+  "mobile.server.mcp.access.loadFailed": "この MCP サーバーのアクセスを読み込めませんでした。",
+  "mobile.server.mcp.access.unavailable":
+    "この MCP サーバーを受け取る相手を選べるのは、オンラインのサーバーのオーナーまたは管理者だけです。",
   "mobile.server.usage.agents": "エージェント",
   "mobile.server.usage.agentLine": "トークン数 {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "この期間にはエージェントの使用量が記録されていません。",
@@ -1316,6 +1355,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { other: "{count} 体のエージェント" },
   "mobile.server.roles.memberCount": { other: "メンバー {count} 人" },
   "mobile.server.roles.agentLevel": "{role} の {agent} へのアクセス",
+  "mobile.server.roles.changeInEveryone": "全員で変更",
+  "mobile.server.roles.setAll": "すべて設定",
+  "mobile.server.roles.setAllLabel": "すべて設定: {role} のすべてのエージェントへのアクセス",
+  "mobile.server.roles.mixed": "混在",
   "mobile.server.roles.delete": "ロールを削除",
   "mobile.server.roles.deleteTitle": "{name} を削除しますか？",
   "mobile.server.roles.deleteBody": "このロールのメンバーは、このロールで使えたエージェントを使えなくなります。",

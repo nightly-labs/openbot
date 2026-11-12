@@ -295,7 +295,7 @@ import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
 import { RoutineRecords } from "./routine-records";
-import type { RoutineHoldWindow } from "./routine-store";
+import type { ImportedRoutineRun, RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
@@ -2328,6 +2328,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent || !agentAutomationAllowed(agent, this.#store.agentDefaults()))
       throw new Error(sourceText("error.agent.automationOff"));
+  }
+
+  /** Writes the finished runs of an imported routine. Returns the new run ids in order. */
+  importRoutineRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.#routines.importRuns(agentId, routineId, runs);
+  }
+
+  /** Writes the finished runs of an imported channel routine. Returns the new run ids in order. */
+  importChannelRoutineRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.#channelRoutines.importRuns(channelId, routineId, runs);
   }
 
   /** `withSkipped` adds the skipped-run records, which only the local history shows. */

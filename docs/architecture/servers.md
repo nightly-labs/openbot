@@ -319,6 +319,18 @@ part at a time, checks each part it gets, and sends or reads a part again up to 
 connection fails; it does not send a part again when the host refuses it. A download appears only
 when it is complete.
 
+Server settings > Transfer > Copy to another server joins the two directions in one step, on the
+desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
+this computer's included. `instance-transfer:copy` is scoped to the destination and takes
+`{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
+without chat history or server settings to a temporary file. As in a file export, the file also has
+the channels that have a selected agent as a member and the Shared folder. Each apply adds the
+channels again as new channels. Main then stages the file at the destination, applies all of its
+agents, and removes the file. Each side uses the routes above, in parts when its host has
+`instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
+`instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
+added beside it. The browser client has no copy: it connects to one host at a time.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
 including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
 new file. Concurrent uploads and exports wait
@@ -472,6 +484,21 @@ whenever it is present, and a list that the contract refuses fails closed. The h
 through `clampConversationSubagents`, so only known keys go out, and the lists of one page share a
 wire budget, newest first. The task conversations of `agent-tasks-v1` do not carry it. The WebRTC
 host peer encodes the local response and the events again with the same option.
+
+### Video generation
+
+`video-generation-v1` (protocol 9 only) carries the request of a video that an agent made with a
+tool (see `VideoGenerationInfo` in `packages/contracts/src/ipc-conversation-messages.ts` and
+`team-protocol/video-generation-v1.ts`). It adds `videoGeneration` beside the frozen keys of a
+message in `GET /v1/agents/:id/conversation` and `conversation-page` (messages and references), and
+in the `conversation` and `conversation-page` events, as `subagents-v1` does. The host adds it only
+for a connection that advertises the capability. A released client reads the `video_generation`
+message as its fallback: the mp4 in `attachments`, with no prompt or aspect ratio. A host without
+the capability never sends `videoGeneration`, so a client keeps it whenever it is present, and a
+value that `isVideoGenerationInfo` refuses fails closed. Only known keys go out, and the values of
+one page share a wire budget, newest first. Channel messages and the task conversations of
+`agent-tasks-v1` do not carry it. The WebRTC host peer encodes the local response and the events
+again with the same option.
 
 ### Prompt multi-select
 
@@ -693,6 +720,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
+| `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -769,6 +797,15 @@ the agents to send short updates between their steps, and the chat shows them as
 the style, so each client knows what to show; only an owner or admin changes it. A change unloads the
 agents' threads, so the next turn uses the new prompt. A host without the capability reads as
 `classic`. Other clients see a change when they open the server again.
+
+`host-restart-v1` lets an owner or admin restart a self-hosted server from Restart server in the
+server menu (desktop and web client) or in Server settings (mobile). Only a host in server mode
+(`OPENBOT_SERVER=1`, not a hosted server) advertises it, because only there does a service manager
+start the app again: systemd (`Restart=always` in `openbot.service`) or the Docker restart policy.
+The host answers, then quits; it does not use `app.relaunch`, which would start the app outside
+`xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
+account service, and a server on this computer through `localServers`. A host that does not answer
+cannot get the request; then the owner runs `sudo openbot restart`.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).

@@ -271,6 +271,8 @@ export function describeChallenge(
   checking = false,
   /** The checkbox that the agent may click once. Only the first read of a document offers it. */
   clickOnce: DetectedChallenge["checkbox"] = null,
+  /** A person completed a takeover of the tab, and the check is still there. */
+  afterTakeover = false,
 ): BrowserChallenge | undefined {
   if (detected?.kind === "block")
     return {
@@ -285,6 +287,13 @@ export function describeChallenge(
       status: "checking",
       waitedMs,
       next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
+    };
+  if (detected && afterTakeover)
+    return {
+      vendor: detected.vendor,
+      status: "blocked",
+      waitedMs,
+      next: "The user took over this tab, and the security check is still here: the site refuses this browser, often because of its network address. Do not reload, retry, or call request_takeover for it again unless the user asks. In one plain sentence, tell the user that the site blocks this browser.",
     };
   if (detected && clickOnce)
     return {

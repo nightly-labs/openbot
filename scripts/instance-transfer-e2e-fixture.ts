@@ -2,6 +2,7 @@
 // agents that have only workspace files. Every other boundary call fails.
 
 import { dirname, join } from "node:path";
+import { DEFAULT_AGENT_DEFAULTS, DEFAULT_MACHINE_ALERT_SETTINGS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
 import { LocalSkillFailure } from "../src/main/local-skill-library";
@@ -17,6 +18,8 @@ export function emptyInstanceTransferService(
   uploadDirectory: string,
   /** Agents with no routines, memories or avatar, that an export reads. */
   exported: readonly AgentSummary[] = [],
+  /** The member id of the server's owner, for an export or import from another computer. */
+  ownerMemberId?: () => string | null,
 ): InstanceTransferService {
   /** An empty answer for an agent of `exported`; any other agent is a boundary call that must not happen. */
   const forExported =
@@ -28,6 +31,14 @@ export function emptyInstanceTransferService(
   const agents: InstanceTransferOptions["agents"] = {
     listAgents: () => [...exported],
     listRoutines: forExported("listRoutines", []),
+    listRoutineRuns: (_input) => [],
+    importRoutineRuns: (_agentId, _routineId, _runs) => {
+      throw unexpected("importRoutineRuns");
+    },
+    listChannelRoutineRuns: (_input) => [],
+    importChannelRoutineRuns: (_channelId, _routineId, _runs) => {
+      throw unexpected("importChannelRoutineRuns");
+    },
     listMemories: forExported("listMemories", []),
     getMemorySelection: forExported("getMemorySelection", { selections: [] }),
     setMemoryInclusion: (_input) => {
@@ -71,6 +82,17 @@ export function emptyInstanceTransferService(
         update: (_channel, _changes) => {
           throw unexpected("channels.update");
         },
+        context: (_channelId, _agentId) => {
+          throw unexpected("channels.context");
+        },
+      },
+      mailbox: {
+        stageGeneratedCopy: (_input) => Effect.die(unexpected("mailbox.stageGeneratedCopy")),
+        persistGeneratedAttachmentsWith: (_ids, _eventType, _write) => {
+          throw unexpected("mailbox.persistGeneratedAttachmentsWith");
+        },
+        discardStagedGeneratedAttachments: (_ids) =>
+          Effect.die(unexpected("mailbox.discardStagedGeneratedAttachments")),
       },
       images: {
         resolve: (_channel) => {
@@ -126,8 +148,31 @@ export function emptyInstanceTransferService(
     connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
     signedInProviders: () => [],
   };
+  /** The host-wide preferences of a new server; an export reads them, and an import must not write them. */
+  const preference = <T>(name: string, value: T) => ({
+    get: () => value,
+    set: (_value: T) => Effect.fail(unexpected(`serverPreferences.${name}.set`)),
+  });
+  const serverPreferences: InstanceTransferOptions["serverPreferences"] = {
+    timezone: preference<string | null>("timezone", "Europe/Warsaw"),
+    personality: preference("personality", { responseStyle: "natural" as const }),
+    busyMessageMode: preference("busyMessageMode", { mode: "queue" as const }),
+    agentDefaults: preference("agentDefaults", DEFAULT_AGENT_DEFAULTS),
+    memoryLimit: preference("memoryLimit", { limit: 128 as const }),
+    memoryReview: preference("memoryReview", { interval: 0 as const }),
+    skillLearning: preference("skillLearning", { mode: "automatic" as const }),
+    promptCacheTtl: preference("promptCacheTtl", "5m" as const),
+    ownerNotificationLevel: preference<"all" | "needs-me" | "nothing" | null>("ownerNotificationLevel", "needs-me"),
+    browsingMemory: preference("browsingMemory", { enabled: true }),
+    claudeUserSetup: preference("claudeUserSetup", false),
+    claudeCompactWindow: preference<number | null>("claudeCompactWindow", null),
+    machineAlerts: preference("machineAlerts", DEFAULT_MACHINE_ALERT_SETTINGS),
+    modelVisibility: preference<{ provider: string; hidden: string[] }[]>("modelVisibility", []),
+  };
   const options: InstanceTransferOptions = {
     uploadDirectory,
+    ...(ownerMemberId ? { ownerMemberId } : {}),
+    serverPreferences,
     channelActor: () => ({ id: "local", name: "You" }),
     sharedRoot: join(dirname(uploadDirectory), "shared"),
     appVersion: "e2e",

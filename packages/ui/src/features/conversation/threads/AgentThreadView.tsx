@@ -101,6 +101,7 @@ function shownInThread(message: AgentMessage): boolean {
     message.body.trim().length > 0 ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
+    message.videoGeneration !== undefined ||
     message.questionPrompt !== undefined ||
     message.plan !== undefined ||
     message.actionMarker !== undefined

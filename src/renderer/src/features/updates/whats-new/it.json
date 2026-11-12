@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Gli agenti nascosti ora continuano a lavorare. OpenBot ha disattivato le routine degli agenti che avevi nascosto prima di questa versione, quindi riattiva le routine che vuoi."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Fissa un messaggio nella chat di un agente: fai clic destro su di esso e seleziona Fissa. Il pulsante dei messaggi fissati nell’intestazione della chat mostra i messaggi fissati di tutte le chat dell’agente.",
+          "La Libreria ha cartelle e tre viste. Un agente può anche salvare i file che allega in una cartella che indichi.",
+          "Insegna un’attività: seleziona Insegna un’attività nel menu +, poi svolgi l’attività nel browser dell’agente. L’agente salva i passaggi come skill.",
+          "Raggruppa gli account di un provider nelle Impostazioni. Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi quello successivo.",
+          "Aggiungi skill da GitHub: incolla il link di un repository pubblico nel campo di ricerca delle skill del Marketplace.",
+          "Impostazioni server → Trasferimento può esportare una copia completa di un server e copiare gli agenti su un altro server in un solo passaggio.",
+          "Silenzia un agente dal suo menu nella barra laterale. Un agente silenziato non invia notifiche e non riproduce suoni."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un messaggio che invii a un agente mentre lavora ora indirizza il turno in corso. Per accodarlo come prima, disattiva Indirizza gli agenti mentre lavorano in Impostazioni → Agenti.",
+          "Un agente nascosto continua a lavorare. Esegue le sue routine e compare in Ha bisogno di te quando attende la tua risposta.",
+          "Il server aperto appare come logo in fondo alla barra delle pagine. Il pulsante Nuovo è alla fine del campo di ricerca della barra laterale.",
+          "OpenBot usa Electron 45.3.0 con Chromium 156, e più siti con una verifica anti-bot si caricano nel browser dell’agente."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot si avvia più in fretta, soprattutto su Windows, e un computer lento resta utilizzabile dopo l’avvio.",
+          "OpenBot resta reattivo dopo un riavvio quando hai molte attività o thread.",
+          "Su Linux e Windows, OpenBot completa la chiusura quando chiudi la finestra principale.",
+          "Le routine vengono eseguite in orario dopo che l’orologio del computer è stato corretto.",
+          "Il testo che copi da una chat non ha più righe vuote all’inizio o alla fine."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

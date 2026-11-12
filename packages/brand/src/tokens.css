@@ -78,6 +78,9 @@
   --openbot-price-sheen-warm-clear: rgba(255, 184, 132, 0);
   --openbot-price-rim: rgba(255, 255, 255, 0.28);
   --openbot-price-rim-under: rgba(255, 255, 255, 0.1);
+  /* The accent of the pricing page: the frame of the order form and the glow behind it. The web page has the
+     same pink. */
+  --openbot-price-accent: #ec4899;
   --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;
@@ -247,6 +250,15 @@
      a white button as well as on a dark surface. Both themes use the same pair. */
   --openbot-star: #facc15;
   --openbot-star-edge: #ca8a04;
+  /* Controls over a video or an image. The media has its own colors and does not follow the theme,
+     so both themes use white controls on a dark scrim. */
+  --openbot-media-control-text: #ffffff;
+  --openbot-media-control-muted: rgba(255, 255, 255, 0.78);
+  --openbot-media-control-track: rgba(255, 255, 255, 0.3);
+  --openbot-media-control-hover: rgba(255, 255, 255, 0.16);
+  --openbot-media-control-surface: rgba(0, 0, 0, 0.5);
+  --openbot-media-control-surface-hover: rgba(0, 0, 0, 0.64);
+  --openbot-media-control-scrim: rgba(0, 0, 0, 0.55);
   /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
   --openbot-beam-teal: var(--openbot-file-teal);
   --openbot-beam-blue: var(--openbot-accent-text);

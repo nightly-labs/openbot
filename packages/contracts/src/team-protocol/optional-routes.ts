@@ -61,16 +61,19 @@ import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
+import { GITHUB_SKILLS_CODECS } from "./github-skills-v1";
 import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
+import { HOST_RESTART_CODECS } from "./host-restart-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CODECS } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CODECS } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
@@ -172,6 +175,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
+  ...HOST_RESTART_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,
@@ -210,6 +214,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CLAUDE_COMPACT_WINDOW_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
+  ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
   ...HERMES_IMPORT_CODECS,
@@ -272,6 +277,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...VAULT_V2_CODECS,
   ...VAULT_V3_CODECS,
   ...INSTANCE_TRANSFER_CHUNKS_CODECS,
+  ...INSTANCE_TRANSFER_FULL_COPY_CODECS,
 ]);
 
 export function optionalRouteCodec(path: string): OptionalRouteCodec | undefined {

@@ -28,6 +28,7 @@ function prices(plan: BillingPlanId) {
     eur: { month: month.eur, year: year.eur },
     usd: { month: month.usd, year: year.usd },
     pln: { month: month.pln, year: year.pln },
+    brl: { month: month.brl, year: year.brl },
   };
 }
 

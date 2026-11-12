@@ -351,6 +351,7 @@ import type {
   ExternalLinkPreference,
 } from "./ipc-external-links";
 import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-github-connector";
+import type { GithubSkillSource } from "./ipc-github-skills";
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
@@ -366,6 +367,7 @@ import type {
 } from "./ipc-hosted-sites";
 import type {
   ApplyInstanceTransferInput,
+  CopyInstanceAgentsInput,
   ExportInstanceInput,
   InstanceExportResult,
   InstanceTransferPreview,
@@ -1367,6 +1369,11 @@ export const IPC_ENDPOINTS = {
      * Paired devices follow the handover that both keys sign.
      */
     rotateHostKey: scopedQuery<void, "required">()("host-admin:rotate-host-key"),
+    /**
+     * Restarts a self-hosted server now, through `host-restart-v1`. Running agent turns stop. A hosted
+     * server and a server on this computer restart through `hostedServers` and `localServers`.
+     */
+    restartHost: scopedQuery<void, "required">()("host-admin:restart-host"),
     getReleaseStatus: scopedQuery<HostReleaseStatus | null, "required">()("host-admin:get-release-status"),
     checkRelease: scopedQuery<HostReleaseStatus, "required">()("host-admin:check-release"),
     getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),
@@ -2135,6 +2142,8 @@ export const IPC_ENDPOINTS = {
     setAgentSkillEnabled: scopedRequest<SetEnabledSkillInput, InstalledSkill, "required">()(
       "agent:admin:set-skill-enabled",
     ),
+    // The skills under a link to a public GitHub repository, read by the computer that installs them.
+    readGithubSkills: scopedRequest<string, GithubSkillSource, "required">()("agent:admin:read-github-skills"),
     // A new agent from a marketplace listing or a shared template, added on the computer that runs
     // it. The `marketplaceAgents` and `agentTemplates` installs stay for this computer.
     addMarketplaceAgent: scopedRequest<InstallMarketplaceAgentInput, AddedAgent, "required">()(
@@ -2233,7 +2242,8 @@ export const IPC_ENDPOINTS = {
   },
   // Bound against the instance transfer service: a server's agents and server settings in one file for
   // another server. A remote server is reached with `instance-transfer-v1`; main opens both file
-  // dialogs and moves the file. `showExport` reveals the file this computer saved last.
+  // dialogs and moves the file. `showExport` reveals the file this computer saved last. `copy` takes
+  // the destination as its server and exports from `fromServerId` and imports in main, with no dialog.
   instanceTransfer: {
     summary: scopedQuery<InstanceTransferSummary, "required">()("instance-transfer:summary"),
     export: scopedRequest<ExportInstanceInput, InstanceExportResult, "required">()("instance-transfer:export"),
@@ -2241,6 +2251,7 @@ export const IPC_ENDPOINTS = {
     choose: scopedQuery<InstanceTransferPreview | null, "required">()("instance-transfer:choose"),
     apply: scopedRequest<ApplyInstanceTransferInput, InstanceTransferResult, "required">()("instance-transfer:apply"),
     discard: scopedRequest<string, void, "required">()("instance-transfer:discard"),
+    copy: scopedRequest<CopyInstanceAgentsInput, InstanceTransferResult, "required">()("instance-transfer:copy"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

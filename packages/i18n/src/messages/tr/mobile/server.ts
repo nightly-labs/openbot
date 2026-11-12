@@ -262,6 +262,7 @@ export const messages = {
     "Sunucu durur ve yeniden başlar. Bu yaklaşık bir dakika sürer. Çalışan ajan turları durur ve üyeler sunucu geri gelene kadar bağlantıyı kaybeder. Dosyalar ve sohbetler korunur.",
   "mobile.server.settings.restartConfirm": "Yeniden başlat",
   "mobile.server.settings.restarted": "{name} yeniden başlatılıyor",
+  "mobile.server.settings.restartUnsupported": "Buradan yeniden başlatmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.leaveTitle": "{name} sunucusundan ayrılmak istiyor musunuz?",
   "mobile.server.settings.leaveBody": "Tekrar katılmak için başka bir davete ihtiyacınız olacak.",
   "mobile.server.settings.leave": "Sunucudan ayrıl",
@@ -331,6 +332,7 @@ export const messages = {
   "mobile.server.route.member": "Üye",
   "mobile.server.route.timezone": "Saat dilimi",
   "mobile.server.route.personality": "Ajan kişiliği",
+  "mobile.server.route.agents": "Ajanlar",
   "mobile.server.settings.storage": "Depolama",
   "mobile.server.route.storage": "Depolama",
   "mobile.server.route.storageFiles": "Tüm dosyalar",
@@ -453,6 +455,25 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Anı sınırı kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Anı sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.memoryReview": "Bellek incelemesi",
+  "mobile.server.settings.memoryReviewDescription":
+    "Bu sunucudaki ajanların sohbetlerindeki kalıcı bilgileri arka planda ne sıklıkla kaydettiği.",
+  "mobile.server.settings.memoryReviewOff": "Kapalı",
+  "mobile.server.settings.memoryReviewTurns": { one: "Her {count} turda", other: "Her {count} turda" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Bellek incelemesi ayarı yüklenemedi.",
+  "mobile.server.settings.skillLearning": "Beceri öğrenme",
+  "mobile.server.settings.skillLearningDescription":
+    "Bu sunucudaki ajanların öğrendiklerini beceri olarak kaydedip kaydetmeyeceği.",
+  "mobile.server.settings.skillLearningAutomatic": "Otomatik",
+  "mobile.server.settings.skillLearningAsk": "Önce sor",
+  "mobile.server.settings.skillLearningOff": "Kapalı",
+  "mobile.server.settings.skillLearningLoadFailed": "Beceri öğrenme ayarı yüklenemedi.",
+  "mobile.server.settings.browsingMemory": "Gezinmemden öğren",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Bir ajanın tarayıcısını kontrol ettiğinizde, ajan kullandığınız sayfalardan ve düğmelerden sitelerin nasıl çalıştığını öğrenir. Yazdığınız metin saklanmaz.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Gezinme ayarı yüklenemedi.",
+  "mobile.server.settings.learningSaveFailed": "Bu ayar kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.learningUnsupported": "Bu ayarı burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.responseStyleDescription":
     "Doğal: ajanlar çalışırken kısa güncellemeler gönderir ve sohbet bunları gösterir. Klasik: ajanlar bitirdiklerinde bir kez yanıt verir.",
   "mobile.server.settings.responseStyleNatural": "Doğal",
@@ -461,8 +482,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Yanıt stili kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.personalityUnsupported":
     "Yanıt stilini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
-  "mobile.server.settings.personalityUnavailable":
-    "Ajan kişiliğini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.settings.agentsUnavailable":
+    "Ajan ayarlarını değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.route.browserProfiles": "Tarayıcı profilleri",
   "mobile.server.browserProfiles.unavailable":
     "Çevrimiçi bir sunucunun tarayıcı profillerini yalnızca sahibi veya bir yönetici yönetebilir.",
@@ -1111,6 +1132,8 @@ export const messages = {
   "mobile.server.settings.mcpCount": { one: "{count} sunucu", other: "{count} sunucu" },
   "mobile.server.mcp.unsupported": "MCP sunucularını burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.unavailable": "MCP sunucularını yönetmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.mcp.accessUnsupported":
+    "MCP sunucularını kimin alacağını seçmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.description":
     "MCP sunucuları bu sunucunun ajanlarına daha fazla araç verir. Claude ve Codex ajanları yalnızca bu listedeki sunucuları alır.",
   "mobile.server.mcp.loading": "MCP sunucuları yükleniyor…",
@@ -1181,6 +1204,21 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "{name} kaldırılsın mı?",
   "mobile.server.mcp.removeBody": "Bu sunucunun ajanları artık araçlarını almaz. Ayarlar saklanmaz.",
   "mobile.server.mcp.remove": "MCP sunucusunu kaldır",
+  "mobile.server.mcp.access.title": "Erişim",
+  "mobile.server.mcp.access.agents": "Ajanlar",
+  "mobile.server.mcp.access.agentsOf": "{name} kullanabilen ajanlar",
+  "mobile.server.mcp.access.allAgents": "Tüm ajanlar",
+  "mobile.server.mcp.access.allAgentsHint": "Tüm ajanlar, daha sonra eklenen her ajanı da kapsar.",
+  "mobile.server.mcp.access.noAgents": "Ajan yok",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "Kullanabilir",
+  "mobile.server.mcp.access.fromEveryone": "Herkes ile aynı",
+  "mobile.server.mcp.access.level": "{role} rolünün {name} erişimi",
+  "mobile.server.mcp.access.hint":
+    "Bir üye, Herkes ve rollerinin en yüksek düzeyini alır. Sahipler, yöneticiler ve sunucuyu ekleyen kişi onu her zaman yönetebilir.",
+  "mobile.server.mcp.access.loadFailed": "Bu MCP sunucusunu kimin aldığı yüklenemedi.",
+  "mobile.server.mcp.access.unavailable":
+    "Bu MCP sunucusunu kimin alacağını yalnızca çevrimiçi bir sunucunun sahibi veya yöneticisi seçebilir.",
   "mobile.server.usage.agents": "Ajanlar",
   "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Bu aralıkta ajan kullanımı kaydedilmedi.",
@@ -1338,6 +1376,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} ajan", other: "{count} ajan" },
   "mobile.server.roles.memberCount": { one: "{count} üye", other: "{count} üye" },
   "mobile.server.roles.agentLevel": "{role} rolünün {agent} erişimi",
+  "mobile.server.roles.changeInEveryone": "Herkes'te değiştir",
+  "mobile.server.roles.setAll": "Tümünü ayarla",
+  "mobile.server.roles.setAllLabel": "Tümünü ayarla: {role} rolünün tüm ajanlara erişimi",
+  "mobile.server.roles.mixed": "Karışık",
   "mobile.server.roles.delete": "Rolü sil",
   "mobile.server.roles.deleteTitle": "{name} silinsin mi?",
   "mobile.server.roles.deleteBody": "Bu role sahip üyeler, rolün verdiği ajanları kaybeder.",

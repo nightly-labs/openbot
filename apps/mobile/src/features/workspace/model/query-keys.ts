@@ -141,6 +141,9 @@ export const queryKeys = {
   /** The servers that the desktop app of `serverId` runs on its computer (`local-servers-v1`). */
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
+  skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
+  browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
   serverPersonality: (scope: QueryScope, serverId: string) => ["server-personality", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
   serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],
@@ -195,6 +198,8 @@ export const queryKeys = {
   customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
+  /** Who gets each MCP server of a host. A change answers with the whole snapshot. */
+  mcpAccess: (scope: QueryScope, serverId: string) => ["mcp-access", ...scope, serverId],
   serverLogo: (scope: QueryScope, serverId: string, ...logo: [] | [logoKey: string | null]) => [
     "server-logo",
     ...scope,
@@ -237,6 +242,8 @@ export const queryKeys = {
     "reads",
     agentId,
   ],
+  /** The pinned messages of all chats of one agent, from `message-pins-v1`. `message-pins-changed` invalidates it. */
+  messagePins: (scope: QueryScope, serverId: string, agentId: string) => ["message-pins", ...scope, serverId, agentId],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",

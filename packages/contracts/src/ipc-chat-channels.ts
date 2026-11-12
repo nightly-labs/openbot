@@ -167,6 +167,11 @@ export interface ChannelTask {
   revision: number;
   assignmentCount: number;
   error: string | null;
+  /**
+   * On a page only, for a `waiting` task: the dependencies whose results one of its earlier turns
+   * already had. Never stored. Absent from a host without channel-seen-subtasks-v1.
+   */
+  seenDependencies?: string[];
 }
 
 export interface ChannelMessage {
@@ -432,7 +437,8 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
-    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
+    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
+    (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
 }
 

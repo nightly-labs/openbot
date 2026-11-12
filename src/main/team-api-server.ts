@@ -86,6 +86,7 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
@@ -96,11 +97,13 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -149,6 +152,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
   teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
@@ -168,6 +172,7 @@ import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custo
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import {
@@ -330,10 +335,12 @@ import { routeDiscordAccess } from "./team-api/route-discord-access";
 import { routeEvents } from "./team-api/route-events";
 import { routeFiles } from "./team-api/route-files";
 import { routeFocusUse } from "./team-api/route-focus-use";
+import { routeGithubSkills } from "./team-api/route-github-skills";
 import { routeHermesImport } from "./team-api/route-hermes-import";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
+import { routeHostRestart } from "./team-api/route-host-restart";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
@@ -1233,6 +1240,7 @@ export class TeamApiServer {
       if ((await routeAgentThreadBranches(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadPages(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeSkillsAdmin(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeGithubSkills(context, this.#options.admin)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
@@ -1243,6 +1251,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
@@ -1506,6 +1515,7 @@ export class TeamApiServer {
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+        videoGeneration: capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       });
       if (encoded === null) return null;
       const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
@@ -2275,11 +2285,13 @@ export class TeamApiServer {
       channelIsolation: route.capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
       channelPicture: route.capabilities.has(CHANNEL_PICTURE_CAPABILITY),
       channelBrowser: route.capabilities.has(CHANNEL_BROWSER_CAPABILITY),
+      channelSeenSubtasks: route.capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+      videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
     };
     // The body is encoded before the head is written. A response the negotiated protocol cannot
     // represent - a route its frozen adapter does not classify - makes the encoder throw, and with
@@ -2584,6 +2596,7 @@ export class TeamApiServer {
           // The host reads the egress channel of each desktop peer, and only a profile proxy uses it.
           if (capability === BROWSER_EGRESS_CAPABILITY) return this.#options.browserProfiles !== undefined;
           if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
+          if (capability === GITHUB_SKILLS_CAPABILITY) return this.#options.admin?.skills !== undefined;
           if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
           if (capability === SHARED_TABLES_CAPABILITY) return this.#options.admin?.sharedTables !== undefined;
           if (capability === AGENT_INSTALL_CAPABILITY)
@@ -2610,6 +2623,7 @@ export class TeamApiServer {
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+          if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
           if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
@@ -2641,6 +2655,8 @@ export class TeamApiServer {
           if (capability === HERMES_IMPORT_CAPABILITY) return this.#options.hermesImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === INSTANCE_TRANSFER_CHUNKS_CAPABILITY) return this.#options.instanceTransfer !== undefined;
+          if (capability === INSTANCE_TRANSFER_FULL_COPY_CAPABILITY)
+            return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;

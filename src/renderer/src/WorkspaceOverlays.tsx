@@ -52,6 +52,7 @@ import {
 } from "./features/servers/hosted-server-upsell-controller";
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
 import {
   remoteMcpSignIn,
@@ -317,6 +318,7 @@ function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
   const { openAppSettings } = useSettings();
+  const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
     (() => {
@@ -336,6 +338,9 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      thisComputer
+      pricingPage={windowPage.pricing}
+      onOpenUrl={(url) => void appPort().openUrl(url)}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
@@ -458,8 +463,15 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { activeServer, hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } =
-    useServers();
+  const {
+    servers,
+    activeServer,
+    hostStatus,
+    hostedServerIds,
+    hostedServersAvailable,
+    hostedServersLoaded,
+    setAddServerOpen,
+  } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -650,6 +662,21 @@ function ServerSettings() {
       link: local ? createLinkAccountStore() : undefined,
     };
   });
+  /**
+   * Copy to another server: each server that the user administers with `instance-transfer-v1`. Main
+   * holds the connections of all of them, so it reads from one and writes to another.
+   */
+  const copyOptions = (): ServerCopyOptions | undefined => {
+    const eligible = servers().filter((entry) => serverCanAdminister(entry, "instance-transfer-v1"));
+    if (eligible.length < 2) return undefined;
+    return {
+      servers: eligible,
+      onOpenServer: (serverId) => {
+        setServerSettingsOpen(false);
+        if (!eligible.find((entry) => entry.id === serverId)?.active) void selectServer(serverId);
+      },
+    };
+  };
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -1004,10 +1031,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1") }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

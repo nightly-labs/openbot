@@ -43,6 +43,7 @@
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
+      "./plugins/with-app-icons",
       "expo-router",
       "expo-video",
       [

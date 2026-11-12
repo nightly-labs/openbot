@@ -30,6 +30,7 @@ import type {
   RoutineRunConversationEvent,
   SkillConversationEvent,
   SkillSuggestionEvent,
+  VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
@@ -240,6 +241,7 @@ export interface AgentMessage {
   /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  videoGeneration?: VideoGenerationInfo | undefined;
   questionPrompt?: ConversationQuestionPrompt | undefined;
   /** The interactive block an agent drew. A blocking block sits beside `questionPrompt`. */
   uiBlock?: ConversationUiBlock;

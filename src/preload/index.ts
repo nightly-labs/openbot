@@ -311,6 +311,7 @@ import {
   decodeAgentTemplateDetail,
   decodeAgentTemplatePreview,
   decodeAgentTemplatePublication,
+  decodeGithubSkillSourceFromMain,
   decodeInstalledSkill,
   decodeInstalledSkillsFromMain,
   decodeMarketplaceAgentDetail,
@@ -1256,6 +1257,7 @@ const openbotApi: OpenBotDesktopApi = {
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     rotateHostKey: decodeVoid,
+    restartHost: decodeVoid,
     getUpdateStatus: decodeHostUpdateStatus,
     getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
     checkRelease: decodeHostReleaseStatusFromMain,
@@ -1307,6 +1309,7 @@ const openbotApi: OpenBotDesktopApi = {
     choose: decodeInstanceTransferPreview,
     apply: decodeInstanceTransferResult,
     discard: decodeVoid,
+    copy: decodeInstanceTransferResult,
   }),
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,
@@ -1422,6 +1425,7 @@ const openbotApi: OpenBotDesktopApi = {
       installAgentSkill: decodeInstalledSkill,
       uninstallAgentSkill: decodeVoid,
       setAgentSkillEnabled: decodeInstalledSkill,
+      readGithubSkills: decodeGithubSkillSourceFromMain,
       addMarketplaceAgent: decodeAddedAgent,
       addTemplateAgent: decodeAddedAgent,
     }),
