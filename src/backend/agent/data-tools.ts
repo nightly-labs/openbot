@@ -71,7 +71,7 @@ export const handleDataTool = Effect.fn("DataTools.handle")(function* (
     }
     default: {
       const statement = yield* toolStep(() => dataStatementSchema.parse(args));
-      const parameters = checkAgentParameters(statement.params);
+      const parameters = checkAgentParameters(statement.params, statement.sql);
       if (!parameters.ok) return openBotToolFailure(parameters.message);
       if (tool === "execute_data") {
         const written = yield* tables
