@@ -204,6 +204,12 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
 
+### Leaseweb servers
+
+Take only a Leaseweb VPS that has no reference, and set its reference before any other work on it.
+Never take a VPS that has a reference, also `pool-free`. The reference scheme is in
+[Leaseweb references](docs/hosted-servers.md#leaseweb-references).
+
 ### Local processes
 
 - `bun run dev:seed --dry-run` is read-only.
