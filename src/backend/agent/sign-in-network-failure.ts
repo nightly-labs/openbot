@@ -55,8 +55,12 @@ function outputClosed(child: ChildProcess): Effect.Effect<void> {
   }).pipe(Effect.timeoutOption(OUTPUT_DRAIN_MS), Effect.asVoid);
 }
 
-/** The network failure of a sign-in command that failed, or null when its output gives another cause. */
+/**
+ * The network failure of a sign-in command that failed, or null when its output gives another cause.
+ * Only a command that ended by itself is read: a sign-in that OpenBot stopped, such as at its deadline,
+ * keeps its own message, also when the command logged a network error that it then recovered from.
+ */
 export const signInNetworkFailure = Effect.fnUntraced(function* (child: ChildProcess, output: () => string) {
   yield* outputClosed(child);
-  return isNetworkFailureOutput(output()) ? signInNetworkError() : null;
+  return child.exitCode !== null && isNetworkFailureOutput(output()) ? signInNetworkError() : null;
 });
