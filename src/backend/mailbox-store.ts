@@ -399,6 +399,32 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * Keeps a draft as a file with no owner agent, as a generated image is kept, and discards the draft.
+   * Answers the new file, `missing` when there is no such draft, or `type` when its type is not in
+   * `types`. A refused draft stays.
+   */
+  keepDraft = Effect.fn("MailboxStore.keepDraft")(function* (
+    this: MailboxStore,
+    id: string,
+    types: ReadonlySet<string>,
+  ): Effect.fn.Return<AttachmentSummary | "missing" | "type", StoredStateFailure> {
+    const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+    if (!draft) return "missing";
+    if (!types.has(draft.mimeType)) return "type";
+    const source = yield* this.#files
+      .resolveDraft(draft)
+      .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    if (!source) return "missing";
+    const kept = yield* this.storeGeneratedAttachment({
+      sourcePath: source.path,
+      name: source.name,
+      mimeType: source.mimeType,
+    });
+    yield* this.discardDraft(id);
+    return kept;
+  }, Effect.uninterruptible).bind(this);
+
   discardDraft = Effect.fn("MailboxStore.discardDraft")(function* (
     this: MailboxStore,
     id: string,

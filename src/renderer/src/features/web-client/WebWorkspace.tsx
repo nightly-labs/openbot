@@ -1300,6 +1300,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       };
     },
     githubConnector: githubPort,
+    attachmentMedia: runtime.attachmentMedia,
   });
   const librarySupported = () => workspace.state.capabilities.includes(STORAGE_CAPABILITY);
   // As the Tasks page: an older host has no storage routes and no Library button.

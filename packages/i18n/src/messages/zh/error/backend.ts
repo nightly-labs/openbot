@@ -61,6 +61,8 @@ export const messages = {
     "压缩无法缩小这个聊天：压缩两次后，它仍占用模型上下文窗口的 {percent}%，所以 OpenBot 停止自动压缩。窗口的大部分被工具和指令占用。请关闭这个智能体不需要的 MCP 服务器或电脑操作，或选择窗口更大的模型。然后开始新的聊天。",
   "error.backend.contextCompactionStopped":
     "此对话的压缩连续失败了两次，因此 OpenBot 停止自动压缩它。每次尝试都会把整个对话发送给模型，并消耗你的套餐额度。选择“立即压缩”重试，或开始新对话。",
+  "error.backend.providerModelAtCapacity":
+    "该模型已满载。提供方会在几分钟后重试。要立即继续，请停止本轮并选择其他模型。",
   "error.backend.providerRetrying":
     "提供方已 {attempts} 次未能完成这个请求，正在重试。如果智能体没有继续，请停止本轮。",
   "error.backend.providerRetryingLargeContext":

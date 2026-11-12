@@ -12,6 +12,7 @@ import {
   type MessagingPlatform,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
+  type WorkflowMediaKind,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
@@ -91,6 +92,14 @@ export interface WorkflowImageModel {
   provider: ProviderLogoVariant;
   /** The company that makes the model. */
   maker: string;
+  /** The subscription that pays for the file, such as "ChatGPT". */
+  subscription: string;
+  /** True when the provider uses an API key in place of the subscription, so each file costs money. */
+  apiKey?: boolean;
+  /** What the model can make. */
+  kinds: readonly WorkflowMediaKind[];
+  /** Whether a video can speak in a preset voice. */
+  voices?: boolean;
 }
 
 /**
@@ -114,6 +123,16 @@ export interface WorkflowCatalogs {
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
+  /**
+   * The address of an image or a video that a media step made, from the attachment id of its result.
+   * A host without it shows the results that `files` names.
+   */
+  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | undefined) | undefined;
+  /**
+   * Sends a picture from the computer to the host and answers it as a Library file. The host shows
+   * why it refused one. Without it, a file from the computer stays in the page.
+   */
+  upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
   /** The name of the user, which a new sticky note saves as its author. */
   self?: string | undefined;
 }

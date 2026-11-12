@@ -176,6 +176,7 @@ import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
+import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
 
@@ -400,6 +401,7 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_MEDIA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
 
@@ -602,6 +604,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
 ] as const;
 
@@ -820,6 +823,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== GITHUB_SKILLS_CAPABILITY &&
     capability !== HOST_RESTART_CAPABILITY &&
     capability !== VAULT_V4_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_CAPABILITY &&
     capability !== AGENT_DEFAULTS_CAPABILITY,
 );
 /**
@@ -913,6 +917,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1090,6 +1095,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== GITHUB_SKILLS_CAPABILITY &&
       capability !== HOST_RESTART_CAPABILITY &&
       capability !== VAULT_V4_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_CAPABILITY &&
       capability !== AGENT_DEFAULTS_CAPABILITY,
   );
 }
