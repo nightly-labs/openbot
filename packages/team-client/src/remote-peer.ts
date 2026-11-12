@@ -401,7 +401,7 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
-  /** When the host last answered a request on this peer. A request deadline counts from it. */
+  /** When the host last answered a request on this peer, as `performance.now()`. A request deadline counts from it. */
   lastAnswerAt: number;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
@@ -1757,7 +1757,7 @@ export function createRemoteTeamPeer(
         if (frame.type !== "response")
           return yield* new RemotePeerError({ message: "The host returned an invalid RPC frame." });
         state.answeredRequest = true;
-        state.lastAnswerAt = Date.now();
+        state.lastAnswerAt = performance.now();
         const pending = pendingRequests.get(frame.requestId);
         if (!pending) return;
         pending.profile?.responded(data);

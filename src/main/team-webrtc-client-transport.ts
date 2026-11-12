@@ -211,7 +211,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       profile: RemoteRequestProfile | null;
     }
   >();
-  /** When each host last answered a request. A request deadline counts from it. */
+  /** When each host last answered a request, as `performance.now()`. A request deadline counts from it. */
   readonly #lastAnswerAt = new Map<string, number>();
   readonly #lastEventSequence = new Map<string, number>();
   readonly #hostPublicKeys = new Map<string, string>();
@@ -1464,7 +1464,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.#failProtocol(hostId, "The host returned a client RPC frame on the RPC channel.");
       return;
     }
-    this.#lastAnswerAt.set(hostId, Date.now());
+    this.#lastAnswerAt.set(hostId, performance.now());
     const pending = this.#pending.get(frame.requestId);
     if (!pending || pending.hostId !== hostId) return;
     pending.profile?.responded(data);

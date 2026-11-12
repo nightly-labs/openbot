@@ -474,7 +474,8 @@ export const REMOTE_REQUEST_MAX_WAIT_MILLISECONDS = 60_000;
  * channel, so on a slow path a request waits behind earlier answers while the host works. Thus
  * `timeoutMs` counts from the send or the last answer on the channel, whichever is later. A host
  * that stops sends no answers and fails the request after `timeoutMs`, as before. `rearm` keeps
- * each later timer, so that the caller can clear it.
+ * each later timer, so that the caller can clear it. Times are `performance.now()`, which a clock
+ * change does not move.
  */
 export function startRemoteRequestDeadline(
   timeoutMs: number,
@@ -482,10 +483,10 @@ export function startRemoteRequestDeadline(
   expire: () => void,
   rearm: (timer: ReturnType<typeof setTimeout>) => void,
 ): ReturnType<typeof setTimeout> {
-  const sentAt = Date.now();
+  const sentAt = performance.now();
   const limitAt = sentAt + Math.max(timeoutMs, REMOTE_REQUEST_MAX_WAIT_MILLISECONDS);
   const check = () => {
-    const now = Date.now();
+    const now = performance.now();
     const next = Math.min(Math.max(sentAt, lastAnswerAt()) + timeoutMs, limitAt);
     if (now >= next) expire();
     else rearm(setTimeout(check, next - now));
