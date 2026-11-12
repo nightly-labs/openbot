@@ -334,6 +334,8 @@ export const messages = {
   "server.settings.later": "Позже",
   "server.settings.setUp": "Настроить",
   "server.settings.agents": "Агенты",
+  "server.settings.agentsDescription":
+    "Выберите, что могут делать агенты на этом сервере, если вы не задали это для агента.",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
     "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",

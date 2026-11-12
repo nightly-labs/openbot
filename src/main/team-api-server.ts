@@ -36,6 +36,7 @@ import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-re
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
@@ -283,6 +284,7 @@ import { routeAgentAccess } from "./team-api/route-agent-access";
 import {
   routeAgentAdmin,
   routeAgentBackupModels,
+  routeAgentDefaults,
   routeAgentFastMode,
   routeAgentHostSettings,
   routeAgentNewChat,
@@ -1183,6 +1185,7 @@ export class TeamApiServer {
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentDefaults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
@@ -2589,6 +2592,7 @@ export class TeamApiServer {
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_DEFAULTS_CAPABILITY) return this.#options.admin?.agentDefaults !== undefined;
           if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (
             capability === BROWSER_PROFILES_CAPABILITY ||

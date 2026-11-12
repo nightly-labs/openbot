@@ -340,6 +340,7 @@ export const messages = {
   "server.settings.later": "稍后",
   "server.settings.setUp": "设置",
   "server.settings.agents": "助手",
+  "server.settings.agentsDescription": "选择在你未单独设置时，此服务器上的助手可以做什么。",
   "server.settings.timezone": "时区",
   "server.settings.timezoneDescription": "当消息未提供发送者时区时，新创建的自动化任务使用该时间。",
   "server.settings.timezoneAutomatic": "自动（{zone}）",

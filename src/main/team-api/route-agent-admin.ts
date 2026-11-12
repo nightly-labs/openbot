@@ -1,6 +1,8 @@
 import {
+  parseSetAgentDefaultChoiceInput,
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
+  parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
@@ -12,6 +14,7 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -290,6 +293,58 @@ export async function routeAgentFastMode(
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid fast mode setting.");
     }
     return json(200, await runCauseEffect(settings.updateFastMode(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Settings › Agents of this computer, changed from a joined server: the agent defaults, the default
+ * for a message sent to a busy agent, and which agents follow them. They decide what the agents may
+ * do on this computer, so only an owner or admin can read or change them. A hidden agent is not
+ * listed and cannot be named. Frozen by `agent-defaults-v1`.
+ */
+export async function routeAgentDefaults(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.update;
+  const choice = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.choice;
+  if (!read && !update && !choice) return "unmatched";
+  const settings = admin?.agentDefaults;
+  if (!settings || !capabilities.has(AGENT_DEFAULTS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the agent-defaults wire codec.
+  const body = await readJson(request);
+  const visible = (overview: ReturnType<typeof settings.read>) => ({
+    ...overview,
+    agents: overview.agents.filter((agent) => !hiddenAgentIds.has(agent.agentId)),
+  });
+  if (read) return json(200, visible(settings.read()));
+  if (update) {
+    let input: ReturnType<typeof parseUpdateAgentDefaultsInput>;
+    try {
+      input = parseUpdateAgentDefaultsInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent defaults.");
+    }
+    return json(200, visible(await runCauseEffect(settings.update(input))));
+  }
+  let input: ReturnType<typeof parseSetAgentDefaultChoiceInput>;
+  try {
+    input = parseSetAgentDefaultChoiceInput(body);
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent default choice.");
+  }
+  if (input.agentIds.some((agentId) => hiddenAgentIds.has(agentId)))
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  try {
+    return json(200, visible(await runCauseEffect(settings.setChoice(input))));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

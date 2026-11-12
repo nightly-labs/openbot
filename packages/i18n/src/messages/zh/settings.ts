@@ -145,6 +145,7 @@ export const messages = {
   "settings.planStart.set": "设置",
   "settings.automationLimit.sectionTitle": "上限",
   "settings.automationLimit.sectionDescription": "适用于这台电脑上的所有助手。",
+  "settings.automationLimit.sectionDescriptionServer": "适用于这台服务器上的所有助手。",
   "settings.automationLimit.title": "每小时请求数",
   "settings.automationLimit.option": "每小时 {limit} 次",
   "settings.automationLimit.note": "本地脚本每小时最多可向每个助手发送的消息和自动化任务运行次数。",

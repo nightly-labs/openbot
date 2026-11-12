@@ -344,6 +344,7 @@ export const messages = {
   "server.settings.later": "나중에",
   "server.settings.setUp": "설정",
   "server.settings.agents": "에이전트",
+  "server.settings.agentsDescription": "에이전트별로 설정하지 않을 때 이 서버의 에이전트가 할 수 있는 일을 선택하세요.",
   "server.settings.timezone": "시간대",
   "server.settings.timezoneDescription": "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요.",
   "server.settings.timezoneAutomatic": "자동 ({zone})",

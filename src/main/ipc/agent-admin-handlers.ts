@@ -11,6 +11,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentDefaultsOverview,
   decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   decodeBrowserComputerSharing,
@@ -29,10 +30,12 @@ import {
   parseClearBrowserDataInput,
   parseDeleteBrowserProxyInput,
   parseSaveBrowserProxyInput,
+  parseSetAgentDefaultChoiceInput,
   parseSetBrowserProfileProxyInput,
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentBrowserProfileInput,
+  parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
@@ -45,6 +48,7 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -83,6 +87,7 @@ import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentDefaultsSettingsService } from "../agent-defaults-settings";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
@@ -122,6 +127,7 @@ interface AgentAdminRemoteServers {
 interface AgentAdminIpcDependencies {
   settings: AgentAdminSettingsService;
   hostSettings: AgentHostSettingsService;
+  defaultsSettings: AgentDefaultsSettingsService;
   browserProfiles: BrowserProfileService;
   skills: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub">;
   marketplaceAgents: Pick<AgentMarketplaceService, "install">;
@@ -138,6 +144,7 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
 export function agentAdminIpcHandlers({
   settings,
   hostSettings,
+  defaultsSettings,
   browserProfiles,
   skills,
   marketplaceAgents,
@@ -256,6 +263,18 @@ export function agentAdminIpcHandlers({
         local: (input) => runCauseEffect(browserProfiles.updateAgent(input)),
         remote: (input, serverId) =>
           remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.updateAgent, input, decodeAgentBrowserProfile),
+      }),
+      getAgentDefaultsOverview: scopedQueryHandler({
+        local: () => defaultsSettings.read(),
+        remote: (serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.settings, {}),
+      }),
+      updateAgentDefaultsOverview: scopedHandler(parseUpdateAgentDefaultsInput, {
+        local: (input) => runCauseEffect(defaultsSettings.update(input)),
+        remote: (input, serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.update, input),
+      }),
+      setAgentDefaultChoice: scopedHandler(parseSetAgentDefaultChoiceInput, {
+        local: (input) => runCauseEffect(defaultsSettings.setChoice(input)),
+        remote: (input, serverId) => remoteAgentDefaults(serverId, AGENT_DEFAULTS_ROUTES.choice, input),
       }),
       listBrowserProxies: scopedQueryHandler({
         local: () => browserProfiles.listProxies(),
@@ -419,6 +438,12 @@ export function agentAdminIpcHandlers({
     return runCauseEffect(
       remoteServers.request(serverId, path, decodeAgentTaskLimitSettings, { method: "POST", body }),
     );
+  }
+
+  function remoteAgentDefaults(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_DEFAULTS_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeAgentDefaultsOverview, { method: "POST", body }));
   }
 
   function remotePlanCard(serverId: string, path: string, body: unknown) {

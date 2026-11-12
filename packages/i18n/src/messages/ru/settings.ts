@@ -148,6 +148,7 @@ export const messages = {
   "settings.planStart.set": "Задать",
   "settings.automationLimit.sectionTitle": "Лимит",
   "settings.automationLimit.sectionDescription": "Действует для всех агентов на этом компьютере.",
+  "settings.automationLimit.sectionDescriptionServer": "Действует для всех агентов на этом сервере.",
   "settings.automationLimit.title": "Запросов в час",
   "settings.automationLimit.option": "{limit} в час",
   "settings.automationLimit.note":

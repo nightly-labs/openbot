@@ -6,6 +6,7 @@ import {
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentDefaultsOverview,
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
   decodeAgentHostSettings,
@@ -49,6 +50,7 @@ import {
   type AgentColorsSnapshot,
   decodeAgentColorsSnapshot,
 } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -89,6 +91,11 @@ import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
+import {
+  BACKGROUND_PROCESSES_CAPABILITY,
+  BACKGROUND_PROCESSES_ROUTES,
+  decodeBackgroundProcessesResponse,
+} from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -425,6 +432,11 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
+  | "loadAgentDefaults"
+  | "updateAgentDefaults"
+  | "setAgentDefaultChoice"
+  | "loadBackgroundProcesses"
+  | "stopBackgroundProcess"
   | "loadAgentFastMode"
   | "updateAgentFastMode"
   | "loadAgentInstructions"
@@ -1343,6 +1355,32 @@ export function createHostRequestActions({
     updateAgentPlanCard: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
+    },
+    loadAgentDefaults: async (serverId) =>
+      has(serverId, AGENT_DEFAULTS_CAPABILITY)
+        ? request("POST", AGENT_DEFAULTS_ROUTES.settings, decodeAgentDefaultsOverview, {}, serverId)
+        : null,
+    updateAgentDefaults: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_DEFAULTS_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_DEFAULTS_ROUTES.update, decodeAgentDefaultsOverview, { ...input }, serverId);
+    },
+    setAgentDefaultChoice: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_DEFAULTS_CAPABILITY, "mobile.agent.host.unsupported");
+      return request(
+        "POST",
+        AGENT_DEFAULTS_ROUTES.choice,
+        decodeAgentDefaultsOverview,
+        { agentIds: [...input.agentIds], setting: input.setting, choice: input.choice },
+        serverId,
+      );
+    },
+    loadBackgroundProcesses: async (serverId) => {
+      requireCapability(capabilities, serverId, BACKGROUND_PROCESSES_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", BACKGROUND_PROCESSES_ROUTES.list, decodeBackgroundProcessesResponse, {}, serverId);
+    },
+    stopBackgroundProcess: async (id, serverId) => {
+      requireCapability(capabilities, serverId, BACKGROUND_PROCESSES_CAPABILITY, "mobile.agent.host.unsupported");
+      await request("POST", BACKGROUND_PROCESSES_ROUTES.stop, ignoreResponse, { id }, serverId);
     },
     loadAgentFastMode: async (agentId, serverId) =>
       has(serverId, AGENT_FAST_MODE_CAPABILITY)

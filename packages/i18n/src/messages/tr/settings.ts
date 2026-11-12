@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Ayarla",
   "settings.automationLimit.sectionTitle": "Sınır",
   "settings.automationLimit.sectionDescription": "Bu bilgisayardaki tüm ajanlar için geçerlidir.",
+  "settings.automationLimit.sectionDescriptionServer": "Bu sunucudaki tüm ajanlar için geçerlidir.",
   "settings.automationLimit.title": "Saatlik istek",
   "settings.automationLimit.option": "Saatte {limit}",
   "settings.automationLimit.note":

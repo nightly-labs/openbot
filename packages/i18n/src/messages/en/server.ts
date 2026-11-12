@@ -417,6 +417,8 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
     "New routines use this timezone when the message does not give the sender's timezone.",

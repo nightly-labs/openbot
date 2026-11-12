@@ -146,6 +146,7 @@ export const messages = {
   "settings.planStart.set": "설정",
   "settings.automationLimit.sectionTitle": "한도",
   "settings.automationLimit.sectionDescription": "이 컴퓨터의 모든 에이전트에 적용돼요.",
+  "settings.automationLimit.sectionDescriptionServer": "이 서버의 모든 에이전트에 적용돼요.",
   "settings.automationLimit.title": "시간당 요청",
   "settings.automationLimit.option": "시간당 {limit}회",
   "settings.automationLimit.note":

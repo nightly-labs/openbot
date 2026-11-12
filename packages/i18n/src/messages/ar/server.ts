@@ -396,6 +396,7 @@ export const messages = {
   "server.settings.later": "لاحقًا",
   "server.settings.setUp": "إعداد",
   "server.settings.agents": "الوكلاء",
+  "server.settings.agentsDescription": "اختر ما يمكن أن يفعله الوكلاء على هذا الخادم عندما لا تحدده لوكيل.",
   "server.settings.timezone": "المنطقة الزمنية",
   "server.settings.timezoneDescription":
     "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
