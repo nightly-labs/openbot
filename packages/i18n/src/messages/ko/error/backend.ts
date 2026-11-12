@@ -258,6 +258,10 @@ export const messages = {
     "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. MCP 설정을 열고 로그인을 선택해 주세요.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. MCP 설정을 열고 연결 테스트를 선택하면 원인을 확인할 수 있어요.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. {provider}은(는) 이 서버의 도구를 사용할 수 없어요. {provider}은(는) 서버를 직접 시작하므로 OpenBot의 연결 테스트는 성공할 수 있어요. 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "서버가 제시간에 응답하지 않아 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":

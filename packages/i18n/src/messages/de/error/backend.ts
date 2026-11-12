@@ -289,6 +289,10 @@ export const messages = {
     "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne die MCP-Einstellungen und wähle Anmelden.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} konnte den MCP-Server {name} nicht starten. Öffne die MCP-Einstellungen und wähle Verbindung testen, um die Ursache zu sehen.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":

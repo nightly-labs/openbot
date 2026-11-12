@@ -263,6 +263,10 @@ export const messages = {
     "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. MCP ayarlarını açın ve Oturum aç'ı seçin.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için MCP ayarlarını açın ve Bağlantıyı test et'i seçin.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı. Araçları {provider} için kullanılamıyor. {provider} sunucuyu kendisi başlatır, bu yüzden OpenBot'taki bağlantı testi başarılı olabilir. Yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu zamanında yanıt vermedi. Yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":

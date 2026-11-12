@@ -250,6 +250,10 @@ export const messages = {
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את הגדרות ה-MCP ולבחור Test connection כדי לראות את הסיבה.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
