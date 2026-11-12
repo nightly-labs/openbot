@@ -45,6 +45,7 @@ import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-pr
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -2592,6 +2593,7 @@ export class TeamApiServer {
           if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_SPEED_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (
             capability === BROWSER_PROFILES_CAPABILITY ||
             capability === BROWSER_PROFILES_EVENTS_CAPABILITY ||
