@@ -47,6 +47,7 @@ import {
   CardValueScrub,
   collectBoundedSnapshot,
   collectFocus,
+  controlIdentity,
   cssObjectMatch,
   describeTargetCandidates,
   fallbackRole,
@@ -908,7 +909,9 @@ export class BrowserCdpEngine {
         const retainedRefs = new Set(snapshot.elements.map((element) => element.ref));
         this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
         this.#lastSnapshot = snapshot;
-        const lowCoverage = parsed.elements.length < 3 && parsed.text.length > 200;
+        // An empty snapshot of a web page also needs the image: the page draws nothing that the snapshot can read.
+        const emptyPage = parsed.elements.length === 0 && !parsed.text && /^https?:/u.test(snapshot.url);
+        const lowCoverage = (parsed.elements.length < 3 && parsed.text.length > 200) || emptyPage;
         const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
         const imageReason = parsed.hasVisualSurface
           ? "canvas-or-video"
@@ -2992,7 +2995,7 @@ export class BrowserCdpEngine {
       const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
       if (deadline !== undefined) {
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId).pipe(
+        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId, record.drawnOnly).pipe(
           Effect.catch(() => Effect.succeed(null)),
         );
         yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -3239,6 +3242,7 @@ export class BrowserCdpEngine {
     send: SendCommand,
     backendNodeId: number,
     sessionId?: string,
+    drawnOnly = false,
   ): Effect.fn.Return<
     { role: string; name: string; tag: string; visibleText: string; visible: boolean },
     BrowserOperationError
@@ -3250,13 +3254,14 @@ export class BrowserCdpEngine {
         this.#callOnNode(
           send,
           backendNodeId,
-          String.raw`function() {
+          // A ref of the fallback snapshot pass is in an aria-hidden or opacity 0 container that the page draws.
+          String.raw`function(drawnOnly) {
           if (this.nodeType !== 1 || !this.isConnected || this.getClientRects().length === 0) return null;
           let element = this;
           while (element) {
-            if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
+            if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || (!drawnOnly && String(element.getAttribute('aria-hidden')).toLowerCase() === 'true')) return null;
             const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
+            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (!drawnOnly && style.opacity === '0')) return null;
             const parent = element.parentElement;
             if (parent) element = parent;
             else {
@@ -3266,7 +3271,7 @@ export class BrowserCdpEngine {
           }
           return { visibleText: String(this.innerText ?? this.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 500) };
         }`,
-          [],
+          [drawnOnly],
           sessionId,
         ),
       ],
@@ -3276,11 +3281,17 @@ export class BrowserCdpEngine {
     const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
     const ax = axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
     const state = recordValue(pageState);
+    const visibleText = stringValue(state?.visibleText);
+    const identity = drawnOnly
+      ? controlIdentity(node ?? {}, ax, visibleText)
+      : {
+          role: ax ? axValue(ax.role).toLowerCase() || fallbackRole(node ?? {}) : fallbackRole(node ?? {}),
+          name: ax ? axValue(ax.name).slice(0, 500) : "",
+        };
     return {
-      role: ax ? axValue(ax.role).toLowerCase() || fallbackRole(node ?? {}) : fallbackRole(node ?? {}),
-      name: ax ? axValue(ax.name).slice(0, 500) : "",
+      ...identity,
       tag: (stringValue(node?.localName) || stringValue(node?.nodeName)).toLowerCase(),
-      visibleText: stringValue(state?.visibleText),
+      visibleText,
       visible: state !== undefined,
     };
   });
