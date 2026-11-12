@@ -111,6 +111,7 @@ export function serverSupportsCapability(
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "instance-transfer-chunks-v1" ||
+      capability === "instance-transfer-full-copy-v1" ||
       capability === "agent-hidden-v1" ||
       capability === "agent-hidden-work" ||
       capability === "agent-tasks-v1" ||

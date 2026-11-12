@@ -524,8 +524,11 @@ export interface TeamApiAdmin {
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
   >;
-  /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
-  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
+  /**
+   * `skills-admin-v1`: list, install, remove and enable the skills of one agent. `github-skills-v1`:
+   * read the skills under a GitHub link.
+   */
+  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */
   sharedTables?: Pick<AgentService, "listTables" | "deleteTable">;
   /**

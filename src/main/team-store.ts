@@ -912,6 +912,16 @@ export class TeamStore {
     return this.#state?.members.map(publicMember) ?? [];
   }
 
+  /**
+   * The account of each member who has one: the same person has the same account on every server,
+   * and a member id belongs to one server. A server transfer moves a person's choices by it.
+   */
+  memberAccounts(): { memberId: string; accountId: string; owner: boolean }[] {
+    return this.#requireState().members.flatMap((member) =>
+      member.accountId ? [{ memberId: member.id, accountId: member.accountId, owner: member.role === "owner" }] : [],
+    );
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));

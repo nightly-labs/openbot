@@ -189,6 +189,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "{provider} CLI はターンを処理中です。終わるまで待ってから更新してください。",
   "error.provider.cliSelectFailed": "OpenBot はインストール済みの管理対象 CLI を選択できませんでした。",
   "error.provider.noAuthenticatedAccount": "{provider} は認証済みのアカウントを返しませんでした。",
+  "error.provider.codexModelProvider":
+    "このコンピューターの Codex は別のモデルプロバイダーを使用しています。このプロバイダーは ChatGPT のサインインや OpenAI API キーを使用しません。ChatGPT エージェントは今すぐこのプロバイダーを使用できます。ChatGPT アカウントを使用するには、Codex のモデルプロバイダーを OpenAI に戻してください。",
   "error.provider.signInExpired":
     "{provider} のサインインの有効期限が切れました。続けるには、もう一度サインインしてください。",
   "error.provider.cliActivateFailed": "OpenBot は管理対象 CLI を有効にできませんでした。",

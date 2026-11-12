@@ -221,6 +221,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
   HOST_KEY_ROTATION_CAPABILITY,
@@ -232,6 +233,10 @@ import {
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
@@ -308,6 +313,7 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
@@ -377,6 +383,7 @@ import {
 } from "../src/main/claude-user-setup-preference-store";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
+import { githubSkillSource } from "../src/main/github-skill-source";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -393,6 +400,7 @@ import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
+import { SkillMarketplaceFailure, type SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
@@ -1909,6 +1917,56 @@ let refuseHostKeyRotation = false;
 /** The servers that the stand-in of `LocalServers` runs. */
 const localServerList: { serverId: string; name: string; published: boolean }[] = [];
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real GitHub skill reader over a fake GitHub: one public repository, `acme/skills`, with two
+// skill folders, a skill folder inside one of them, and a folder with no skill.
+const GITHUB_COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const GITHUB_SKILL_FILES: Record<string, string> = {
+  "skills/pdf/SKILL.md": "---\nname: pdf\ndescription: Read and fill PDF forms.\n---\n\n# PDF\n",
+  "skills/pdf/reference.md": "# Reference\n",
+  "skills/docx/SKILL.md": "---\nname: docx\ndescription: Write Word documents.\n---\n\n# DOCX\n",
+  "skills/docx/nested/SKILL.md": "---\nname: nested\ndescription: A skill inside a skill.\n---\n",
+  "docs/guide.md": "# Guide\n",
+};
+const githubFetches: string[] = [];
+const githubReader = githubSkillSource(async (url) => {
+  githubFetches.push(url);
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const commit = /^https:\/\/api\.github\.com\/repos\/acme\/skills\/commits\/(HEAD|main)$/u.exec(url);
+  if (commit) return json(200, { sha: GITHUB_COMMIT, commit: { committer: { date: "2026-11-01T10:00:00Z" } } });
+  if (url === `https://api.github.com/repos/acme/skills/git/trees/${GITHUB_COMMIT}?recursive=1`)
+    return json(200, {
+      tree: Object.entries(GITHUB_SKILL_FILES).map(([path, text]) => ({ type: "blob", path, size: text.length })),
+    });
+  const raw = `https://raw.githubusercontent.com/acme/skills/${GITHUB_COMMIT}/`;
+  const file = url.startsWith(raw) ? GITHUB_SKILL_FILES[url.slice(raw.length)] : undefined;
+  if (file !== undefined) return new Response(file);
+  return json(404, { message: "Not Found" });
+});
+// The host's skill service: the real GitHub read, and an install that records the id it gets.
+const githubSkillsAdmin: Pick<
+  SkillMarketplaceService,
+  "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub"
+> = {
+  readGithub: (link) =>
+    githubReader.read(link).pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause }))),
+  listInstalled: () => Effect.succeed([]),
+  install: (input) =>
+    Effect.sync(() => {
+      record("installSkill", input);
+      return {
+        skillId: input.skillId,
+        slug: "pdf",
+        name: "pdf",
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed" as const,
+      };
+    }),
+  uninstall: (input) => Effect.sync(() => record("uninstallSkill", input)),
+  setEnabled: () => Effect.die(new Error("Not used.")),
+};
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2055,6 +2113,7 @@ try {
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      skills: githubSkillsAdmin,
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -2352,7 +2411,7 @@ try {
     connectors,
     vault,
     // The real transfer service and parts over an empty instance, with its upload folder on disk.
-    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent]),
+    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent], () => store.getOwnerMemberId()),
     browserProfiles,
     machine,
     // The host reads its own Hermes folder: one profile under a token.
@@ -5014,6 +5073,108 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  // ---- Skills from GitHub (github-skills-v1) ----
+  {
+    const capabilities = [SKILLS_ADMIN_CAPABILITY, GITHUB_SKILLS_CAPABILITY];
+    const v9 = { protocol: TEAM_PROTOCOL_V9, capabilities };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises github-skills-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY),
+    );
+
+    const read = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const skills = list(field(read.body, "skills"));
+    const ids = skills.map((skill) => field(skill, "id"));
+    check(
+      "an admin reads a repository link: the host pins the commit and lists each top skill folder once",
+      read.status === 200 &&
+        field(read.body, "owner") === "acme" &&
+        field(read.body, "repo") === "skills" &&
+        field(read.body, "commit") === GITHUB_COMMIT &&
+        field(read.body, "committedAt") === "2026-11-01T10:00:00Z" &&
+        isDeepStrictEqual(ids, [
+          `github:acme/skills@${GITHUB_COMMIT}:skills/docx`,
+          `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`,
+        ]) &&
+        field(skills[1], "description") === "Read and fill PDF forms." &&
+        field(skills[1], "instructions") === "# PDF" &&
+        isDeepStrictEqual(field(skills[1], "files"), ["SKILL.md", "reference.md"]),
+      summary(read),
+    );
+
+    const fetchesBefore = githubFetches.length;
+    const noCapability = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const member = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: bobToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    check(
+      "without the capability the read gets 400, a member gets 403, and the host does not contact GitHub",
+      errorIs(noCapability, 400, sourceText("error.skill.githubHostTooOld")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        githubFetches.length === fetchesBefore,
+      { noCapability: summary(noCapability), member: summary(member) },
+    );
+
+    const missing = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/private" },
+    });
+    const empty = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills/tree/main/docs" },
+    });
+    const invalid = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://example.com/acme/skills" },
+    });
+    check(
+      "a missing repository, a folder with no SKILL.md and a link that is not GitHub get the admin's reason",
+      errorIs(missing, 409, sourceText("error.skill.githubNotFound", { repository: "acme/private" })) &&
+        errorIs(empty, 409, sourceText("error.skill.githubNoSkills", { folder: "acme/skills/docs" })) &&
+        errorIs(invalid, 409, sourceText("error.skill.githubLinkInvalid")),
+      { missing: summary(missing), empty: summary(empty), invalid: summary(invalid) },
+    );
+
+    const skillId = `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`;
+    const installsBefore = callsOf("installSkill").length;
+    const oldClient = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    const install = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      ...v9,
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    check(
+      "skills-admin-v1 installs a GitHub skill id only for a client with github-skills-v1",
+      errorIs(oldClient, 400, sourceText("error.skill.githubHostTooOld")) &&
+        install.status === 200 &&
+        field(install.body, "skillId") === skillId &&
+        isDeepStrictEqual(callsOf("installSkill").slice(installsBefore), [[{ agentId: "agent-ada", skillId }]]),
+      { oldClient: summary(oldClient), install: summary(install) },
     );
   }
 
@@ -8419,6 +8580,134 @@ try {
         uploads().length === 0 &&
         errorIs(afterDone, 400, sourceText("error.import.transferPartsClosed")),
       [summary(done), summary(afterDone)],
+    );
+
+    // instance-transfer-full-copy-v1: each part is a field of its own. The parts are read and the
+    // export ends with the chunks routes.
+    const fullCopyCapabilities = [...capabilities, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY];
+    const fullCopyInput = {
+      ...exportInput,
+      includeFiles: false,
+      includeHistory: false,
+      includeChannelMessages: false,
+      includeServerPreferences: true,
+    };
+    /** The manifest of a whole export that `begin` started, read in parts; the export then ends. */
+    const exportedManifest = async (begin: Awaited<ReturnType<typeof call>>) => {
+      const id = String(field(begin.body, "exportId"));
+      const chunks = field(begin.body, "chunks");
+      const parts = [];
+      for (let index = 0; index < (Array.isArray(chunks) ? chunks.length : 0); index++)
+        parts.push((await readPart(adaToken, id, index)).bytes);
+      await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, { exportId: id });
+      const entry = unzipSync(Buffer.concat(parts))[INSTANCE_TRANSFER_MANIFEST];
+      return entry ? parseJson(new TextDecoder().decode(entry)) : null;
+    };
+    const withoutCapability = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, fullCopyInput);
+    const fullCopyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: bobToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const { includeServerPreferences: _preferences, ...missingField } = fullCopyInput;
+    const fullCopyMissing = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: missingField,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopyManifest = fullCopy.status === 200 ? await exportedManifest(fullCopy) : null;
+    const fullCopyPreferences = field(fullCopyManifest, "serverPreferences");
+    // The chunks codec does not know the field, so an older client's export has no server preferences.
+    const chunksExport = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, fullCopyInput);
+    const chunksManifest = chunksExport.status === 200 ? await exportedManifest(chunksExport) : null;
+    // The apply that also replaces the server preferences has the same guards.
+    const applyInput = {
+      token: "no-such-token",
+      keys: [],
+      includeSettings: true,
+      includeServerPreferences: true,
+      timezone: "UTC",
+    };
+    const applyWithout = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, applyInput);
+    const applyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: bobToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const applyClosed = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: adaToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    check(
+      "full copy: the apply that replaces the server preferences needs instance-transfer-full-copy-v1 and an owner or admin",
+      errorIs(applyWithout, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(applyMember, 403, sourceText("error.team.adminRequired")) &&
+        applyClosed.status >= 400 &&
+        applyClosed.status !== 403,
+      [summary(applyWithout), summary(applyMember), summary(applyClosed)],
+    );
+
+    // The owner from another computer is the owner: their own notification level is in the file.
+    const ownerCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: owner.sessionToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const ownerExportId = String(field(ownerCopy.body, "exportId"));
+    const ownerParts = [];
+    const ownerChunks = field(ownerCopy.body, "chunks");
+    for (let index = 0; index < (Array.isArray(ownerChunks) ? ownerChunks.length : 0); index++) {
+      const response = await fetch(`${base}${INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk}`, {
+        method: "POST",
+        headers: {
+          ...protocolHeaders({ token: owner.sessionToken, capabilities }),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ exportId: ownerExportId, index }),
+      });
+      ownerParts.push(new Uint8Array(await response.arrayBuffer()));
+    }
+    await call("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, {
+      token: owner.sessionToken,
+      json: { exportId: ownerExportId },
+      capabilities,
+    });
+    const ownerEntry =
+      ownerParts.length > 0 ? unzipSync(Buffer.concat(ownerParts))[INSTANCE_TRANSFER_MANIFEST] : undefined;
+    const ownerManifest = ownerEntry ? parseJson(new TextDecoder().decode(ownerEntry)) : null;
+    check(
+      "full copy: the owner who exports from another computer gets their own notification level in the file",
+      ownerCopy.status === 200 &&
+        field(field(ownerManifest, "serverPreferences"), "ownerNotificationLevel") === "needs-me" &&
+        uploads().length === 0,
+      [summary(ownerCopy), field(ownerManifest, "serverPreferences")],
+    );
+    check(
+      "full copy: the export start needs instance-transfer-full-copy-v1, an owner or admin and every field; an admin's file has the server preferences without the owner's notification level, and the chunks route leaves them out",
+      errorIs(withoutCapability, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(fullCopyMember, 403, sourceText("error.team.adminRequired")) &&
+        fullCopyMissing.status === 400 &&
+        fullCopy.status === 200 &&
+        field(fullCopyPreferences, "timezone") === "Europe/Warsaw" &&
+        field(fullCopyPreferences, "ownerNotificationLevel") === undefined &&
+        chunksExport.status === 200 &&
+        chunksManifest !== null &&
+        field(chunksManifest, "serverPreferences") === undefined &&
+        uploads().length === 0,
+      [
+        summary(withoutCapability),
+        summary(fullCopyMember),
+        summary(fullCopyMissing),
+        summary(fullCopy),
+        fullCopyPreferences,
+        summary(chunksExport),
+      ],
     );
 
     // The desktop workflow over this host: the three calls of `RemoteServerManager` that it uses go

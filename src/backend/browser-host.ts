@@ -1934,11 +1934,13 @@ export class BrowserHost {
     return connected;
   }
 
-  endTakeover(tabId: string): void {
+  /** `completed`: the person selected Done, so a bot check that was on the page is one they could not pass. */
+  endTakeover(tabId: string, completed = false): void {
     const tab = this.#tabs.get(tabId);
     if (tab) {
       tab.engine.invalidateReferences();
       tab.diagnostics.clearDiagnostics();
+      if (completed && tab.checkOrigin) tab.checkAfterTakeover = tab.checkOrigin;
     }
     this.#takeoverTabIds.delete(tabId);
     this.#syncAttachedView();

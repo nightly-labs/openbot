@@ -711,10 +711,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "אין הגדרות שרת",
   "settings.transfer.includeAgent": "הכללת {name}",
   "settings.transfer.export.title": "ייצוא השרת הזה",
-  "settings.transfer.export.files": "הכללת קבצי סביבת עבודה",
-  "settings.transfer.export.filesDescription": "קבצים שהסוכנים יצרו, ותיקיית Shared. יש לכבות לקבלת קובץ קטן.",
-  "settings.transfer.export.settings": "הכללת הגדרות שרת",
-  "settings.transfer.export.settingsDescription": "שרתי MCP, ספקי מודלים מותאמים אישית, מדורים בסרגל הצד וזרימות שגרה.",
+  "settings.transfer.preset.label": "מה נכנס לקובץ",
+  "settings.transfer.preset.templates": "תבניות",
+  "settings.transfer.preset.everything": "הכול",
+  "settings.transfer.meter.files": "מתוך {total} בקבצי סביבת עבודה",
+  "settings.transfer.part.agents": "סוכנים וההגדרה שלהם",
+  "settings.transfer.part.agentsDescription": "{contents}. תמיד בקובץ.",
+  "settings.transfer.part.settings": "הגדרות שרת",
+  "settings.transfer.part.chats": "היסטוריית צ'אטים",
+  "settings.transfer.part.chatsDescription":
+    "הצ'אטים והשרשורים הצדדיים עם הקבצים שלהם, והיסטוריית הריצות של השגרות. הסוכנים ממשיכים את הצ'אטים האלה עם ההקשר שלהם.",
+  "settings.transfer.part.channels": "הודעות ערוצים",
+  "settings.transfer.part.channelsDescription":
+    "ההודעות של הערוצים שהסוכנים המיוצאים חברים בהם, עם הקבצים שלהן והיסטוריית הריצות של שגרות הערוצים.",
+  "settings.transfer.part.files": "קבצי סביבת עבודה",
+  "settings.transfer.part.filesDescription": "קבצים שהסוכנים יצרו, ותיקיית Shared.",
+  "settings.transfer.part.preferences": "העדפות שרת",
+  "settings.transfer.part.preferencesDescription":
+    "שם, לוגו, אזור זמן, אישיות, ברירות מחדל לסוכנים, בחירות מודלים, הגדרות זיכרון ומיומנויות, ורמות ההתראות והפריטים המוצמדים של כל אדם.",
+  "settings.transfer.export.settingsDescription":
+    "שרתי MCP, ספקי מודלים מותאמים אישית, מדורים בסרגל הצד, זרימות שגרה ומיומנויות משותפות.",
   "settings.transfer.export.chooseAgents": "בחירת סוכנים ({selected} מתוך {total})",
   "settings.transfer.export.hideAgents": "הסתרת סוכנים",
   "settings.transfer.export.agentsLabel": "סוכנים לייצוא",
@@ -740,8 +756,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "סוכנים בקובץ",
   "settings.transfer.import.nameExists": "השם כבר בשימוש",
   "settings.transfer.import.settings": "ייבוא הגדרות שרת",
-  "settings.transfer.import.settingsDescription":
-    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית והמדורים בסרגל הצד שאין בשרת הזה.",
+  "settings.transfer.import.settingsAndPreferences":
+    "מוסיף את שרתי MCP, ספקי המודלים המותאמים אישית, המדורים בסרגל הצד והמיומנויות המשותפות שאין בשרת הזה.",
+  "settings.transfer.import.preferences": "ייבוא העדפות השרת",
+  "settings.transfer.import.preferencesDescription":
+    "מחליף את השם, הלוגו וההעדפות של השרת הזה, ואת רמות ההתראות והפריטים המוצמדים של כל אדם, באלה שבקובץ.",
   "settings.transfer.import.submit": { one: "ייבוא סוכן אחד", two: "ייבוא שני סוכנים", other: "ייבוא {count} סוכנים" },
   "settings.transfer.import.submitSettings": "ייבוא הגדרות שרת",
   "settings.transfer.import.importing": "מייבא…",

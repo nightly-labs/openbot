@@ -151,6 +151,7 @@ import {
   decodeCustomAgentSummaries,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
+  decodeGithubSkillSource,
   decodeHostAddedAgent,
   decodeHostAgentMemoryLimit,
   decodeHostAgentTemplatePreview,
@@ -198,6 +199,7 @@ import {
   decodeStorageUsage,
   type GetStorageUsageInput,
   type GitHubConnectorRepositories,
+  type GithubSkillSource,
   type HostAddMessagingOrchestratorInput,
   type HostAgentMemoryLimit,
   type HostBrowsingMemory,
@@ -322,6 +324,7 @@ import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browse
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
+import { GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -444,6 +447,14 @@ export function listAgentSkills(
   agentId: string,
 ): Effect.Effect<InstalledSkill[], TeamAdminRequestError> {
   return adminCall(() => request("POST", SKILLS_ADMIN_ROUTES.list, decodeInstalledSkills, { agentId }));
+}
+
+/** The host reads a public GitHub link and pins its commit (`github-skills-v1`). */
+export function readGithubSkills(
+  request: TeamApiRequest,
+  link: string,
+): Effect.Effect<GithubSkillSource, TeamAdminRequestError> {
+  return adminCall(() => request("POST", GITHUB_SKILLS_ROUTES.read, decodeGithubSkillSource, { link }));
 }
 
 /** Only ids cross the wire: the host downloads the skill with its own account. */

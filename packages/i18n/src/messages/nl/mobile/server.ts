@@ -324,6 +324,7 @@ export const messages = {
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
+  "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -447,6 +448,24 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.memoryReview": "Geheugencontrole",
+  "mobile.server.settings.memoryReviewDescription":
+    "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",
+  "mobile.server.settings.memoryReviewOff": "Uit",
+  "mobile.server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
+  "mobile.server.settings.skillLearning": "Vaardigheden leren",
+  "mobile.server.settings.skillLearningDescription": "Of agents op deze server wat ze leren als vaardigheden opslaan.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatisch",
+  "mobile.server.settings.skillLearningAsk": "Eerst vragen",
+  "mobile.server.settings.skillLearningOff": "Uit",
+  "mobile.server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "mobile.server.settings.browsingMemory": "Leren van mijn browsen",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
+  "mobile.server.settings.learningSaveFailed": "Kan deze instelling niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.learningUnsupported": "Werk OpenBot bij op deze server om deze instelling hier te wijzigen.",
   "mobile.server.settings.responseStyleDescription":
     "Natuurlijk: agents sturen korte updates terwijl ze werken, en de chat toont ze. Klassiek: agents antwoorden één keer, als ze klaar zijn.",
   "mobile.server.settings.responseStyleNatural": "Natuurlijk",
@@ -455,8 +474,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Kan de antwoordstijl niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.personalityUnsupported":
     "Werk OpenBot bij op deze server om de antwoordstijl hier te wijzigen.",
-  "mobile.server.settings.personalityUnavailable":
-    "Maak verbinding met deze server als eigenaar of beheerder om de agentpersoonlijkheid te wijzigen.",
+  "mobile.server.settings.agentsUnavailable":
+    "Maak verbinding met deze server als eigenaar of beheerder om de agentinstellingen te wijzigen.",
   "mobile.server.route.browserProfiles": "Browserprofielen",
   "mobile.server.browserProfiles.unavailable":
     "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",
@@ -1330,6 +1349,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agent", other: "{count} agents" },
   "mobile.server.roles.memberCount": { one: "{count} lid", other: "{count} leden" },
   "mobile.server.roles.agentLevel": "Toegang van {role} tot {agent}",
+  "mobile.server.roles.changeInEveryone": "Wijzigen in Iedereen",
+  "mobile.server.roles.setAll": "Alles instellen",
+  "mobile.server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
+  "mobile.server.roles.mixed": "Gemengd",
   "mobile.server.roles.delete": "Rol verwijderen",
   "mobile.server.roles.deleteTitle": "{name} verwijderen?",
   "mobile.server.roles.deleteBody": "Leden met deze rol verliezen de agents die deze rol hun geeft.",

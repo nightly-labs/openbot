@@ -70,6 +70,8 @@ import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/ho
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
@@ -1550,7 +1552,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     download: (serverId) => hostAdmin(serverId).download,
     listAgents: () => workspace.runtime.listAgents(),
     saveFile,
+    fullCopy: () => instanceTransferFullCopy(),
+    sendsParts: () => workspace.state.capabilities.includes(INSTANCE_TRANSFER_CHUNKS_CAPABILITY),
   });
+  // The export in parts with each part chosen: chat history, channel messages, server preferences.
+  const instanceTransferFullCopy = () =>
+    workspace.state.capabilities.includes(INSTANCE_TRANSFER_CHUNKS_CAPABILITY) &&
+    workspace.state.capabilities.includes(INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
   // Only an owner or admin moves a whole server, and the host checks the role again.
   const instanceTransferEnabled = () =>
     workspace.state.capabilities.includes(INSTANCE_TRANSFER_CAPABILITY) &&
@@ -1558,7 +1566,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   // A named function, not a ternary in the prop: the settings read the prop in a tracked effect.
   // No copy to another server: the browser client connects to one host, and only the desktop app
   // holds the connections of two servers at the same time.
-  const instanceTransferSettings = () => (instanceTransferEnabled() ? { calls: instanceTransferCalls } : undefined);
+  const instanceTransferSettings = () =>
+    instanceTransferEnabled()
+      ? {
+          calls: instanceTransferCalls,
+          history: instanceTransferFullCopy(),
+          fullCopy: instanceTransferFullCopy(),
+        }
+      : undefined;
   const memberUpdateAccess = () => !serverRoleCanAdminister(server());
   const hostUpdateCalls: HostUpdateCalls = {
     getReleaseStatus: async (serverId) =>
