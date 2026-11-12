@@ -162,6 +162,8 @@
     "tr",
     "zh"
   ],
+  "error.backend.mcpHtmlLogin": ["ar", "de", "es", "fr", "he", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.mcpHtmlLoginRejected": ["ar", "de", "es", "fr", "he", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.replyReferenceRequests": [
     "ar",
     "de",
