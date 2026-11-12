@@ -183,7 +183,7 @@ import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/c
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -1082,7 +1082,12 @@ export interface MobileWorkspaceContextValue {
     /** Hears the fraction of the file sent so far, from 0 to 1. */
     onProgress?: (fraction: number) => void,
   ) => Promise<DraftAttachment>;
-  downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
+  /** `largeDownload` lets a file larger than the attachment limit answer, for a file the user asked for. */
+  downloadAttachment: (
+    serverId: string,
+    attachmentId: string,
+    largeDownload?: RemoteLargeDownload,
+  ) => Promise<RemoteFileUpload>;
   /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member
    * reads it; the host keeps the path inside the folder.

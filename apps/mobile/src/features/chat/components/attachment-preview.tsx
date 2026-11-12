@@ -17,6 +17,13 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import {
+  fileLimitText,
+  largeDownloadOf,
+  MOBILE_LARGE_FILE_BYTES,
+  requestLargeFile,
+  useAttachmentDownload,
+} from "../model/large-files";
 import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile } from "./use-media-file";
 
@@ -90,11 +97,12 @@ export function localAttachmentPreview(file: { mimeType: string; base64: string;
 }
 
 /**
- * A downloaded image as a file in the chat media folder. The image view gets a short file URI, not
- * a data URL of many megabytes: Android Glide copies its source text, and a large data URL ran
- * the app out of memory. A file that cannot be written leaves the data URL.
+ * A downloaded image, or a file above the attachment limit, as a file in the chat media folder. The
+ * image view gets a short file URI, not a data URL of many megabytes: Android Glide copies its
+ * source text, and a large data URL ran the app out of memory. A large file is not kept as Base64
+ * in the cache. A file that cannot be written leaves the data.
  */
-function keepImageFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
+function keepFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) {
@@ -108,14 +116,13 @@ function keepImageFile(serverId: string, attachment: AttachmentSummary, data: Re
 }
 
 /**
- * An image that this launch downloaded before, as a file that is whole, when the phone also knows
- * its size. The chat then shows it again without a new download. Its data has no Base64.
+ * A file that this launch downloaded before, as a file that is whole: an image when the phone also
+ * knows its shape, or a file above the attachment limit. It is used again without a new download.
+ * Its data has no Base64.
  */
-function keptImageFile(
-  serverId: string,
-  attachment: AttachmentSummary,
-): (RemoteFileUpload & { fileUri: string }) | null {
-  if (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id)) return null;
+function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
+  const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+  if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) return null;
@@ -125,10 +132,13 @@ function keptImageFile(
   }
 }
 
-/** The Base64 of a file, read from its kept copy when the data has none. */
-async function fileBase64(data: RemoteFileUpload & { fileUri?: string }): Promise<string> {
-  if (data.base64 || !data.fileUri) return data.base64;
-  return new File(data.fileUri).base64();
+/**
+ * Writes a downloaded file to `file`. Data with no Base64 copies its kept file, so a large file is
+ * not read back into memory.
+ */
+async function writeFileData(file: File, data: RemoteFileUpload & { fileUri?: string }) {
+  if (data.base64 || !data.fileUri) file.writeSync(data.base64, { encoding: "base64" });
+  else await new File(data.fileUri).copy(file);
 }
 
 type DownloadAttachment = ReturnType<typeof useMobileWorkspaceActions>["downloadAttachment"];
@@ -143,14 +153,16 @@ function attachmentFileQuery(
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
     queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
-      if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(tooLarge);
-      const kept = keptImageFile(serverId, attachment);
+      // A file between the two limits runs this query only when the user asks for it, or with the
+      // setting on: `useAttachmentFile` does not enable it before.
+      if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
+      const kept = keptFile(serverId, attachment);
       if (kept) return kept;
-      const data = await downloadAttachment(serverId, attachment.id);
-      return {
-        ...data,
-        fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,
-      };
+      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
+      const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+      const fileUri = large || data.mimeType.startsWith("image/") ? keepFile(serverId, attachment, data) : undefined;
+      // The cache does not keep the Base64 of a large file that is on disk: the file has it.
+      return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
     },
     retry: false,
     staleTime: Infinity,
@@ -161,7 +173,7 @@ function attachmentFileQuery(
 /** A copy of a downloaded file with an extension, in a folder the caller deletes. */
 async function writeCopy(folder: Directory, name: string, data: RemoteFileUpload & { fileUri?: string }) {
   const file = new File(folder, name);
-  file.writeSync(await fileBase64(data), { encoding: "base64" });
+  await writeFileData(file, data);
   return file;
 }
 
@@ -176,7 +188,10 @@ function imageExtension(attachment: AttachmentSummary, mimeType: string) {
  */
 export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
-  const { t, sourceText } = useText();
+  const text = useText();
+  const { t, sourceText } = text;
+  // A large file shows only after the user asks for it, or with the setting on.
+  const { download } = useAttachmentDownload(serverId, attachment);
   const [sharing, setSharing] = useState(false);
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
   const local =
@@ -184,8 +199,13 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       ? attachment.previewUrl
       : null;
   const query = useQuery({
-    ...attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
-    enabled: preview && !local && !pending,
+    ...attachmentFileQuery(
+      serverId,
+      attachment,
+      downloadAttachment,
+      t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+    ),
+    enabled: preview && download === "download" && !local && !pending,
   });
   const data = query.data;
   const dimensions = useMemo(() => {
@@ -199,6 +219,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   const uri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
   async function share() {
+    // The user asks for this file, so a large file downloads.
+    requestLargeFile(serverId, attachment.id);
     setSharing(true);
     let file: File | null = null;
     try {
@@ -208,7 +230,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
       file = new File(Paths.cache, `${Date.now()}-${name}`);
-      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
+      await writeFileData(file, result.data);
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
       void haptics.notification("error");
@@ -225,6 +247,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   }
   /** Saves the image to the photo library. It reports its own failure and returns whether it saved. */
   async function saveToPhotos(): Promise<boolean> {
+    requestLargeFile(serverId, attachment.id);
     setSharing(true);
     let file: File | null = null;
     try {
@@ -240,7 +263,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       // The photo library reads the type from the extension, so the file keeps one.
       const extension = imageExtension(attachment, result.data.mimeType);
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
-      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
+      await writeFileData(file, result.data);
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
@@ -277,11 +300,17 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
 export function useAttachmentFiles(serverId: string, attachments: readonly AttachmentSummary[]) {
   const { downloadAttachment } = useMobileWorkspaceActions();
   const queryClient = useQueryClient();
-  const { t, sourceText } = useText();
+  const text = useText();
+  const { t, sourceText } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
     queryClient.fetchQuery(
-      attachmentFileQuery(serverId, attachment, downloadAttachment, t("mobile.chat.attachment.tooLargeForMobile")),
+      attachmentFileQuery(
+        serverId,
+        attachment,
+        downloadAttachment,
+        t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+      ),
     );
   const fail = (error: unknown, title: string) => {
     void haptics.notification("error");
@@ -329,7 +358,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
       for (const attachment of attachments) {
         const data = await load(attachment);
         // The chat media folder holds the file with a safe name, and the next launch clears it.
-        const uri = data.fileUri ?? keepImageFile(serverId, attachment, data);
+        const uri = data.fileUri ?? keepFile(serverId, attachment, data);
         if (!uri) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
         types.add(data.mimeType);
         uris.push(uri);

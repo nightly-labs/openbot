@@ -92,7 +92,7 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -695,6 +695,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [directoryRefresh]);
 
   const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
+  const largeAttachmentDownloads = useRef<Promise<void>>(Promise.resolve());
   const request = useCallback(
     async <T,>(
       method: string,
@@ -704,11 +705,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverId = activeServerIdRef.current,
       upload?: RemoteFileUpload,
       onUploadProgress?: (fraction: number) => void,
+      largeDownload?: RemoteLargeDownload,
     ): Promise<T> => {
       if (serverId) await connectionWaits.whenConnected(serverId);
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return client.request(method, path, decode, body, upload, onUploadProgress);
+      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload);
     },
     [connectionWaits],
   );
@@ -1779,6 +1781,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         queryScope,
         capabilities: serverCapabilities.current,
         attachmentDownloads,
+        largeAttachmentDownloads,
       }),
     [request, teamApi, queryClient, queryScope],
   );

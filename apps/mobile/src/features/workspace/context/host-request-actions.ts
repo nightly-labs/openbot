@@ -160,7 +160,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   addAgentFolder,
@@ -335,6 +335,7 @@ export type WorkspaceRequest = <T>(
   serverId?: string | null,
   upload?: RemoteFileUpload,
   onUploadProgress?: (fraction: number) => void,
+  largeDownload?: RemoteLargeDownload,
 ) => Promise<T>;
 
 /** The capability checks that only read what a host advertised. */
@@ -597,6 +598,7 @@ export function createHostRequestActions({
   queryScope,
   capabilities,
   attachmentDownloads,
+  largeAttachmentDownloads,
 }: {
   request: WorkspaceRequest;
   teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
@@ -605,6 +607,8 @@ export function createHostRequestActions({
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
   attachmentDownloads: { current: Promise<void> };
+  /** The lane of the files above the attachment limit, one at a time. */
+  largeAttachmentDownloads: { current: Promise<void> };
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   /** The Team API of a server that serves `capability`, for an optional admin route set. */
@@ -1447,12 +1451,24 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload) => {
       const download = () =>
-        request("GET", TEAM_API_ROUTES.attachment(attachmentId), decodeHostFile, undefined, serverId);
-      // Limit native/DOM copies when a message contains several large images.
-      const result = attachmentDownloads.current.then(download);
-      attachmentDownloads.current = result.then(
+        request(
+          "GET",
+          TEAM_API_ROUTES.attachment(attachmentId),
+          decodeHostFile,
+          undefined,
+          serverId,
+          undefined,
+          undefined,
+          largeDownload,
+        );
+      // Limit native/DOM copies when a message contains several large images. A file above the
+      // attachment limit has its own lane: the images of the chat do not wait behind it, and two
+      // such files never download at the same time.
+      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      const result = lane.current.then(download);
+      lane.current = result.then(
         () => {},
         () => {},
       );
