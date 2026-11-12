@@ -286,11 +286,11 @@ and only a loopback `http:` origin is accepted.
     `hosted_start_wait_ms`, the average time of each step, and the `failed` share by `last_phase`;
     `system_startup` `workspace_ready_ms` by `host_kind`. Percentiles come from
     `scripts/openpanel-sql.ts`.
-13. Ops, "Server pool": `hosted_pool_snapshot` (`account_api` generation 16 and later). The last
-    value of `free`, `free_in_7d` and `free_in_30d` for `location = all`, the same counts by
-    `location` and `product`, and `free` by `location`. The Worker sends one snapshot each 5 minutes.
-    Each report uses the minute interval and the largest value in the last 30 minutes: a longer
-    interval adds up more than one snapshot.
+13. Ops, "Server pool": `hosted_pool_snapshot` (`account_api` generation 16 and later). `free`,
+    `free_in_7d` and `free_in_30d`, and the machines taken, by `product` and by `location` and
+    `product`. The Worker sends one snapshot each 5 minutes. Each report is a bar with the `max`
+    metric, the minute interval and a 30-minute range: a longer interval adds up more than one
+    snapshot (`docs/hosted-servers.md#reuse-a-pool-machine`).
 
 Every dashboard must filter by the intended `surface` and that surface's current
 `event_schema_version`. Website bounce
