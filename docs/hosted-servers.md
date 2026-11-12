@@ -990,8 +990,8 @@ never waits for one. Move only Standard and Pro servers: Starter servers stay on
 | `operator_host` | The machine that an operator runs for the server, such as `leaseweb:12728110`. `NULL` on each server that boat runs. A row has a machine or a sandbox, never the two, and one machine has one server. |
 | `retired_sandbox_id` | The boat sandbox from before the move. The rollback and the delete use it. |
 
-The list of machines in use is `SELECT operator_host FROM hosted_servers WHERE operator_host IS NOT NULL`.
-A pool server that is not in the list is free.
+The machines of the pool are in `operator_hosts` (migration 0053). A machine of the pool that no row
+of `hosted_servers` names is free. See [Reuse a pool machine](#reuse-a-pool-machine).
 
 For a row with `operator_host`, the Worker sends no call to boat, with one exception (the delete).
 It writes what it wants in `desired_state`; the operator starts and stops OpenBot on the machine and
@@ -1003,25 +1003,15 @@ writes `observed_state`:
 | A client or a connector event asks for a start | Nothing. | Nothing. |
 | The server reports its use | Stores `last_active_at` and `next_run_at`. | Nothing. |
 | The plan changes | Sets `size` at once. | Nothing: each pool server has the same size. |
-| The plan ends | Sets `desired_state = 'stopped'` and `observed_error = 'plan_ended'`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
-| The owner renews | Sets `desired_state = 'running'` and clears the error. | Start `openbot.service`, then write `observed_state = 'running'`. |
+| The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
+| The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
+| 30 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
 | The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool-free`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
 
-The Worker sends no message to the operator. The work is in these queries; run them each day:
-
-```sql
--- Plan ended, and the server still runs: stop OpenBot on the machine.
-SELECT server_id, operator_host FROM hosted_servers
- WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND observed_state != 'stopped';
--- Renewed, and the server does not run: start OpenBot on the machine.
-SELECT server_id, operator_host FROM hosted_servers
- WHERE operator_host IS NOT NULL AND desired_state = 'running' AND observed_state != 'running';
--- Deleted, and the machine still has the data: reinstall it.
-SELECT server_id, operator_host FROM hosted_servers
- WHERE operator_host IS NOT NULL AND observed_state = 'deleted';
-```
+The Worker sends no message to the operator. Run `leaseweb-pool.ts sync` each day: it does the
+operator column of the table. See [Reuse a pool machine](#reuse-a-pool-machine).
 
 Never write `desired_state = 'idle'` on such a row: the next client request changes it to `running`,
 and the cron query for a server with a routine does not look at the machine.
@@ -1275,6 +1265,82 @@ Not confirmed for Leaseweb:
 - `resetPassword`, which needs the guest agent, and a custom image for a VPS;
 - why the start after `detachIso` took 173 seconds;
 - WebRTC with a rule set that also filters incoming connections.
+
+### Reuse a pool machine
+
+A pool machine has one server at a time. When the server ends, the machine gets a new operating
+system and goes back to the pool for the next move. The Worker and the operator share the work:
+
+1. The plan ends. The Worker sets `desired_state = 'stopped'` and `plan_ended_at`. `sync` stops
+   OpenBot on the machine. The data stays, so the owner can renew.
+2. 30 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
+   subscription is not open and Stripe reports it `canceled`. The delete is the one of the owner: the
+   old sandbox, the Remote host and the session go, and `observed_state = 'deleted'`. A subscription
+   that Stripe still retries (`past_due`, `unpaid`, `paused`) keeps the server, with no limit: the
+   operator decides. A renewal before the 30 days keeps the server. The 30 days are
+   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`.
+3. `sync` reinstalls the machine with `UBUNTU_26_04_64BIT`, which erases the disk, sets its reference
+   to `pool-free`, and sets `operator_host = NULL` on the deleted row. The machine is free.
+   Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
+   host keys.
+
+A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
+so its 30 days start then.
+
+Tested on 2026-11-12 with the test Worker, its D1 and one VPS in `AMS-01`: `add`, `status`, `sync`
+stop and start, the cron delete of a server whose plan ended 31 days before with a `canceled` Stripe
+test subscription, then `sync`. The reinstall took 51 seconds: the machine started 26 seconds after
+the request, and `sync` returned 25 seconds later. A file in `/root` and `/opt/OpenBot` were gone.
+Then `remove` and `add`.
+
+`operator_hosts` has one row for each machine that was in the pool:
+
+| Column | Value |
+| --- | --- |
+| `host_id` | `leaseweb:<VPS ID>`, as in `hosted_servers.operator_host`. |
+| `location` | The Leaseweb data center, such as `AMS-01`. |
+| `product` | `VPS02` or `VPS03`, from the Leaseweb pack. |
+| `added_at` | When the operator added the machine. |
+| `removed_at` | When the machine left the pool. `NULL` while it is in the pool. |
+
+`scripts/hosting/leaseweb-pool.ts` does the operator work. It shows what it would do and changes
+nothing without `--apply`. It reads the Leaseweb keys and the Cloudflare token from the environment,
+so it runs on each computer that has the key file, and it can run on a server of the operator later:
+
+```bash
+bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
+  bun scripts/hosting/leaseweb-pool.ts <command> [--apply] [--env=test]
+```
+
+| Command | Work |
+| --- | --- |
+| `status` | Read only. Free machines of each location and product, and the work of `sync`. |
+| `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool-free` when the machine has none. It refuses a machine with another reference. |
+| `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
+| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. |
+
+`sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
+operator. A move still uses [Move a server from boat](#move-a-server-from-boat) on a free machine,
+from step 2.
+
+The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each hour, at minute 0, the
+production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
+`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. The
+snapshot counts each machine in one state:
+
+| State | Machine |
+| --- | --- |
+| `free` | No server. Ready for a move. |
+| `to_reinstall` | Its server is deleted. Free after the next `sync`. |
+| `plan_ended` | Its plan ended. Free 30 days after `plan_ended_at`, unless the owner renews. |
+| `cancel_scheduled` | The owner cancelled the plan at the period end, or scheduled a delete. |
+| `in_use` | Each other server. |
+
+`free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews.
+A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
+subscription that Stripe still retries has no date. A server that names a machine that is not in the
+pool is in the group `unknown`: add the machine. `bun run test:hosted-operator-pool` checks the
+delete, the snapshot and its event on the real service with a fake Stripe and a fake boat.
 
 ## Not confirmed
 
