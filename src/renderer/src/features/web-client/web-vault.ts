@@ -89,8 +89,9 @@ function loginBody({ twoStepKey, ...login }: Extract<VaultSaveInput, { kind: "lo
   return twoStepKey === undefined ? login : { ...login, twoStepKey };
 }
 
+/** An item with no `agents` keeps its saved agents; the key stays out of the body, as for `fillSites`. */
 function saveBody(input: VaultSaveInput) {
-  if (input.kind === "card") return cardBody(input);
-  if (input.kind === "login") return loginBody(input);
-  return { ...input };
+  const { agents, ...body } =
+    input.kind === "card" ? cardBody(input) : input.kind === "login" ? loginBody(input) : { ...input };
+  return agents === undefined ? body : { ...body, agents };
 }
