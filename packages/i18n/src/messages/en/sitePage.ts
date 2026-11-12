@@ -448,6 +448,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.download.googlePlay": "Get it on Google Play",
   // Links to the install page of each platform follow.
   "sitePage.landing.download.pages": "System requirements and install steps:",
+  // Starts the download of the Android app as an APK file. It is next to "Get it on Google Play".
+  "sitePage.landing.download.apk": "Get the APK",
   // The header, the menu, the footer and the last call to action of the public site.
   "sitePage.site.download": "Download",
   "sitePage.site.app": "App",

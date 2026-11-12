@@ -380,6 +380,7 @@ export const messages = {
   "sitePage.landing.download.appStore": "Pobierz z App Store",
   "sitePage.landing.download.googlePlay": "Pobierz z Google Play",
   "sitePage.landing.download.pages": "Wymagania systemowe i instalacja:",
+  "sitePage.landing.download.apk": "Pobierz APK",
   "sitePage.site.download": "Pobierz",
   "sitePage.site.app": "Aplikacja",
   "sitePage.site.primaryNavigation": "Główna nawigacja",
