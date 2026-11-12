@@ -334,6 +334,17 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
 };
 
 /**
+ * Hermes Agent 0.23.1 fails a turn whose MCP server did not connect, or whose provider kept failing,
+ * with only `admitted_turn_failed` in the error. The reason is in its log, or in the answer text
+ * before the error. The chat showed "Internal error: admitted_turn_failed" (#6395).
+ */
+function hermesTurnFailure(error: unknown, detail: string): string {
+  return isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed"
+    ? sourceText("error.provider.hermesTurnFailed")
+    : detail;
+}
+
+/**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
  * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
  * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
@@ -348,6 +359,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   resendsAnswer: true,
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
+  turnFailure: hermesTurnFailure,
 };
 
 /**
@@ -466,8 +478,9 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its lost turns are
-  // discarded, and its answer sent again replaces the streamed one, as for the Hermes provider.
-  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true },
+  // discarded, its answer sent again replaces the streamed one, and its failed turn is explained, as
+  // for the Hermes provider.
+  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true, turnFailure: hermesTurnFailure },
 };
 
 /**
