@@ -8,6 +8,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "远程桌面测试不可用。",
   "error.remote.controlUnavailable": "远程控制不可用。",
   "error.remote.controlSessionNotFound": "未找到远程控制会话。",
+  "error.remote.controlNotAllowed": "此电脑的所有者不允许你的角色控制它。",
+  "error.remote.controlDeclined": "此电脑前的人没有允许远程控制。",
   "error.remote.testRuntimeUpdate": "请更新 macOS 远程桌面运行时以运行该测试。",
   "error.remote.testOtherSessions": "开始测试前请先结束其他远程桌面会话。",
   "error.remote.testPermissions": "开始测试前请检查主机上的权限和图形会话。",
@@ -84,6 +86,7 @@ export const messages = {
   "error.remote.fileTransferFailed": "WebRTC 文件传输失败。",
   "error.remote.fileResumeFailed": "WebRTC 文件传输未能在截止时间前恢复。",
   "error.remote.fileTransportStopped": "WebRTC 文件传输已停止。",
+  "error.remote.downloadStopped": "下载已停止。",
   "error.remote.fileResumeExpired": "WebRTC 文件续传的截止时间已过。",
   "error.remote.hostRequestFailed": "主机无法完成该请求。",
   "error.remote.responseTooLarge": "主机返回的回复过大，无法发送到这台设备。",
@@ -175,6 +178,7 @@ export const messages = {
   "error.remote.memberLimitReached": "该主机已达到成员上限，请让所有者腾出位置。",
   "error.remote.hostNotRegistered": "该主机已不再注册于 OpenBot 服务。",
   "error.remote.membershipEnded": "你已不再是该主机的成员，请向所有者申请新的邀请。",
+  "error.remote.membershipChanged": "有人同时更改了该成员。请重新加载成员列表后重试。",
   "error.remote.accountSessionInactive": "你的登录已失效，请重新登录。",
   "error.remote.hostOtherAccount": "该主机属于另一个账号。",
   "error.remote.remoteNotConfigured": "该 OpenBot 服务未配置远程连接。",
@@ -182,8 +186,11 @@ export const messages = {
   // Channel actions on mobile.
   "error.remote.formUnavailable": "该表单已不可用。",
   "error.remote.hostedServerRemoval": "请使用账单页面删除托管服务器。",
+  "error.remote.hostRemoved": "所有者已将该服务器从账户中移除。",
   "error.remote.channelsUnsupported": "请更新这台桌面服务器以使用频道。",
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",
   "error.remote.taskHistoryRefreshFailed": "任务已更改，但无法刷新对话历史。",
+  "error.remote.localServerAccountRemovalFailed":
+    "服务器已在其电脑上删除，但账户中仍列出它。请再次删除以将其从账户中移除。",
 } as const satisfies PartialTranslation<typeof source>;

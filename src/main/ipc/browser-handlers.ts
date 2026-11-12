@@ -1,6 +1,11 @@
 // The embedded browser and its picture-in-picture window.
 
-import { type BrowserDisplayState, type BrowserTab, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import {
+  type BrowserDisplayState,
+  type BrowserTab,
+  type BrowserTeachStep,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
@@ -12,6 +17,11 @@ import {
   BROWSER_SIGN_IN_ROUTES,
   decodeBrowserSignInResult,
 } from "@openbot/contracts/team-protocol/browser-sign-in-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -38,12 +48,13 @@ import {
   decodeBrowserTab,
   decodeBrowserTabs,
 } from "../remote-device-decoding";
-import { decodeVoid } from "../remote-host-decoding";
+import { acceptEmpty, decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
   parseBrowserBounds,
   parseBrowserNavigate,
   parseBrowserOpen,
+  parseBrowserTeachStop,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
@@ -69,6 +80,8 @@ export interface BrowserIpcDependencies {
     | "close"
     | "takeUserControl"
     | "releaseUserControl"
+    | "startTeach"
+    | "stopTeach"
     | "listTabs"
     | "getDisplayState"
     | "getControlState"
@@ -129,6 +142,16 @@ export function browserIpcHandlers({
     await runCauseEffect(
       remoteServers.request(serverId, route, decodeBrowserUserControlSnapshot, { method: "POST", body: { tabId } }),
     );
+  };
+  const teachRequest = async <Result>(
+    serverId: string,
+    route: string,
+    decode: (value: unknown) => Result,
+    body: { tabId: string; save?: boolean },
+  ): Promise<Result> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_TEACH_CAPABILITY))
+      throw new Error(sourceText("error.backend.browserTeachUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decode, { method: "POST", body }));
   };
   return {
     browser: {
@@ -301,6 +324,18 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.releaseUserControl(tabId),
           remote: (serverId) => userControlRequest(serverId, BROWSER_USER_CONTROL_ROUTES.release, tabId),
+        }),
+      ),
+      startTeach: payloadHandler(stringPayload("tabId"), (tabId) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.startTeach(tabId, { kind: "local" })),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.start, acceptEmpty, { tabId }),
+        }),
+      ),
+      stopTeach: payloadHandler(parseBrowserTeachStop, (input) =>
+        routeToServer<BrowserTeachStep[]>(remoteServers.activeServerId, {
+          local: () => browser.stopTeach(input.tabId, { kind: "local" }, input.save),
+          remote: (serverId) => teachRequest(serverId, BROWSER_TEACH_ROUTES.stop, decodeBrowserTeachSteps, input),
         }),
       ),
       listTabs: handler(() =>

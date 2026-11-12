@@ -10,6 +10,8 @@ body:
 
         Do not include credentials, private files, conversation contents, or unreviewed diagnostics. Report vulnerabilities through the private security process.
 
+        For a problem in the iPhone or Android app, use the **Mobile app bug report** form.
+
   - type: dropdown
     id: platform
     attributes:
@@ -19,8 +21,6 @@ body:
         - macOS
         - Windows
         - Linux
-        - iOS
-        - Android
         - Web client
         - Docker
         - Self-hosted server
@@ -35,8 +35,6 @@ body:
       options:
         - Release download from GitHub or openbot.run
         - In-app update
-        - TestFlight or App Store
-        - Google Play
         - Built from source
         - Other
     validations:
@@ -46,7 +44,7 @@ body:
     id: version
     attributes:
       label: OpenBot version
-      description: "Desktop: Settings → Updates. Phone: Settings → About. From source: the commit SHA."
+      description: "Desktop: Settings → Updates. From source: the commit SHA."
       placeholder: 0.42.0
     validations:
       required: true
@@ -203,7 +201,7 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Only the relevant lines. On a phone, use Settings → Support → "Save log file". Remove tokens, email addresses, and private paths.
+      description: Only the relevant lines. Remove tokens, email addresses, and private paths.
       render: shell
 
   - type: textarea

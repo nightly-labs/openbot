@@ -117,8 +117,8 @@ export interface SearchConversationMessagesInput {
   cursor?: string;
   limit?: number;
   /**
-   * Also search the open side threads. Only this computer's server reads it: the Team API search
-   * returns the agents' own chats.
+   * Also search the open side threads. A joined server reads it only when its host serves
+   * `thread-message-search-v1`; an older host searches the agents' own chats.
    */
   includeSideThreads?: boolean;
 }
@@ -184,6 +184,17 @@ export interface SendMessageInput {
    * the message for replay and never gives it to the agent.
    */
   voiceRecordingDraftId?: string;
+}
+
+/**
+ * Deletes one message from the chat of an agent, or of one open side task of the agent. The host
+ * removes it from its history and view; the provider session of the agent can still remember it.
+ */
+export interface DeleteConversationMessageInput {
+  agentId: string;
+  messageId: string;
+  /** The open task of this agent whose chat holds the message. Without it, the agent's own chat. */
+  taskId?: string;
 }
 
 export interface SetMessageReactionInput {

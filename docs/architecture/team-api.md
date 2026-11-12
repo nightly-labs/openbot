@@ -29,14 +29,30 @@ the read state and the sections load. These three reads run together. Cached con
 again after Online, the open conversation first; a chat that did not load then loads when it opens.
 Transport failures and reconnect attempts show Offline, and protocol failures show Connection error.
 The existing RTC connection updates and recovery controller are the source of truth; the indicator
-adds no polling or health requests. Foreground resume reuses a healthy connection and reads the
-workspace again without showing a reconnect. The time away decides what happens to the connection:
+adds no polling or health requests. Foreground resume reuses a healthy connection without showing a
+reconnect. When the connection from before the background stays (`kept` on the `connect` result) and
+no read stopped at background entry, the first attempt only checks the path with the compatibility
+read and reads the open chats again; the event stream delivered every event, or an `event-reset`
+asks for a full load. A new connection, a stopped read, a refresh and a failed check load the
+workspace again. The time away decides what happens to the connection:
 after less than 30 s the path is kept. After 30 s the host stopped using the path (ICE consent), so the
 peer renews its Signal socket and restarts ICE; a host that dropped the connection answers with a new
 fingerprint, and the peer fails at once instead of after a read timeout. A connection that is lost
-while a return checks it is replaced at once, with no countdown, as when the check fails. After 160 s Signal has told
-the host to drop the connection (120 s socket idle timeout, then 30 s), so the peer is replaced on the
-same session at once, without a resume hello, and the first attempt connects. A server that was
+while a return checks it is replaced at once, with no countdown, as when the check fails. Signal
+closes the socket of a suspended phone after its 120 s idle timeout and drops the connection after the
+reconnect grace: 10 minutes for a host that multiplexes, 30 s for an older host or an older Signal
+(`reconnectGraceMs` in `ready`, `SIGNAL_CLIENT_RECONNECT_GRACE_MS`). After the idle timeout, the grace
+and 10 s more, the peer is replaced on the same session at once, without a resume hello, and the
+first attempt connects. A move to another kind of network, such as Wi-Fi to mobile data
+(`expo-network`, `apps/mobile/src/shared/lib/network-path.ts`), ends the connection, and the recovery
+makes a new one on the same session at once (`networkMoved`); the WebView's `online` event does not
+fire for such a move. In support logs, an ICE restart after a network move did not bring the path
+back within 6 s, and a new connection was up in 1.5–3 s. In other cases, a probe of the path waits up
+to 6 s after the start of an ICE restart (`ICE_RESTART_PROBE_MS`) before it judges the path dead. The desktop host closes a connection
+at its 11th ICE restart, so the peer counts its restart offers and, after 10, makes a new connection
+on the same session instead of an 11th. A new connection to a known host opens its Signal socket while the ticket request runs,
+and, with ICE servers less than 30 minutes old, gathers candidates before `ready`; its first offer
+holds the candidates gathered so far. A server that was
 Online when the app left keeps its Online look during the first attempt after the return, for up to
 5 s (`QUIET_RESUME_MS` in `server-connection.tsx`): the server is `resuming`, `showsOnline` is
 true, and no reconnect status, faded avatars or faded chat show. A workspace request to a resuming
@@ -104,8 +120,9 @@ links from email invitations. Email mode creates an address-bound invitation and
 the same delivery endpoint as desktop; failed delivery attempts revoke the new invitation. Released restore endpoints
 remain compatible with older clients. Member and invitation lists refresh after changes or on explicit request.
 Conversation read cursors belong to a team member and are shared across that member's devices.
-Advancing a cursor emits a conversation invalidation without the reader's identity or cursor;
-clients reload their own read state even when the conversation content revision is unchanged.
+Moving a cursor emits a conversation invalidation without the reader's identity or cursor, only to the
+connections of that member; other members get no event, because their read state did not change. The
+member's clients reload their own read state even when the conversation content revision is unchanged.
 Mobile acknowledges rendered replies only in the foreground, focused chat at the latest messages.
 Mobile attachments use the shared desktop filename allowlist in `packages/contracts/src/attachment-files.ts`.
 The native document and photo pickers and the in-chat camera panel prepare local drafts. The existing Team file protocol
@@ -143,6 +160,15 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+That route marks the whole chat. The optional `conversation-unread-from-v1` capability (protocol 9
+only, `packages/contracts/src/team-protocol/conversation-unread-from-v1.ts`, host route
+`src/main/team-api/route-conversation-unread-from.ts`) adds `POST /v1/conversations/unread-from` with
+`{ agentId, fromMessageId }`: the member's read mark moves to the message shown before it, and the
+answer is the new read state. It needs `view` on the agent, as the other read routes do. A message
+the chat does not show is not found. The phone's message sheet and the desktop message menu on a
+joined server use it for Mark unread. After it, the open chat does not read itself again until it
+opens again. The chat shows a NEW line above the first unread message. The line keeps the message
+that the host had as first unread when the chat opened, because the open chat then reads itself.
 Mobile external links enter through Expo Router's `+native-intent` and the links feature.
 Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
 local request ID. Invitations wait through sign-in and show a verified host preview before an
@@ -291,7 +317,8 @@ revisions and returns an empty acknowledgement; the client then reads selection 
 Each route requires authentication and a visible agent. Selection writes use the same member
 access as existing memory writes. User choices override automatic selection.
 
-The released full-list GET route, memory shapes, and 2 MiB frame limit stay unchanged. A new
+The released full-list GET route, memory shapes, and 2 MiB frame limit stay unchanged. The
+memory routes leave out the `site` of a memory (see [browser](browser.md)). A new
 client connected to an older host keeps text editing and hides selection controls. An older
 client can edit text on a new host without changing inclusion. Storage choices remain 64, 128,
 256, and 512. Lowering the setting never deletes existing entries.
@@ -314,6 +341,230 @@ serializer checks the complete prompt block during migration, mutation, and prom
 Automatic text and selection changes stay pending until the turn completes successfully. Commit
 checks ownership, revisions, user choices, and capacity again. Agent tools cannot change or delete
 a user-controlled selection. The user can release that control without changing its inclusion.
+
+The optional `message-delete-v1` capability (protocol 9 only) adds three POST routes that delete one
+message and return an empty acknowledgement: `/v1/messages/delete` (`agentId`, `messageId`),
+`/v1/messages/delete-task` (`agentId`, `taskId`, `messageId`) and `/v1/channels/messages/delete`
+(`channelId`, `messageId`). The host always advertises it to a protocol 9 peer, because every host
+that has the routes can delete. `src/main/team-api/route-message-delete.ts` owns the authorization.
+In an agent chat, the agent must be visible to the member (else 404), and the member needs `chat` on
+the agent to delete their own messages; `manage` lets them delete any message. In a channel, each
+member deletes their own messages, and owners and admins delete any message. A host without channels
+answers the channel route with 400 `channelsUnsupported`, as it answers each channel route. A refusal
+from the service gets 403 (not the member's message), 404 (no shown message with that ID) or 409 (the
+message is in a running turn), with the host's sentence. A delete removes the message from the host's
+history, search and attachments; the provider session can still remember it. The host sends its
+usual change events (`conversation-invalidated` and `channels-changed`), so other members refresh.
+
+The optional `chat-history-v1` capability (protocol 9 only) adds four POST routes with an empty
+acknowledgement: `/v1/agent-history/delete` (`agentId`), `/v1/channels/context/clear`,
+`/v1/channels/context/compact` and `/v1/channels/history/delete` (each `channelId`). They do on a
+joined server what "Delete history" of an agent chat, and "New conversation", "Compact now" and
+"Delete history" of a channel do on this computer. The host always advertises it to a protocol 9
+peer. `src/main/team-api/route-chat-history.ts` owns the authorization. An agent history delete needs
+a visible agent (else 404) and `manage` on it (else 403). A member who sees a channel starts a new
+conversation or compacts it; only owners and admins delete its history (else 403
+`membersCannotDeleteChannelHistory`). A host without channels answers the channel routes with 400
+`channelsUnsupported`. Work that still runs or waits, an archived channel, or a compaction that no
+member session can do, gets 409 with the host's sentence.
+
+The optional `agent-import-v2` capability (protocol 9 only) sends a Grok Bot export of any size in
+parts: `/v1/agent-import/v2/open`, `/v1/agent-import/v2/chunk` (raw body, with `upload` and `offset`
+in the query) and `/v1/agent-import/v2/stage`. A host that advertises it also serves
+`agent-import-v1`, whose `apply` and `discard` routes take the staged token. See
+[Agent import from a joined server](servers.md#agent-import-from-a-joined-server).
+
+The optional `agent-welcome-v1` capability (protocol 9 only) changes no route shape. A client that
+sends it says that the `initialMessage` of `POST /v1/agents` is a setup message for the new agent. The
+host stores that message with `welcome: true` in its mailbox JSON and the item type `agent_welcome`.
+No conversation page, live snapshot, read state, search result, queue, runtime `work` item or preview
+shows it, for any member. While it waits or runs, the host's local queue snapshot has `welcome: true`, so
+the host's own window shows that the agent works and not the empty chat. `GET /v1/agents/:id/queue`
+keeps its released keys and does not send the flag: a remote member sees the empty chat until the
+welcome turn starts. The agent answers it, and that answer shows as usual. A client sends a setup message only to
+a host that advertises the capability; an older host still gets the released role text, which stays
+a visible user message there.
+
+The optional `message-pins-v1` capability (protocol 9 only) adds `POST /v1/message-pins/list`
+(`agentId`) and `POST /v1/message-pins/set` (`agentId`, `taskId` as a string or `null` for the
+agent's own chat, `messageId`, `pinned`). The list holds the pins of all chats of the agent (its own
+chat and its side threads, archived ones too), at most 200, the newest pin first. Each pin has its
+side thread and title, the first 1,000 characters of its message, and who pinned it: a person (`null`
+for the user of the host computer) or the agent. The agent pins with its `pin_message` tool. Both
+routes answer the list after the request. A member needs the `chat` level on the agent. A hidden or
+unknown agent gets 404, a message that is not in the chat gets 404, and a pin over the limit of 50
+for one chat gets 409. All members see the same pins. The host sends `message-pins-changed` with the
+agent id after each change, and the client reads the list again. A client opens a pin of another
+chat in the tab of that chat, or in the side panel when the thread is open there. When the thread
+view does not hold the message, `POST /v1/message-pins/read-thread` (`agentId`, `taskId`,
+`messageId`, `limit` 1 to 100) reads one part of the thread around it, oldest first, in the
+`agent-tasks-v1` conversation shape, with `hasOlder` and `hasNewer`. A message that the thread does
+not hold gives no messages. While the view holds a part with `hasNewer`, it skips live deltas and
+read marks, and shows the way to the latest message; a send reads the latest messages first. A host
+without the capability gets no part read: the client opens the newest messages. Channels have no
+pins. `src/main/team-api/route-message-pins.ts` owns the routes.
+
+The optional `agent-waits-v1` capability (protocol 9 only) adds `POST /v1/agent-waits/list`
+(`agentId`) and `POST /v1/agent-waits/cancel` (`agentId`, `waitId`). They show the open waits of an
+agent in the composer of a joined server, with Cancel. `src/main/team-api/route-agent-waits.ts` owns
+the authorization. A hidden or missing agent gets 404; a cancel needs `chat` on the agent (else 403).
+The host cuts each request text to 2,000 characters. A wait that is already closed gets 409 with the
+host's sentence. The host sends no event when a wait changes, so a client reads the list again after a
+cancel and when a turn of the agent starts or ends.
+
+The optional `agent-queue-task-v1` capability (protocol 9 only) adds
+`POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
+new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
+when it has `agent-tasks-v1`, and the answer is the frozen task of an `agent-tasks-v1` start.
+`src/main/team-api/route-agent-queue-task.ts` owns the authorization: a visible agent (else 404) and
+`chat` on it (else 403). A message that left the queue, or a message of a channel, gets 409 with the
+host's sentence. The host then sends `agent-tasks-changed` and the queue change.
+
+The optional `background-processes-v1` capability (protocol 9 only) adds
+`POST /v1/admin/background-processes/list` and `POST /v1/admin/background-processes/stop` (`id`).
+They show, in Server Settings > Storage, the programs that agents left running on the host, such as a
+dev server, with Stop. Only owners and admins can use them (else 403). The host redacts each command
+line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
+200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
+Windows host, which cannot find these programs. Stop signals only a program that is in the list at
+that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+
+The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
+and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's
+built-in providers in Server Settings > Providers. Only owners and admins can use them (else 403). Both
+routes answer `off`, the ids of the providers that are off after the call, at most 64. The released
+status routes leave out `off`, so a client reads it from this list. The host refuses the custom agent
+provider (`acp`) with 400, and a provider that an agent uses or that is busy with 409 and the host's
+message. Without the capability a client hides the switch for that host.
+
+The optional `routines-once-v1` capability (protocol 9 only) adds `POST /v1/routines-once/list`
+(`owner`), `POST /v1/routines-once/create` (`owner` and the routine, with a `once` schedule) and
+`POST /v1/routines-once/update` (`owner`, `id` and the changed fields). `owner` is
+`{ kind: "agent" | "channel", id }`. They carry one-time routines (the `once` schedule), which the
+frozen routine, channel, event and run-place codecs cannot carry. Those routes still hide and refuse
+`once` routines. The list gives only the `once` routines of the owner, so a client adds them to the
+released list. The update changes any schedule routine of the owner, so a client with the capability
+sends each routine update of an agent or a channel there. An agent routine carries `runIn` on these
+routes. Run, test and delete stay on the released routes, which take the id of a `once` routine.
+`src/main/team-api/route-routines-once.ts` owns the authorization, which is that of the released
+routes: a visible agent (else 404), and `manage` on it for a save (else 403); a channel that the member
+sees, on a host with `channel-chats-v1`. An unknown routine or a date that has passed gets 400.
+Without the capability the routes answer 400, and a client hides the `once` option for that host.
+
+The optional `routine-run-command-v1` capability (protocol 9 only) adds
+`POST /v1/admin/routines/run-command` (`agentId`, `routineId`). It answers `command`, the command that
+runs that routine from a script on the host, as Routines > Copy run command gives it on this computer.
+Only owners and admins can use it (else 403): the same people who turn on Local scripts for an agent.
+A member gets no shell access. The command reads the address and the token of the host's automation
+server from their files when it runs, so the token is not in the answer, and the command works only
+in a shell on the host. The host refuses an agent without Local scripts and a routine that is gone
+with 409 and the host's message. `src/main/team-api/route-routine-run-command.ts` owns it. Without the
+capability a client hides Copy run command for that host.
+
+The optional `claude-user-setup-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/claude-user-setup` and `POST /v1/admin/host/claude-user-setup/update`
+(`enabled`). They are "Use my Claude Code setup" of the host on the Claude page of Server Settings >
+Providers. On, the Claude agents of the server load the Claude Code setup of the host's user
+(`~/.claude` and `~/.agents/skills` on the host). Only owners and admins can use them (else 403). The
+routes carry only the switch, never a file of that setup. A change applies to the Claude processes
+that start after it, and the host sends the provider status event, so open settings pages read it
+again. `src/main/team-api/route-claude-user-setup.ts` owns them. Without the capability a client hides
+the switch for that host.
+
+The optional `provider-account-models-v1` capability (protocol 9 only) adds
+`POST /v1/admin/providers/accounts/models` (empty request). It gives, for each provider, the accounts
+after the first that serve models the provider's own sign-in does not, with those models (at most 1,000
+for each account; no credential, usage or agent). `provider-accounts-v1` carries no model list, so a
+client reads both and puts the models on their account: the model picker of that account then shows
+them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
+keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
+
+The optional `claude-compact-window-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
+(`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are
+"Compact chats at" of the host on the Claude page of Server Settings > Providers. Only owners and
+admins can use them (else 403); the wire codec refuses a size outside the range with 400. A change
+applies to the Claude processes that start after it, and the host sends the provider status event, so
+open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
+Without the capability a client hides the row for that host.
+
+The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
+`POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,
+`taskId`, `deliveryIds`). The list gives, in full, the waiting messages of each open side thread of
+the agent that has one, as the queue panel of a thread shows them on this computer. The released
+`agent-tasks-v1` list gives only the start of each message. The reorder route changes the order of
+the waiting messages of one thread. Cancel and Send now use the released queue routes of the agent,
+by delivery id. A member who can send the agent a message can use them: a visible agent (else 404)
+and `chat` on it (else 403). The host sends no preview URL of a file, because it is an address on the
+host. A stale order and an order with channel work get 409 and the host's message. A change sends the
+released `agent-tasks-changed` event. That event has no full queue, so a client reads the list again
+when the waiting messages of a thread change. `src/main/team-api/route-agent-thread-queue.ts` owns
+them. Without the capability a client shows the waiting messages of a thread without their actions.
+
+The optional `agent-usage-limit-v1` capability (protocol 9 only) adds `POST /v1/agent-usage-limit/list`
+(empty body) and `POST /v1/agent-usage-limit/switch` (`agentId`, `provider`, `model`,
+`reasoningEffort`, optional `providerAccountId`). The released `runtime-snapshot` event does not carry
+the usage limits. The list gives the agents whose queued message a provider usage limit holds, with the
+reset time, and the models and accounts that a usage limit or a provider error holds now. It leaves out
+a hidden agent, an agent that the member cannot see, and a model of a provider that the peer's protocol
+does not know. The switch route moves the agent to another model and sends the held message there, as
+the usage-limit card on the host's computer does. It needs a visible agent (else 404) and `manage` on it
+(else 403). A move to a named provider account that is not the agent's account needs an owner or admin
+(else 403). A change of a hold sends the released `runtime-snapshot` event, and the client then reads
+the list again; the desktop main process adds the list to the snapshot that it forwards.
+`src/main/team-api/route-agent-usage-limit.ts` owns them. Without the capability a client does not show
+the usage-limit card for that host. Only an owner or admin sees "Next time, switch without asking" on
+the card, because the backup models use `agent-backup-models-v1`.
+
+The optional `hermes-import-v1` capability (protocol 9 only) adds `POST /v1/hermes-import/read` (empty
+body), `POST /v1/hermes-import/apply` (`token`, `profiles` with `key` and `allow`) and
+`POST /v1/hermes-import/discard` (`token`). They import the Hermes Agent profiles of the Hermes folder
+of the host, as Import > Hermes does on this computer. The host reads only the folder that Hermes uses
+on the host: the client cannot name a folder (the wire codec drops a folder field). The read answers the
+profiles under a token, or `null` when the host has no Hermes profiles; a new read closes the earlier
+one. The answer shows the home folder of the host as `~` and carries no value from `.env` or
+`auth.json`. Only owners and admins can use the routes (else 403), because an import adds agents,
+skills and MCP servers to the whole server. A stale token gets 409 and the host's message.
+`src/main/team-api/route-hermes-import.ts` owns them. Without the capability a client shows no Hermes
+source for that host. The folder dialog stays on this computer: it shows the files of this computer,
+and the host cannot read them; to import Hermes from this computer to a server, export a `.zip` file.
+
+The optional `provider-detection-v1` capability (protocol 9 only) adds five routes under
+`/v1/admin/provider-detection/`: `settings` (empty body), `settings/update` (`enabled`, `addresses`,
+`folders`, `hiddenIds`), `scan-model-servers` (empty body), `scan-agents` (empty body) and
+`discover-models` (`baseUrl`, `apiKey`, `headers`, optional `savedProviderId`). They find the local
+model servers and the ACP agent commands of the host, as Server Settings > Providers does on this
+computer. The host makes each request from the host. A scan sends no key. A model list request can
+carry a key and headers towards the host; for a saved endpoint, the host uses its stored values only
+for the same origin. No answer carries a key or a header value. Only owners and admins can use the
+routes (else 403), because a model list request makes the host connect to an address that the client
+names, as a custom endpoint does. A refused entry gets 400. The client adds a found row with the
+released custom endpoint and custom agent routes, so it shows the rows only when it also manages
+those on the host. `src/main/team-api/route-provider-detection.ts` owns them. Without the capability a
+client shows no found rows for that host.
+
+The optional `channel-picture-v1` capability (protocol 9 only) adds `icon` and `imageUrl` to the
+channel side routes, `icon` to a `save` draft, and `/v1/channels/image?channelId=<id>`:
+`GET` with `&v=<version>` answers the image bytes of the current version (else 404), `PUT` with a raw
+PNG, JPEG, GIF or WebP body of at most 512 KiB sets the image, and `DELETE` removes it. `PUT` and
+`DELETE` answer the channel. Each request needs `channel-chats-v1` and a channel that the member sees
+(else 404); owners and admins see all channels. `src/main/team-api/route-channels.ts` owns the route.
+The host adds and reads these keys only for a request that advertises the capability, so released
+peers see the same `channels-v1` wire. The host's `imageUrl` is an
+`openbot-avatar://channel/<id>?v=&type=` URL. The desktop changes it to
+`openbot-remote-avatar://<server>/channel/<id>?v=`, the scheme of remote agent avatars, so the CSP does
+not change; the main process reads that URL with `GET /v1/channels/image`. The web client reads the
+bytes into a data URL. Over WebRTC, a `PUT` body and a `GET` answer go as file transfers, as for agent
+avatars. Without the capability a client hides the picture control for that host, and the channel
+shows its member faces.
+
+The optional `channel-browser-v1` capability (protocol 9 only) adds `browser` to the channel side
+routes and to a `save` draft (#4135): `{ kind: "members" }`, `{ kind: "none" }` or
+`{ kind: "member", agentId }`. Absent on a draft keeps the stored value; absent on a record is every
+member. A present value that a client cannot read reads as `none`. The host adds and reads the key only
+for a request that advertises the capability, so released peers see the same `channels-v1` wire, and a
+save from such a peer keeps the setting. Without the capability a client hides the Browser select for
+that host.
 
 Team API failures use a JSON error envelope with `error` and a stable `code`. Compatibility codes are `client_update_required`, `host_update_required`, and `protocol_error`. Authentication and network failures are projected to `authentication_required` and `network_unavailable` in the desktop connection state. A confirmed compatibility or protocol error stops data-plane requests and automatic reconnect until the user selects `Retry`, restarts, or updates.
 

@@ -1,5 +1,5 @@
 import { BloubBot, POSES } from "@norbert_bodziony/bloub";
-import { type AvatarMood, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
+import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import { Button } from "@openbot/ui";
 import { bloubAvatarProfile } from "@openbot/ui/bloub-avatar";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -102,55 +102,91 @@ const AVATAR_MOODS = [
   "connecting",
   "asleep",
 ] as const satisfies readonly AvatarMood[];
+const PLUSH_AND_FLAT_SEEDS = ["agent-alpha", "agent-beta", "agent-gamma", "agent-delta", "agent-epsilon"] as const;
 
 /**
- * One seed across every mood and every size.
+ * One seed across every mood and every size, as the app draws a resting avatar.
  *
  * This is the story that proves the point of the mood table: reading down a column, the silhouette
- * is the same in all seven rows and only the face changes. A row that draws a different body is a
- * state that should not be in `SHAPE_SAFE_STATES`.
+ * is the same in all seven rows and only the face and the plush's felt pieces change. A row that
+ * draws a different body is a mood that should map to another plush state.
  */
 export const SizesAndMoods: AgentStory = {
-  render: () => {
-    const profile = bloubAvatarProfile("story-avatar", 215);
-    return (
-      <div
-        class="grid gap-6 p-8"
-        style={{ background: "var(--openbot-bg-canvas)", color: "var(--openbot-text-primary)" }}
-      >
-        {AVATAR_MOODS.map((mood) => {
-          const presentation = avatarMoodPresentation(mood);
-          return (
-            <section class="grid gap-3" aria-label={`${mood} avatar sizes`}>
-              <strong class="text-sm capitalize">{mood}</strong>
-              <div class="flex items-end gap-5">
-                {AVATAR_SIZES.map((size) => (
-                  <div class="grid justify-items-center gap-2">
-                    <span class="agent-avatar agent-avatar-bloub" style={{ width: `${size}px`, height: `${size}px` }}>
-                      <BloubBot
-                        size={100}
-                        shape={profile.shape}
-                        color={profile.color}
-                        expression={presentation.expression ?? profile.expression}
-                        state={presentation.state}
-                        frozenAt={POSES[presentation.state]}
-                        ariaLabel={`${mood} avatar at ${size} pixels`}
-                        class="bloub-avatar-svg"
-                      />
-                    </span>
-                    <small style={{ color: "var(--openbot-text-muted)" }}>{size}</small>
-                  </div>
-                ))}
+  render: () => (
+    <div
+      class="grid gap-6 p-8"
+      style={{ background: "var(--openbot-bg-canvas)", color: "var(--openbot-text-primary)" }}
+    >
+      {AVATAR_MOODS.map((mood) => (
+        <section class="grid gap-3" aria-label={`${mood} avatar sizes`}>
+          <strong class="text-sm capitalize">{mood}</strong>
+          <div class="flex items-end gap-5">
+            {AVATAR_SIZES.map((size) => (
+              <div class="grid justify-items-center gap-2">
+                <AgentAvatar
+                  seed="story-avatar"
+                  hue={215}
+                  mood={mood}
+                  motion="hover"
+                  style={{ width: `${size}px`, height: `${size}px` }}
+                />
+                <small style={{ color: "var(--openbot-text-muted)" }}>{size}</small>
               </div>
-            </section>
-          );
-        })}
-      </div>
-    );
-  },
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  ),
 };
 
-/** The live moods, with their rings and breathing, as the app actually renders them. */
+/**
+ * The felt plush that the app draws, above the flat Bloub that it replaced, for the same seeds and
+ * sizes. It shows where the small sizes stop reading.
+ */
+export const PlushAndFlat: AgentStory = {
+  render: () => (
+    <div
+      class="grid gap-6 p-8"
+      style={{ background: "var(--openbot-bg-canvas)", color: "var(--openbot-text-primary)" }}
+    >
+      {PLUSH_AND_FLAT_SEEDS.map((seed) => {
+        const profile = bloubAvatarProfile(seed, null);
+        return (
+          <section class="grid gap-3" aria-label={`${seed} plush and flat`}>
+            <div class="flex items-end gap-5">
+              {AVATAR_SIZES.map((size) => (
+                <AgentAvatar
+                  seed={seed}
+                  hue={null}
+                  motion="hover"
+                  style={{ width: `${size}px`, height: `${size}px` }}
+                />
+              ))}
+            </div>
+            <div class="flex items-end gap-5">
+              {AVATAR_SIZES.map((size) => (
+                <span class="agent-avatar agent-avatar-bloub" style={{ width: `${size}px`, height: `${size}px` }}>
+                  <BloubBot
+                    size={100}
+                    shape={profile.shape}
+                    color={profile.color}
+                    expression={profile.expression}
+                    frozenAt={POSES.idle}
+                    ariaLabel={`Flat ${seed} at ${size} pixels`}
+                    class="bloub-avatar-svg"
+                  />
+                </span>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  ),
+};
+
+/** The live moods as the app renders them: each one plays on the plush face, with no ring or glow. */
 export const Moods: AgentStory = {
   render: () => (
     <div class="flex items-center gap-8 p-8">

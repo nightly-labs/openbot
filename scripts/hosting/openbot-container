@@ -52,9 +52,10 @@ eval "$session"
 # The locks of the last run stay in the container too.
 rm -f /tmp/.X0-lock /tmp/.X11-unix/X0 /tmp/.X1-lock /tmp/.X11-unix/X1
 # The subshells exit at once, so tini adopts Xvfb. As a child of OpenBot, Xvfb would get the high OOM
-# value of the agent processes, and OpenBot stops when the kernel kills its display.
+# value of the agent processes, and OpenBot stops when the kernel kills its display. :1 has a white
+# root (`-wr`): remote desktop shows it, and the default black root looks like no video (#3554).
 (Xvfb :0 -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 &)
-(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp >/dev/null 2>&1 &)
+(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp -wr >/dev/null 2>&1 &)
 export DISPLAY=:0 OPENBOT_AGENT_DISPLAY=:1
 for display in :0 :1; do
   for _ in $(seq 1 100); do

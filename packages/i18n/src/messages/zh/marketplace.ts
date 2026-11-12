@@ -103,7 +103,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack 中的提及和私信",
   "marketplace.app.discordTagline": "Discord 中的提及和私信",
   "marketplace.app.telegramTagline": "Telegram 中的群组和私聊",
+  "marketplace.app.whatsappTagline": "WhatsApp 中你自己的聊天和你允许的人",
   "marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
+  "marketplace.app.protonPassTagline": "用共享保管库中的登录信息登录网站",
   // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "登录与凭据管理",
   "marketplace.app.yourApps": "你的应用",
@@ -120,12 +122,22 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "移除 {name}？",
   "marketplace.app.remove.keep": "保留",
   "marketplace.app.connection": "连接",
+  "marketplace.app.access.use": "可使用",
+  "marketplace.app.access.noAgents": "无助手",
+  "marketplace.app.access.agentsOf": "可使用 {name} 的助手",
+  "marketplace.app.access.chooseAgents": "{name}：{summary}。选择助手",
+  "marketplace.app.access.level": "{role} 对 {name} 的访问权限",
   "marketplace.app.setup.account": "在浏览器中使用你的 {name} 账号登录。",
   "marketplace.app.setup.key": "需要你的 {name} 账号中的 API 密钥。",
   "marketplace.app.setup.keySaved": "{field} 已保存在 {host} 上。",
+  "marketplace.app.account.removeDescription": "OpenBot 会删除 {host} 上该账号的登录凭据。",
   "marketplace.app.setup.desktop": "在 {name} 桌面应用中运行，地址为 {address}。",
   "marketplace.app.setup.desktopConnected": "已连接到 {address}。",
   "marketplace.app.setup.open": "无需登录或密钥。",
+  "marketplace.app.blocked.update":
+    "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
+  "marketplace.app.blocked.member":
+    "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -184,6 +196,22 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "开始之前，请先加载我在 Cobrain 中的这个项目的上下文。",
   "marketplace.plugin.cobrain.prompt.searchDecision": "在我的 Cobrain 笔记中搜索我们关于定价的决定。",
   "marketplace.plugin.cobrain.prompt.saveNote": "在 Cobrain 中保存一条笔记，记下我们今天做了什么、还剩什么。",
+  "marketplace.plugin.honcho.tagline": "跨 AI 工具的个人记忆",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs 的 Honcho 为智能体提供关于你的长期记忆，你连接的其他 AI 工具也可以共享。智能体保存所学内容，Honcho 据此推理，构建你的偏好、目标和工作方式的模型。智能体在开始前会向它提问。OpenBot 智能体也有自己的记忆；Honcho 是跟随你到其他工具的记忆。智能体保存的消息会发送到你的 Honcho 账户。",
+  "marketplace.plugin.honcho.app": "通过一个 MCP 服务器，在 Honcho 工作区中保存和查询长期记忆。",
+  "marketplace.plugin.honcho.prompt.recall": "开始之前，问问 Honcho 它对我喜欢的工作方式了解多少。",
+  "marketplace.plugin.honcho.prompt.save": "把这个对话中的决定保存到 Honcho。",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho 对我的写作风格怎么说？把它用在这份草稿里。",
+  "marketplace.plugin.honcho.hint.apiKey": "在 app.honcho.dev 创建密钥。",
+  "marketplace.plugin.hindsight.tagline": "随时间学习的记忆",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize 的 Hindsight 为智能体提供 Hindsight Cloud 中的长期记忆。智能体保留事实和事件，按含义、时间和实体回忆它们，并对其进行反思以形成心智模型。记忆保存在记忆库中，智能体可以为每个项目或每个人创建一个记忆库。OpenBot 智能体也有自己的记忆；Hindsight 是你连接的其他 AI 工具可以共享的记忆。智能体保留的内容会发送到你的 Hindsight Cloud 账户。",
+  "marketplace.plugin.hindsight.app": "通过一个 MCP 服务器，在 Hindsight Cloud 记忆库中保留、回忆和反思记忆。",
+  "marketplace.plugin.hindsight.prompt.recall": "开始之前，从 Hindsight 中回忆我们对这个项目的了解。",
+  "marketplace.plugin.hindsight.prompt.retain": "把这个对话中的决定和未解决的问题保留到 Hindsight。",
+  "marketplace.plugin.hindsight.prompt.reflect": "反思我在 Hindsight 中的记忆：你在我上个月的工作中看到了哪些规律？",
+  "marketplace.plugin.hindsight.hint.apiKey": "在 Hindsight Cloud 的 Connect 页面创建密钥。",
   "marketplace.plugin.figma.tagline": "设计与原型",
   "marketplace.plugin.figma.description":
     "Figma 让助手读取设计文件、检查组件、样式与变量，并把生产规格交给工程师。它连接这台电脑上 Figma 桌面应用里的 MCP 服务器。该服务器目前只能读取设计，写入支持仍在开发中。",
@@ -199,6 +227,22 @@ export const messages = {
   "marketplace.plugin.paper.prompt.implement": "按我们的代码规范，在这个代码库里实现选中的 Paper 画框。",
   "marketplace.plugin.paper.prompt.codeToDesign": "用这个仓库里的样式，在 Paper 中设计一个设置页面。",
   "marketplace.plugin.paper.prompt.tokens": "列出打开的 Paper 文件中的设计 token，并与我们的主题对比。",
+  "marketplace.plugin.higgsfield.tagline": "AI 图片、视频和音频",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield 让助手使用 Seedance、Kling、Veo 和 MiniMax Hailuo 等 Higgsfield 模型生成图片、视频、角色和音频，查看积分余额，并浏览 Asset Library。结果保存到用户的 Higgsfield Assets。每个用户在浏览器中登录自己的 Higgsfield 账户。每次生成都按标准费率消耗该账户的积分，无限套餐也一样。",
+  "marketplace.plugin.higgsfield.app":
+    "通过 Higgsfield 的 MCP 服务器生成图片、视频和音频，管理角色、积分和素材，在浏览器中登录。",
+  "marketplace.plugin.higgsfield.prompt.credits": "我还有多少 Higgsfield 积分？",
+  "marketplace.plugin.higgsfield.prompt.productShot": "用 Higgsfield 生成一张陶瓷马克杯放在木桌上的产品照。",
+  "marketplace.plugin.higgsfield.prompt.clip": "用 Higgsfield 生成一段 5 秒的日落海浪视频。",
+  "marketplace.plugin.elevenlabs.tagline": "语音、声音和语音智能体",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs 让智能体把文本转成语音、使用各种声音，并创建、测试和查看 ElevenLabs 语音智能体及其对话。生成的音频以短时有效的下载链接返回。每位用户在浏览器中登录自己的 ElevenLabs 账号，每次生成都会使用该账号的额度。",
+  "marketplace.plugin.elevenlabs.app":
+    "文本转语音、声音和语音智能体管理，通过 ElevenLabs 的 MCP 服务器，在浏览器中登录。",
+  "marketplace.plugin.elevenlabs.prompt.speech": "用平静的 ElevenLabs 声音朗读这段文字，并把音频给我。",
+  "marketplace.plugin.elevenlabs.prompt.agents": "列出我的 ElevenLabs 语音智能体以及每个使用的声音。",
+  "marketplace.plugin.elevenlabs.prompt.conversations": "总结我的客服语音智能体最近十次对话。",
   "marketplace.plugin.appleApps.tagline": "Mac 上的邮件、日历等",
   "marketplace.plugin.appleApps.description":
     "Apple apps 让助手使用这台 Mac 上的邮件、日历、通讯录、提醒事项、备忘录、信息和 Safari。它仅适用于 macOS。OpenBot 会启动 mcp-icloud，这是一个社区服务器，不是 Apple 或 OpenBot 制作的。该服务器在这台电脑上通过 AppleScript 控制这些应用，不需要账号和密钥。安装时，OpenBot 可以一次性向 macOS 请求访问所有这些应用，每个应用显示一次提示。如果不这样做，macOS 会在助手第一次使用某个应用时询问。如需之后更改，打开系统设置 › 隐私与安全性 › 自动化。助手可以发送邮件和 iMessage，并修改或删除日程、联系人和提醒事项，因此请在批准前检查每次写入。工具读取的内容（例如邮件正文）会发送给助手的模型提供商。",
@@ -214,6 +258,14 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.newErrors": "昨天发布之后出现了哪些新错误？",
   "marketplace.plugin.sentry.prompt.topCrash": "解释移动端项目中最严重的崩溃及其可能原因。",
   "marketplace.plugin.sentry.prompt.releaseHealth": "当前版本的健康状况与上一个版本相比如何？",
+  "marketplace.plugin.gitlab.tagline": "Issue、合并请求和流水线",
+  "marketplace.plugin.gitlab.description":
+    "GitLab 让助手在 GitLab.com 上搜索项目、阅读和创建 Issue、审查和更新合并请求、阅读仓库文件和提交，并检查 CI 流水线和作业。每位用户通过浏览器登录自己的 GitLab 账号。助手拥有与用户相同的权限：可以推送提交、修改 Issue 和合并请求，并执行合并。对于自托管的 GitLab，请在 MCP 服务器设置中添加一个服务器，地址为你的 GitLab 地址加上 /api/v4/mcp，然后在那里登录。",
+  "marketplace.plugin.gitlab.app":
+    "通过 GitLab 的 MCP 服务器和浏览器登录，提供项目、Issue、合并请求、仓库和 CI 流水线。",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "哪些合并请求在等我审查？",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "默认分支上最近一次流水线为什么失败了？",
+  "marketplace.plugin.gitlab.prompt.newIssue": "为同步队列的崩溃建一个 Issue，附上复现步骤。",
   "marketplace.plugin.vercel.tagline": "部署、构建日志与项目",
   "marketplace.plugin.vercel.description":
     "Vercel 让助手列出项目和最近的部署、读取构建与运行时日志，并查明构建失败的原因。每位用户通过浏览器登录自己的 Vercel 账号，并选择助手可用的团队。在这些团队中，助手拥有与该账号相同的权限，还可以修改环境变量、域名、DNS 记录和部署，以及购买域名。",
@@ -249,6 +301,16 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "查询这笔支付并解释它为什么失败。",
   "marketplace.plugin.stripe.prompt.customer": "总结该客户的发票和未结余额。",
   "marketplace.plugin.stripe.prompt.link": "为每月 49 的专业版套餐起草一个支付链接。",
+  "marketplace.plugin.revenuecat.tagline": "订阅、产品和付费墙",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat 让智能体读取和更改应用内订阅的设置：应用、产品、权益、Offering、套餐、付费墙和实验。智能体还可以查找客户及其购买记录，并读取图表和指标。RevenueCat 密钥 API 密钥放在一个 Authorization 请求头中。该密钥可访问一个项目。使用只读密钥时，智能体只能读取。使用写入密钥时，智能体可以将产品提交到 App Store 审核、向客户授予权益，并删除套餐、定向规则和 Webhook。",
+  "marketplace.plugin.revenuecat.app":
+    "通过 RevenueCat 的 MCP 服务器和密钥 API 密钥使用产品、权益、Offering、付费墙和指标。",
+  "marketplace.plugin.revenuecat.prompt.offerings": "我的 RevenueCat 项目有哪些 Offering 和套餐？",
+  "marketplace.plugin.revenuecat.prompt.revenue": "本月我在 RevenueCat 的收入和活跃订阅有什么变化？",
+  "marketplace.plugin.revenuecat.prompt.customer": "这位 RevenueCat 客户有哪些权益，什么时候到期？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "在 RevenueCat 控制台中，打开项目的 API keys，并创建一个密钥 API 密钥。只读密钥就足以查看数据。",
   "marketplace.plugin.posthog.tagline": "产品分析与功能开关",
   "marketplace.plugin.posthog.description":
     "PostHog 让助手查询事件和漏斗、检查功能开关，并总结发布后的变化。把项目设置中的个人 API 密钥填入一个 Authorization 请求头即可。",
@@ -293,16 +355,31 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "把发布公告草稿发送到内测名单。",
   "marketplace.plugin.resend.prompt.status": "发票邮件送达客户了吗？",
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
-  "marketplace.plugin.composio.tagline": "通过你自己的 Composio 链接连接大量应用",
+  "marketplace.plugin.omnisend.tagline": "邮件和短信营销",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每个用户在浏览器中登录自己的 Omnisend 账户，并在授权页面选择访问级别。拥有写入权限时，智能体还可以发送活动和删除数据。如果智能体只需要报告，请选择只读权限。",
+  "marketplace.plugin.omnisend.app":
+    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
+  "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
+  "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.postiz.description":
+    "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
+  "marketplace.plugin.postiz.app":
+    "通过 Postiz 的 MCP 服务器，用浏览器登录或 API 密钥处理频道、草稿、已排程的帖子和媒体。",
+  "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
+  "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
+  "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
-    "Composio 通过一个 MCP 服务器把助手连接到 Gmail、Slack、GitHub 以及数百个其他应用。在你的 Composio 账号中连接想要的应用，然后把它的 MCP URL 和 API 密钥粘贴到这里。",
-  "marketplace.plugin.composio.app": "通过你 Composio 账号中的链接，使用你添加到 Composio MCP 服务器的应用。",
+    "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",
+  "marketplace.plugin.composio.app": "你在 Composio 账号中连接的应用。助手需要某个应用时，会请你连接它。",
   "marketplace.plugin.composio.prompt.inbox": "总结我的未读邮件，并为紧急的几封起草回复。",
   "marketplace.plugin.composio.prompt.handoff": "把这个拉取请求的摘要发到我们的团队频道。",
   "marketplace.plugin.composio.prompt.apps": "通过 Composio 你能使用哪些应用和操作？",
 
   // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
-  "marketplace.plugin.composio.hint.url": "你的 Composio 账号中某个 MCP 服务器的链接",
   "marketplace.plugin.composio.hint.apiKey": "可在你的 Composio 账号的 Settings > Sessions & API Key 中找到。",
   "marketplace.plugin.neon.tagline": "Postgres 项目、分支与迁移",
   "marketplace.plugin.neon.description":
@@ -353,6 +430,13 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今天到期的 Todoist 任务有哪些？",
   "marketplace.plugin.todoist.prompt.capture": "把这些待办事项添加到我的 Todoist 收件箱。",
   "marketplace.plugin.todoist.prompt.overdue": "把我逾期的 Todoist 任务改到明天。",
+  "marketplace.plugin.ticktick.tagline": "任务、清单、习惯和专注",
+  "marketplace.plugin.ticktick.description":
+    "TickTick 让助手搜索和筛选任务，添加和修改任务，并管理清单、分组、文件夹、标签和评论。助手还可以读取和修改习惯与专注记录，并读取与 TickTick 关联的日历中的日程。每位用户在浏览器中登录自己的 TickTick 账号。助手获得读写权限：可以完成、移动和删除任务，以及删除标签和专注记录。",
+  "marketplace.plugin.ticktick.app": "通过 TickTick 的 MCP 服务器以浏览器登录处理任务、清单、习惯和专注记录。",
+  "marketplace.plugin.ticktick.prompt.today": "今天有哪些 TickTick 任务到期？",
+  "marketplace.plugin.ticktick.prompt.capture": "把这些待办事项添加到我的 TickTick 收集箱。",
+  "marketplace.plugin.ticktick.prompt.week": "我上周完成了哪些 TickTick 任务？",
   "marketplace.plugin.trello.tagline": "看板、列表和卡片",
   "marketplace.plugin.trello.description":
     "Trello 让助手搜索和读取看板、列表、卡片、清单和评论，创建看板和卡片，移动列表和卡片，将卡片标记为完成，并添加清单、评论和标签。助手还可以读取和添加用户 Trello 收件箱中的卡片，并读取 Planner 中的日程，这些日程可能来自已连接的 Google 或 Outlook 日历。每位用户通过浏览器登录自己的 Trello 账号，并在授权页面上选择工作区。助手在这些工作区中拥有与用户相同的权限。助手可以归档卡片和列表，但服务器无法永久删除任何内容。",
@@ -367,6 +451,20 @@ export const messages = {
   "marketplace.plugin.clickup.prompt.findTasks": "找出我本周到期且未完成的 ClickUp 任务。",
   "marketplace.plugin.clickup.prompt.createTask": "用这些待办事项创建一个 ClickUp 任务，并分配给我。",
   "marketplace.plugin.clickup.prompt.summarizeDoc": "在 ClickUp 中找到最新的项目进展，并总结未解决的问题。",
+  "marketplace.plugin.coinbase.tagline": "加密货币价格、投资组合和交易",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase 让智能体读取 Coinbase Advanced Trade 中的价格、余额、投资组合、订单和费用，预览并下单，在资产之间兑换，并在投资组合之间转移资金。每个用户在浏览器中登录自己的 Coinbase 账户。智能体拥有与用户相同的权限。订单和兑换使用真实资金，智能体还可以用 USDC 余额支付 x402 请求。",
+  "marketplace.plugin.coinbase.app": "价格、余额、投资组合、订单和兑换，通过 Coinbase 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.coinbase.prompt.balances": "我在 Coinbase 每个投资组合中的余额是多少？",
+  "marketplace.plugin.coinbase.prompt.price": "显示 Coinbase 上的 BTC-USD 价格以及本周的走势。",
+  "marketplace.plugin.coinbase.prompt.previewOrder": "在 Coinbase 上预览一笔 50 USD 的 ETH 市价买入。不要下单。",
+  "marketplace.plugin.robinhood.tagline": "证券账户和智能体交易",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood 让智能体读取 Robinhood 客户的账户、持仓、余额、交易记录、自选列表和市场数据，并下达股票、期权和加密货币订单。每个用户在浏览器中登录自己的 Robinhood 账户。首次登录时，Robinhood 会要求用户开设一个单独的 Agentic 账户。智能体只能在该账户中交易，并且默认下单时不会逐笔请求用户批准。",
+  "marketplace.plugin.robinhood.app": "账户、持仓、市场数据和交易，通过 Robinhood 的 MCP 服务器并在浏览器中登录。",
+  "marketplace.plugin.robinhood.prompt.positions": "总结我在 Robinhood 的持仓以及今天的变动。",
+  "marketplace.plugin.robinhood.prompt.watchlist": "我在 Robinhood 自选列表中的每只股票本周走势如何？",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "我的 Robinhood Agentic 账户里有多少现金？",
   "marketplace.plugin.huggingface.tagline": "Hub 上的模型、数据集和论文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face 让助手在 Hugging Face Hub 上搜索模型、数据集、Spaces、合集和论文，读取模型卡片和仓库文件，预览数据集，并搜索 Hugging Face 文档。它使用 Hub 的公开数据，无需账号和密钥。这些工具只读取数据：助手不能创建仓库，也不能运行任务。",
@@ -377,7 +475,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "找一个天气时间序列数据集，并显示它的列。",
   "marketplace.auth.apiKey": "API 密钥",
   "marketplace.auth.personalApiKey": "个人 API 密钥",
-  "marketplace.auth.mcpUrl": "MCP 链接",
   "marketplace.auth.createKey": "创建密钥",
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",

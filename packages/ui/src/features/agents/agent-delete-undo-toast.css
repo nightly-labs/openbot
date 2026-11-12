@@ -3,24 +3,25 @@
   width: var(--width);
 }
 
-/* The same raised surface, border, and shadow as the shared toast. The bottom padding keeps the bar
-   clear of the text. */
+/* The raised toast surface with the 1px ring only. Undo sits on its own row, 8px from the bottom and
+   end edges, as in the shared toast. The bar runs along the bottom edge below it. */
 .agent-delete-undo-toast {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--openbot-space-3);
   overflow: hidden;
-  padding: var(--openbot-space-3);
-  padding-bottom: calc(var(--openbot-space-3) + var(--openbot-space-1));
-  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface-raised);
-  box-shadow:
-    0 0 0 1px var(--openbot-border),
-    var(--openbot-shadow-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
+}
+
+.agent-delete-undo-toast-actions {
+  grid-column: 1 / -1;
 }
 
 /* Without a fixed track, the grid row grows to the drawing's width, and the drawing's 128% height

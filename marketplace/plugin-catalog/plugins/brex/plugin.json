@@ -1,0 +1,33 @@
+{
+  "slug": "brex",
+  "name": "Brex",
+  "tagline": "Expenses, cards, and bills",
+  "description": "Brex lets agents look up expenses, users, cards, banking transactions, and bills in the account of the signed-in user. Each user signs in to their own Brex account through the browser.",
+  "category": "other",
+  "creatorName": "Brex",
+  "iconUrl": "https://www.brex.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-missing-receipts", "text": "Which of my expenses this month are missing receipts?" },
+    { "id": "prompt-team-spend", "text": "Summarize card spend by team for last quarter." },
+    { "id": "prompt-bills", "text": "Which bills are due in the next two weeks?" }
+  ],
+  "apps": [
+    {
+      "id": "app-brex-mcp",
+      "name": "Brex",
+      "description": "Expense, card, transaction, and bill lookup, over Brex's MCP server with browser sign-in.",
+      "iconUrl": "https://www.brex.com/favicon.ico",
+      "server": {
+        "name": "brex",
+        "transport": "http",
+        "url": "https://api.brex.com/mcp",
+        "auth": [{ "id": "brex-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.brex.com",
+  "privacyPolicyUrl": "https://www.brex.com/legal/privacy",
+  "termsUrl": "https://www.brex.com/legal/platform-agreement"
+}

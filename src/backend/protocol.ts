@@ -76,11 +76,19 @@ export interface AppServerRequest {
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 /**
- * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
- * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ * The account of a Codex whose selected model provider does not use an OpenAI login
+ * (`requires_openai_auth` is false, the default of a custom provider). Codex then reports no account
+ * and skips its own login screen: the provider's key or gateway authenticates the turns.
+ */
+export const CODEX_MODEL_PROVIDER_ACCOUNT_TYPE = "codex-model-provider";
+
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`), or a model provider that needs no OpenAI
+ * login. Turns on a key use API credits.
  */
 export function isCodexLoginType(type: string | undefined): boolean {
-  return type === "chatgpt" || type === "apiKey";
+  return type === "chatgpt" || type === "apiKey" || type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE;
 }
 
 export interface AccountReadResult {
@@ -88,6 +96,11 @@ export interface AccountReadResult {
     type: string;
     email?: string | null | undefined;
     planType?: string | null | undefined;
+    /**
+     * The organization or workspace of the login, when the CLI gives one: the Claude `orgId` or the
+     * Codex `workspaceName`. One email can sign in to a team and to a personal account.
+     */
+    organization?: string | null | undefined;
   };
   requiresOpenaiAuth: boolean;
 }
@@ -124,6 +137,22 @@ export interface AccountRateLimitWindowResult {
   resetsAt?: number | null | undefined;
 }
 
+/**
+ * The weekly or the monthly window, whichever is closer to its limit, since that is the one that stops
+ * a turn first. When both are spent, the one that resets later, since turns stay stopped until then.
+ */
+export function bindingWindow<T extends { usedPercent: number; resetsAt?: number | null | undefined }>(
+  weekly: T,
+  monthly: T,
+): T {
+  if (weekly.usedPercent >= 100 && monthly.usedPercent >= 100) {
+    return (monthly.resetsAt ?? Number.POSITIVE_INFINITY) >= (weekly.resetsAt ?? Number.POSITIVE_INFINITY)
+      ? monthly
+      : weekly;
+  }
+  return monthly.usedPercent > weekly.usedPercent ? monthly : weekly;
+}
+
 export interface AccountRateLimitResult {
   limitId?: string | null | undefined;
   limitName?: string | null | undefined;
@@ -144,7 +173,10 @@ export interface AccountRateLimitsReadResult {
   rateLimits?: AccountRateLimitResult | null | undefined;
   /** Antigravity only: every quota group of the plan. `rateLimits` is one of them. */
   groups?: AccountRateLimitGroupResult[] | undefined;
-  /** OpenCode only: the weekly or monthly window that `rateLimits.secondary` does not hold. */
+  /**
+   * OpenCode and Kimi: the weekly or monthly window that `rateLimits.secondary` does not hold. Cursor:
+   * the total of a plan split into Cursor's own models and the others.
+   */
   tertiary?: AccountRateLimitWindowResult | undefined;
   /** Cursor only: the provider whose plan quota this reading also counts, such as Grok on a merged plan. */
   sharedQuotaWith?: AgentProviderId | undefined;
@@ -259,14 +291,27 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
   const accountRecord = decodeRecord(account, "account");
   const email = optionalString(accountRecord, "email");
   const planType = optionalString(accountRecord, "planType");
+  // The Claude client gives `organization`; the Codex app server gives `workspaceName`.
+  const organization = optionalString(accountRecord, "organization") ?? optionalString(accountRecord, "workspaceName");
   return {
     account: {
       type: requiredString(accountRecord, "type"),
       ...(email === undefined ? {} : { email }),
       ...(planType === undefined ? {} : { planType }),
+      ...(organization === undefined ? {} : { organization }),
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
+}
+
+/**
+ * The Codex `account/read`. Only an explicit `requiresOpenaiAuth: false` means that the model
+ * provider needs no OpenAI login; a response without the field stays signed out.
+ */
+export function decodeCodexAccountReadResult(value: unknown): AccountReadResult {
+  const result = decodeAccountReadResult(value);
+  if (result.account || decodeRecord(value, "account response").requiresOpenaiAuth !== false) return result;
+  return { account: { type: CODEX_MODEL_PROVIDER_ACCOUNT_TYPE, email: null }, requiresOpenaiAuth: false };
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {
@@ -530,7 +575,8 @@ export function getRecord(record: unknown, key: string): DynamicRecord | null {
 export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
-  return getString(getRecord(item, "arguments"), "name");
+  const args = getRecord(item, "arguments");
+  return getString(args, "name") ?? getString(args, "tool");
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

@@ -1,17 +1,28 @@
 import {
+  isCodexLiveVoice,
+  isDictationKeyProvider,
+  isElevenLabsSpeechVoice,
+  isSpeechKeyProvider,
   isSpeechLanguage,
+  isSpeechModelId,
+  isSpeechSpeed,
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerRoutes,
+  isXaiSpeechVoice,
   SPEECH_LIMITS,
+  type SpeechApiKeyInput,
   type SpeechInput,
   type SpeechSettings,
   VOICE_API_KEY_MAX_LENGTH,
   VOICE_AUDIO_LIMITS,
+  VOICE_LIVE_LIMITS,
   VOICE_SERVER_LIMITS,
   VOICE_STREAM_LIMITS,
   type VoiceApiKeyInput,
+  type VoiceLiveStart,
+  type VoiceLiveStop,
   type VoiceModelRequest,
   type VoiceServerConnection,
   type VoiceServerSave,
@@ -85,16 +96,27 @@ export function parseVoiceSettings(input: unknown): VoiceSettings {
   return { modelId: input.modelId, language: input.language };
 }
 
-/** The one place an ElevenLabs key from the renderer enters main. Null removes the saved key. */
+/** The one place a dictation provider's key from the renderer enters main. Null removes the saved key. */
 export function parseVoiceApiKey(input: unknown): VoiceApiKeyInput {
-  if (!isObject(input)) throw new Error(sourceText("error.provider.keyRequired"));
-  if (input.key === null) return { key: null };
-  if (typeof input.key !== "string" || !input.key.trim()) throw new Error(sourceText("error.provider.keyRequired"));
-  if (input.key.length > VOICE_API_KEY_MAX_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
-  const key = input.key.trim();
+  if (!isObject(input) || !isDictationKeyProvider(input.provider)) throw new Error("A dictation provider is required.");
+  return { provider: input.provider, key: parseApiKey(input.key) };
+}
+
+/** A provider API key, or null. Every voice key goes through these checks. */
+function parseApiKey(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim()) throw new Error(sourceText("error.provider.keyRequired"));
+  if (value.length > VOICE_API_KEY_MAX_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
+  const key = value.trim();
   // The key goes into an HTTP header, which refuses other characters when the socket opens.
   if (!/^[\x21-\x7e]+$/u.test(key)) throw new Error(sourceText("error.provider.keyInvalidCharacters"));
-  return { key };
+  return key;
+}
+
+/** A key of a provider that reads replies aloud, with the same checks as `parseVoiceApiKey`. */
+export function parseSpeechApiKey(input: unknown): SpeechApiKeyInput {
+  if (!isObject(input) || !isSpeechKeyProvider(input.provider)) throw new Error("A speech provider is required.");
+  return { provider: input.provider, key: parseApiKey(input.key) };
 }
 
 export function parseVoiceStream(input: unknown): VoiceStream {
@@ -113,10 +135,43 @@ export function parseVoiceStreamAudio(input: unknown): VoiceStreamAudio {
 }
 
 export function parseSpeechSettings(input: unknown): SpeechSettings {
-  if (!isObject(input) || typeof input.readReplies !== "boolean" || !isSpeechVoice(input.voice)) {
-    throw new Error("Speech settings need a known voice.");
+  if (
+    !isObject(input) ||
+    typeof input.readReplies !== "boolean" ||
+    !isSpeechModelId(input.modelId) ||
+    !isSpeechVoice(input.voice) ||
+    !isElevenLabsSpeechVoice(input.elevenLabsVoice) ||
+    !isXaiSpeechVoice(input.xaiVoice) ||
+    !isSpeechSpeed(input.speed) ||
+    typeof input.codexLive !== "boolean" ||
+    !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice))
+  ) {
+    throw new Error("Speech settings need a known model, voice and speed.");
   }
-  return { readReplies: input.readReplies, voice: input.voice };
+  return {
+    readReplies: input.readReplies,
+    modelId: input.modelId,
+    voice: input.voice,
+    elevenLabsVoice: input.elevenLabsVoice,
+    xaiVoice: input.xaiVoice,
+    speed: input.speed,
+    codexLive: input.codexLive,
+    codexLiveVoice: input.codexLiveVoice,
+  };
+}
+
+/** A Codex live voice start: the agent and the renderer's WebRTC offer. */
+export function parseVoiceLiveStart(input: unknown): VoiceLiveStart {
+  if (!isObject(input) || !isString(input.agentId) || !input.agentId || !isString(input.sdp) || !input.sdp)
+    throw new Error("Live voice needs an agent and an offer.");
+  if (input.sdp.length > VOICE_LIVE_LIMITS.maximumSdpLength) throw new Error("The live voice offer is too long.");
+  return { agentId: input.agentId, sdp: input.sdp };
+}
+
+export function parseVoiceLiveStop(input: unknown): VoiceLiveStop {
+  if (!isObject(input) || !isString(input.sessionId) || !input.sessionId)
+    throw new Error("Live voice needs a session.");
+  return { sessionId: input.sessionId };
 }
 
 export function parseSpeechInput(input: unknown): SpeechInput {

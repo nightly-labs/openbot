@@ -127,9 +127,14 @@ function RoutineCalendar(props: {
   const moveFocus = (event: KeyboardEvent, key: string) => {
     const step = NAVIGATION_STEPS[event.key];
     if (step === undefined) return;
+    // Right to left, the week runs from the right, so the horizontal arrows swap.
+    const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
+    const rightToLeft =
+      event.currentTarget instanceof Element && getComputedStyle(event.currentTarget).direction === "rtl";
+    const days = horizontal && rightToLeft ? -step : step;
     event.preventDefault();
     const date = parseRoutineDateKey(key);
-    const next = inCalendar(new Date(date.getFullYear(), date.getMonth(), date.getDate() + step));
+    const next = inCalendar(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
     const nextKey = routineDateKey(next);
     if (isPast(nextKey)) return;
     setFocusKey(nextKey);

@@ -1,0 +1,39 @@
+{
+  "slug": "statsig",
+  "name": "Statsig",
+  "tagline": "Feature gates and experiments",
+  "description": "Statsig lets agents look up feature gates, dynamic configs, experiments, and metrics in a Statsig project, and draft changes that the project's review rules still apply to. Each user signs in to their own Statsig account through the browser.",
+  "category": "coding",
+  "creatorName": "Statsig",
+  "iconUrl": "https://statsig.com/images/favicons/favicon256.png",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-stale-gates",
+      "text": "Which feature gates have been fully rolled out for more than a month and can be cleaned up?"
+    },
+    { "id": "prompt-experiment-results", "text": "Summarize the results of the checkout experiment so far." },
+    {
+      "id": "prompt-gate-draft",
+      "text": "Draft a new feature gate for the beta search page that targets internal users only."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-statsig-mcp",
+      "name": "Statsig",
+      "description": "Feature gate, experiment, and metric lookup and edits, over Statsig's MCP server with browser sign-in.",
+      "iconUrl": "https://statsig.com/images/favicons/favicon256.png",
+      "server": {
+        "name": "statsig",
+        "transport": "http",
+        "url": "https://api.statsig.com/v3/mcp",
+        "auth": [{ "id": "statsig-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://statsig.com",
+  "privacyPolicyUrl": "https://statsig.com/privacy",
+  "termsUrl": "https://statsig.com/terms"
+}

@@ -100,7 +100,7 @@
 }
 
 .chat-action-card-footer-action {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .chat-action-card-error {
@@ -110,4 +110,9 @@
 .chat-action-card-removed .chat-action-card-title {
   color: var(--openbot-text-muted);
   text-decoration: line-through;
+}
+
+/* Open points to the end side. */
+:dir(rtl) .chat-action-card-open svg[class~="lucide-chevron-right"] {
+  transform: scaleX(-1);
 }

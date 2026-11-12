@@ -14,6 +14,7 @@ import {
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
 import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
@@ -43,6 +44,33 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
 }
 
 /**
+ * A video that an agent made with a tool (Grok `reference_to_video`). The video file is the
+ * message's attachment. The Team API carries it only to a client with the `video-generation-v1`
+ * capability; an older client shows the attachment alone.
+ */
+export interface VideoGenerationInfo {
+  prompt?: string | undefined;
+  aspectRatio: ImageGenerationAspectRatio;
+  /** The length that the agent asked for, in seconds. The player shows the real length. */
+  durationSeconds?: number | undefined;
+  /** The resolution that the agent asked for, such as "720p". */
+  resolution?: string | undefined;
+  error?: string | undefined;
+}
+
+export function isVideoGenerationInfo(value: unknown): value is VideoGenerationInfo {
+  return (
+    isDynamicRecord(value) &&
+    (value.prompt === undefined || isString(value.prompt)) &&
+    isImageGenerationAspectRatio(value.aspectRatio) &&
+    (value.durationSeconds === undefined ||
+      (isNumber(value.durationSeconds) && Number.isFinite(value.durationSeconds) && value.durationSeconds > 0)) &&
+    (value.resolution === undefined || isBoundedString(value.resolution, 40)) &&
+    (value.error === undefined || isString(value.error))
+  );
+}
+
+/**
  * The id of the question that asks the user to allow or block an MCP plugin request. The plugin
  * takes only one of its options; a typed answer cancels the request.
  */
@@ -52,6 +80,8 @@ export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
+  /** A short line under the question. The Team API does not carry it. */
+  detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
   /** The user can pick more than one option. Set only when true. */
@@ -64,6 +94,7 @@ export function isAgentPromptQuestion(value: unknown): value is AgentPromptQuest
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.header, INPUT_LIMITS.promptHeader) &&
     isBoundedString(value.question, INPUT_LIMITS.promptQuestion) &&
+    (value.detail === undefined || isBoundedString(value.detail, INPUT_LIMITS.promptQuestion)) &&
     isBoolean(value.isSecret) &&
     (value.multiSelect === undefined || isBoolean(value.multiSelect)) &&
     (value.options === null ||
@@ -151,6 +182,11 @@ export interface AgentExchangeSummary {
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
   /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
+  /**
+   * The sender's side thread that sent an incoming message. The sender link opens it. The Team API
+   * does not carry it, so a joined client opens the sender's own chat.
+   */
+  senderTaskId?: string;
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -175,7 +211,8 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
     ) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.senderTaskId === undefined || isIdentifier(value.senderTaskId))
   );
 }
 
@@ -214,6 +251,8 @@ export interface ConversationMessage {
   /** What the user said, on a message that a voice turn sent. The agent got only the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  /** Set on a `video_generation` message. Absent on a message from an older host. */
+  videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
@@ -235,6 +274,8 @@ export interface ConversationMessage {
   memoryChanges?: ConversationMemoryChange[] | undefined;
   /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
+  /** Set on a `skill-suggestion:*` message: the skill that the review asks to save. */
+  skillSuggestion?: ConversationSkillSuggestion | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -287,11 +328,13 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.name, INPUT_LIMITS.routineName) &&
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
+    (value.videoGeneration === undefined || isVideoGenerationInfo(value.videoGeneration)) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );
@@ -312,6 +355,13 @@ function isConversationDelivery(value: unknown): boolean {
  * The desktop chat shows it inside the run, which starts collapsed.
  */
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
+
+/**
+ * The item type of the setup message that a client sends to a new agent (`agent-welcome-v1`). The
+ * agent answers it with a welcome. No chat, history page, search, queue or preview shows it, and it
+ * does not go to a Team API client.
+ */
+export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
 /**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the

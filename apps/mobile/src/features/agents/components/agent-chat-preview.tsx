@@ -3,11 +3,12 @@ import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { useState } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
@@ -54,7 +55,7 @@ function PreviewBubble({ text, onHeight }: { text: string; onHeight?: (height: n
  */
 export function useAgentChatPreview(agent: MobileAgent) {
   const { t } = useText();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   // In the chat list pane, the preview has the width of the pane, not of the whole window.
   const screenWidth = useColumnWidth();
   const [measuring, setMeasuring] = useState(false);
@@ -75,6 +76,7 @@ export function useAgentChatPreview(agent: MobileAgent) {
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={36}
             animateIdle={false}

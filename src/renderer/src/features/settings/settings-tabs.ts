@@ -7,6 +7,7 @@ import {
   CreditCard,
   Mic,
   MousePointer2,
+  PanelRight,
   PanelTop,
   Server,
   Settings,
@@ -20,6 +21,7 @@ export type SettingsTab =
   | "notifications"
   | "voice"
   | "dynamic-island"
+  | "agent-dock"
   | "computer-use"
   | "profile"
   | "billing"
@@ -34,7 +36,14 @@ export type SettingsTab =
 type SettingsRow = {
   titleKey: AppTextKey;
   descriptionKey?: AppTextKey;
+  /** True: the row shows only on macOS. False: never on macOS. Missing: on each platform. */
+  macOS?: boolean;
 };
+
+/** False for a row that this platform does not show, so the search does not find it. */
+export function settingsRowShown(row: { macOS?: boolean }, platform: AppInfo["platform"] | undefined): boolean {
+  return row.macOS === undefined || row.macOS === (platform === "darwin");
+}
 
 /**
  * A tab holds the keys of its label and its header text, not the text itself. The list is read at
@@ -58,16 +67,27 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
+      { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
+      { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
+      { titleKey: "sidebar.order.title", descriptionKey: "settings.chatOrder.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
+      {
+        titleKey: "settings.compactMessageActions.title",
+        descriptionKey: "settings.compactMessageActions.description",
+      },
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
       { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
       { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },
-      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description" },
+      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description", macOS: false },
+      { titleKey: "settings.menuBar.title", descriptionKey: "settings.menuBar.description", macOS: true },
       { titleKey: "settings.keepAwake.title", descriptionKey: "settings.keepAwake.description" },
       { titleKey: "settings.keepAwakeOnBattery.title", descriptionKey: "settings.keepAwakeOnBattery.description" },
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
+      { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
     ],
   },
@@ -114,13 +134,18 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.voice.description",
     icon: Mic,
     rows: [
-      { titleKey: "settings.voice.models.title" },
-      { titleKey: "settings.voice.language.title", descriptionKey: "settings.voice.language.description" },
+      { titleKey: "settings.voice.dictation.section" },
+      { titleKey: "settings.voice.language.section", descriptionKey: "settings.voice.language.description" },
       {
         titleKey: "settings.voice.speech.readReplies.title",
         descriptionKey: "settings.voice.speech.readReplies.description",
       },
       { titleKey: "settings.voice.speech.voice.title" },
+      { titleKey: "settings.voice.speech.speed.title" },
+      {
+        titleKey: "settings.voice.speech.codexLive.title",
+        descriptionKey: "settings.voice.speech.codexLive.description",
+      },
     ],
   },
   {
@@ -129,12 +154,30 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.dynamicIsland.description",
     icon: PanelTop,
     rows: [
-      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description" },
+      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description", macOS: true },
+      {
+        titleKey: "settings.notch.show.titleTopOfScreen",
+        descriptionKey: "settings.notch.show.description",
+        macOS: false,
+      },
       { titleKey: "settings.notch.idle.title", descriptionKey: "settings.notch.idle.description" },
       { titleKey: "settings.notch.displays.title", descriptionKey: "settings.notch.displays.description" },
-      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description" },
+      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description", macOS: true },
       { titleKey: "settings.notch.servers.title", descriptionKey: "settings.notch.servers.description" },
       { titleKey: "settings.notch.size.title", descriptionKey: "settings.notch.size.description" },
+    ],
+  },
+  {
+    value: "agent-dock",
+    titleKey: "settings.tab.agentDock.title",
+    descriptionKey: "settings.tab.agentDock.description",
+    icon: PanelRight,
+    rows: [
+      { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
+      { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
+      { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.size.title", descriptionKey: "settings.agentDock.size.description" },
+      { titleKey: "settings.agentDock.agents.title" },
     ],
   },
   {
@@ -200,17 +243,22 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
 
 /**
  * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel.
+ * from this panel. The Dynamic Island and the agent dock are macOS, Windows and Linux features of the main window.
  */
-export function settingsTabShown(tab: SettingsTab, dynamicIslandShown: boolean): boolean {
+export function settingsTabShown(
+  tab: SettingsTab,
+  window: { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+): boolean {
   if (tab === "hosted-servers") return false;
-  return tab !== "dynamic-island" || dynamicIslandShown;
+  if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
+  if (tab === "agent-dock") return window.platform !== undefined && !window.chatWindow;
+  return true;
 }
 
 /**
- * The Dynamic Island exists only on macOS, and only the main window owns it: main rejects its calls
- * from a chat window.
+ * The Dynamic Island exists on macOS, Windows and Linux, and only the main window owns it: main rejects
+ * its calls from a chat window.
  */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
-  return platform === "darwin" && !chatWindow;
+  return platform !== undefined && !chatWindow;
 }

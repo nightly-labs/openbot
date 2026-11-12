@@ -62,7 +62,7 @@
   background: transparent;
   padding: 0;
   color: inherit;
-  text-align: left;
+  text-align: start;
 }
 
 .attachment-preview-button:disabled {
@@ -145,6 +145,41 @@
   }
 }
 
+/* While a file from a joined server downloads, its download button shows the progress and stops it. */
+.attachment-download-ring {
+  --ui-radial-progress-color: var(--openbot-text-primary);
+
+  width: var(--openbot-control-xs);
+}
+
+/* The card sizes every button icon; the ring chart fills its own box instead. */
+.attachment-download-stop .ui-radial-progress-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.attachment-download-stop .ui-radial-progress-content {
+  padding: 0;
+}
+
+.attachment-download-stop .ui-radial-progress-content svg {
+  width: var(--openbot-glyph-sm);
+  height: var(--openbot-glyph-sm);
+  fill: currentcolor;
+  stroke: none;
+}
+
+.message-attachment[data-download] small {
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-attachment[data-download="failed"] small {
+  color: var(--openbot-danger);
+}
+
 .agent-queue-panel {
   --queue-row-height: 29px;
   --queue-composer-overlap: 14px;
@@ -192,7 +227,8 @@
  */
 .agent-queue-hold {
   margin: 0;
-  padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
+  padding-block: var(--queue-row-gutter) 0;
+  padding-inline: var(--queue-row-inset-start) var(--queue-row-inset-end);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: 16px;

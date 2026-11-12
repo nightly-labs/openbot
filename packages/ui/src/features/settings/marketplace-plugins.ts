@@ -10,6 +10,7 @@
  */
 
 import type { MacAutomationTarget, McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
+import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { isListingUrl, type McpAuth, mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 
 /** One of the example questions a plugin listing opens with. */
@@ -28,7 +29,12 @@ export interface MarketplacePluginPrompt {
  */
 export type MarketplacePluginServer = MarketplacePluginServerBase &
   (
-    | { transport: Extract<McpTransport, "http">; url: string }
+    | {
+        transport: Extract<McpTransport, "http">;
+        url: string;
+        /** The addresses that an earlier version of the listing saved rows on. */
+        earlierUrls?: readonly string[];
+      }
     | {
         transport: Extract<McpTransport, "stdio">;
         /**
@@ -64,17 +70,39 @@ interface MarketplacePluginServerBase {
  */
 export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
   const server = app.server;
-  if (config.name !== server.name || config.transport !== server.transport) return false;
+  if (config.transport !== server.transport) return false;
   if (server.transport === "http") {
+    // An account the user added has its own label for a name, and the fragment that only "Add
+    // account" writes. Any other row must have the catalog name.
+    if (mcpAccountFragment(config.url) === null && config.name !== server.name) return false;
+    const url = withoutMcpAccountFragment(config.url);
+    if (url === server.url) return true;
     // A listing that asks for the user's own link cannot know the address, only its host.
     const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
-    return userLink ? isListingUrl(config.url, server.url) : config.url === server.url;
+    if (userLink && isListingUrl(url, server.url)) return true;
+    // A row that an earlier version of the listing saved, such as a Composio link from before its sign-in.
+    return (server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier));
   }
+  if (config.name !== server.name) return false;
   return (
     config.command === server.command &&
     config.args.length === server.args.length &&
     config.args.every((arg, index) => arg === server.args[index])
   );
+}
+
+/**
+ * The row to connect again. A row that an earlier version of the listing saved moves to the address
+ * the listing names now, so the new sign-in or key goes to the current server. Its headers stay
+ * behind: they are the credentials of the old address. An account fragment stays with the row.
+ */
+export function currentPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): McpServerConfig {
+  const server = app.server;
+  if (server.transport !== "http" || config.transport !== "http") return config;
+  const url = withoutMcpAccountFragment(config.url);
+  if (url === server.url || isListingUrl(url, server.url)) return config;
+  if (!(server.earlierUrls ?? []).some((earlier) => isListingUrl(url, earlier))) return config;
+  return { ...config, url: `${server.url}${mcpAccountFragment(config.url) ?? ""}`, headers: [] };
 }
 
 /** An MCP server the plugin publishes. The listing calls it an app, because that is what it is to the user. */

@@ -79,10 +79,16 @@ export const messages = {
   "sitePage.pricing.description":
     "ホスト型サーバーとチーム向けライセンス。自分のコンピューターでの個人利用なら OpenBot は無料です。",
   "sitePage.pricing.heading": "料金",
+  "sitePage.pricing.personal.title": "個人利用は無料",
+  "sitePage.pricing.personal.body":
+    "すべての機能を、自分のコンピューターで、すでに契約している AI プランで使えます。サーバーもライセンスも不要です。",
   "sitePage.pricing.enterprise.title": "エンタープライズ",
   "sitePage.pricing.enterprise.body":
     "より大きなサーバー、{count} 人を超えるメンバー、そのほかのご要望にも対応します。エンタープライズサポート付きです。",
   "sitePage.pricing.enterprise.contact": "営業に問い合わせる",
+  "sitePage.pricing.consent.statement": "{policy}、{terms}に同意します。",
+  "sitePage.pricing.consent.policy": "プライバシーポリシー",
+  "sitePage.pricing.consent.terms": "利用規約および撤回権",
   "sitePage.marketplace.agents.title": "エージェント — OpenBot マーケットプレイス",
   "sitePage.marketplace.agents.description":
     "OpenBot でほかの人が作ったエージェントです。スキルやルーティンと一緒に OpenBot に追加できます。",

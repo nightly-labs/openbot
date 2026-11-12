@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "이 요청에서는 기록을 사용할 수 없어요. 최근 기록을 다시 읽거나, 채널 작업에는 channel_history를 사용하세요.",
+  "error.agent.historyArgumentsInvalid":
+    "기록 인수가 올바르지 않습니다: {detail} 인수를 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.toolRequestInvalid":
     "도구 검색 인수가 올바르지 않아요. 선언된 스키마와 원래의 정규화된 도구 이름을 사용하세요.",
+  "error.agent.toolCallArgumentsNotObject":
+    "도구가 실행되지 않았어요. tool_call의 arguments는 텍스트가 아니라 JSON 객체여야 해요. arguments를 객체로 바꿔 다시 호출하세요.",
+  "error.agent.toolCallDiscoveryTool":
+    "도구가 실행되지 않았어요. tool_call로는 openbot.tool_search나 openbot.tool_describe를 실행할 수 없어요. 같은 인수로 직접 호출하세요.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "루틴 일정이 올바르지 않아요: {detail} 일정을 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.approvalWhileDeleting": "에이전트를 삭제하는 중에는 승인할 수 없어요.",
   "error.agent.accessLocalOnly": "에이전트 접근 권한은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.duplicateCleanupFailed": "에이전트 복제에 실패했고 불완전한 사본을 제거할 수 없었어요.",
@@ -46,6 +54,7 @@ export const messages = {
     "지금 사용할 수 있는 {provider} 모델이 없어요. list_models를 호출해 사용 가능한 모델을 확인하세요.",
   "error.agent.reasoningEffortUnsupported":
     '모델 "{model}"은(는) 추론 강도 "{effort}"을(를) 지원하지 않아요. 지원하는 강도: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable": '모델 "{model}"에는 추론 강도 설정이 없어서 강도를 바꿀 수 없어요.',
   "error.agent.noStartingModelInSettings":
     "{provider}에 사용할 수 있는 모델이 없고, 로그인된 다른 제공자에도 없어요. 제공자에 로그인하거나 서버 설정 → 제공자에서 기본 제공자를 변경하세요.",
   "error.agent.noStartingModel":
@@ -55,6 +64,7 @@ export const messages = {
     "이 에이전트의 작업이 실행 중이에요. 제공자를 변경하기 전에 작업이 끝날 때까지 기다리거나 작업을 중지해 주세요.",
   "error.agent.waitBeforeClearContext": "새 채팅을 시작하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.waitBeforeCompactContext": "컨텍스트를 압축하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
+  "error.agent.waitBeforeDeleteHistory": "기록을 삭제하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.compactContextUnavailable": "이 에이전트는 지금 컨텍스트를 압축할 수 없어요.",
   "error.agent.unknown": "알 수 없는 에이전트: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -72,6 +82,8 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.compactionConnectionLost":
+    "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겨 작업이 멈췄어요. 인터넷 연결을 확인한 다음 메시지를 보내 계속해 주세요.",
   "error.agent.selectedGone": "선택한 에이전트가 더 이상 없어요.",
   "error.agent.profileEndpointsChanged": "생성하는 동안 사용자 지정 엔드포인트가 변경되었어요. 다시 시도해 주세요.",
   "error.agent.profileInvalid": "제공자가 올바르지 않은 프로필을 반환했어요. 프롬프트를 수정해 보세요.",
@@ -101,6 +113,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "이 설정은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.sideQuestionBusy": "곁다리 질문이 너무 많이 실행 중이에요. 잠시 후 다시 시도해 주세요.",
   "error.agent.sideQuestionFailed": "에이전트가 곁다리 질문에 답하지 못했어요. 다시 시도해 주세요.",
+  "error.agent.webSearchSignIn": "웹 검색을 사용하려면 ChatGPT 계정으로 Codex에 로그인해야 합니다.",
+  "error.agent.webSearchBusy": "실행 중인 검색과 사이드 질문이 너무 많습니다. 잠시 후 다시 시도하세요.",
+  "error.agent.webSearchFailed": "웹 검색이 완료되지 않았습니다. 다시 시도하세요.",
   "error.agent.busyMessageModeLocalOnly":
     "에이전트가 작업 중일 때 메시지를 처리하는 방식은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
   "error.agent.backupModelsLocalOnly": "백업 모델은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
@@ -132,6 +147,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",
   "error.agent.mcpServerKeysMove":
     "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 서버 설정의 MCP에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
+  "error.agent.mcpServerBuiltIn":
+    "{name}은(는) OpenBot의 일부라서 MCP 도구로 테스트하거나 켜고 끄거나 제거할 수 없어요. 사용자가 OpenBot을 실행하는 컴퓨터에서 관리해요. GitHub 연결은 마켓플레이스, 앱, GitHub에서, 컴퓨터 제어는 설정, 컴퓨터 제어에서 관리해요.",
   "error.agent.mcpServerUnknown": "{name}(이)라는 MCP 서버가 없어요. list_mcp_servers를 호출해 이름을 확인하세요.",
   "error.agent.screenCaptureWindowMissing":
     "해당 창이 지금 열려 있지 않아요. list_capture_sources를 호출해 현재 창 ID를 확인하세요.",

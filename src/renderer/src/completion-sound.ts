@@ -87,6 +87,28 @@ export function unlockCompletionSound(): void {
   }
 }
 
+let preparing = false;
+
+/**
+ * Opens the app audio context when the page is idle. The first context opens the audio output, which
+ * blocks the page for 100–150ms on macOS. Opened at the end of a turn, it stops the entry of the
+ * reply; opened while the agent works, it stops the send glide or the avatar. The app calls this at
+ * start, and again when a turn starts after the sound choice changed. A theme plays on the cuelume
+ * context, so only the classic tone needs it.
+ */
+export function prepareCompletionSound(): void {
+  if (completionAudioContext || preparing || readTaskSound() !== "classic") return;
+  preparing = true;
+  requestIdleCallback(() => {
+    preparing = false;
+    try {
+      completionAudioContext ??= new AudioContext();
+    } catch {
+      completionAudioContext = undefined;
+    }
+  });
+}
+
 /** The one audio context of the app sounds, so that each sound does not keep its own output open. */
 export async function appSoundContext(): Promise<AudioContext> {
   try {

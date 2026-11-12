@@ -24,6 +24,8 @@ interface ComposerDraftOwner {
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDraftBackup: () => ComposerDraft | null;
+  /** The queue edit in a side thread's message box, and the draft that it restores when it ends. */
+  threadQueueEdit: () => { draftKey: string; backup: ComposerDraft } | null;
   /** Messages that left the composer but that the host has not confirmed, per chat, oldest first. */
   unsentTexts: () => Record<string, string[]>;
 }
@@ -57,8 +59,8 @@ function decodeStoredDrafts(value: unknown): StoredComposerDrafts {
 /**
  * Writes the drafts shortly after each change, and at once when the window goes away.
  *
- * A queue edit stores its own draft (`QUEUE_EDIT_STORAGE_KEY`), so for that conversation this keeps
- * the draft the edit restores when it ends.
+ * A queue edit stores its own draft (`QUEUE_EDIT_STORAGE_KEY`, or `THREAD_QUEUE_EDIT_STORAGE_KEY` in a
+ * side thread), so for that conversation this keeps the draft the edit restores when it ends.
  */
 export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -71,6 +73,9 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
     if (editAgentId && editServerId)
       agents[composerDraftKey({ agentId: editAgentId, serverId: editServerId })] =
         owner.editingDraftBackup() ?? EMPTY_DRAFT;
+    const threads = { ...owner.threadDrafts() };
+    const threadEdit = owner.threadQueueEdit();
+    if (threadEdit) threads[threadEdit.draftKey] = threadEdit.backup;
     // A failed or waiting message lives only in memory. After a restart its text is back in the
     // composer, before what the user typed later, and nothing sends it again on its own.
     for (const [key, texts] of Object.entries(owner.unsentTexts())) {
@@ -83,7 +88,7 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
         JSON.stringify({
           agents: storableDrafts(agents),
           channels: storableDrafts(owner.channelDrafts()),
-          threads: storableThreadDrafts(owner.threadDrafts()),
+          threads: storableThreadDrafts(threads),
         }),
       );
     } catch {
@@ -98,6 +103,7 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
         owner.threadDrafts(),
         owner.editingAgentId(),
         owner.editingDraftBackup(),
+        owner.threadQueueEdit(),
         owner.unsentTexts(),
       ] as const,
     () => {

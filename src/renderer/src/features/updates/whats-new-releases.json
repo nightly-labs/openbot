@@ -1,5 +1,395 @@
 [
   {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Channel settings have a Browser setting. Choose if every member, one member or no member can use the browser in the channel.",
+          "The channel side panel has a Browser pane and a Files pane. They show the tabs of the channel's members and the files sent in the channel.",
+          "Right-click the Dynamic Island or the agent dock to hide it. You can also drag an agent to a new place on the dock and change the dock size in Settings.",
+          "You can turn off the Unread group in the sidebar. Right-click the Unread heading, or set Sort chats to Manual.",
+          "When a new version cannot start 3 times in a row, a recovery window opens. You can try again, download the previous version or export diagnostics."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new version now goes to about 1 in 10 computers first, and to all computers about one day later. To get it at once, select Check for updates.",
+          "Agents ask questions with options in the question prompt. Cards with buttons are only for approvals."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A chat that you read no longer stays in the Unread group. Unread side threads, such as the thread of a routine, no longer keep an agent there.",
+          "On Windows, the agent dock and the Dynamic Island no longer make the pointer slow in all apps while many agents work.",
+          "A team no longer stops when the lead ends its turn with no answer after its teammates report back.",
+          "A Claude chat that got too long now starts a new session with the chat history. Before, each message failed with \"Prompt is too long\".",
+          "When a Claude account reaches its 5-hour limit, the agent moves to its backup model or waits for the reset.",
+          "An agent can save a browser screenshot as a file and attach it to its reply."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini installs and updates on Windows again. In 0.67.0, it stopped with an error about a link or special file.",
+          "An agent that sends a message to a busy teammate now knows if the message went into the teammate's running task. When the message waits, the agent can tell you why.",
+          "During Computer Use, agents no longer say that their cursor is not available. OpenBot draws the cursor where the agent clicks, scrolls or moves."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Fast mode is off for each Claude agent after this update. If you used it, turn it on again in the model picker."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Add a server on your own Linux computer or VPS with one command, or ask an agent to install it there over SSH.",
+          "Server settings → Transfer can now move the chat history, the channels and the workflows to the new server.",
+          "On Linux, the Dynamic Island and the agent dock stay above other windows, as on a Mac.",
+          "Turn on Fast mode for a Claude agent, or choose Ultrafast for a Codex agent, in the model picker.",
+          "Agents keep what they learn about a site as a memory of that site, and do not repeat steps that failed.",
+          "The Apps catalog has 207 new apps, such as monday.com, Miro, Dropbox and Zapier. You connect them with a browser sign-in."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats with unread replies show first, in an Unread group. To change the order, select Sort chats in the menu of the chat list.",
+          "On a joined server, such as a VPS, the desktop app and the browser app now have most of the features of this computer.",
+          "Agents add OpenBot as a co-author to their git commits. You stay the author. Turn it off in Your settings → Agents.",
+          "Agents finish browser tasks with fewer steps and about 18% fewer tokens.",
+          "Gemini now runs on the Antigravity CLI. Your Google sign-in stays."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A Claude agent that you stop now stops in about 10 seconds, and its queued messages start.",
+          "On Windows, agents can use the browser while the OpenBot window is minimized or in the tray.",
+          "On macOS, Restart to update no longer closes OpenBot when it runs from its disk image. It tells you to move OpenBot to Applications.",
+          "In a voice conversation, a cough or a key press no longer stops the agent's reply."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents learn new skills by themselves after a correction or a method that worked. Choose Automatic, Ask first or Off in Server settings → General.",
+          "Vault logins can keep a two-step code, and agents can sign in with it.",
+          "On Windows, the Dynamic Island and the agent dock show your agents, as on a Mac. The agent dock can also hold channels.",
+          "Agents can watch public online videos, such as YouTube or TikTok links.",
+          "Select many files in the Library to download or delete them at once.",
+          "Agents can send a bug report or a feature idea to the OpenBot team for you."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Channel members answer while they work in their own chat, and a greeting or an unclear message goes to the lead.",
+          "A new agent opens with a short welcome and three first tasks that you can choose.",
+          "Connect Composio with a sign-in in the browser. You no longer type a URL and an API key.",
+          "Settings is now named Your settings, and Server settings has a search field.",
+          "The macOS app icon has a new glass look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "An agent's queue no longer starts the same message again and again while the agent waits on its own question.",
+          "A ChatGPT agent no longer compacts again and again, or stays on \"Compacting context\" with no end.",
+          "Agents on Cursor and some other providers keep their OpenBot tools after OpenBot restarts.",
+          "Agents can use a remote MCP server that you signed in to, such as n8n, with the newest MCP version."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A Library page in the window rail shows every picture and file from the chats of a server.",
+          "Delete the history of a chat or a channel in its settings. The setup, memories and routines stay.",
+          "Read replies aloud with ElevenLabs or xAI, and dictate with Groq, with your own API key in Settings → Voice.",
+          "Add Mistral as a provider.",
+          "Open a page that an agent makes as a side panel tab next to the chat.",
+          "Choose a chat background color for the Light theme and another one for the Dark theme in Settings → General."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents use fewer tokens in each request on Claude, Codex, Pi, OpenCode, Grok and Hermes.",
+          "OpenBot uses less memory for browser tabs, idle agents and app windows.",
+          "Agent browser tabs wait for bot checks that pass by themselves, and finish short tasks in fewer steps.",
+          "Notifications have a new look."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agents now use a login that you save in a password manager or the Vault after their chat started.",
+          "A server connects to Signal again when Signal does not answer, so devices no longer see \"The host is offline.\" until a restart.",
+          "The Dynamic Island and the agent dock no longer make other apps stutter while an agent works.",
+          "Claude agents on an Anthropic API key now use the key's promotional API credit."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "If your Claude agents use your own CLAUDE.md, skills or hooks, turn on Settings → Providers → Claude → Use my Claude Code setup."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Put your agents on the new agent dock at the edge of the screen on macOS. Turn it off in Settings → Agent dock.",
+          "Agents now write short updates while they work. To get the old style, choose Classic in Server settings → Personality.",
+          "Start a new conversation or compact the context of a channel from its settings.",
+          "Members of a joined server can add their own MCP servers and connect apps such as Trello.",
+          "Choose who can control this computer with remote desktop in Server settings → Remote desktop.",
+          "Use OpenBot in Hebrew, and connect GitLab, Omnisend and ElevenLabs in the Marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Attach a file of any type to a chat, such as a certificate or a VPN profile.",
+          "The web app opens and sends files of up to 100 MB.",
+          "A message shows React, Reply and More when you hover it. Turn off Settings → General → Compact message actions to get the full row.",
+          "On a Mac, ⌘Q asks you to hold it only while an agent works."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Mentions in Slack, Discord, Telegram and WhatsApp posts now notify the person.",
+          "When a provider quota runs out, the agent continues the work on its first ready backup model.",
+          "A chat that compacted again after each turn now stops automatic compactions after 2 in a row.",
+          "OpenBot no longer closes when an agent's browser action waits on a page that navigates.",
+          "Proton Pass logins work after OpenBot restarts."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Choose when the plan card starts a long task by itself in Settings → Agents, or let it start only when you press Start.",
+          "Choose the provider account when you create an agent, if the provider has more than one account connected.",
+          "Change how many requests local scripts can send each agent in one hour in Settings → Agents → Local scripts.",
+          "The Usage page has a Skill tab that shows how often your agents load each skill and what it costs.",
+          "Connect Higgsfield in the Marketplace to make images, videos and audio."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The chat color picker has 11 new preset colors, and code, tables and cards in a colored bubble take its color.",
+          "Cards where an agent asks for an answer, such as an API key form, look like the agent's questions.",
+          "Ask an agent in a channel to make a new channel or change another channel, and it does it there."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude stays signed in after OpenBot restarts or updates, and Claude agents use less of the 5-hour usage window.",
+          "Older messages that you load in a long chat stay loaded. The chat no longer jumps back to the latest messages.",
+          "Automatic compactions of a ChatGPT (Codex), Muse, Pi or Antigravity chat stop after 2 fail in a row, so the chat no longer uses up the plan limit.",
+          "GPT voice works with every agent, also when the agent uses a Codex model.",
+          "The browser fills saved logins from Proton Pass."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Give a browser profile its own proxy in Server settings → Browser profiles, or use your own computer as its proxy on a joined server.",
+          "Connect Proton Pass in the Marketplace. The browser fills the logins of the vault that you share with OpenBot.",
+          "Type @ in an agent's chat to tag one of its browser tabs or side threads.",
+          "Settings → Voice has two more local dictation models: Parakeet Unified EN and Cohere Transcribe.",
+          "A thread shows a blue dot when the agent wrote in it and you did not read it.",
+          "Agents can send files to WhatsApp, Slack, Discord and Telegram chats, and create GitHub repositories.",
+          "Download Hermes Agent from Settings → Providers, and delete a provider and its CLI with one button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Routines run in the agent's chat again. Turn on \"Run in a separate thread\" to keep a routine in its own thread.",
+          "Agent questions show in one bubble, one question at a time.",
+          "When an agent asks for an API key, the key goes to the Vault for all agents by default.",
+          "Icons have one line weight, and they turn white when you point to them."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot uses less energy when it is open with no task.",
+          "Long chats scroll without stops and open faster.",
+          "OpenBot no longer stays on \"Connecting to OpenBot\" or on the server loading screen at start.",
+          "Routine runs have Computer Use again when it is on for the agent."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Delete a message in a chat: right-click it and select Delete. This works in agent chats, side tasks and channels.",
+          "Agents can make, change and run workflows, and you see them build each step on the Workflows page.",
+          "Talk to a Codex agent with Codex live voice. Turn it on in Settings → Voice.",
+          "Devin and GitHub Copilot are new providers under More providers.",
+          "Pick a chat color for each agent and for yourself. Agents also have more avatar colors.",
+          "Agents can save an API key or a password that you paste in the chat to the Vault.",
+          "Webhook routines accept Standard Webhooks requests, such as from Composio, Svix, Clerk and Resend.",
+          "Connect Coinbase, Robinhood or RevenueCat from the Apps marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Each routine of an agent runs in its own thread, so routines and the chat no longer wait for each other.",
+          "Agents finish more of a task before they stop, and ask with a confirm card before a send, a post, a delete or a payment.",
+          "The sidebar badges are felt, and a pinned channel shows its unread count."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A channel with a long history opens quickly again.",
+          "On Linux, OpenBot no longer asks you to sign in again after each restart when the keyring does not keep its key.",
+          "On Windows, channel leads route messages again, and you can create a server on this computer.",
+          "When an older OpenBot opens data that a newer version saved, it installs the latest version."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Talk to your agents from WhatsApp. Link a number under Marketplace → Apps → WhatsApp. A separate number is safer, because WhatsApp can block numbers that it sees as automated.",
+          "Start a workflow when someone mentions OpenBot in Slack or in a Telegram group, and send its result back there.",
+          "Use OpenBot in Arabic. The layout mirrors from right to left.",
+          "Turn models off in Server settings → Providers. The model picker shows the newest models first, and older models are under a fold.",
+          "Server settings has an Audit log of member, role and agent access changes.",
+          "Company sign-in: a server owner can connect Microsoft Entra ID, Okta, Google Workspace or another OpenID Connect provider in Members → Company sign-in. People with a company email then join with no invitation.",
+          "Give a channel a picture or an icon in channel settings.",
+          "A channel can keep its own memories, and an agent can send a task to a channel from your direct chat.",
+          "Side threads have Reply on each message.",
+          "Downloads and uploads of a joined server show their progress, and a failed upload has a Retry button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chat messages use more of a wide window.",
+          "Each file that you open from a chat gets its own tab in the side panel.",
+          "A text paste of more than 4,000 characters becomes a pasted-text.txt attachment, so the message keeps all of the text.",
+          "OpenBot is free for personal use, and first run says so."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sign-in codes reach users in all regions.",
+          "A white window after a crash loads again by itself.",
+          "When Claude cannot reach its server, the chat shows the retries.",
+          "An agent with backup models moves to the next one when a credit balance or quota is spent before it starts to write."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi is a new provider. OpenBot downloads the Kimi Code CLI, and you sign in with your Kimi Code account.",
+          "Use Hermes Agent from Nous Research as a provider, with your own memories, skills and sign-ins.",
+          "On a Mac, OpenBot has an icon in the menu bar. After you close the window, the Dock icon hides and tasks keep running.",
+          "Start a workflow when someone mentions OpenBot in Discord, and send its result back as a reply, a post or a reaction.",
+          "Sidebar folders can hold folders, up to three levels. Drag a chat or a folder into a folder.",
+          "Choose the None, Minimal and Ultra reasoning levels when a model offers them.",
+          "Pinned agents and channels stay the same on each device that connects to a server.",
+          "Attach SVG images to a chat. The agent reads the SVG text.",
+          "Connect more than one Notion account, and connect ClickUp from Apps.",
+          "An agent can ask you to add a login, a card or an address to the Vault. You type the secret, and the agent gets only the name."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "On a Mac, hold ⌘Q or press it twice to quit. One press by mistake no longer stops your agents.",
+          "An agent continues by itself more often when its plan still has open steps.",
+          "Pasted images show as thumbnails above the message box, and sent images show full size.",
+          "Agents with no photo now show a soft plush bot that shows what the agent does."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Slack mentions and direct messages reach OpenBot again when a computer with the Slack workspace is off.",
+          "Phones and other devices can connect to your servers at once after the computer wakes from sleep.",
+          "An upload to one chat no longer blocks Send in other chats.",
+          "Text that you copy from OpenBot pastes into other apps without the colors of the app."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.58.0",
     "date": "2026-11-01",
     "notices": [],

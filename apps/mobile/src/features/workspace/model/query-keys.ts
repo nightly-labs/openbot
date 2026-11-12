@@ -18,6 +18,8 @@ type AgentRecordPart =
   | "task-limit"
   | "new-chat"
   | "plan-card"
+  | "fast-mode"
+  | "instructions"
   | "publish"
   | "browser-profile"
   | "folders";
@@ -33,6 +35,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "task-limit",
   "new-chat",
   "plan-card",
+  "fast-mode",
   "session-settings",
   "provider-accounts",
   "browser-profile",
@@ -47,6 +50,8 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
 export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
+  /** The server IDs of the owner's hosted servers, as Server settings reads them. */
+  ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
   /** The public Marketplace catalog of one account service: a list read, or one listing. */
   marketplace: (apiUrl: string | null, ...parts: (string | null)[]) => ["marketplace", apiUrl, ...parts],
@@ -123,13 +128,25 @@ export const queryKeys = {
     serverId: string | undefined,
     ...avatar: [] | [agentId: string | undefined, avatarUrl: string | null | undefined]
   ) => ["agent-avatar", ...scope, serverId, ...avatar],
+  channelImage: (
+    scope: QueryScope,
+    serverId: string | undefined,
+    ...image: [] | [channelId: string | undefined, imageUrl: string | null | undefined]
+  ) => ["channel-image", ...scope, serverId, ...image],
   agentModels: (scope: QueryScope, serverId: string) => ["agent-models", ...scope, serverId],
 
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  /** The servers that the desktop app of `serverId` runs on its computer (`local-servers-v1`). */
+  localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
+  skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
+  browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
+  serverPersonality: (scope: QueryScope, serverId: string) => ["server-personality", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
+  serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],
   serverConnector: (scope: QueryScope, serverId: string, connector: string) => [
     "server-connector",
     ...scope,
@@ -143,11 +160,31 @@ export const queryKeys = {
   instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
   /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
   serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
+  /** The saved proxies and the member computers of a host. `browser-profiles-changed` reads them again. */
+  serverBrowserProxies: (scope: QueryScope, serverId: string) => ["server-browser-proxies", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],
   providerKey: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-key",
+    ...scope,
+    serverId,
+    provider,
+  ],
+  /** Every model of one provider of a host, and the ones its model picker shows (`model-visibility-v1`). */
+  providerModels: (scope: QueryScope, serverId: string, ...provider: [] | [provider: string]) => [
+    "provider-models",
+    ...scope,
+    serverId,
+    ...provider,
+  ],
+  /** How long Claude keeps the prompt cache of a host's agents (`prompt-cache-ttl-v1`). */
+  providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  /** The size at which Claude Code compacts the chats of a host's agents (`claude-compact-window-v1`). */
+  providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
+  /** The usage reset credits of each account of one provider of a host (`provider-usage-reset-v1`). */
+  providerUsageResets: (scope: QueryScope, serverId: string, provider: string) => [
+    "provider-usage-resets",
     ...scope,
     serverId,
     provider,
@@ -160,6 +197,8 @@ export const queryKeys = {
   customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
+  /** Who gets each MCP server of a host. A change answers with the whole snapshot. */
+  mcpAccess: (scope: QueryScope, serverId: string) => ["mcp-access", ...scope, serverId],
   serverLogo: (scope: QueryScope, serverId: string, ...logo: [] | [logoKey: string | null]) => [
     "server-logo",
     ...scope,
@@ -168,7 +207,15 @@ export const queryKeys = {
   ],
   /** The plan limits of a server's providers. The host's `usage-changed` event writes the providers' own sign-ins. */
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
+  /** The past year of the paired desktop, which the Profile page summarizes as the desktop Profile tab does. */
+  profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [
+    "profile-activity",
+    ...scope,
+    serverId,
+    range,
+  ],
   /** The routine calendar of a server. Its routine and turn events invalidate the prefix. */
   serverRoutines: (scope: QueryScope, serverId: string, ...range: [] | [from: string, to: string]) => [
     "server-routines",
@@ -194,6 +241,8 @@ export const queryKeys = {
     "reads",
     agentId,
   ],
+  /** The pinned messages of all chats of one agent, from `message-pins-v1`. `message-pins-changed` invalidates it. */
+  messagePins: (scope: QueryScope, serverId: string, agentId: string) => ["message-pins", ...scope, serverId, agentId],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",
@@ -202,13 +251,38 @@ export const queryKeys = {
   /** The workflows of a server. `workflows-changed` invalidates the list and the one workflow under it. */
   serverWorkflows: (scope: QueryScope, serverId: string) => ["server-workflows", ...scope, serverId],
   workflowList: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "list"],
-  /** A workflow, its newest runs, all its runs page by page, and a run that is older than the first page. */
+  /**
+   * A workflow, its newest runs, all its runs page by page, a run that is older than the first page,
+   * its versions, and the events of its GitHub triggers.
+   */
   workflow: (
     scope: QueryScope,
     serverId: string,
     workflowId: string,
-    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string]
+    ...part: [] | ["detail"] | ["runs"] | ["history"] | ["run", runId: string] | ["versions"] | ["github-history"]
   ) => [...queryKeys.serverWorkflows(scope, serverId), "workflow", workflowId, ...part],
+  /**
+   * The graph of one version. A version does not change, so the key is outside `workflow(...)`: a
+   * `workflows-changed` event does not read it again.
+   */
+  workflowVersionGraph: (scope: QueryScope, serverId: string, workflowId: string, versionId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "version-graph",
+    workflowId,
+    versionId,
+  ],
+  /** The repositories of the host's GitHub connection, and the labels and people of one of them. */
+  workflowGitHubCatalog: (scope: QueryScope, serverId: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-catalog",
+  ],
+  /** The Telegram chats and Slack workspaces of the host, from the routine-results options. */
+  workflowChats: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "chats"],
+  workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
+    ...queryKeys.serverWorkflows(scope, serverId),
+    "github-options",
+    repository.toLowerCase(),
+  ],
   /** The query is the last part: a search that continues the typed query keeps its results on screen. */
   messageSearch: (scope: QueryScope, serverId: string, query: string) => ["message-search", ...scope, serverId, query],
   fileSearch: (scope: QueryScope, serverId: string, query: string) => ["file-search", ...scope, serverId, query],

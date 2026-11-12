@@ -10,6 +10,7 @@ import type {
   VaultSecretField,
   VaultSecretRequest,
   VaultState,
+  VaultTwoStepCodes,
 } from "@openbot/contracts/ipc";
 import {
   API_KEY_NAME_PATTERN,
@@ -19,7 +20,9 @@ import {
   VAULT_NOTES_LIMIT,
   VAULT_PASSWORD_LIMIT,
   VAULT_TEXT_LIMIT,
+  vaultExpiryText,
 } from "@openbot/contracts/ipc";
+import { normalizeTwoStepKey } from "@openbot/contracts/two-step-code";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -71,6 +74,16 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
+import {
+  createDraftTwoStepCode,
+  createSavedTwoStepCodes,
+  type LiveTwoStepCode,
+  TwoStepCheckStep,
+  TwoStepKeyStep,
+  TwoStepRow,
+  TwoStepRowCode,
+} from "./vault-two-step";
 
 export interface VaultPanelProps {
   state: VaultState;
@@ -83,14 +96,21 @@ export interface VaultPanelProps {
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   /** Puts the saved value on the clipboard. On desktop the value does not come to this window. */
   onCopy: (request: VaultSecretRequest) => Promise<void>;
-  /** Puts a username or an address on the clipboard. */
+  /** Puts a username, an address or a two-step code on the clipboard. */
   onCopyText: (value: string) => Promise<void>;
-  /** Opens the file dialog. Null when the user closes it. Absent for a joined server: no import. */
+  /**
+   * The current two-step code of each login with a key. Absent for a server that cannot keep two-step
+   * keys: the dialog does not offer them.
+   */
+  onCodes?: (() => Promise<VaultTwoStepCodes>) | undefined;
+  /** Opens the file dialog. Null when the user closes it. Absent for a host without CSV import. */
   onImportCsv?: (() => Promise<VaultImportResult>) | undefined;
   /** Deletes the Vault file that cannot be read, and starts again with no items. */
   onReset: () => Promise<void>;
   /** Where the menus open, so they stay inside the settings page. */
   menuMount?: HTMLElement | undefined;
+  /** The Link account of this computer, above the cards. Absent for a joined server. */
+  link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
 }
 
 type Filter = VaultItemKind | "all";
@@ -139,9 +159,6 @@ const SECRET_TEXT = {
 
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
 
-const twoDigits = (value: number) => String(value).padStart(2, "0");
-const expiryText = (month: number, year: number) => `${twoDigits(month)}/${twoDigits(year % 100)}`;
-
 /** `MM/YY` or `MM/YYYY`, or null when the text is not a date. */
 function parseExpiry(text: string): { month: number; year: number } | null {
   const match = /^\s*(\d{1,2})\s*\/\s*(\d{2}|\d{4})\s*$/u.exec(text);
@@ -151,7 +168,17 @@ function parseExpiry(text: string): { month: number; year: number } | null {
   return month >= 1 && month <= 12 ? { month, year } : null;
 }
 
-type LoginDraft = { kind: "login"; website: string; username: string; notes: string; password: string };
+type LoginDraft = {
+  kind: "login";
+  website: string;
+  username: string;
+  notes: string;
+  password: string;
+  /** A new two-step key that the user typed. The saved key never comes to this window. */
+  twoStepKey: string;
+  /** The user removed the saved two-step key. */
+  twoStepRemoved: boolean;
+};
 type CardDraft = {
   kind: "card";
   label: string;
@@ -184,8 +211,16 @@ const EMPTY_CONTACT: VaultContactFields = {
 function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   if (kind === "login")
     return item?.kind === "login"
-      ? { kind, website: item.website, username: item.username, notes: item.notes, password: "" }
-      : { kind, website: "", username: "", notes: "", password: "" };
+      ? {
+          kind,
+          website: item.website,
+          username: item.username,
+          notes: item.notes,
+          password: "",
+          twoStepKey: "",
+          twoStepRemoved: false,
+        }
+      : { kind, website: "", username: "", notes: "", password: "", twoStepKey: "", twoStepRemoved: false };
   if (kind === "card")
     return item?.kind === "card"
       ? {
@@ -193,7 +228,7 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
           label: item.label,
           nameOnCard: item.nameOnCard,
           number: "",
-          expiry: expiryText(item.expMonth, item.expYear),
+          expiry: vaultExpiryText(item.expMonth, item.expYear),
           securityCode: "",
           billingContactId: item.billingContactId ?? "",
           fillSites: item.fillSites,
@@ -219,6 +254,38 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   return { kind, ...EMPTY_CONTACT };
 }
 
+/** The values that a chat request filled in, over a new item's draft. A secret field is never one of them. */
+function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draft {
+  const value = (key: string, current: string) => values[key] ?? current;
+  switch (draft.kind) {
+    case "login":
+      return { ...draft, website: value("website", draft.website), username: value("username", draft.username) };
+    case "card":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        nameOnCard: value("nameOnCard", draft.nameOnCard),
+        expiry: value("expiry", draft.expiry),
+      };
+    case "contact":
+      return {
+        ...draft,
+        label: value("label", draft.label),
+        fullName: value("fullName", draft.fullName),
+        address: value("address", draft.address),
+        address2: value("address2", draft.address2),
+        city: value("city", draft.city),
+        region: value("region", draft.region),
+        postalCode: value("postalCode", draft.postalCode),
+        country: value("country", draft.country).toUpperCase(),
+        phone: value("phone", draft.phone),
+        email: value("email", draft.email),
+      };
+    case "apiKey":
+      return draft;
+  }
+}
+
 /** Whether a draft has the fields that the item needs. A saved secret counts as present. */
 function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
   if (draft.kind === "login")
@@ -238,6 +305,13 @@ function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
   return [draft.fullName, draft.address, draft.phone, draft.email].some((field) => field.trim() !== "");
 }
 
+/** A new key, an empty text that removes the saved key, or nothing, which keeps it. */
+function twoStepKeyInput(draft: LoginDraft): { twoStepKey?: string } {
+  const typed = normalizeTwoStepKey(draft.twoStepKey);
+  if (typed !== null) return { twoStepKey: typed };
+  return draft.twoStepRemoved ? { twoStepKey: "" } : {};
+}
+
 /** An empty secret field keeps the saved value. */
 function saveInput(draft: Draft, id: string | null): VaultSaveInput {
   if (draft.kind === "login")
@@ -248,6 +322,7 @@ function saveInput(draft: Draft, id: string | null): VaultSaveInput {
       username: draft.username.trim(),
       notes: draft.notes,
       password: draft.password === "" ? null : draft.password,
+      ...twoStepKeyInput(draft),
     };
   if (draft.kind === "card") {
     const expiry = parseExpiry(draft.expiry) ?? { month: 0, year: 0 };
@@ -292,13 +367,24 @@ function itemMatches(item: VaultItemSummary, query: string): boolean {
   return text.some((value) => value.toLowerCase().includes(needle));
 }
 
+/** The countries that a contact can have, by name in the reader's language. */
+function useCountries() {
+  const { locale } = useText();
+  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
+  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
+  const countries = createMemo(() =>
+    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  return { countryName, countries };
+}
+
 /**
  * The Vault of the computer that runs the agents, in its server settings: filter tabs with counts,
  * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
  * a security code or an API key; the edit dialog asks for one only when the user shows it.
  */
 export function VaultPanel(props: VaultPanelProps) {
-  const { t, errorDetails, locale } = useText();
+  const { t, errorDetails } = useText();
   const [filter, setFilter] = createSignal<Filter>("all");
   const [query, setQuery] = createSignal("");
   const [ui, setUi] = createStore<{
@@ -310,11 +396,7 @@ export function VaultPanel(props: VaultPanelProps) {
     notice: string | null;
   }>({ editing: null, deleting: null, importing: false, resetting: false, failure: null, notice: null });
 
-  const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
-  const countryName = (code: string) => (code ? (regionNames().of(code) ?? code) : "");
-  const countries = createMemo(() =>
-    VAULT_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name)),
-  );
+  const { countryName, countries } = useCountries();
   const contactLine = (contact: VaultContactFields) =>
     [contact.address, contact.city, contact.postalCode, countryName(contact.country)].filter(Boolean).join(", ");
   const maskedCard = (card: Pick<VaultCardSummary, "brand" | "last4">) =>
@@ -329,7 +411,7 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemDetail = (item: VaultItemSummary) => {
     if (item.kind === "login") return item.username || t("vault.noUsername");
     if (item.kind === "card")
-      return t("vault.cardSummary", { last4: item.last4, expiry: expiryText(item.expMonth, item.expYear) });
+      return t("vault.cardSummary", { last4: item.last4, expiry: vaultExpiryText(item.expMonth, item.expYear) });
     if (item.kind === "apiKey") return item.notes || t("vault.kind.apiKey");
     return contactLine(item) || item.email || item.phone;
   };
@@ -337,6 +419,16 @@ export function VaultPanel(props: VaultPanelProps) {
   const itemSummary = (item: VaultItemSummary) =>
     [itemDetail(item), item.addedBy ? t("vault.addedBy", { agent: item.addedBy }) : ""].filter(Boolean).join(" · ");
 
+  // A new list after each saved change, so a replaced key loads its code again.
+  const keyedLogins = createMemo(() =>
+    props.state.items.filter((item) => item.kind === "login" && item.hasTwoStep).map((item) => item.id),
+  );
+  const twoStepCodes = createSavedTwoStepCodes(() => props.onCodes, keyedLogins);
+  const editingCode = () => {
+    const item = ui.editing?.item;
+    return item ? twoStepCodes.code(item.id) : undefined;
+  };
+  const copyCode = (code: string) => void run(() => props.onCopyText(code), "vault.copyFailed");
   const ready = () => props.state.status === "ready";
   const filters = () => FILTERS.filter((item) => item.value !== "apiKey" || props.apiKeys);
   const contacts = () => props.state.items.filter((item): item is VaultContactSummary => item.kind === "contact");
@@ -502,6 +594,17 @@ export function VaultPanel(props: VaultPanelProps) {
               <For each={filters()}>
                 {(tab) => (
                   <SlidingTabs.Content value={tab.value}>
+                    <Show when={tab.value === "card" && props.link}>
+                      {(link) => (
+                        <VaultLinkAccount
+                          status={link().status}
+                          onConnect={link().onConnect}
+                          onCancel={link().onCancel}
+                          onDisconnect={link().onDisconnect}
+                          menuMount={props.menuMount}
+                        />
+                      )}
+                    </Show>
                     <ItemGroup class="settings-modal-card" surface="subtle" aria-label={t(tab.label)}>
                       <Show
                         when={visible(tab.value).length > 0}
@@ -537,6 +640,16 @@ export function VaultPanel(props: VaultPanelProps) {
                                 <ItemDescription class="vault-truncate">{itemSummary(item)}</ItemDescription>
                               </ItemContent>
                               <ItemActions class="integrations-hub-actions">
+                                <Show when={twoStepCodes.code(item.id)}>
+                                  {(code) => (
+                                    <TwoStepRowCode
+                                      code={code()}
+                                      now={twoStepCodes.now()}
+                                      site={itemTitle(item)}
+                                      onCopy={copyCode}
+                                    />
+                                  )}
+                                </Show>
                                 <ItemMenu
                                   item={item}
                                   title={itemTitle(item)}
@@ -577,6 +690,9 @@ export function VaultPanel(props: VaultPanelProps) {
             countries={countries()}
             contactLine={contactLine}
             title={editingTitle(editing())}
+            twoStep={props.onCodes !== undefined}
+            savedCode={editingCode()}
+            onCopyCode={copyCode}
             onSave={(input) => props.onSave(input)}
             onReveal={props.onReveal}
             onClose={closeDialogs}
@@ -967,12 +1083,23 @@ function ItemDialog(props: {
   contacts: readonly VaultContactSummary[];
   countries: readonly { code: string; name: string }[];
   contactLine: (contact: VaultContactFields) => string;
+  /** The values of a chat request for a new item. */
+  prefill?: Readonly<Record<string, string>> | undefined;
+  /** A request from the chat: no billing address and no notes, which it does not carry. */
+  fromChat?: boolean | undefined;
+  /** The server keeps two-step keys, so a login offers one. */
+  twoStep?: boolean | undefined;
+  /** The current code of the saved key, from main. */
+  savedCode?: LiveTwoStepCode | undefined;
+  onCopyCode?: ((code: string) => void) | undefined;
   onSave: (input: VaultSaveInput) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
   const { t, errorDetails } = useText();
-  const [draft, setDraft] = createSignal<Draft>(untrack(() => draftOf(props.kind, props.item)));
+  const [draft, setDraft] = createSignal<Draft>(
+    untrack(() => prefilled(draftOf(props.kind, props.item), props.prefill ?? {})),
+  );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
@@ -980,6 +1107,39 @@ function ItemDialog(props: {
     const current = draft();
     return current.kind === "login" ? current : undefined;
   };
+  /** The setup of a two-step key replaces the fields: the key, then a check of its code on the site. */
+  const [step, setStep] = createSignal<"form" | "key" | "check">("form");
+  const typedKey = createDraftTwoStepCode(() => loginDraft()?.twoStepKey ?? "");
+  const savedTwoStep = () => props.item?.kind === "login" && props.item.hasTwoStep;
+  const twoStepOn = (login: LoginDraft) => typedKey.valid() || (savedTwoStep() && !login.twoStepRemoved);
+  const twoStepCode = () => (typedKey.valid() ? typedKey.code() : props.savedCode);
+  const siteName = (login: LoginDraft) =>
+    login.website
+      .trim()
+      .replace(/^https?:\/\//u, "")
+      .split("/")[0] || t("vault.twoStep.theSite");
+  const keyInvalid = (login: LoginDraft) => login.twoStepKey.trim() !== "" && !typedKey.valid();
+  const startSetup = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "" });
+    setStep("key");
+  };
+  /** Back from the key step drops the typed key, so the login keeps what it had. */
+  const cancelSetup = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "" });
+    setStep("form");
+  };
+  function finishSetup() {
+    const login = loginDraft();
+    if (login) set(login, { twoStepRemoved: false });
+    setStep("form");
+  }
+  const removeTwoStep = () => {
+    const login = loginDraft();
+    if (login) set(login, { twoStepKey: "", twoStepRemoved: true });
+  };
+  const dialogTitle = () => (step() === "form" ? props.title : t("vault.twoStep.setupTitle"));
   const cardDraft = () => {
     const current = draft();
     return current.kind === "card" ? current : undefined;
@@ -1009,6 +1169,14 @@ function ItemDialog(props: {
   });
 
   async function submit(): Promise<void> {
+    if (step() === "key") {
+      if (typedKey.valid()) setStep("check");
+      return;
+    }
+    if (step() === "check") {
+      finishSetup();
+      return;
+    }
     if (saving() || !draftReady(draft(), props.item)) return;
     setSaving(true);
     setFailure(null);
@@ -1052,14 +1220,26 @@ function ItemDialog(props: {
                 onChange={(password) => set(login(), { password })}
               />
             </Field>
-            <Field label={t("vault.field.notes")} class="vault-wide">
-              <Textarea
-                rows={2}
-                maxlength={VAULT_NOTES_LIMIT}
-                value={login().notes}
-                onInput={(event) => set(login(), { notes: event.currentTarget.value })}
+            <Show when={props.twoStep && !props.fromChat}>
+              <TwoStepRow
+                on={twoStepOn(login())}
+                code={twoStepCode()}
+                now={typedKey.now()}
+                onSetUp={startSetup}
+                onRemove={removeTwoStep}
+                onCopy={(code) => props.onCopyCode?.(code)}
               />
-            </Field>
+            </Show>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.notes")} class="vault-wide">
+                <Textarea
+                  rows={2}
+                  maxlength={VAULT_NOTES_LIMIT}
+                  value={login().notes}
+                  onInput={(event) => set(login(), { notes: event.currentTarget.value })}
+                />
+              </Field>
+            </Show>
           </div>
         )}
       </Match>
@@ -1110,21 +1290,23 @@ function ItemDialog(props: {
                 onChange={(securityCode) => set(card(), { securityCode })}
               />
             </Field>
-            <Field label={t("vault.field.billing")} class="vault-wide">
-              <NativeSelect
-                value={card().billingContactId}
-                onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
-              >
-                <option value="">{t("vault.billingNone")}</option>
-                <For each={props.contacts}>
-                  {(contact) => (
-                    <option value={contact.id}>
-                      {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
-                    </option>
-                  )}
-                </For>
-              </NativeSelect>
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.billing")} class="vault-wide">
+                <NativeSelect
+                  value={card().billingContactId}
+                  onChange={(event) => set(card(), { billingContactId: event.currentTarget.value })}
+                >
+                  <option value="">{t("vault.billingNone")}</option>
+                  <For each={props.contacts}>
+                    {(contact) => (
+                      <option value={contact.id}>
+                        {[contact.label || contact.fullName, props.contactLine(contact)].filter(Boolean).join(" · ")}
+                      </option>
+                    )}
+                  </For>
+                </NativeSelect>
+              </Field>
+            </Show>
             <Show when={card().fillSites.length > 0}>
               <fieldset class="vault-wide vault-fill-sites">
                 <legend class="ui-label">{t("vault.field.fillSites")}</legend>
@@ -1208,6 +1390,12 @@ function ItemDialog(props: {
                 onChange={(event) => set(contact(), { country: event.currentTarget.value })}
               >
                 <option value="">{t("vault.chooseCountry")}</option>
+                {/* A country outside the list, such as one that an agent saved, stays a choice under its code. */}
+                <Show
+                  when={contact().country && !props.countries.some((country) => country.code === contact().country)}
+                >
+                  <option value={contact().country}>{contact().country}</option>
+                </Show>
                 <For each={props.countries}>{(country) => <option value={country.code}>{country.name}</option>}</For>
               </NativeSelect>
             </Field>
@@ -1287,14 +1475,30 @@ function ItemDialog(props: {
               <header class="vault-dialog-header">
                 <DraftLogo draft={draft()} saved={props.item} />
                 <Dialog.Title as="h2" class="vault-dialog-title">
-                  {props.title}
+                  {dialogTitle()}
                 </Dialog.Title>
                 <IconButton label={t("common.close")} variant="ghost" disabled={saving()} onClick={props.onClose}>
                   <X />
                 </IconButton>
               </header>
               <div class="vault-dialog-body">
-                {fields()}
+                <Switch fallback={fields()}>
+                  <Match when={step() === "key" && loginDraft()}>
+                    {(login) => (
+                      <TwoStepKeyStep
+                        site={siteName(login())}
+                        keyText={login().twoStepKey}
+                        invalid={keyInvalid(login())}
+                        onChange={(twoStepKey) => set(login(), { twoStepKey })}
+                      />
+                    )}
+                  </Match>
+                  <Match when={step() === "check" && loginDraft()}>
+                    {(login) => (
+                      <TwoStepCheckStep site={siteName(login())} code={typedKey.code()} now={typedKey.now()} />
+                    )}
+                  </Match>
+                </Switch>
                 <Show when={failure()}>
                   {(current) => (
                     <Text tone="danger" variant="caption" role="alert">
@@ -1304,17 +1508,38 @@ function ItemDialog(props: {
                 </Show>
               </div>
               <footer class="ui-confirm-dialog-actions">
-                <Button type="button" variant="ghost" disabled={saving()} onClick={props.onClose}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  loading={saving()}
-                  loadingLabel={t("common.saving")}
-                  disabled={!draftReady(draft(), props.item)}
+                <Switch
+                  fallback={
+                    <>
+                      <Button type="button" variant="ghost" disabled={saving()} onClick={props.onClose}>
+                        {t("common.cancel")}
+                      </Button>
+                      <Button
+                        type="submit"
+                        loading={saving()}
+                        loadingLabel={t("common.saving")}
+                        disabled={!draftReady(draft(), props.item)}
+                      >
+                        {t("common.save")}
+                      </Button>
+                    </>
+                  }
                 >
-                  {t("common.save")}
-                </Button>
+                  <Match when={step() === "key"}>
+                    <Button type="button" variant="ghost" onClick={cancelSetup}>
+                      {t("common.back")}
+                    </Button>
+                    <Button type="submit" disabled={!typedKey.valid()}>
+                      {t("common.continue")}
+                    </Button>
+                  </Match>
+                  <Match when={step() === "check"}>
+                    <Button type="button" variant="ghost" onClick={() => setStep("key")}>
+                      {t("common.back")}
+                    </Button>
+                    <Button type="submit">{t("common.done")}</Button>
+                  </Match>
+                </Switch>
               </footer>
             </form>
           </Dialog.Content>
@@ -1323,3 +1548,40 @@ function ItemDialog(props: {
     </Dialog.Root>
   );
 }
+
+/**
+ * The Vault dialog for a request from the chat: a new login, card or contact, with the values that the
+ * agent filled in. It has no billing address and no notes, which a request does not carry.
+ */
+export function VaultRequestDialog(props: {
+  kind: Exclude<VaultItemKind, "apiKey">;
+  title: string;
+  prefill: Readonly<Record<string, string>>;
+  /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
+  onSave: (input: VaultSaveInput) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { countries } = useCountries();
+  return (
+    <ItemDialog
+      kind={props.kind}
+      item={null}
+      title={props.title}
+      contacts={[]}
+      countries={countries()}
+      contactLine={() => ""}
+      prefill={props.prefill}
+      fromChat
+      onSave={props.onSave}
+      onReveal={() => Promise.resolve("")}
+      onClose={props.onClose}
+    />
+  );
+}
+
+export {
+  BRAND_NAME as VAULT_BRAND_NAME,
+  CardLogo as VaultCardLogo,
+  ContactLogo as VaultContactLogo,
+  SiteLogo as VaultSiteLogo,
+};

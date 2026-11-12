@@ -1,3 +1,4 @@
+import type { ChatVisualKey } from "@openbot/contracts/chat-visual";
 import type { FilePreview, WorkspaceDirectory, WorkspaceDirectoryEntry } from "@openbot/contracts/ipc";
 import {
   ArrowLeft,
@@ -19,8 +20,10 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot/ui/features/conversation/CodeBlock";
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
+import type { QuoteShortcutModifier } from "@openbot/ui/features/conversation/SelectionActions";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
+import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 
@@ -79,6 +82,16 @@ interface FilePreviewPanelProps {
    * the selection actions, so the user can quote the passage or ask for a change.
    */
   selectionQuoteId?: string | undefined;
+  /** Quotes text that the user selected in the page. See `ChatVisual`. */
+  onPageQuote?: ((text: string) => void) | undefined;
+  /** The page state for the agent, shown to the user with their next message. See `ChatVisual`. */
+  onPageContext?: ((text: string) => void) | undefined;
+  /** Text that the page wrote for the user's message box. See `ChatVisual`. */
+  onPageMessage?: ((text: string) => void) | undefined;
+  /** Whether a key chord that the user pressed in the page is an app shortcut. See `ChatVisual`. */
+  isPageAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
+  /** The modifier of the quote shortcut on this device. */
+  quoteShortcut?: QuoteShortcutModifier | undefined;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
   onOpenExternally: () => void;
@@ -174,7 +187,15 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
   });
 
-  const revealPanel = () => {
+  let panel!: HTMLElement;
+  // The chat beside the panel makes room for it (`panel-layout.css`).
+  onSettled(() => {
+    const conversation = panel.closest(".conversation-panel");
+    return conversation ? holdFlag(conversation, "file-preview-panel") : undefined;
+  });
+
+  const revealPanel = (element: HTMLElement) => {
+    panel = element;
     revealFrame = requestAnimationFrame(() => {
       revealFrame = requestAnimationFrame(() => {
         setRevealed(true);
@@ -284,7 +305,13 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             </HeaderButton>
           )}
         </Show>
-        <HeaderButton label={t("preview.panel.close")} data-cuelume-tap="close" onClick={props.onClose}>
+        {/* In the side panel, the file tab closes the file, so this button hides there. */}
+        <HeaderButton
+          label={t("preview.panel.close")}
+          class="side-panel-pane-close"
+          data-cuelume-tap="close"
+          onClick={props.onClose}
+        >
           <X class="browser-toolbar-icon" />
         </HeaderButton>
       </header>
@@ -352,6 +379,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             html={pageHtml() ?? undefined}
             title={title()}
             onOpenLink={props.onOpenLink}
+            onQuote={props.onPageQuote}
+            onContext={props.onPageContext}
+            onMessage={props.onPageMessage}
+            isAppShortcut={props.isPageAppShortcut}
+            quoteShortcut={props.quoteShortcut}
             macWindowControls={props.macWindowControls}
           />
         </Show>
@@ -405,6 +437,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 /** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
 function HeaderButton(props: {
   label: string;
+  class?: string;
   pressed?: boolean;
   onClick: () => void;
   "data-cuelume-tap"?: string;
@@ -417,7 +450,7 @@ function HeaderButton(props: {
         as={Button}
         variant="ghost"
         type="button"
-        class="browser-toolbar-button"
+        class={["browser-toolbar-button", props.class]}
         aria-label={props.label}
         aria-pressed={pressed()}
         data-cuelume-tap={props["data-cuelume-tap"]}

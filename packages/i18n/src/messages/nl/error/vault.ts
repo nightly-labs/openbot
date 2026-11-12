@@ -9,6 +9,8 @@ export const messages = {
   "error.vault.valueTooLong": "Een waarde is te lang.",
   "error.vault.websiteInvalid": "Voer een HTTPS-websiteadres in.",
   "error.vault.passwordRequired": "Voer een wachtwoord in.",
+  "error.vault.twoStepKeyInvalid":
+    "Dit is geen sleutel voor verificatie in twee stappen. Voer de instelsleutel of de otpauth://-link van de site in.",
   "error.vault.cardNumberInvalid": "Voer een geldig kaartnummer in.",
   "error.vault.securityCodeInvalid": "Voer een beveiligingscode van 3 of 4 cijfers in.",
   "error.vault.expiryInvalid": "Voer een geldige vervalmaand en vervaljaar in.",

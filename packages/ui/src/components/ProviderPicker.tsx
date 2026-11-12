@@ -5,6 +5,7 @@ import type {
   AgentProviderState,
   AgentProviderStatus,
   CustomProviderSummary,
+  ProviderAccountPool,
   ProviderApiKeyStatus,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,7 @@ import {
   Copy,
   DropdownMenu,
   Ellipsis,
+  Globe2,
   Input,
   Link,
   RefreshCw,
@@ -70,6 +72,13 @@ export interface ProviderConnection {
   connect: (provider: AgentProviderId) => void | Promise<void>;
   /** Runs the second way in from the ⋯ menu. */
   alternative: (provider: AgentProviderId) => void;
+  /**
+   * The site of the provider's mainland China accounts that the ⋯ menu signs in with, such as
+   * `kimi.com`, or null when the row offers no such sign-in here. Connect uses the global site.
+   */
+  mainlandChinaSite?: (provider: AgentProviderId) => string | null;
+  /** Signs in with an account of `mainlandChinaSite`. A rejection is shown on the row. */
+  connectInMainlandChina?: (provider: AgentProviderId) => Promise<void>;
 }
 
 export interface ProviderPickerOption {
@@ -122,6 +131,8 @@ export interface ProviderPickerOption {
    * `accountActions`, a connected row offers Add account, and lists them from the second one on.
    */
   accounts?: readonly ProviderPickerAccount[] | undefined;
+  /** The pool of `accounts`. Absent while the pool is off. */
+  accountPool?: ProviderAccountPool | undefined;
 }
 
 export interface ProviderPickerProps {
@@ -457,6 +468,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 version,
                 visualState,
                 alternative,
+                mainlandChinaSite,
+                connectInMainlandChina,
                 connectOptional,
                 runtimeAction,
                 browserConnect,
@@ -482,7 +495,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 freeKey,
               } = createProviderRow(option, props);
               const actionsMenu = () =>
-                alternative() !== null || updateOffered() || restartOffered() || diagnosticsOffered();
+                alternative() !== null ||
+                mainlandChinaSite() !== null ||
+                updateOffered() ||
+                restartOffered() ||
+                diagnosticsOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               /** An off row is not a choice, so it never holds the check. */
               const checked = () => !off() && checkedProvider() === option().id;
@@ -780,6 +797,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                         ? "provider.action.pasteAddress"
                                         : "provider.action.signInWithCode",
                                     )}
+                                  </DropdownMenu.Item>
+                                )}
+                              </Show>
+                              <Show when={mainlandChinaSite()}>
+                                {(site) => (
+                                  <DropdownMenu.Item onSelect={connectInMainlandChina}>
+                                    <Globe2 aria-hidden="true" />
+                                    {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
                               </Show>

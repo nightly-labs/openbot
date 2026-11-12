@@ -7,14 +7,17 @@
 // the agent, and sends a message with a link to each file. The person's message must show the shared
 // link and no workspace link, because a person's message in a channel names no workspace. The
 // agent repeats the workspace link, and each link must open its file in the preview panel. A quote of
-// the workspace file must name its absolute path and open the file again. Then the same links must
-// still open from the person's message in the agent's own chat. It deletes its channel and its two
+// the workspace file must name its absolute path and open the file again. When the agent's access is
+// not limited to its workspace, the agent reads a file outside its workspace in the channel and links
+// it by its name only; the link must open that file from the agent's tool history. Then the same links
+// must still open from the person's message in the agent's own chat. It deletes its channel and its
 // files at the end.
 // Writes .openbot-build/channel-file-link-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { ChannelClient, connectChannelE2e, WAIT_MS, waitFor, writeReport } from "./channel-e2e-support";
 
@@ -27,6 +30,8 @@ interface Report {
   shared?: { linkShown: boolean; opened: boolean; workspaceLinksInFile: number };
   workspace?: { linkInOwnMessage: number; linkInAgentReply: boolean; opened: boolean };
   quote?: { absolutePath: boolean; reopened: boolean };
+  /** A file outside the workspace that the agent read in the channel, linked by its name only. */
+  outside?: { opened: boolean } | { skipped: "workspace access" };
   directChat?: { sharedOpened: boolean; workspaceOpened: boolean; workspaceLinksInSharedFile: number };
   /** What the agent wrote, and the state of its task, when a step fails. */
   agentReplies?: string[] | undefined;
@@ -47,6 +52,9 @@ const sharedName = `e2e-channel-shared-${id}.md`;
 const sharedText = `Shared spec ${id}`;
 const workspaceName = `e2e-channel-workspace-${id}.md`;
 const workspaceText = `Workspace spec ${id}`;
+const outsideName = `e2e-channel-outside-${id}.md`;
+const outsideText = `Outside spec ${id}`;
+const outsideFile = join(OUT, `outside-${id}`, outsideName);
 // The dev profile uses the real ~/OpenBot folder, so the script removes only the files it wrote.
 const sharedFile = join(homedir(), "OpenBot", "Shared", sharedName);
 let workspaceFile: string | null = null;
@@ -136,10 +144,12 @@ try {
     (quote) => quote !== undefined,
     UI_WAIT_MS,
   );
-  await panel()
-    .getByRole("button", { name: english("preview.panel.close"), exact: true })
+  // The file tab closes the preview in the side panel, so the header button collapses the panel.
+  await conversation()
+    .getByRole("button", { name: english("conversation.sidePanel.close"), exact: true })
+    .first()
     .click();
-  await panel().waitFor({ state: "detached", timeout: UI_WAIT_MS });
+  await panel().getByText(workspaceText).waitFor({ state: "hidden", timeout: UI_WAIT_MS });
   await conversation()
     .getByRole("button", { name: english("chat.reference.open.quote", { name: workspaceText }), exact: true })
     .click();
@@ -150,7 +160,33 @@ try {
   };
   await shot("quote-reopened");
 
-  // 4. In the agent's own chat, the person's message links both files, and both still open.
+  // 4. A file that the agent read outside its workspace in the channel opens from a link with its name only.
+  if (workspaceAccessEnforced(agent)) {
+    report.outside = { skipped: "workspace access" };
+  } else {
+    mkdirSync(join(OUT, `outside-${id}`), { recursive: true });
+    writeFileSync(outsideFile, `# ${outsideText}\n`);
+    await client.send(
+      channel.id,
+      [
+        `Read the file ${outsideFile} with one tool call. Then reply with exactly the next line and nothing else.`,
+        `[outside spec](${outsideName})`,
+      ].join("\n"),
+      agent.id,
+    );
+    const outsideLink = () =>
+      conversation().getByRole("button", {
+        name: english("chat.file.openWorkspace", { name: outsideName }),
+        exact: true,
+      });
+    await outsideLink().first().waitFor({ timeout: WAIT_MS });
+    await outsideLink().first().click();
+    await panel().getByText(outsideText).waitFor({ timeout: UI_WAIT_MS });
+    report.outside = { opened: true };
+    await shot("outside-preview");
+  }
+
+  // 5. In the agent's own chat, the person's message links both files, and both still open.
   await page
     .getByRole("navigation", { name: english("sidebar.nav.label") })
     .getByRole("button", { name: new RegExp(`^${literal(agent.name)},`) })
@@ -189,6 +225,7 @@ try {
   await client.cleanup();
   rmSync(sharedFile, { force: true });
   if (workspaceFile) rmSync(workspaceFile, { force: true });
+  rmSync(join(OUT, `outside-${id}`), { recursive: true, force: true });
   writeReport("channel-file-link-e2e", report);
   await session.close();
 }

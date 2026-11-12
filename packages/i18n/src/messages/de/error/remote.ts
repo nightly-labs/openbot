@@ -7,6 +7,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Remote-Desktop-Tests sind nicht verfügbar.",
   "error.remote.controlUnavailable": "Die Fernsteuerung ist nicht verfügbar.",
   "error.remote.controlSessionNotFound": "Fernsteuerungssitzung nicht gefunden.",
+  "error.remote.controlNotAllowed": "Der Eigentümer dieses Computers erlaubt deiner Rolle keine Fernsteuerung.",
+  "error.remote.controlDeclined": "Die Person an diesem Computer hat die Fernsteuerung nicht erlaubt.",
   "error.remote.testRuntimeUpdate": "Aktualisiere die macOS-Remote-Desktop-Laufzeit, um diesen Test auszuführen.",
   "error.remote.testOtherSessions": "Beende andere Remote-Desktop-Sitzungen, bevor du einen Test startest.",
   "error.remote.testPermissions":
@@ -92,6 +94,7 @@ export const messages = {
   "error.remote.fileResumeFailed":
     "Die WebRTC-Dateiübertragung konnte nicht vor Ablauf ihrer Frist fortgesetzt werden.",
   "error.remote.fileTransportStopped": "Der WebRTC-Dateitransport wurde gestoppt.",
+  "error.remote.downloadStopped": "Der Download wurde gestoppt.",
   "error.remote.fileResumeExpired": "Die Frist zum Fortsetzen der WebRTC-Dateiübertragung ist abgelaufen.",
   "error.remote.hostRequestFailed": "Der Host konnte die Anfrage nicht abschließen.",
   "error.remote.responseTooLarge": "Die Antwort des Hosts ist zu groß, um sie an dieses Gerät zu senden.",
@@ -190,16 +193,21 @@ export const messages = {
   "error.remote.hostNotRegistered": "Dieser Host ist nicht mehr beim OpenBot-Dienst registriert.",
   "error.remote.membershipEnded":
     "Du bist kein Mitglied dieses Hosts mehr. Bitte den Eigentümer um eine neue Einladung.",
+  "error.remote.membershipChanged":
+    "Jemand hat dieses Mitglied gleichzeitig geändert. Lade die Mitglieder neu und versuche es erneut.",
   "error.remote.accountSessionInactive": "Deine Anmeldung ist nicht mehr aktiv. Melde dich erneut an.",
   "error.remote.hostOtherAccount": "Dieser Host gehört zu einem anderen Konto.",
   "error.remote.remoteNotConfigured": "Remote-Verbindungen sind für diesen OpenBot-Dienst nicht eingerichtet.",
   "error.remote.hostRefused": "Der Host hat die Anfrage abgelehnt ({status}).",
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
+  "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":
     "Die Nachricht wurde gesendet, aber der Chatverlauf konnte nicht aktualisiert werden.",
   "error.remote.taskHistoryRefreshFailed":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",
+  "error.remote.localServerAccountRemovalFailed":
+    "Der Server ist auf seinem Computer gelöscht, aber das Konto führt ihn noch. Lösche ihn erneut, um ihn aus dem Konto zu entfernen.",
 } as const satisfies PartialTranslation<typeof source>;

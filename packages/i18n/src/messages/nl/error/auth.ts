@@ -8,6 +8,7 @@ export const messages = {
     "Een firewall of proxy op dit netwerk blokkeert de verbinding van OpenBot met {host}. Vraag je netwerkbeheerder om {host} toe te staan en probeer het opnieuw.",
   "error.auth.signInFirst": "Log eerst in bij OpenBot.",
   "error.auth.signInRequired": "Inloggen is verplicht.",
+  "error.auth.chatColorUnavailable": "De accountservice ondersteunt nog geen chatkleuren. Probeer het later opnieuw.",
   "error.auth.accountChangedDuringRegister":
     "Het ingelogde account is gewijzigd terwijl deze server werd geregistreerd.",
   "error.auth.hostCredentialUnavailable":
@@ -19,6 +20,7 @@ export const messages = {
   "error.auth.serviceTimeout": "De accountservice reageerde niet op tijd. Probeer het opnieuw.",
   "error.auth.serviceStatus": "De accountservice gaf een fout ({status}). Probeer het later opnieuw.",
   "error.auth.invalidHostedServer": "De accountservice gaf een ongeldige gehoste server terug.",
+  "error.auth.invalidServerClaim": "De accountservice gaf een ongeldige servercode terug.",
   "error.auth.codeNotSent": "OpenBot kon de inlogcode niet versturen.",
   "error.auth.deliveryTimeout":
     "OpenBot kon de bezorging niet op tijd bevestigen. De code kan nog aankomen; controleer de bezorging voordat je opnieuw verstuurt.",

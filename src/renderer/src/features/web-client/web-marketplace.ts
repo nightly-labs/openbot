@@ -4,6 +4,8 @@ import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
 import {
   cancelMcpSignIn,
+  getHostAgentAccess,
+  getHostMcpAccess,
   installAgentSkill,
   installAgentTemplate,
   installMarketplaceAgent,
@@ -13,6 +15,7 @@ import {
   removeMcpServer,
   saveMcpServer,
   setAgentSkillEnabled,
+  setHostMcpAccess,
   testMcpServer,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
@@ -83,6 +86,15 @@ export function createWebMarketplaceCalls(
       cancelMcpSignIn: async (input, serverId) => {
         await runTeamEffect(cancelMcpSignIn(request(serverId), input).pipe(Effect.mapError((error) => error.cause)));
       },
+    },
+    mcpAccess: {
+      get: async (serverId) =>
+        runTeamEffect(getHostMcpAccess(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      set: async (input, serverId) =>
+        runTeamEffect(setHostMcpAccess(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      roles: async (serverId) =>
+        (await runTeamEffect(getHostAgentAccess(request(serverId)).pipe(Effect.mapError((error) => error.cause))))
+          .roles ?? [],
     },
     signInRelay: {
       page: async (url) => relay.page(url),

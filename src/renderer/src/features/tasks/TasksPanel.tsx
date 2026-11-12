@@ -1,6 +1,5 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
@@ -13,6 +12,7 @@ import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
+import { createAttachmentDownloads } from "../conversation/attachment-downloads";
 import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
@@ -27,8 +27,6 @@ interface TasksPanelProps {
   serverId: string;
   hostName: string;
   onBack?: (() => void) | undefined;
-  agentsOpen?: boolean | undefined;
-  onToggleAgents?: (() => void) | undefined;
 }
 
 /** The Tasks page on desktop: the agents of the active server, the task IPC, and voice from this computer. */
@@ -41,12 +39,20 @@ export function TasksPanel(props: TasksPanelProps) {
   const platform = usePlatform();
   const layout = useLayout();
 
-  function openAttachment(attachment: AttachmentSummary, action: "open" | "reveal" | "download"): void {
-    window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }, props.serverId).catch((error) => {
+  const attachmentFiles = createAttachmentDownloads({
+    serverId: () => props.serverId,
+    calls: () => ({
+      open: (input) => window.openbot.agent.openAttachment(input, props.serverId),
+      stop: (attachmentId) => window.openbot.agent.stopAttachmentDownload(attachmentId, props.serverId),
+      subscribe: window.openbot.agent.onAttachmentDownload,
+    }),
+    // A toast has no target.
+    target: () => undefined,
+    onError: (error) => {
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("attachment.error.open")));
-    });
-  }
+    },
+  });
 
   return (
     <TasksView
@@ -55,7 +61,8 @@ export function TasksPanel(props: TasksPanelProps) {
       agents={agentList()}
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
-      onAttachmentAction={openAttachment}
+      onAttachmentAction={attachmentFiles.open}
+      downloads={attachmentFiles.downloads}
       files={{
         accepted: threads.filesAccepted,
         import: (data, serverId) => window.openbot.agent.importAttachmentData(data, serverId),
@@ -88,11 +95,14 @@ export function TasksPanel(props: TasksPanelProps) {
 }
 
 /**
- * The voice of the Tasks composer, with the voice store of the chat composer. The transcript goes into
- * the draft; a send while it records starts the task with the transcript.
+ * The voice of the Tasks composer and of the open task's message box, with the voice store of the chat
+ * composer. One recording at a time. The transcript goes into the draft of the box that records; a send
+ * while it records starts the task, or sends the message to the open task, with the transcript.
  */
 function createTasksVoice(controls: TasksVoiceControls): TasksVoiceAdapter {
   const [phase, setPhase] = createSignal<ReturnType<VoiceStoreDeps["voicePhase"]>>("idle");
+  /** The task of the last recording, as a side thread key. Undefined for the Tasks composer. */
+  const [taskId, setTaskId] = createSignal<string | undefined>();
   const [levels, setLevels] = createSignal<number[]>(Array.from({ length: VOICE_LEVEL_COUNT }, () => 0));
   const [elapsedSeconds, setElapsedSeconds] = createSignal(0);
   const [liveText, setLiveText] = createSignal("");
@@ -134,9 +144,9 @@ function createTasksVoice(controls: TasksVoiceControls): TasksVoiceAdapter {
     voiceElapsedSeconds: elapsedSeconds,
     setVoiceElapsedSeconds: setElapsedSeconds,
     setVoiceLiveTranscript: (transcript) => setLiveText(transcript?.text ?? ""),
-    // The Tasks composer has no side threads.
-    voiceThreadKey: () => undefined,
-    setVoiceThreadKey: () => {},
+    // The open task's message box records as a side thread does.
+    voiceThreadKey: taskId,
+    setVoiceThreadKey: setTaskId,
     setVoiceLevels: setLevels,
     drafts: () => ({ [key()]: draft() }),
     setDrafts: (update) => controls.setDraft(update({ [key()]: draft() })[key()]?.text ?? ""),
@@ -152,7 +162,23 @@ function createTasksVoice(controls: TasksVoiceControls): TasksVoiceAdapter {
       restoreTranscript: (_target, transcript) =>
         controls.setDraft(appendVoiceTranscript(controls.draft(), transcript)),
     },
+    thread: {
+      // The Tasks composer stays shown with a task open, so only a task recording ends when its panel closes.
+      openDraftKey: () => (taskId() === undefined ? undefined : (controls.openTaskId() ?? undefined)),
+      appendTranscript: controls.appendTaskTranscript,
+      send: controls.sendTask,
+      reportError: (message) => actionToast.error(message),
+      reportLimit: () => actionToast.warning(currentText().t("composer.voice.limitReached")),
+    },
   });
+  // A task recording ends when its panel closes or another task opens: its text then stays in the
+  // draft of its task. The Tasks composer stays shown, so its recording goes on.
+  createEffect(
+    () => ({ open: controls.openTaskId(), owner: taskId(), recording: phase() === "recording" }),
+    ({ open, owner, recording }) => {
+      if (recording && owner !== undefined && owner !== open) store.stopVoiceRecording();
+    },
+  );
 
   onCleanup(() => {
     mounted = false;
@@ -181,7 +207,12 @@ function createTasksVoice(controls: TasksVoiceControls): TasksVoiceAdapter {
     get modelProgress() {
       return modelProgress();
     },
+    get taskId() {
+      return taskId();
+    },
     onStart: () => void store.startVoiceRecording(),
+    startTask: (id) => void store.startVoiceRecording(id),
+    sendTask: store.stopVoiceRecordingAndSend,
     onCancel: store.cancelVoiceRecording,
     onFinish: store.stopVoiceRecording,
     submit() {

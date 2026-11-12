@@ -24,7 +24,11 @@ export function SidebarSectionEditor() {
   // The ref callback runs without an owner in Solid 2, so the cleanup has to be registered here, in
   // the component body, or it never runs and `focusSectionName` keeps aiming at a detached input.
   let element: HTMLInputElement | undefined;
-  onCleanup(() => releaseSectionNameInput(element));
+  let stopWaitingForWindow: (() => void) | undefined;
+  onCleanup(() => {
+    stopWaitingForWindow?.();
+    releaseSectionNameInput(element);
+  });
   return (
     <header class="sidebar-section-editor-wrap">
       <Input
@@ -54,7 +58,24 @@ export function SidebarSectionEditor() {
             cancelSectionEditor();
           }
         }}
-        onBlur={cancelSectionEditor}
+        onBlur={(event) => {
+          const input = event.currentTarget;
+          // The input is still the page's active element when only the window lost focus, as when
+          // the user switches apps. Keep the name they typed. No blur fires for a focus move made
+          // while the window is in the background, so check again when the window comes back.
+          if (input.ownerDocument.activeElement !== input) {
+            cancelSectionEditor();
+            return;
+          }
+          const view = input.ownerDocument.defaultView;
+          if (!view || stopWaitingForWindow) return;
+          const recheck = () => {
+            stopWaitingForWindow = undefined;
+            if (input.ownerDocument.activeElement !== input) cancelSectionEditor();
+          };
+          view.addEventListener("focus", recheck, { once: true });
+          stopWaitingForWindow = () => view.removeEventListener("focus", recheck);
+        }}
       />
       <ChevronDown class="sidebar-section-editor-chevron size-4" aria-hidden="true" />
       <Show when={editor()?.error}>
@@ -65,5 +86,22 @@ export function SidebarSectionEditor() {
         )}
       </Show>
     </header>
+  );
+}
+
+/** The name field of a folder that a create is making in `parentId` (null: at the top). */
+export function SidebarSectionDraft(draftProps: { parentId: string | null }) {
+  const { pending } = useSidebarScope();
+  const { t } = useText();
+  const here = () => {
+    const target = pending.sectionEditor?.target;
+    return target?.kind === "create" && (target.parentId ?? null) === draftProps.parentId;
+  };
+  return (
+    <Show when={here()}>
+      <section class="sidebar-chat-group sidebar-section sidebar-section-draft" aria-label={t("sidebar.new.section")}>
+        <SidebarSectionEditor />
+      </section>
+    </Show>
   );
 }

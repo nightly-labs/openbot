@@ -12,6 +12,8 @@ export const messages = {
   // A workflow output step that tells the user its result.
   "notification.workflowOutput": "У рабочего процесса есть новый результат.",
   "notification.failed": "Остановлено из-за ошибки.",
+  "notification.subagentFailed": "Субагент остановлен из-за ошибки.",
+  "notification.subagentFailedFor": "Субагент остановлен из-за ошибки: {task}",
   "notification.channelTitle": "{agent} в канале {channel}",
   "notification.channelMessage": "Новое сообщение.",
   "notification.usageLimit.title": "Аккаунт {provider} достиг лимита",

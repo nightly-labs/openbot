@@ -6,6 +6,8 @@
 //   --mobile checks the version of apps/mobile/app.json in apps/mobile/CHANGELOG.md instead, and
 //            accepts "In review" and the dates of each store as its date
 //   --no-pending also stops when notes wait for a version: in the fragment folder or under Unreleased
+//   bun scripts/check-release-notes.ts [--staged] --ota  checks each OTA section of apps/mobile/CHANGELOG.md,
+//            such as "## [1.4.8.1] - 2026-11-12 (Android)". An OTA update does not change a version file.
 //
 // No package imports: `release.yml` runs this before `bun install`.
 
@@ -18,6 +20,7 @@ import {
   MOBILE_CHANGELOG,
   MOBILE_FRAGMENT_DIR,
   MOBILE_VERSION_FILES,
+  otaSectionProblems,
   releaseNotesProblems,
   unreleasedItems,
 } from "./release-notes";
@@ -48,6 +51,25 @@ if (fragmentsFlag !== -1) {
   if (problems.length > 0) {
     process.stderr.write(
       ["These release notes are not ready:", ...problems, "", "See docs/RELEASING.md#release-notes.", ""].join("\n"),
+    );
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+if (process.argv.includes("--ota")) {
+  const problems = otaSectionProblems(
+    (staged ? show(`:${MOBILE_CHANGELOG}`) : readFileSync(MOBILE_CHANGELOG, "utf8")) ?? "",
+  );
+  if (problems.length > 0) {
+    process.stderr.write(
+      [
+        `The OTA release notes in ${MOBILE_CHANGELOG} are not ready:`,
+        ...problems.map((problem) => `- ${problem}`),
+        "",
+        "Write them with bun run mobile:release:ota. See apps/mobile/changelog.d/README.md#ota-updates.",
+        "",
+      ].join("\n"),
     );
     process.exit(1);
   }

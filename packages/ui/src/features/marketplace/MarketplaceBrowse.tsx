@@ -1,11 +1,14 @@
+import type { SkillCategory } from "@openbot/contracts/ipc";
 import { Button, Heading, Input, Plus, Search, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, For, Match, Show, Switch } from "solid-js";
+import { createEffect, For, Match, Show, Switch, untrack } from "solid-js";
 import { AgentLibrary, agentFromSource } from "./MarketplaceAgents";
 import { AppRow } from "./MarketplaceCards";
+import { MarketplaceNoMatchPlush } from "./MarketplaceNoMatchPlush";
 import { MissingNotice } from "./MarketplaceParts";
-import { SkillLibrary } from "./MarketplaceSkills";
+import { GroupHead, MarketplaceSearch, SkillLibrary } from "./MarketplaceSkills";
 import { CATEGORY_LABELS } from "./marketplace-listing";
+import type { MarketplaceApp } from "./marketplace-model";
 import {
   appCategories,
   MARKETPLACE_TABS,
@@ -13,6 +16,9 @@ import {
   type MarketplaceTab,
   matchesApp,
 } from "./marketplace-view";
+
+/** A category on the Apps tab shows this many apps, as on the Skills and Agents tabs. "See all" opens the rest. */
+const APP_GROUP_LIMIT = 6;
 
 const NO_MATCH = {
   agents: "marketplace.noMatch.agents",
@@ -46,6 +52,7 @@ function NoMatch(props: {
   const others = () => MARKETPLACE_TABS.filter((tab) => tab !== props.tab && props.counts()[tab] > 0);
   return (
     <div class="marketplace-empty">
+      <MarketplaceNoMatchPlush />
       <Text as="p" variant="body-sm" tone="muted">
         {props.filtered ? t("marketplace.noMatch.filters") : searching() ? t(NO_MATCH[props.tab]) : t(EMPTY[props.tab])}
       </Text>
@@ -116,9 +123,22 @@ export function createBrowseLists(scope: MarketplaceScope) {
 
 export type BrowseLists = ReturnType<typeof createBrowseLists>;
 
-/** The apps by category, in two columns of rows. */
+/** Apps in two columns of rows. */
+function AppRows(props: { scope: MarketplaceScope; apps: readonly MarketplaceApp[] }) {
+  return (
+    /* Each read of the host makes new app objects, so the rows are kept by id: the element under the
+       pointer or the focus stays. */
+    <ul class="marketplace-app-list">
+      <For each={props.apps} keyed={(app) => app.id}>
+        {(app) => <AppRow scope={props.scope} app={app()} />}
+      </For>
+    </ul>
+  );
+}
+
+/** The apps by category. Each category shows its first apps, also during a search; "See all" opens the category. */
 function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
-  const { t, format } = useText();
+  const { t } = useText();
   return (
     <Show
       when={props.lists.apps().length > 0}
@@ -134,22 +154,59 @@ function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
     >
       <For each={appCategories(props.lists.apps())} keyed={(group) => group.category}>
         {(group) => (
-          <section class="marketplace-app-group" aria-labelledby={`marketplace-apps-${group().category}`}>
-            <h4 id={`marketplace-apps-${group().category}`} class="marketplace-app-group-title">
-              {t(CATEGORY_LABELS[group().category])}
-              <span class="marketplace-app-group-count">{format.number(group().apps.length)}</span>
-            </h4>
-            {/* Each read of the host makes new app objects, so the rows are kept by id: the element
-                under the pointer or the focus stays. */}
-            <ul class="marketplace-app-list">
-              <For each={group().apps} keyed={(app) => app.id}>
-                {(app) => <AppRow scope={props.scope} app={app()} />}
-              </For>
-            </ul>
+          <section
+            class="marketplace-app-group"
+            aria-labelledby={`marketplace-apps-${group().category}`}
+            data-marketplace-shared={props.scope.nav.state.appGroup === group().category ? "" : undefined}
+          >
+            <GroupHead
+              id={`marketplace-apps-${group().category}`}
+              label={t(CATEGORY_LABELS[group().category])}
+              count={group().apps.length}
+              more={group().apps.length > APP_GROUP_LIMIT}
+              onSeeAll={() => props.scope.nav.go({ kind: "appGroup", category: group().category })}
+            />
+            <AppRows scope={props.scope} apps={group().apps.slice(0, APP_GROUP_LIMIT)} />
           </section>
         )}
       </For>
     </Show>
+  );
+}
+
+/** All apps of one category, on their own page. The search stays. */
+export function AppGroupPage(props: { scope: MarketplaceScope; category: SkillCategory }) {
+  const { t } = useText();
+  const category = untrack(() => props.category);
+  const nav = () => props.scope.nav;
+  const label = () => t(CATEGORY_LABELS[category]);
+  const apps = () =>
+    appCategories(props.scope.model.apps().filter((app) => matchesApp(app, nav().state.query))).find(
+      (group) => group.category === category,
+    )?.apps ?? [];
+  return (
+    <div class="marketplace-view marketplace-browse marketplace-skill-group-page" data-marketplace-shared="">
+      <header class="marketplace-browse-copy">
+        <Heading as="h3" size="lg" class="marketplace-browse-title">
+          {label()}
+        </Heading>
+      </header>
+      <div class="marketplace-toolbar marketplace-skill-group-bar">
+        <MarketplaceSearch nav={nav()} label={t("marketplace.skills.searchIn", { name: label() })} />
+      </div>
+      <Show
+        when={apps().length > 0}
+        fallback={
+          <Text as="p" variant="body" tone="muted">
+            {t("marketplace.noMatch.apps")}
+          </Text>
+        }
+      >
+        <section class="marketplace-skill-group-list" aria-label={label()}>
+          <AppRows scope={props.scope} apps={apps()} />
+        </section>
+      </Show>
+    </div>
   );
 }
 

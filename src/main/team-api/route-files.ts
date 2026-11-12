@@ -5,11 +5,12 @@
 // here would read as `"unmatched"` and let the router answer 404 over a response it had already
 // finished.
 //
-// None of them scopes anything to the caller: any authenticated member may fetch any attachment id
-// or any path. The containment check that makes that safe - the path being inside the shared or
-// workspace directory - lives in `AgentService`, so what is enforced here is the size ceiling and
-// the length limits, and it must stay enforced here because this is the only caller that reads a
-// path off the wire.
+// Any authenticated member may fetch any attachment id or any path. The containment check that
+// makes that safe - the path being inside the shared or workspace directory - lives in
+// `AgentService`. Only the workspace route reads the role: an owner or admin reads a workspace file
+// as the local user does, also outside the workspace when the agent's workspace access is
+// unrestricted. What is enforced here is the size ceiling and the length limits, and it must stay
+// enforced here because this is the only caller that reads a path off the wire.
 //
 // A download goes from disk to the socket in stream chunks, so ten parallel 100 MB downloads do not
 // hold 1 GB in main. An upload must be in memory, because `prepareImportedAttachments` takes bytes,
@@ -20,6 +21,7 @@ import type { OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { basename } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { canAdministerServer } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect } from "effect";
@@ -80,7 +82,11 @@ const attachmentUploads = new UploadSlots(ATTACHMENT_UPLOAD_SLOTS);
 export interface FileRouteDependencies {
   agents: Pick<
     TeamApiAgents,
-    "prepareImportedAttachments" | "discardDraftAttachment" | "resolveSharedFile" | "resolveWorkspaceFile"
+    | "prepareImportedAttachments"
+    | "discardDraftAttachment"
+    | "resolveSharedFile"
+    | "resolveWorkspaceFile"
+    | "resolveLocalWorkspaceFile"
   >;
   mailbox: TeamApiMailbox;
 }
@@ -89,7 +95,7 @@ export async function routeFiles(
   context: TeamApiRequestContext,
   { agents, mailbox }: FileRouteDependencies,
 ): Promise<RouteOutcome> {
-  const { method, url, request, response, json, empty } = context;
+  const { method, url, request, response, member, json, empty } = context;
 
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.attachments) {
     const name = url.searchParams.get("name")?.trim();
@@ -154,9 +160,11 @@ export async function routeFiles(
     if (!workspacePath || workspacePath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid workspace file path is required.");
     }
-    const workspaceFile = await runCauseEffect(agents.resolveWorkspaceFile(agentId, workspacePath)).catch(
-      rethrowWorkspacePathError,
-    );
+    const workspaceFile = await runCauseEffect(
+      canAdministerServer(member.role)
+        ? agents.resolveLocalWorkspaceFile(agentId, workspacePath)
+        : agents.resolveWorkspaceFile(agentId, workspacePath),
+    ).catch(rethrowWorkspacePathError);
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.workspaceFileTooLarge"));
     }
@@ -184,15 +192,18 @@ export async function sendFile(
   path: string,
   tooLarge: string | null,
   headers: (size: number) => OutgoingHttpHeaders,
+  /** Sends only these bytes of the file, or fewer when the file is shorter. */
+  range: { start: number; length: number } | null = null,
 ): Promise<"handled"> {
   const file = await open(path, "r");
+  const start = range?.start ?? 0;
   let size: number;
   let head: OutgoingHttpHeaders;
   try {
     const metadata = await file.stat();
     if (!metadata.isFile()) throw new Error("The requested path is not a file.");
     if (tooLarge !== null && metadata.size > ATTACHMENT_LIMITS.fileBytes) throw new HttpError(413, tooLarge);
-    size = metadata.size;
+    size = range ? Math.max(0, Math.min(range.length, metadata.size - start)) : metadata.size;
     head = headers(size);
   } catch (error) {
     await file.close();
@@ -204,7 +215,7 @@ export async function sendFile(
     response.end();
     return "handled";
   }
-  const stream = file.createReadStream({ start: 0, end: size - 1 });
+  const stream = file.createReadStream({ start, end: start + size - 1 });
   try {
     await pipeline(stream, response, { end: false });
   } catch (error) {

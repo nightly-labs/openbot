@@ -38,6 +38,8 @@ export default function WorkflowEditorLayout() {
       <Stack.Screen name="step" options={{ title: t("mobile.workflow.editor.step") }} />
       <Stack.Screen name="add" options={{ title: t("mobile.workflow.add.title") }} />
       <Stack.Screen name="trigger" options={{ title: t("mobile.workflow.detail.trigger") }} />
+      {/* The page names the list that it shows. */}
+      <Stack.Screen name="github-pick" options={{ title: t("mobile.workflow.github.repository") }} />
     </Stack>
   );
 }

@@ -7,7 +7,13 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
-import { type PasswordVault, PasswordVaultError, type VaultLogin } from "../backend/password-vault";
+import {
+  type PasswordVault,
+  PasswordVaultError,
+  type VaultLogin,
+  websiteMatchesOrigin,
+  websiteUrl,
+} from "../backend/password-vault";
 import type { BitwardenConnectorRecord, BitwardenConnectorStore } from "./bitwarden-connector-store";
 
 const logger = createOpenBotLogger("bitwarden-connector");
@@ -132,7 +138,10 @@ function serverAddress(value: string): string | null {
   }
 }
 
-/** Exact HTTPS origins only. Never widens Bitwarden's matching rule to a parent domain. */
+/**
+ * Bitwarden's default and base domain rules (`null`, `0`) compare the registrable domain, and its
+ * host rule (`1`) compares the host, as Bitwarden does. Only HTTPS pages match.
+ */
 function matches(item: Item, folderId: string, origin: string): boolean {
   if (
     item.type !== 1 ||
@@ -144,13 +153,8 @@ function matches(item: Item, folderId: string, origin: string): boolean {
   return (
     item.login?.uris?.some((entry) => {
       if (!entry.uri || (entry.match != null && entry.match !== 0 && entry.match !== 1)) return false;
-      try {
-        const saved = new URL(entry.uri);
-        const page = new URL(origin);
-        return saved.protocol === "https:" && page.protocol === "https:" && saved.origin === page.origin;
-      } catch {
-        return false;
-      }
+      if (websiteUrl(entry.uri)?.protocol !== "https:") return false;
+      return websiteMatchesOrigin({ url: entry.uri, autofill: entry.match === 1 ? "exact" : "anywhere" }, origin);
     }) ?? false
   );
 }

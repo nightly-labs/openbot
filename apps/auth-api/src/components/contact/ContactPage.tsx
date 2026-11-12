@@ -7,12 +7,13 @@ import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
+import type { ContactPageText } from "./contact-page-text";
 
+/** The channels with a description in the page text. Email follows them, with the address as its description. */
 const CONTACT_CHANNELS = [
-  { label: "Discord", detail: "Community and help", href: OPENBOT_LINKS.discord },
-  { label: "GitHub", detail: "Bugs and source code", href: `${OPENBOT_LINKS.repository}/issues/new/choose` },
-  { label: "X", detail: "News", href: OPENBOT_LINKS.x },
-  { label: "Email", detail: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
+  { id: "discord", label: "Discord", href: OPENBOT_LINKS.discord },
+  { id: "github", label: "GitHub", href: `${OPENBOT_LINKS.repository}/issues/new/choose` },
+  { id: "x", label: "X", href: OPENBOT_LINKS.x },
 ] as const;
 
 type ContactStatus = "idle" | "sending" | "sent" | "failed" | "limited";
@@ -28,7 +29,7 @@ function fieldText(data: FormData, name: string): string {
 }
 
 /** The form state: validation, the send to `/v1/contact`, and its result. */
-function createContactForm() {
+function createContactForm(errorText: () => ContactPageText["errors"]) {
   const [status, setStatus] = createSignal<ContactStatus>("idle");
   const [errors, setErrors] = createSignal<FieldErrors>({});
   const [sentTo, setSentTo] = createSignal("");
@@ -41,8 +42,8 @@ function createContactForm() {
     const email = fieldText(data, "email");
     const message = fieldText(data, "message");
     const next: FieldErrors = {
-      email: normalizeEmailAddress(email) ? undefined : "Enter a valid email",
-      message: message.length > 0 ? undefined : "Write a message",
+      email: normalizeEmailAddress(email) ? undefined : errorText().email,
+      message: message.length > 0 ? undefined : errorText().message,
     };
     setErrors(next);
     const firstInvalid = next.email ? "email" : next.message ? "message" : null;
@@ -87,17 +88,13 @@ function createContactForm() {
  * The label row of a field. An error replaces "Optional" on the right of the label, so the field
  * does not move when the error shows.
  */
-function FieldHead(props: { for: string; label: string; optional?: boolean | undefined; error?: string | undefined }) {
+function FieldHead(props: { for: string; label: string; optional?: string | undefined; error?: string | undefined }) {
   return (
     <div class="contact-field-head">
       <label for={props.for}>{props.label}</label>
       <Show
         when={props.error}
-        fallback={
-          <Show when={props.optional}>
-            <span class="contact-optional">Optional</span>
-          </Show>
-        }
+        fallback={<Show when={props.optional}>{(optional) => <span class="contact-optional">{optional()}</span>}</Show>}
       >
         <span id={`${props.for}-error`} class="contact-error">
           {props.error}
@@ -113,7 +110,8 @@ interface TextFieldProps {
   type: "text" | "email";
   autocomplete: string;
   maxlength?: number | undefined;
-  optional?: boolean | undefined;
+  /** The "Optional" text of an optional field. */
+  optional?: string | undefined;
   error?: string | undefined;
 }
 
@@ -135,18 +133,18 @@ function TextField(props: TextFieldProps) {
   );
 }
 
-function MessageField(props: { error?: string | undefined }) {
+function MessageField(props: { label: string; placeholder: string; error?: string | undefined }) {
   const id = createUniqueId();
   const [length, setLength] = createSignal(0);
   return (
     <div class="contact-field">
-      <FieldHead for={id} label="Message" error={props.error} />
+      <FieldHead for={id} label={props.label} error={props.error} />
       <textarea
         id={id}
         name="message"
         rows={6}
         maxlength={CONTACT_LIMITS.message}
-        placeholder="How can we help?"
+        placeholder={props.placeholder}
         aria-invalid={props.error ? "true" : undefined}
         aria-describedby={`${id}-count${props.error ? ` ${id}-error` : ""}`}
         onInput={(event) => setLength(event.currentTarget.value.length)}
@@ -159,7 +157,8 @@ function MessageField(props: { error?: string | undefined }) {
 }
 
 /** A failed send replaces the privacy line beside the button, so the form does not grow. */
-function SubmitRow(props: { status: ContactStatus }) {
+function SubmitRow(props: { status: ContactStatus; text: ContactPageText }) {
+  const failure = () => (props.status === "limited" ? props.text.limited : props.text.failed);
   return (
     <div class="contact-submit">
       <button
@@ -168,92 +167,110 @@ function SubmitRow(props: { status: ContactStatus }) {
         data-icon="arrow-right"
         disabled={props.status === "sending"}
       >
-        {props.status === "sending" ? "Sending…" : "Send message"}
+        {props.status === "sending" ? props.text.sending : props.text.send}
       </button>
       <Show
         when={props.status === "failed" || props.status === "limited"}
         fallback={
           <p class="contact-privacy">
-            We use your email only to answer you.{" "}
+            {props.text.privacy}{" "}
             <a href={OPENBOT_LINKS.privacy} target="_blank" rel={EXTERNAL_LINK_REL}>
-              Privacy
+              {props.text.privacyLink}
             </a>
           </p>
         }
       >
         <p class="contact-privacy contact-failed" role="alert">
-          {props.status === "limited" ? "Too many messages. Try again later" : "Could not send. Try again"}, or write to{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+          {failure().before}
+          <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+          {failure().after}
         </p>
       </Show>
     </div>
   );
 }
 
-function SentNotice(props: { email: string; onReset: () => void }) {
+function SentNotice(props: { email: string; text: ContactPageText; onReset: () => void }) {
   return (
     <div class="contact-sent" role="status">
       <span class="contact-sent-mark">
         <LandingIcon name="check" />
       </span>
-      <h2>Message sent</h2>
+      <h2>{props.text.sentTitle}</h2>
       <p>
-        We will answer at <strong>{props.email}</strong>.
+        {props.text.sentBody.before}
+        <strong>{props.email}</strong>
+        {props.text.sentBody.after}
       </p>
       <button type="button" class="contact-text-button" onClick={() => props.onReset()}>
-        Send another message
+        {props.text.sendAnother}
       </button>
     </div>
   );
 }
 
-export function ContactPage() {
-  const form = createContactForm();
+function ContactChannel(props: { label: string; detail: string; href: string }) {
+  return (
+    <li>
+      <a href={props.href} target="_blank" rel={EXTERNAL_LINK_REL}>
+        <span class="contact-channel-label">{props.label}</span>
+        <span class="contact-channel-detail">{props.detail}</span>
+        <LandingIcon name="arrow-up-right" class="contact-channel-icon" />
+      </a>
+    </li>
+  );
+}
+
+export function ContactPage(props: { lang: string; text: ContactPageText }) {
+  const form = createContactForm(() => props.text.errors);
   const topicId = createUniqueId();
 
   onSettled(() => landingAnalytics.start(document, window.location.hostname, CONTACT_ROUTE));
 
   return (
-    <div class="landing-page">
+    <div class="landing-page" lang={props.lang}>
       <SiteHeader page="content" />
       <main>
         <section class="landing-section contact-section" data-revealed="true" aria-labelledby="contact-title">
           <div class="landing-section-inner">
             <div class="landing-faq-layout">
               <header class="landing-section-heading landing-faq-heading">
-                <h1 id="contact-title">Talk to the team</h1>
-                <p>Tell us what you need. A person on the OpenBot team reads each message.</p>
+                <h1 id="contact-title">{props.text.heading}</h1>
+                <p>{props.text.intro}</p>
                 <ul class="contact-channels">
                   <For each={CONTACT_CHANNELS}>
                     {(channel) => (
-                      <li>
-                        <a href={channel.href} target="_blank" rel={EXTERNAL_LINK_REL}>
-                          <span class="contact-channel-label">{channel.label}</span>
-                          <span class="contact-channel-detail">{channel.detail}</span>
-                          <LandingIcon name="arrow-up-right" class="contact-channel-icon" />
-                        </a>
-                      </li>
+                      <ContactChannel
+                        label={channel.label}
+                        detail={props.text.channels[channel.id]}
+                        href={channel.href}
+                      />
                     )}
                   </For>
+                  <ContactChannel
+                    label={props.text.fields.email}
+                    detail={CONTACT_EMAIL}
+                    href={`mailto:${CONTACT_EMAIL}`}
+                  />
                 </ul>
               </header>
               <div class="contact-card">
                 <Show
                   when={form.status() !== "sent"}
-                  fallback={<SentNotice email={form.sentTo()} onReset={form.reset} />}
+                  fallback={<SentNotice email={form.sentTo()} text={props.text} onReset={form.reset} />}
                 >
                   <form class="contact-form" novalidate onSubmit={form.submit}>
                     <div class="contact-row">
                       <TextField
-                        label="Name"
+                        label={props.text.fields.name}
                         name="name"
                         type="text"
                         autocomplete="name"
                         maxlength={CONTACT_LIMITS.name}
-                        optional
+                        optional={props.text.optional}
                       />
                       <TextField
-                        label="Email"
+                        label={props.text.fields.email}
                         name="email"
                         type="email"
                         autocomplete="email"
@@ -261,24 +278,30 @@ export function ContactPage() {
                       />
                     </div>
                     <TextField
-                      label="Company"
+                      label={props.text.fields.company}
                       name="company"
                       type="text"
                       autocomplete="organization"
                       maxlength={CONTACT_LIMITS.company}
-                      optional
+                      optional={props.text.optional}
                     />
                     <div class="contact-field">
-                      <FieldHead for={topicId} label="Topic" />
+                      <FieldHead for={topicId} label={props.text.fields.topic} />
                       <div class="contact-select">
                         <select id={topicId} name="topic">
-                          <For each={CONTACT_TOPICS}>{(topic) => <option value={topic.id}>{topic.label}</option>}</For>
+                          <For each={CONTACT_TOPICS}>
+                            {(topic) => <option value={topic.id}>{props.text.topics[topic.id]}</option>}
+                          </For>
                         </select>
                         <LandingIcon name="chevron-down" class="contact-select-icon" />
                       </div>
                     </div>
-                    <MessageField error={form.errors().message} />
-                    <SubmitRow status={form.status()} />
+                    <MessageField
+                      label={props.text.fields.message}
+                      placeholder={props.text.placeholder}
+                      error={form.errors().message}
+                    />
+                    <SubmitRow status={form.status()} text={props.text} />
                   </form>
                 </Show>
               </div>

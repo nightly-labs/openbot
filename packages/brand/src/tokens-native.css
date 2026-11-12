@@ -44,6 +44,10 @@
     --openbot-accent-text: #5b52df;
     --openbot-logo-production: #cdadec;
     --openbot-logo-eye: #040007;
+    --openbot-paper: #f0f0f0;
+    --openbot-paper-text: #141414;
+    --openbot-paper-text-muted: rgba(20, 20, 20, 0.52);
+    --openbot-paper-border: rgba(20, 20, 20, 0.14);
     --openbot-success: #32a85d;
     --openbot-warning: #c58a23;
     --openbot-danger: #d85f58;
@@ -86,6 +90,9 @@
     --openbot-file-pink-soft: rgba(163, 71, 143, 0.12);
     --openbot-file-default: #5b52df;
     --openbot-file-default-soft: rgba(91, 82, 223, 0.12);
+    /* Markdown tables: the desktop values, so a table looks the same on the phone. */
+    --openbot-data-table-header-text: #6b6b70;
+    --openbot-data-table-text: #1c1c1e;
   }
 
   @variant dark {
@@ -114,6 +121,10 @@
     --openbot-accent-text: #42a0ff;
     --openbot-logo-production: #d6adf2;
     --openbot-logo-eye: #040007;
+    --openbot-paper: #f0f0f0;
+    --openbot-paper-text: #141414;
+    --openbot-paper-text-muted: rgba(20, 20, 20, 0.52);
+    --openbot-paper-border: rgba(20, 20, 20, 0.14);
     --openbot-success: #31cf76;
     --openbot-warning: #ff9412;
     --openbot-danger: #fd2f3b;
@@ -150,5 +161,7 @@
     --openbot-file-pink-soft: rgba(217, 138, 201, 0.14);
     --openbot-file-default: #42a0ff;
     --openbot-file-default-soft: rgba(0, 124, 247, 0.14);
+    --openbot-data-table-header-text: #a1a1a1;
+    --openbot-data-table-text: #f5f5f5;
   }
 }

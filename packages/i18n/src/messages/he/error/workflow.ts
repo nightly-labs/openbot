@@ -1,0 +1,61 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/workflow";
+
+export const messages = {
+  "error.workflow.missing": "תהליך העבודה הזה כבר לא קיים.",
+  "error.workflow.versionMissing": "הגרסה הזו של תהליך העבודה כבר לא קיימת.",
+  "error.workflow.annotation": "אי אפשר לחבר טקסט, הערות וצורות.",
+  "error.workflow.port": "שלב לא יכול לקבל סוג קלט כזה.",
+  "error.workflow.branch": "רק לתנאי יכולים להיות חיבורי כן ולא.",
+  "error.workflow.conditionBranch": "כל חיבור היוצא מתנאי חייב להיות כן או לא.",
+  "error.workflow.duplicateEdge": "שני השלבים האלה כבר מחוברים כך.",
+  "error.workflow.serverTooOld": "השרת הזה אינו תומך בתהליכי עבודה. יש לעדכן את OpenBot במחשב שמפעיל אותו.",
+  "error.workflow.nodeUnsupported": "הגרסה הזו של OpenBot עדיין לא יכולה להריץ שלבי תמונה, קובץ והודעה.",
+  "error.workflow.interrupted": "OpenBot נעצר בזמן שהשלב הזה רץ. יש להריץ אותו שוב.",
+  "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
+  "error.workflow.handoffFailed": "OpenBot לא הצליח לשלוח את השלב הזה לסוכן שלו.",
+  "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
+  "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
+  "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
+  "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
+  "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
+  "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
+  "error.workflow.runMissing": "ההרצה הזו כבר לא קיימת.",
+  "error.workflow.notRetryable": "אפשר להריץ שוב רק שלב שנכשל או שנעצר.",
+  "error.workflow.noDecision": "השלב הזה לא ממתין להחלטה.",
+  "error.workflow.outputPlaceMissing": "יש לבחור מקום הודעות לפלט הזה.",
+  "error.workflow.outputChannelMissing": "בחרו ערוץ לפלט הזה.",
+  "error.workflow.outputChannelFailed": "OpenBot לא הצליח לפרסם את התוצאה בערוץ. הריצו את השלב שוב.",
+  "error.workflow.discordNoMessage":
+    "הפלט הזה פועל על הודעת Discord שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Discord, או לבחור ״פרסום בערוץ״.",
+  "error.workflow.slackNoMessage":
+    "הפלט הזה פועל על הודעת Slack שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Slack, או לבחור ״פרסום בערוץ״.",
+  "error.workflow.telegramNoMessage":
+    "הפלט הזה פועל על הודעת Telegram שהפעילה את ההרצה. יש להפעיל את ההרצה מאזכור ב-Telegram, או לבחור ״פרסום בצ'אט״.",
+  "error.workflow.outputConnectionOff": "חיבור ההודעות של הפלט הזה כבוי או הוסר. יש לבחור מקום מחדש.",
+  "error.workflow.outputNotRunning": "חיבור ההודעות אינו פועל כעת. יש לנסות שוב כשיפעל.",
+  "error.workflow.outputRefused": "המקום דחה את הפרסום. יש לוודא ש-OpenBot יכול לפרסם שם.",
+  "error.workflow.outputUncertain": "הפרסום נעצר באמצע. ייתכן שחלק ממנו נמצא במקום. יש לבדוק שם לפני שמנסים שוב.",
+  "error.workflow.tooLarge": "תהליך העבודה הזה גדול מדי לשמירה. יש להסיר חלק מהציורים או מהטקסטים הארוכים ולנסות שוב.",
+  "error.workflow.tooLargeToSend": "תהליך העבודה הזה גדול מדי לשליחה למחשב אחר. יש לפתוח אותו במחשב שמפעיל את השרת.",
+  "error.workflow.webhookMissing": "השלב הזה אינו טריגר webhook. יש לשמור את תהליך העבודה ולנסות שוב.",
+  "error.workflow.githubActionMissing": "יש לבחור מה הפלט הזה עושה ב-GitHub.",
+  "error.workflow.githubRepositoryMissing": "יש לבחור מאגר לפלט הזה.",
+  "error.workflow.githubItemMissing":
+    "לפלט הזה אין issue או pull request. יש להפעיל את ההרצה מאירוע GitHub, או להזין את המספר בקלט שלו.",
+  "error.workflow.githubPullRequestOnly": "הפעולה הזו פועלת רק על pull requests.",
+  "error.workflow.githubTextMissing": "לפלט הזה אין טקסט לשליחה. יש לחבר שלב שכותב אותו.",
+  "error.workflow.githubEventText":
+    "הפלט הזה לא יכול לשלוח את האירוע הגולמי של הטריגר. יש להציב סוכן בין הטריגר לפלט הזה.",
+  "error.workflow.githubChoiceMissing": "יש לבחור את התוויות או את האדם לפלט הזה.",
+  "error.workflow.githubChoseNothing": "המודל לא בחר תווית או אדם מהמאגר הזה.",
+  "error.workflow.githubNotConnected": "יש לחבר את GitHub במחשב שמפעיל את תהליך העבודה הזה.",
+  "error.workflow.githubNoAccess": "ל-OpenBot GitHub App אין גישה למאגר או לפריט הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubNoWrite": "OpenBot GitHub App לא יכול לשנות את המאגר הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubLocked": "השיחה הזו נעולה ב-GitHub.",
+  "error.workflow.githubRefused": "GitHub דחה את השינוי: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot לא הצליח להגיע ל-GitHub. יש להריץ את השלב שוב.",
+  "error.workflow.githubUncertain":
+    "השינוי נעצר באמצע. ייתכן שהוא נמצא ב-GitHub. יש לבדוק שם לפני שמריצים את השלב שוב.",
+  "error.workflow.githubNoEvent": "ב-GitHub אין issue או pull request שהטריגר הזה מתחיל מהם.",
+} as const satisfies PartialTranslation<typeof source>;

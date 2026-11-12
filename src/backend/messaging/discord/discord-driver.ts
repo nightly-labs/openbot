@@ -5,6 +5,7 @@ import {
   DISCORD_UPLOAD_BYTES_LIMIT,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordEmbed,
   type DiscordHistoryMessage,
   decodeDiscordChannels,
   decodeDiscordHistory,
@@ -75,7 +76,7 @@ const BUTTON_STYLES = { primary: "primary", danger: "danger" } as const;
 
 /**
  * The Discord side of one guild's connection. Every call goes through Signal, which holds the bot
- * token and refuses a call outside this host's guilds. Signal sends no post that can ping anyone. It
+ * token and refuses a call outside this host's guilds. Only a new text post can ping, and only a user. It
  * never logs message text or a response body.
  */
 class DiscordAdapter implements MessagingAdapter {
@@ -124,6 +125,8 @@ class DiscordAdapter implements MessagingAdapter {
         content: clip(body.text),
         replyTo: target.replyThreadId,
         buttons: buttons(body),
+        // Only with embeds: an older Signal refuses the key.
+        ...(body.embeds?.length ? { embeds: body.embeds } : {}),
       },
       decodeDiscordMessageId,
     );
@@ -183,6 +186,18 @@ class DiscordAdapter implements MessagingAdapter {
     );
   });
 
+  readonly addEmoji = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    messageId: string,
+    emoji: string,
+  ): Effect.fn.Return<void, MessagingAdapterError> {
+    yield* this.#call(
+      { op: "react", guildId: this.#guildId, channelId: target.platformChannelId, messageId, emoji, on: true },
+      ignoreAnswer,
+    );
+  });
+
   readonly postAnswer = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     target: MessageTarget,
@@ -207,6 +222,22 @@ class DiscordAdapter implements MessagingAdapter {
         firstId = yield* this.post(target, { text: first });
       }
     } else firstId = yield* this.post(target, { text: first });
+    for (const chunk of rest) yield* this.post(target, { text: chunk });
+    return firstId;
+  });
+
+  /**
+   * The text in as many posts as it needs, with the embeds on the first one: when Signal or Discord
+   * refuses the embeds, nothing is posted. Returns the id of the first post.
+   */
+  readonly postEmbeds = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    target: MessageTarget,
+    markdown: string,
+    embeds: DiscordEmbed[],
+  ) {
+    const [first = "", ...rest] = markdown ? chunkMarkdown(markdown, CHUNK_CHARACTERS) : [];
+    const firstId = yield* this.post(target, { text: first, embeds });
     for (const chunk of rest) yield* this.post(target, { text: chunk });
     return firstId;
   });
@@ -394,17 +425,16 @@ class DiscordAdapter implements MessagingAdapter {
   /** Discord messages as context, with each user mention named. A bot's post names the bot. */
   readonly #entries = Effect.fnUntraced(function* (this: DiscordAdapter, messages: DiscordHistoryMessage[]) {
     const names = yield* mentionNames(
-      messages.flatMap((message) => discordMentionIds(message.content)),
+      messages.flatMap((message) => discordMentionIds([message.content, ...message.embeds].join("\n"))),
       (userId) => this.authorName(userId),
     );
     return messages.map(
       (message): ContextEntry => ({
         id: message.id,
         authorName: message.authorIsBot ? `${message.authorName} (bot)` : message.authorName,
-        text: discordContextText(
-          withMentionNames(discordPlainText(message.content), names),
-          message.attachments,
-          message.forwarded,
+        text: withMentionNames(
+          discordContextText(discordPlainText(message.content), message.attachments, message.embeds, message.forwarded),
+          names,
         ),
         sentAt: message.sentAt,
         ...(message.attachments.length ? { files: message.attachments.map(inboundFile) } : {}),
@@ -479,7 +509,7 @@ class DiscordAdapter implements MessagingAdapter {
     return this.#call({ op: "listRoles", guildId: this.#guildId }, decodeDiscordRoles);
   }
 
-  /** Signal posts with no mention allowed, so a mention shows the person and pings nobody. */
+  /** A new text post pings the person; an edit or a private reply shows the person and pings nobody. */
   mention(userId: string): string {
     return /^[0-9]+$/.test(userId) ? `<@${userId}>` : userId;
   }
@@ -542,9 +572,14 @@ function snowflakeTime(id: bigint): bigint {
   return (id >> 22n) + DISCORD_EPOCH_MS;
 }
 
-/** A message that has text or files for the context, or a forward, which says when it has neither. */
+/** A message that has text, embeds or files for the context, or a forward, which says when it has none. */
 function hasContent(message: DiscordHistoryMessage): boolean {
-  return discordPlainText(message.content) !== "" || message.attachments.length > 0 || message.forwarded;
+  return (
+    discordPlainText(message.content) !== "" ||
+    message.attachments.length > 0 ||
+    message.embeds.length > 0 ||
+    message.forwarded
+  );
 }
 
 function compareSnowflakes(left: string, right: string): number {
@@ -587,13 +622,23 @@ const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
   );
 });
 
-/** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
-const downloadAttachment = Effect.fnUntraced(function* (url: string, destination: string, maxBytes: number) {
+/** One response of the CDN: a redirect to follow, or the value of the body. */
+type CdnStep<A> = { redirect: string } | { value: A };
+
+/**
+ * Follows Discord's CDN redirects to the body of one attachment and gives it to `consume`. Each address,
+ * the first one too, must be on Discord's CDN, and a file larger than `maxBytes` is refused.
+ */
+const withCdnBody = Effect.fnUntraced(function* <A>(
+  url: string,
+  maxBytes: number,
+  consume: (body: ReadableStream<Uint8Array>) => Effect.Effect<A, MessagingAdapterError>,
+) {
   let current = url;
   for (let redirects = 0; ; redirects += 1) {
     if (!trustedCdnUrl(current))
       return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "untrusted_file_url") });
-    const next = yield* Effect.acquireUseRelease(
+    const next: CdnStep<A> = yield* Effect.acquireUseRelease(
       Effect.sync(() => new AbortController()),
       (controller) =>
         Effect.gen(function* () {
@@ -602,7 +647,7 @@ const downloadAttachment = Effect.fnUntraced(function* (url: string, destination
             const location = response.headers.get("location");
             if (!location || redirects >= REDIRECT_LIMIT)
               return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "redirect") });
-            return new URL(location, current).toString();
+            return { redirect: new URL(location, current).toString() } as const;
           }
           const body = response.body;
           if (!response.ok || !body)
@@ -611,14 +656,41 @@ const downloadAttachment = Effect.fnUntraced(function* (url: string, destination
             });
           if (Number(response.headers.get("content-length") ?? "0") > maxBytes)
             return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "too_large") });
-          yield* writeBody(body, destination, maxBytes);
-          return null;
+          return { value: yield* consume(body) } as const;
         }),
       (controller) => Effect.sync(() => controller.abort()),
     );
-    if (next === null) return;
-    current = next;
+    if ("value" in next) return next.value;
+    current = next.redirect;
   }
+});
+
+/** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
+const downloadAttachment = (url: string, destination: string, maxBytes: number) =>
+  withCdnBody(url, maxBytes, (body) => writeBody(body, destination, maxBytes));
+
+/**
+ * The bytes of one attachment on Discord's CDN, for a workflow output that copies it elsewhere. A
+ * signed CDN address needs no token. A file larger than `maxBytes` is refused.
+ */
+export const downloadDiscordAttachment = (url: string, maxBytes: number) =>
+  withCdnBody(url, maxBytes, (body) => readBody(body, maxBytes));
+
+/** The whole body in memory, up to `maxBytes`. */
+const readBody = Effect.fnUntraced(function* (body: ReadableStream<Uint8Array>, maxBytes: number) {
+  const reader = body.getReader();
+  return yield* Effect.gen(function* () {
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = yield* adapterIo(() => reader.read());
+      if (done) return Buffer.concat(chunks, received);
+      received += value.byteLength;
+      if (received > maxBytes)
+        return yield* new MessagingAdapterError({ cause: new DiscordApiError("download", "too_large") });
+      chunks.push(value);
+    }
+  }).pipe(Effect.ensuring(adapterIo(() => reader.cancel()).pipe(Effect.catch(() => Effect.void))));
 });
 
 const writeBody = Effect.fnUntraced(function* (

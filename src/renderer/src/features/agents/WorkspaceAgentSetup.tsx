@@ -1,14 +1,18 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useProviders } from "../../providers";
+import { useAuth } from "../account/account-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { serverCanAdminister } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useAgentActions } from "./agent-actions";
 import { resolveCreationModel } from "./agent-creation-model";
 import { useAgents } from "./agents-context";
+import { withHostAccountUsage } from "./host-provider-accounts";
 
 /**
  * The create-an-agent form, which takes over the conversation pane instead of
@@ -26,6 +30,7 @@ export function WorkspaceAgentSetup() {
     modelOptions,
     agentStatus,
     serverSetupChoice,
+    hostAccountLimits,
     developmentCreation,
   } = useAgents();
   const { createAgent } = useAgentActions();
@@ -42,6 +47,13 @@ export function WorkspaceAgentSetup() {
     activeCustomProviders,
   } = useProviders();
   const { openServerSettings } = useServerSettings();
+  const auth = useAuth();
+  /**
+   * The released Team API create route does not carry the account. Main sets it on
+   * `provider-accounts-v1` after the create, so an owner or admin of a joined server with that
+   * capability can choose it too. The host gives its accounts only to them.
+   */
+  const accountChoice = createMemo(() => serverCanAdminister(activeServer(), PROVIDER_ACCOUNTS_CAPABILITY));
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -104,6 +116,8 @@ export function WorkspaceAgentSetup() {
       error={agentSetupError()}
       modelOptions={createModelSupported() ? modelOptions() : undefined}
       agentStatus={agentStatus()}
+      accountChoice={accountChoice()}
+      accountUsage={accountChoice() ? withHostAccountUsage(auth.accountUsage(), hostAccountLimits()) : undefined}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={activeCustomProviders()}
       // The custom agents are this computer's. A joined host's picker counts its own from its models.
@@ -118,7 +132,8 @@ export function WorkspaceAgentSetup() {
         if (
           next.provider !== current.provider ||
           next.model !== current.model ||
-          next.reasoningEffort !== current.reasoningEffort
+          next.reasoningEffort !== current.reasoningEffort ||
+          next.providerAccountId !== current.providerAccountId
         )
           setModelTouched(true);
         setAgentSetupDraft(next);

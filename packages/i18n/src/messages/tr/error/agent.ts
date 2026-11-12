@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Bu istek için geçmiş kullanılamıyor. Son geçmişi tekrar okuyun veya kanal çalışması için channel_history kullanın.",
+  "error.agent.historyArgumentsInvalid":
+    "Geçmiş bağımsız değişkenleri yanlış: {detail} Bağımsız değişkenleri düzeltip yeniden dene. openbot.tool_describe şemayı verir.",
   "error.agent.toolRequestInvalid":
     "Geçersiz araç keşfi bağımsız değişkenleri. Bildirilen şemayı ve özgün nitelikli araç adını kullanın.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
+  "error.agent.toolCallDiscoveryTool":
+    "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
@@ -48,6 +56,8 @@ export const messages = {
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    '"{model}" modelinin akıl yürütme eforu ayarı yok, bu yüzden eforunu değiştiremezsiniz.',
   "error.agent.noStartingModelInSettings":
     "{provider} için kullanılabilir model yok ve oturum açılmış diğer sağlayıcılarda da yok. Bir sağlayıcıda oturum açın veya Sunucu ayarları → Sağlayıcılar bölümünden varsayılan sağlayıcıyı değiştirin.",
   "error.agent.noStartingModel":
@@ -57,6 +67,7 @@ export const messages = {
     "Bu ajanın görevleri çalışıyor. Sağlayıcıyı değiştirmeden önce bitmelerini bekleyin veya onları durdurun.",
   "error.agent.waitBeforeClearContext": "Yeni bir sohbet başlatmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.waitBeforeCompactContext": "Bağlamı sıkıştırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
+  "error.agent.waitBeforeDeleteHistory": "Geçmişi silmeden önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.compactContextUnavailable": "Bu ajan bağlamını şu anda sıkıştıramaz.",
   "error.agent.unknown": "Bilinmeyen ajan: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -74,6 +85,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.compactionConnectionLost":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",
@@ -104,6 +117,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Bu ayarı yalnızca ajanı çalıştıran bilgisayar değiştirebilir.",
   "error.agent.sideQuestionBusy": "Çok fazla yan soru çalışıyor. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.sideQuestionFailed": "Ajan yan soruyu yanıtlayamadı. Tekrar deneyin.",
+  "error.agent.webSearchSignIn": "Web araması için bir ChatGPT hesabıyla Codex'te oturum açmanız gerekir.",
+  "error.agent.webSearchBusy": "Çalışan çok fazla arama ve yan soru var. Biraz sonra yeniden deneyin.",
+  "error.agent.webSearchFailed": "Web araması tamamlanmadı. Yeniden deneyin.",
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",

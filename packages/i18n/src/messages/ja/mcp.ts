@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "未接続",
   "mcp.connect.close": "{name} の接続画面を閉じる",
   "mcp.connect.getKey": "キーを取得",
+  "mcp.connect.useKey": "代わりに API キーを使う",
+  "mcp.connect.useSignIn": "代わりにサインインする",
   "mcp.connect.keyDescription":
     "{name} アカウントの認証情報を貼り付けてください。OpenBot はそれを使って接続し、{host} に保存します。",
   "mcp.connect.thisComputer": "このコンピューター",
@@ -139,11 +141,11 @@ export const messages = {
   "mcp.panel.appSaved": "アプリを保存しました。使用するにはサインインしてください。",
   "mcp.panel.appRemoved": "アプリを削除しました。",
   "mcp.signIn.relayDescription":
-    "サインインページが {page} にあることを確認してから、ブラウザーで開いてください。完了すると、OpenBot がサインインを {host} に送信します。",
+    "ブラウザーで {page} にサインインしてください。完了すると、OpenBot がサインインを {host} に送信します。",
   "mcp.signIn.relayOpenDescription":
-    "お使いのブラウザーで {page} のサインインページを開いてください。完了したら、ブラウザーに表示されたアドレスをここに貼り付けてください。その後、OpenBot がサインインを {host} に送信します。",
+    "ブラウザーで {page} にサインインしてください。完了したら、ブラウザーに表示されたアドレスをここに貼り付けてください。その後、OpenBot がサインインを {host} に送信します。",
   "mcp.signIn.relayDeviceDescription":
-    "サインインページが {page} にあることを確認してから、ブラウザーで開いてサインインを完了してください。{host} はサインインを自動で検出します。",
+    "ブラウザーで {page} にサインインし、そこで完了してください。{host} はサインインを自動で検出します。",
   "mcp.signIn.relayOpen": "サインインページを開く",
   "mcp.signIn.relayPasteHint":
     "ブラウザーが OpenBot に戻らない場合は、表示されているアドレスをコピーしてここに貼り付けてください。",

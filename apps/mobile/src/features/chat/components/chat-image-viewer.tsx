@@ -9,16 +9,17 @@ import {
   useSharedValue,
 } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
-import { useAttachmentFile } from "./attachment-preview";
+import { savesToPhotos, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ImageViewer, type ImageViewerPage } from "./image-viewer";
 
 /** An image the chat can show itself: one that is on the host and small enough to download. */
 export function isViewableImage(attachment: AttachmentSummary) {
-  return (
-    attachment.kind === "image" &&
-    attachment.size <= MOBILE_ATTACHMENT_BYTES &&
-    !attachment.id.startsWith("mobile-draft-attachment-")
-  );
+  return isStackImage(attachment) && !attachment.id.startsWith("mobile-draft-attachment-");
+}
+
+/** An image a message stack shows: a viewable one, or one this phone is still sending. */
+export function isStackImage(attachment: AttachmentSummary) {
+  return showsAsImage(attachment) && attachment.size <= MOBILE_ATTACHMENT_BYTES;
 }
 
 interface ImageSource {
@@ -98,7 +99,7 @@ export function ChatImageViewerProvider({
   );
 }
 
-/** The viewer, with the share and save actions of the image on screen. */
+/** The viewer, with the share, copy and save actions of the image on screen. */
 function ConversationImageViewer({
   serverId,
   pages,
@@ -124,7 +125,9 @@ function ConversationImageViewer({
       hiddenSource={hiddenSource}
       busy={file.busy}
       onShare={file.share}
-      onSave={file.saveToPhotos}
+      // The clipboard and the photo library take the same pictures: raster images, not an SVG.
+      onCopy={page && savesToPhotos(page.attachment) ? file.copyImage : undefined}
+      onSave={page && savesToPhotos(page.attachment) ? file.saveToPhotos : undefined}
       onIndexChange={setIndex}
       onDismissed={onDismissed}
     />
@@ -156,5 +159,5 @@ export function useChatImageSource(id: string | null, originRadius: number) {
     () => (id && register ? register(id, { origin, originRadius }) : undefined),
     [id, register, origin, originRadius],
   );
-  return { origin, hiddenStyle, open: viewer?.open };
+  return { origin, hiddenStyle, hiddenSource, open: viewer?.open };
 }

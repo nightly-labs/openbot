@@ -1,81 +1,64 @@
-// The instruction file at the root of a local agent's workspace. Only the local service answers: the
-// Team API does not carry the file, so a joined server's agent has none here.
+// The instruction file at the root of an agent's workspace. On a joined server the host reads and
+// saves it through `agent-instructions-v1`, and the host answers only an owner or admin.
 
 import { parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
-import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result } from "effect";
-import { shell } from "electron";
 import {
-  type AgentInstructionsFileFailed,
-  type AgentInstructionsFileRefused,
-  agentInstructionsRevealPath,
-  readAgentInstructionsFile,
-  saveAgentInstructionsFile,
-} from "../../backend/agent/workspace-instructions";
-import type { AgentService } from "../../backend/agent-service";
+  AGENT_INSTRUCTIONS_CAPABILITY,
+  AGENT_INSTRUCTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
+import { shell } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
+import type { AgentInstructionsFiles } from "../agent-instructions-files";
+import { decodeRemoteAgentInstructionsFile } from "../remote-agent-decoding";
+import type { ResponseDecoder } from "../remote-host-decoding";
+import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import { parseAgentId } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { oneAtATimePerKey } from "./one-at-a-time";
+import { scopedHandler } from "./scoped-handler";
 
-export interface AgentInstructionsIpcDependencies {
-  service: AgentService;
+interface AgentInstructionsRemoteServers {
+  supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
-const REFUSED_MESSAGES = {
-  "too-large": "error.agent.instructionsTooLarge",
-  outside: "error.agent.instructionsOutside",
-  changed: "error.agent.instructionsChanged",
-} as const satisfies Record<AgentInstructionsFileRefused["reason"], string>;
-
-/** The page gets a message for each failure, never the native one, which names paths. */
-async function run<A>(
-  operation: Effect.Effect<A, AgentInstructionsFileRefused | AgentInstructionsFileFailed>,
-): Promise<A> {
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (Result.isSuccess(result)) return result.success;
-  const failure = result.failure;
-  if (failure._tag === "AgentInstructionsFileRefused") throw new Error(sourceText(REFUSED_MESSAGES[failure.reason]));
-  throw new Error(
-    sourceText(
-      failure.operation === "read" ? "error.agent.instructionsReadFailed" : "error.agent.instructionsSaveFailed",
-    ),
-  );
+export interface AgentInstructionsIpcDependencies {
+  files: AgentInstructionsFiles;
+  remoteServers: AgentInstructionsRemoteServers;
 }
 
 export function agentInstructionsIpcHandlers({
-  service,
+  files,
+  remoteServers,
 }: AgentInstructionsIpcDependencies): Pick<IpcGroupHandlers, "agentInstructions"> {
-  // A save in the editor and an Undo in the chat can overlap. One at a time for each agent, so each
-  // save compares with the text that the save before it wrote.
-  const oneAtATime = oneAtATimePerKey();
-
-  function workspace(agentId: string): string {
-    const agent = service.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.agent.gone"));
-    return agent.workspacePath;
+  function remote(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_INSTRUCTIONS_CAPABILITY))
+      throw new Error(sourceText("error.team.agentInstructionsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeRemoteAgentInstructionsFile, { method: "POST", body }),
+    );
   }
 
   return {
     agentInstructions: {
-      readAgentInstructions: payloadHandler(parseAgentId, (agentId) =>
-        run(readAgentInstructionsFile(workspace(agentId))),
-      ),
-      saveAgentInstructions: payloadHandler(parseSaveAgentInstructionsInput, ({ agentId, text, expected }) =>
-        oneAtATime(agentId, async () => {
-          const path = workspace(agentId);
-          const done = service.instructionsSaving(agentId, text);
-          let written = false;
-          try {
-            const file = await run(saveAgentInstructionsFile(path, text, expected));
-            written = true;
-            return file;
-          } finally {
-            done(written);
-          }
-        }),
-      ),
+      readAgentInstructions: scopedHandler(parseAgentId, {
+        local: (agentId) => files.read(agentId),
+        remote: (agentId, serverId) => remote(serverId, AGENT_INSTRUCTIONS_ROUTES.read, { agentId }),
+      }),
+      saveAgentInstructions: scopedHandler(parseSaveAgentInstructionsInput, {
+        local: (input) => files.save(input),
+        remote: (input, serverId) => remote(serverId, AGENT_INSTRUCTIONS_ROUTES.save, input),
+      }),
       revealAgentInstructions: payloadHandler(parseAgentId, async (agentId) => {
-        shell.showItemInFolder(await run(agentInstructionsRevealPath(workspace(agentId))));
+        shell.showItemInFolder(await files.revealPath(agentId));
       }),
     },
   };

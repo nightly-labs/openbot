@@ -7,7 +7,7 @@ import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { HeroUINativeProvider } from "heroui-native/provider";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -27,17 +27,23 @@ import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
+import { loadLargeFilePreference } from "@/features/settings/model/large-files";
+import { offerLayoutRestart } from "@/features/settings/model/layout-direction";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
-import { loadAgentColorMessages } from "@/features/settings/model/message-color";
+import { loadMessageColor } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
+import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
+import { loadTextSize } from "@/features/settings/model/text-size";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
-import { parakeetModel } from "@/features/voice/model/parakeet-model";
+import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
+import { loadVoiceServer } from "@/features/voice/model/voice-server";
 import { loadVoiceSettings } from "@/features/voice/model/voice-settings";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
+import { useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import { BloubStage } from "@/shared/components/bloub-stage/bloub-stage";
 import { BloubStageProvider, useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
 import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
@@ -189,6 +195,10 @@ export default function RootLayout() {
   const animations = useMotionPreferences((state) => state.allAnimations);
   const heroConfig = useMemo(() => (animations ? {} : { animation: "disable-all" as const }), [animations]);
   const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
+  const bloub = useBloubColors();
+  // The reload screen of a direction restart has the color of the splash.
+  const splashColor = useRef("");
+  splashColor.current = bloub.dark ? bloub.dimBody : bloub.body;
   // React Navigation paints its near-black dark background behind screens during transitions.
   const darkTheme = useMemo(
     () => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas }, fonts: navigationFonts }),
@@ -206,15 +216,24 @@ export default function RootLayout() {
     void untilForeground().then(() => {
       void loadAppearance().catch(() => undefined);
       void loadHapticsPreference().catch(() => undefined);
-      void loadAgentColorMessages().catch(() => undefined);
+      void loadLargeFilePreference().catch(() => undefined);
+      void loadMessageColor().catch(() => undefined);
+      void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);
       void loadMotionPreferences().catch(() => undefined);
       void loadDictationLanguage().catch(() => undefined);
       void loadVoiceSettings().catch(() => undefined);
+      void loadVoiceServer().catch(() => undefined);
       supertonicModel.check();
-      parakeetModel.check();
-      void loadAppLanguage().catch(() => undefined);
+      checkRecognitionModels();
+      // The layout direction follows the app language. A start with the other direction, such as the
+      // first start or a start after the phone language changed, asks for a restart. A failed read
+      // keeps the default language, which still sets the direction.
+      void loadAppLanguage()
+        .catch(() => undefined)
+        .then(() => offerLayoutRestart(splashColor.current, () => undefined));
       void loadOnboardingProgress().catch(() => undefined);
     });
   }, []);

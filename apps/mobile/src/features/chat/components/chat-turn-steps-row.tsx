@@ -2,11 +2,12 @@ import { Typography } from "heroui-native";
 import Brain from "lucide-react-native/icons/brain";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useState } from "react";
-import { type ColorValue, Pressable } from "react-native";
+import { type ColorValue, Pressable, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { type MobileText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { TurnStepsSummary } from "../model/turn-thinking";
 
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -21,7 +22,10 @@ export function turnDuration(seconds: number, { t, format }: Pick<MobileText, "t
   });
 }
 
-/** The row above a finished answer: how long the turn took and its step count. It opens the steps. */
+/**
+ * The row above a finished answer, or of a finished turn with no answer: how long the turn took and
+ * its step count. It opens the steps where a sheet can show them.
+ */
 export function ChatTurnStepsRow({
   summary,
   muted,
@@ -29,7 +33,8 @@ export function ChatTurnStepsRow({
 }: {
   summary: TurnStepsSummary;
   muted: ColorValue;
-  onPress: () => void;
+  /** Absent where no sheet can show the steps, such as a channel. */
+  onPress: (() => void) | undefined;
 }) {
   const text = useText();
   const reducedMotion = useReducedMotion();
@@ -39,6 +44,15 @@ export function ChatTurnStepsRow({
     summary.seconds === null
       ? steps
       : text.t("mobile.chat.thinking.summary", { duration: turnDuration(summary.seconds, text), steps });
+  if (!onPress)
+    return (
+      <View accessible accessibilityLabel={label} className="flex-row items-center gap-1.5 self-start px-1 py-1">
+        <Brain size={14} color={muted} />
+        <Typography.Paragraph type="body-xs" className="text-muted" numberOfLines={1}>
+          {label}
+        </Typography.Paragraph>
+      </View>
+    );
   return (
     <Pressable
       accessibilityRole="button"
@@ -66,7 +80,7 @@ export function ChatTurnStepsRow({
         <Typography.Paragraph type="body-xs" className="text-muted" numberOfLines={1}>
           {label}
         </Typography.Paragraph>
-        <ChevronRight size={14} color={muted} />
+        <ChevronRight size={14} color={muted} style={MIRROR_IN_RTL} />
       </Animated.View>
     </Pressable>
   );

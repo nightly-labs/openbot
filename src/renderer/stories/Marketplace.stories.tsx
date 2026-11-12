@@ -57,6 +57,23 @@ export const PluginKey = at(plugin("resend"), { held: { resend: "connected" } })
 /** The server refused the saved sign-in, so the page asks the user to sign in again. */
 export const PluginSignInNeeded = at(plugin("notion"), { held: { notion: "signInNeeded" } });
 
+/**
+ * Three Notion accounts on a host that keeps a sign-in for each. A message tags an account by its
+ * row name, such as `@Notion Work`. One account needs a new sign-in.
+ */
+export const PluginAccounts = at(plugin("notion"), {
+  accounts: {
+    notion: [
+      { id: "notion-work", name: "Notion Work", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-personal", name: "Notion Personal", signInNeeded: false, signedIn: true, renamable: true },
+      { id: "notion-client", name: "Notion Acme", signInNeeded: true, signedIn: true, renamable: true },
+    ],
+  },
+});
+
+/** A listing with two ways in: sign-in first, and an API key as the other choice in the dialog. */
+export const PluginComposio = at(plugin("composio"), { catalog: ["composio"], held: {} });
+
 /** A desktop app: the server runs in an app on this computer, at a local address. */
 export const PluginDesktop = at(plugin("figma"), { held: { figma: "connected" } });
 
@@ -130,6 +147,22 @@ export const EmptyCatalog = at(tab("agents"), { empty: true });
 
 /** A member of a joined server: no Add, no Add custom, no install menu and no Connect. */
 export const Member: Story = { args: { member: true } };
+
+/** A member of a host that lets only owners and admins connect apps: the page says whom to ask. */
+export const MemberPluginApp = at(plugin("cloudflare"), {
+  catalog: ["cloudflare"],
+  member: true,
+  held: {},
+  blocked: { reason: "member", host: "Studio" },
+});
+
+/** The app has not read yet what the joined server serves: Connect waits, then connects. */
+export const PluginAppChecking = at(plugin("cloudflare"), {
+  catalog: ["cloudflare"],
+  member: true,
+  held: {},
+  blocked: { reason: "checking" },
+});
 
 const connector = (id: string) => at((nav) => nav.go({ kind: "app", id }), { connected: true });
 

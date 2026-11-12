@@ -37,6 +37,7 @@ import type { DiscordDelivery } from "./discord-api";
 import type { GitHubDeliveryStatus } from "./github-route";
 import type { TelegramCallFailure, TelegramCallMethod, TelegramCallParams, TelegramCallResult } from "./telegram-route";
 import type { RemoteMemberRole } from "./ticket";
+import type { WebhookSignatureFormat } from "./webhook-route";
 
 export const SIGNAL_PROTOCOL_VERSION = 1;
 export type SignalProtocolVersion = typeof SIGNAL_PROTOCOL_VERSION;
@@ -56,6 +57,17 @@ export const SIGNAL_TURN_CREDENTIAL_TTL_SECONDS = 60 * 60;
 // expired, and a peer only notices that when it needs the relay, so the connection would have kept
 // working for everyone except the users behind a symmetric NAT.
 export const SIGNAL_TURN_REFRESH_INTERVAL_MS = Math.floor(SIGNAL_TURN_CREDENTIAL_TTL_SECONDS * 0.75) * 1_000;
+
+// How long Signal keeps a client's connection after the client's socket closes, so the client can
+// resume it with its resume token. Then Signal tells the host to drop the connection. A Signal that
+// sends no `reconnectGraceMs` in `ready` uses the default. The client value is for a host that
+// multiplexes: an older host serves one session, and a kept connection would hold off the others.
+export const SIGNAL_DEFAULT_RECONNECT_GRACE_MS = 30_000;
+export const SIGNAL_CLIENT_RECONNECT_GRACE_MS = 10 * 60_000;
+
+// The code that the desktop's WebRTC window gives main in `signal-closed` when it replaced a host
+// socket that did not answer in time. It is not a WebSocket close code and never goes to Signal.
+export const SIGNAL_NO_READY_CLOSE_CODE = "no-ready";
 
 // Which side of the relay a socket is. Only a host may set `multiplex`. An `ingress` socket belongs
 // to a host too, but it only receives Slack and Discord deliveries: Signal never attaches a client
@@ -160,6 +172,10 @@ export type SignalClientMessage =
       // `ingress` only, and optional: the host's queue key (`./ingress-queue.ts`). With it, Signal
       // keeps the events of a route for this host while the host starts.
       queueKey?: string;
+      // `ingress` only, and optional: the webhook signature formats that this host checks in addition
+      // to `X-OpenBot-Signature` (`./webhook-route.ts`). An older Signal ignores it, and Signal ignores
+      // a format that it does not know.
+      webhookFormats?: string[];
     }
   // An `ingress` socket's Bot API call, sent only to a Signal whose `ready` named the `telegram`
   // capability. Signal answers with one `telegram-call-result` of the same `requestId`.
@@ -218,6 +234,10 @@ export type SignalServerMessage =
       // `ingress` only, and optional: what this Signal can do beyond Slack, such as `telegram`. An
       // older Signal sends none.
       capabilities?: string[];
+      // `client` only, and optional: how long Signal keeps this connection after the client's socket
+      // closes, for a resume with the resume token. Then it tells the host to drop the connection.
+      // An older Signal sends none and uses `SIGNAL_DEFAULT_RECONNECT_GRACE_MS`.
+      reconnectGraceMs?: number;
     }
   // Answers a client hello with `waitForHost` while its host is offline. The socket stays open, and
   // Signal sends `ready` on it when the host connects. `resumeToken` lets the client renew the socket
@@ -313,5 +333,8 @@ export type SignalServerMessage =
       deliveryId: string;
       signature: string;
       bodyBase64: string;
+      // Absent for an `X-OpenBot-Signature` request. Present only when the host named the format in
+      // its `ingress` hello.
+      format?: WebhookSignatureFormat;
     }
   | SignalRelayMessage;

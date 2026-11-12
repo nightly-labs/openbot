@@ -81,9 +81,10 @@ const GLASS_TINT_ALPHA = 0.55;
 /**
  * The palette's main colour for the filled voice controls, the glyph colour
  * with the higher contrast on it (a yellow agent gets a dark glyph), and the
- * same colour as a see-through tint for Liquid Glass.
+ * same colour as a see-through tint for Liquid Glass. `lightGlyph` says that a
+ * white glyph still reads on the fill, with the 3:1 contrast of a control.
  */
-export function voiceAccent(palette: VoicePalette): { fill: string; glyph: string; tint: string } {
+export function voiceAccent(palette: VoicePalette): { fill: string; glyph: string; tint: string; lightGlyph: boolean } {
   const color = palette[1];
   const [r, g, b] = color.map((channel) => Math.round(channel * 255));
   const light = luminance(color);
@@ -91,5 +92,6 @@ export function voiceAccent(palette: VoicePalette): { fill: string; glyph: strin
     fill: `rgb(${r}, ${g}, ${b})`,
     tint: `rgba(${r}, ${g}, ${b}, ${GLASS_TINT_ALPHA})`,
     glyph: (light + 0.05) / 0.05 > 1.05 / (light + 0.05) ? "#000000" : "#ffffff",
+    lightGlyph: 1.05 / (light + 0.05) >= 3,
   };
 }

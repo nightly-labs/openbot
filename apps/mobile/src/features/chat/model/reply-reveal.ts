@@ -42,6 +42,7 @@ function isWholeWord(token: Token): boolean {
   return (
     token.type === "agentMention" ||
     token.type === "skillMention" ||
+    token.type === "tabMention" ||
     token.type === "code" ||
     token.type === "inlineMath" ||
     token.type === "blockMath"

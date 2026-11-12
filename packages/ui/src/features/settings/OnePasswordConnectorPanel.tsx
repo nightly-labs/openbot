@@ -13,15 +13,15 @@ import {
   ItemMedia,
   ItemTitle,
   KeyRound,
+  PlushLoader,
   RefreshCw,
   SettingsSection,
-  Spinner,
   Text,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
-import { OnePasswordMark } from "./brand-marks";
+import { OnePasswordTile } from "./brand-marks";
 import { IntegrationPage, type IntegrationPageSlots } from "./IntegrationLayout";
 import {
   SharedVaultSection,
@@ -111,7 +111,7 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
   return (
     <IntegrationPage
       class="onepassword-connector"
-      logo={<OnePasswordMark />}
+      logo={<OnePasswordTile />}
       name={t("connector.onePassword.title")}
       status={header().status}
       statusLabel={t(header().label)}
@@ -241,7 +241,7 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
                     </Button>
                   }
                 >
-                  <Spinner size="sm" label={t("connector.onePassword.approveInApp")} />
+                  <PlushLoader size={24} label={t("connector.onePassword.approveInApp")} />
                   <Button type="button" size="sm" variant="ghost" onClick={props.onCancel}>
                     {t("connector.onePassword.cancel")}
                   </Button>

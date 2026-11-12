@@ -17,7 +17,9 @@ import {
   type CreateRoutineInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
+  type DeleteChannelMessageInput,
   type DeleteChannelRoutineInput,
+  type DeleteConversationMessageInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
   type EditQueuedMessageInput,
@@ -29,6 +31,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
@@ -49,6 +52,8 @@ import {
   type PasteMessageLinkInput,
   type PreviewSharedFileInput,
   type PreviewWorkspaceFileInput,
+  type ReadAgentTaskAroundInput,
+  type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
@@ -57,15 +62,19 @@ import {
   type RespondToPromptInput,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineCalendarInput,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutineRunPlace,
   type RunQueuedMessageAsTaskInput,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
+  type SetChannelImageInput,
+  type SetMessagePinnedInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -129,6 +138,28 @@ export function parseOptionalAgentId(value: unknown): string | undefined {
   return parseAgentId(value);
 }
 
+/** An action of the renderer or of `sidebar-folders-v1`: it can nest a folder in a folder. */
+export function parseSidebarFolderAction(value: unknown): SidebarLayoutAction {
+  if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
+  if (value.type === "nest") {
+    const parentId = value.parentId;
+    const beforeSectionId = value.beforeSectionId;
+    if (parentId !== null && !isString(parentId)) throw new Error("Invalid sidebar folder parent.");
+    if (beforeSectionId !== null && !isString(beforeSectionId)) throw new Error("Invalid sidebar folder order target.");
+    return {
+      type: "nest",
+      sectionId: requireString(value.sectionId, "sectionId", INPUT_LIMITS.identifier),
+      parentId: parentId === null ? null : requireString(parentId, "parentId", INPUT_LIMITS.identifier),
+      beforeSectionId:
+        beforeSectionId === null ? null : requireString(beforeSectionId, "beforeSectionId", INPUT_LIMITS.identifier),
+    };
+  }
+  const action = parseSidebarLayoutAction(value);
+  if (action.type !== "create" || value.parentId === undefined) return action;
+  return { ...action, parentId: requireString(value.parentId, "parentId", INPUT_LIMITS.identifier) };
+}
+
+/** An action of the released `/v1/sidebar-layout/actions` route: every folder is at the top level. */
 export function parseSidebarLayoutAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   switch (value.type) {
@@ -200,11 +231,16 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
+  const avatarColor = value.avatarColor;
+  if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) {
+    throw new Error("Invalid avatar color.");
+  }
   const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
+    ...(avatarColor === undefined ? {} : { avatarColor }),
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
   if (value.provider !== undefined) {
@@ -218,6 +254,10 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   if (value.reasoningEffort !== undefined) {
     if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
     result.reasoningEffort = value.reasoningEffort;
+  }
+  if (value.providerAccountId !== undefined) {
+    if (!isProviderAccountId(value.providerAccountId)) throw new Error("Invalid provider account.");
+    result.providerAccountId = value.providerAccountId;
   }
   return result;
 }
@@ -259,6 +299,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
     ...optionalMissedPolicy(value.missedPolicy),
+    ...optionalRunPlace(value.runIn),
   };
 }
 
@@ -277,7 +318,12 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
+  Object.assign(
+    parsed,
+    optionalLimitPolicy(value.limitPolicy),
+    optionalMissedPolicy(value.missedPolicy),
+    optionalRunPlace(value.runIn),
+  );
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -292,6 +338,12 @@ function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPol
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
   return { missedPolicy: value };
+}
+
+function optionalRunPlace(value: unknown): { runIn?: RoutineRunPlace } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_RUN_PLACES, value)) throw new Error("Invalid routine run place.");
+  return { runIn: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -575,6 +627,27 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    beforeMessageId: requireString(value.beforeMessageId, "beforeMessageId", INPUT_LIMITS.identifier),
+    // 0 asks only whether the thread has older messages.
+    limit: value.limit === 0 ? 0 : parsePageLimit(value.limit),
+  };
+}
+
+export function parseReadAgentTaskAround(value: unknown): ReadAgentTaskAroundInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    limit: parsePageLimit(value.limit),
+  };
+}
+
 export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
   if (!isObject(value)) throw new Error("Invalid branch request.");
   return {
@@ -630,6 +703,33 @@ export function parseMarkConversationUnread(value: unknown): MarkConversationUnr
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseDeleteConversationMessage(value: unknown): DeleteConversationMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseSetMessagePinned(value: unknown): SetMessagePinnedInput {
+  if (!isObject(value) || typeof value.pinned !== "boolean") throw new Error("Invalid pinned.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    pinned: value.pinned,
+  };
+}
+
+export function parseDeleteChannelMessage(value: unknown): DeleteChannelMessageInput {
+  if (!isObject(value)) throw new Error("Invalid message delete request.");
+  return {
+    channelId: requireString(value.channelId, "channelId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
   };
 }
 
@@ -696,6 +796,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.fastMode)) throw new Error("Invalid fast mode value.");
     result.fastMode = value.fastMode;
   }
+  if (value.ultrafast !== undefined) {
+    if (!isBoolean(value.ultrafast)) throw new Error("Invalid fast mode value.");
+    result.ultrafast = value.ultrafast;
+  }
   if (value.providerAccountId !== undefined) {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
       throw new Error("Invalid provider account.");
@@ -737,6 +841,14 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     }
     result.avatarHue = value.avatarHue;
   }
+  if (value.avatarColor !== undefined) {
+    if (value.avatarColor !== null && !isAvatarColor(value.avatarColor)) throw new Error("Invalid avatar color.");
+    result.avatarColor = value.avatarColor;
+  }
+  if (value.chatColor !== undefined) {
+    if (value.chatColor !== null && !isAvatarColor(value.chatColor)) throw new Error("Invalid chat color.");
+    result.chatColor = value.chatColor;
+  }
   return result;
 }
 
@@ -744,6 +856,14 @@ export function parseSetAgentAvatar(value: unknown): SetAgentAvatarInput {
   if (!isObject(value)) throw new Error("Invalid agent avatar request.");
   return {
     agentId: requireString(value.agentId, "agentId"),
+    image: parseAvatarImage(value.image),
+  };
+}
+
+export function parseSetChannelImage(value: unknown): SetChannelImageInput {
+  if (!isObject(value)) throw new Error("Invalid channel image request.");
+  return {
+    channelId: requireString(value.channelId, "channelId"),
     image: parseAvatarImage(value.image),
   };
 }
@@ -771,7 +891,13 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
     }
     return { name: item.name, mimeType: item.mimeType, bytes: item.bytes };
   });
-  return { paths: value.paths, data };
+  return {
+    paths: value.paths,
+    data,
+    ...(value.requestId === undefined
+      ? {}
+      : { requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier) }),
+  };
 }
 
 /** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
@@ -812,9 +938,13 @@ export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
   if (!isObject(value) || (value.action !== "open" && value.action !== "reveal" && value.action !== "download")) {
     throw new Error("Invalid attachment action.");
   }
+  if (value.size !== undefined && (!Number.isSafeInteger(value.size) || Number(value.size) < 0)) {
+    throw new Error("Invalid attachment size.");
+  }
   return {
     attachmentId: requireString(value.attachmentId, "attachmentId"),
     action: value.action,
+    ...(isNumber(value.size) ? { size: value.size } : {}),
   };
 }
 
@@ -847,7 +977,11 @@ export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
 
 export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
   if (!isObject(value)) throw new Error("Invalid workspace file request.");
-  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+  return {
+    ...parseOpenWorkspaceFile(value),
+    ...optionalPreviewByteLimit(value.maxBytes),
+    ...(value.exactPath === true ? { exactPath: true } : {}),
+  };
 }
 
 function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
@@ -914,6 +1048,7 @@ export function parseReorderQueue(value: unknown): ReorderQueueInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     deliveryIds: parseIdentifierList(value.deliveryIds, "delivery ids", INPUT_LIMITS.queueReorder),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 

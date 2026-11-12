@@ -13,6 +13,7 @@ import type {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import { quietRoutineRun } from "./agent/routine-quiet-runs";
 import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
@@ -91,6 +92,9 @@ function channelRunStatusForTasks(
   // A person cancelled the run from its stopped task: it did not succeed.
   if (tasks.some((task) => task.parentTaskId === null && task.state === "cancelled"))
     return { status: "cancelled", error: null };
+  // A completed task has an error only when its owner reported that the run failed (#6667).
+  const reported = tasks.find((task) => task.state === "completed" && task.error);
+  if (reported) return { status: "failed", error: reported.error };
   // Every task is completed or cancelled. This includes the lead judging that no work was needed.
   return { status: "succeeded", error: null };
 }
@@ -247,6 +251,15 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     if (!run || this.#routines.getRecord(channelId, run.routineId)?.limitPolicy !== "skip") return false;
     this.#settle(run, { status: "cancelled", error: null });
     return true;
+  }
+
+  /**
+   * Whether nobody waits for the answer of the run that posted this request: a scheduled, script or
+   * webhook run, not a Test run (`quietRoutineRun`).
+   */
+  quietRun(requestMessageId: string): boolean {
+    const run = this.#routines.runForRequest(requestMessageId);
+    return run !== null && quietRoutineRun(run);
   }
 
   skipMissed(now: Date, held?: RoutineHoldWindow): void {

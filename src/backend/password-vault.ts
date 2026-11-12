@@ -1,8 +1,21 @@
 // The password vault that the browser fills logins from. The main process implements it with the
 // 1Password connection; the agent service only reads it.
 
+import type { PasswordManagerId } from "@openbot/contracts/ipc";
 import { type Effect, Schema } from "effect";
 import { getDomain } from "tldts";
+
+/**
+ * The brand name of each password manager that main connects, in `PASSWORD_MANAGER_IDS` order. Agent
+ * text names them; a brand is not translated.
+ */
+export const PASSWORD_MANAGER_BRANDS = {
+  onepassword: "1Password",
+  bitwarden: "Bitwarden",
+  protonpass: "Proton Pass",
+} as const satisfies Record<PasswordManagerId, string>;
+
+export const PASSWORD_MANAGER_BRAND_NAMES: readonly string[] = Object.values(PASSWORD_MANAGER_BRANDS);
 
 /**
  * Where a saved website may be filled, as 1Password's autofill behavior says:

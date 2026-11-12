@@ -3,13 +3,15 @@
  * model, in the same way a skill tag is, and it changes no tool the provider is given. `quote` is
  * text the user selected in a message of the same chat: its name is that text and its id is the
  * message id. A quote of a file that the side panel shows has a file quote id in place of the
- * message id (see `fileQuoteId`).
+ * message id (see `fileQuoteId`). `tab` is a browser tab of the agent, by tab id, and `thread` is
+ * one of its side threads, by task id. Both stay in the message as a name: the provider reads the
+ * current title and state of each when the message is delivered.
  *
  * An app that predates a kind does not match its marker, so it shows the marker text rather than
  * the name. Message bodies are stored as written, so an older app reading a newer message is a
  * real case, and it stays readable.
  */
-export type ChatTagKind = "agent" | "skill" | "mcp" | "quote";
+export type ChatTagKind = "agent" | "skill" | "mcp" | "quote" | "tab" | "thread";
 
 export interface ChatTagReference {
   kind: ChatTagKind;
@@ -19,7 +21,7 @@ export interface ChatTagReference {
   end: number;
 }
 
-const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote)(\+uri)?:([^)\r\n]+)\)/gu;
+const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote|tab|thread)(\+uri)?:([^)\r\n]+)\)/gu;
 
 /*
  * Quoted text is any text, and Markdown reads the marker as a link. A bracket, a backslash, a
@@ -74,8 +76,26 @@ export function fileQuoteTarget(id: string): FileQuoteTarget | null {
   return { source: "attachment", attachmentId: file.slice(0, slash), name: file.slice(slash + 1), lines };
 }
 
+/**
+ * The most characters of a tab or thread title that a tag keeps. The provider reads the current
+ * title when the message is delivered, so the tag needs only enough to show what it names.
+ */
+const REFERENCE_NAME_LIMIT = 80;
+
+/** The name of a tab or thread tag: one line, at most `REFERENCE_NAME_LIMIT` characters. */
+export function referenceName(name: string): string {
+  const characters = Array.from(name.replace(/\s+/gu, " ").trim());
+  return characters.length > REFERENCE_NAME_LIMIT
+    ? `${characters
+        .slice(0, REFERENCE_NAME_LIMIT - 1)
+        .join("")
+        .trimEnd()}…`
+    : characters.join("");
+}
+
 export function serializeChatTagReference(kind: ChatTagKind, name: string, id: string): string {
-  const unsafeName = kind === "quote" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
+  // A quote, a page title and a thread title are any text, so they get the strict rule.
+  const unsafeName = kind === "quote" || kind === "tab" || kind === "thread" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
   if (name && id && !unsafeName.test(name) && !/[)\r\n]/u.test(id)) return `@[${name}](${kind}:${id})`;
   return `@[${encodeChatTagComponent(name)}](${kind}+uri:${encodeChatTagComponent(id)})`;
 }
@@ -102,9 +122,11 @@ const ADDRESS_SEPARATORS = /^(?:[\s,]|and\b|&|@everyone(?![\p{L}\p{N}_'’-]))*/
 /**
  * Whom a message opens by addressing, as a reader addresses several people: "@A @B, @C what do
  * you think?" or "@everyone ideas?". Spaces, commas and "and" may separate them. A tag after the
- * first other word is a reference in the text, not an address.
+ * first other word is a reference in the text, not an address. A quote is not a word: the composer
+ * puts a quote where the caret is, often before the mention, so "<quote> @A why?" still asks A.
+ * `end` is where the address and the quotes in it stop.
  */
-export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean } {
+export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean; end: number } {
   const mentions: ChatTagReference[] = [];
   let end = 0;
   let everyone = false;
@@ -112,22 +134,23 @@ export function leadingAddress(value: string): { mentions: ChatTagReference[]; e
     const gap = value.slice(end, reference?.start);
     const separators = ADDRESS_SEPARATORS.exec(gap)?.[0] ?? "";
     everyone ||= separators.toLowerCase().includes(EVERYONE_MENTION);
-    if (reference?.kind !== "agent" || separators.length !== gap.length) break;
-    mentions.push(reference);
+    if ((reference?.kind !== "agent" && reference?.kind !== "quote") || separators.length !== gap.length) break;
+    if (reference.kind === "agent") mentions.push(reference);
     end = reference.end;
   }
-  return { mentions, everyone };
+  return { mentions, everyone, end };
 }
 
 function chatTagKind(value: string | undefined): ChatTagKind {
-  if (value === "skill" || value === "mcp" || value === "quote") return value;
+  if (value === "skill" || value === "mcp" || value === "quote" || value === "tab" || value === "thread") return value;
   return "agent";
 }
 
 /**
  * The text with each marker as words. `resolveName` gives the current name of an agent, skill or
- * MCP server. For a quote it gives the whole replacement: a one-line preview uses it to keep the
- * quote out of a block quote. `fileHeadings` names the file and lines above a file quote. Only a
+ * MCP server. For a quote, a tab or a thread it gives the whole replacement: a one-line preview uses
+ * it to keep the quote out of a block quote, and a provider prompt uses it to add the id and state
+ * of a tab or a thread. Without it, a tab or a thread is its name. `fileHeadings` names the file and lines above a file quote. Only a
  * provider prompt asks for it: the heading is English, and a person reads the other results.
  */
 export function expandChatTagReferences(
@@ -157,6 +180,7 @@ export function expandChatTagReferences(
         text.quoteEnd = offset + marker.length;
         return expanded;
       }
+      if (kind === "tab" || kind === "thread") return resolveName?.(reference) ?? name;
       const resolvedName = resolveName?.(reference) ?? name;
       return expandedChatTag(kind, resolvedName);
     },
@@ -200,7 +224,7 @@ function fileQuoteHeading(file: FileQuoteTarget): string {
 }
 
 /** What the provider reads in place of a marker. A name alone would not say what it names. */
-function expandedChatTag(kind: Exclude<ChatTagKind, "quote">, name: string): string {
+function expandedChatTag(kind: "agent" | "skill" | "mcp", name: string): string {
   if (kind === "agent") return `@${name}`;
   return kind === "mcp" ? `${name} (MCP server)` : `${name} (skill)`;
 }

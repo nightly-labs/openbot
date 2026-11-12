@@ -6,17 +6,24 @@ interface ElevenLabsVoicesState {
   phase: "idle" | "loading" | "ready" | "failed";
   voices: ElevenLabsVoice[];
   failure: ElevenLabsError["code"] | null;
+  /** The reason that ElevenLabs gave for the failure, when it gave one. */
+  reason: string | null;
 }
 
 /** The voices of the saved key, shared by the Voice page and the voice list. */
-export const useElevenLabsVoices = create<ElevenLabsVoicesState>(() => ({ phase: "idle", voices: [], failure: null }));
+export const useElevenLabsVoices = create<ElevenLabsVoicesState>(() => ({
+  phase: "idle",
+  voices: [],
+  failure: null,
+  reason: null,
+}));
 
 let loading: Promise<void> | null = null;
 
 /** Lists the voices of the saved key. A second call while one runs waits for it. */
 export function loadElevenLabsVoices(): Promise<void> {
   loading ??= (async () => {
-    useElevenLabsVoices.setState({ phase: "loading", failure: null });
+    useElevenLabsVoices.setState({ phase: "loading", failure: null, reason: null });
     try {
       const key = await readElevenLabsKey();
       if (!key) {
@@ -28,6 +35,7 @@ export function loadElevenLabsVoices(): Promise<void> {
       useElevenLabsVoices.setState({
         phase: "failed",
         failure: error instanceof ElevenLabsError ? error.code : "failed",
+        reason: error instanceof ElevenLabsError ? error.reason : null,
       });
     } finally {
       loading = null;
@@ -38,5 +46,5 @@ export function loadElevenLabsVoices(): Promise<void> {
 
 /** Forgets the voices of a removed key. */
 export function clearElevenLabsVoices(): void {
-  useElevenLabsVoices.setState({ phase: "idle", voices: [], failure: null });
+  useElevenLabsVoices.setState({ phase: "idle", voices: [], failure: null, reason: null });
 }

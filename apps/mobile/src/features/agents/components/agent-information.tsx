@@ -18,6 +18,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 import { AgentFiles } from "./agent-files";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
+import { AgentRoutines } from "./agent-routines";
 import { AgentSkills, CreateSkillAction } from "./agent-skills";
 import { AgentUsageReport } from "./agent-usage-report";
 import { UsageLoading } from "./usage-motion";
@@ -271,37 +272,11 @@ export function AgentInformation({
             if (eventsEnabled) void eventRoutines.refetch();
           }}
         >
-          {allRoutines.map((routine) => (
-            <SettingsRow
-              key={routine.id}
-              supportingText={t(routine.active ? "mobile.agent.info.routineActive" : "mobile.agent.info.routinePaused")}
-              onPress={() =>
-                router.push({
-                  pathname: "/agent-info/[agentId]/routine",
-                  params: { agentId: agent.id, serverId: agent.serverId, recordId: routine.id },
-                })
-              }
-            >
-              <Typography.Paragraph numberOfLines={1}>{routine.name}</Typography.Paragraph>
-            </SettingsRow>
-          ))}
-          {!allRoutines.length ? (
-            <SettingsRow>
-              <Typography.Paragraph className="text-grouped-secondary">
-                {t("mobile.agent.info.noRoutines")}
-              </Typography.Paragraph>
-            </SettingsRow>
-          ) : null}
-          <SettingsRow
-            onPress={() =>
-              router.push({
-                pathname: "/agent-info/[agentId]/routine",
-                params: { agentId: agent.id, serverId: agent.serverId },
-              })
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.info.addRoutine")}</Typography.Paragraph>
-          </SettingsRow>
+          <AgentRoutines
+            agent={agent}
+            routines={allRoutines}
+            queryKey={queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "routines")}
+          />
         </InformationSection>
       ) : null}
       {section === "skills" ? (
@@ -477,7 +452,7 @@ function InformationSection({
   const { t } = useText();
   const text = LIST_SECTION_TEXT[kind];
   if (list && available && !pending && !failed)
-    return kind === "memories" || kind === "routines" ? <SettingsSection>{children}</SettingsSection> : children;
+    return kind === "memories" ? <SettingsSection>{children}</SettingsSection> : children;
   return (
     <SettingsSection title={t(text.title)}>
       <SettingsRow>

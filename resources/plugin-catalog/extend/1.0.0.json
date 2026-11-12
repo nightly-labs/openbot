@@ -1,0 +1,33 @@
+{
+  "slug": "extend",
+  "name": "Extend",
+  "tagline": "Virtual cards and spend",
+  "description": "Extend lets agents look up virtual cards, card transactions, and receipts in the signed-in Extend account. Each user signs in to their own Extend account through the browser.",
+  "category": "other",
+  "creatorName": "Extend",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/d8/85/10/d885108f-802a-1620-923f-08d99dec774b/AppIcon-0-0-1x_U007emarketing-0-3-0-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-card-spend", "text": "Which virtual cards had the most spend this month?" },
+    { "id": "prompt-missing-receipts", "text": "List the transactions from last week that have no receipt." },
+    { "id": "prompt-card-summary", "text": "Summarize the limits and remaining balance of my active virtual cards." }
+  ],
+  "apps": [
+    {
+      "id": "app-extend-mcp",
+      "name": "Extend",
+      "description": "Virtual card, transaction, and receipt lookups, over Extend's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/d8/85/10/d885108f-802a-1620-923f-08d99dec774b/AppIcon-0-0-1x_U007emarketing-0-3-0-sRGB-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "extend",
+        "transport": "http",
+        "url": "https://mcp.paywithextend.com/mcp",
+        "auth": [{ "id": "extend-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.paywithextend.com",
+  "privacyPolicyUrl": "https://paywithextend.com/privacy",
+  "termsUrl": "https://paywithextend.com/terms",
+  "skills": []
+}

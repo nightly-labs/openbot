@@ -9,6 +9,8 @@ export const messages = {
     "このネットワークのファイアウォールまたはプロキシが、OpenBot から {host} への接続をブロックしました。ネットワーク管理者に {host} の許可を依頼してから、再試行してください。",
   "error.auth.signInFirst": "先に OpenBot にサインインしてください。",
   "error.auth.signInRequired": "サインインが必要です。",
+  "error.auth.chatColorUnavailable":
+    "アカウントサービスはまだチャットの色に対応していません。後でもう一度お試しください。",
   "error.auth.accountChangedDuringRegister": "このサーバーの登録中に、サインイン中のアカウントが変わりました。",
   "error.auth.hostCredentialUnavailable": "リモートホストの認証情報を利用できません。ホストを再登録してください。",
   "error.auth.codeNotVerified": "サインインコードを確認できませんでした。",
@@ -18,6 +20,7 @@ export const messages = {
   "error.auth.serviceTimeout": "アカウントサービスが時間内に応答しませんでした。もう一度お試しください。",
   "error.auth.serviceStatus": "アカウントサービスがエラー ({status}) を返しました。後でもう一度お試しください。",
   "error.auth.invalidHostedServer": "アカウントサービスが無効なホスト型サーバーを返しました。",
+  "error.auth.invalidServerClaim": "アカウントサービスが無効なサーバーコードを返しました。",
   "error.auth.codeNotSent": "OpenBot がサインインコードを送信できませんでした。",
   "error.auth.deliveryTimeout":
     "OpenBot が時間内に配信を確認できませんでした。コードが後で届く場合があります。再送信する前に配信を確認してください。",

@@ -1,12 +1,28 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentEvent,
-  AskSideQuestionInput,
-  AttachmentImportEvent,
-  AttachmentSummary,
-  TeamRealtimeEvent,
+import {
+  type AgentEvent,
+  type AskSideQuestionInput,
+  type AttachmentImportEvent,
+  type AttachmentSummary,
+  decodeSaveSkillSuggestionResult,
+  type SaveSkillSuggestionInput,
+  STORAGE_CAPABILITY,
+  type TeamRealtimeEvent,
+  type TestRoutineInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import {
+  decodeRoutineRunCommandResponse,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  ROUTINE_RUN_COMMAND_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -27,11 +43,21 @@ import { listInstalledSkills, type TeamApiRequest, teamAgentRoutinesApi } from "
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
+import type { SkillCatalogCalls } from "../../skills-port";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import type { FilesPort } from "../files/files-port";
+import {
+  webAgentFoldersApi,
+  webAgentInstructionsApi,
+  webAgentMemoriesApi,
+  webAgentMemoryLimit,
+  webRoutineResultsCalls,
+} from "./web-agent-settings";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import { webBrowserProfileCalls } from "./web-browser-profiles";
+import { useWebLiveVoice, webLiveVoicePort } from "./web-live-voice";
 import { webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -46,12 +72,18 @@ function webHostAdmin(
   sessionSettingsEnabled?: () => boolean,
   routineRecoveryEnabled?: () => boolean,
   webhookTestsEnabled?: () => boolean,
+  webhookSenderSecretEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
+  routinesOnceEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
     (...args) => request()(...args),
     () => routineRecoveryEnabled?.() === true,
     () => webhookTestsEnabled?.() === true,
+    () => webhookSenderSecretEnabled?.() === true,
+    () => routineRunPlaceEnabled?.() === true,
+    () => routinesOnceEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -122,7 +154,21 @@ export function createWebConversationRuntime(
   sideQuestionEnabled?: () => boolean,
   webhookTestsEnabled?: () => boolean,
   browserProfilesEnabled?: () => boolean,
+  webhookSenderSecretEnabled?: () => boolean,
+  browserProxiesEnabled?: () => boolean,
+  routineRunPlaceEnabled?: () => boolean,
+  skillLearningEnabled?: () => boolean,
+  /** Whether the connected host advertises the capability. */
+  hasCapability?: (capability: string) => boolean,
+  /** Whether the connected host advertises the capability and this user is its owner or admin. */
+  canAdminister?: (capability: string) => boolean,
+  /** The storage calls of the connected host, which Server settings > Storage also uses. */
+  storageCalls?: () => FilesPort,
+  /** The marketplace skills catalog of the account service that serves this page. */
+  skillCatalog?: () => SkillCatalogCalls,
 ): ConversationRuntime {
+  const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
+  const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote, hostId);
   let importing: { cancelled: boolean; serverId: string } | undefined;
@@ -140,6 +186,7 @@ export function createWebConversationRuntime(
     }
   }
   async function cancelImportFiles() {
+    cancelGeneration += 1;
     if (!importing) return;
     importing.cancelled = true;
     try {
@@ -173,6 +220,75 @@ export function createWebConversationRuntime(
     await discard();
     return null;
   }
+  // The files and host of each failed import, for Retry, until the composer removes the chip.
+  const failedImports = new Map<string, { serverId: string; files: readonly File[] }>();
+  // Cancel upload adds one. A pick stops its files that did not start when the value is not the one
+  // it saw at its start, so a later pick cannot hide the earlier one from Cancel.
+  let cancelGeneration = 0;
+  // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
+  // files: it has no chips, and the banner says why it failed.
+  const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
+    emit({
+      type: "started",
+      serverId,
+      requestId,
+      files: retryable ? files.map((file) => ({ name: file.name, size: file.size })) : [],
+    });
+  /**
+   * Each file is its own import, as on desktop, so a failed file does not drop the others. They go
+   * one after another, because the web client uploads one file at a time.
+   */
+  async function importPick(files: readonly File[]) {
+    // The pick belongs to the host on screen now. After a host change, its other files go nowhere.
+    const serverId = hostId();
+    if (files.length > INPUT_LIMITS.attachments) {
+      const requestId = crypto.randomUUID();
+      announceImport(requestId, serverId, files, false);
+      await runImportFiles(requestId, serverId, files, false);
+      return;
+    }
+    const generation = cancelGeneration;
+    const imports = files.map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
+    for (const item of imports) announceImport(item.requestId, serverId, item.files, true);
+    for (const item of imports) {
+      if (generation !== cancelGeneration || hostId() !== serverId)
+        emit({ type: "completed", serverId, requestId: item.requestId, attachments: [] });
+      else await runImportFiles(item.requestId, serverId, item.files, true);
+    }
+  }
+  // `uploadFiles` stops when the host is no longer `serverId`, and the import then lands nowhere.
+  async function runImportFiles(requestId: string, serverId: string, files: readonly File[], retryable: boolean) {
+    failedImports.delete(requestId);
+    if (importBusy) {
+      if (retryable) failedImports.set(requestId, { serverId, files });
+      emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
+      return;
+    }
+    await runImport(async () => {
+      const job = { cancelled: false, serverId };
+      importing = job;
+      try {
+        if (files.length > INPUT_LIMITS.attachments)
+          throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+        const attachments = await uploadFiles(files, serverId, () => job.cancelled);
+        emit({ type: "completed", serverId, requestId, attachments: attachments ?? [] });
+      } catch (error) {
+        if (job.cancelled) {
+          emit({ type: "completed", serverId, requestId, attachments: [] });
+          return;
+        }
+        if (retryable) failedImports.set(requestId, { serverId, files });
+        emit({
+          type: "error",
+          serverId,
+          requestId,
+          message: error instanceof Error ? error.message : currentText().t("webClient.error.fileTransfer"),
+        });
+      } finally {
+        importing = undefined;
+      }
+    });
+  }
   const unavailable = async (): Promise<never> => {
     throw new Error(currentText().t("webClient.error.desktopOnly"));
   };
@@ -186,8 +302,18 @@ export function createWebConversationRuntime(
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
+  const browserProfiles = adminRequest
+    ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
+    : undefined;
   const listLevels = remote.listAgentNotificationLevels;
+  const agentMemories = adminRequest
+    ? webAgentMemoriesApi(adminRequest, onHostEvent, (capability) => hasCapability?.(capability) === true)
+    : undefined;
+  const agentFolders = adminRequest ? webAgentFoldersApi(adminRequest) : undefined;
+  const agentInstructions = adminRequest ? webAgentInstructionsApi(adminRequest) : undefined;
+  const routineResults = adminRequest ? webRoutineResultsCalls(adminRequest) : undefined;
+  const agentMemoryLimit = adminRequest ? webAgentMemoryLimit(adminRequest) : undefined;
+  const administers = (capability: string) => canAdminister?.(capability) === true;
   return {
     agent: {
       ...messageLinks,
@@ -240,6 +366,15 @@ export function createWebConversationRuntime(
           listeners.delete(listener);
         };
       },
+      retryAttachmentImport(requestId) {
+        const failed = failedImports.get(requestId);
+        if (!failed) return;
+        announceImport(requestId, failed.serverId, failed.files, true);
+        void runImportFiles(requestId, failed.serverId, failed.files, true);
+      },
+      discardAttachmentImport(requestId) {
+        failedImports.delete(requestId);
+      },
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
       // The browser has no app to open a host file in, so it downloads.
       openSharedFile: ({ path }) => files.saveShared(path),
@@ -262,6 +397,8 @@ export function createWebConversationRuntime(
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
+      startTeach: (tabId) => remote.startBrowserTeach(tabId),
+      stopTeach: (input) => remote.stopBrowserTeach(input),
       setVisible: async () => {},
     },
     voice: {
@@ -277,6 +414,15 @@ export function createWebConversationRuntime(
       onStreamTranscript: () => () => {},
     },
     openUrl: openWebLink,
+    // Any member who can chat with the agent can talk to it, so the request is not limited to an admin.
+    get liveVoice() {
+      if (!adminRequest || !onHostEvent || hasCapability?.(LIVE_VOICE_CAPABILITY) !== true || !webLiveVoice())
+        return undefined;
+      return webLiveVoicePort(adminRequest, onHostEvent);
+    },
+    get skillCatalog() {
+      return skillCatalog?.();
+    },
     // Any member can ask, so the request is not limited to an admin.
     get askSideQuestion() {
       if (!adminRequest || sideQuestionEnabled?.() !== true) return undefined;
@@ -288,6 +434,41 @@ export function createWebConversationRuntime(
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
     },
+    // A member who can chat with the agent can press Save; the host checks the level.
+    get saveSkillSuggestion() {
+      if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
+      return async (input: SaveSkillSuggestionInput) =>
+        adminRequest()("POST", SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
+        });
+    },
+    agentMemories,
+    get agentFolders() {
+      return administers(AGENT_FOLDERS_CAPABILITY) ? agentFolders : undefined;
+    },
+    get agentInstructions() {
+      return administers(AGENT_INSTRUCTIONS_CAPABILITY) ? agentInstructions : undefined;
+    },
+    get routineResultCalls() {
+      return administers(ROUTINE_RESULTS_CAPABILITY) ? routineResults : undefined;
+    },
+    // The command runs in a shell on the host, so the host gives it to an owner or admin only.
+    get routineRunCommand() {
+      if (!adminRequest || !administers(ROUTINE_RUN_COMMAND_CAPABILITY)) return undefined;
+      return async (input: TestRoutineInput) =>
+        adminRequest()("POST", ROUTINE_RUN_COMMAND_ROUTES.command, decodeRoutineRunCommandResponse, {
+          agentId: input.agentId,
+          routineId: input.routineId,
+        });
+    },
+    get agentMemoryLimit() {
+      return administers(AGENT_MEMORY_LIMIT_CAPABILITY) ? agentMemoryLimit : undefined;
+    },
+    // Every member reads the files; the host lets only an owner or admin delete them.
+    get storageCalls() {
+      return hasCapability?.(STORAGE_CAPABILITY) === true ? storageCalls?.() : undefined;
+    },
     // Any member keeps an own level for each agent. The panel asks only a host with the capability.
     agentNotificationLevels: listLevels ? { list: () => listLevels(hostId()) } : undefined,
     // Any member reads the tab labels; the panels offer the other calls to an owner or admin only.
@@ -298,44 +479,17 @@ export function createWebConversationRuntime(
     attachmentMedia,
     visualPage: files.visualPage,
     async importFiles(files) {
-      if (files.length === 0) return;
-      const serverId = hostId();
-      const requestId = crypto.randomUUID();
-      // `started` names the chat on screen, so it comes before any wait.
-      emit({ type: "started", serverId, requestId });
-      if (importBusy) {
-        emit({ type: "error", serverId, requestId, message: currentText().t("error.remote.attachmentBusy") });
-        return;
-      }
-      await runImport(async () => {
-        const job = { cancelled: false, serverId };
-        importing = job;
-        try {
-          if (files.length > INPUT_LIMITS.attachments)
-            throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
-          const attachments = await uploadFiles(files, serverId, () => job.cancelled);
-          emit({ type: "completed", serverId, requestId, attachments: attachments ?? [] });
-        } catch (error) {
-          if (job.cancelled) {
-            emit({ type: "completed", serverId, requestId, attachments: [] });
-            return;
-          }
-          emit({
-            type: "error",
-            serverId,
-            requestId,
-            message: error instanceof Error ? error.message : currentText().t("webClient.error.fileTransfer"),
-          });
-        } finally {
-          importing = undefined;
-        }
-      });
+      if (files.length > 0) await importPick(files);
     },
     cancelImportFiles,
     // `request()` names the connected host at call time, so a host switch reaches the new host.
     routines: adminRequest
       ? {
-          ...teamAgentRoutinesApi((...args) => adminRequest()(...args)),
+          ...teamAgentRoutinesApi(
+            (...args) => adminRequest()(...args),
+            () => routineRunPlaceEnabled?.() === true,
+            routinesOnceEnabled,
+          ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
               if (event.type === "routines-changed") listener(event);
@@ -350,6 +504,9 @@ export function createWebConversationRuntime(
           sessionSettingsEnabled,
           routineRecoveryEnabled,
           webhookTestsEnabled,
+          webhookSenderSecretEnabled,
+          routineRunPlaceEnabled,
+          routinesOnceEnabled,
         )
       : undefined,
   };

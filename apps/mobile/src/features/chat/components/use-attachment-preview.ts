@@ -1,14 +1,38 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
 import { useState } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { attachmentCodeLanguage, attachmentPreviewKind, PREVIEW_TEXT_LIMIT } from "../model/attachment-file-preview";
+import {
+  type AttachmentPreviewKind,
+  attachmentCodeLanguage,
+  attachmentPreviewKind,
+  PREVIEW_TEXT_LIMIT,
+} from "../model/attachment-file-preview";
 import { type CodePreviewEntry, storeCodePreview } from "../model/code-preview-store";
+import { useAttachmentDownload } from "../model/large-files";
 import { useMediaFile } from "./use-media-file";
+
+/** Opens a file on this phone on the preview screen. The text of a text file is read first. */
+export async function openFilePreview(
+  kind: AttachmentPreviewKind,
+  file: { uri: string; name: string; mimeType: string },
+) {
+  const entry: CodePreviewEntry = { kind, source: "", file };
+  if (kind === "html") {
+    entry.source = await new File(file.uri).text();
+    entry.language = "html";
+  } else if (kind === "markdown" || kind === "text") {
+    const text = await new File(file.uri).text();
+    entry.source = text.slice(0, PREVIEW_TEXT_LIMIT);
+    entry.truncated = text.length > PREVIEW_TEXT_LIMIT;
+    entry.language = kind === "markdown" ? "markdown" : attachmentCodeLanguage(file.name);
+  }
+  const previewId = storeCodePreview(entry);
+  router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+}
 
 /**
  * Opens a host file on the preview screen, as the desktop file panel shows it. The file downloads
@@ -17,7 +41,9 @@ import { useMediaFile } from "./use-media-file";
  */
 export function useAttachmentPreview(serverId: string, attachment: AttachmentSummary) {
   const { t, sourceText } = useText();
-  const kind = attachment.size > MOBILE_ATTACHMENT_BYTES ? null : attachmentPreviewKind(attachment);
+  // A file above the host's limit has no preview. A large file within it previews after a tap.
+  const kind =
+    useAttachmentDownload(serverId, attachment).download === "desktop" ? null : attachmentPreviewKind(attachment);
   const file = useMediaFile(serverId, attachment, false);
   const [opening, setOpening] = useState(false);
 
@@ -28,19 +54,7 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
       const result = file.data ? { data: file.data, error: null } : await file.refetch();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
-      const local = { uri: result.data, name: attachment.name, mimeType: attachment.mimeType };
-      const entry: CodePreviewEntry = { kind, source: "", file: local };
-      if (kind === "html") {
-        entry.source = await new File(result.data).text();
-        entry.language = "html";
-      } else if (kind === "markdown" || kind === "text") {
-        const text = await new File(result.data).text();
-        entry.source = text.slice(0, PREVIEW_TEXT_LIMIT);
-        entry.truncated = text.length > PREVIEW_TEXT_LIMIT;
-        entry.language = kind === "markdown" ? "markdown" : attachmentCodeLanguage(attachment.name);
-      }
-      const previewId = storeCodePreview(entry);
-      router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+      await openFilePreview(kind, { uri: result.data, name: attachment.name, mimeType: attachment.mimeType });
     } catch (error) {
       void haptics.notification("error");
       showFailureAlert(

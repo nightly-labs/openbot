@@ -27,3 +27,8 @@
   height: var(--openbot-icon-sm);
   flex: none;
 }
+
+/* Back and forward follow the reading direction. */
+.sidebar-history-button > svg:dir(rtl) {
+  transform: scaleX(-1);
+}

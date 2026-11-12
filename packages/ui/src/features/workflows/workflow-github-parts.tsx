@@ -18,6 +18,8 @@ import {
   type WorkflowGitHubItem,
   type WorkflowGitHubSkipReason,
   workflowGitHubEventItemKind,
+  workflowGitHubTriggerRepositories,
+  workflowGitHubTriggerRepositoryFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -55,11 +57,11 @@ import {
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { GitHubMark } from "../settings/brand-marks";
 import { GitHubConnectDialog } from "../settings/GitHubConnectorPanel";
-import { PickerActions, type PickerChip, type PickerGroup } from "./WorkflowPicker";
+import { PickerActions, PickerChecks, type PickerChip, type PickerGroup } from "./WorkflowPicker";
 import { useBoard } from "./workflow-board";
 import { githubRepository, type WorkflowGitHubCanvas } from "./workflow-github";
 import { asString, type Choice, oneOf, useField, useTextField } from "./workflow-node-parts";
@@ -219,24 +221,36 @@ function accessProblem(
   return undefined;
 }
 
-function AccessAlerts(props: { github: WorkflowGitHubCanvas; repository: string; write: boolean; events: boolean }) {
+const ACCESS_ALERT = {
+  missing: "workflow.github.alert.missing",
+  readOnly: "workflow.github.alert.readOnly",
+  eventsOff: "workflow.github.alert.eventsOff",
+} as const satisfies Record<AccessProblem, string>;
+
+/** One alert for each repository that stops the step, and one button: one page on GitHub fixes them all. */
+function AccessAlerts(props: {
+  github: WorkflowGitHubCanvas;
+  repositories: readonly string[];
+  write: boolean;
+  events: boolean;
+}) {
   const { t } = useText();
-  const problem = () => accessProblem(props.github, props.repository, { write: props.write, events: props.events });
+  const problems = () =>
+    props.repositories.flatMap((repository) => {
+      const problem = accessProblem(props.github, repository, { write: props.write, events: props.events });
+      return problem ? [{ repository, problem }] : [];
+    });
+  const buttonLabel = () =>
+    problems().some((entry) => entry.problem === "missing")
+      ? t("connector.github.chooseRepositories")
+      : t("connector.github.openGitHub");
   return (
-    <>
-      <Show when={problem() === "missing"}>
-        <Warning>{t("workflow.github.alert.missing", { repository: props.repository })}</Warning>
-        <OpenGitHubButton github={props.github} label={t("connector.github.chooseRepositories")} />
-      </Show>
-      <Show when={problem() === "readOnly"}>
-        <Warning>{t("workflow.github.alert.readOnly", { repository: props.repository })}</Warning>
-        <OpenGitHubButton github={props.github} label={t("connector.github.openGitHub")} />
-      </Show>
-      <Show when={problem() === "eventsOff"}>
-        <Warning>{t("workflow.github.alert.eventsOff", { repository: props.repository })}</Warning>
-        <OpenGitHubButton github={props.github} label={t("connector.github.openGitHub")} />
-      </Show>
-    </>
+    <Show when={problems().length > 0}>
+      <For each={problems()}>
+        {(entry) => <Warning>{t(ACCESS_ALERT[entry.problem], { repository: entry.repository })}</Warning>}
+      </For>
+      <OpenGitHubButton github={props.github} label={buttonLabel()} />
+    </Show>
   );
 }
 
@@ -270,19 +284,26 @@ function useRepositoryChoices() {
   };
 }
 
-/** The labels and people of a repository, as the host reads them. */
-function useRepositoryOptions(repository: () => string) {
+/** The labels and people of the repositories, as the host reads them. A name in more than one shows once. */
+function useRepositoryOptions(repositories: () => readonly string[]) {
   const board = useBoard();
-  const options = () => {
-    const name = repository();
-    return name ? board.github()?.options(name) : undefined;
-  };
+  const all = createMemo(() => repositories().map((name) => board.github()?.options(name)));
+  /** The labels by their name in lower case. */
+  const labels = createMemo(() => {
+    const byKey = new Map<string, { name: string; color: string }>();
+    for (const options of all())
+      for (const label of options?.labels ?? []) {
+        const key = label.name.toLowerCase();
+        if (!byKey.has(key)) byKey.set(key, label);
+      }
+    return byKey;
+  });
   return {
-    labels: () => options()?.labels.map((label) => label.name) ?? [],
-    tone: (name: string) => labelTone(options()?.labels.find((label) => label.name === name)?.color),
-    people: () => options()?.people ?? [],
+    labels: () => [...labels().values()].map((label) => label.name),
+    tone: (name: string) => labelTone(labels().get(name.toLowerCase())?.color),
+    people: () => [...new Set(all().flatMap((options) => options?.people ?? []))],
     /** The host still reads them. */
-    loading: () => Boolean(repository()) && options() === undefined,
+    loading: () => all().some((options) => options === undefined),
   };
 }
 
@@ -291,6 +312,111 @@ const withValues = (options: readonly string[], values: readonly string[]) => [
   ...values.filter((value) => !options.includes(value)),
   ...options,
 ];
+
+const sameNames = (before: readonly string[], after: readonly string[]) =>
+  before.length === after.length && before.every((name, index) => name === after[index]);
+const repositoryOwner = (fullName: string) => fullName.slice(0, Math.max(fullName.indexOf("/"), 0));
+const repositoryName = (fullName: string) => fullName.slice(fullName.indexOf("/") + 1);
+
+/**
+ * The repositories of a trigger. One reads as a choice row; more show as tags, and a tag of a repository
+ * that sends no events has the warning tone. The menu groups the repositories by owner and stays open.
+ */
+function RepositoriesRow(props: {
+  github: WorkflowGitHubCanvas | undefined;
+  values: readonly string[];
+  disabled: boolean;
+  onChange: (values: readonly string[]) => void;
+}) {
+  const { t } = useText();
+  const name = () => (props.values.length > 1 ? t("workflow.github.repositories") : t("workflow.github.repository"));
+  const entry = (fullName: string) => githubRepository(props.github, fullName);
+  const noEvents = (fullName: string) => entry(fullName)?.events === false;
+  const icon = (fullName: string) => (entry(fullName)?.private ? <Lock aria-hidden="true" /> : <GitHubIcon />);
+  /** The values as the catalog spells them, so each one checks its row. */
+  const values = () => props.values.map((fullName) => entry(fullName)?.fullName ?? fullName);
+  const chips = (fullName: string): PickerChip[] => [
+    ...(entry(fullName)?.private ? [{ text: t("connector.github.private") }] : []),
+    ...(noEvents(fullName)
+      ? [{ icon: () => <TriangleAlert aria-hidden="true" />, text: t("workflow.github.noEvents") }]
+      : []),
+  ];
+  // A repository that the App no longer reaches stays in the list, so the user can turn it off. The rows
+  // change only when the catalog or these names change: a check keeps its row and the keyboard focus.
+  const unknown = createMemo(() => props.values.filter((fullName) => !entry(fullName)), { equals: sameNames });
+  const groups = createMemo((): PickerGroup<string>[] => {
+    const known = props.github?.catalog()?.repositories.map((repository) => repository.fullName) ?? [];
+    const names = [...unknown(), ...known];
+    return [...new Set(names.map(repositoryOwner))].map((owner) => ({
+      label: owner,
+      options: names
+        .filter((fullName) => repositoryOwner(fullName) === owner)
+        .map((fullName) => ({
+          value: fullName,
+          label: repositoryName(fullName),
+          searchText: fullName,
+          tile: () => icon(fullName),
+          chips: chips(fullName),
+        })),
+    }));
+  });
+  const shown = () => (props.values.length > 0 ? props.values.join(", ") : t("workflow.github.chooseRepository"));
+  const single = () => (props.values.length === 1 ? props.values[0] : undefined);
+  return (
+    <DropdownMenu.Root placement="bottom-start" gutter={6} sameWidth>
+      <DropdownMenu.Trigger
+        class="wfn-row"
+        aria-label={t("workflow.node.choice", { name: name(), value: shown() })}
+        disabled={props.disabled}
+      >
+        <span class="wfn-row-name">{name()}</span>
+        <Show
+          when={props.values.length > 0}
+          fallback={
+            <span class="wfn-row-value" data-empty="">
+              {t("workflow.github.chooseRepository")}
+            </span>
+          }
+        >
+          <Show
+            when={single()}
+            fallback={
+              <span class="wfn-row-value">
+                <For each={props.values}>
+                  {(fullName) => (
+                    <span class="wfn-tag" data-warning={noEvents(fullName) ? "" : undefined} title={fullName}>
+                      <Show when={noEvents(fullName)}>
+                        <TriangleAlert aria-hidden="true" />
+                      </Show>
+                      <span class="wfn-tag-text">{repositoryName(fullName)}</span>
+                    </span>
+                  )}
+                </For>
+              </span>
+            }
+          >
+            {(fullName) => (
+              <span class="wfn-row-value">
+                {icon(fullName())}
+                <span class="wfn-row-text">{fullName()}</span>
+              </span>
+            )}
+          </Show>
+        </Show>
+        <ChevronDown class="wfn-row-arrow" aria-hidden="true" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <PickerChecks
+          label={name()}
+          groups={groups()}
+          values={values()}
+          search={t("workflow.github.searchRepositories")}
+          onChange={props.onChange}
+        />
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
 
 /* ------------------------------------------------------------- Trigger */
 
@@ -301,6 +427,9 @@ export const GITHUB_TRIGGER_DEFAULTS = { event: "issue.opened", filters: "notBot
 function useGitHubTrigger(id: () => string) {
   const board = useBoard();
   const [repository] = useField<string>(id, "repository", "", asString);
+  const [storedRepositories] = useField<string>(id, "repositories", "", asString);
+  const repositories = () =>
+    workflowGitHubTriggerRepositories({ repository: repository(), repositories: storedRepositories() });
   const [event, setEvent] = useField<WorkflowGitHubEvent>(
     id,
     "event",
@@ -317,11 +446,18 @@ function useGitHubTrigger(id: () => string) {
       (filter) => filter !== "branch" || workflowGitHubEventItemKind(event()) === "pullRequest",
     );
   const filters = () => storedFilters().filter((filter) => filterOptions().some((option) => option === filter));
-  /** Labels belong to one repository, so a new repository starts with none, in one change. */
-  const setRepository = (value: string) => board.setFields(id(), { repository: value, labels: "" });
+  /**
+   * Labels are names that the item must have. They stay while one repository of the list stays; a list
+   * with none of the old repositories starts with no labels, in one change.
+   */
+  const setRepositories = (values: readonly string[]) => {
+    const old = new Set(repositories().map((name) => name.toLowerCase()));
+    const keeps = values.some((name) => old.has(name.toLowerCase()));
+    board.setFields(id(), { ...workflowGitHubTriggerRepositoryFields(values), ...(keeps ? {} : { labels: "" }) });
+  };
   return {
-    repository,
-    setRepository,
+    repositories,
+    setRepositories,
     event,
     setEvent,
     filterOptions,
@@ -340,8 +476,7 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
   const { t } = useText();
   const board = useBoard();
   const fields = useGitHubTrigger(() => props.id);
-  const repositories = useRepositoryChoices();
-  const options = useRepositoryOptions(fields.repository);
+  const options = useRepositoryOptions(fields.repositories);
   // On "Issue labeled", the list is the labels that start a run. On other events, the item must have one of them.
   const labelsName = () =>
     fields.event() === "issue.labeled"
@@ -363,14 +498,11 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
   const hasFilter = (filter: WorkflowGitHubFilter) => fields.filters().some((value) => value === filter);
   return (
     <Connected>
-      <SettingRow
-        name={t("workflow.github.repository")}
-        value={fields.repository()}
-        placeholder={t("workflow.github.chooseRepository")}
-        search={t("workflow.github.searchRepositories")}
-        choices={repositories(fields.repository())}
+      <RepositoriesRow
+        github={board.github()}
+        values={fields.repositories()}
         disabled={props.locked}
-        onChange={fields.setRepository}
+        onChange={fields.setRepositories}
       />
       <SettingRow
         name={t("workflow.github.trigger.event")}
@@ -420,10 +552,10 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
       <Show when={board.github()}>
         {(github) => (
           <>
-            <AccessAlerts github={github()} repository={fields.repository()} write={false} events />
-            <Show when={fields.repository()}>
+            <AccessAlerts github={github()} repositories={fields.repositories()} write={false} events />
+            <Show when={fields.repositories().length > 0}>
               <SettingsFoot>
-                <EventsRow id={props.id} github={github()} />
+                <EventsRow id={props.id} github={github()} withRepository={fields.repositories().length > 1} />
               </SettingsFoot>
             </Show>
           </>
@@ -433,14 +565,16 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
   );
 }
 
-/** Whether "Run with last event" can start: GitHub is connected and the trigger can read its repository. */
+/** Whether "Run with last event" can start: GitHub is connected and the trigger can read one of its repositories. */
 export function useGitHubTriggerReady(id: () => string) {
   const board = useBoard();
   const fields = useGitHubTrigger(id);
   return () => {
     const github = board.github();
-    if (!github?.catalog()?.connected || !fields.repository()) return false;
-    return accessProblem(github, fields.repository(), { write: false, events: false }) !== "missing";
+    if (!github?.catalog()?.connected) return false;
+    return fields
+      .repositories()
+      .some((repository) => accessProblem(github, repository, { write: false, events: false }) !== "missing");
   };
 }
 
@@ -531,8 +665,12 @@ function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
     }
     return runChip(delivery.runId);
   };
-  const label = (delivery: WorkflowGitHubDelivery) =>
-    delivery.item ? `#${delivery.item.number} ${delivery.item.title}` : t("workflow.github.history.offline");
+  /** With `withRepository`, the item names its repository, as GitHub writes `name#12`. */
+  const label = (delivery: WorkflowGitHubDelivery, withRepository: boolean) => {
+    const item = delivery.item;
+    if (!item) return t("workflow.github.history.offline");
+    return `${withRepository ? repositoryName(item.repository) : ""}#${item.number} ${item.title}`;
+  };
   return { runName, clock, waitsFor, outcomeChip, label };
 }
 
@@ -540,7 +678,7 @@ function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
  * The events row at the end of a GitHub trigger: the newest event that GitHub sent, and how many wait.
  * Its menu lists each event with what it did. A run opens on the canvas; a skipped event opens on GitHub.
  */
-function EventsRow(props: { id: string; github: WorkflowGitHubCanvas }) {
+function EventsRow(props: { id: string; github: WorkflowGitHubCanvas; withRepository: boolean }) {
   const { t, format } = useText();
   const board = useBoard();
   const text = useGitHubHistory(() => props.github);
@@ -549,7 +687,7 @@ function EventsRow(props: { id: string; github: WorkflowGitHubCanvas }) {
   const waiting = () => deliveries().filter((delivery) => delivery.outcome === "waiting");
   const option = (delivery: WorkflowGitHubDelivery) => ({
     value: delivery.id,
-    label: text.label(delivery),
+    label: text.label(delivery, props.withRepository),
     tile: deliveryIcon(delivery),
     chips: [{ text: text.clock(delivery.receivedAt) }, text.outcomeChip(delivery)],
   });
@@ -579,7 +717,7 @@ function EventsRow(props: { id: string; github: WorkflowGitHubCanvas }) {
   };
   const shown = () => {
     const delivery = newest();
-    return delivery ? text.label(delivery) : t("workflow.github.history.none");
+    return delivery ? text.label(delivery, props.withRepository) : t("workflow.github.history.none");
   };
   return (
     <DropdownMenu.Root placement="bottom-start" gutter={6}>
@@ -600,7 +738,7 @@ function EventsRow(props: { id: string; github: WorkflowGitHubCanvas }) {
           {(delivery) => (
             <span class="wfn-row-value" data-one-line="">
               {deliveryIcon(delivery())()}
-              <span class="wfn-row-text">{text.label(delivery())}</span>
+              <span class="wfn-row-text">{text.label(delivery(), props.withRepository)}</span>
               <Show when={waiting().length > 0}>
                 <span class="wfn-tag">
                   {t("workflow.github.history.waitingCount", {
@@ -658,10 +796,13 @@ function useGitHubOutput(id: () => string) {
     oneOf(WORKFLOW_GITHUB_CLOSE_REASONS),
   );
   const [title, setTitle] = useTextField(id, "title", "");
-  /** The repository that the action changes. Empty when it is the trigger's and no GitHub trigger leads here. */
-  const target = () => {
+  /**
+   * The repositories that the action can change. With "trigger", it is the repository of each event, so
+   * each repository of the trigger; empty when no GitHub trigger leads here.
+   */
+  const targets = (): readonly string[] => {
     const value = repository();
-    return value === "trigger" || !value ? trigger.repository() : value;
+    return value === "trigger" || !value ? trigger.repositories() : [value];
   };
   const creates = () => action() === "issue.create";
   /** The action uses the trigger's repository or its item, but no GitHub trigger leads to it. */
@@ -678,7 +819,7 @@ function useGitHubOutput(id: () => string) {
     triggerEvent: trigger.event,
     repository,
     setRepository: chooseRepository,
-    target,
+    targets,
     item,
     setItem,
     action,
@@ -706,9 +847,12 @@ export function useGitHubOutputReady(id: () => string) {
   const fields = useGitHubOutput(id);
   return () => {
     const github = board.github();
-    if (!github?.catalog()?.connected || !fields.target()) return false;
-    const problem = accessProblem(github, fields.target(), { write: true, events: false });
-    return problem === undefined && !fields.noEvent() && !fields.pullRequestOnly();
+    const targets = fields.targets();
+    if (!github?.catalog()?.connected || targets.length === 0) return false;
+    const blocked = targets.some(
+      (repository) => accessProblem(github, repository, { write: true, events: false }) !== undefined,
+    );
+    return !blocked && !fields.noEvent() && !fields.pullRequestOnly();
   };
 }
 
@@ -717,7 +861,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   const board = useBoard();
   const fields = useGitHubOutput(() => props.id);
   const repositoryChoices = useRepositoryChoices();
-  const options = useRepositoryOptions(fields.target);
+  const options = useRepositoryOptions(fields.targets);
   const actionLabel = (action: WorkflowGitHubAction) => t(ACTION_LABEL[action]);
   const isLabels = () => fields.action() === "label.add" || fields.action() === "label.remove" || fields.creates();
   const isPerson = () => fields.action() === "assign" || fields.action() === "review.request";
@@ -850,7 +994,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
         <Warning>{t("workflow.github.alert.pullRequestOnly", { action: actionLabel(fields.action()) })}</Warning>
       </Show>
       <Show when={board.github()}>
-        {(github) => <AccessAlerts github={github()} repository={fields.target()} write events={false} />}
+        {(github) => <AccessAlerts github={github()} repositories={fields.targets()} write events={false} />}
       </Show>
     </Connected>
   );

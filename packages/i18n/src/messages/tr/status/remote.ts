@@ -47,4 +47,6 @@ export const messages = {
     one: "Yeniden bağlanılıyor {attempt}/{count}",
     other: "Yeniden bağlanılıyor {attempt}/{count}",
   },
+  "status.remote.messageCut":
+    "[Bu mesajın {size} MB'lık kısmı bu cihazda gösterilmiyor. Tamamını okumak için sunucuyu çalıştıran bilgisayarda açın.]",
 } as const satisfies PartialTranslation<typeof source>;

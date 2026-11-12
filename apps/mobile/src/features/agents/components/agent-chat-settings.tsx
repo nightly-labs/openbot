@@ -1,11 +1,13 @@
 import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
+import Bell from "lucide-react-native/icons/bell";
 import { useState } from "react";
 import { Alert } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { NOTIFICATION_LEVEL_KEYS } from "@/features/push-notifications/components/server-notification-settings";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { effectiveServerLevel, useSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { serverNotificationSetting, usePushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
@@ -35,6 +37,7 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
           : t("mobile.agent.notificationLevel.serverValue", { level: t(NOTIFICATION_LEVEL_KEYS[serverLevel]) });
   return (
     <SettingsRow
+      leading={<RowIcon icon={Bell} />}
       supportingText={value}
       onPress={() =>
         // The agent sheet shows Settings > Notifications in its own stack, not as a second sheet.
@@ -95,6 +98,51 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
       >
         <Typography.Paragraph>
           {t(starting ? "mobile.agent.newChat.starting" : "mobile.agent.newChat.title")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/**
+ * Asks the host to compact the context of the agent's chat now, as "Compact now" on desktop. The
+ * messages stay. The phone does not show the context usage, so it does not show the progress. The
+ * host refuses while the agent works or when its provider cannot compact, and its reason shows in
+ * the alert.
+ */
+export function AgentCompactSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+  const { t } = useText();
+  const { compactContext } = useMobileWorkspaceActions();
+  const [compacting, setCompacting] = useState(false);
+  // The host starts the compaction and answers; the provider finishes it later.
+  const [started, setStarted] = useState(false);
+
+  function compact(): void {
+    setCompacting(true);
+    setStarted(false);
+    compactContext(agent.id, agent.serverId)
+      .then(() => {
+        setStarted(true);
+        void haptics.notification("success");
+      })
+      .catch((cause: unknown) => {
+        void haptics.notification("error");
+        const text = currentText();
+        showFailureAlert(
+          cause,
+          "agent",
+          text.t("mobile.agent.compact.failed"),
+          text.errorMessage(cause, text.t("mobile.agent.compact.failedBody")),
+        );
+      })
+      .finally(() => setCompacting(false));
+  }
+
+  return (
+    <SettingsSection footer={t(started ? "mobile.agent.compact.started" : "mobile.agent.compact.footer")}>
+      <SettingsRow disabled={!available || compacting} onPress={compact}>
+        <Typography.Paragraph>
+          {t(compacting ? "mobile.agent.compact.compacting" : "mobile.agent.compact.title")}
         </Typography.Paragraph>
       </SettingsRow>
     </SettingsSection>

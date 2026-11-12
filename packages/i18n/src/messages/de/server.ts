@@ -123,6 +123,24 @@ export const messages = {
     "OpenBot stoppt den Server und verschiebt seine Agenten, Chats und Dateien in den Papierkorb.",
   "server.local.deleting": "Server wird gelöscht…",
   "server.local.deletedTitle": "{name} gelöscht",
+  "server.install.title": "Neuer Server auf einem anderen Computer",
+  "server.install.description":
+    "Führe diesen Befehl auf einem Linux-Computer oder VPS aus, der dir gehört. Er installiert OpenBot und fügt den Server zu diesem Konto hinzu.",
+  "server.install.making": "Befehl für dieses Konto wird erstellt…",
+  "server.install.failed": "OpenBot konnte keinen Befehl erstellen. Prüfe die Internetverbindung.",
+  "server.install.copyForAgent": "Für einen KI-Agenten kopieren",
+  "server.install.expiresIn": "Funktioniert einmal. Läuft in {time} ab.",
+  "server.install.newCommand": "Neuer Befehl",
+  "server.install.waiting": "Warte, bis der Befehl auf deinem Server läuft…",
+  "server.install.starting": "{name} ist angemeldet. Server wird gestartet…",
+  "server.install.connected": "{name} ist verbunden.",
+  "server.install.offline": "{name} ist offline.",
+  "server.install.expired": "Dieser Befehl ist abgelaufen. Erstelle einen neuen.",
+  "server.install.agentPrompt":
+    'Installiere OpenBot auf diesem Linux-Server und melde ihn bei meinem OpenBot-Konto an.\nFühre diesen Befehl als root aus. Er stellt keine Fragen und dauert einige Minuten:\n\n{command}\n\nEr endet mit der Zeile "OpenBot is connected to your account." und dem Exit-Code 0.\nDer Befehl funktioniert einmal, 15 Minuten lang. Speichere ihn nirgends.',
+  "server.install.setUpWithAgent": "Mit einem Agenten einrichten",
+  "server.install.sshAgentPrompt":
+    "Verbinde dich per SSH mit meinem Linux-Server und installiere dort OpenBot als Server.\n\nSSH-Adresse (user@host):",
   "server.add.limit.title": "Dieses Konto hat die maximale Anzahl von Servern",
   "server.add.limit.description": {
     one: "Ein Konto kann {count} kostenpflichtigen Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",
@@ -130,6 +148,13 @@ export const messages = {
       "Ein Konto kann {count} kostenpflichtige Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",
   },
   "server.add.limit.manage": "Server verwalten",
+  "server.upgrade.title": "Deinen Agenten geht der Speicherplatz aus",
+  "server.upgrade.description":
+    "Auf {server} ist nur noch wenig Speicherplatz frei. Führe ein Upgrade durch, damit deine Agenten ohne Unterbrechung weiterarbeiten.",
+  "server.upgrade.used": "{used} von {total} belegt",
+  "server.upgrade.current": "{plan} (aktuell)",
+  "server.upgrade.price": "Preis",
+  "server.upgrade.action": "Upgrade auf {plan}",
   "server.hosted.progressTitle": "{name} wird eingerichtet",
   "server.hosted.paymentTitle": "Schließe die Zahlung in deinem Browser ab",
   "server.hosted.paymentDescription": "Die Einrichtung beginnt, sobald Stripe die Zahlung bestätigt.",
@@ -301,6 +326,7 @@ export const messages = {
   "server.settings.addLogo": "Serverlogo hinzufügen",
   "server.settings.removeLogo": "Serverlogo entfernen",
   "server.settings.access": "Zugriff",
+  "server.companySignIn.desktopOnly": "Richte Single Sign-on in der OpenBot-Desktop-App ein.",
   "server.settings.publish": "Server veröffentlichen",
   "server.settings.published": "Server ist veröffentlicht",
   "server.settings.setUpDesktopTitle": "Remotedesktop einrichten",
@@ -322,6 +348,16 @@ export const messages = {
   "server.settings.memoryReviewOff": "Aus",
   "server.settings.memoryReviewTurns": { one: "Alle {count} Runde", other: "Alle {count} Runden" },
   "server.settings.memoryReviewLoadFailed": "Die Einstellung für die Erinnerungsprüfung konnte nicht geladen werden.",
+  "server.settings.skillLearning": "Fähigkeiten lernen",
+  "server.settings.skillLearningDescription": "Ob Agenten auf diesem Server das Gelernte als Fähigkeiten speichern.",
+  "server.settings.skillLearningAutomatic": "Automatisch",
+  "server.settings.skillLearningAsk": "Zuerst fragen",
+  "server.settings.skillLearningOff": "Aus",
+  "server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
   "server.settings.remoteOnline": "Der Host ist online. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.remoteOffline": "Der Host ist offline. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.reachable": "Online erreichbar. Nur eingeladene Personen können sich anmelden.",
@@ -340,7 +376,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Letzte Änderung",
   "server.settings.hostKeyChangedDescription":
     "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
-  "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
+  "server.settings.hostKeyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":
     "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",
@@ -451,8 +487,8 @@ export const messages = {
   "server.invite.revokeDescription":
     "Die Einladung funktioniert nicht mehr. Wer damit beigetreten ist, bleibt Mitglied.",
   "server.desktop.accessTitle": "Remotedesktop-Zugriff",
-  "server.desktop.gatewayDescription":
-    "Jedes aktive Servermitglied kann diesen Host steuern. Es gibt kein separates Remotedesktop-Passwort.",
+  "server.desktop.gatewayPolicyDescription":
+    "Es gibt kein separates Passwort für den Remotedesktop. Die Einstellungen unten legen fest, wer diesen Computer steuern darf.",
   "server.desktop.componentInstalled": "Host-Komponente installiert",
   "server.desktop.componentNotInstalled": "Host-Komponente nicht installiert",
   "server.desktop.sessions": "Unbeaufsichtigt: {unattended} · Aktive Sitzungen: {active}/{max}",
@@ -465,12 +501,26 @@ export const messages = {
   "server.desktop.hostOfflineDescription": "Verbinde dich erneut mit dem Host, bevor du seinen Desktop öffnest.",
   "server.desktop.hostUpdateDescription": "Aktualisiere OpenBot auf dem Host, um die Fernsteuerung zu verwenden.",
   "server.desktop.serviceAvailable": "Dienst verfügbar",
-  "server.desktop.serviceAvailableDescription": "Die WebRTC-Steuerung ist für alle aktiven Mitglieder verfügbar.",
   "server.desktop.serviceNotReady": "Dienst nicht bereit",
   "server.desktop.serviceNotReadyDescription":
     "Starte die Fernsteuerung, um Host-Komponenten und Berechtigungen zu prüfen. Der Host meldet alle Einrichtungsfehler.",
   "server.desktop.remoteControl": "Fernsteuerung",
   "server.desktop.startHint": "Starte die Fernsteuerung über die Monitor-Schaltfläche in der Server-Kopfzeile.",
+  "server.desktop.accessLabel": "Wer diesen Computer steuern darf",
+  "server.desktop.accessDescription":
+    "Die Mitglieder, die den Desktop dieses Computers von einem anderen Gerät aus öffnen können.",
+  "server.desktop.accessOwner": "Nur der Eigentümer",
+  "server.desktop.accessAdmins": "Eigentümer und Administratoren",
+  "server.desktop.accessMembers": "Alle Mitglieder",
+  "server.desktop.askLabel": "Auf diesem Computer fragen",
+  "server.desktop.askDescription":
+    "Jede Sitzung wartet, bis eine Person an diesem Computer sie erlaubt. Ohne Antwort innerhalb von 30 Sekunden lehnt OpenBot sie ab.",
+  "server.desktop.activeTitle": "Aktive Remotedesktop-Sitzungen: {active}",
+  "server.desktop.activeDescription": "Beendet jede Sitzung sofort. Mitglieder können erneut fragen.",
+  "server.desktop.stopAll": "Alle Fernsteuerungen beenden",
+  "server.desktop.policyLoadFailed": "Die Einstellungen der Fernsteuerung konnten nicht geladen werden.",
+  "server.desktop.policySaveFailed": "Die Einstellungen der Fernsteuerung konnten nicht gespeichert werden.",
+  "server.desktop.stopFailed": "Die Fernsteuerung konnte nicht beendet werden.",
   "server.settings.providersTitle": "Anbieter",
   "server.settings.providersDescription": "Verwalte die KI-Anbieter des Computers, auf dem dieser Server läuft.",
   "server.settings.providersSwitchNote": "Wechsle zu {name}, um seine KI-Anbieter zu verwalten.",
@@ -594,4 +644,12 @@ export const messages = {
   "server.restartNotice.restartingDescription":
     "OpenBot verbindet sich automatisch erneut, sobald {name} wieder verfügbar ist.",
   "server.restartNotice.backTitle": "{name} ist wieder online",
+  "server.settings.personalityTitle": "Persönlichkeit",
+  "server.settings.personalityDescription": "Lege fest, wie die Agenten auf diesem Server mit dir sprechen.",
+  "server.settings.responseStyle": "Antwortstil",
+  "server.settings.responseStyleDescription":
+    "Natürlich: Agenten senden während der Arbeit kurze Updates, und der Chat zeigt sie. Klassisch: Agenten antworten einmal, wenn sie fertig sind.",
+  "server.settings.responseStyleNatural": "Natürlich",
+  "server.settings.responseStyleClassic": "Klassisch",
+  "server.settings.personalityLoadFailed": "Die Persönlichkeit des Servers konnte nicht geladen werden.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -20,6 +20,8 @@ export const messages = {
   "usage.column.tokens": "Token",
   "usage.column.date": "日期",
   "usage.column.costUsd": "费用 · USD",
+  "usage.column.loads": "加载次数",
+  "usage.column.agents": "助手",
   "usage.empty": "该时间范围内没有用量记录。",
   "usage.partial":
     "部分数据 · {turns} 轮对话没有用量记录；{unpriced} 条记录没有费用估算；{incomplete} 条记录的 token 数据不完整。",
@@ -47,9 +49,12 @@ export const messages = {
   "usage.breakdown.model": "模型",
   "usage.breakdown.agent": "助手",
   "usage.breakdown.day": "日期",
+  "usage.breakdown.skill": "技能",
   "usage.breakdown.byModel": "按模型统计",
   "usage.breakdown.byAgent": "按助手统计",
   "usage.breakdown.byDay": "每日用量与费用",
+  "usage.breakdown.bySkill": "按技能统计",
+  "usage.breakdown.skillEmpty": "此期间没有加载技能。",
   "usage.unknownModel": "未知模型",
   "usage.footer": "采集开始于 {started} · 更新于 {updated}",
   "usage.updatedNever": "从未",
@@ -69,4 +74,6 @@ export const messages = {
   "usage.panel.loading": "正在加载用量…",
   "usage.panel.unsupported": "这台主机不支持助手分析，请更新主机以使用该视图。",
   "usage.panel.loadFailed": "无法加载用量，请检查连接和日期范围。",
+  "usage.machine.label": "机器使用情况。CPU：{cpu}，内存：{memory}",
+  "usage.machine.openStorage": "打开存储。磁盘：{percent}，{detail}",
 } as const satisfies PartialTranslation<typeof source>;

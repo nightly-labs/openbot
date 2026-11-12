@@ -90,34 +90,73 @@ private let parakeetFiles = (
   tokens: "tokens.txt"
 )
 
-/// Parakeet TDT 0.6B v3 in sherpa-onnx: the speech recognizer of desktop. It finds the spoken
-/// language itself. Only the recognition queue uses it.
-private final class ParakeetRecognizer {
+/// The files of the Qwen3-ASR 0.6B export, as `@openbot/contracts/speech-models` downloads them. The
+/// tokenizer files are in the model directory itself.
+private let qwen3AsrFiles = (
+  convFrontend: "conv_frontend.onnx",
+  encoder: "encoder.int8.onnx",
+  decoder: "decoder.int8.onnx"
+)
+
+/// A speech model of the phone in sherpa-onnx. Parakeet TDT 0.6B v3 is the speech recognizer of
+/// desktop; Qwen3-ASR 0.6B also hears Chinese mixed with English. Both find the spoken language
+/// themselves. Only the recognition queue uses it.
+private final class OfflineSpeechRecognizer {
+  enum Model {
+    case parakeet
+    case qwen3Asr
+  }
+
   let directory: String
+  let model: Model
   let recognizer: OpaquePointer
 
-  init(directory: String, threads: Int) throws {
+  init(directory: String, model: Model, threads: Int) throws {
     let file = { (name: String) in strdup((directory as NSString).appendingPathComponent(name)) }
-    let strings = [
-      file(parakeetFiles.encoder), file(parakeetFiles.decoder), file(parakeetFiles.joiner), file(parakeetFiles.tokens),
-      strdup("cpu"), strdup("nemo_transducer"), strdup("greedy_search"),
-    ]
-    defer { strings.forEach { free($0) } }
     var config = SherpaOnnxOfflineRecognizerConfig()
     config.feat_config.sample_rate = Int32(captureSampleRate)
     config.feat_config.feature_dim = 80
-    config.model_config.transducer.encoder = UnsafePointer(strings[0])
-    config.model_config.transducer.decoder = UnsafePointer(strings[1])
-    config.model_config.transducer.joiner = UnsafePointer(strings[2])
-    config.model_config.tokens = UnsafePointer(strings[3])
-    config.model_config.provider = UnsafePointer(strings[4])
-    config.model_config.model_type = UnsafePointer(strings[5])
     config.model_config.num_threads = Int32(threads)
     config.model_config.debug = 0
-    config.decoding_method = UnsafePointer(strings[6])
-    config.max_active_paths = 4
+    let strings: [UnsafeMutablePointer<CChar>?]
+    switch model {
+    case .parakeet:
+      strings = [
+        file(parakeetFiles.encoder), file(parakeetFiles.decoder), file(parakeetFiles.joiner), file(parakeetFiles.tokens),
+        strdup("cpu"), strdup("nemo_transducer"), strdup("greedy_search"),
+      ]
+      config.model_config.transducer.encoder = UnsafePointer(strings[0])
+      config.model_config.transducer.decoder = UnsafePointer(strings[1])
+      config.model_config.transducer.joiner = UnsafePointer(strings[2])
+      config.model_config.tokens = UnsafePointer(strings[3])
+      config.model_config.provider = UnsafePointer(strings[4])
+      config.model_config.model_type = UnsafePointer(strings[5])
+      config.decoding_method = UnsafePointer(strings[6])
+      config.max_active_paths = 4
+    case .qwen3Asr:
+      strings = [
+        file(qwen3AsrFiles.convFrontend), file(qwen3AsrFiles.encoder), file(qwen3AsrFiles.decoder), strdup(directory),
+        strdup("cpu"), strdup(""), strdup("greedy_search"),
+      ]
+      config.model_config.qwen3_asr.conv_frontend = UnsafePointer(strings[0])
+      config.model_config.qwen3_asr.encoder = UnsafePointer(strings[1])
+      config.model_config.qwen3_asr.decoder = UnsafePointer(strings[2])
+      config.model_config.qwen3_asr.tokenizer = UnsafePointer(strings[3])
+      // The export holds 512 positions: a segment of 25 s takes about 330 of them, and its words fit
+      // in the rest.
+      config.model_config.qwen3_asr.max_total_len = 512
+      config.model_config.qwen3_asr.max_new_tokens = 256
+      config.model_config.qwen3_asr.temperature = 1e-6
+      config.model_config.qwen3_asr.top_p = 0.8
+      config.model_config.qwen3_asr.seed = 42
+      config.model_config.qwen3_asr.hotwords = UnsafePointer(strings[5])
+      config.model_config.provider = UnsafePointer(strings[4])
+      config.decoding_method = UnsafePointer(strings[6])
+    }
+    defer { strings.forEach { free($0) } }
     guard let recognizer = SherpaOnnxCreateOfflineRecognizer(&config) else { throw SpeechError.modelLoadFailed }
     self.directory = directory
+    self.model = model
     self.recognizer = recognizer
   }
 
@@ -176,13 +215,15 @@ private let leadingSilenceSamples = 4_800
 private let interimFrames = 10
 
 /// The microphone, converted to 16 kHz mono. In `transcribe` mode it cuts the speech into segments
-/// at the user's pauses and recognizes each one with Parakeet; in `stream` mode it sends the audio.
+/// at the user's pauses and recognizes each one with the loaded recognizer; in `stream` mode it sends the audio.
 private final class SpeechCapture {
   let queue = DispatchQueue(label: "run.openbot.speech.capture", qos: .userInitiated)
-  /// Its own engine: the playback engine changes its configuration when a reply starts.
-  let engine = AVAudioEngine()
+  /// Its own engine: the playback engine changes its configuration when a reply starts. Each capture
+  /// makes a new one. An engine keeps the microphone format of the route it first saw, and a reply
+  /// or a new route between two captures changes that format: the old engine then cannot start.
+  /// Only `queue` reads and writes it.
+  private(set) var engine = AVAudioEngine()
   private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: captureSampleRate, channels: 1, interleaved: false)!
-  private var converter: AVAudioConverter?
   private var meter = LoudnessMeter()
   private var pending: [Float] = []
   private var segment: [Float] = []
@@ -196,10 +237,10 @@ private final class SpeechCapture {
   private(set) var mode: String?
 
   private let recognition: DispatchQueue
-  private let recognizer: () -> ParakeetRecognizer?
+  private let recognizer: () -> OfflineSpeechRecognizer?
   private let send: (String, [String: Any]) -> Void
 
-  init(recognition: DispatchQueue, recognizer: @escaping () -> ParakeetRecognizer?, send: @escaping (String, [String: Any]) -> Void) {
+  init(recognition: DispatchQueue, recognizer: @escaping () -> OfflineSpeechRecognizer?, send: @escaping (String, [String: Any]) -> Void) {
     self.recognition = recognition
     self.recognizer = recognizer
     self.send = send
@@ -216,18 +257,27 @@ private final class SpeechCapture {
     guard audio.recordPermission == .granted else { throw CaptureError.permission }
     try audio.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
     try audio.setActive(true)
+    allowHapticsWhileRecording()
+    engine = AVAudioEngine()
     let input = engine.inputNode
-    let format = input.outputFormat(forBus: 0)
-    guard format.sampleRate > 0, format.channelCount > 0, let converter = AVAudioConverter(from: format, to: target) else {
-      throw CaptureError.noMicrophone
-    }
-    self.converter = converter
+    let hardware = input.inputFormat(forBus: 0)
+    guard hardware.sampleRate > 0, hardware.channelCount > 0 else { throw CaptureError.noMicrophone }
     let own = session
-    input.installTap(onBus: 0, bufferSize: 4_096, format: format) { [weak self] buffer, _ in
-      guard let self, let samples = self.convert(buffer) else { return }
-      self.queue.async {
-        guard own == self.session else { return }
-        self.receive(samples)
+    // A reply that plays, or a new route, changes the session between two captures, and the input
+    // node can still report the format of the route before. A tap with a format that differs from
+    // the hardware raises an Objective-C exception. So the tap takes the format of the node itself,
+    // and the converter follows the buffers it gets. A route that changes during the start can
+    // still make the tap raise; caught, the start fails and the app continues.
+    var converter: AVAudioConverter?
+    try EXUtilities.catchException {
+      input.installTap(onBus: 0, bufferSize: 4_096, format: nil) { [weak self] buffer, _ in
+        guard let self else { return }
+        if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: self.target) }
+        guard let converter, let samples = self.convert(buffer, with: converter) else { return }
+        self.queue.async {
+          guard own == self.session else { return }
+          self.receive(samples)
+        }
       }
     }
     engine.prepare()
@@ -293,12 +343,10 @@ private final class SpeechCapture {
   private func stopEngine() {
     if engine.isRunning { engine.stop() }
     engine.inputNode.removeTap(onBus: 0)
-    converter = nil
   }
 
   /// Runs on the tap's thread, one buffer after another, so the converter keeps its state.
-  private func convert(_ buffer: AVAudioPCMBuffer) -> [Float]? {
-    guard let converter else { return nil }
+  private func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter) -> [Float]? {
     let capacity = AVAudioFrameCount(Double(buffer.frameLength) * captureSampleRate / buffer.format.sampleRate) + 1
     guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return nil }
     var consumed = false
@@ -410,6 +458,8 @@ private enum CaptureError: Error {
 private final class SpeechPlayer {
   private let engine = AVAudioEngine()
   private let node = AVAudioPlayerNode()
+  /// Changes the speed of the parts and keeps their pitch.
+  private let timePitch = AVAudioUnitTimePitch()
   private var format: AVAudioFormat?
   /// The parts that are scheduled, in order. The first one plays.
   private var scheduled: [String] = []
@@ -421,6 +471,12 @@ private final class SpeechPlayer {
     self.onStart = onStart
     self.onDone = onDone
     engine.attach(node)
+    engine.attach(timePitch)
+  }
+
+  /// Runs on `queue`. Applies at once, also to the part that plays now.
+  func setSpeed(_ speed: Float) {
+    timePitch.rate = speed
   }
 
   /// Runs on `queue`. A part of a stopped reply is dropped by its caller.
@@ -467,14 +523,19 @@ private final class SpeechPlayer {
       // A new sample rate, such as a reply of the other voice engine, needs a new connection.
       node.stop()
       engine.disconnectNodeOutput(node)
-      engine.connect(node, to: engine.mainMixerNode, format: format)
+      engine.disconnectNodeOutput(timePitch)
+      engine.connect(node, to: timePitch, format: format)
+      engine.connect(timePitch, to: engine.mainMixerNode, format: format)
       self.format = format
     }
     if !engine.isRunning {
       engine.prepare()
       try engine.start()
     }
-    if !node.isPlaying { node.play() }
+    // A session change, such as a capture that starts during a voice conversation, can stop the
+    // engine after the check above. The play then raises an Objective-C exception, which stops the
+    // app; caught, it fails only this part.
+    if !node.isPlaying { try EXUtilities.catchException { self.node.play() } }
   }
 }
 
@@ -482,7 +543,7 @@ public class SpeechModule: Module {
   private let synthesis = DispatchQueue(label: "run.openbot.speech.synthesis", qos: .userInitiated)
   private var voice: SupertonicVoice?
   /// Only `recognitionQueue` reads and writes it.
-  private var recognizer: ParakeetRecognizer?
+  private var recognizer: OfflineSpeechRecognizer?
   private let recognitionQueue = DispatchQueue(label: "run.openbot.speech.recognition", qos: .userInitiated)
   private var observers: [NSObjectProtocol] = []
   private lazy var capture = SpeechCapture(
@@ -497,6 +558,23 @@ public class SpeechModule: Module {
     onStart: { [weak self] id in self?.sendEvent("onSpeechStart", ["id": id]) },
     onDone: { [weak self] id in self?.sendEvent("onSpeechDone", ["id": id]) }
   )
+
+  /// Loads a recognizer on the recognition queue. The same directory and model keep the loaded one.
+  private func loadRecognizer(_ directory: URL, model: OfflineSpeechRecognizer.Model, threads: Int, promise: Promise) {
+    recognitionQueue.async {
+      if self.recognizer?.directory == directory.path && self.recognizer?.model == model {
+        promise.resolve(nil)
+        return
+      }
+      self.recognizer = nil
+      do {
+        self.recognizer = try OfflineSpeechRecognizer(directory: directory.path, model: model, threads: threads)
+        promise.resolve(nil)
+      } catch {
+        promise.reject("ERR_SPEECH_MODEL", "The speech recognition model could not load.")
+      }
+    }
+  }
 
   private func currentGeneration() -> Int {
     lock.lock()
@@ -534,9 +612,13 @@ public class SpeechModule: Module {
           let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
           if type == .began { stopped(notification) }
         },
-        // The notice can also come for the change that the start itself made; only a stopped engine ends it.
-        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: capture.engine, queue: nil) { _ in
-          capture.queue.async { if !capture.engine.isRunning { capture.fail("interrupted") } }
+        // The notice can also come for the change that the start itself made; only a stopped engine
+        // ends it. Each capture has a new engine, so the notice names the engine of the capture.
+        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { notification in
+          let changed = notification.object as AnyObject?
+          capture.queue.async {
+            if changed === capture.engine && !capture.engine.isRunning { capture.fail("interrupted") }
+          }
         },
         // About 1 GB that the next session can load again.
         center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: nil) { [weak self] _ in
@@ -552,19 +634,13 @@ public class SpeechModule: Module {
     /// Loads Parakeet from a downloaded model directory. A second call with the same directory keeps
     /// the loaded model.
     AsyncFunction("loadRecognizer") { (directory: URL, threads: Int, promise: Promise) in
-      self.recognitionQueue.async {
-        if self.recognizer?.directory == directory.path {
-          promise.resolve(nil)
-          return
-        }
-        self.recognizer = nil
-        do {
-          self.recognizer = try ParakeetRecognizer(directory: directory.path, threads: threads)
-          promise.resolve(nil)
-        } catch {
-          promise.reject("ERR_SPEECH_MODEL", "The speech recognition model could not load.")
-        }
-      }
+      self.loadRecognizer(directory, model: .parakeet, threads: threads, promise: promise)
+    }
+
+    /// Loads Qwen3-ASR from a downloaded model directory. A second call with the same directory keeps
+    /// the loaded model.
+    AsyncFunction("loadQwenRecognizer") { (directory: URL, threads: Int, promise: Promise) in
+      self.loadRecognizer(directory, model: .qwen3Asr, threads: threads, promise: promise)
     }
 
     /// Frees the recognizer, such as before its files are deleted.
@@ -575,7 +651,7 @@ public class SpeechModule: Module {
       }
     }
 
-    /// Opens the microphone: `transcribe` recognizes speech with Parakeet, `stream` sends the audio.
+    /// Opens the microphone: `transcribe` recognizes speech with the loaded recognizer, `stream` sends the audio.
     AsyncFunction("startCapture") { (mode: String, promise: Promise) in
       let capture = self.capture
       capture.queue.async {
@@ -590,6 +666,28 @@ public class SpeechModule: Module {
           promise.reject("ERR_CAPTURE", "The microphone could not start.")
         }
       }
+    }
+
+    /// Lets haptics play while the microphone records. The phone recognizer opens its own session,
+    /// which iOS starts with haptics silenced, so JavaScript calls this when that recognizer listens.
+    Function("allowHapticsWhileRecording") {
+      allowHapticsWhileRecording()
+    }
+
+    /// GPT live voice: WebRTC sets the session to voice chat, which plays on the earpiece. This keeps
+    /// the voice chat mode, so echo cancellation stays on, and adds the loudspeaker as the output when
+    /// no headset is connected. WebRTC sets its own options again when it starts its audio, so
+    /// JavaScript calls this after that; a call when the options are already set changes nothing.
+    /// `false` changes nothing: WebRTC ends its session, and the next capture or reply sets its own.
+    Function("setCallAudio") { (active: Bool) in
+      guard active else { return }
+      let session = AVAudioSession.sharedInstance()
+      let options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetoothHFP]
+      if session.category == .playAndRecord && session.mode == .voiceChat && session.categoryOptions.contains(options) {
+        return
+      }
+      try? session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
+      allowHapticsWhileRecording()
     }
 
     /// Closes the microphone, sends the text of the speech that is left, then `onCaptureEnd`.
@@ -675,6 +773,12 @@ public class SpeechModule: Module {
       self.enqueue(SpeechPart(id: id, samples: samples, sampleRate: Double(sampleRate)), generation: own)
     }
 
+    /// Plays every part at this speed, also the part that plays now. 1 is normal speed.
+    Function("setSpeed") { (speed: Double) in
+      let player = self.player
+      player.queue.async { player.setSpeed(Float(speed)) }
+    }
+
     /// Stops the part that plays and drops the parts that wait.
     Function("stop") {
       self.lock.lock()
@@ -697,4 +801,11 @@ public class SpeechModule: Module {
       self.recognitionQueue.sync { self.recognizer = nil }
     }
   }
+}
+
+/// iOS silences haptics while an audio session records, so the detents of a hold on the mic and the
+/// tick of the lock would not play while the user speaks. A failure keeps the silence; nothing else
+/// depends on it.
+func allowHapticsWhileRecording() {
+  try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
 }

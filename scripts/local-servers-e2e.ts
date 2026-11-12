@@ -31,6 +31,10 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/local-servers-e2e");
 const NAMES = ["E2E studio one", "E2E studio two"] as const;
 // A child's first start opens its database and its Team API. A bound on failure only.
 const START_DEADLINE_MS = 90_000;
+/** `STOPPED_LOCAL_SERVER_URL` in `src/main/remote-server-manager.ts`. */
+const STOPPED_API_URL = "http://127.0.0.1:0";
+/** `RESTART_LIMIT` in `src/main/local-servers/local-servers.ts`: the stop after these many does not restart. */
+const SUPERVISOR_RESTARTS = 3;
 const MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
 
 interface Child {
@@ -96,6 +100,23 @@ async function waitForServer(page: Page, serverId: string, state: ServerSummary[
     [serverId, state] as const,
     { timeout: START_DEADLINE_MS, polling: 250 },
   );
+}
+
+/**
+ * A server on this computer that stopped has the stopped address and is offline; a started one has its
+ * new port and is online. The state alone is not enough: it reads online until the stop is seen.
+ */
+async function waitForLocalServer(page: Page, serverId: string, phase: "stopped" | "started"): Promise<void> {
+  // Polled here: `waitForFunction` takes the promise of an async predicate as a true value at once.
+  const deadline = Date.now() + START_DEADLINE_MS;
+  for (;;) {
+    const server = (await servers(page)).find((item) => item.id === serverId);
+    const stopped = server?.apiUrl === STOPPED_API_URL && server.state === "offline";
+    const started = server !== undefined && server.apiUrl !== STOPPED_API_URL && server.state === "online";
+    if (phase === "stopped" ? stopped : started) return;
+    assert.ok(Date.now() < deadline, `${serverId} was not ${phase} within ${START_DEADLINE_MS} ms.`);
+    await new Promise((done) => setTimeout(done, 250));
+  }
 }
 
 async function waitForActive(page: Page, serverId: string): Promise<void> {
@@ -250,10 +271,36 @@ try {
     assert.ok(first);
     const stopped = first.child.pid;
     process.kill(stopped, "SIGKILL");
+    await waitForLocalServer(page, first.server.id, "stopped");
     const next = await waitForChild(first.entryId, stopped);
-    await waitForServer(page, first.server.id, "online");
+    await waitForLocalServer(page, first.server.id, "started");
     first.child = next;
     return { stoppedPid: stopped, newPid: next.pid };
+  });
+
+  // #7209: the supervisor starts a child again a few times only. After that the server stays stopped,
+  // and Retry on its connection screen must start it, not connect again to the stopped address.
+  await step("Retry starts a server that stopped too often", async () => {
+    const [first] = created;
+    assert.ok(first);
+    const stoppedPids: number[] = [];
+    // The step above stopped the child once already.
+    for (let stop = 2; stop <= SUPERVISOR_RESTARTS; stop += 1) {
+      stoppedPids.push(first.child.pid);
+      process.kill(first.child.pid, "SIGKILL");
+      await waitForLocalServer(page, first.server.id, "stopped");
+      first.child = await waitForChild(first.entryId, first.child.pid);
+      await waitForLocalServer(page, first.server.id, "started");
+    }
+    const last = first.child.pid;
+    stoppedPids.push(last);
+    process.kill(last, "SIGKILL");
+    await waitForLocalServer(page, first.server.id, "stopped");
+    const summary = await page.evaluate((id) => window.openbot.servers.retryConnection(id), first.server.id);
+    assert.equal(summary.state, "online", "Retry did not start the stopped server.");
+    const next = await waitForChild(first.entryId, last);
+    first.child = next;
+    return { stoppedPids, newPid: next.pid };
   });
 
   await step("Restart server starts a new child", async () => {

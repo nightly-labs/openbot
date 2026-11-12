@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
-import { appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
   IdleRestart,
@@ -61,6 +63,11 @@ export type UpdateAdapter = {
   on(event: "update-downloaded", listener: (info: UpdateInfo) => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
+  /**
+   * electron-updater's staged rollout test (docs/RELEASING.md#staged-rollout). An adapter with no
+   * staged rollout, such as the hosted server adapter, does not have it.
+   */
+  isUserWithinRollout?: (info: UpdateInfo) => boolean | Promise<boolean>;
 };
 
 export function createDisabledUpdateAdapter(): UpdateAdapter {
@@ -73,6 +80,33 @@ export function createDisabledUpdateAdapter(): UpdateAdapter {
     on: () => undefined,
     quitAndInstall: () => undefined,
   };
+}
+
+/** electron-updater's updater, or `null` when the module does not load. */
+export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
+  try {
+    const updaterModule = await import("electron-updater");
+    const adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    if (adapter) return adapter;
+    logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
+  } catch {
+    logger.warn("OpenBot updates are disabled: electron-updater failed to load");
+  }
+  return null;
+}
+
+/**
+ * electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. The base is
+ * the cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's.
+ */
+export function electronUpdaterCacheDirectory(): string {
+  const root =
+    process.platform === "win32"
+      ? process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local")
+      : process.platform === "darwin"
+        ? join(homedir(), "Library", "Caches")
+        : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+  return join(root, "openbot-updater");
 }
 
 export function isValidSemver(version: string): boolean {
@@ -97,6 +131,8 @@ interface UpdateServiceOptions {
   /** The uid of this process. It tells a refusal in this account apart from another account. */
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
+  /** macOS: the application bundle that Squirrel.Mac replaces. */
+  appBundlePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
@@ -184,6 +220,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   > &
     Pick<
       UpdateServiceOptions,
+      | "appBundlePath"
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
@@ -197,6 +234,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkTimer: ReturnType<typeof setTimeout> | null = null;
   #phaseTimer: ReturnType<typeof setTimeout> | null = null;
   #started = false;
+  /** False for a start that checks only on request, such as the newer-database recovery. */
+  #checksScheduled = false;
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
@@ -218,6 +257,15 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkRequest: Deferred.Deferred<UpdateCheckOutcome | null, UpdateOperationFailure> | null = null;
   #downloadInFlight = false;
   #teardownCommitted = false;
+  /**
+   * The release in its staged rollout that a person's check found. The later checks and download
+   * retries of this session also get it. A later release keeps its staged rollout.
+   */
+  #requestedVersion: string | null = null;
+  /** The release that the staged rollout left out in the current check request. */
+  #rolloutMiss: string | null = null;
+  /** A newer release in its staged rollout that the last check did not offer to this install. */
+  #stagedVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -259,6 +307,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#updater.autoDownload = false;
     this.#updater.autoInstallOnAppQuit = false;
     this.#updater.allowPrerelease = false;
+    // A check that a person asks for gets a release that is still in its staged rollout. A paused
+    // release (0%) stays paused for everyone, because a pause stops a release that is bad.
+    // electron-updater calls this test only for a release that this system supports.
+    const stagedRollout = this.#updater.isUserWithinRollout;
+    if (stagedRollout) {
+      this.#updater.isUserWithinRollout = async (info) => {
+        const percentage = stagingPercentage(info.stagingPercentage);
+        if (percentage !== 0 && info.version === this.#requestedVersion) return true;
+        const within = await stagedRollout(info);
+        if (!within && percentage !== null && percentage > 0) this.#rolloutMiss = info.version;
+        return within;
+      };
+    }
 
     // The check lifecycle is driven entirely by checkForUpdates(), whose result is generation
     // guarded, so there are deliberately no checking-for-update / update-available /
@@ -303,9 +364,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#fork(pruneInstalledUpdate(this.#options.updaterCacheDirectory, this.#options.currentVersion));
     }
 
+    this.#checksScheduled = scheduleChecks;
     if (scheduleChecks && this.#options.enabled) {
       this.#scheduleCheck(this.#options.initialCheckDelayMs);
     }
+  }
+
+  /** Schedules the checks that `stop` cleared, for an app that keeps running after it, such as after a Windows session end that another app cancels. */
+  resume(): void {
+    if (!this.#started) return;
+    // `stop` cleared the deadline of a busy phase, and a download keeps running after it.
+    if (!this.#phaseTimer) this.#armPhaseTimer();
+    if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
+    this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   getStatus(): UpdateStatus {
@@ -314,6 +385,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#scheduledRestart)
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
+    if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
     return status;
   }
 
@@ -399,6 +471,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
    * The user-facing check. Unlike the periodic loop this one always reports: it moves into
    * "checking" and settles on a real outcome even when an earlier call is still unsettled, because
    * an action that answers a press by leaving the same error on screen reads as a dead button.
+   * Each caller is a person: the Settings button, the app menu, a member's request from a joined
+   * server, and the recovery when an older app opens newer data. So a release in its staged rollout
+   * is offered here, and also to the later checks and download retries of this session.
    */
   checkForUpdates(): Effect.Effect<UpdateStatus, UpdateOperationFailure> {
     return this.#check(true);
@@ -428,7 +503,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       const generation = ++this.#checkGeneration;
       this.#operation = "check";
       this.#setStatus({ phase: "checking", progress: null, message: null, errorCode: null });
-      const checked = yield* Effect.result(this.#issueCheck()).pipe(
+      const checked = yield* this.#issueRequestedCheck(joinOutstandingRequest, generation).pipe(
         Effect.ensuring(
           Effect.sync(() => {
             if (this.#checkGeneration === generation) this.#scheduleCheck(this.#options.checkIntervalMs);
@@ -436,6 +511,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         ),
       );
       if (this.#checkGeneration !== generation) return this.getStatus();
+      this.#stagedVersion = null;
       if (Result.isFailure(checked)) this.#setError("check_failed", describeCheckFailure(checked.failure.cause));
       else {
         const result = checked.success;
@@ -445,6 +521,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           this.#markAvailable(result.updateInfo.version);
         } else {
           this.#downloadedVersion = null;
+          // Settings > Updates says that a check that a person asks for gets the release that the
+          // staged rollout left out. A paused release (0%) is not offered to any check, so it is not shown.
+          if (this.#rolloutMiss && isNewerRelease(this.#rolloutMiss, this.#status.currentVersion))
+            this.#stagedVersion = this.#rolloutMiss;
           this.#setStatus({
             phase: "up-to-date",
             availableVersion: null,
@@ -569,6 +649,11 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       );
       if (siblings.length > 0)
         return yield* new UpdateOperationFailure({ cause: new Error(this.#siblingSessionMessage(siblings)) });
+      const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
+      if (bundle && (yield* isOnReadOnlyVolume(bundle))) {
+        logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
+      }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.notReady")) });
@@ -638,6 +723,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       if (this.#checkRequest) return yield* Deferred.await(this.#checkRequest);
       const request = Deferred.makeUnsafe<UpdateCheckOutcome | null, UpdateOperationFailure>();
       this.#checkRequest = request;
+      this.#rolloutMiss = null;
       return yield* updateIO(() => this.#updater.checkForUpdates()).pipe(
         // Logged once per request, here, because joined callers and the status keep only a message.
         Effect.tapError(({ cause }) => Effect.sync(() => logUpdateFailure("OpenBot update check failed.", cause))),
@@ -649,6 +735,24 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         ),
         Effect.uninterruptible,
       );
+    });
+  }
+
+  /**
+   * A person's check that the staged rollout left out asks again for that release. The second
+   * request also replaces a joined periodic request that ran the staged rollout test.
+   */
+  #issueRequestedCheck(
+    requested: boolean,
+    generation: number,
+  ): Effect.Effect<Result.Result<UpdateCheckOutcome | null, UpdateOperationFailure>> {
+    return Effect.gen({ self: this }, function* () {
+      const checked = yield* Effect.result(this.#issueCheck());
+      const missed = this.#rolloutMiss;
+      if (!requested || !missed || Result.isFailure(checked) || this.#checkGeneration !== generation) return checked;
+      if (checked.success?.isUpdateAvailable) return checked;
+      this.#requestedVersion = missed;
+      return yield* Effect.result(this.#issueCheck());
     });
   }
 
@@ -900,6 +1004,21 @@ function logUpdateFailure(text: string, error: unknown): void {
   );
 }
 
+/**
+ * Squirrel.Mac cannot replace an application on a read-only volume, and it finds this only inside
+ * `quitAndInstall`, after shutdown preparation. macOS App Translocation runs a quarantined app from
+ * such a volume, and so does an app opened from its disk image. Checked first, the app stays open.
+ */
+function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
+  if (bundlePath.includes("/AppTranslocation/")) return Effect.succeed(true);
+  return updateIO(() => access(bundlePath, constants.W_OK)).pipe(
+    Effect.as(false),
+    Effect.catch(({ cause }) =>
+      Effect.succeed(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EROFS"),
+    ),
+  );
+}
+
 function errorMessage(code: UpdateFailureCode) {
   if (code === "download_failed") return sourceText("error.update.downloadFailed");
   if (code === "install_failed") return INSTALL_FAILED_MESSAGE;
@@ -966,6 +1085,13 @@ function pruneInstalledUpdate(directory: string, currentVersion: string): Effect
  * a candidate with the same numbers is not newer. A stale feed answer that names an older release
  * must not replace a newer download.
  */
+/** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
+function stagingPercentage(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const percentage = Number.parseInt(String(value), 10);
+  return Number.isNaN(percentage) ? null : percentage;
+}
+
 function isNewerRelease(candidate: string, current: string): boolean {
   const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
   const [left, right] = [parse(candidate), parse(current)];

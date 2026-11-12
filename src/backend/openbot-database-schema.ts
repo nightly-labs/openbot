@@ -10,26 +10,36 @@ import {
   AGENT_THREAD_MIGRATION_SQL,
   AGENT_THREAD_SCHEMA_SQL,
   V48_AGENT_THREAD_BRANCH_COLUMNS_SQL,
+  V54_AGENT_THREAD_ROUTINE_COLUMN_SQL,
+  V54_AGENT_THREAD_ROUTINE_INDEX_SQL,
 } from "./agent-threads/agent-thread-schema";
 import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
+import { BROWSER_PROXY_SCHEMA_SQL } from "./browser-profiles/browser-proxy-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schema";
+import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
+import { PINNED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/pinned-thread-messages-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
+  MESSAGING_PINGS_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
 } from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
+import { addDiscordWorkflows } from "./workflows/workflow-discord-schema";
 import {
   addGitHubWorkflows,
   V46_WORKFLOW_RUN_SOURCE_SQL,
-  V49_WORKFLOW_RUN_SOURCE_SQL,
   WORKFLOW_GITHUB_SCHEMA_SQL,
 } from "./workflows/workflow-github-schema";
 import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
+import { addSlackWorkflows, V53_WORKFLOW_RUN_SOURCE_SQL } from "./workflows/workflow-slack-schema";
+import { addTelegramWorkflows } from "./workflows/workflow-telegram-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -420,6 +430,21 @@ const V33_ROUTINE_RUN_MISSED_COLUMNS_SQL = [
 // the migration 33 columns, before the UNIQUE constraint.
 const V35_ROUTINE_RUN_SOURCE_COLUMN_SQL = `run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook'))`;
 
+// Migration 57 adds where the runs of an agent routine run: in the agent's chat, or in the routine's own
+// thread. Frozen with the migration. Every existing routine gets 'chat', as before 0.61. Channel routines
+// run in their channel and have no such column. ADD COLUMN puts it after the migration 33 column.
+const V57_AGENT_ROUTINE_RUN_IN_COLUMN_SQL = `run_in TEXT NOT NULL DEFAULT 'chat' CHECK(run_in IN ('chat', 'thread'))`;
+
+// Migration 60 ties an agent memory to a site: the host name of the pages it is about, such as
+// `github.com`, or NULL for a memory of no site. Frozen with the migration. No default: every existing
+// memory stays a memory of no site. ADD COLUMN puts it after the last column, before the UNIQUE
+// constraint. The index serves the recall of one site's memories when the agent opens a page of it.
+const V60_AGENT_MEMORY_SITE_COLUMN_SQL = `site TEXT CHECK(site IS NULL OR length(site) BETWEEN 1 AND 253)`;
+const V60_AGENT_MEMORY_SITE_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS agent_memories_site
+    ON projection_agent_memories(agent_id, site) WHERE site IS NOT NULL;
+`;
+
 // Migration 40 stores the shown-order keys of each thread message, so a page reads an index range rather
 // than sorting the whole thread (#2226). Frozen with the migration; `database/thread-message-order.ts`
 // keeps them current, and every write to the table must call it. No default: a key of 0 or '' would look
@@ -497,6 +522,10 @@ const V43_THREAD_EVENT_TYPE_INDEX_SQL = `
     ON orchestration_events(aggregate_id, event_type, sequence) WHERE aggregate_type = 'thread';
 `;
 
+const BASELINE_AGENT_MEMORIES_END_SQL = `    last_event_sequence INTEGER NOT NULL,
+    UNIQUE(agent_id, normalized_text)
+  );
+  CREATE INDEX IF NOT EXISTS agent_memories_agent`;
 const BASELINE_AGENT_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS agent_routines_agent`;
@@ -572,7 +601,11 @@ const LATEST_SCHEMA_SQL =
     substituteOnce(
       substituteOnce(
         substituteOnce(
-          substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+          substituteOnce(
+            substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+            BASELINE_AGENT_MEMORIES_END_SQL,
+            withAgentMemorySite(BASELINE_AGENT_MEMORIES_END_SQL),
+          ),
           BASELINE_THREAD_MESSAGES_END_SQL,
           withThreadMessageOrderColumns(BASELINE_THREAD_MESSAGES_END_SQL),
         ),
@@ -580,7 +613,7 @@ const LATEST_SCHEMA_SQL =
         V28_PROVIDER_SESSIONS_COLUMN_SQL,
       ),
       BASELINE_AGENT_ROUTINES_END_SQL,
-      withRoutinePolicies(BASELINE_AGENT_ROUTINES_END_SQL),
+      withAgentRoutineRunPlace(withRoutinePolicies(BASELINE_AGENT_ROUTINES_END_SQL)),
     ),
     BASELINE_ROUTINE_RUNS_END_SQL,
     withRunAddedColumns(BASELINE_ROUTINE_RUNS_END_SQL),
@@ -612,9 +645,16 @@ const LATEST_SCHEMA_SQL =
   V43_THREAD_EVENT_TYPE_INDEX_SQL +
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
   BROWSER_PROFILE_SCHEMA_SQL +
-  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V49_WORKFLOW_RUN_SOURCE_SQL) +
+  substituteOnce(WORKFLOW_SCHEMA_SQL, V46_WORKFLOW_RUN_SOURCE_SQL, V53_WORKFLOW_RUN_SOURCE_SQL) +
   AGENT_THREAD_SCHEMA_SQL +
-  WORKFLOW_GITHUB_SCHEMA_SQL;
+  WORKFLOW_GITHUB_SCHEMA_SQL +
+  MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL +
+  DELETED_THREAD_MESSAGES_SCHEMA_SQL +
+  BROWSER_PROXY_SCHEMA_SQL +
+  AGENT_SKILL_LOADS_SCHEMA_SQL +
+  MESSAGING_PINGS_SCHEMA_SQL +
+  V60_AGENT_MEMORY_SITE_INDEX_SQL +
+  PINNED_THREAD_MESSAGES_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -629,6 +669,22 @@ function withRoutinePolicies(tableEnd: string): string {
   return tableEnd.replace(
     "last_event_sequence INTEGER NOT NULL\n",
     `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL},\n    ${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+  );
+}
+
+/** The end of the agent memory table with the migration 60 column before its UNIQUE constraint. */
+function withAgentMemorySite(tableEnd: string): string {
+  return tableEnd.replace(
+    "last_event_sequence INTEGER NOT NULL,\n",
+    `last_event_sequence INTEGER NOT NULL,\n    ${V60_AGENT_MEMORY_SITE_COLUMN_SQL},\n`,
+  );
+}
+
+/** The end of the agent routine table with the migration 57 column after the migration 33 one. */
+function withAgentRoutineRunPlace(tableEnd: string): string {
+  return tableEnd.replace(
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL}\n`,
+    `${V33_ROUTINE_MISSED_POLICY_COLUMN_SQL},\n    ${V57_AGENT_ROUTINE_RUN_IN_COLUMN_SQL}\n`,
   );
 }
 
@@ -898,6 +954,81 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     disableForeignKeys: true,
     up: addGitHubWorkflows,
   },
+  {
+    version: 50,
+    // Rebuilds the run table again to add the Discord run source, as migration 49 did, so foreign keys
+    // pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addDiscordWorkflows,
+  },
+  {
+    version: 51,
+    // Only creates a table, so no foreign-key pause and no vacuum. No WhatsApp connection exists before
+    // it, so no connection loses senders.
+    up: (db) => db.exec(MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL),
+  },
+  {
+    version: 52,
+    // Rebuilds the run table again to add the Telegram run source, as migration 50 did, so foreign keys
+    // pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addTelegramWorkflows,
+  },
+  {
+    version: 53,
+    // Rebuilds the run table again to add the Slack run source, as migrations 50 and 52 did, so foreign
+    // keys pause and run ids do not change. Few rows, so no vacuum. No table is added.
+    disableForeignKeys: true,
+    up: addSlackWorkflows,
+  },
+  {
+    version: 54,
+    // Adds one column with no default and an index: no rebuild, so no foreign-key pause and no vacuum.
+    // Every existing thread gets null, which is a thread of no routine, as it was before.
+    up: addAgentThreadRoutine,
+  },
+  {
+    version: 55,
+    // Only creates a table, so no foreign-key pause and no vacuum. No message was deleted before it,
+    // so the table starts empty and no thread loses a message.
+    up: (db) => db.exec(DELETED_THREAD_MESSAGES_SCHEMA_SQL),
+  },
+  {
+    version: 56,
+    // Only creates tables, so no foreign-key pause and no vacuum. No profile has a proxy yet, so every
+    // profile keeps the proxy settings of the computer, which is what it used before.
+    up: (db) => db.exec(BROWSER_PROXY_SCHEMA_SQL),
+  },
+  {
+    version: 57,
+    // Adds one column with a constant default: no rebuild, so no foreign-key pause and no vacuum. Every
+    // existing agent routine gets 'chat', so its runs go back to the agent's chat, as before 0.61.
+    up: addAgentRoutineRunPlace,
+  },
+  {
+    version: 58,
+    // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No skill load was
+    // recorded before it, so the table starts empty and no usage row changes.
+    up: (db) => db.exec(AGENT_SKILL_LOADS_SCHEMA_SQL),
+  },
+  {
+    version: 59,
+    // Only creates a table, so no foreign-key pause and no vacuum. No post was recorded as a ping
+    // before it, so the table starts empty, and every thread routes its replies as before.
+    up: (db) => db.exec(MESSAGING_PINGS_SCHEMA_SQL),
+  },
+  {
+    version: 60,
+    // Adds one nullable column and a partial index: no rebuild, so no foreign-key pause and no vacuum.
+    // Every existing memory gets no site, so the agent recalls it as before.
+    up: addAgentMemorySite,
+  },
+  {
+    version: 61,
+    // Only creates a table, so no foreign-key pause and no vacuum. No message was pinned before it,
+    // so the table starts empty and every thread shows its messages as before.
+    up: (db) => db.exec(PINNED_THREAD_MESSAGES_SCHEMA_SQL),
+  },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
@@ -1042,12 +1173,20 @@ function readAppliedVersions(db: DatabaseSync): number[] {
     });
 }
 
+/**
+ * A newer OpenBot migrated the database. This build stops before it writes anything; the start can
+ * recover by installing a release that knows the version (`src/main/newer-database-recovery.ts`).
+ */
+export class NewerDatabaseError extends Error {
+  constructor(databaseVersion: number, supportedVersion: number) {
+    super(`OpenBot database version ${databaseVersion} is newer than this application supports (${supportedVersion}).`);
+  }
+}
+
 function validateAppliedVersions(versions: number[]): void {
   const newestVersion = versions.at(-1) ?? 0;
   if (newestVersion > LATEST_SCHEMA_VERSION) {
-    throw new Error(
-      `OpenBot database version ${newestVersion} is newer than this application supports (${LATEST_SCHEMA_VERSION}).`,
-    );
+    throw new NewerDatabaseError(newestVersion, LATEST_SCHEMA_VERSION);
   }
 
   const baselineAndLater = versions.filter((version) => version >= BASELINE_SCHEMA_VERSION);
@@ -1287,6 +1426,32 @@ function addAgentThreadBranch(db: DatabaseSync): void {
     if (columns.some((existing) => isDynamicRecord(existing) && existing.name === name)) continue;
     db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${column}`);
   }
+}
+
+// Migration 54 links a side thread to the routine whose runs go to it.
+function addAgentThreadRoutine(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the column already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_threads)").all();
+  if (!columns.some((existing) => isDynamicRecord(existing) && existing.name === "routine_id"))
+    db.exec(`ALTER TABLE projection_agent_threads ADD COLUMN ${V54_AGENT_THREAD_ROUTINE_COLUMN_SQL}`);
+  db.exec(V54_AGENT_THREAD_ROUTINE_INDEX_SQL);
+}
+
+// Migration 57 adds where the runs of an agent routine run.
+function addAgentRoutineRunPlace(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the column already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_routines)").all();
+  if (columns.some((existing) => isDynamicRecord(existing) && existing.name === "run_in")) return;
+  db.exec(`ALTER TABLE projection_agent_routines ADD COLUMN ${V57_AGENT_ROUTINE_RUN_IN_COLUMN_SQL}`);
+}
+
+// Migration 60 adds the site of an agent memory.
+function addAgentMemorySite(db: DatabaseSync): void {
+  // A development profile that ran this version before it shipped has the column already.
+  const columns = db.prepare("PRAGMA table_info(projection_agent_memories)").all();
+  if (!columns.some((existing) => isDynamicRecord(existing) && existing.name === "site"))
+    db.exec(`ALTER TABLE projection_agent_memories ADD COLUMN ${V60_AGENT_MEMORY_SITE_COLUMN_SQL}`);
+  db.exec(V60_AGENT_MEMORY_SITE_INDEX_SQL);
 }
 
 // Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the

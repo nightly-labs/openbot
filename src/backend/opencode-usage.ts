@@ -11,7 +11,13 @@ import { DatabaseSync } from "node:sqlite";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Schema } from "effect";
 import { openCodeDataDirectory } from "./process-confinement";
-import { type AccountRateLimitsReadResult, type AccountRateLimitWindowResult, getRecord, getString } from "./protocol";
+import {
+  type AccountRateLimitsReadResult,
+  type AccountRateLimitWindowResult,
+  bindingWindow,
+  getRecord,
+  getString,
+} from "./protocol";
 
 const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
 
@@ -172,18 +178,6 @@ function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
     ...(tertiary ? { tertiary } : {}),
     rateLimitsByLimitId: null,
   };
-}
-
-function bindingWindow<T extends { usedPercent: number; resetsAt?: number | null | undefined }>(
-  weekly: T,
-  monthly: T,
-): T {
-  if (weekly.usedPercent >= 100 && monthly.usedPercent >= 100) {
-    return (monthly.resetsAt ?? Number.POSITIVE_INFINITY) >= (weekly.resetsAt ?? Number.POSITIVE_INFINITY)
-      ? monthly
-      : weekly;
-  }
-  return monthly.usedPercent > weekly.usedPercent ? monthly : weekly;
 }
 
 function usageWindow(

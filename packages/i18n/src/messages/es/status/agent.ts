@@ -17,6 +17,7 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} creó la rutina {routine}. {person} lo pidió.",
   "status.agent.channelRoutineUpdated": "{agent} cambió la rutina {routine}. {person} lo pidió.",
   "status.agent.channelRoutineDeleted": "{agent} eliminó la rutina {routine}. {person} lo pidió.",
+  "status.agent.channelTaskCancelled": "{agent} canceló la tarea «{task}» y sus subtareas. {person} lo pidió.",
   "status.agent.screenCaptureScreen": "Capturar la pantalla principal y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureChannel":
     "La imagen aparece en el canal {channel}, y cada miembro de este servidor que lee el canal puede verla.",
@@ -24,6 +25,18 @@ export const messages = {
   "status.agent.screenCaptureWindow": "Capturar la ventana {name} y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureRegion":
     "Capturar el área de la pantalla en {x}, {y}, de {width} × {height} puntos, y enviar la imagen al modelo del agente.",
+  "status.agent.reportProblem":
+    "Esto será un issue público en GitHub, con la versión de la app y tu sistema. Tu nombre no aparece.",
+  "status.agent.sendIdea": "Esto se convierte en un issue público de GitHub. Tu nombre no se muestra.",
+  "status.agent.feedbackRecentErrors": "Errores recientes en el chat:",
+  "status.agent.feedbackSameAs": "Se añade al issue #{issue}",
+  "status.agent.feedbackSent": "Enviado al equipo de OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Crear un comando de un solo uso que instala OpenBot en otro ordenador como el servidor {name} y lo conecta a tu cuenta. El agente lo ejecuta allí.",
+  "status.agent.serverInstallCard": "Comando de instalación para el servidor {name}",
+  "status.agent.feedbackSending": "Enviando tus comentarios al equipo de OpenBot…",
+  "status.agent.workflowDelete":
+    "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",
   "status.agent.screenCaptureProgress": "Pidiendo permiso para capturar la pantalla…",
   "status.agent.screenCaptureReviewing": "Revisando la captura de pantalla…",
   "status.agent.browserOpening": "Abriendo una página web…",
@@ -53,11 +66,27 @@ export const messages = {
   "status.agent.changesReviewing": "Revisando los cambios que hice…",
   "status.agent.agentCoordinating": "Coordinando con otro agente…",
   "status.agent.agentResponseReviewing": "Revisando la respuesta del otro agente…",
+  "status.agent.commandRunningUnnamed": "Ejecutando un comando…",
   "status.agent.toolStepWorking": "Procesando el siguiente paso asistido por herramientas…",
+  "status.agent.webSearching": "Buscando en la web «{query}»…",
+  "status.agent.urlFetching": "Abriendo {host}…",
+  "status.agent.fileReading": "Leyendo {name}…",
+  "status.agent.filesReading": "Leyendo archivos…",
+  "status.agent.filesListing": "Revisando {path}…",
+  "status.agent.filesLooking": "Revisando archivos…",
+  "status.agent.textSearching": "Buscando «{query}»…",
+  "status.agent.filesSearchingText": "Buscando en los archivos…",
+  "status.agent.folderSizesMeasuring": "Midiendo el tamaño de las carpetas…",
+  "status.agent.diskSpaceChecking": "Comprobando el espacio libre en disco…",
+  "status.agent.processesChecking": "Comprobando los procesos en ejecución…",
+  "status.agent.gitChecking": "Comprobando el repositorio Git…",
+  "status.agent.commandRunning": "Ejecutando {program}…",
   "status.agent.memoryChanges": "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados.",
   "status.agent.memoryChangesWithConflicts":
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
+  "status.agent.compactionContinues":
+    "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

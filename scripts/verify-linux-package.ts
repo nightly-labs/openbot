@@ -63,7 +63,9 @@ const executablePath = resolve(appPath, "openbot");
 const resourcesPath = resolve(appPath, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
-const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.so", "libonnxruntime.so"];
+const voiceRuntimeLibraries = ["sherpa-onnx.node", "libsherpa-onnx-c-api.so", "libonnxruntime.so"];
+// ONNX Runtime session settings that the voice hosts read. It is text, not a library.
+const voiceSessionSettingsPath = resolve(voiceRuntimePath, "no-arena.cfg");
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
 
@@ -77,7 +79,8 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
-  ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
+  ...voiceRuntimeLibraries.map((name) => access(resolve(voiceRuntimePath, name))),
+  access(voiceSessionSettingsPath),
   access(voiceHostPath),
   access(speechHostPath),
   // A hosted server refuses an update to a release without all of its hosting files.
@@ -98,9 +101,9 @@ await Promise.all(
 
 // The voice runtime is the one this architecture loads. The Parakeet, Bark, Whisper and Supertonic
 // models are downloaded on demand.
-await Promise.all(voiceRuntimeFiles.map((name) => assertElfMachine(resolve(voiceRuntimePath, name))));
+await Promise.all(voiceRuntimeLibraries.map((name) => assertElfMachine(resolve(voiceRuntimePath, name))));
 // `prepare-voice` removes the CI build directory and the working directory from the search paths.
-for (const name of voiceRuntimeFiles) {
+for (const name of voiceRuntimeLibraries) {
   const paths = elfSearchPaths(await readFile(resolve(voiceRuntimePath, name)));
   if (paths.some(({ value }) => value !== ORIGIN_SEARCH_PATH)) {
     throw new Error(
@@ -111,8 +114,10 @@ for (const name of voiceRuntimeFiles) {
 await Promise.all(
   [
     "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
     "voice/bark-3.0-plus-int8",
     "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
     "voice/supertonic-3-int8",
     "voice/runtime/encoder.int8.onnx",
     "voice/runtime/turbo-encoder.int8.onnx",

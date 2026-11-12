@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { KEY_ONLY_PROVIDERS } from "@openbot/contracts/agent-providers";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
   type AnalyticsProviderDay,
+  type AnalyticsSkill,
   type AnalyticsTotals,
   analyticsDate,
   type ConversationMessage,
@@ -45,8 +47,25 @@ export interface UsageSample {
    * cost for the whole session. Without one, the cost is kept with the tokens.
    */
   costCounterId?: string;
+  /** A turn that adds 0 to `reportedCost` used a model with no rates, so it stays unpriced. */
+  zeroCostUnpriced?: boolean;
 }
 const TOKEN_KEYS = ["uncachedInput", "cachedInput", "cacheCreation", "output"] as const;
+
+/** One skill an agent loaded, from the finished tool step that loaded it. */
+export interface SkillLoadSample {
+  agentId: string;
+  sessionId: string;
+  turnId: string;
+  /** The provider's id of the tool step. With the skill, it makes a step that comes again count once. */
+  itemId: string;
+  provider: string;
+  model: string;
+  skill: string;
+  /** The estimated tokens of its SKILL.md, or null when the file was not found. */
+  tokens: number | null;
+  occurredAt: string;
+}
 
 /** The tokens one model used in a turn. */
 export interface TurnModelUsage {
@@ -158,19 +177,17 @@ export class AgentUsage {
         if ((!before && sample.baseline) || sample.turnId === "baseline") return null;
         // A resumed Claude process reports its cost from 0, so the cost of its first turn is unknown.
         // That turn, and a Claude report with no cost, are priced from list rates instead.
-        const reported =
+        const reportedDelta =
           sample.reportedCost === undefined ||
           sample.reportedCost === null ||
           costStartUnknown ||
           (!sample.costCounterId && before && typeof previousCost !== "number")
             ? null
-            : {
-                cost: Math.max(0, sample.reportedCost - (typeof previousCost === "number" ? previousCost : 0)),
-                basis:
-                  sample.provider === "opencode"
-                    ? "OpenCode session cost report; API-equivalent rates, not subscription charges"
-                    : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
-              };
+            : Math.max(0, sample.reportedCost - (typeof previousCost === "number" ? previousCost : 0));
+        const reported =
+          reportedDelta === null || (sample.zeroCostUnpriced && reportedDelta === 0)
+            ? null
+            : { cost: reportedDelta, basis: reportedCostBasis(sample.provider) };
         const turn = databaseRow(
           db
             .prepare("SELECT occurred_at FROM agent_usage_activity WHERE agent_id = ? AND activity_id = ?")
@@ -204,6 +221,38 @@ export class AgentUsage {
         return null;
       },
     );
+  }
+
+  /**
+   * Keeps one skill load. Its tokens are priced as uncached input of the turn's model, which is
+   * what the skill adds when it enters the context; later requests read it from the cache.
+   */
+  recordSkillLoad(sample: SkillLoadSample): void {
+    const cost =
+      sample.tokens === null
+        ? null
+        : estimateUsageCost(
+            sample.provider,
+            sample.model,
+            { uncachedInput: sample.tokens, cachedInput: 0, cacheCreation: 0, output: 0 },
+            null,
+            null,
+            sample.occurredAt,
+          ).cost;
+    this.#core.connection
+      .prepare("INSERT OR IGNORE INTO agent_usage_skill_loads VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(
+        sample.agentId,
+        JSON.stringify([sample.sessionId, sample.itemId, sample.skill]),
+        sample.sessionId,
+        sample.turnId,
+        sample.provider,
+        sample.model,
+        sample.skill,
+        sample.tokens,
+        cost,
+        sample.occurredAt,
+      );
   }
 
   startTurn(agentId: string, sessionId: string, turnId: string, provider: string, model: string): void {
@@ -273,7 +322,12 @@ export class AgentUsage {
   read(raw: AgentAnalyticsInput): AgentAnalytics {
     // A spread does not trigger excess-property checking, so the host-only arrays of a
     // single-agent report are dropped by name rather than left for a decoder to strip.
-    const { agents: _agents, providerDaily: _providerDaily, ...report } = this.readHost(parseAgentAnalyticsInput(raw));
+    const {
+      agents: _agents,
+      providerDaily: _providerDaily,
+      skills: _skills,
+      ...report
+    } = this.readHost(parseAgentAnalyticsInput(raw));
     return { ...report, agentId: raw.agentId };
   }
 
@@ -381,6 +435,28 @@ export class AgentUsage {
       }
     }
     const summary = finish(totals);
+    const skills = new Map<string, { row: AnalyticsSkill; agents: Set<string> }>();
+    let skillTokens = 0;
+    for (const row of readRange("agent_usage_skill_loads")) {
+      const occurred = requiredStringColumn(row, "occurred_at");
+      if (!days.has(analyticsDate(new Date(occurred), input.timeZone))) continue;
+      const name = requiredStringColumn(row, "skill");
+      let entry = skills.get(name);
+      if (!entry) {
+        entry = {
+          row: { skill: name, loads: 0, tokens: 0, estimatedCostUsd: null, agents: 0, share: 0 },
+          agents: new Set(),
+        };
+        skills.set(name, entry);
+      }
+      entry.row.loads++;
+      const tokens = optionalNumberColumn(row, "tokens") ?? 0;
+      entry.row.tokens += tokens;
+      skillTokens += tokens;
+      const cost = optionalNumberColumn(row, "estimated_cost_usd");
+      if (cost !== null) entry.row.estimatedCostUsd = (entry.row.estimatedCostUsd ?? 0) + cost;
+      entry.agents.add(requiredStringColumn(row, "agent_id"));
+    }
     return {
       ...input,
       collectionStartedAt: this.collectionStartedAt(),
@@ -409,6 +485,13 @@ export class AgentUsage {
       providerDaily: [...providerDays.values()].sort(
         (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
       ),
+      skills: [...skills.values()]
+        .map(({ row, agents: loadedBy }) => ({
+          ...row,
+          agents: loadedBy.size,
+          share: skillTokens ? row.tokens / skillTokens : 0,
+        }))
+        .sort((a, b) => b.tokens - a.tokens || b.loads - a.loads || a.skill.localeCompare(b.skill)),
     };
   }
 }
@@ -456,4 +539,13 @@ export function recordUsageMessage(
     message.createdAt,
     message.createdAt,
   );
+}
+
+function reportedCostBasis(provider: string) {
+  if (provider === "opencode") return "OpenCode session cost report; API-equivalent rates, not subscription charges";
+  if (provider === "grok") return "Grok CLI prompt cost report";
+  if (provider === "pi" || KEY_ONLY_PROVIDERS.some((id) => id === provider))
+    return "Pi session cost report; rates of Pi's model list, not subscription charges";
+  if (provider === "acp") return "Custom agent session cost report";
+  return "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07";
 }

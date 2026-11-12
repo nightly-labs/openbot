@@ -22,12 +22,15 @@ import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
 import { useBoard } from "./workflow-board";
+import { DISCORD_TRIGGER_DEFAULTS, DiscordIcon, DiscordTriggerRows } from "./workflow-discord-parts";
 import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
 import { newTriggerSchedule, stableJson } from "./workflow-history";
 import { type Choice, NodeShell, NodeToolbar, oneOf, useField, useLocked, useStepRun } from "./workflow-node-parts";
 import { PlaceRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
+import { SLACK_TRIGGER_DEFAULTS, SlackIcon, SlackTriggerRows } from "./workflow-slack-parts";
+import { TELEGRAM_TRIGGER_DEFAULTS, TelegramIcon, TelegramTriggerRows } from "./workflow-telegram-parts";
 
-type TriggerType = "schedule" | "manual" | "webhook" | "message" | "github";
+type TriggerType = "schedule" | "manual" | "webhook" | "message" | "github" | "discord" | "telegram" | "slack";
 
 const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
   {
@@ -47,9 +50,31 @@ const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
     icon: () => <MessageSquare aria-hidden="true" />,
   },
   { value: "github", label: t("workflow.trigger.type.github"), icon: () => <GitHubIcon /> },
+  { value: "discord", label: t("workflow.trigger.type.discord"), icon: () => <DiscordIcon /> },
+  { value: "telegram", label: t("workflow.trigger.type.telegram"), icon: () => <TelegramIcon /> },
+  { value: "slack", label: t("workflow.trigger.type.slack"), icon: () => <SlackIcon /> },
 ];
 
-const TRIGGER_TYPES: readonly TriggerType[] = ["schedule", "manual", "webhook", "message", "github"];
+const TRIGGER_TYPES: readonly TriggerType[] = [
+  "schedule",
+  "manual",
+  "webhook",
+  "message",
+  "github",
+  "discord",
+  "telegram",
+  "slack",
+];
+
+/** Trigger types that only an admin's host offers: they act as the host's GitHub App or messaging bot. */
+const HOST_TYPES: readonly TriggerType[] = ["github", "discord", "telegram", "slack"];
+
+const TRIGGER_DEFAULTS: Partial<Record<TriggerType, Record<string, string>>> = {
+  github: GITHUB_TRIGGER_DEFAULTS,
+  discord: DISCORD_TRIGGER_DEFAULTS,
+  telegram: TELEGRAM_TRIGGER_DEFAULTS,
+  slack: SLACK_TRIGGER_DEFAULTS,
+};
 
 /**
  * The start of a workflow. The type is the first row of the card, and the settings of that type follow it:
@@ -78,16 +103,21 @@ export function TriggerNode(props: {
     untrack(() => props.trigger ?? "schedule"),
     oneOf(TRIGGER_TYPES),
   );
-  /** A new GitHub trigger stores the event and the filter that its rows show, so the host reads the same. */
+  /**
+   * A new GitHub, Discord, Telegram or Slack trigger stores the fields that its rows show, so the host reads the
+   * same. Each keeps an `event`, so a change from one to another writes the defaults again.
+   */
   const chooseTrigger = (value: TriggerType) => {
-    if (value !== "github" || board.field(props.id, "event") !== undefined) return setTrigger(value);
-    board.setFields(props.id, { trigger: value, ...GITHUB_TRIGGER_DEFAULTS });
+    const defaults = TRIGGER_DEFAULTS[value];
+    const fromOther = trigger() !== value && HOST_TYPES.includes(trigger());
+    if (!defaults || (board.field(props.id, "event") !== undefined && !fromOther)) return setTrigger(value);
+    board.setFields(props.id, { trigger: value, ...defaults });
   };
-  /** GitHub needs a host that can run it. Other types show unless the host lists the types it runs. */
+  /** GitHub, Discord, Telegram and Slack need a host that can run them. Other types show unless the host lists the types it runs. */
   const offered = (type: TriggerType) => {
     const triggers = board.features()?.triggers;
     if (type === trigger()) return true;
-    return type === "github" ? triggers?.includes(type) === true : (triggers?.includes(type) ?? true);
+    return HOST_TYPES.includes(type) ? triggers?.includes(type) === true : (triggers?.includes(type) ?? true);
   };
   /**
    * The draft that the user edits. A cron text with a space at the end saves without it, so the picker
@@ -241,6 +271,15 @@ export function TriggerNode(props: {
         </Show>
         <Show when={isGitHub()}>
           <GitHubTriggerRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={trigger() === "discord"}>
+          <DiscordTriggerRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={trigger() === "telegram"}>
+          <TelegramTriggerRows id={props.id} locked={locked()} />
+        </Show>
+        <Show when={trigger() === "slack"}>
+          <SlackTriggerRows id={props.id} locked={locked()} />
         </Show>
       </SettingRows>
     </NodeShell>

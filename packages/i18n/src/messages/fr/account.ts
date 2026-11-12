@@ -38,7 +38,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} min",
   "account.usage.window.cursorModels": "Modèles Cursor",
   "account.usage.window.otherModels": "Autres modèles",
+  "account.usage.window.total": "Total",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} restant",
   "account.update.failedRetry": "La mise à jour a échoué. Réessayez.",
   "account.update.managedByHost": "Gérée par l’hôte",
   "account.update.restart": "Redémarrer",
@@ -64,6 +66,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot ne peut pas joindre le service de compte pour le moment.",
   "account.login.signInDescription":
     "Utilisez votre e-mail pour vous connecter ou créer un compte. Nous vous enverrons un code à usage unique.",
+  "account.login.keyringChangedDescription":
+    "Le trousseau du système a perdu votre dernière connexion. OpenBot conserve désormais les connexions dans son propre fichier sur cet ordinateur. Connectez-vous encore une fois.",
   "account.login.codeAccepted": "Votre code a été accepté.",
   "account.login.codeSent": "Nous avons envoyé un code à {email}.",
   "account.login.connectingSecurely": "Connexion sécurisée…",

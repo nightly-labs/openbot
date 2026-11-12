@@ -11,6 +11,9 @@
 //   3. Without such a file, the same uninstaller deletes the workspaces.
 //   4. The new installer updates the installation in %USERPROFILE%\OpenBot: it installs in the
 //      default folder, keeps the workspaces, and removes only the earlier app.
+//   5. An installation in the default folder that lost its registry entry and was installed again
+//      in an OpenBot subfolder: the new installer removes the earlier, incomplete app from the
+//      default folder, keeps the other files there, and points the login item at the new copy.
 // Usage: bun scripts/windows-home-install-update-e2e.ts <earlier installer> <new installer>
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -39,6 +42,7 @@ if (!localAppData) throw new Error("LOCALAPPDATA is not set.");
 
 const homeFolder = join(homedir(), "OpenBot");
 const defaultFolder = join(localAppData, "Programs", "OpenBot");
+const nestedFolder = join(defaultFolder, "OpenBot");
 // Missing on a computer where no program was installed for this user.
 const uninstallKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 const runKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -71,6 +75,8 @@ interface CaseResult {
   loginItem?: string;
   appFilesInDefaultFolder?: string[];
   appFilesInHomeFolder?: string[];
+  appFilesInNestedFolder?: string[];
+  otherFileKept?: boolean;
   longPathLength?: number | undefined;
   temporaryFolder?: string;
 }
@@ -80,6 +86,7 @@ const cases: {
   earlierUninstallerStops?: CaseResult;
   earlierUninstallerDeletesWorkspaces?: CaseResult;
   newInstallerMovesTheInstallation?: CaseResult;
+  newInstallerRemovesTheCopyAbove?: CaseResult;
 } = {};
 const report: {
   earlierInstaller: string;
@@ -156,6 +163,13 @@ function setLoginItem(executable: string): void {
 }
 
 async function removeEverything(): Promise<void> {
+  removeRegistration();
+  powershell(`Remove-ItemProperty -LiteralPath '${runKey}' -Name '${loginItemName}' -ErrorAction SilentlyContinue
+    exit 0`);
+  for (const folder of [homeFolder, defaultFolder]) await rm(folder, { recursive: true, force: true });
+}
+
+function removeRegistration(): void {
   const keys = powershell(`
     if (Test-Path ${uninstallKey}) {
       Get-ChildItem ${uninstallKey} | Get-ItemProperty |
@@ -167,9 +181,6 @@ async function removeEverything(): Promise<void> {
       Remove-Item -LiteralPath "HKCU:\\Software\\${key}" -Recurse -Force -ErrorAction SilentlyContinue
       exit 0`);
   }
-  powershell(`Remove-ItemProperty -LiteralPath '${runKey}' -Name '${loginItemName}' -ErrorAction SilentlyContinue
-    exit 0`);
-  for (const folder of [homeFolder, defaultFolder]) await rm(folder, { recursive: true, force: true });
 }
 
 // Node writes paths longer than MAX_PATH; NSIS cannot move them to a longer path.
@@ -294,6 +305,37 @@ async function newInstallerMovesTheInstallation(): Promise<void> {
   check(result.loginItem === `"${join(defaultFolder, "OpenBot.exe")}"`, "The login item does not name the new copy.");
 }
 
+async function newInstallerRemovesTheCopyAbove(): Promise<void> {
+  await removeEverything();
+  check((await runInstaller(earlierInstaller, "/S")) === 0, "The earlier installer failed.");
+  removeRegistration();
+  check((await runInstaller(earlierInstaller, `/S /D=${nestedFolder}`)) === 0, "The earlier installer failed again.");
+  check(existsSync(join(defaultFolder, "OpenBot.exe")), "The earlier copy is not in the folder above.");
+  check(existsSync(join(nestedFolder, "OpenBot.exe")), "The earlier installer did not use the subfolder.");
+  // The reported copy has files missing.
+  await rm(join(defaultFolder, "ffmpeg.dll"));
+  const otherFile = join(defaultFolder, "notes.txt");
+  await writeFile(otherFile, "not an app file\n");
+  setLoginItem(join(defaultFolder, "OpenBot.exe"));
+  const exitCode = await runInstaller(newInstaller, "--updated /S");
+  const result = {
+    exitCode,
+    registration: registration(),
+    loginItem: loginItem(),
+    appFilesInDefaultFolder: presentAppFiles(defaultFolder),
+    appFilesInNestedFolder: presentAppFiles(nestedFolder),
+    otherFileKept: existsSync(otherFile),
+    missingWorkspaceFiles: [],
+  };
+  cases.newInstallerRemovesTheCopyAbove = result;
+  check(exitCode === 0, `The new installer exited with ${exitCode}.`);
+  check(result.registration.installLocation === nestedFolder, "The registry does not name the subfolder.");
+  check(result.appFilesInNestedFolder.includes("OpenBot.exe"), "The new installer did not update the subfolder.");
+  check(result.appFilesInDefaultFolder.length === 0, `App files stay above: ${result.appFilesInDefaultFolder}`);
+  check(result.otherFileKept, "The new installer deleted a file that is not an app file.");
+  check(result.loginItem === `"${join(nestedFolder, "OpenBot.exe")}"`, "The login item does not name the new copy.");
+}
+
 let failure: unknown = null;
 try {
   for (const step of [
@@ -301,6 +343,7 @@ try {
     earlierUninstallerStops,
     earlierUninstallerDeletesWorkspaces,
     newInstallerMovesTheInstallation,
+    newInstallerRemovesTheCopyAbove,
   ]) {
     await step();
   }

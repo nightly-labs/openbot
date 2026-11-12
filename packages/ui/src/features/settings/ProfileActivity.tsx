@@ -1,11 +1,18 @@
+import {
+  heatLevel,
+  heatmapMonths,
+  heatmapWeeks,
+  type ProfileDay,
+  type ProfileStats,
+} from "@openbot/team-client/profile-stats";
 import { Button, ErrorReference, SettingsSection, Text } from "@openbot/ui";
 import { Portal } from "@solidjs/web";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { DigitRuns } from "../../digit-runs";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { UsageProviderMark } from "../usage/UsageProviderMark";
 import { usageCompact, usageCost, usageProviderName, usageSeriesColor } from "../usage/usage-format";
-import { heatLevel, heatmapMonths, heatmapWeeks, type ProfileDay, type ProfileStats } from "./profile-stats";
 
 export type ProfileActivityPhase = "loading" | "ready" | "error" | "unsupported";
 
@@ -168,13 +175,19 @@ function ProfileTiles(props: { stats: ProfileStats }) {
               <strong>
                 <span class="sr-only">{tile().value}</span>
                 <span class="t-digit-group is-animating profile-tile-value" aria-hidden="true">
-                  <For each={[...tile().value]}>
-                    {(character, characterIndex) => (
+                  <DigitRuns
+                    text={tile().value}
+                    digit={(character, characterIndex) => (
                       <span class="t-digit" style={{ "--profile-c": String(characterIndex()) }}>
-                        {character}
+                        {character()}
                       </span>
                     )}
-                  </For>
+                    word={(word, characterIndex) => (
+                      <span class="t-digit" style={{ "--profile-c": String(characterIndex()) }}>
+                        {word()}
+                      </span>
+                    )}
+                  />
                 </span>
               </strong>
               <span>{tile().detail}</span>

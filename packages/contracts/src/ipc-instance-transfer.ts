@@ -53,6 +53,11 @@ export interface ExportInstanceInput {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  /**
+   * The agents' chats and side threads with the files of their messages. Absent is off: the Team API
+   * route `instance-transfer-v1` does not carry it.
+   */
+  includeHistory?: boolean;
 }
 
 export interface InstanceExportResult {
@@ -79,6 +84,17 @@ export interface ApplyInstanceTransferInput {
   /** May be empty when only the settings are imported. */
   keys: string[];
   includeSettings: boolean;
+}
+
+/**
+ * Agents of one server copied into another, with their workspace files and no chat history or server
+ * settings. The server scope of the request is the destination. Main exports from the source and
+ * imports at the destination with the routes above, so a host needs no new route.
+ */
+export interface CopyInstanceAgentsInput {
+  /** The server that has the agents. It is not the destination. */
+  fromServerId: string;
+  agentIds: string[];
 }
 
 export interface InstanceTransferResult {
@@ -126,7 +142,13 @@ export function parseExportInstanceInput(value: unknown): ExportInstanceInput {
   if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
     invalid("agent selection");
   if (!isBoolean(input.includeFiles) || !isBoolean(input.includeSettings)) invalid("export request");
-  return { agentIds: input.agentIds, includeFiles: input.includeFiles, includeSettings: input.includeSettings };
+  if (input.includeHistory !== undefined && !isBoolean(input.includeHistory)) invalid("export request");
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    ...(input.includeHistory ? { includeHistory: true } : {}),
+  };
 }
 
 export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTransferInput {
@@ -136,6 +158,14 @@ export function parseApplyInstanceTransferInput(value: unknown): ApplyInstanceTr
   if (!isBoolean(input.includeSettings)) invalid("import request");
   if (input.keys.length === 0 && !input.includeSettings) invalid("import request");
   return { token: input.token, keys: input.keys, includeSettings: input.includeSettings };
+}
+
+export function parseCopyInstanceAgentsInput(value: unknown): CopyInstanceAgentsInput {
+  const input = record(value, "copy request");
+  if (!isIdentifier(input.fromServerId)) invalid("source server");
+  if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
+    invalid("agent selection");
+  return { fromServerId: input.fromServerId, agentIds: input.agentIds };
 }
 
 function decodeTransferAgent(value: unknown): InstanceTransferAgent {

@@ -36,6 +36,7 @@ import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 type PreviewView = "preview" | "code";
@@ -94,6 +95,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
   const headerBottom = insets.top + HEADER_OFFSET + HEADER_HEIGHT + HEADER_OFFSET;
   const title =
     entry.file?.name ??
+    entry.title ??
     (entry.kind === "html"
       ? t("mobile.chat.preview.htmlTitle")
       : entry.kind === "mermaid"
@@ -252,7 +254,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
             router.back();
           }}
         >
-          <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} />
+          <ArrowLeft color={String(foreground)} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
         </ChatGlassIconButton>
         <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} style={{ flexShrink: 1 }}>
           <Animated.View
