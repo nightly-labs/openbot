@@ -32,8 +32,11 @@ export interface LiveTwoStepCode {
 
 /** The time after a failed load before the codes load again, as on desktop. */
 const RETRY_MS = 30_000;
-/** The time after a code runs out that it still shows, before the reload of the codes starts. */
-const RELOAD_GRACE_MS = 1_000;
+/**
+ * The time after a code runs out that it still shows while the next codes load. Sites also accept the
+ * previous code, so a copy in this time still works.
+ */
+const RELOAD_GRACE_MS = 5_000;
 
 /** The time, once a second while `active`. */
 export function useSecondClock(active = true): number {
@@ -97,12 +100,12 @@ export function useServerVaultCodes(serverId: string, hasKeys: boolean) {
       return Math.max(250, first - Date.now() + 50);
     },
   });
-  // A code that ran out stays while the next codes load, and for a short time before the load starts,
-  // so it does not flash at each change. After a failed load the query keeps its last codes; then a
-  // code that ran out is not shown or copied.
+  // A code that ran out stays for a short time while the next codes load, so it does not flash at each
+  // change. A load can wait minutes for an offline host, and a failed load keeps the last codes, so the
+  // limit is a time and not the load state.
   const code = (id: string) => {
     const live = query.data?.get(id);
-    return live && (live.expiresAt + RELOAD_GRACE_MS > Date.now() || query.isFetching) ? live : undefined;
+    return live && live.expiresAt + RELOAD_GRACE_MS > Date.now() ? live : undefined;
   };
   return { code, query };
 }
