@@ -4,7 +4,7 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
-import { Directory, File, Paths } from "expo-file-system";
+import { Directory, File, FileMode, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import { useThemeColor } from "heroui-native/hooks";
@@ -189,14 +189,37 @@ async function writeToFolder(
     throw new Error(currentText().t("mobile.chat.attachment.unavailable"));
   if (kept) {
     // A kept file copies natively, so a large file is not read into memory. A folder that cannot take
-    // a copy, such as an Android content URI, gets the bytes below.
+    // a copy, such as an Android content URI, gets the file in chunks below.
     try {
       await new File(kept).copy(new File(folder, candidate));
       return;
     } catch {}
   }
   const file = folder.createFile(candidate, data.mimeType);
-  await file.write(kept ? await new File(kept).base64() : data.base64, { encoding: "base64" });
+  if (kept) await copyInChunks(new File(kept), file);
+  else await file.write(data.base64, { encoding: "base64" });
+}
+
+/** The size of one read in `copyInChunks`. */
+const COPY_CHUNK_BYTES = 1024 * 1024;
+
+/** Copies a file one chunk at a time, so a large file never is in JS memory at once. */
+async function copyInChunks(source: File, target: File) {
+  const input = source.open(FileMode.ReadOnly);
+  try {
+    const output = target.open(FileMode.Truncate);
+    try {
+      for (;;) {
+        const chunk = await input.readBytes(COPY_CHUNK_BYTES);
+        if (chunk.length === 0) break;
+        await output.writeBytes(chunk);
+      }
+    } finally {
+      output.close();
+    }
+  } finally {
+    input.close();
+  }
 }
 
 /** Whether a folder has a file with this name. A content URI folder on Android cannot say, and gives a new name itself. */
