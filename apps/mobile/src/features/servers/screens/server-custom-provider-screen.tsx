@@ -295,9 +295,12 @@ function CustomProviderForm({
     }
 )) {
   const { t, errorMessage } = useText();
-  const { saved } = from;
+  // The endpoint as the form opened it: a list that a refresh reads later does not change which
+  // header values the form keeps.
+  const [opened] = useState(from);
+  const saved = opened.saved;
   const [draft, setDraft] = useState<CustomProviderDraft>(() =>
-    from.saved ? savedCustomProviderDraft(from.saved) : presetCustomProviderDraft(from.preset),
+    opened.saved ? savedCustomProviderDraft(opened.saved) : presetCustomProviderDraft(opened.preset),
   );
   const initial = useRef(draft);
   const [error, setError] = useState<string | null>(null);
@@ -357,7 +360,7 @@ function CustomProviderForm({
       {/* A preset fills the form, so Add shows also before the first change. */}
       <SheetSaveAction
         dirty={saved ? dirty : dirty || ready}
-        canSave={ready}
+        canSave={ready && !action.pending}
         pending={action.pending && !removing.current}
         label={saved ? undefined : t("mobile.server.customProviders.addConfirm")}
         pendingLabel={saved ? undefined : t("mobile.server.customProviders.adding")}
@@ -365,7 +368,7 @@ function CustomProviderForm({
           action.run(async () => {
             removing.current = false;
             const result = from.saved
-              ? await from.update(customProviderUpdateInput(draft, from.saved))
+              ? await from.update(customProviderUpdateInput(draft, saved ?? from.saved))
               : await admin.saveCustom(customProviderInput(draft));
             return () => void onList(result.providers);
           })
@@ -471,37 +474,18 @@ function CustomProviderForm({
         onChange={(headers) => edit({ headers })}
       />
       {saved ? (
-        <SettingsSection>
-          <SettingsRow
-            disclosure={false}
-            disabled={locked}
-            leading={<RowIcon icon={Trash2} tone="danger" />}
-            onPress={() =>
-              Alert.alert(
-                t("mobile.server.customProviders.removeTitle", { name: saved.name }),
-                t("mobile.server.customProviders.removeBody"),
-                [
-                  { text: t("common.cancel"), style: "cancel" },
-                  {
-                    text: t("mobile.server.customProviders.remove"),
-                    style: "destructive",
-                    onPress: () =>
-                      action.run(async () => {
-                        removing.current = true;
-                        setError(null);
-                        const result = await admin.deleteCustom(saved.id);
-                        return () => void onList(result.providers);
-                      }),
-                  },
-                ],
-              )
-            }
-          >
-            <Typography.Paragraph className="text-danger-text">
-              {t("mobile.server.customProviders.remove")}
-            </Typography.Paragraph>
-          </SettingsRow>
-        </SettingsSection>
+        <RemoveCustomProviderRow
+          name={saved.name}
+          disabled={locked}
+          onRemove={() =>
+            action.run(async () => {
+              removing.current = true;
+              setError(null);
+              const result = await admin.deleteCustom(saved.id);
+              return () => void onList(result.providers);
+            })
+          }
+        />
       ) : null}
     </SettingsContent>
   );
@@ -566,36 +550,53 @@ function SavedCustomProvider({
           </SettingsRow>
         ))}
       </SettingsSection>
-      <SettingsSection>
-        <SettingsRow
-          disclosure={false}
-          disabled={action.pending}
-          leading={<RowIcon icon={Trash2} tone="danger" />}
-          onPress={() =>
-            Alert.alert(
-              t("mobile.server.customProviders.removeTitle", { name: provider.name }),
-              t("mobile.server.customProviders.removeBody"),
-              [
-                { text: t("common.cancel"), style: "cancel" },
-                {
-                  text: t("mobile.server.customProviders.remove"),
-                  style: "destructive",
-                  onPress: () =>
-                    action.run(async () => {
-                      setError(null);
-                      const result = await admin.deleteCustom(provider.id);
-                      return () => void onList(result.providers);
-                    }),
-                },
-              ],
-            )
-          }
-        >
-          <Typography.Paragraph className="text-danger-text">
-            {t("mobile.server.customProviders.remove")}
-          </Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
+      <RemoveCustomProviderRow
+        name={provider.name}
+        disabled={action.pending}
+        onRemove={() =>
+          action.run(async () => {
+            setError(null);
+            const result = await admin.deleteCustom(provider.id);
+            return () => void onList(result.providers);
+          })
+        }
+      />
     </SettingsContent>
+  );
+}
+
+/** Remove, after the user confirms it. A removal moves the agents of the endpoint off its models. */
+function RemoveCustomProviderRow({
+  name,
+  disabled,
+  onRemove,
+}: {
+  name: string;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const { t } = useText();
+  return (
+    <SettingsSection>
+      <SettingsRow
+        disclosure={false}
+        disabled={disabled}
+        leading={<RowIcon icon={Trash2} tone="danger" />}
+        onPress={() =>
+          Alert.alert(
+            t("mobile.server.customProviders.removeTitle", { name }),
+            t("mobile.server.customProviders.removeBody"),
+            [
+              { text: t("common.cancel"), style: "cancel" },
+              { text: t("mobile.server.customProviders.remove"), style: "destructive", onPress: onRemove },
+            ],
+          )
+        }
+      >
+        <Typography.Paragraph className="text-danger-text">
+          {t("mobile.server.customProviders.remove")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
   );
 }
