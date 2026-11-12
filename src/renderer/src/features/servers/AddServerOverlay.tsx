@@ -445,7 +445,15 @@ function AddServerSession(
       draft.orderError = null;
     });
     try {
-      if (!(await loaded)) return;
+      // The user chose on the last answers. When the new ones change the first choices, the page starts again with
+      // them, and the user must look at it again before an order.
+      const shownKey = state.plans && pageKey(state.plans);
+      if (!(await loaded) || (state.plans && pageKey(state.plans)) !== shownKey) {
+        setState((draft) => {
+          draft.orderedFromPage = false;
+        });
+        return;
+      }
       if (order.server) {
         await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
       } else if (order.license) {
