@@ -22,6 +22,17 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     if (url.pathname === "/stuck" && stuckPageFails) return Response.error();
     if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
     if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
+    if (url.pathname === "/signup")
+      // A sign-up form: it sends only when the password and its confirmation match (#6333).
+      return new Response(
+        `<!doctype html><body>
+        <label>Name<input id="name" type="text"></label>
+        <label>Password<input id="password" type="password"></label>
+        <label>Confirm password<input id="confirm" type="password"></label>
+        <button id="submit" onclick="const password = document.querySelector('#password').value; if (password && password === document.querySelector('#confirm').value) location.href = '/complete'">Register</button>
+        </body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.pathname === "/mirrored") {
       mirroredPageLoads += 1;
       // A single-page sign-in as React renders it: the field's value is copied to its value attribute,
@@ -305,6 +316,62 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(wrongTab.id));
       }
     }
+    // One saved password fills a sign-up form's password and its confirmation, and the form sends. A
+    // text field cannot take the second copy (#6333).
+    let vaultFillable = false;
+    const signup: Array<{ confirm: string; result: string; path: string }> = [];
+    for (const [confirm, expected] of [
+      ["#confirm", "submitted"],
+      ["#name", "must both be password fields"],
+    ] as const) {
+      const signupTab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/signup", "secret-thread", "secret-agent"),
+      );
+      try {
+        const signupContents = webContents.getAllWebContents().find((item) => item.getURL() === signupTab.url);
+        if (!signupContents) throw new Error("Missing sign-up fixture.");
+        await waitForPresentedFrame(signupContents);
+        const result = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `signup-${confirm}`,
+            arguments: {
+              tabId: signupTab.id,
+              method: "password",
+              targets: [
+                { kind: "css", selector: "#password" },
+                { kind: "css", selector: confirm },
+              ],
+              submission: "click",
+              submitTarget: { kind: "css", selector: "#submit" },
+            },
+          }),
+        ).then(
+          async (handoff) => {
+            vaultFillable ||= handoff.vaultFillable;
+            return runCauseEffect(handoff.submit(vaultPassword, true));
+          },
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+        const snapshot = await runCauseEffect(browser.snapshot(signupTab.id));
+        signup.push({ confirm, result, path: new URL(snapshot.url).pathname });
+        if (!result.includes(expected) || (expected === "submitted") !== snapshot.url.endsWith("/complete"))
+          throw new Error(`A sign-up fill with ${confirm} gave ${result} at ${snapshot.url}.`);
+        if (JSON.stringify(snapshot).includes(vaultPassword)) throw new Error("A sign-up password reached a snapshot.");
+      } finally {
+        await runCauseEffect(browser.close(signupTab.id));
+      }
+    }
+    if (!vaultFillable) throw new Error("A sign-up password and confirmation were not vault-fillable.");
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(
+      ".openbot-build/browser-secret-confirm-password.json",
+      JSON.stringify({ status: "passed", vaultFillable, signup }, null, 2),
+    );
     // A sign-in that answers in the same document keeps its answer: OpenBot empties the field and its
     // value attribute, and does not load the page again (#7564).
     const mirroredTab = await runCauseEffect(

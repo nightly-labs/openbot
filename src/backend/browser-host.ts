@@ -1600,8 +1600,9 @@ export class BrowserHost {
     if (args.method !== "password" && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
-      (args.method === "password" && args.targets.length !== 1) ||
-      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (args.method === "password"
+        ? args.targets.length > 2
+        : args.targets.length !== 1 && args.targets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
       return yield* browserFailure(
@@ -1611,7 +1612,7 @@ export class BrowserHost {
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
               : args.method === "password"
-                ? "Invalid authentication targets: method=password needs exactly one field target."
+                ? "Invalid authentication targets: method=password needs one field target, or a password and its confirmation field."
                 : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
@@ -1629,7 +1630,13 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(
+                args.targets,
+                url.origin,
+                args.method === "password",
+                args.submission,
+                args.submitTarget,
+              ),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
