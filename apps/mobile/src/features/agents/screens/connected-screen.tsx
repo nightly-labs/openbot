@@ -749,7 +749,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDraggingChange: setDragging,
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
-      layout: () => sidebarLayout,
+      // Without manual sections, a drop in the list only unpins: it does not move the chat in the layout.
+      layout: () => (chatOrder === "unread-first" ? null : sidebarLayout),
     }),
     [
       items,
