@@ -1,9 +1,14 @@
 // @vitest-environment node
 
-import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "@openbot/contracts/ipc";
+import {
+  BROWSER_DOCK_OVERLAY_WIDTH,
+  type BrowserDockAction,
+  type BrowserDockFrame,
+  type BrowserDockPresentation,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BROWSER_DOCK_OVERLAY_WIDTH, browserDockLayout } from "../browser-dock-overlay";
+import { browserDockLayout } from "../browser-dock-overlay";
 import { browserDockIpcHandlers } from "./browser-dock-handlers";
 
 // Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so

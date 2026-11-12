@@ -11,7 +11,7 @@ import type {
   BrowserDockGlass,
   BrowserDockPresentation,
 } from "@openbot/contracts/ipc";
-import { BROWSER_DOCK_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { BROWSER_DOCK_LIMITS, BROWSER_DOCK_OVERLAY_WIDTH, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Schema, Semaphore } from "effect";
 import { type BrowserWindow, type Input, type Rectangle, View, type WebContents, WebContentsView } from "electron";
@@ -22,8 +22,6 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
 
 const logger = createOpenBotLogger("browser-dock-overlay");
 
-/** The overlay width, in CSS pixels, until the dock reports the space that it needs. It is wider than the dock. */
-export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
 /** The height of the overlay, in CSS pixels, until it reports the space that the dock needs. */
 const INITIAL_HEIGHT = 160;
 /** A smaller frame waits for this time, so a dock that shrinks while it moves is not cut. */

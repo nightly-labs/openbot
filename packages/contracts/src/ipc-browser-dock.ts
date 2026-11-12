@@ -40,6 +40,12 @@ export const BROWSER_DOCK_LIMITS = {
   label: 600,
 } as const;
 
+/**
+ * The width of the overlay while the box shows, in CSS pixels: the widest box (640 in `browser-dock.css`)
+ * and the room for its shadow at each side. On a narrow page, main makes the overlay as wide as the page.
+ */
+export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
+
 /** The agent fields that the dock reads. */
 export interface BrowserDockAgent {
   id: string;

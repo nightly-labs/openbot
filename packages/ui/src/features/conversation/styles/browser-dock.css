@@ -253,8 +253,9 @@
 }
 
 /*
- * The user hid the box: a tab with the agent stays at the bottom edge, in the middle of the box. It has the height, the bottom line and the avatar inset of the field, so the glass of the field
- * shrinks into it and grows out of it.
+ * The user hid the box: a tab with the agent stays at the bottom edge, in the middle of the box. It has the
+ * height, the bottom line and the avatar inset of the field, so the glass of the field shrinks into it and
+ * grows out of it.
  */
 /* While the copy of its glass moves, the field draws no glass of its own. */
 .browser-dock[data-glassless] .browser-dock-composer {

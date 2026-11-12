@@ -1,5 +1,6 @@
 import {
   BROWSER_DOCK_LIMITS,
+  BROWSER_DOCK_OVERLAY_WIDTH,
   type BrowserDockAction,
   type BrowserDockFrame,
   type BrowserDockGlass,
@@ -79,8 +80,10 @@ export function BrowserDockSurface() {
         if (shape) glass.push(shape);
       }
     }
-    // The dock is at the bottom centre, so the overlay needs only the width of the box, or of its tab when
-    // the user hid the box, so the page at its sides gets the clicks. A menu needs the whole page.
+    // The dock is at the bottom centre, so the page at its sides gets the clicks. A menu needs the whole page.
+    // The box takes its width from the overlay, so the overlay of the box has a fixed width: a width measured
+    // from the box would keep a narrow overlay narrow. The overlay of the tab, when the user hid the box, is
+    // only as wide as the tab. An even width keeps the centre on a whole pixel.
     const tab = dock.hasAttribute("data-tucked") ? dock.querySelector(".browser-dock-tab") : null;
     const box = (tab ?? dock).getBoundingClientRect();
     const limit = BROWSER_DOCK_LIMITS.frameSize;
@@ -88,7 +91,8 @@ export function BrowserDockSurface() {
     const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, limit);
     const centre = window.innerWidth / 2;
     const reach = Math.max(centre - box.left, box.right - centre);
-    const width = open.length > 0 ? limit : clamp(Math.ceil(2 * (reach + SHADOW_ROOM)), 0, limit);
+    const width =
+      open.length > 0 ? limit : tab ? clamp(2 * Math.ceil(reach + SHADOW_ROOM), 0, limit) : BROWSER_DOCK_OVERLAY_WIDTH;
     // Main places the glass in an overlay of the new width before this view has that width. The dock stays
     // at the centre, so a glass shape keeps its distance from the centre.
     const shift = (width - window.innerWidth) / 2;
