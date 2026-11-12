@@ -1517,6 +1517,7 @@ export const messages = {
   "mobile.server.route.transfer": "Transfert",
   "mobile.server.route.transferExport": "Exporter",
   "mobile.server.route.transferImport": "Importer",
+  "mobile.server.route.transferCopy": "Copier vers un autre serveur",
   "mobile.server.transfer.unsupported": "Mettez à jour OpenBot sur ce serveur pour le transférer ici.",
   "mobile.server.transfer.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour le transférer.",
@@ -1582,4 +1583,21 @@ export const messages = {
     "Ces fournisseurs étaient connectés sur l’autre serveur, mais ne le sont pas ici. Connectez-vous à eux dans Réglages du serveur › Fournisseurs.",
   "mobile.server.transfer.notImported": "Non importé",
   "mobile.server.transfer.warnings": "À vérifier",
+  "mobile.server.transfer.copy": "Copier vers un autre serveur",
+  "mobile.server.transfer.copyNote": "Envoyez des agents vers un autre de vos serveurs.",
+  "mobile.server.transfer.copyTo": "Vers",
+  "mobile.server.transfer.copyNoAgents": "Ce serveur n’a aucun agent.",
+  "mobile.server.transfer.copyNotMoved":
+    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+  "mobile.server.transfer.copySubmit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "mobile.server.transfer.copying": "Copie…",
+  "mobile.server.transfer.copyFailed": "La copie n’a pas abouti.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent copié vers {server}.",
+    other: "{count} agents copiés vers {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents à copier",
+  "mobile.server.transfer.copyNext": "Les agents copiés suivent les règles d’approbation de {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Connectez-vous à un autre serveur en tant que propriétaire ou administrateur pour y copier des agents.",
 } as const satisfies PartialTranslation<typeof source>;

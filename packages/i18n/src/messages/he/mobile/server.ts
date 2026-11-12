@@ -1956,6 +1956,7 @@ export const messages = {
   "mobile.server.route.transfer": "העברה",
   "mobile.server.route.transferExport": "ייצוא",
   "mobile.server.route.transferImport": "ייבוא",
+  "mobile.server.route.transferCopy": "העתקה לשרת אחר",
   "mobile.server.transfer.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי להעביר אותו כאן.",
   "mobile.server.transfer.unavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי להעביר אותו.",
   "mobile.server.transfer.title": "העברת השרת הזה למחשב אחר",
@@ -2017,4 +2018,25 @@ export const messages = {
     "הספקים האלה היו מחוברים בשרת האחר ואינם מחוברים כאן. יש להתחבר אליהם בהגדרות שרת › ספקים.",
   "mobile.server.transfer.notImported": "לא יובאו",
   "mobile.server.transfer.warnings": "יש לבדוק את אלה",
+  "mobile.server.transfer.copy": "העתקה לשרת אחר",
+  "mobile.server.transfer.copyNote": "שליחת סוכנים לשרת אחר שלך.",
+  "mobile.server.transfer.copyTo": "אל",
+  "mobile.server.transfer.copyNoAgents": "אין סוכנים בשרת הזה.",
+  "mobile.server.transfer.copyNotMoved":
+    "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+  "mobile.server.transfer.copySubmit": {
+    one: "העתקת סוכן אחד",
+    two: "העתקת שני סוכנים",
+    other: "העתקת {count} סוכנים",
+  },
+  "mobile.server.transfer.copying": "מעתיק…",
+  "mobile.server.transfer.copyFailed": "ההעתקה לא הסתיימה.",
+  "mobile.server.transfer.copied": {
+    one: "סוכן אחד הועתק אל {server}.",
+    two: "שני סוכנים הועתקו אל {server}.",
+    other: "{count} סוכנים הועתקו אל {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "סוכנים להעתקה",
+  "mobile.server.transfer.copyNext": "סוכנים מועתקים משתמשים בכללי האישור של {server}.",
+  "mobile.server.transfer.copyNoServer": "יש להתחבר לשרת אחר כבעלים או כמנהל כדי להעתיק אליו סוכנים.",
 } as const satisfies PartialTranslation<typeof source>;

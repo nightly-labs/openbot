@@ -1482,6 +1482,7 @@ export const messages = {
   "mobile.server.route.transfer": "移行",
   "mobile.server.route.transferExport": "エクスポート",
   "mobile.server.route.transferImport": "インポート",
+  "mobile.server.route.transferCopy": "別のサーバーにコピー",
   "mobile.server.transfer.unsupported": "ここで移行するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.transfer.unavailable": "移行するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.transfer.title": "このサーバーを別のコンピューターに移動",
@@ -1546,4 +1547,18 @@ export const messages = {
     "これらのプロバイダーは別のサーバーではサインインしていましたが、ここではサインインしていません。「サーバー設定 › プロバイダー」でサインインしてください。",
   "mobile.server.transfer.notImported": "インポートされなかった項目",
   "mobile.server.transfer.warnings": "確認事項",
+  "mobile.server.transfer.copy": "別のサーバーにコピー",
+  "mobile.server.transfer.copyNote": "エージェントを自分の別のサーバーに送ります。",
+  "mobile.server.transfer.copyTo": "コピー先",
+  "mobile.server.transfer.copyNoAgents": "このサーバーにはエージェントがありません。",
+  "mobile.server.transfer.copyNotMoved":
+    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+  "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
+  "mobile.server.transfer.copying": "コピー中…",
+  "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",
+  "mobile.server.transfer.copied": { other: "エージェント {count} 件を {server} にコピーしました。" },
+  "mobile.server.transfer.copyAgents": "コピーするエージェント",
+  "mobile.server.transfer.copyNext": "コピーしたエージェントには、{server} の承認ルールが適用されます。",
+  "mobile.server.transfer.copyNoServer":
+    "エージェントをコピーするには、オーナーまたは管理者として別のサーバーに接続してください。",
 } as const satisfies PartialTranslation<typeof source>;

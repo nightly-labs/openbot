@@ -1933,6 +1933,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.transfer": "Transfer",
   "mobile.server.route.transferExport": "Export",
   "mobile.server.route.transferImport": "Import",
+  "mobile.server.route.transferCopy": "Copy to another server",
   "mobile.server.transfer.unsupported": "Update OpenBot on this server to transfer it here.",
   "mobile.server.transfer.unavailable": "Connect to this server as an owner or admin to transfer it.",
   "mobile.server.transfer.title": "Move this server to another computer",
@@ -1996,4 +1997,20 @@ export const messages = defineMessages("mobile.server", {
     "These providers were signed in on the other server and are not signed in here. Sign in to them in Server settings › Providers.",
   "mobile.server.transfer.notImported": "Not imported",
   "mobile.server.transfer.warnings": "Check these",
+  "mobile.server.transfer.copy": "Copy to another server",
+  "mobile.server.transfer.copyNote": "Send agents to another of your servers.",
+  "mobile.server.transfer.copyTo": "To",
+  "mobile.server.transfer.copyNoAgents": "This server has no agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "mobile.server.transfer.copying": "Copying…",
+  "mobile.server.transfer.copyFailed": "The copy did not finish.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents to copy",
+  "mobile.server.transfer.copyNext": "Copied agents use the approval rules of {server}.",
+  "mobile.server.transfer.copyNoServer": "Connect to another server as an owner or admin to copy agents to it.",
 });
