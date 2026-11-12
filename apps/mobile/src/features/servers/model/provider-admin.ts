@@ -197,7 +197,7 @@ function providerSignInAlternative(provider: AgentProviderId, capabilities: read
 
 /**
  * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`,
- * Inception, DeepSeek and OpenRouter from `providers-v8`, and Claude and ChatGPT when the host reads
+ * Inception, DeepSeek, OpenRouter and Venice from `providers-v8`, and Claude and ChatGPT when the host reads
  * their key (`claude-api-key-v1`, `codex-api-key-v1`). An older host stores such a key and never
  * reads it.
  */

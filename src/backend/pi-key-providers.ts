@@ -5,6 +5,7 @@ import type { KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { Effect } from "effect";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
+import { VENICE_MODELS } from "./venice-models";
 
 // Each extension takes the key from the environment and removes it before a tool can start a child
 // process. The key is never written to the extension file. Pi runs an extension again when it
@@ -19,6 +20,8 @@ const readKey = (provider: KeyOnlyProviderId, variable: string) => `
   if (!key) return;
   const literal = key.replaceAll("$", "$$$$");
   const apiKey = literal.replace(/^!/, "$$!");`;
+
+const VENICE_MODELS_VARIABLE = "OPENBOT_PI_VENICE_MODELS";
 
 const KEY_EXTENSIONS = {
   // Inception serves Mercury through OpenAI chat completions. Pi has no built-in Inception provider,
@@ -96,9 +99,42 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
+  // Venice serves its models through OpenAI chat completions. Pi has no Venice provider, so this
+  // registers one with the models of `venice-models.ts`. They are public, so they are in a JSON file
+  // beside the extension, which the environment names: the list is too long for one Windows variable
+  // (32,767 characters). The Authorization header replaces a key that Pi could read from its auth.json,
+  // as for DeepSeek. Venice adds its own system prompt to each request unless
+  // `include_venice_system_prompt` is false; this process runs only Venice models, so each request
+  // gets it.
+  venice: {
+    variable: "OPENBOT_PI_VENICE_API_KEY",
+    source: `import { readFileSync } from "node:fs";
+export default function (pi) {${readKey("venice", "OPENBOT_PI_VENICE_API_KEY")}
+  const modelSlot = Symbol.for("openbot.pi.veniceModels");
+  globalThis[modelSlot] ??= JSON.parse(readFileSync(process.env.${VENICE_MODELS_VARIABLE}, "utf8"));
+  delete process.env.${VENICE_MODELS_VARIABLE};
+  pi.registerProvider("venice", {
+    baseUrl: "https://api.venice.ai/api/v1",
+    api: "openai-completions",
+    apiKey,
+    headers: { Authorization: "Bearer " + literal },
+    models: globalThis[modelSlot],
+  });
+  pi.on("before_provider_request", (event) => {
+    const payload = event.payload;
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+    const venice = payload.venice_parameters !== null && typeof payload.venice_parameters === "object" ? payload.venice_parameters : {};
+    return { ...payload, venice_parameters: { ...venice, include_venice_system_prompt: false } };
+  });
+}
+`,
+  },
 } as const satisfies Record<KeyOnlyProviderId, { variable: string; source: string }>;
 
-/** Owns one temporary, key-free extension file that gives a key-only provider its key in Pi. */
+/**
+ * Owns one temporary, key-free extension file that gives a key-only provider its key in Pi, and for
+ * Venice the model list beside it.
+ */
 export const createPiKeyExtension = Effect.fn("PiKeyProviders.createExtension")(function* (
   provider: KeyOnlyProviderId,
   key: string,
@@ -109,12 +145,14 @@ export const createPiKeyExtension = Effect.fn("PiKeyProviders.createExtension")(
   yield* providerCall(() => mkdir(root, { recursive: true, mode: 0o700 }));
   const folder = yield* providerCall(() => mkdtemp(join(root, "openbot-pi-")));
   const path = join(folder, `${provider}.mjs`);
-  yield* providerCall(() => writeFile(path, source, { mode: 0o600 })).pipe(
-    Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)),
-  );
+  const models = provider === "venice" ? join(folder, "venice-models.json") : null;
+  yield* providerCall(async () => {
+    await writeFile(path, source, { mode: 0o600 });
+    if (models) await writeFile(models, JSON.stringify(VENICE_MODELS), { mode: 0o600 });
+  }).pipe(Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)));
   return {
     path,
-    environment: { [variable]: key },
+    environment: { [variable]: key, ...(models ? { [VENICE_MODELS_VARIABLE]: models } : {}) },
     secrets: [key],
     close: () => providerCall(() => rm(folder, { recursive: true, force: true })),
   } satisfies PiMcpExtension;

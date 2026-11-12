@@ -7,9 +7,14 @@ import { useCSSVariable } from "uniwind";
 /** The colour of a provider mark. Codex, Grok and the others draw in the text colour. */
 function useProviderColor(provider: AgentProviderId): string {
   const foreground = String(useThemeColor("foreground"));
-  const [claude, gemini] = useCSSVariable(["--openbot-provider-claude", "--openbot-provider-antigravity"]);
+  const [claude, gemini, venice] = useCSSVariable([
+    "--openbot-provider-claude",
+    "--openbot-provider-antigravity",
+    "--openbot-provider-venice",
+  ]);
   if (provider === "claude" && claude) return String(claude);
   if (provider === "antigravity" && gemini) return String(gemini);
+  if (provider === "venice" && venice) return String(venice);
   return foreground;
 }
 

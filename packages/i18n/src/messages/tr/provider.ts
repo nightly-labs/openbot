@@ -184,6 +184,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
+  "provider.veniceKey.title": "Venice API anahtarı",
+  "provider.veniceKey.description":
+    "Venice modellerini kullanmak için bu bilgisayara bir Venice API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.veniceKey.label": "Venice API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
     "Ücretsiz modeller hesap gerektirmez. Bir anahtar, ücretli Go modellerinin kilidini açar.",

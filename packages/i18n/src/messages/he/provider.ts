@@ -187,6 +187,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "אפשר לשמור מפתח OpenRouter API במחשב הזה כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
+  "provider.veniceKey.title": "מפתח Venice API",
+  "provider.veniceKey.description":
+    "אפשר לשמור מפתח Venice API במחשב הזה כדי להשתמש במודלים ש-Venice מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.veniceKey.label": "מפתח Venice API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
   "provider.openCodeKey.unreadable": "המפתח השמור אינו קריא. יש להדביק אותו שוב, או להסיר אותו.",

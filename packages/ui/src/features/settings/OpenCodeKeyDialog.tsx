@@ -83,6 +83,12 @@ const KEY_TEXT = {
     description: "provider.openrouterKey.description",
     label: "provider.openrouterKey.label",
   },
+  venice: {
+    name: "Venice",
+    title: "provider.veniceKey.title",
+    description: "provider.veniceKey.description",
+    label: "provider.veniceKey.label",
+  },
 } as const satisfies Record<string, { name: string; title: AppTextKey; description: AppTextKey; label: AppTextKey }>;
 
 /** A provider whose API key this dialog saves. */

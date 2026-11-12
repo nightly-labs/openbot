@@ -1217,7 +1217,7 @@ provider added after v8 needs no new protocol version. The `providers-v8` routes
 The host hides a provider from a peer below v8 when that protocol's frozen list does not have it
 (`FROZEN_PROVIDERS` in `src/main/team-api/provider-visibility.ts`). So a new provider is hidden
 from old peers with no change there. Do not edit those lists. A key-only provider
-(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek and OpenRouter) is not in any frozen list, so a v8
+(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek, OpenRouter and Venice) is not in any frozen list, so a v8
 peer is the first to see it. The `providers-v8` key routes read, set and clear its key. A key set
 there starts the host's Pi download when Pi cannot start, and does not wait for it. Until Pi is
 ready no process uses the key, so the route saves only the key; the provider is checked again when Pi
@@ -1545,6 +1545,26 @@ Pi unchanged. The catalog drops the aliases that start with `~`, such as
 `anthropic/claude-sonnet-5.5`. The model picker groups the models by lab (`openRouterLab` in
 `provider-model-options.ts`) and marks the `:free` models as free. A 402 means the account has no
 credits. Peers see OpenRouter from v8, as Inception.
+
+## Venice
+
+Venice works as Inception does: a key-only provider on Pi's managed CLI. The key is stored as the
+`venice` API key. Pi has no built-in Venice provider, so the extension from `pi-key-providers.ts`
+registers `venice` with `https://api.venice.ai/api/v1`, Pi's `openai-completions` API, the key, the
+`Authorization` header and the models. The models come from `src/backend/venice-models.ts`, which
+`bun scripts/venice-model-catalog.ts` makes from Venice's public `GET /models?type=text` (no key).
+The catalog keeps the text models that are online and support function calls, and drops the
+`e2ee-*` models and the ids that `isAgentModel` refuses. Each model keeps Venice's context window,
+completion limit, prices and reasoning efforts; Pi's `off` level sends Venice's `none`. The list
+is too long for one environment variable on Windows (32,767 characters), so `createPiKeyExtension`
+writes it to `venice-models.json` beside the extension, and the variable holds only its path. The
+key is in neither file. A `before_provider_request` hook sets
+`venice_parameters.include_venice_system_prompt` to `false`, so Venice does not add its own system
+prompt to OpenBot's. When OpenBot reads the model list, Pi does not contact Venice. Model ids are
+Venice's bare ids, and the default is `deepseek-v4-1-flash-1017`. A 401 or a 402 shows the saved-key
+or balance text. Run the generator again to take new Venice models. Peers see Venice from v8, as
+Inception. `bun scripts/venice-agent-smoke.ts` checks the driver with the real Pi CLI against a
+local fake Venice server.
 
 ## Muse
 

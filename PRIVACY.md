@@ -1840,6 +1840,18 @@ with the key, for the models that the key can use. Pi keeps its session files in
 files. OpenRouter's terms apply: <https://openrouter.ai/terms>. OpenRouter agents stay on this
 computer: OpenBot does not show them to team members.
 
+### Venice
+
+Venice agents run in the Pi CLI that OpenBot downloads for Pi. On this computer, Connect on the
+Venice row saves a Venice API key. OpenBot encrypts it in its existing provider credential store,
+gives it to the local Pi process in its environment, and redacts it from logs. Pi does not write
+the key to a file. Prompts, attachments, and tool results go to that process, and Pi sends them with
+this key to `api.venice.ai`. OpenBot asks Venice not to add its own system prompt. The Venice model
+list comes with OpenBot, so when OpenBot reads it, Pi does not contact Venice. Pi keeps its session
+files in its own folder, as for Pi agents. OpenBot does not copy or upload these files. Venice's
+terms and privacy policy apply: <https://venice.ai/legal/tos> and <https://venice.ai/privacy>.
+Venice agents stay on this computer: OpenBot does not show them to team members.
+
 ### Local model servers
 
 When Server settings shows the Providers section of this computer, and once on the onboarding

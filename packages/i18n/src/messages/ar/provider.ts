@@ -206,6 +206,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "احفظ مفتاح OpenRouter API على هذا الحاسوب لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.label": "مفتاح OpenRouter API",
+  "provider.veniceKey.title": "مفتاح Venice API",
+  "provider.veniceKey.description":
+    "احفظ مفتاح Venice API على هذا الحاسوب لاستخدام النماذج التي يقدمها Venice. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.veniceKey.label": "مفتاح Venice API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
   "provider.openCodeKey.unreadable": "المفتاح المحفوظ غير قابل للقراءة. الصقه مرة أخرى، أو أزله.",

@@ -130,6 +130,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Mercury models with an Inception API key": "onboarding.provider.inceptionKey",
   "DeepSeek models with a DeepSeek API key": "onboarding.provider.deepseekKey",
   "Many models with an OpenRouter API key": "onboarding.provider.openrouterKey",
+  "Many models with a Venice API key": "onboarding.provider.veniceKey",
   "Nous Portal plan or your Hermes setup": "onboarding.provider.hermesNous",
 };
 

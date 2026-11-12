@@ -170,6 +170,9 @@
   --openbot-provider-codex: var(--openbot-text-primary);
   --openbot-provider-claude: #d97757;
   --openbot-provider-grok: var(--openbot-text-primary);
+  /* venice.ai/brand allows the keys only in Deep Blue, Off White, white or black; never Venetian
+     Blue. The light palettes set Deep Blue. */
+  --openbot-provider-venice: #ffffff;
   /* The Gemini brand colour that Simple Icons gives. */
   --openbot-provider-antigravity: #8e75b2;
   /* A chart series needs a hue of its own: the logo colours above give codex and grok the
@@ -508,6 +511,10 @@
 
 [data-provider="mistral"] {
   --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="venice"] {
+  --openbot-provider-current: var(--openbot-provider-venice);
 }
 
 [data-provider="acp"] {
