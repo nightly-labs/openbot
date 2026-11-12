@@ -338,6 +338,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "مرتفع جدًا",
   "mobile.agent.runtime.effort.max": "أقصى",
   "mobile.agent.runtime.effort.ultra": "فائق",
+  "mobile.agent.runtime.fast": "سريع",
   "mobile.agent.runtime.retryModels": "إعادة محاولة النماذج",
   "mobile.agent.runtime.loadingModels": "جارٍ تحميل النماذج…",
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
