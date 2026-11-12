@@ -90,6 +90,7 @@ import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
@@ -307,6 +308,7 @@ export {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
@@ -594,6 +596,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -808,7 +811,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
     capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
-    capability !== GITHUB_SKILLS_CAPABILITY,
+    capability !== GITHUB_SKILLS_CAPABILITY &&
+    capability !== HOST_RESTART_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -899,6 +903,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1072,6 +1077,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
       capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
-      capability !== GITHUB_SKILLS_CAPABILITY,
+      capability !== GITHUB_SKILLS_CAPABILITY &&
+      capability !== HOST_RESTART_CAPABILITY,
   );
 }

@@ -68,6 +68,7 @@ import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
+import { HOST_RESTART_CODECS } from "./host-restart-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
@@ -174,6 +175,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
+  ...HOST_RESTART_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,

@@ -84,6 +84,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-restart-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||

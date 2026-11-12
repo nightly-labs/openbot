@@ -491,6 +491,13 @@ export interface MobileWorkspaceContextValue {
   localServerKind: (serverId: string) => "computer" | "onComputer" | null;
   /** Deletes a server on a computer through the computer's own server, which must be online. */
   deleteLocalServer: (serverId: string) => Promise<void>;
+  /**
+   * An owner or admin of an online self-hosted server that serves `host-restart-v1`. A hosted server
+   * restarts through the account service instead. The host checks the role again.
+   */
+  canRestartServerItself: (serverId: string) => boolean;
+  /** Asks a self-hosted server to restart now. Its service manager starts it again. */
+  restartServerItself: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -1210,6 +1217,7 @@ type ServerCheckKey =
   | "canEditServerIdentity"
   | "canRotateServerKey"
   | "canCreateLocalServers"
+  | "canRestartServerItself"
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"

@@ -253,6 +253,7 @@ export const messages = {
     "服务器会停止并重新启动，大约需要一分钟。正在运行的助手对话会中断，服务器恢复前成员会失去连接。文件和对话会保留。",
   "mobile.server.settings.restartConfirm": "重启",
   "mobile.server.settings.restarted": "{name} 正在重启",
+  "mobile.server.settings.restartUnsupported": "请更新此服务器上的 OpenBot，以便在此处重启它。",
   "mobile.server.settings.leaveTitle": "退出 {name}？",
   "mobile.server.settings.leaveBody": "如需再次加入，你需要另一个邀请。",
   "mobile.server.settings.leave": "退出服务器",

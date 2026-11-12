@@ -262,6 +262,7 @@ export const messages = {
     "Der Server stoppt und startet wieder. Das dauert etwa eine Minute. Laufende Agentendurchläufe stoppen, und Mitglieder verlieren die Verbindung, bis der Server zurück ist. Dateien und Chats bleiben erhalten.",
   "mobile.server.settings.restartConfirm": "Neu starten",
   "mobile.server.settings.restarted": "{name} startet neu",
+  "mobile.server.settings.restartUnsupported": "Aktualisiere OpenBot auf diesem Server, um ihn hier neu zu starten.",
   "mobile.server.settings.leaveTitle": "{name} verlassen?",
   "mobile.server.settings.leaveBody": "Du brauchst eine neue Einladung, um erneut beizutreten.",
   "mobile.server.settings.leave": "Server verlassen",

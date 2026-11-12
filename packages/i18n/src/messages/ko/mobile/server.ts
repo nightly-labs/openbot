@@ -251,6 +251,7 @@ export const messages = {
     "서버가 중지된 후 다시 시작돼요. 약 1분 정도 걸려요. 실행 중인 에이전트 턴이 중지되고, 서버가 돌아올 때까지 멤버의 연결이 끊겨요. 파일과 채팅은 그대로 유지돼요.",
   "mobile.server.settings.restartConfirm": "다시 시작",
   "mobile.server.settings.restarted": "{name}을(를) 다시 시작하는 중이에요",
+  "mobile.server.settings.restartUnsupported": "여기에서 다시 시작하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.leaveTitle": "{name}에서 나갈까요?",
   "mobile.server.settings.leaveBody": "다시 참여하려면 새 초대가 필요해요.",
   "mobile.server.settings.leave": "서버 나가기",

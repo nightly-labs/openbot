@@ -147,6 +147,12 @@ open a database that a newer one migrated. It also refuses a computer that is a 
 | `sudo openbot uninstall` | Sign out and remove OpenBot. The data stays (see [Remove](#remove)). |
 | `openbot version` | Show the installed version. |
 
+An owner or admin can also restart the server from the app: select Restart server in the server
+menu, or in Server settings on the phone. OpenBot closes, and `openbot.service` starts it again after
+about 10 seconds. In Docker, the container must have a restart policy, such as `--restart
+unless-stopped`; without one, the container stays stopped. When the server does not answer, use
+`sudo openbot restart`.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 

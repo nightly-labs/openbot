@@ -1257,6 +1257,7 @@ const openbotApi: OpenBotDesktopApi = {
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     rotateHostKey: decodeVoid,
+    restartHost: decodeVoid,
     getUpdateStatus: decodeHostUpdateStatus,
     getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
     checkRelease: decodeHostReleaseStatusFromMain,
