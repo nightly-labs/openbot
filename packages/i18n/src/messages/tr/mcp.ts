@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Yanıt yok",
   "mcp.status.didNotStart": "Başlamadı",
   "mcp.status.unreachable": "Ulaşılamıyor",
-  "mcp.server.providerLimitNote":
-    "Yalnızca Claude ve Codex: Çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
   "mcp.server.runtimeDownloading":
     "Bir STDIO sunucusunun başlatıldığı çalışma zamanı indiriliyor. Tamamlanana kadar başlatılamayabilir.",
   "mcp.server.runtimeDownloadingProgress":

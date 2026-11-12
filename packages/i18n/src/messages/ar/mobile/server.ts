@@ -1550,7 +1550,6 @@ export const messages = {
   "mobile.server.mcp.http": "عنوان URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "يشغّل الخادم هذا الأمر على حاسوب الخادم.",
   "mobile.server.mcp.httpDescription": "يمكن لكل مزوّد استخدام خادم HTTP MCP.",
-  "mobile.server.mcp.providerLimit": "Claude وCodex فقط: لا يحصل المزوّدون الآخرون على خادم له دليل عمل.",
   "mobile.server.mcp.command": "الأمر",
   "mobile.server.mcp.commandHint": "البرنامج فقط. ضع كل كلمة بعده في الوسيطات.",
   "mobile.server.mcp.arguments": "الوسيطات",

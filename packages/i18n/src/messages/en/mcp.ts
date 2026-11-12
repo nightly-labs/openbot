@@ -41,8 +41,6 @@ export const messages = defineMessages("mcp", {
   "mcp.status.noAnswer": "No answer",
   "mcp.status.didNotStart": "Did not start",
   "mcp.status.unreachable": "Unreachable",
-  "mcp.server.providerLimitNote":
-    "Claude and Codex only: a server with a working directory is not given to the other providers.",
   "mcp.server.runtimeDownloading":
     "Downloading the runtime a STDIO server is started with. One may not start until it finishes.",
   "mcp.server.runtimeDownloadingProgress":

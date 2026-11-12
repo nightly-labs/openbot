@@ -190,19 +190,6 @@ export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
 }
 
 /**
- * The provider limit this configuration already carries, or `null`.
- *
- * Not a health claim, and so not the stored state the note above rules out: it is read from the
- * saved row alone, it needs no connection, and it is the same answer every time until the user
- * edits the field. A server that names a working directory reaches Claude, Codex and the test and
- * no other provider, which the user should be able to see without starting an agent to find out.
- */
-export function mcpProviderLimitNote(config: McpServerConfig, t: AppTranslate): string | null {
-  if (config.transport !== "stdio" || !config.workingDirectory.trim()) return null;
-  return t("mcp.server.providerLimitNote");
-}
-
-/**
  * What the panel says about the runtime a local stdio server is started with, or `null` when there
  * is nothing to say.
  *

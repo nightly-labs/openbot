@@ -743,7 +743,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       return bunx ? { command: bunx, args: ["--bun"] } : "pending";
     };
     if (!(executable && bunx)) return { ...NO_MCP_TOOL_RUNTIMES, catalogCommand };
-    return { binDirectories: [dirname(executable)], commandAliases: { npx: bunx }, catalogCommand };
+    return { binDirectories: [dirname(executable)], commandAliases: { npx: bunx }, catalogCommand, bun: executable };
   }
 
   /**

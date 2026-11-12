@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Geen antwoord",
   "mcp.status.didNotStart": "Niet gestart",
   "mcp.status.unreachable": "Onbereikbaar",
-  "mcp.server.providerLimitNote":
-    "Alleen Claude en Codex: een server met een werkmap wordt niet aan de andere aanbieders gegeven.",
   "mcp.server.runtimeDownloading":
     "De runtime waarmee een STDIO-server start, wordt gedownload. Zo’n server start mogelijk pas als dit klaar is.",
   "mcp.server.runtimeDownloadingProgress":

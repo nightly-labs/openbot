@@ -42,7 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "응답 없음",
   "mcp.status.didNotStart": "시작 안 됨",
   "mcp.status.unreachable": "연결할 수 없음",
-  "mcp.server.providerLimitNote": "Claude 및 Codex 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
   "mcp.server.runtimeDownloading":
     "STDIO 서버를 시작하는 데 쓰는 런타임을 다운로드하는 중이에요. 완료될 때까지 일부 서버는 시작되지 않을 수 있어요.",
   "mcp.server.runtimeDownloadingProgress":

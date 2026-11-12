@@ -1544,7 +1544,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "השרת מפעיל את הפקודה הזו במחשב של השרת.",
   "mobile.server.mcp.httpDescription": "כל ספק יכול להשתמש בשרת MCP מסוג HTTP.",
-  "mobile.server.mcp.providerLimit": "Claude ו-Codex בלבד: ספקים אחרים לא מקבלים שרת שיש לו ספריית עבודה.",
   "mobile.server.mcp.command": "פקודה",
   "mobile.server.mcp.commandHint": "התוכנית בלבד. כל מילה אחריה נכנסת לארגומנטים.",
   "mobile.server.mcp.arguments": "ארגומנטים",

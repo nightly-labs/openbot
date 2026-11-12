@@ -47,7 +47,6 @@ export const messages = {
   "mcp.status.noAnswer": "لا إجابة",
   "mcp.status.didNotStart": "لم يبدأ",
   "mcp.status.unreachable": "يتعذّر الوصول",
-  "mcp.server.providerLimitNote": "Claude وCodex فقط: لا يُمنح الخادم الذي له دليل عمل للمزوّدين الآخرين.",
   "mcp.server.runtimeDownloading":
     "جارٍ تنزيل بيئة التشغيل التي يبدأ بها خادم STDIO. قد لا يبدأ أي خادم حتى ينتهي التنزيل.",
   "mcp.server.runtimeDownloadingProgress":

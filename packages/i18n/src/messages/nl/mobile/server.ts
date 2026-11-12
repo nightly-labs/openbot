@@ -1095,8 +1095,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "De server start deze opdracht op de computer van de server.",
   "mobile.server.mcp.httpDescription": "Elke aanbieder kan een HTTP-MCP-server gebruiken.",
-  "mobile.server.mcp.providerLimit":
-    "Alleen Claude en Codex: de andere aanbieders krijgen geen server die een werkmap heeft.",
   "mobile.server.mcp.command": "Opdracht",
   "mobile.server.mcp.commandHint": "Alleen het programma. Zet elk woord daarna in Argumenten.",
   "mobile.server.mcp.arguments": "Argumenten",

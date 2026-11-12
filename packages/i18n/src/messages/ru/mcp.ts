@@ -47,7 +47,6 @@ export const messages = {
   "mcp.status.noAnswer": "Нет ответа",
   "mcp.status.didNotStart": "Не запустился",
   "mcp.status.unreachable": "Недоступен",
-  "mcp.server.providerLimitNote": "Только Claude и Codex: сервер с рабочей папкой не передаётся другим провайдерам.",
   "mcp.server.runtimeDownloading":
     "Загружается среда, в которой запускается сервер STDIO. Пока загрузка не завершится, сервер может не запуститься.",
   "mcp.server.runtimeDownloadingProgress":

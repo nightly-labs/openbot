@@ -38,7 +38,6 @@ export const messages = {
   "mcp.status.noAnswer": "无响应",
   "mcp.status.didNotStart": "未启动",
   "mcp.status.unreachable": "无法连接",
-  "mcp.server.providerLimitNote": "仅限 Claude 和 Codex：带工作目录的服务器不会提供给其他服务商。",
   "mcp.server.runtimeDownloading": "正在下载 STDIO 服务器启动所需的运行时，下载完成前它可能无法启动。",
   "mcp.server.runtimeDownloadingProgress":
     "正在下载 STDIO 服务器启动所需的运行时（{percent}%），下载完成前它可能无法启动。",

@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "応答なし",
   "mcp.status.didNotStart": "起動しませんでした",
   "mcp.status.unreachable": "接続できません",
-  "mcp.server.providerLimitNote":
-    "Claude と Codex のみ: 作業ディレクトリを指定したサーバーは、ほかのプロバイダーには渡されません。",
   "mcp.server.runtimeDownloading":
     "STDIO サーバーの起動に使うランタイムをダウンロードしています。完了するまでサーバーが起動しないことがあります。",
   "mcp.server.runtimeDownloadingProgress":

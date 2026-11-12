@@ -211,9 +211,7 @@ function McpServerForm({
           footer={
             draft.transport === "http"
               ? t("mobile.server.mcp.httpDescription")
-              : config.workingDirectory
-                ? t("mobile.server.mcp.providerLimit")
-                : t("mobile.server.mcp.stdioDescription")
+              : t("mobile.server.mcp.stdioDescription")
           }
         >
           <SettingsRow

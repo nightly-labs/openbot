@@ -1699,18 +1699,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             let currentModelId: string | null;
             // OpenBot's bridge servers last: all providers key MCP servers by name, so a user
             // configuration that reached one of those names would take the agent's own tools away.
+            const tools = this.options.mcpToolRuntimes?.();
             const handoff = acpMcpServers(
               providerResult(
                 yield* Effect.result(
                   usableMcpServers(
                     agentMcpServers(this.options.mcpServers?.(agentId) ?? [], computerUse),
-                    this.options.mcpToolRuntimes?.(),
+                    tools,
                     this.options.mcpEndpoint,
                     agentId,
                   ).pipe(toProviderClientOperationError),
                 ),
               ),
               this.#ownMcpServerNames(cwd),
+              tools?.bun,
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
             const mcpServers = [...handoff.servers, ...mcp.servers];

@@ -1124,8 +1124,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "Il server avvia questo comando sul computer del server.",
   "mobile.server.mcp.httpDescription": "Ogni provider può usare un server MCP HTTP.",
-  "mobile.server.mcp.providerLimit":
-    "Solo Claude e Codex: gli altri provider non ricevono un server che ha una cartella di lavoro.",
   "mobile.server.mcp.command": "Comando",
   "mobile.server.mcp.commandHint": "Solo il programma. Metti ogni parola successiva in Argomenti.",
   "mobile.server.mcp.arguments": "Argomenti",

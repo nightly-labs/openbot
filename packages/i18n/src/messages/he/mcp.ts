@@ -41,7 +41,6 @@ export const messages = {
   "mcp.status.noAnswer": "אין תשובה",
   "mcp.status.didNotStart": "לא הופעל",
   "mcp.status.unreachable": "לא זמין",
-  "mcp.server.providerLimitNote": "Claude ו-Codex בלבד: שרת עם ספריית עבודה לא ניתן לספקים האחרים.",
   "mcp.server.runtimeDownloading": "מוריד את סביבת ההרצה שבה מופעל שרת STDIO. ייתכן ששרת לא יופעל עד שההורדה תסתיים.",
   "mcp.server.runtimeDownloadingProgress":
     "מוריד את סביבת ההרצה שבה מופעל שרת STDIO ({percent}%). ייתכן ששרת לא יופעל עד שההורדה תסתיים.",

@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Sem resposta",
   "mcp.status.didNotStart": "Não iniciou",
   "mcp.status.unreachable": "Inacessível",
-  "mcp.server.providerLimitNote":
-    "Somente Claude e Codex: um servidor com diretório de trabalho não é fornecido aos outros provedores.",
   "mcp.server.runtimeDownloading":
     "Baixando o ambiente de execução usado para iniciar servidores STDIO. Eles podem não iniciar até o download terminar.",
   "mcp.server.runtimeDownloadingProgress":
