@@ -512,7 +512,7 @@ class Pool {
   #remote(
     machine: Vps,
     command: string,
-    options: { input?: string; capture?: boolean; quiet?: boolean; password?: string } = {},
+    options: { input?: string; capture?: boolean; quiet?: boolean; password?: string | undefined } = {},
   ) {
     if (!machine.address) throw new Error(`VPS ${machine.id} has no public IPv4 address.`);
     const args = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15"];
@@ -739,7 +739,7 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
         authorization: `Bearer ${this.#boatKey}`,
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? null : JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) throw new Error(`boat answered ${response.status} for ${method} ${path}.`);
