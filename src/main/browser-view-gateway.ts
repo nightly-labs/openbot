@@ -354,7 +354,10 @@ export class BrowserViewGateway {
             this.#holdFrame(session, client, frame);
             return;
           }
-          this.#sendFrame(session, client, frame);
+          // A held frame is older than this one. Sent later, it would replace the newer picture.
+          this.#forgetHeldFrame(session);
+          if (!this.#sendFrame(session, client, frame) && session.rememberFrames)
+            this.#holdFrame(session, client, frame);
         },
         (reason) => {
           this.#dispatch(this.#closeSession(session, reason));
