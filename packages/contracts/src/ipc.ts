@@ -58,6 +58,7 @@ export * from "./ipc-endpoints";
 export * from "./ipc-events";
 export * from "./ipc-external-links";
 export * from "./ipc-github-connector";
+export * from "./ipc-github-skills";
 export * from "./ipc-hermes-import";
 export * from "./ipc-hidden-agents";
 export * from "./ipc-host-analytics";

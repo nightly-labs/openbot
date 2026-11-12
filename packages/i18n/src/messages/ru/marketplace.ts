@@ -590,6 +590,13 @@ export const messages = {
   "marketplace.skills.origin.local": "Создан на этом компьютере",
   "marketplace.skills.origin.workspace": "В папке этого агента",
   "marketplace.skills.origin.marketplace": "Из каталога · версия {version}",
+  "marketplace.skills.origin.github": "Из GitHub · {repository}",
+  "marketplace.skills.github.search": "Поиск или ссылка на GitHub",
+  "marketplace.skills.github.reading": "Поиск навыков в репозитории",
+  "marketplace.skills.github.trust": "OpenBot не проверял навыки из GitHub. Прочитайте навык, прежде чем добавить его.",
+  "marketplace.skills.github.source": "GitHub · {repository}, коммит {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Открыть {repository} на GitHub",
   "marketplace.skills.status.notAdded": "Не добавлен",
   "marketplace.skills.status.on": "Включён: {agents}",
   "marketplace.skills.agentCount": {

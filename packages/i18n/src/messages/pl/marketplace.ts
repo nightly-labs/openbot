@@ -586,6 +586,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Utworzona na tym komputerze",
   "marketplace.skills.origin.workspace": "W folderze tego agenta",
   "marketplace.skills.origin.marketplace": "Z Marketplace · wersja {version}",
+  "marketplace.skills.origin.github": "Z GitHub · {repository}",
+  "marketplace.skills.github.search": "Szukaj lub wklej link do GitHub",
+  "marketplace.skills.github.reading": "Szukanie umiejętności w repozytorium",
+  "marketplace.skills.github.trust":
+    "OpenBot nie sprawdził umiejętności z GitHub. Przeczytaj umiejętność, zanim ją dodasz.",
+  "marketplace.skills.github.source": "GitHub · {repository}, commit {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Otwórz {repository} w GitHub",
   "marketplace.skills.status.notAdded": "Niedodana",
   "marketplace.skills.status.on": "Włączona: {agents}",
   "marketplace.skills.agentCount": {

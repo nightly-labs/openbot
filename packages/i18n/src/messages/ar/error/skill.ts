@@ -55,4 +55,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "يحتاج مجلد المهارة إلى SKILL.md في جذره.",
   "error.skill.pathSymlink": "لا يمكن أن تحتوي مسارات المهارات على روابط رمزية.",
   "error.skill.folderNotRead": "لا يقرأ {provider} المجلد {folder}. انسخ هذا المجلد إلى {target}.",
+  "error.skill.githubLinkInvalid": "الصق رابطًا إلى مستودع أو مجلد على GitHub.",
+  "error.skill.githubNotFound": "لا يستطيع OpenBot فتح {repository}. المستودع خاص أو غير موجود.",
+  "error.skill.githubNoSkills": "لا يوجد SKILL.md في {folder}.",
+  "error.skill.githubUnavailable": "لا يستطيع OpenBot قراءة GitHub الآن. حاول مرة أخرى لاحقًا.",
+  "error.skill.githubRateLimited": "يحدّ GitHub من عدد مرات قراءة OpenBot له بدون حساب. حاول مرة أخرى بعد ساعة.",
+  "error.skill.githubTooLarge": "لا يستطيع OpenBot قراءة كل ملفات {repository}. المستودع كبير جدًا.",
+  "error.skill.githubHostTooOld": "حدّث هذا الخادم لإضافة مهارات من GitHub.",
+  "error.skill.publishGithub": "{name} من GitHub. يمكنك نشر المهارات التي أنشأتها فقط.",
 } as const satisfies PartialTranslation<typeof source>;
