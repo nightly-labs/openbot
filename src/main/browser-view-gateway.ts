@@ -34,6 +34,7 @@ import {
   encodeBrowserViewHostMessage,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
+import type { BrowserScreencastFrame } from "../backend/browser-cdp";
 import type { BrowserHost } from "../backend/browser-host";
 import { rawDataSize, rawDataText } from "./ws-raw-data";
 
@@ -46,18 +47,28 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
 /**
- * Frames kept after the one the client has drawn. A client that asked to name frames and then
- * stops saying which one is on screen would otherwise keep one entry per frame for the whole
- * view. Past this the view is closed. The drawn frame is not dropped in place: that is what made
- * a click land on the wrong page.
+ * Frames sent after the one the client has drawn, for a client that says which frame it drew. A
+ * tunneled socket empties at once into the WebRTC channel, so the buffer check above does not see
+ * a slow link: the frames wait in the tunnel, and the view shows the page seconds late. Past this
+ * a new frame waits, and only the newest one, until the client draws one. A slow link then gets
+ * fewer frames, not old ones, and a client that stops drawing holds no more than these.
  */
-const MAX_UNACKNOWLEDGED_FRAMES = 120;
+const MAX_FRAMES_IN_FLIGHT = 4;
 
 /** Frames older than the one on the member's screen. The named frame itself stays, so a click on it still expands. */
 function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
   for (const sequence of sizes.keys()) {
     if (sequence < drawn) sizes.delete(sequence);
   }
+}
+
+/** Frames sent after the one the client last drew. */
+function framesInFlight(session: Pick<ManagedViewSession, "frameSizes" | "drawnSequence">) {
+  let count = 0;
+  for (const sequence of session.frameSizes.keys()) {
+    if (sequence > session.drawnSequence) count += 1;
+  }
+  return count;
 }
 const MAX_SESSIONS = 4;
 /** A paste at its longest, with every character escaped, and the rest of the message around it. */
@@ -116,6 +127,10 @@ interface ManagedViewSession {
    */
   frameSizes: Map<number, { width: number; height: number }>;
   rememberFrames: boolean;
+  /** The newest frame the client last said it drew. Frames after it are on the way. */
+  drawnSequence: number;
+  /** The newest frame not sent because too many are on the way. The next drawn frame sends it. */
+  heldFrame: BrowserScreencastFrame | null;
   /**
    * One input at a time, in the order the member sent them. A paste takes several CDP calls, and a
    * key typed after it must not land first.
@@ -169,6 +184,8 @@ export class BrowserViewGateway {
       frameHeight: 0,
       frameSizes: new Map(),
       rememberFrames: false,
+      drawnSequence: 0,
+      heldFrame: null,
       input: Semaphore.makeUnsafe(1),
       waiting: 0,
       heldMove: null,
@@ -255,6 +272,8 @@ export class BrowserViewGateway {
     session.frameWidth = 0;
     session.frameHeight = 0;
     session.frameSizes.clear();
+    session.drawnSequence = 0;
+    session.heldFrame = null;
     session.rememberFrames = browserViewClientAcksFrames(url);
     session.reportCursor = browserViewClientWantsCursor(url);
     session.reportContextMenu = browserViewClientWantsContextMenu(url);
@@ -310,20 +329,12 @@ export class BrowserViewGateway {
       const stopView = yield* browser.start(
         session.tabId,
         (frame) => {
-          if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
-          // A dropped frame is one the client never sees, so it cannot be the frame a fraction is a
-          // fraction of. Recording its shape here would expand the client's next point with a size
-          // only this side knows about, and the click would land somewhere the user never pointed.
-          if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
-          client.send(encodeBrowserViewFrame(frame), { binary: true });
-          session.frameWidth = frame.width;
-          session.frameHeight = frame.height;
-          if (session.rememberFrames) {
-            session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
-            if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
-              this.#dispatch(this.#closeSession(session, "The live view fell too far behind."));
-            }
+          if (session.socket !== client) return;
+          if (session.rememberFrames && framesInFlight(session) >= MAX_FRAMES_IN_FLIGHT) {
+            session.heldFrame = frame;
+            return;
           }
+          this.#sendFrame(session, client, frame);
         },
         (reason) => {
           this.#dispatch(this.#closeSession(session, reason));
@@ -369,6 +380,12 @@ export class BrowserViewGateway {
     if (input.type === "ack") {
       if (!session.frameSizes.has(input.sequence)) return;
       forgetFramesBefore(session.frameSizes, input.sequence);
+      session.drawnSequence = Math.max(session.drawnSequence, input.sequence);
+      const held = session.heldFrame;
+      if (held && session.socket && framesInFlight(session) < MAX_FRAMES_IN_FLIGHT) {
+        session.heldFrame = null;
+        this.#sendFrame(session, session.socket, held);
+      }
       return;
     }
     this.#options.onInput?.();
@@ -434,6 +451,18 @@ export class BrowserViewGateway {
     const browser = yield* BrowserViewPort;
     yield* browser.input(session.tabId, move).pipe(Effect.catch(() => Effect.void));
   });
+
+  #sendFrame(session: ManagedViewSession, client: Ws.WebSocket, frame: BrowserScreencastFrame): void {
+    if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+    // A dropped frame is one the client never sees, so it cannot be the frame a fraction is a
+    // fraction of. Recording its shape here would expand the client's next point with a size
+    // only this side knows about, and the click would land somewhere the user never pointed.
+    if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
+    client.send(encodeBrowserViewFrame(frame), { binary: true });
+    session.frameWidth = frame.width;
+    session.frameHeight = frame.height;
+    if (session.rememberFrames) session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+  }
 
   #send(session: ManagedViewSession, client: Ws.WebSocket, message: BrowserViewHostMessage): void {
     if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
