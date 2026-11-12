@@ -12,6 +12,8 @@ const RECENT_MESSAGES = 200;
 const RECENT_META = "recent-messages";
 /** The text that a stored message keeps. The prompt reads at most 12,000 characters of context. */
 const STORED_TEXT = 2_000;
+/** The messages of this time go to the store in one write. */
+const SAVE_DELAY_MS = 1_000;
 /** The approval and stop posts whose numbered answers the transport still reads. */
 const MENU_ENTRIES = 200;
 /** The messages whose keys a reaction or a quote needs, and whose files a download reads. */
@@ -35,7 +37,9 @@ const StoredRecentMessages = Schema.Struct({
     }),
   ),
 });
-const decodeStoredRecentMessages = Schema.decodeUnknownOption(Schema.fromJsonString(StoredRecentMessages));
+const StoredRecentMessagesJson = Schema.fromJsonString(StoredRecentMessages);
+const decodeStoredRecentMessages = Schema.decodeUnknownOption(StoredRecentMessagesJson);
+const encodeStoredRecentMessages = Schema.encodeSync(StoredRecentMessagesJson);
 
 /** Where the recent messages stay across a restart: the number's encrypted store. */
 export type RecentMessageStore = Pick<WhatsAppAuthStore, "getMeta" | "setMeta">;
@@ -70,6 +74,7 @@ export class WhatsAppChatState {
   readonly #keys = new Map<string, MessageKeyFacts>();
   readonly #media = new Map<string, WAMessage>();
   readonly #store: RecentMessageStore | null;
+  #saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(store: RecentMessageStore | null = null) {
     this.#store = store;
@@ -98,22 +103,29 @@ export class WhatsAppChatState {
     if (this.#recent.some((entry) => entry.id === message.id && entry.chatJid === message.chatJid)) return;
     this.#recent.push(message);
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
-    this.#save();
+    if (!this.#store || this.#saveTimer) return;
+    this.#saveTimer = setTimeout(() => this.flush(), SAVE_DELAY_MS);
+    this.#saveTimer.unref?.();
   }
 
-  /** Keeps the recent messages in the store. A failed write keeps them in memory only. */
-  #save(): void {
-    if (!this.#store) return;
-    const messages = this.#recent.map(({ id, chatJid, threadKey, authorName, text, sentAt }) => ({
-      id,
-      chatJid,
-      threadKey,
-      authorName,
-      text: text.slice(0, STORED_TEXT),
-      sentAt,
+  /**
+   * Writes the recent messages to the store now, when a write waits. The runtime calls it before it
+   * closes the store. A failed write keeps them in memory only.
+   */
+  flush(): void {
+    if (!this.#store || !this.#saveTimer) return;
+    clearTimeout(this.#saveTimer);
+    this.#saveTimer = null;
+    const messages = this.#recent.map((message) => ({
+      id: message.id,
+      chatJid: message.chatJid,
+      threadKey: message.threadKey,
+      authorName: message.authorName,
+      text: storedText(message),
+      sentAt: message.sentAt,
     }));
     try {
-      this.#store.setMeta(RECENT_META, JSON.stringify({ version: 1, messages }));
+      this.#store.setMeta(RECENT_META, encodeStoredRecentMessages({ version: 1, messages }));
     } catch (cause) {
       logger.warn("The recent WhatsApp messages could not be saved.", {
         cause: cause instanceof Error ? cause.name : "unknown",
@@ -178,6 +190,14 @@ export class WhatsAppChatState {
   forgetMenu(messageId: string): void {
     this.#menus.delete(messageId);
   }
+}
+
+/** The text that the store keeps of a message: a long text is shortened, and the files are named. */
+function storedText({ text, files }: RecentMessage): string {
+  const kept = text.length > STORED_TEXT ? `${text.slice(0, STORED_TEXT)}… (shortened)` : text;
+  const names = (files ?? []).map((file) => file.name).join(", ");
+  if (!names || text === names) return kept;
+  return kept ? `${kept}\nFiles: ${names}` : `Files: ${names}`;
 }
 
 /** The recent messages that the store kept, or none when it has none or cannot read them. */

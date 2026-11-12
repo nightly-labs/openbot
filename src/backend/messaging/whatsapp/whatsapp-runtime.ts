@@ -108,6 +108,7 @@ export class WhatsAppRuntime {
   close(storeId: string): void {
     const handle = this.#open.get(storeId);
     this.#open.delete(storeId);
+    handle?.chats.flush();
     handle?.store.close();
   }
 
