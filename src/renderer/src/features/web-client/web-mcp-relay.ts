@@ -87,9 +87,10 @@ export function webMcpRelay(
         current = await status();
       }
       if (current.result) return current.result;
-      // The cancel ends before the answer, so it cannot stop a sign-in that starts after it.
+      // The cancel ends before the answer, so it cannot stop a sign-in that starts after it. A failed
+      // cancel does not stop the host tab: the flow already ended, or the next start replaces it.
       if (hostOnlySignInPage(current.authorizeUrl ?? "")) {
-        await run(cancelSignInRelay(request, flowId));
+        await run(cancelSignInRelay(request, flowId)).catch(() => undefined);
         return hostOnly;
       }
       const page = webPage(current.authorizeUrl ?? "");
