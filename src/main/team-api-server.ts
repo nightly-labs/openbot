@@ -287,6 +287,7 @@ import {
   routeAgentHostSettings,
   routeAgentNewChat,
   routeAgentPlanCard,
+  routeAgentSpeed,
   routeAgentTaskLimit,
 } from "./team-api/route-agent-admin";
 import { agentColorsOf, routeAgentColors, visibleAgentColors } from "./team-api/route-agent-colors";
@@ -1184,6 +1185,7 @@ export class TeamApiServer {
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentSpeed(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"

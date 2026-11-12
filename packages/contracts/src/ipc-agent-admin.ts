@@ -291,35 +291,101 @@ export function parseUpdateAgentPlanCardInput(value: unknown): UpdateAgentPlanCa
 
 /**
  * Whether one agent asks its provider for the fast service tier. The local window reads it from the
- * agent summary; a member of a joined server reads it on `agent-fast-mode-v1`. Null: never set, so
- * the host sends no tier and the provider keeps its own.
+ * agent summary; a member of a joined server reads it on `agent-speed-v1`, or on `agent-fast-mode-v1`
+ * from an older host. Null: never set, so the host sends no tier and the provider keeps its own.
+ * `ultrafast` comes only with `fastMode: true`, and only from a host with `agent-speed-v1`.
  */
 export interface AgentFastModeSettings {
   fastMode: boolean | null;
+  ultrafast?: boolean;
 }
 
 export interface UpdateAgentFastModeInput {
   agentId: string;
   fastMode: boolean;
+  /** With `fastMode: true`, the Ultrafast tier in place of Fast. A joined server needs `agent-speed-v1`. */
+  ultrafast?: boolean;
 }
 
 export function decodeAgentFastModeSettings(value: unknown): AgentFastModeSettings {
-  if (!isDynamicRecord(value) || (value.fastMode !== null && !isBoolean(value.fastMode)))
+  if (
+    !isDynamicRecord(value) ||
+    (value.fastMode !== null && !isBoolean(value.fastMode)) ||
+    (value.ultrafast !== undefined && !isBoolean(value.ultrafast))
+  )
     throw new Error("Invalid fast mode setting.");
-  return { fastMode: value.fastMode };
+  return {
+    fastMode: value.fastMode,
+    ...(value.fastMode === true && value.ultrafast === true ? { ultrafast: true } : {}),
+  };
 }
 
 export function parseUpdateAgentFastModeInput(value: unknown): UpdateAgentFastModeInput {
-  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.fastMode))
+  if (
+    !isDynamicRecord(value) ||
+    !isIdentifier(value.agentId) ||
+    !isBoolean(value.fastMode) ||
+    (value.ultrafast !== undefined && !isBoolean(value.ultrafast))
+  )
     throw new Error("Invalid fast mode setting.");
-  return { agentId: value.agentId, fastMode: value.fastMode };
+  return {
+    agentId: value.agentId,
+    fastMode: value.fastMode,
+    ...(value.fastMode && value.ultrafast === true ? { ultrafast: true } : {}),
+  };
 }
 
-/** A model of a host that has a fast service tier, and the tier id that the host sends for it. */
+/** The speed of an agent on `agent-speed-v1`. */
+export type AgentSpeed = "standard" | "fast" | "ultrafast";
+
+/** The speed settings of one agent on `agent-speed-v1`. Null: never set. */
+export interface AgentSpeedSettings {
+  speed: AgentSpeed | null;
+}
+
+export interface UpdateAgentSpeedInput {
+  agentId: string;
+  speed: AgentSpeed;
+}
+
+function isAgentSpeed(value: unknown): value is AgentSpeed {
+  return value === "standard" || value === "fast" || value === "ultrafast";
+}
+
+export function decodeAgentSpeedSettings(value: unknown): AgentSpeedSettings {
+  if (!isDynamicRecord(value) || (value.speed !== null && !isAgentSpeed(value.speed)))
+    throw new Error("Invalid speed setting.");
+  return { speed: value.speed };
+}
+
+export function parseUpdateAgentSpeedInput(value: unknown): UpdateAgentSpeedInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isAgentSpeed(value.speed))
+    throw new Error("Invalid speed setting.");
+  return { agentId: value.agentId, speed: value.speed };
+}
+
+/** The speed of the stored `fastMode` and `ultrafast` of an agent. */
+export function agentSpeed(settings: AgentFastModeSettings): AgentSpeed | null {
+  if (settings.fastMode === null) return null;
+  if (!settings.fastMode) return "standard";
+  return settings.ultrafast ? "ultrafast" : "fast";
+}
+
+/** The stored `fastMode` and `ultrafast` of a speed. */
+export function agentFastModeSettings({ speed }: AgentSpeedSettings): AgentFastModeSettings {
+  if (speed === null) return { fastMode: null };
+  return { fastMode: speed !== "standard", ...(speed === "ultrafast" ? { ultrafast: true } : {}) };
+}
+
+/**
+ * A model of a host that has a fast service tier, and the tier ids that the host sends for it. Only
+ * `agent-speed-v1` carries `ultrafastServiceTier`.
+ */
 export interface AgentFastModel {
   provider: string;
   id: string;
   fastServiceTier: string;
+  ultrafastServiceTier?: string;
 }
 
 /** A model entry that this build cannot read is left out, as the released model list does. */
@@ -331,20 +397,36 @@ export function decodeAgentFastModels(value: unknown): AgentFastModel[] {
     isAgentModel(model.id) &&
     isBoundedString(model.fastServiceTier, INPUT_LIMITS.serviceTier) &&
     model.fastServiceTier
-      ? [{ provider: model.provider, id: model.id, fastServiceTier: model.fastServiceTier }]
+      ? [
+          {
+            provider: model.provider,
+            id: model.id,
+            fastServiceTier: model.fastServiceTier,
+            ...(isBoundedString(model.ultrafastServiceTier, INPUT_LIMITS.serviceTier) && model.ultrafastServiceTier
+              ? { ultrafastServiceTier: model.ultrafastServiceTier }
+              : {}),
+          },
+        ]
       : [],
   );
 }
 
-/** Puts the fast tiers of `agent-fast-mode-v1` back on a host's model list, which drops them. */
-export function withFastServiceTiers<Model extends { provider: string; id: string; fastServiceTier?: string }>(
-  models: Model[],
-  fast: AgentFastModel[],
-): Model[] {
-  const tiers = new Map(fast.map((model) => [`${model.provider}\u0000${model.id}`, model.fastServiceTier]));
+/**
+ * Puts the fast tiers of `agent-speed-v1` or `agent-fast-mode-v1` back on a host's model list, which
+ * drops them.
+ */
+export function withFastServiceTiers<
+  Model extends { provider: string; id: string; fastServiceTier?: string; ultrafastServiceTier?: string },
+>(models: Model[], fast: AgentFastModel[]): Model[] {
+  const tiers = new Map(fast.map((model) => [`${model.provider}\u0000${model.id}`, model]));
   return models.map((model) => {
-    const fastServiceTier = tiers.get(`${model.provider}\u0000${model.id}`);
-    return fastServiceTier ? { ...model, fastServiceTier } : model;
+    const tier = tiers.get(`${model.provider}\u0000${model.id}`);
+    if (!tier) return model;
+    return {
+      ...model,
+      fastServiceTier: tier.fastServiceTier,
+      ...(tier.ultrafastServiceTier ? { ultrafastServiceTier: tier.ultrafastServiceTier } : {}),
+    };
   });
 }
 

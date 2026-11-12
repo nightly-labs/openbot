@@ -692,9 +692,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Usar",
   "mobile.agent.folders.notAddedTitle": "Pasta não adicionada",
   "mobile.agent.folders.notExcludedTitle": "Pasta não excluída",
-  "mobile.agent.fastMode.label": "Modo rápido",
   "mobile.agent.fastMode.footer":
     "O agente pede respostas mais rápidas ao provedor. Uma alteração vale a partir do próximo turno.",
+  "mobile.agent.fastMode.speed": "Velocidade",
+  "mobile.agent.fastMode.standard": "Padrão",
+  "mobile.agent.fastMode.fast": "Rápido",
+  "mobile.agent.fastMode.ultrafast": "Ultrarrápido",
+  "mobile.agent.fastMode.confirmTitle": "Ativar o modo rápido?",
+  "mobile.agent.fastMode.confirmBody":
+    "O Claude responde mais rápido, mas cada token custa mais. Com uma assinatura do Claude, o modo rápido sempre usa créditos de uso, mesmo quando o seu plano ainda tem uso disponível.",
+  "mobile.agent.fastMode.confirm": "Ativar",
   "mobile.agent.compact.title": "Compactar contexto",
   "mobile.agent.compact.compacting": "Iniciando a compactação…",
   "mobile.agent.compact.footer": "O provedor encurta o contexto deste chat. As mensagens continuam.",

@@ -126,6 +126,7 @@ import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -537,7 +538,9 @@ function startDisk(volumes: Json | undefined): boolean {
   return list(volumes).some((volume) => field(volume, "path") === root);
 }
 
-// One model with a fast tier and one without: the fast-mode models route lists only the first.
+// A Codex model with fast and Ultrafast tiers, a Codex model without a tier, and a Claude model with a
+// fast tier. The fast-mode models route lists only the first, with no Ultrafast tier; the speed route
+// lists the first and the Claude model.
 const FAST_MODE_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
@@ -547,6 +550,16 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
     fastServiceTier: "priority",
+    ultrafastServiceTier: "ultrafast",
+  },
+  {
+    provider: "claude",
+    id: "claude-fast",
+    name: "Claude Fast",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    fastServiceTier: "fast",
   },
   {
     provider: "codex",
@@ -2175,7 +2188,12 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
-              if (input.fastMode !== undefined) target.fastMode = input.fastMode;
+              if (input.fastMode !== undefined) {
+                target.fastMode = input.fastMode;
+                // As the agent store: a `fastMode` change without `ultrafast: true` turns Ultrafast off.
+                if (input.fastMode && input.ultrafast) target.ultrafast = true;
+                else delete target.ultrafast;
+              }
               return target;
             }),
           listModels: () => FAST_MODE_MODELS,
@@ -4434,6 +4452,136 @@ try {
     check(
       "a member cannot set the fast mode of an agent that the client protocol does not show",
       errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 2,
+      summary(hiddenSet),
+    );
+  }
+
+  // ---- Speed (agent-speed-v1) ----
+  {
+    const speedCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_SPEED_CAPABILITY];
+    const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-speed-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "the speed routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const models = await call("POST", AGENT_SPEED_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: speedCapabilities,
+    });
+    const fastModels = await call("POST", AGENT_FAST_MODE_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member reads the models with a fast tier, with the Ultrafast tier and the Claude model; the older route keeps neither",
+      models.status === 200 &&
+        isDeepStrictEqual(models.body, {
+          models: [
+            { provider: "codex", id: "gpt-fast", fastServiceTier: "priority", ultrafastServiceTier: "ultrafast" },
+            { provider: "claude", id: "claude-fast", fastServiceTier: "fast" },
+          ],
+        }) &&
+        isDeepStrictEqual(fastModels.body, {
+          models: [{ provider: "codex", id: "gpt-fast", fastServiceTier: "priority" }],
+        }),
+      [summary(models), summary(fastModels)],
+    );
+    const unknownSpeed = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "turbo" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the host refuses a speed that is not standard, fast or ultrafast, and writes nothing",
+      unknownSpeed.status === 400 && callsOf("updateAgent").length === writes,
+      summary(unknownSpeed),
+    );
+    const ultra = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "ultrafast" },
+      capabilities: speedCapabilities,
+    });
+    const readUltra = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    const readUltraOld = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member sets Ultrafast through the agent writer; the speed route reads it, the older route reads fast mode on",
+      ultra.status === 200 &&
+        isDeepStrictEqual(ultra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltraOld.body, { fastMode: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true, ultrafast: true }]),
+      [summary(ultra), summary(readUltra), summary(readUltraOld)],
+    );
+    const oldFast = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: true, ultrafast: true },
+      capabilities: fastCapabilities,
+    });
+    const readFast = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the older fast-mode route sets only Fast, so Ultrafast ends",
+      oldFast.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true }]) &&
+        isDeepStrictEqual(readFast.body, { speed: "fast" }),
+      [summary(oldFast), summary(readFast)],
+    );
+    const standard = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "standard" },
+      capabilities: speedCapabilities,
+    });
+    const missing = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "a member sets Standard, and an unknown agent gets 404",
+      standard.status === 200 &&
+        isDeepStrictEqual(standard.body, { speed: "standard" }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: false }]) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(standard), summary(missing)],
+    );
+    const hiddenSet = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-pi", speed: "fast" },
+      capabilities: speedCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a member cannot set the speed of an agent that the client protocol does not show",
+      errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 3,
       summary(hiddenSet),
     );
   }

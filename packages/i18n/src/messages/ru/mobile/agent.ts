@@ -753,9 +753,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Выбрать",
   "mobile.agent.folders.notAddedTitle": "Папка не добавлена",
   "mobile.agent.folders.notExcludedTitle": "Папка не исключена",
-  "mobile.agent.fastMode.label": "Быстрый режим",
   "mobile.agent.fastMode.footer":
     "Агент запрашивает у провайдера более быстрые ответы. Изменение действует со следующего хода.",
+  "mobile.agent.fastMode.speed": "Скорость",
+  "mobile.agent.fastMode.standard": "Обычная",
+  "mobile.agent.fastMode.fast": "Быстро",
+  "mobile.agent.fastMode.ultrafast": "Сверхбыстро",
+  "mobile.agent.fastMode.confirmTitle": "Включить быстрый режим?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude отвечает быстрее, но каждый токен стоит дороже. С подпиской Claude быстрый режим всегда расходует кредиты использования, даже если в тарифе ещё осталось использование.",
+  "mobile.agent.fastMode.confirm": "Включить",
   "mobile.agent.compact.title": "Сжать контекст",
   "mobile.agent.compact.compacting": "Запуск сжатия…",
   "mobile.agent.compact.footer": "Провайдер сокращает контекст этого чата. Сообщения остаются.",

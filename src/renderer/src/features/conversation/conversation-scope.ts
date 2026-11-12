@@ -14,6 +14,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
+import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -1423,12 +1424,15 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   /**
    * The Speed select of the model pickers, in the chat header and in the agent settings: on this
-   * computer, or on a joined server with `agent-fast-mode-v1`. The picker shows it only for a model
-   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`). A joined
-   * server lists no Ultrafast tier, so its picker offers Standard and Fast.
+   * computer, or on a joined server with `agent-speed-v1` or `agent-fast-mode-v1`. The picker shows it
+   * only for a model that the host lists with a fast tier (Codex, and Claude since its client lists
+   * `fast`). Only `agent-speed-v1` lists Ultrafast tiers and Claude models, so on an older host the
+   * picker offers Standard and Fast, and no Claude fast mode.
    */
   const fastModeChange = () =>
-    props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
+    props.server?.kind === "local" ||
+    serverSupportsCapability(props.server, AGENT_SPEED_CAPABILITY) ||
+    serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
       ? (next: boolean, nextUltrafast: boolean) => requestFastMode(next, nextUltrafast)
       : undefined;
   /**

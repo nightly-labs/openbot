@@ -23,6 +23,7 @@ import { AGENT_PLAN_CARD_CAPABILITY } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "./agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY } from "./agent-speed-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "./agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "./agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
@@ -261,6 +262,7 @@ export {
   AGENT_PUBLISH_CAPABILITY,
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_UI_BLOCKS_CAPABILITY,
   AGENT_TASKS_CAPABILITY,
@@ -434,6 +436,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_ADMIN_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
   ACP_REGISTRY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -603,6 +606,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -820,7 +824,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== GITHUB_SKILLS_CAPABILITY &&
     capability !== HOST_RESTART_CAPABILITY &&
     capability !== VAULT_V4_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+    capability !== AGENT_SPEED_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -914,6 +919,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1090,6 +1096,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== GITHUB_SKILLS_CAPABILITY &&
       capability !== HOST_RESTART_CAPABILITY &&
       capability !== VAULT_V4_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+      capability !== AGENT_SPEED_CAPABILITY,
   );
 }

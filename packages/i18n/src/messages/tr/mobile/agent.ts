@@ -695,9 +695,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Kullan",
   "mobile.agent.folders.notAddedTitle": "Klasör eklenmedi",
   "mobile.agent.folders.notExcludedTitle": "Klasör hariç tutulmadı",
-  "mobile.agent.fastMode.label": "Hızlı mod",
   "mobile.agent.fastMode.footer":
     "Ajan, sağlayıcısından daha hızlı yanıtlar ister. Değişiklik bir sonraki turdan itibaren geçerli olur.",
+  "mobile.agent.fastMode.speed": "Hız",
+  "mobile.agent.fastMode.standard": "Standart",
+  "mobile.agent.fastMode.fast": "Hızlı",
+  "mobile.agent.fastMode.ultrafast": "Ultra hızlı",
+  "mobile.agent.fastMode.confirmTitle": "Hızlı mod açılsın mı?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude daha hızlı yanıt verir, ancak her token daha pahalıdır. Claude aboneliğinde hızlı mod, planınızda kullanım kalsa bile her zaman kullanım kredisi harcar.",
+  "mobile.agent.fastMode.confirm": "Aç",
   "mobile.agent.compact.title": "Bağlamı sıkıştır",
   "mobile.agent.compact.compacting": "Sıkıştırma başlatılıyor…",
   "mobile.agent.compact.footer": "Sağlayıcı bu sohbetin bağlamını kısaltır. Mesajlar kalır.",

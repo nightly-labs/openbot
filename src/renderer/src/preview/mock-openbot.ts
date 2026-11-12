@@ -2360,7 +2360,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       getAgentFastMode: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
-        return { fastMode: agent.fastMode ?? null };
+        return { fastMode: agent.fastMode ?? null, ...(agent.fastMode && agent.ultrafast ? { ultrafast: true } : {}) };
       },
       updateAgentFastMode: async (input) => {
         await api.agent.updateAgent(input);

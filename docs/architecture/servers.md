@@ -690,7 +690,7 @@ An owner or admin of a joined server manages its host through optional `POST /v1
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
 except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
-`storage-channel-v1`, `library-folders-v1` and `agent-fast-mode-v1`. The
+`storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1` and `agent-speed-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -702,6 +702,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
 | `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
+| `agent-speed-v1` | The speed of the agent: standard, fast or ultrafast. Its model list adds the Ultrafast tier ids and the Claude models, which `agent-fast-mode-v1` leaves out. A client that advertises it asks the user to confirm the price before it turns on a faster speed for a Claude agent. The access is that of `agent-fast-mode-v1`. A client uses it in place of `agent-fast-mode-v1` when the host has both. Protocol 9 only | `agentAdmin` |
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
