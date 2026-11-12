@@ -327,6 +327,7 @@
     "test:codex-idle-thread-release": "bun scripts/codex-idle-thread-release-e2e.ts",
     "test:codex-missing-rollout": "bun scripts/codex-missing-rollout-e2e.ts",
     "test:codex-usage-metering": "bun scripts/codex-usage-metering-e2e.ts",
+    "test:codex-capacity-retry": "bun scripts/codex-capacity-retry-e2e.ts",
     "test:codex-usage-reset": "bun scripts/codex-usage-reset-e2e.ts",
     "test:usage-read-pacing": "bun scripts/usage-read-pacing-e2e.ts",
     "test:routine-fresh-session": "bun scripts/routine-fresh-session-e2e.ts",
