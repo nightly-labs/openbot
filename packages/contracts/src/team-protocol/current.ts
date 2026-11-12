@@ -62,6 +62,7 @@ import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
+import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -284,6 +285,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
@@ -586,6 +588,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -797,7 +800,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
-    capability !== TEAM_VIDEO_GENERATION_CAPABILITY,
+    capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
+    capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -885,6 +889,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1055,6 +1060,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
-      capability !== TEAM_VIDEO_GENERATION_CAPABILITY,
+      capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
+      capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   );
 }

@@ -424,6 +424,27 @@ export class ChannelStore {
   }
 
   /**
+   * `tasks` with the dependencies that each waiting task already read: the `awaitedTaskIds` of its
+   * turns, whose results the turn had when it started. A lead that assigns work in rounds keeps every
+   * sub-task in `dependencies`, so the page shows only the round it waits for (#7505). Only the views
+   * of a person read it; the agent's channel history does not.
+   */
+  withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
+    if (!tasks.some((task) => task.state === "waiting")) return tasks;
+    const seen = new Map<string, Set<string>>();
+    for (const assignment of this.assignments(channelId)) {
+      const ids = seen.get(assignment.taskId) ?? new Set<string>();
+      for (const id of assignment.awaitedTaskIds) ids.add(id);
+      seen.set(assignment.taskId, ids);
+    }
+    return tasks.map((task) => {
+      const read = seen.get(task.id);
+      const seenDependencies = read ? task.dependencies.filter((id) => read.has(id)) : [];
+      return task.state === "waiting" && seenDependencies.length ? { ...task, seenDependencies } : task;
+    });
+  }
+
+  /**
    * How many messages are older than a page, and when the first one was written: the day rail draws
    * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
    */

@@ -109,6 +109,7 @@ export async function routeChannels(
       const page = channels.store.page(input.channelId, input.beforeSequence, limit);
       let body = {
         ...page,
+        tasks: channels.store.withSeenDependencies(input.channelId, page.tasks),
         channel: peerChannel(page.channel),
         messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
       };
