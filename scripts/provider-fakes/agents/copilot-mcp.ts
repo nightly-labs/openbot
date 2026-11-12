@@ -3,6 +3,7 @@
 // (github/copilot-cli#3889). It lists the tools of each http server and logs them.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { type AcpHandler, type AcpParams, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 type SessionServer = NonNullable<AcpParams["mcpServers"]>[number];
@@ -10,10 +11,31 @@ type SessionServer = NonNullable<AcpParams["mcpServers"]>[number];
 const MODELS = [{ modelId: "copilot-fake", name: "Copilot Fake" }];
 let count = 0;
 
+/**
+ * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
+ * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
+ */
+function asTransport(inner: StreamableHTTPClientTransport): Transport {
+  const transport: Transport = {
+    start: () => {
+      inner.onclose = () => transport.onclose?.();
+      inner.onerror = (error) => transport.onerror?.(error);
+      inner.onmessage = (message) => transport.onmessage?.(message);
+      return inner.start();
+    },
+    send: (message, options) => inner.send(message, options),
+    close: () => inner.close(),
+    setProtocolVersion: (version) => inner.setProtocolVersion(version),
+  };
+  return transport;
+}
+
 async function listTools(server: SessionServer): Promise<string[]> {
   const client = new Client({ name: "fake-copilot", version: "1.0.105" });
   const headers = Object.fromEntries((server.headers ?? []).map(({ name, value }) => [name, value]));
-  await client.connect(new StreamableHTTPClientTransport(new URL(server.url ?? ""), { requestInit: { headers } }));
+  await client.connect(
+    asTransport(new StreamableHTTPClientTransport(new URL(server.url ?? ""), { requestInit: { headers } })),
+  );
   try {
     return (await client.listTools()).tools.map((tool) => tool.name);
   } finally {
