@@ -262,8 +262,9 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
 
 /** The CLI's own cause of a failure that its answer does not name, from its log, or `null` (#7319). */
 function antigravityLoggedFailure(text: string, argv: readonly string[], sessionId: string): string | null {
-  const log = antigravityPromptLog(text, argv, sessionId);
-  return log ? (GEMINI_EXECUTOR_ERROR.exec(log)?.[0].trim() ?? null) : null;
+  // The last line is the failure that ended the turn: a step that the CLI tried again logs one before it.
+  const causes = antigravityPromptLog(text, argv, sessionId)?.match(new RegExp(GEMINI_EXECUTOR_ERROR.source, "gu"));
+  return causes?.at(-1)?.trim() ?? null;
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
