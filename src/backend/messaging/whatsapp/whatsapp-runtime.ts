@@ -73,7 +73,7 @@ export class WhatsAppRuntime {
       storeId,
       store,
       session: this.#session(store, pairing),
-      chats: new WhatsAppChatState(),
+      chats: new WhatsAppChatState(store),
     };
     this.#open.set(storeId, handle);
     return handle;

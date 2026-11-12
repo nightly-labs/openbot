@@ -1490,18 +1490,19 @@ connection, OpenBot asks `web.whatsapp.com` for the current WhatsApp Web version
 OpenBot uses an unofficial client (a modified copy of the open-source Baileys library), so WhatsApp can
 restrict or block a number that it sees as automated.
 
-- **Stored on the host.** The device's keys, its Signal sessions, the messages that OpenBot sent in the
-  last day (WhatsApp asks for them again when a phone could not decrypt one), the last 30 minutes of
-  received messages that the agents took (so a crash does not lose them), and the reply chains of the
-  last 7 days are in `<userData>/whatsapp/`. Every value is encrypted with a random key that the
-  operating system's secret storage keeps, and the file is readable only by the user. The database
-  holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
-  that the owner allowed, and one row per conversation that an agent answers. The messages of that
-  conversation are kept as a conversation of that agent, and files people send are kept with the
-  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
-  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
-  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
-  allowed senders.
+- **Stored on the host.** The device's keys, its Signal sessions, the messages that OpenBot sent in
+  the last day (WhatsApp asks for them again when a phone could not decrypt one), the last 30
+  minutes of received messages that the agents took (so a crash does not lose them), the reply
+  chains of the last 7 days, and the text of the newest 200 messages of the allowed chats (the
+  context that an agent reads after a restart) are in `<userData>/whatsapp/`. Every value is
+  encrypted with a random key that the operating system's secret storage keeps, and the file is
+  readable only by the user. The database holds the number, a masked name, which agent is the
+  WhatsApp Orchestrator, the contacts and groups that the owner allowed, and one row per
+  conversation that an agent answers. The messages of that conversation are kept as a conversation
+  of that agent, and files people send are kept with the agent's attachments. Names are kept in
+  memory until OpenBot quits. Pairing requests are kept in memory for at most an hour. Disconnect
+  logs the device out (when OpenBot is connected), deletes its keys and the stored messages, and
+  keeps the conversations, the workspace memories and the allowed senders.
 - **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
   only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
   the groups the owner allowed, where a request starts only from a mention of the number or a reply in
