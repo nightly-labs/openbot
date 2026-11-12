@@ -55,10 +55,11 @@ function geminiAccountLink(text: string): string | null {
 }
 /**
  * Antigravity's SDK error when a model step returns neither text nor a tool call, as when an agent
- * ends its turn silently after a tool call or on a message that asks for no reply (#4505).
+ * ends its turn silently after a tool call or on a message that asks for no reply (#4505). The
+ * Antigravity CLI 1.5 sends it as the answer "⚠ Model produced invalid output." (#7266).
  */
 const GEMINI_EMPTY_OUTPUT_FAILURE =
-  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b/iu;
+  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b|\bModel produced invalid output\b/iu;
 
 /**
  * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
