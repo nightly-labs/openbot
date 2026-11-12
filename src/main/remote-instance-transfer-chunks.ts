@@ -166,7 +166,7 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
  * its own; without it, the chunks codec keeps only the fields it knows, and the channel messages
  * follow `includeHistory`.
  */
-export function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
+function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
   return fullCopy
     ? { route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, body: fullCopyExportBody(input) }
     : { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };

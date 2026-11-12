@@ -36,7 +36,7 @@ export const SERVER_FOLDER = "server";
 /** Where the shared skills that no agent has are in the archive. */
 export const LIBRARY_FOLDER = "library";
 /** The most members whose choices a file carries. */
-export const TRANSFER_MEMBERS = 1000;
+const TRANSFER_MEMBERS = 1000;
 /** The most shared skills a file carries. */
 export const TRANSFER_SHARED_SKILLS = 1000;
 /** The largest skill bundle the import reads: the limit of a skill package (`skill-package.ts`). */
