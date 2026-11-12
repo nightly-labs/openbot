@@ -4,7 +4,9 @@
 // error." and ends the turn as a success. A session keeps the servers that its process started, also
 // after a resume without them. This fake does the same: a session with the server `resend` refuses
 // `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`.
+// user's own `mcp_config.json`. The CLI gives the same answer for each failure of its own (#7319): a
+// prompt with `FAIL_KEY` logs Google's refusal of the API key, `FAIL_OTHER` logs a cause that OpenBot
+// does not know, and `FAIL_QUIET` logs no cause.
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -19,6 +21,13 @@ mkdirSync(folder, { recursive: true });
 const logFile = join(folder, `acp-server-20261111_000000-${process.pid}.log`);
 const log = (line: string) => appendFileSync(logFile, `${line}\n`);
 log(`I1111 00:00:00.000000       1 options.go:485] Starting ACP server (pid ${process.pid})`);
+
+/** The causes that the CLI 1.5.6 logs for its own failures, by the word in the prompt. */
+const FAILURES: Record<string, string> = {
+  KEY: "generating and executing: Error 400, Message: API key not valid. Please pass a valid API key., Status: INVALID_ARGUMENT, Details: [map[@type:type.googleapis.com/google.rpc.ErrorInfo reason:API_KEY_INVALID]]",
+  OTHER: "creating trajectory: unexpected step state 7",
+  QUIET: "",
+};
 
 /** The servers of each session that this process started. A resume does not change them. */
 const started = new Map<string, string[]>();
@@ -59,7 +68,11 @@ serveFakeAcpAgent({
       /REFUSE_TOOL=(\S+)/u.exec(text)?.[1] ??
       (started.get(sessionId)?.includes("resend") ? "mcp_resend_get-contact" : null);
     logEntry({ method: request.method, sessionId, pid: process.pid, refused });
-    if (refused) {
+    const failure = FAILURES[/\bFAIL_(KEY|OTHER|QUIET)\b/u.exec(text)?.[1] ?? ""];
+    if (failure !== undefined) {
+      if (failure) log(`E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: ${failure}`);
+      peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
+    } else if (refused) {
       log(
         `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`,
       );

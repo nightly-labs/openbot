@@ -283,6 +283,8 @@ export const messages = {
     "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini s’est arrêté à cause d’une erreur. Renvoyez votre message. S’il s’arrête encore, choisissez un autre modèle ou un autre fournisseur.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Sur un hôte Windows, Gemini ouvre la page Google sur l’hôte lui-même. Connectez Gemini sur l’ordinateur hôte.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",

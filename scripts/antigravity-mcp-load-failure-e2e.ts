@@ -15,6 +15,8 @@
 // its own log, and keeps the server after a resume in the same process. The session opens again on a
 // new process without the server, and the turn answers. A refused tool of the user's own server
 // leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
+// From #7319: the CLI gives the same answer for each failure of its own. The turn shows a plain
+// message from the cause in the CLI's log, and no Go text, also when the log names no cause.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -22,6 +24,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
@@ -298,6 +301,21 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+  const stopped = sourceText("error.provider.antigravityTurnStopped");
+  assert.equal(ownRefused.error, stopped, "The turn shows the plain message, not the CLI's text.");
+
+  // 8. The CLI's own failures: the cause in its log gives the message, and its Go text is not shown.
+  const failures: Record<string, TurnResult> = {};
+  for (const word of ["FAIL_KEY", "FAIL_OTHER", "FAIL_QUIET"]) {
+    const turn = await runTurn(refusedClient, refusedThread, { text: word, timeoutMs: 30_000 });
+    failures[word] = turn;
+    report.turns[word] = turn;
+    assert.equal(turn.status, "failed", `The ${word} turn fails.`);
+  }
+  assert.equal(failures.FAIL_KEY?.error, sourceText("error.provider.geminiKeyRefused"), "A refused key is named.");
+  assert.equal(failures.FAIL_OTHER?.error, stopped, "An unknown cause gives the plain message.");
+  assert.equal(failures.FAIL_QUIET?.error, stopped, "A log with no cause gives the plain message.");
+  assert.equal(refusedDrops.length, 1, "No server is left out for these failures.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

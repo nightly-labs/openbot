@@ -267,6 +267,8 @@ export const messages = {
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini is gestopt door een fout. Stuur je bericht opnieuw. Stopt het weer, kies dan een ander model of een andere provider.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Op een Windows-host opent Gemini de Google-pagina op de host zelf. Verbind Gemini op de hostcomputer.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",

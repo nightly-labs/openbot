@@ -125,7 +125,14 @@ function geminiTurnFailure(answer: string): string {
   // The server's text names its harness and a WebSocket close code, which the user cannot act on.
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text)) return sourceText("error.provider.antigravityConnectionLost");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
+  // The CLI's own failure: its answer names no cause, and its log line has Go's words (#7319).
+  const logged = GEMINI_EXECUTOR_ERROR.test(text);
+  if (key) {
+    const detail = logged ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
+    return sourceText(key, { detail: shownFailureDetail(detail) });
+  }
+  if (logged || GEMINI_TERMINATED_ANSWER.test(text)) return sourceText("error.provider.antigravityTurnStopped");
+  return shownFailureDetail(text);
 }
 
 /** Only a failure the server answered with: a local failure is not Google's to explain. */
@@ -171,6 +178,13 @@ function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): str
 
 /** The CLI 1.5.6 answer for a failure of its own, such as a refused tool schema. It names no cause. */
 const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due to error\.?\s*$/u;
+/**
+ * The CLI 1.5.6 log line of the failure behind that answer, to the end of the line, such as
+ * `agent executor error: generating and executing: Error 400, Message: API key not valid. ...`.
+ */
+const GEMINI_EXECUTOR_ERROR = /\bagent executor error: [^\n]+/u;
+/** Google's message in the Go harness's form of an API error in that line. */
+const GEMINI_API_ERROR_MESSAGE = /\bError \d{3}, Message: (.+?), Status: /u;
 /** The Antigravity CLI 1.5.6 log line of each prompt, before it builds the toolbox for the prompt. */
 const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
 /**
@@ -197,16 +211,16 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The tools that the CLI refused after the last prompt of the session. Each session has a process,
- * and so a log, of its own. A session that opened again on a new process has an older log too, so
- * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
- * the turn then fails as before.
+ * The CLI's log after the last prompt of the session, for an answer that names no cause, or `null`.
+ * Each session has a process, and so a log, of its own. A session that opened again on a new process
+ * has an older log too, so only the newest log with a prompt of the session counts. A log that cannot
+ * be read gives `null`.
  */
-function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
-  if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
+function antigravityPromptLog(text: string, argv: readonly string[], sessionId: string): string | null {
+  if (!GEMINI_TERMINATED_ANSWER.test(text)) return null;
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
-  if (!home || !appData) return [];
+  if (!home || !appData) return null;
   const folder = join(home, appData, "log");
   const since = Date.now() - GEMINI_LOG_RECENT_MS;
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
@@ -225,7 +239,7 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
       })
       .sort((a, b) => b.mtimeMs - a.mtimeMs);
   } catch {
-    return [];
+    return null;
   }
   for (const { file, size } of logs) {
     let log: string;
@@ -235,9 +249,21 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
       continue;
     }
     const at = log.lastIndexOf(prompt);
-    if (at >= 0) return Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+    if (at >= 0) return log.slice(at);
   }
-  return [];
+  return null;
+}
+
+/** The tools that the CLI refused after the last prompt of the session. A log that cannot be read gives none. */
+function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const log = antigravityPromptLog(text, argv, sessionId);
+  return log ? Array.from(log.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "") : [];
+}
+
+/** The CLI's own cause of a failure that its answer does not name, from its log, or `null` (#7319). */
+function antigravityLoggedFailure(text: string, argv: readonly string[], sessionId: string): string | null {
+  const log = antigravityPromptLog(text, argv, sessionId);
+  return log ? (GEMINI_EXECUTOR_ERROR.exec(log)?.[0].trim() ?? null) : null;
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
@@ -288,6 +314,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     },
     mcpLoadFailure: geminiMcpLoadFailure,
     refusedMcpTools: antigravityRefusedMcpTools,
+    loggedFailure: antigravityLoggedFailure,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the

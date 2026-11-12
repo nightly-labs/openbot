@@ -260,6 +260,8 @@ export const messages = {
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini остановился из-за ошибки. Отправьте сообщение ещё раз. Если он снова остановится, выберите другую модель или другого провайдера.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "На хосте с Windows Gemini открывает страницу Google на самом хосте. Подключите Gemini на компьютере-хосте.",
   "error.provider.cursorArchivePath": "В архиве Cursor неожиданный файл.",

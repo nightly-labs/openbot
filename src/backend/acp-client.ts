@@ -2402,7 +2402,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
         const failure = failureAt === null ? "" : turn.text.slice(failureAt).trim();
         if (failureAt !== null) {
-          const detail = failure || turn.text.trim();
+          const answer = failure || turn.text.trim();
+          // Antigravity 1.5.6 answers "Agent execution terminated due to error." for each failure of its
+          // own, and names the cause only in its log (#7319).
+          const logged = sdkHarness.loggedFailure?.(answer, this.options.argv, thread.id) ?? null;
+          if (logged) this.emit("diagnostic", this.#redact(logged));
+          const detail = logged ?? answer;
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
           // A turn that already produced output (such as a tool call) or needs no answer can end on
           // an empty model step, which Antigravity's harness reports as an empty-output error (#4505).

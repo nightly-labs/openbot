@@ -273,6 +273,8 @@ export const messages = {
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
+  "error.provider.antigravityTurnStopped":
+    "Gemini はエラーのため停止しました。メッセージをもう一度送信してください。再び停止する場合は、別のモデルまたはプロバイダーを選択してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ホストでは、Gemini は Google のページをホスト上で開きます。ホストのコンピューターで Gemini を接続してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",

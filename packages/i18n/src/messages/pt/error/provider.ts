@@ -270,6 +270,8 @@ export const messages = {
     "O Gemini recusou esta solicitação. Escolha outro modelo e envie sua mensagem novamente. Se falhar de novo, inicie um novo chat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "O Gemini perdeu a conexão com seu agente e parou. Envie uma mensagem para continuar.",
+  "error.provider.antigravityTurnStopped":
+    "O Gemini parou por causa de um erro. Envie sua mensagem de novo. Se ele parar de novo, escolha outro modelo ou provedor.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Em um host Windows, o Gemini abre a página do Google no próprio host. Conecte o Gemini no computador host.",
   "error.provider.cursorArchivePath": "O arquivo compactado do Cursor contém um arquivo inesperado.",
