@@ -29,7 +29,7 @@ import {
   OctagonX,
   PlushLoader,
   RotateCcw,
-  ServerGradientLogo,
+  ServerPlushLogo,
   SlidersHorizontal,
   Spinner,
   Text,
@@ -307,7 +307,7 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
   return (
     <Item class="billing-server" role="listitem">
       <ItemMedia>
-        <ServerGradientLogo class="billing-server-logo" seed={props.server.serverId ?? props.server.subscriptionId} />
+        <ServerPlushLogo class="billing-server-logo" seed={props.server.serverId ?? props.server.subscriptionId} />
       </ItemMedia>
       <ItemContent>
         <div class="billing-server-title">

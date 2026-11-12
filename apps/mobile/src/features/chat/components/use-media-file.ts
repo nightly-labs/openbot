@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { largeDownloadOf } from "../model/large-files";
 
 /** The extension of a file whose name has none, for the types a player cannot read without one. */
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -77,7 +78,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
     queryFn: async () => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
-      const data = await downloadAttachment(serverId, attachment.id);
+      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       file.parentDirectory.create({ intermediates: true, idempotent: true });
       file.writeSync(data.base64, { encoding: "base64" });
       return file.uri;

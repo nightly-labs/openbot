@@ -1182,6 +1182,16 @@ textarea {
   height: 100%;
 }
 
+/* The plush keeps its own squircle: a circle clip and ring cut its fur. */
+.server-menu-mark:has(> .ui-server-plush-logo) {
+  overflow: visible;
+  border-radius: 0;
+}
+
+.server-menu-mark:has(> .ui-server-plush-logo)::after {
+  content: none;
+}
+
 .server-menu-name {
   min-width: 0;
   flex: 1 1 auto;

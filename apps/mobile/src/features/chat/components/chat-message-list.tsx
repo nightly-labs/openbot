@@ -46,6 +46,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
+import { ChatAppSuggestion } from "@/features/chat/components/chat-app-suggestion";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
@@ -562,6 +563,8 @@ function playbackEligible(message: VisibleMessage) {
     message.author === "agent" &&
     (message.streaming || message.status === "completed") &&
     !message.superseded &&
+    // A progress update enters with all of its text, as on desktop.
+    !message.progress &&
     (!message.speaker || message.speaker.kind === "agent")
   );
 }
@@ -621,33 +624,42 @@ const MessageRow = memo(function MessageRow({
   // Select text in that sheet, in a read-only field that covers it with all of its text selected.
   const selectable = Boolean(bubble?.body.trim()) && shared.canSelectText;
   const messageActions = useMessageActions(
-    bubble
-      ? {
+    bubble?.progress
+      ? // A progress update is a step of its turn, as on desktop: no reply, reaction or delete.
+        {
           messageId: bubble.id,
           copyText: messageCopyText(bubble),
           createdAt: bubble.createdAt,
-          reactions: bubble.reactions,
-          onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
-          onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
-          onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
           onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
-          onDelete:
-            shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
-          // As on desktop, only an agent's message marks the chat unread from it.
-          onMarkUnread:
-            shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
-              ? () => shared.actions.markUnread(bubble)
-              : undefined,
-          sendToChannel:
-            shared.sendChannels.length > 0 && bubble.body.trim()
-              ? {
-                  channels: shared.sendChannels,
-                  onSend: (channelId) => shared.actions.sendToChannel(bubble, channelId),
-                }
-              : undefined,
-          readAloudId: bubble.author === "agent" ? bubble.id : undefined,
+          readAloudId: bubble.id,
         }
-      : null,
+      : bubble
+        ? {
+            messageId: bubble.id,
+            copyText: messageCopyText(bubble),
+            createdAt: bubble.createdAt,
+            reactions: bubble.reactions,
+            onReact: shared.canReact ? (emoji) => shared.actions.react(bubble, emoji) : undefined,
+            onReply: shared.canReply ? () => shared.actions.reply(bubble) : undefined,
+            onBranch: shared.branchPoints.has(bubble.id) ? () => shared.actions.branch(bubble) : undefined,
+            onSelectText: selectable ? () => shared.actions.selectText(bubble) : undefined,
+            onDelete:
+              shared.canDelete && (shared.deletesAny || bubble.mine) ? () => shared.actions.delete(bubble) : undefined,
+            // As on desktop, only an agent's message marks the chat unread from it.
+            onMarkUnread:
+              shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
+                ? () => shared.actions.markUnread(bubble)
+                : undefined,
+            sendToChannel:
+              shared.sendChannels.length > 0 && bubble.body.trim()
+                ? {
+                    channels: shared.sendChannels,
+                    onSend: (channelId) => shared.actions.sendToChannel(bubble, channelId),
+                  }
+                : undefined,
+            readAloudId: bubble.author === "agent" ? bubble.id : undefined,
+          }
+        : null,
   );
   const {
     agents,
@@ -799,6 +811,8 @@ const MessageRow = memo(function MessageRow({
       <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "app-suggestion" ? (
+      <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
     ) : message.kind === "exchange-group" ? (
       <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
@@ -978,7 +992,8 @@ const MessageRow = memo(function MessageRow({
       {message.author === "agent" ? (
         <ChatMessageGesture
           selecting={selecting}
-          onReply={shared.canReply ? () => actions.reply(message) : undefined}
+          // A progress update is a step of its turn: it takes no reply, as on desktop.
+          onReply={shared.canReply && !message.progress ? () => actions.reply(message) : undefined}
           onHold={messageActions.open}
         >
           {withReactions}
@@ -1665,10 +1680,9 @@ export const ChatMessageList = memo(function ChatMessageList({
         (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
     );
     // One run of text, as desktop shows it: the row clamps the label, and blank lines would fill it.
-    const thinkingDetail =
-      !replying && latestThinking?.kind === "thinking"
-        ? latestThinking.steps.at(-1)?.text.replace(/\s+/gu, " ").trim()
-        : null;
+    const latestStep = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
+    // A progress update shows as a message, so the row does not say it again.
+    const thinkingDetail = latestStep && !latestStep.progress ? latestStep.text.replace(/\s+/gu, " ").trim() : null;
     const activityLabel =
       sending && !activity
         ? t("common.sending")

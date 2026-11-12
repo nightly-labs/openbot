@@ -26,6 +26,7 @@ import {
   isQueueSnapshot,
   isRoutine,
   isRoutineRun,
+  LEGACY_RESPONSE_STYLE,
   MCP_SERVERS_CAPABILITY,
   type RoutineCalendarOwner,
   type SetAgentHiddenInput,
@@ -118,6 +119,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -158,7 +160,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   addAgentFolder,
@@ -183,6 +185,7 @@ import {
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostPersonality,
   getHostReleaseStatus,
   getHostTimezone,
   getHostUpdateStatus,
@@ -238,6 +241,7 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowserProfileProxy,
+  setHostPersonality,
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
@@ -331,6 +335,7 @@ export type WorkspaceRequest = <T>(
   serverId?: string | null,
   upload?: RemoteFileUpload,
   onUploadProgress?: (fraction: number) => void,
+  largeDownload?: RemoteLargeDownload,
 ) => Promise<T>;
 
 /** The capability checks that only read what a host advertised. */
@@ -418,6 +423,8 @@ type HostRequestActions = Pick<
   | "setServerTimezone"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadServerPersonality"
+  | "setServerPersonality"
   | "loadServerRoles"
   | "setServerRoles"
   | "loadServerAuditLog"
@@ -591,6 +598,7 @@ export function createHostRequestActions({
   queryScope,
   capabilities,
   attachmentDownloads,
+  largeAttachmentDownloads,
 }: {
   request: WorkspaceRequest;
   teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
@@ -599,6 +607,8 @@ export function createHostRequestActions({
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
   attachmentDownloads: { current: Promise<void> };
+  /** The lane of the files above the attachment limit, one at a time. */
+  largeAttachmentDownloads: { current: Promise<void> };
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   /** The Team API of a server that serves `capability`, for an optional admin route set. */
@@ -653,6 +663,9 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  /** Any member reads the personality; the host lets only an owner or admin set it. */
+  const personalityApi = (serverId: string) =>
+    capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
@@ -756,6 +769,13 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    // A host before host-personality-v1 uses the classic prompt, as the desktop and the web client read it.
+    loadServerPersonality: async (serverId) =>
+      has(serverId, HOST_PERSONALITY_CAPABILITY)
+        ? runTeamRequest(getHostPersonality(personalityApi(serverId)))
+        : { responseStyle: LEGACY_RESPONSE_STYLE },
+    setServerPersonality: async (personality, serverId) =>
+      runTeamRequest(setHostPersonality(personalityApi(serverId), personality)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
     loadServerAuditLog: async (serverId) => runTeamRequest(getHostAuditLog(auditAdmin(serverId))),
@@ -1431,12 +1451,24 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload) => {
       const download = () =>
-        request("GET", TEAM_API_ROUTES.attachment(attachmentId), decodeHostFile, undefined, serverId);
-      // Limit native/DOM copies when a message contains several large images.
-      const result = attachmentDownloads.current.then(download);
-      attachmentDownloads.current = result.then(
+        request(
+          "GET",
+          TEAM_API_ROUTES.attachment(attachmentId),
+          decodeHostFile,
+          undefined,
+          serverId,
+          undefined,
+          undefined,
+          largeDownload,
+        );
+      // Limit native/DOM copies when a message contains several large images. A file above the
+      // attachment limit has its own lane: the images of the chat do not wait behind it, and two
+      // such files never download at the same time.
+      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      const result = lane.current.then(download);
+      lane.current = result.then(
         () => {},
         () => {},
       );

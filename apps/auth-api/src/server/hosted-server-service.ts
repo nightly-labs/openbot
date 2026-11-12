@@ -136,6 +136,12 @@ const RETENTION_DISK_KEPT_MS = 14 * 24 * 60 * 60_000;
  * cron each 5 minutes or each minute) leaves them to clients.
  */
 const RETENTION_WAKE_EVERY_MINUTES = 10;
+/**
+ * The Terms and the DPA keep the data of an ended plan for 30 days. After that the cron deletes a server
+ * that runs on a machine of the operator, and the operator reinstalls the machine for the next customer
+ * (docs/hosted-servers.md#reuse-a-pool-machine).
+ */
+export const OPERATOR_HOST_DATA_KEPT_MS = 30 * 24 * 60 * 60_000;
 /** A server can report a routine run at most this far ahead. A later run is reported when it comes nearer. */
 const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 /**
@@ -755,6 +761,57 @@ export class HostedServerService {
     }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
   });
 
+  /**
+   * Deletes a server on a machine of the operator when its plan ended `OPERATOR_HOST_DATA_KEPT_MS` ago and
+   * Stripe confirms that its newest subscription is cancelled. An open subscription, such as an `unpaid`
+   * one that Stripe still retries, keeps the server. The operator then reinstalls the machine.
+   */
+  readonly #deleteExpired = Effect.fn("HostedServerService.deleteExpired")(function* (
+    this: HostedServerService,
+    row: HostedServerRow & { plan_ended_at: number },
+  ) {
+    const dependencies = yield* HostedServerDependencies;
+    const billing = dependencies.billing;
+    if (!billing) return;
+    const newest = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT stripe_subscription_id,
+           EXISTS(SELECT 1 FROM billing_subscriptions o WHERE o.server_id = ? AND o.status IN ${OPEN_STATUSES_SQL}) AS open
+         FROM billing_subscriptions WHERE server_id = ?
+         ORDER BY COALESCE(current_period_end, 0) DESC, updated_at DESC LIMIT 1`,
+        )
+        .bind(row.server_id, row.server_id)
+        .first<{ stripe_subscription_id: string; open: number }>(),
+    );
+    if (!newest || newest.open) return;
+    const token = crypto.randomUUID();
+    if (!(yield* this.#claimLifecycle(row.server_id, token))) return;
+    yield* Effect.gen({ self: this }, function* () {
+      if (!(yield* billing.subscriptionEnded(newest.stripe_subscription_id).pipe(Effect.mapError(hostedFailure))))
+        return;
+      // A renewal that the owner paid just now keeps the server, and its webhook starts it. When the close
+      // fails, the page stays open and the owner can still pay, so the next tick tries again.
+      const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
+      if (checkout && (yield* this.#closeCheckout(checkout)) !== "closed") return;
+      const claimed = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
+         WHERE server_id = ? AND desired_state = 'stopped' AND operator_host IS NOT NULL AND plan_ended_at = ?
+         AND lifecycle_token = ? AND lifecycle_lease_until > ?
+         AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND s.status IN ${OPEN_STATUSES_SQL})`,
+          )
+          .bind(dependencies.now(), row.server_id, row.plan_ended_at, token, dependencies.now())
+          .run(),
+      );
+      if (claimed.meta.changes !== 1) return;
+      this.#track(row, { name: "hosted_server_action", action: "deleted", plan: row.plan, size: row.size });
+      yield* this.#finishDelete(yield* this.#requireRow(row.server_id));
+    }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
+  });
+
   readonly delete = Effect.fn("HostedServerService.delete")(
     function* (
       this: HostedServerService,
@@ -1205,9 +1262,9 @@ export class HostedServerService {
       );
       const boat = dependencies.boat;
       if (!boat) return result;
-      const run = (
-        rows: HostedServerRow[],
-        action: (row: HostedServerRow) => Effect.Effect<unknown, HostedFailure, HostedServerDependencies>,
+      const run = <Row extends HostedServerRow>(
+        rows: Row[],
+        action: (row: Row) => Effect.Effect<unknown, HostedFailure, HostedServerDependencies>,
       ) =>
         Effect.gen({ self: this }, function* () {
           let done = 0;
@@ -1417,6 +1474,29 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       yield* run(scheduledDeletes.results, (row) => this.#deleteScheduled(row));
+      // A plan that ended under the Worker from before migration 0053 gets the date of this check.
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            "UPDATE hosted_servers SET plan_ended_at = ? WHERE desired_state = 'stopped' AND plan_ended_at IS NULL",
+          )
+          .bind(now)
+          .run(),
+      );
+      const expired = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS}, plan_ended_at FROM hosted_servers
+         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ?
+           AND EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id)
+           AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+             AND s.status IN ${OPEN_STATUSES_SQL})
+         ORDER BY plan_ended_at LIMIT ?`,
+          )
+          .bind(now - OPERATOR_HOST_DATA_KEPT_MS, TICK_BATCH_SIZE)
+          .all<HostedServerRow & { plan_ended_at: number }>(),
+      );
+      yield* run(expired.results, (row) => this.#deleteExpired(row));
       const deleting = yield* hostedCall(() =>
         dependencies.database
           .prepare(
@@ -1959,7 +2039,10 @@ export class HostedServerService {
     yield* this.#wake(yield* this.#requireRow(row.server_id), "restart");
   });
 
-  /** The plan ended: the server stops and keeps its data. It is never deleted for this. */
+  /**
+   * The plan ended: the server stops and keeps its data. boat runs a server until the owner deletes it.
+   * A server on a machine of the operator is deleted `OPERATOR_HOST_DATA_KEPT_MS` later (`#deleteExpired`).
+   */
   readonly #endPlan = Effect.fn("HostedServerService.endPlan")(function* (
     this: HostedServerService,
     row: HostedServerRow,
@@ -1969,10 +2052,10 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET desired_state = 'stopped', observed_error = 'plan_ended', claim_token_hash = NULL,
-           updated_at = ?
+           plan_ended_at = ?, updated_at = ?
          WHERE server_id = ? AND desired_state IN ('running', 'idle')`,
         )
-        .bind(dependencies.now(), row.server_id)
+        .bind(dependencies.now(), dependencies.now(), row.server_id)
         .run(),
     );
     if (ended.meta.changes !== 1) return;

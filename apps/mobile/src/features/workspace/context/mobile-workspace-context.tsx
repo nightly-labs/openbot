@@ -39,6 +39,7 @@ import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
+import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -91,7 +92,7 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -694,6 +695,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   }, [directoryRefresh]);
 
   const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
+  const largeAttachmentDownloads = useRef<Promise<void>>(Promise.resolve());
   const request = useCallback(
     async <T,>(
       method: string,
@@ -703,11 +705,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverId = activeServerIdRef.current,
       upload?: RemoteFileUpload,
       onUploadProgress?: (fraction: number) => void,
+      largeDownload?: RemoteLargeDownload,
     ): Promise<T> => {
       if (serverId) await connectionWaits.whenConnected(serverId);
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return client.request(method, path, decode, body, upload, onUploadProgress);
+      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload);
     },
     [connectionWaits],
   );
@@ -1778,6 +1781,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         queryScope,
         capabilities: serverCapabilities.current,
         attachmentDownloads,
+        largeAttachmentDownloads,
       }),
     [request, teamApi, queryClient, queryScope],
   );
@@ -2459,6 +2463,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
       canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
+      canManageServerPersonality: (serverId) => administers(serverId, HOST_PERSONALITY_CAPABILITY),
+      servesServerPersonality: (serverId) => {
+        const server = servers.find((candidate) => candidate.id === serverId);
+        return Boolean(
+          server &&
+            showsOnline(server) &&
+            hasCapability(serverCapabilities.current, serverId, HOST_PERSONALITY_CAPABILITY),
+        );
+      },
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),
       canReadServerAudit: (serverId) => administers(serverId, SERVER_AUDIT_CAPABILITY),
       hasAgentAccessLimits: (serverId) => {

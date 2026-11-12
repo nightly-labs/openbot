@@ -105,7 +105,7 @@ export const messages = {
   "mobile.chat.attachment.typeText": "TEKST",
   "mobile.chat.attachment.typeFile": "BESTAND",
   "mobile.chat.attachment.tooLargeForMobile":
-    "Dit bestand is groter dan de mobiele limiet van 10 MB. Open het op je computer.",
+    "Dit bestand is groter dan de mobiele limiet van {limit}. Open het op je computer.",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
   "mobile.chat.attachment.unavailable": "De bijlage is niet beschikbaar. Probeer opnieuw.",
   "mobile.chat.attachment.openFailed": "Kan bijlage niet openen",
@@ -123,7 +123,9 @@ export const messages = {
   "mobile.chat.attachment.uploadingPercent": "Uploaden · {percent}",
   "mobile.chat.attachment.downloading": "Downloaden…",
   "mobile.chat.attachment.openOrSave": "Open of bewaar {name}",
-  "mobile.chat.attachment.tooLargeHint": "Dit bestand is groter dan 10 MB. Open het op je computer.",
+  "mobile.chat.attachment.tooLargeHint": "Dit bestand is groter dan {limit}. Open het op je computer.",
+  "mobile.chat.attachment.downloadLargeDetail": "{size} · Tik om te downloaden",
+  "mobile.chat.attachment.downloadLargeHint": "Downloadt dit grote bestand naar je telefoon.",
   "mobile.chat.attachment.tileHint": "{type}, {size}, bijlage {position} van {total}",
   "mobile.chat.attachment.remove": "Verwijder {name}",
   "mobile.chat.attachment.replace": "Vervangen",
@@ -481,4 +483,11 @@ export const messages = {
   "mobile.chat.vaultRequest.gone": "Dit verzoek is niet meer open.",
   "mobile.chat.vaultRequest.notAllowed":
     "Alleen de servereigenaar of een beheerder kan een item aan de Kluis toevoegen.",
+  "mobile.chat.appSuggestion.skip": "Overslaan",
+  "mobile.chat.appSuggestion.skipNamed": "{name} overslaan",
+  "mobile.chat.appSuggestion.connectNamed": "Verbind {name}",
+  "mobile.chat.appSuggestion.skipped": "{name} overgeslagen",
+  "mobile.chat.appSuggestion.undo": "Ongedaan maken",
+  "mobile.chat.appSuggestion.notAllowed": "Alleen de servereigenaar of een beheerder kan {name} verbinden.",
+  "mobile.chat.appSuggestion.unavailable": "Deze server kan {name} niet verbinden.",
 } as const satisfies PartialTranslation<typeof source>;

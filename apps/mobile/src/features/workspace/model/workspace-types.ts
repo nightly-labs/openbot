@@ -71,6 +71,7 @@ import type {
   HostGitHubConnectorStatus,
   HostMessagingConnectInput,
   HostMessagingWorkspaceInput,
+  HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
@@ -182,7 +183,7 @@ import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/c
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -486,6 +487,17 @@ export interface MobileWorkspaceContextValue {
   /** How many memories each agent of the server can keep, and the values that the host permits. */
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  /** An owner or admin of an online host that serves `host-personality-v1`. The host checks the role again. */
+  canManageServerPersonality: (serverId: string) => boolean;
+  /** An online host that serves `host-personality-v1`. Any member reads its personality. */
+  servesServerPersonality: (serverId: string) => boolean;
+  /**
+   * How the agents of the server talk while they work. Any member reads it, because the chat shows
+   * progress updates only for a "natural" server. A host without `host-personality-v1` is "classic".
+   */
+  loadServerPersonality: (serverId: string) => Promise<HostPersonality>;
+  /** Owners and admins only. The change applies from the next turn of each agent. */
+  setServerPersonality: (personality: HostPersonality, serverId: string) => Promise<HostPersonality>;
   /** An owner or admin of an online host that serves `agent-access-v1`. The host checks the role again. */
   canManageServerRoles: (serverId: string) => boolean;
   /**
@@ -1070,7 +1082,12 @@ export interface MobileWorkspaceContextValue {
     /** Hears the fraction of the file sent so far, from 0 to 1. */
     onProgress?: (fraction: number) => void,
   ) => Promise<DraftAttachment>;
-  downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
+  /** `largeDownload` lets a file larger than the attachment limit answer, for a file the user asked for. */
+  downloadAttachment: (
+    serverId: string,
+    attachmentId: string,
+    largeDownload?: RemoteLargeDownload,
+  ) => Promise<RemoteFileUpload>;
   /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member
    * reads it; the host keeps the path inside the folder.
@@ -1170,6 +1187,8 @@ type MobileWorkspaceStateKey =
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageServerPersonality"
+  | "servesServerPersonality"
   | "canManageServerRoles"
   | "canReadServerAudit"
   | "hasAgentAccessLimits"
