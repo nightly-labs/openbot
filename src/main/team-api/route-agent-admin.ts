@@ -1,10 +1,13 @@
 import {
+  parseSetAgentDefaultChoiceInput,
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
+  parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
+  parseUpdateAgentSpeedInput,
   parseUpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -12,6 +15,7 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -25,6 +29,7 @@ import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -289,7 +294,103 @@ export async function routeAgentFastMode(
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid fast mode setting.");
     }
-    return json(200, await runCauseEffect(settings.updateFastMode(input)));
+    // The frozen route sets only Fast. A change of it turns Ultrafast off, as a Fast choice in the picker.
+    return json(
+      200,
+      await runCauseEffect(settings.updateFastMode({ agentId: input.agentId, fastMode: input.fastMode })),
+    );
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * The speed of one agent (standard, fast or ultrafast), and the models of this computer that have a
+ * fast tier, with their Ultrafast tiers and the Claude models. The access is that of
+ * `agent-fast-mode-v1`. Frozen by `agent-speed-v1`.
+ */
+export async function routeAgentSpeed(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  const models = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.models;
+  const read = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_SPEED_ROUTES.update;
+  if (!models && !read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_SPEED_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  // `readJson` has already run the body through the agent-speed wire codec.
+  const body = await readJson(request);
+  if (models) return json(200, { models: settings.listSpeedModels() });
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  const agentId = stringField(body, "agentId");
+  // The level of the released agent route: reading needs view, a change needs manage.
+  requireAgentLevel(context, agentId, read ? "view" : "manage");
+  try {
+    if (read) return json(200, settings.readSpeed(agentId));
+    let input: ReturnType<typeof parseUpdateAgentSpeedInput>;
+    try {
+      input = parseUpdateAgentSpeedInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid speed setting.");
+    }
+    return json(200, await runCauseEffect(settings.updateSpeed(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Settings › Agents of this computer, changed from a joined server: the agent defaults, the default
+ * for a message sent to a busy agent, and which agents follow them. They decide what the agents may
+ * do on this computer, so only an owner or admin can read or change them. A hidden agent is not
+ * listed and cannot be named. Frozen by `agent-defaults-v1`.
+ */
+export async function routeAgentDefaults(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.update;
+  const choice = method === "POST" && url.pathname === AGENT_DEFAULTS_ROUTES.choice;
+  if (!read && !update && !choice) return "unmatched";
+  const settings = admin?.agentDefaults;
+  if (!settings || !capabilities.has(AGENT_DEFAULTS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the agent-defaults wire codec.
+  const body = await readJson(request);
+  const visible = (overview: ReturnType<typeof settings.read>) => ({
+    ...overview,
+    agents: overview.agents.filter((agent) => !hiddenAgentIds.has(agent.agentId)),
+  });
+  if (read) return json(200, visible(settings.read()));
+  if (update) {
+    let input: ReturnType<typeof parseUpdateAgentDefaultsInput>;
+    try {
+      input = parseUpdateAgentDefaultsInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent defaults.");
+    }
+    return json(200, visible(await runCauseEffect(settings.update(input))));
+  }
+  let input: ReturnType<typeof parseSetAgentDefaultChoiceInput>;
+  try {
+    input = parseSetAgentDefaultChoiceInput(body);
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Invalid agent default choice.");
+  }
+  if (input.agentIds.some((agentId) => hiddenAgentIds.has(agentId)))
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  try {
+    return json(200, visible(await runCauseEffect(settings.setChoice(input))));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

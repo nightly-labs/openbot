@@ -53,6 +53,7 @@ import {
   MOBILE_STORE_NAMES,
   MOBILE_STORES,
   type MobileStore,
+  otaVersion,
   parseStoreDates,
   SKIPPED,
   type StoreDates,
@@ -74,12 +75,15 @@ export const ANNOUNCED_TAG_PREFIX = "mobile-announced/";
 const FIRST_TAGGED_VERSION = "1.4.7";
 const STORE_LINKS: Record<MobileStore, string> = { ios: IOS_APP_STORE_URL, android: ANDROID_PLAY_STORE_URL };
 
-/** The heading state of each version in `changelog`, newest first. */
+/**
+ * The heading state of each store version in `changelog`, newest first. An OTA section, such as
+ * `## [1.4.8.1]`, is left out: no store has that version, so it gets no post, tag or highlights.
+ */
 export function mobileVersions(changelog: string): { version: string; dates: StoreDates }[] {
   return changelog.split(/\r?\n/).flatMap((line) => {
     const [, version = "", text = ""] = /^## \[([^\]]+)\] - (.+)$/.exec(line) ?? [];
     const dates = parseStoreDates(text);
-    return dates === undefined ? [] : [{ version, dates }];
+    return dates === undefined || otaVersion(version) !== undefined ? [] : [{ version, dates }];
   });
 }
 

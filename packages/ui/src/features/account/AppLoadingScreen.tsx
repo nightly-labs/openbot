@@ -26,6 +26,8 @@ const EXIT_FADE_DELAY_MS = 300;
 const MIN_RAIN_S = 2;
 const EXIT_ANIMATION = "app-loading-exit";
 const THINKING_SIZE = 132;
+// The wait before the stage shows, as in `app-loading-screen.css`.
+const ENTER_DELAY_S = 0.25;
 
 const STATUS_LINES = [
   "webClient.loadingLine.wake",
@@ -155,6 +157,11 @@ export interface AppLoadingScreenProps {
    * The default only fades a screen that was ready quickly.
    */
   quickExit?: boolean;
+  /**
+   * The stage shows at once. The default waits a short time, so a fast load does not flash it. Use it
+   * for a screen that is sure to stay, such as one that takes the place of another screen.
+   */
+  immediate?: boolean;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
@@ -174,6 +181,8 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const start = seat?.start ?? performance.now();
   const age = () => (performance.now() - start) / 1000;
   const mountedAt = age();
+  // An immediate screen starts as if its stage had waited already.
+  const enterAt = untrack(() => props.immediate) ? Math.max(mountedAt, ENTER_DELAY_S) : mountedAt;
   const [clock, setClock] = createSignal(mountedAt);
   const [phase, setPhase] = createSignal<Phase>("loading");
   const status = () => STATUS_LINES[Math.floor(clock() / STATUS_EVERY_S) % STATUS_LINES.length] ?? STATUS_LINES[0];
@@ -275,7 +284,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
         root = element;
       }}
       class="app-loading"
-      style={{ "--app-loading-at": `${mountedAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
+      style={{ "--app-loading-at": `${enterAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
       data-scene={pileScene ? "pile" : "thinking"}
       data-phase={phase()}
       role="status"

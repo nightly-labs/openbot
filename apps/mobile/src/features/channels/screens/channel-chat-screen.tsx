@@ -7,6 +7,8 @@ import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
+import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
@@ -38,9 +40,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     () => serverAgents.filter((agent) => channel?.members.some((member) => member.agentId === agent.id)),
     [serverAgents, channel?.members],
   );
+  const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
-    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null),
-    [page?.messages, server?.membershipId],
+    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null, progressUpdates),
+    [page?.messages, server?.membershipId, progressUpdates],
   );
   // A host with channel-attention-v1 names the thread of each member in this channel. A request on
   // one of them belongs here, and not in the agent's own chat.
@@ -59,9 +62,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     return serverApprovals.filter((approval) => workers.has(approval.agentId));
   }, [serverApprovals, archived, threadIds, page?.tasks]);
   const serverBrowserRequests = useBrowserRequests(serverId);
-  // A member that asks in this channel waits for the person, and its row says what for.
-  const activities = useMemo(() => {
-    if (!online || archived) return [];
+  // A member that asks in this channel waits for the person, and its row says what for. The steps
+  // rows read this work also while the server is offline, so a running turn does not show as finished.
+  const memberWork = useMemo(() => {
+    if (archived) return [];
     const working = channelTaskActivities(page?.tasks ?? [], page?.messages ?? [], channel?.leadAgentId ?? null);
     const waits = new Map<string, MobileAgentWaitReason>();
     for (const approval of approvals) waits.set(approval.agentId, "approval");
@@ -90,16 +94,26 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       if (!next.some((activity) => activity.agentId === agentId))
         next.push(waiting({ agentId, turnId: null, phase: "working", detail: null }, reason));
     return next;
-  }, [
-    online,
-    archived,
-    channel?.leadAgentId,
-    page?.tasks,
-    page?.messages,
-    approvals,
-    serverBrowserRequests,
-    threadIds,
-  ]);
+  }, [archived, channel?.leadAgentId, page?.tasks, page?.messages, approvals, serverBrowserRequests, threadIds]);
+  const activities = useMemo(() => (online ? memberWork : []), [online, memberWork]);
+  // A finished turn of a member with no answer, such as a stopped one, shows its steps in its own row.
+  // A member's running turn shows them in its activity row. An activity with no turn is the member's latest turn.
+  const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
+  const turnSummaries = useMemo(() => {
+    const entries = page?.messages ?? [];
+    const latestTurns = new Map<string, string>();
+    for (const entry of entries)
+      if (entry.author.kind === "agent" && entry.message.turnId) latestTurns.set(entry.author.id, entry.message.turnId);
+    lastTurnSummaries.current = unansweredChannelTurnSummaries(
+      entries,
+      (turnId, agentId) =>
+        memberWork.some(
+          (activity) => activity.agentId === agentId && (activity.turnId ?? latestTurns.get(agentId)) === turnId,
+        ),
+      lastTurnSummaries.current,
+    );
+    return lastTurnSummaries.current;
+  }, [page?.messages, memberWork]);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
@@ -151,8 +165,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   const name = channel?.name ?? t("mobile.channel.chat.fallbackName");
   const target = useMemo(
-    () => ({ kind: "channel" as const, id: channelId, serverId, name, members }),
-    [channelId, serverId, name, members],
+    () => ({
+      kind: "channel" as const,
+      id: channelId,
+      serverId,
+      name,
+      members,
+      icon: channel?.icon,
+      imageUrl: channel?.imageUrl,
+    }),
+    [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
   return (
     <ChatView
@@ -184,6 +206,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       loadOlder={loadOlder}
       needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0}
       channelLeadAgentId={channel?.leadAgentId ?? null}
+      channelTurnSummaries={turnSummaries}
       onLeave={leaveChat}
     />
   );

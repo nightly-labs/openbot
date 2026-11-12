@@ -91,6 +91,9 @@ import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } fr
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
+/** The failure of a snapshot of a page that navigated during the read. */
+export const SNAPSHOT_NAVIGATED_MESSAGE = "Page navigated during the browser snapshot. Take a fresh snapshot.";
+
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
 const MAX_RESULT_BYTES = 64 * 1024;
@@ -347,6 +350,8 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
     origin: string,
+    /** A password goes whole into each field, such as a sign-up form's password and its confirmation. */
+    wholeSecretInEachField: boolean,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
@@ -451,6 +456,9 @@ export class BrowserCdpEngine {
           fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
+        // A second copy of a password goes only to a password field, so no field shows the value.
+        if (wholeSecretInEachField && inputs.length > 1 && !fields.password)
+          return yield* browserFailure(new Error("A password and its confirmation must both be password fields."));
         return { inputs, button, fingerprints, fields, servedByWorker };
       }),
     );
@@ -491,7 +499,9 @@ export class BrowserCdpEngine {
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
-                yield* send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+                yield* send("Input.insertText", {
+                  text: wholeSecretInEachField || nodes.inputs.length === 1 ? secret : secret[index],
+                });
               }
               if (submission === "on_input" || generation !== this.#navigationGeneration) return;
               if (submission === "click" && nodes.button) {
@@ -553,7 +563,8 @@ export class BrowserCdpEngine {
             const cleared = yield* this.#callOnNode(
               send,
               node.backendNodeId,
-              `function() { this.value = ''; return this.value === ''; }`,
+              // React and similar libraries copy a field's value into its value attribute.
+              `function() { this.value = ''; this.defaultValue = ''; return this.value === ''; }`,
               [],
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (cleared !== true) return false;
@@ -750,8 +761,19 @@ export class BrowserCdpEngine {
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       if (details.isMainFrame && !details.isSameDocument) this.#documentGeneration += 1;
-      this.#targets.clear();
-      this.#lastSnapshot = null;
+      if (details.isMainFrame) {
+        this.#targets.clear();
+        this.#lastSnapshot = null;
+        return;
+      }
+      // Pages such as mail apps navigate their frames all the time. The refs of the main process stay:
+      // its node ids are not used again, so a ref of a replaced frame document fails and cannot hit a
+      // new element. A frame in another process can get a new process with the same ids. A navigation
+      // in the same document keeps all nodes.
+      if (details.isSameDocument) return;
+      for (const [ref, record] of this.#targets) {
+        if (record.targetId !== undefined) this.#targets.delete(ref);
+      }
     });
     // Main frame only. The payment frames of the old document go with it.
     contents.on("did-navigate", () => this.#cardScrub.endDocument());
@@ -795,7 +817,12 @@ export class BrowserCdpEngine {
             { concurrency: "unbounded" },
           );
         let [metrics, [parsed, focus], challenge, settle] = yield* Effect.all(
-          [send("Page.getLayoutMetrics"), collect(), detectChallenge(this.#contents, send), probeSettle(send)],
+          [
+            send("Page.getLayoutMetrics"),
+            collect(),
+            detectChallenge(this.#contents, send, [...this.#targetSessions.keys()]),
+            probeSettle(send),
+          ],
           { concurrency: "unbounded" },
         );
         // A page that still shows loading placeholders, or a new page with no controls yet, would
@@ -827,7 +854,7 @@ export class BrowserCdpEngine {
           if (navigationGeneration === this.#navigationGeneration) [parsed, focus] = yield* collect();
         }
         if (navigationGeneration !== this.#navigationGeneration) {
-          return yield* browserFailure(new Error("Page navigated during the browser snapshot. Take a fresh snapshot."));
+          return yield* browserFailure(new Error(SNAPSHOT_NAVIGATED_MESSAGE));
         }
         const viewport = readViewport(metrics, context.environment);
         const snapshot: BrowserSnapshot = {
@@ -2651,10 +2678,16 @@ export class BrowserCdpEngine {
             if (text) {
               matched &&= yield* pageContainsText(send, this.#snapshotTargets(), text, deadline);
             }
-            const target = condition.target;
+            // A wait needs one match, not the only match: a wait for `article.product_pod` on a page of
+            // 20 products timed out, because the ambiguity refusal failed each poll.
+            const target =
+              condition.target &&
+              (condition.target.kind === "css" || condition.target.kind === "role" || condition.target.kind === "text")
+                ? { ...condition.target, nth: condition.target.nth ?? 0 }
+                : condition.target;
             if (target) {
               yield* Effect.gen({ self: this }, function* () {
-                // A poll drops the error, so an ambiguous target needs no candidate list here.
+                // A poll drops the error, so a missing target needs no candidate list here.
                 yield* this.#resolveTargetEffect(send, target, deadline, true, false);
               }).pipe(
                 Effect.catch(() =>
@@ -2908,6 +2941,8 @@ export class BrowserCdpEngine {
         y: 0,
       };
     }
+    // A target with nth chooses one match by its index, so the scan collects matches up to that index.
+    const limit = target.nth === undefined ? MAX_TARGET_CANDIDATES : target.nth + 1;
     if (target.kind === "css") {
       const matches: Array<{ objectId: string; sessionId?: string | undefined; targetId?: string | undefined }> = [];
       const releaseMatches = () =>
@@ -2919,14 +2954,14 @@ export class BrowserCdpEngine {
         );
       yield* Effect.gen({ self: this }, function* () {
         for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId)) {
+          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId, limit)) {
             matches.push({
               objectId,
               ...(capture.sessionId === undefined ? {} : { sessionId: capture.sessionId }),
               ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
             });
           }
-          if (matches.length >= MAX_TARGET_CANDIDATES) break;
+          if (matches.length >= limit) break;
         }
       }).pipe(
         Effect.catch((operationFailure) =>
@@ -2936,6 +2971,18 @@ export class BrowserCdpEngine {
           }),
         ),
       );
+      if (target.nth !== undefined) {
+        const chosen = matches[target.nth];
+        const others = matches.filter((match) => match !== chosen);
+        yield* Effect.all(
+          others.map((match) =>
+            Effect.exit(send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId)),
+          ),
+          { concurrency: "unbounded" },
+        );
+        matches.splice(0, matches.length, ...(chosen ? [chosen] : []));
+        if (!chosen && others.length) return yield* browserFailure(new Error(nthMissing(target, others.length)));
+      }
       if (matches.length > 1) {
         const summary = `CSS selector is ambiguous (at least ${Math.min(matches.length, MAX_TARGET_CANDIDATES)} matches): ${target.selector}`;
         if (!describeAmbiguity) {
@@ -2943,14 +2990,17 @@ export class BrowserCdpEngine {
           return yield* browserFailure(new Error(summary));
         }
         // A match that cannot be described, such as one removed after the scan, is left out of the list.
-        const candidates = yield* Effect.forEach(matches.slice(0, MAX_TARGET_CANDIDATES), (match) =>
+        // The other candidates keep their numbers, so that nth still selects the candidate it names.
+        const described = yield* Effect.forEach(matches.slice(0, MAX_TARGET_CANDIDATES), (match) =>
           describedMatch(send, match.objectId, match, "").pipe(Effect.catch(() => Effect.succeed(undefined))),
         ).pipe(Effect.ensuring(releaseMatches()));
+        const kept = described.flatMap((candidate, index) => (candidate ? [{ candidate, index }] : []));
         return yield* this.#ambiguousTarget(
           send,
           summary,
-          candidates.filter((candidate) => candidate !== undefined),
+          kept.map(({ candidate }) => candidate),
           deadline,
+          kept.map(({ index }) => index),
         );
       }
       const match = matches[0];
@@ -2979,16 +3029,23 @@ export class BrowserCdpEngine {
     const candidates: SemanticMatch[] = [];
     const seen = new Set<string>();
     for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-      for (const candidate of yield* semanticAxMatches(send, capture, target, allowNonActionableRole, deadline)) {
+      for (const candidate of yield* semanticAxMatches(
+        send,
+        capture,
+        target,
+        allowNonActionableRole,
+        deadline,
+        limit,
+      )) {
         const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
         if (seen.has(key)) continue;
         seen.add(key);
         candidates.push(candidate);
-        if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+        if (candidates.length >= limit) break;
       }
-      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+      if (candidates.length >= limit) break;
       if (target.kind === "text") {
-        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline);
+        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline, limit);
         yield* Effect.gen({ self: this }, function* () {
           for (const objectId of objectIds) {
             const candidate = yield* describedMatch(send, objectId, capture, target.text);
@@ -2997,7 +3054,7 @@ export class BrowserCdpEngine {
             if (seen.has(key)) continue;
             seen.add(key);
             candidates.push(candidate);
-            if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+            if (candidates.length >= limit) break;
           }
         }).pipe(
           Effect.ensuring(
@@ -3012,12 +3069,25 @@ export class BrowserCdpEngine {
           ),
         );
       }
-      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
+      if (candidates.length >= limit) break;
     }
     if (navigationGeneration !== this.#navigationGeneration) {
       return yield* browserFailure(
         new Error("Page navigated during semantic target collection. Take a fresh snapshot."),
       );
+    }
+    if (target.nth !== undefined) {
+      const chosen = candidates[target.nth];
+      if (!chosen) {
+        return yield* browserFailure(
+          new Error(
+            candidates.length
+              ? nthMissing(target, candidates.length)
+              : `No element matches ${describeBrowserTarget(target)}.`,
+          ),
+        );
+      }
+      candidates.splice(0, candidates.length, chosen);
     }
     const [found] = candidates;
     if (!found) return yield* browserFailure(new Error(`No element matches ${describeBrowserTarget(target)}.`));
@@ -3046,6 +3116,8 @@ export class BrowserCdpEngine {
     summary: string,
     candidates: readonly SemanticMatch[],
     deadline?: number,
+    /** The nth index of each candidate, when it is not its position in `candidates`. */
+    positions?: readonly number[],
   ): Effect.fn.Return<never, BrowserOperationError> {
     const key = (candidate: SemanticMatch) => `${candidate.targetId ?? "main"}:${candidate.backendNodeId}`;
     const texts = new Map<string, TargetCandidateText>();
@@ -3069,7 +3141,7 @@ export class BrowserCdpEngine {
       const text = texts.get(key(candidate));
       const label = labels[index] ?? "";
       const ref = revision === undefined ? undefined : `${revision}:${key(candidate)}`;
-      const tokens = [`${index + 1}.`];
+      const tokens = [`${(positions?.[index] ?? index) + 1}.`];
       if (ref !== undefined && this.#targets.has(ref)) tokens.push(`ref=${ref}`);
       else missingRef = true;
       if (candidate.role) tokens.push(candidate.role);
@@ -3083,7 +3155,7 @@ export class BrowserCdpEngine {
     const message = [
       `${summary}. No input was sent. Candidates:`,
       ...lines,
-      "Act on the ref of the intended item, or use a target that matches only that item." +
+      "Act on the ref of the intended item, add nth (0 for candidate 1) to the target, or use a target that matches only that item." +
         (missingRef ? " Take a fresh snapshot to get a ref for a candidate that has none." : "") +
         " If the task does not say which item, ask the user.",
     ].join("\n");
@@ -3110,7 +3182,7 @@ export class BrowserCdpEngine {
           if (this.nodeType !== 1 || !this.isConnected || this.getClientRects().length === 0) return null;
           let element = this;
           while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
+            if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
             const style = getComputedStyle(element);
             if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
             const parent = element.parentElement;
@@ -3513,6 +3585,11 @@ export class BrowserCdpEngine {
       viewport: { mode: "custom", width: viewport.width, height: viewport.height, deviceScaleFactor: 0, preset: null },
     };
   }
+}
+
+/** The refusal for a target whose nth is past its last match. */
+function nthMissing(target: BrowserTarget, matches: number): string {
+  return `${describeBrowserTarget(target)} has no match at that index: it matches ${matches} element${matches === 1 ? "" : "s"}, and nth counts from 0.`;
 }
 
 function assertTypingProgressBeforeDeadline(deadline: number | undefined, sent: number, total: number): void {

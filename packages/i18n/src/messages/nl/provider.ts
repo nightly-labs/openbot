@@ -120,6 +120,8 @@ export const messages = {
     "Voeg een OpenAI-compatibel endpoint toe: een modelserver op deze computer, of een dienst met een basis-URL en een sleutel.",
   "provider.picker.customPending":
     "De modellen van je endpoints zijn nog niet geladen. De aanbieder leest ze nadat zijn huidige taak stopt.",
+  "provider.picker.customUnlisted": "{name} toont de modellen van je endpoints niet.",
+  "provider.picker.editEndpoints": "Endpoints bewerken",
   "provider.picker.defaultModelLabel": "{name}, standaard",
   "provider.picker.usageLimit": "Gebruikslimiet bereikt",
   "provider.picker.usageLimitWindow": "Limiet ({window})",
@@ -130,7 +132,12 @@ export const messages = {
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
   "provider.picker.fast": "Snel",
-  "provider.picker.fastLabel": "Snelle modus",
+  "provider.picker.fastText": "Snellere antwoorden, meer verbruik",
+  "provider.picker.speed": "Snelheid",
+  "provider.picker.standard": "Standaard",
+  "provider.picker.standardText": "Standaardsnelheid",
+  "provider.picker.ultrafast": "Ultrasnel",
+  "provider.picker.ultrafastText": "De snelste antwoorden, veel meer verbruik",
   "provider.picker.selectEffort": "Kies niveau",
   "provider.picker.custom": "Eigen",
   "provider.picker.cliReady": "{cli} gereed",
@@ -211,6 +218,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} heeft geen resettegoed meer.",
   "provider.account.resetUsageAlreadyRedeemed": "Dit resettegoed van {name} is al gebruikt.",
   "provider.account.resetUsageFailed": "Kan het gebruik van {name} niet resetten.",
+  "provider.account.pool": "Accounts bundelen",
+  "provider.account.poolDescription":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "provider.account.inUse": "In gebruik",
+  "provider.account.notInPool": "Niet in pool",
+  "provider.account.leaveOutOfPool": "Uit pool halen",
+  "provider.account.putBackInPool": "Terug in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool van {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in gebruik",
   "provider.settings.connected": "Verbonden",
   "provider.settings.other": "Andere aanbieders",
   "provider.settings.search": "Aanbieders zoeken",
@@ -232,6 +249,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "Standaard voor nieuwe agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} van {max}. Elke agent gebruikt één account.",
+  "provider.settings.accountsPooledDescription": "{count} van {max}. Agents delen deze accounts.",
   "provider.settings.accountBlocked": "{agents} kan niet draaien tot je opnieuw inlogt.",
   "provider.settings.removeTitle": "{name} verwijderen?",
   "provider.settings.removeMoves": "{agents} gaat {name} gebruiken.",
@@ -252,6 +270,8 @@ export const messages = {
   "provider.settings.keyAlternative": "Of plak een {name}-API-sleutel.",
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",
@@ -275,7 +295,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":
     "Agents laden je CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents laden CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude op de server. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Kan de Claude Code-instelling niet laden.",
+  "provider.settings.context": "Context",
+  "provider.settings.compactWindow": "Chats comprimeren bij",
+  "provider.settings.compactWindowDescription":
+    "Claude Code vat de oudere beurten van een chat samen wanneer de chat deze grootte bereikt. Lager houdt beurten snel en goedkoop. Hoger bewaart meer details. Een model met een kleiner venster comprimeert bij zijn eigen limiet.",
+  "provider.settings.compactWindowDefault": "Standaard van Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {
     one: "{shown} van {count} model staat in de modelkiezer.",
@@ -303,4 +332,6 @@ export const messages = {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
 } as const satisfies PartialTranslation<typeof source>;

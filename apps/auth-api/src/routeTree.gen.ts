@@ -86,6 +86,7 @@ import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agen
 import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
+import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
 import { Route as V1MeAnalyticsRouteImport } from './routes/v1/me/analytics'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
@@ -599,6 +600,11 @@ const V1AvatarsUserIdRoute = V1AvatarsUserIdRouteImport.update({
   id: '/v1/avatars/$userId',
   path: '/v1/avatars/$userId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const V1FeedbackSimilarRoute = V1FeedbackSimilarRouteImport.update({
+  id: '/similar',
+  path: '/similar',
+  getParentRoute: () => V1FeedbackRoute,
 } as any)
 const V1GithubInstallationTokensRoute =
   V1GithubInstallationTokensRouteImport.update({
@@ -1350,7 +1356,7 @@ export interface FileRoutesByFullPath {
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
-  '/v1/feedback': typeof V1FeedbackRoute
+  '/v1/feedback': typeof V1FeedbackRouteWithChildren
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand/': typeof BrandIndexRoute
   '/compare/': typeof CompareIndexRoute
@@ -1376,6 +1382,7 @@ export interface FileRoutesByFullPath {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -1553,7 +1560,7 @@ export interface FileRoutesByTo {
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
-  '/v1/feedback': typeof V1FeedbackRoute
+  '/v1/feedback': typeof V1FeedbackRouteWithChildren
   '/v1/me': typeof V1MeRouteWithChildren
   '/brand': typeof BrandIndexRoute
   '/compare': typeof CompareIndexRoute
@@ -1579,6 +1586,7 @@ export interface FileRoutesByTo {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -1760,7 +1768,7 @@ export interface FileRoutesById {
   '/providers/rss.xml': typeof ProvidersRssDotxmlRoute
   '/slack/connect': typeof SlackConnectRoute
   '/v1/contact': typeof V1ContactRoute
-  '/v1/feedback': typeof V1FeedbackRoute
+  '/v1/feedback': typeof V1FeedbackRouteWithChildren
   '/v1/me': typeof V1MeRouteWithChildren
   '/_home/': typeof HomeIndexRoute
   '/brand/': typeof BrandIndexRoute
@@ -1787,6 +1795,7 @@ export interface FileRoutesById {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -1992,6 +2001,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/feedback/similar'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -2195,6 +2205,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/feedback/similar'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -2402,6 +2413,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/feedback/similar'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -2578,7 +2590,7 @@ export interface RootRouteChildren {
   ProvidersRssDotxmlRoute: typeof ProvidersRssDotxmlRoute
   SlackConnectRoute: typeof SlackConnectRoute
   V1ContactRoute: typeof V1ContactRoute
-  V1FeedbackRoute: typeof V1FeedbackRoute
+  V1FeedbackRoute: typeof V1FeedbackRouteWithChildren
   V1MeRoute: typeof V1MeRouteWithChildren
   BrandIndexRoute: typeof BrandIndexRoute
   CompareIndexRoute: typeof CompareIndexRoute
@@ -3244,6 +3256,13 @@ declare module '@tanstack/solid-router' {
       fullPath: '/v1/avatars/$userId'
       preLoaderRoute: typeof V1AvatarsUserIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/v1/feedback/similar': {
+      id: '/v1/feedback/similar'
+      path: '/similar'
+      fullPath: '/v1/feedback/similar'
+      preLoaderRoute: typeof V1FeedbackSimilarRouteImport
+      parentRoute: typeof V1FeedbackRoute
     }
     '/v1/github/installation-tokens': {
       id: '/v1/github/installation-tokens'
@@ -4202,6 +4221,18 @@ const TeamsRouteChildren: TeamsRouteChildren = {
 
 const TeamsRouteWithChildren = TeamsRoute._addFileChildren(TeamsRouteChildren)
 
+interface V1FeedbackRouteChildren {
+  V1FeedbackSimilarRoute: typeof V1FeedbackSimilarRoute
+}
+
+const V1FeedbackRouteChildren: V1FeedbackRouteChildren = {
+  V1FeedbackSimilarRoute: V1FeedbackSimilarRoute,
+}
+
+const V1FeedbackRouteWithChildren = V1FeedbackRoute._addFileChildren(
+  V1FeedbackRouteChildren,
+)
+
 interface V1MeRouteChildren {
   V1MeAnalyticsRoute: typeof V1MeAnalyticsRoute
   V1MeAvatarRoute: typeof V1MeAvatarRoute
@@ -4394,7 +4425,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProvidersRssDotxmlRoute: ProvidersRssDotxmlRoute,
   SlackConnectRoute: SlackConnectRoute,
   V1ContactRoute: V1ContactRoute,
-  V1FeedbackRoute: V1FeedbackRoute,
+  V1FeedbackRoute: V1FeedbackRouteWithChildren,
   V1MeRoute: V1MeRouteWithChildren,
   BrandIndexRoute: BrandIndexRoute,
   CompareIndexRoute: CompareIndexRoute,

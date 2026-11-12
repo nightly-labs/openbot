@@ -108,6 +108,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name}을(를) 제거할까요?",
   "marketplace.app.remove.keep": "유지",
   "marketplace.app.connection": "연결",
+  "marketplace.app.access.use": "사용 가능",
+  "marketplace.app.access.noAgents": "에이전트 없음",
+  "marketplace.app.access.agentsOf": "{name}을(를) 사용할 수 있는 에이전트",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. 에이전트 선택",
+  "marketplace.app.access.level": "{name}에 대한 {role}의 접근 권한",
   "marketplace.app.setup.account": "브라우저에서 {name} 계정으로 로그인해요.",
   "marketplace.app.setup.key": "{name} 계정의 API 키가 필요해요.",
   "marketplace.app.setup.keySaved": "{field}: {host}에 저장돼 있어요.",
@@ -181,6 +186,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "시작하기 전에 이 프로젝트의 Cobrain 컨텍스트를 불러와 줘.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "가격에 대해 우리가 뭘 결정했는지 Cobrain 노트에서 검색해 줘.",
   "marketplace.plugin.cobrain.prompt.saveNote": "오늘 한 일과 남은 일을 Cobrain에 노트로 저장해 줘.",
+  "marketplace.plugin.honcho.tagline": "모든 AI 도구에 걸친 나의 기억",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs의 Honcho는 연결한 다른 AI 도구와 공유할 수 있는, 나에 대한 장기 기억을 에이전트에게 제공합니다. 에이전트는 배운 내용을 저장하고, Honcho는 이를 바탕으로 추론하여 나의 선호, 목표, 일하는 방식에 대한 모델을 만듭니다. 에이전트는 시작하기 전에 Honcho에게 질문합니다. OpenBot 에이전트에도 자체 기억이 있습니다. Honcho는 다른 도구에서도 나를 따라오는 기억입니다. 에이전트가 저장한 메시지는 내 Honcho 계정으로 전송됩니다.",
+  "marketplace.plugin.honcho.app": "하나의 MCP 서버로 Honcho 워크스페이스에 장기 기억을 저장하고 조회합니다.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "시작하기 전에 내가 어떻게 일하는 것을 좋아하는지 Honcho가 무엇을 알고 있는지 물어봐 주세요.",
+  "marketplace.plugin.honcho.prompt.save": "이 스레드의 결정 사항을 Honcho에 저장해 주세요.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho는 내 글쓰기 스타일에 대해 뭐라고 하나요? 이 초안에 반영해 주세요.",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev에서 키를 만드세요.",
+  "marketplace.plugin.hindsight.tagline": "시간이 지나며 배우는 기억",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize의 Hindsight는 Hindsight Cloud에 있는 장기 기억을 에이전트에게 제공합니다. 에이전트는 사실과 사건을 보존하고, 의미, 시간, 엔터티로 불러오며, 이를 되돌아보며 멘털 모델을 만듭니다. 기억은 뱅크에 보관되며, 에이전트는 프로젝트나 사람마다 뱅크를 만들 수 있습니다. OpenBot 에이전트에도 자체 기억이 있습니다. Hindsight는 연결한 다른 AI 도구와 공유할 수 있는 기억입니다. 에이전트가 보존한 내용은 내 Hindsight Cloud 계정으로 전송됩니다.",
+  "marketplace.plugin.hindsight.app":
+    "하나의 MCP 서버로 Hindsight Cloud 뱅크의 기억을 보존하고, 불러오고, 되돌아봅니다.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "시작하기 전에 이 프로젝트에 대해 알고 있는 내용을 Hindsight에서 불러와 주세요.",
+  "marketplace.plugin.hindsight.prompt.retain": "이 스레드의 결정 사항과 남은 질문을 Hindsight에 보존해 주세요.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "내 Hindsight 기억을 되돌아봐 주세요. 지난 한 달 동안 내 작업에서 어떤 패턴이 보이나요?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud의 Connect 페이지에서 키를 만드세요.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",
   "marketplace.plugin.figma.description":
     "Figma를 사용하면 에이전트가 디자인 파일을 읽고, 컴포넌트, 스타일, 변수를 살펴보고, 개발자에게 제작 명세를 전달할 수 있어요. 이 컴퓨터의 Figma 데스크톱 앱에 있는 MCP 서버에 연결해요. 서버는 디자인을 읽기만 할 수 있고, 쓰기 지원은 준비 중이에요.",
@@ -342,6 +368,14 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
+  "marketplace.plugin.postiz.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.postiz.description":
+    "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. 브라우저에서 Postiz 계정에 로그인하거나 Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 API 액세스가 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
+  "marketplace.plugin.postiz.app":
+    "브라우저 로그인 또는 API 키로 Postiz의 MCP 서버를 통해 채널, 초안, 예약 게시물, 미디어를 다룹니다.",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz에 연결된 소셜 미디어 채널은 무엇인가요?",
+  "marketplace.plugin.postiz.prompt.week": "다음 주에 예약된 게시물은 무엇인가요?",
+  "marketplace.plugin.postiz.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성해 줘. 단, 예약하지는 마.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",
@@ -489,6 +523,13 @@ export const messages = {
   "marketplace.skills.origin.local": "이 컴퓨터에서 만듦",
   "marketplace.skills.origin.workspace": "이 에이전트의 폴더에 있음",
   "marketplace.skills.origin.marketplace": "마켓플레이스 · 버전 {version}",
+  "marketplace.skills.origin.github": "GitHub · {repository}",
+  "marketplace.skills.github.search": "검색하거나 GitHub 링크 붙여 넣기",
+  "marketplace.skills.github.reading": "저장소에서 스킬을 찾는 중",
+  "marketplace.skills.github.trust": "OpenBot은 GitHub의 스킬을 검토하지 않았어요. 추가하기 전에 스킬을 읽어 보세요.",
+  "marketplace.skills.github.source": "GitHub · {repository} 커밋 {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "GitHub에서 {repository} 열기",
   "marketplace.skills.status.notAdded": "추가 안 됨",
   "marketplace.skills.status.on": "{agents}에서 켜짐",
   "marketplace.skills.agentCount": { other: "에이전트 {count}개" },

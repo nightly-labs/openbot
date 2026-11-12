@@ -97,15 +97,17 @@ export class GitHubBotTokens {
 
   /**
    * Replaces the set with the API's answer. A failure keeps the tokens that are still valid and
-   * does not reject. An answer that arrives after `clear` is discarded.
+   * does not reject. An answer that arrives after `clear` is discarded. True when GitHub refused
+   * `userToken`: the API then answers 401.
    */
 
   readonly renew = Effect.fn("GitHubBotTokens.renew")(function* (
     this: GitHubBotTokens,
     userToken: string,
     signal?: AbortSignal,
-  ): Effect.fn.Return<void, GitHubOperationError> {
+  ): Effect.fn.Return<boolean, GitHubOperationError> {
     const epoch = this.#epoch;
+    let refused = false;
     yield* Effect.gen({ self: this }, function* () {
       const response = yield* githubCall((fiberSignal) =>
         this.#fetch(new URL("/v1/github/installation-tokens", this.#apiUrl).toString(), {
@@ -123,6 +125,7 @@ export class GitHubBotTokens {
         this.#nextAt = this.#now() + RETRY_MS;
         return;
       }
+      refused = response.status === 401;
       if (!response.ok)
         return yield* new GitHubOperationError({
           cause: new Error(`The OpenBot API refused the GitHub token request (HTTP ${response.status}).`),
@@ -160,5 +163,6 @@ export class GitHubBotTokens {
         }),
       ),
     );
+    return refused;
   });
 }

@@ -29,7 +29,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { GitHubMark } from "./brand-marks";
+import { GitHubTile } from "./brand-marks";
 import {
   DangerZone,
   IntegrationPage,
@@ -132,7 +132,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   return (
     <IntegrationPage
       class="github-connector"
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       name={t("connector.github.title")}
       status={header().status}
       statusLabel={t(header().label)}
@@ -395,7 +395,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
       closeLabel={running() ? t("connector.github.cancelConnecting") : t("connector.github.close")}
       dismissible={!running()}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link={link()}
       title={title()}
       description={description()}
@@ -557,7 +557,7 @@ function DisconnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.github.close")}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link="broken"
       title={t("connector.github.disconnectConfirmTitle")}
       description={

@@ -69,8 +69,15 @@ export interface ChannelsEnvironment {
    */
   isolationSupported: () => boolean;
   /**
-   * Whether this reader can change the picture of a channel. Only this computer keeps a channel
-   * picture: the Team API does not carry it, so a joined server and the browser client cannot.
+   * Whether the host reads and keeps the Browser setting (`channel-browser-v1`); `supported()` is
+   * checked as well. An older joined server drops the setting on the wire, so its select would always
+   * show every member and never save.
+   */
+  browserSupported: () => boolean;
+  /**
+   * Whether this reader can change the picture of a channel. The host keeps a channel picture, and
+   * only a phone with `channel-picture-v1` changes it over the Team API, so a joined server and the
+   * browser client cannot.
    */
   pictureSupported: () => boolean;
   /**
@@ -542,6 +549,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     deletionSupported: () => supported() && env.deletionSupported(),
     taskCancelSupported: () => supported() && env.taskCancelSupported(),
     isolationSupported: () => supported() && env.isolationSupported(),
+    browserSupported: () => supported() && env.browserSupported(),
     messageDeletionSupported,
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,

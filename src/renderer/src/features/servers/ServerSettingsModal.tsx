@@ -20,6 +20,7 @@ import {
   AppWindow,
   ArrowLeftRight,
   Blocks,
+  Bot,
   Button,
   CalendarClock,
   Download,
@@ -58,16 +59,28 @@ import { type ServerBrowserProfilesOptions, ServerBrowserProfilesPanel } from ".
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { hostedPlanStorageGb } from "../files/storage-usage";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
+import type {
+  HostClaudeCompactWindowOptions,
+  ProviderClaudeCompactWindowSource,
+} from "../settings/provider-claude-compact-window";
+import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { createServerAgentsSection, type ServerAgentDefaultsOptions } from "./ServerAgentsSection";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
+import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
 import { ServerDesktopPanel } from "./ServerDesktopPanel";
 import { createServerGeneralSection } from "./ServerGeneralSection";
-import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
+import {
+  type HermesFolderPlace,
+  type ServerImportDetail,
+  type ServerImportOptions,
+  ServerImportPanel,
+} from "./ServerImportPanel";
 import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
@@ -227,16 +240,29 @@ export interface ServerSettingsModalProps {
    */
   skillLearning?: ServerSkillLearningOptions | undefined;
   /**
+   * General shows whether the agents learn from what people do in agent tabs they hold only when a
+   * caller supplies this, and only for the local server or a remote host with `browsing-memory-v1`
+   * that this member administers.
+   */
+  browsingMemory?: ServerBrowsingMemoryOptions | undefined;
+  /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member
    * administers.
    */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
   /**
-   * The Claude provider page of the local server shows "Use my Claude Code setup" only when the
-   * desktop app sets this. A joined server and the web client have no route for it.
+   * The Claude provider page shows "Use my Claude Code setup" only when a caller supplies this, and
+   * only for the local server or a remote host with `claude-user-setup-v1` that this member
+   * administers.
    */
-  claudeUserSetup?: boolean | undefined;
+  claudeUserSetup?: HostClaudeUserSetupOptions | undefined;
+  /**
+   * The Claude provider page shows the size at which Claude Code compacts chats only when a caller
+   * supplies this, and only for the local server or a remote host with `claude-compact-window-v1`
+   * that this member administers.
+   */
+  claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
   /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
@@ -258,6 +284,11 @@ export interface ServerSettingsModalProps {
    * a remote host with `server-audit-v1` that this member administers.
    */
   serverAudit?: ServerAuditOptions | undefined;
+  /**
+   * The Agents section appears only when a caller supplies this, and only for a remote host with
+   * `agent-defaults-v1` that this member administers. This computer uses Settings > Agents.
+   */
+  agentDefaults?: ServerAgentDefaultsOptions | undefined;
   /**
    * The Routines section appears only when a caller supplies this: the feed listens on this
    * computer, so a remote server passes nothing.
@@ -295,6 +326,7 @@ export interface ServerHostedSitesOptions {
 export type ServerSettingsSection =
   | "general"
   | "personality"
+  | "agents"
   | "vault"
   | "members"
   | "roles"
@@ -314,6 +346,7 @@ type Section = ServerSettingsSection;
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
   personality: { title: "server.settings.personalityTitle", description: "server.settings.personalityDescription" },
+  agents: { title: "server.settings.agents", description: "server.settings.agentsDescription" },
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
@@ -334,6 +367,7 @@ const sections = {
 const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings }> = [
   { value: "general", icon: Settings },
   { value: "personality", icon: Smile },
+  { value: "agents", icon: Bot },
   { value: "vault", icon: KeyRound },
   { value: "members", icon: UsersRound },
   { value: "roles", icon: ShieldCheck },
@@ -363,6 +397,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (section() === "mcp") return mcpDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
+    if (section() === "agents") return agents.crumb();
     return section() === "providers" ? providerDetail() : null;
   };
   /** The key of the one action in flight, gating every panel at once rather than belonging to any. */
@@ -377,6 +412,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
+  // A named function, not a ternary in the prop: a ternary makes a memo on each read, and a read
+  // from an effect callback (a select that reports a change) then halts the renderer.
+  const hostName = () => (local() ? undefined : props.server.name);
   // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
   // because its owner chooses there who can control the computer.
   const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
@@ -388,9 +426,26 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
    */
   const canManageMcp = () => serverRoleCanAdminister(props.server) || serverCanManageMcp(props.server);
   const actionsAvailable = () => local() || props.server.state === "online";
+  // A joined server reads its own Hermes folder for an owner or admin. Only this computer's server lets
+  // the user choose another folder: the folder dialog shows this computer's files.
+  const hermesFolderPlace = (): HermesFolderPlace | undefined => {
+    if (local()) return "computer";
+    return serverCanAdminister(props.server, "hermes-import-v1") ? "server" : undefined;
+  };
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function claudeUserSetupSource(): ProviderClaudeUserSetupSource | undefined {
+    const options = props.claudeUserSetup;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-user-setup-v1")) return undefined;
+    return { ...options, serverId: props.server.id, remote: !local() };
+  }
+  function claudeCompactWindowSource(): ProviderClaudeCompactWindowSource | undefined {
+    const options = props.claudeCompactWindow;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-compact-window-v1"))
+      return undefined;
     return { ...options, serverId: props.server.id };
   }
   function modelVisibilitySource(): ProviderModelVisibilitySource | undefined {
@@ -451,6 +506,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const general = createServerGeneralSection(host);
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
   const audit = createServerAuditSection(host, () => section() === "audit");
+  const agents = createServerAgentsSection(host, () => section() === "agents");
 
   /** Whether this server and the caller support the section. */
   const sectionSupported = (value: Section): boolean => {
@@ -460,6 +516,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return true;
       case "personality":
         return Boolean(personalityOptions());
+      case "agents":
+        return agents.available();
       case "vault":
         return Boolean(props.vault);
       case "roles":
@@ -599,6 +657,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
+        agents.resetForServer();
       }
       if (!editing) general.syncFromServer(name, logoUrl);
     },
@@ -620,6 +679,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
+  /** The agent defaults leave with the access that gives them, as Roles does. */
+  createEffect(
+    () => section() === "agents" && !agents.available(),
+    (gone) => {
+      if (gone) setSection("general");
+    },
+  );
+
   /** A server with no Vault for this account has no Vault section. */
   createEffect(
     () => section() === "vault" && !props.vault,
@@ -636,8 +703,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
+  // A joined host can offer its scan after the section opens, when its capabilities arrive.
   createEffect(
-    () => props.open && section() === "providers" && props.providers !== undefined,
+    () => props.open && section() === "providers" && props.providers?.onShown !== undefined,
     (visible) => {
       if (visible) untrack(() => props.providers?.onShown?.());
     },
@@ -664,6 +732,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       if (
         value === "general" ||
         value === "personality" ||
+        value === "agents" ||
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
@@ -858,6 +927,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Tabs.Content>
           )}
         </Show>
+        <Show when={agents.available()}>
+          <Tabs.Content value="agents" class="settings-modal-tab-panel server-settings-panel" data-tab="agents">
+            <agents.Panel />
+          </Tabs.Content>
+        </Show>
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
@@ -967,11 +1041,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(providers) => (
                 <HostProviderSettingsPanel
                   {...providers()}
-                  hostName={local() ? undefined : props.server.name}
+                  hostName={hostName()}
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}
-                  claudeUserSetup={props.claudeUserSetup === true && local()}
+                  claudeUserSetup={claudeUserSetupSource()}
+                  claudeCompactWindow={claudeCompactWindowSource()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />
@@ -1000,7 +1075,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   <ServerImportPanel
                     serverId={serverId}
                     {...agentImport()}
-                    hermes={local()}
+                    hermes={hermesFolderPlace()}
+                    onServer={!local()}
                     onOpenTransfer={props.instanceTransfer ? () => setSection("transfer") : undefined}
                     onDetailChange={setImportDetail}
                   />

@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "La cronologia non è disponibile per questa richiesta. Rileggi la cronologia recente o usa channel_history per il lavoro nei canali.",
+  "error.agent.historyArgumentsInvalid":
+    "Argomenti della cronologia non corretti: {detail} Correggi gli argomenti e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.toolRequestInvalid":
     "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Il tool non è stato eseguito. In tool_call, arguments deve essere un oggetto JSON, non testo. Invia di nuovo la chiamata con arguments come oggetto.",
+  "error.agent.toolCallDiscoveryTool":
+    "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La pianificazione della routine non è valida: {detail} Correggi la pianificazione e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",
   "error.agent.accessLocalOnly": "L'accesso dell'agente si può cambiare solo sul computer che lo esegue.",
   "error.agent.duplicateCleanupFailed":
@@ -50,6 +58,8 @@ export const messages = {
     "Al momento nessun modello di {provider} è disponibile. Chiama list_models per vedere i modelli disponibili.",
   "error.agent.reasoningEffortUnsupported":
     "Il modello «{model}» non supporta il livello di impegno «{effort}». Livelli supportati: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Il modello «{model}» non ha un'impostazione del livello di impegno, quindi non puoi modificarlo.",
   "error.agent.noStartingModelInSettings":
     "{provider} non ha modelli disponibili e nessun altro provider con accesso ne ha. Accedi a un provider, oppure cambia il provider predefinito in Impostazioni del server → Provider.",
   "error.agent.noStartingModel":

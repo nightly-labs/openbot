@@ -184,7 +184,13 @@ interface WebhookToolBody {
 const report: {
   calls: { name: string; turnId: string; success: boolean | null; body: WebhookToolBody | null }[];
   routines: EventRoutine[];
-  receive?: { signed: number; wrongSecret: number; activity: EventActivity[] };
+  receive?: {
+    signed: number;
+    wrongSecret: number;
+    cardStandard: number;
+    legacyStandard: number;
+    activity: EventActivity[];
+  };
   standard?: {
     refusals: { shortSecret: string | null; scheduleRoutine: string | null };
     statuses: Record<string, number>;
@@ -271,6 +277,7 @@ const events = new HostEventsService({
     setEnabled: () => {},
     setAccountActive: () => {},
     refresh: () => {},
+    ensureHost: () => Effect.void,
     registerRoute: (routeId) =>
       relayUp
         ? Effect.succeed(`${RELAY_ORIGIN}/v1/webhooks/${routeId}`)
@@ -443,13 +450,48 @@ try {
   };
   const wrong = await deliver("whsec_not-the-secret");
   const signed = await deliver(secret);
+  // A Standard Webhooks sender such as PostHog signs with the base64 key after `whsec_` (#6638).
+  const cardStandardBody = new TextEncoder().encode(JSON.stringify({ type: "build.failed", branch: "main" }));
+  const deliverCardStandard = (key: Buffer) => {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const deliveryId = `msg_${randomUUID().replaceAll("-", "")}`;
+    const digest = createHmac("sha256", key).update(`${deliveryId}.${timestamp}.`).update(cardStandardBody);
+    return Effect.runPromise(
+      events.receive({
+        routeId,
+        deliveryId,
+        timestamp,
+        signature: `v1,${digest.digest("base64")}`,
+        body: cardStandardBody,
+        format: STANDARD_WEBHOOKS_FORMAT,
+      }),
+    );
+  };
+  const cardStandard = await deliverCardStandard(Buffer.from(secret.slice("whsec_".length), "base64"));
+  // An older host made the secret in base64url. The sender converts it to base64: the key bytes are the same.
+  const legacyKey = randomBytes(32);
+  await Effect.runPromise(
+    events.setSecret({ owner, id: result.routineId, secret: `whsec_${legacyKey.toString("base64url")}` }),
+  );
+  const legacyStandard = await deliverCardStandard(legacyKey);
+  // Step 7 checks that the card's secret stays.
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret }));
   const activity = await Effect.runPromise(events.listActivity({ owner, routineId: result.routineId }));
-  report.receive = { signed: signed.status, wrongSecret: wrong.status, activity };
+  report.receive = {
+    signed: signed.status,
+    wrongSecret: wrong.status,
+    cardStandard: cardStandard.status,
+    legacyStandard: legacyStandard.status,
+    activity,
+  };
   pass("A request with another secret is refused", wrong.status === 401);
   pass(
     "A request signed with the card's secret starts the routine",
     signed.status === 202 && activity.some((item) => item.status === "started"),
   );
+  pass("The card's secret is standard base64", /^whsec_[A-Za-z0-9+/]{43}=$/.test(secret));
+  pass("A Standard Webhooks sender signs with the card's secret", cardStandard.status === 202);
+  pass("An older base64url secret signs after the sender converts it", legacyStandard.status === 202);
 
   // 7. The agent finds the routine and changes its filters. The URL and the secret stay.
   const listedByTool = await callTool("list", agent.id, { __tool: "list_routines" });

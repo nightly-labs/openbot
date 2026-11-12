@@ -334,6 +334,8 @@ export const messages = {
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
   "server.settings.agents": "Agenten",
+  "server.settings.agentsDescription":
+    "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
@@ -354,6 +356,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Zuerst fragen",
   "server.settings.skillLearningOff": "Aus",
   "server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
   "server.settings.remoteOnline": "Der Host ist online. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.remoteOffline": "Der Host ist offline. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.reachable": "Online erreichbar. Nur eingeladene Personen können sich anmelden.",
@@ -372,7 +378,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Letzte Änderung",
   "server.settings.hostKeyChangedDescription":
     "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
-  "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
+  "server.settings.hostKeyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":
     "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",

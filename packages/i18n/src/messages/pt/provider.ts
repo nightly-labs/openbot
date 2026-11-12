@@ -120,6 +120,8 @@ export const messages = {
     "Adicione um endpoint compatível com OpenAI: um servidor de modelos neste computador ou qualquer serviço com uma URL base e uma chave.",
   "provider.picker.customPending":
     "Os modelos dos seus endpoints ainda não foram carregados. O provedor os lê após a tarefa atual parar.",
+  "provider.picker.customUnlisted": "{name} não lista os modelos dos seus endpoints.",
+  "provider.picker.editEndpoints": "Editar endpoints",
   "provider.picker.defaultModelLabel": "{name}, padrão",
   "provider.picker.usageLimit": "Limite de uso atingido",
   "provider.picker.usageLimitWindow": "Limite ({window})",
@@ -130,7 +132,12 @@ export const messages = {
   "provider.picker.effortLabel": "Esforço de raciocínio do agente",
   "provider.picker.effortFixed": "{effort}, definido por {provider}",
   "provider.picker.fast": "Rápido",
-  "provider.picker.fastLabel": "Modo rápido",
+  "provider.picker.fastText": "Respostas mais rápidas, maior uso",
+  "provider.picker.speed": "Velocidade",
+  "provider.picker.standard": "Padrão",
+  "provider.picker.standardText": "Velocidade padrão",
+  "provider.picker.ultrafast": "Ultrarrápido",
+  "provider.picker.ultrafastText": "As respostas mais rápidas, uso muito maior",
   "provider.picker.selectEffort": "Selecionar esforço",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} pronto",
@@ -212,12 +219,25 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} não tem mais créditos de redefinição de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de redefinição de {name} já foi usado.",
   "provider.account.resetUsageFailed": "Não foi possível redefinir o uso de {name}.",
+  "provider.account.pool": "Agrupar contas",
+  "provider.account.poolDescription":
+    "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "provider.account.inUse": "Em uso",
+  "provider.account.notInPool": "Fora do grupo",
+  "provider.account.leaveOutOfPool": "Tirar do grupo",
+  "provider.account.putBackInPool": "Voltar ao grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} em uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Os agentes compartilham estas contas.",
   "provider.settings.disconnectTitle": "Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "As outras contas do {provider} esperam até você conectar o {provider} de novo.",
   "provider.settings.disconnectLocal":
     "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.cache": "Cache",
@@ -231,7 +251,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Usar minha configuração do Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Os agentes carregam seu CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Os agentes carregam CLAUDE.md, skills, agentes, hooks e plugins de ~/.claude no servidor. Desativado, cada turno envia um prompt mais curto. Os arquivos do espaço de trabalho continuam sendo carregados.",
   "provider.settings.claudeUserSetupLoadFailed": "Não foi possível carregar a configuração do Claude Code.",
+  "provider.settings.context": "Contexto",
+  "provider.settings.compactWindow": "Compactar chats em",
+  "provider.settings.compactWindowDescription":
+    "O Claude Code resume os turnos antigos de um chat quando o chat atinge este tamanho. Menor mantém os turnos rápidos e baratos. Maior mantém mais detalhes. Um modelo com uma janela menor compacta no próprio limite.",
+  "provider.settings.compactWindowDefault": "Padrão do Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Não foi possível carregar o tamanho de compactação deste servidor.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece no seletor de modelos.",
@@ -250,4 +279,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
+  "provider.settings.disconnectLocalOnly":
+    "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
 } as const satisfies PartialTranslation<typeof source>;

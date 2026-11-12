@@ -334,6 +334,8 @@ export const messages = {
   "server.settings.later": "Позже",
   "server.settings.setUp": "Настроить",
   "server.settings.agents": "Агенты",
+  "server.settings.agentsDescription":
+    "Выберите, что могут делать агенты на этом сервере, если вы не задали это для агента.",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
     "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
@@ -359,6 +361,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Сначала спросить",
   "server.settings.skillLearningOff": "Выкл.",
   "server.settings.skillLearningLoadFailed": "Не удалось загрузить настройку обучения навыкам.",
+  "server.settings.browsingMemory": "Учиться на моём браузинге",
+  "server.settings.browsingMemoryDescription":
+    "Когда вы управляете браузером агента, агент узнаёт, как работают сайты, по страницам и кнопкам, которые вы используете. Введённый текст не сохраняется.",
+  "server.settings.browsingMemoryLoadFailed": "Не удалось загрузить настройку браузинга.",
   "server.settings.remoteOnline": "Хост в сети. Публикацией управляет его владелец.",
   "server.settings.remoteOffline": "Хост не в сети. Публикацией управляет его владелец.",
   "server.settings.reachable": "Доступен из интернета. Войти могут только приглашённые.",
@@ -376,7 +382,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Ключ сервера изменён",
   "server.settings.hostKeyChanged": "Последнее изменение",
   "server.settings.hostKeyChangedDescription": "{date}. Предыдущий и новый ключи подписали это изменение.",
-  "server.settings.hostKeyLocalOnly": "Здесь ключ может сменить только сервер на этом компьютере.",
+  "server.settings.hostKeyOwnerOnly": "Сменить ключ сервера может только владелец.",
   "server.settings.removeTitle": "Удалить сервер",
   "server.settings.removeDescription":
     "Удалить этот сервер из сервиса аккаунтов для всех участников. Используйте, когда его компьютер больше недоступен.",

@@ -3,6 +3,7 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
   type ConversationSnapshot,
+  type QueueDelivery,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type RoutineRun,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,12 @@ import { bridgedToolName, getString, type ThreadItem } from "../protocol";
  * it unlikely as the start or the whole of a real report.
  */
 const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
+
+/**
+ * The quiet token of Hermes Agent cron jobs. The Hermes import copies job prompts as they are, and a
+ * model trained on Hermes writes it, so the whole answer `[SILENT]` is also the marker (#6909).
+ */
+const HERMES_SILENT_MARKER = "[silent]";
 
 /**
  * The OpenBot tool that a quiet routine run calls when it has nothing to report. A model often
@@ -51,13 +58,31 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
+/**
+ * Whether a teammate's message may start a quiet turn: it wants no answer and does not reply to a
+ * message of this agent, so it is information only and nobody waits for the turn. A provider such
+ * as Claude Code makes the model write a visible answer, so without the no-update tool each such
+ * update puts filler in the user's chat (#6821). A reply to this agent's message can hold the result
+ * that the user asked for, so it is never quiet.
+ */
+export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+  return (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply === false &&
+    !delivery.replyToMessageId
+  );
+}
+
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
-  return text.trim() === ROUTINE_NO_UPDATE_MARKER;
+  const answer = text.trim();
+  return answer === ROUTINE_NO_UPDATE_MARKER || answer.toLowerCase() === HERMES_SILENT_MARKER;
 }
 
 /**
- * Settles the answers of a completed turn that ran only quiet routine runs. Each answer that is only
+ * Settles the answers of a completed turn that ran only quiet routine runs and teammate updates
+ * (`quietTeammateDelivery`). Each answer that is only
  * the marker goes: the user never needs to see it. After a call to the no-update tool, each text answer
  * is a quiet answer. When nothing else in the turn tells the user anything, the turn is quiet: its
  * thinking and plan go, and each quiet answer stays as a `ROUTINE_QUIET_ANSWER_ITEM_TYPE` message that
@@ -94,6 +119,25 @@ export function settleQuietRoutineTurn(
   return !reported;
 }
 
+/**
+ * Settles the answers of a channel routine turn whose owner called the no-update tool (#7166). Each
+ * text answer becomes a quiet answer, which the channel shows as a step, so the run posts no message.
+ * Nothing goes: the channel already shows the turn's steps. A file, an image or a question is a
+ * report, and then nothing changes. Returns whether the turn is quiet.
+ */
+export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: string): boolean {
+  const answers = new Set(
+    snapshot.messages.filter(
+      (message) => message.author === "assistant" && message.turnId === turnId && !isWorkNote(message),
+    ),
+  );
+  if ([...answers].some((message) => !isTextAnswer(message))) return false;
+  for (const [index, message] of snapshot.messages.entries()) {
+    if (answers.has(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+  }
+  return true;
+}
+
 /** A text answer of a quiet turn that says more than the marker. */
 export function keptQuietAnswer(message: ConversationMessage): boolean {
   return isTextAnswer(message) && message.text.trim() !== "" && !isNoUpdateAnswer(message.text);
@@ -105,7 +149,8 @@ export function isTextAnswer(message: ConversationMessage): boolean {
     !isWorkNote(message) &&
     message.itemType !== "question_prompt" &&
     !message.attachments?.length &&
-    !message.imageGeneration
+    !message.imageGeneration &&
+    !message.videoGeneration
   );
 }
 
@@ -123,6 +168,7 @@ function carriesContent(message: ConversationMessage): boolean {
     message.itemType === "question_prompt" ||
     message.text.trim() !== "" ||
     Boolean(message.attachments?.length) ||
-    Boolean(message.imageGeneration)
+    Boolean(message.imageGeneration) ||
+    Boolean(message.videoGeneration)
   );
 }

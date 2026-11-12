@@ -117,6 +117,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "Supprimer {name} ?",
   "marketplace.app.remove.keep": "Conserver",
   "marketplace.app.connection": "Connexion",
+  "marketplace.app.access.use": "Peut utiliser",
+  "marketplace.app.access.noAgents": "Aucun agent",
+  "marketplace.app.access.agentsOf": "Agents qui peuvent utiliser {name}",
+  "marketplace.app.access.chooseAgents": "{name} : {summary}. Choisir les agents",
+  "marketplace.app.access.level": "Accès de {role} à {name}",
   "marketplace.app.setup.account": "Connectez-vous avec votre compte {name} dans le navigateur.",
   "marketplace.app.setup.key": "Nécessite une clé API de votre compte {name}.",
   "marketplace.app.setup.keySaved": "{field} est enregistré sur {host}.",
@@ -201,6 +206,29 @@ export const messages = {
     "Cherchez dans mes notes Cobrain ce que nous avons décidé pour les prix.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Enregistrez dans Cobrain une note avec ce que nous avons fait aujourd’hui et ce qui reste.",
+  "marketplace.plugin.honcho.tagline": "Votre mémoire dans tous vos outils d'IA",
+  "marketplace.plugin.honcho.description":
+    "Honcho, de Plastic Labs, donne aux agents une mémoire à long terme de vous que d'autres outils d'IA connectés peuvent partager. Les agents enregistrent ce qu'ils apprennent, et Honcho raisonne dessus pour construire un modèle de vos préférences, objectifs et façons de travailler. Les agents l'interrogent avant de commencer. Les agents OpenBot ont aussi leur propre mémoire ; Honcho est la mémoire qui vous suit dans d'autres outils. Les messages que les agents enregistrent vont sur votre compte Honcho.",
+  "marketplace.plugin.honcho.app":
+    "Enregistrez et interrogez une mémoire à long terme dans vos espaces de travail Honcho via un seul serveur MCP.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Avant de commencer, demande à Honcho ce qu'il sait de ma façon de travailler.",
+  "marketplace.plugin.honcho.prompt.save": "Enregistre dans Honcho les décisions de ce fil.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Que dit Honcho de mon style d'écriture ? Utilise-le pour ce brouillon.",
+  "marketplace.plugin.honcho.hint.apiKey": "Créez une clé sur app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Une mémoire qui apprend avec le temps",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight, de Vectorize, donne aux agents une mémoire à long terme dans Hindsight Cloud. Les agents retiennent des faits et des événements, les retrouvent par sens, par date et par entité, et y réfléchissent pour former des modèles mentaux. Les souvenirs sont rangés dans des banques, et les agents peuvent créer une banque pour chaque projet ou personne. Les agents OpenBot ont aussi leur propre mémoire ; Hindsight est la mémoire que d'autres outils d'IA connectés peuvent partager. Ce que les agents retiennent va sur votre compte Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app":
+    "Retenez, retrouvez et analysez des souvenirs dans vos banques Hindsight Cloud via un seul serveur MCP.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Avant de commencer, retrouve dans Hindsight ce que nous savons de ce projet.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Retiens dans Hindsight les décisions et les questions ouvertes de ce fil.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Réfléchis à mes souvenirs Hindsight : quelles tendances vois-tu dans mon travail du mois dernier ?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Créez une clé sur la page Connect de Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Designs et prototypes",
   "marketplace.plugin.figma.description":
     "Figma permet aux agents de lire des fichiers de design, d’inspecter les composants, les styles et les variables, et de transmettre les spécifications de production aux développeurs. Il se connecte au serveur MCP de l’app de bureau Figma, sur cet ordinateur. Le serveur peut seulement lire les designs ; la prise en charge de l’écriture est en cours.",
@@ -390,6 +418,15 @@ export const messages = {
     "Combien de contacts compte le segment VIP, et comment a-t-il évolué ce mois-ci ?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prépare un brouillon de campagne pour la nouvelle collection, mais ne l'envoie pas.",
+  "marketplace.plugin.postiz.tagline": "Planification des réseaux sociaux",
+  "marketplace.plugin.postiz.description":
+    "Postiz permet aux agents de lister vos comptes de réseaux sociaux, et de rédiger, planifier et publier des posts sur plus de 30 réseaux, comme X, LinkedIn, Instagram et TikTok. Les agents peuvent aussi importer des médias et créer des images et des vidéos par IA. Connectez-vous à votre compte Postiz dans le navigateur, ou collez la clé API de Settings › Developers dans Postiz. Toutes les offres cloud de Postiz incluent l'accès à l'API. Les agents peuvent publier un post tout de suite : vérifiez chaque post avant de l'approuver.",
+  "marketplace.plugin.postiz.app":
+    "Comptes, brouillons, posts planifiés et médias, via le serveur MCP de Postiz avec une connexion dans le navigateur ou une clé API.",
+  "marketplace.plugin.postiz.prompt.channels": "Quels comptes de réseaux sociaux sont connectés à Postiz ?",
+  "marketplace.plugin.postiz.prompt.week": "Quels posts sont planifiés pour la semaine prochaine ?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Rédige un post LinkedIn sur notre nouvelle version, mais ne le planifie pas.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub et plus de 1 000 autres apps",
   "marketplace.plugin.composio.description":
     "Composio connecte vos agents à Gmail, Slack, GitHub et plus de 1 000 autres apps via un seul serveur MCP. Connectez-vous avec votre compte Composio. Quand un agent a besoin d’une app, il vous demande de la connecter.",
@@ -556,6 +593,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Créée sur cet ordinateur",
   "marketplace.skills.origin.workspace": "Dans le dossier de cet agent",
   "marketplace.skills.origin.marketplace": "De la Marketplace · version {version}",
+  "marketplace.skills.origin.github": "De GitHub · {repository}",
+  "marketplace.skills.github.search": "Rechercher ou coller un lien GitHub",
+  "marketplace.skills.github.reading": "Recherche de compétences dans le dépôt",
+  "marketplace.skills.github.trust":
+    "OpenBot n'a pas vérifié les compétences de GitHub. Lisez une compétence avant de l'ajouter.",
+  "marketplace.skills.github.source": "GitHub · {repository} au commit {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Ouvrir {repository} sur GitHub",
   "marketplace.skills.status.notAdded": "Non ajoutée",
   "marketplace.skills.status.on": "Activée sur {agents}",
   "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },

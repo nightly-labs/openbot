@@ -190,11 +190,13 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* An email can be long: the account gives way before the model name does. */
+/* An email can be long: the account gives way before the model name does. Shrink is in proportion
+   to the factor, so the account takes all of it until it has no width left. The factor is large
+   because a part of a pixel off the model name is sufficient to cut it with an ellipsis. */
 .provider-model-trigger-account {
   min-width: 0;
   max-width: 160px;
-  flex-shrink: 1;
+  flex-shrink: 100000;
   overflow: hidden;
 }
 
@@ -709,6 +711,21 @@
 
 .provider-model-effort-content .ui-select-item[data-highlighted] {
   background: var(--ui-menu-item-hover);
+}
+
+/* Each speed has a name and a description, so the list is wider than the select, and wraps. */
+.provider-model-speed-content {
+  width: 300px;
+}
+
+.provider-model-speed-item .ui-select-item-label {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.provider-model-speed-name {
+  color: var(--openbot-text-primary);
 }
 
 /* The check of the selected model is a filled circle on the left, as in the menus. */

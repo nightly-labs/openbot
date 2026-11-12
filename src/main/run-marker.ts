@@ -212,7 +212,7 @@ function uncleanExit(record: RunMarkerRecord, options: RunMarkerOptions): Unclea
 }
 
 /** Counts `.dmp` files with a time in `[from, to)`. Reads names and times only. */
-function countCrashDumps(directory: string, from: number, to: number, depth = 0): number {
+export function countCrashDumps(directory: string, from: number, to: number, depth = 0): number {
   if (depth >= CRASH_DUMP_DEPTH) return 0;
   const entries = Effect.runSync(
     Effect.try({

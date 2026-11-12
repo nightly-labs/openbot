@@ -1,10 +1,12 @@
 import {
   type AppAppearancePreference,
+  type AppFontFamily,
   type AppThemePalette,
   type ChatBackgroundColor,
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
   isAppAppearance,
+  isAppFontFamily,
   isAppThemePalette,
   isChatBackgroundColor,
   sameThemePalettes,
@@ -16,6 +18,7 @@ import {
   appearanceSelectValue,
 } from "@openbot/ui/features/settings/AppearanceSelect";
 import { createSignal, onSettled } from "solid-js";
+import { applyAppFonts } from "./app-fonts";
 import { appPort } from "./app-port";
 import { applyChatBackground } from "./chat-background";
 import { syncColorScheme } from "./color-scheme";
@@ -59,7 +62,7 @@ function saveTheme(next: AppearanceSelectValue): Promise<AppearanceSelectValue> 
   return appPort().setAppAppearancePreference(appearanceChangeOfSelectValue(next)).then(appearanceSelectValue);
 }
 
-/** The Settings control state of the theme, the transparent window and the chat background. */
+/** The Settings control state of the theme, the transparent window, the chat background and the fonts. */
 export function useAppearanceChoice() {
   const theme = optimisticChoice<AppearanceSelectValue>(DEFAULT_APP_APPEARANCE, saveTheme);
   // Each event from main carries a new array. Kobalte rebuilds its list when the options change, and
@@ -80,12 +83,24 @@ export function useAppearanceChoice() {
       .setAppAppearancePreference({ chatBackgroundDark: next })
       .then((preference) => preference.chatBackgroundDark),
   );
+  const interfaceFont = optimisticChoice<AppFontFamily | null>(null, (next) =>
+    appPort()
+      .setAppAppearancePreference({ interfaceFont: next })
+      .then((preference) => preference.interfaceFont),
+  );
+  const codeFont = optimisticChoice<AppFontFamily | null>(null, (next) =>
+    appPort()
+      .setAppAppearancePreference({ codeFont: next })
+      .then((preference) => preference.codeFont),
+  );
   const confirm = (preference: AppAppearancePreference) => {
     setPalettes(() => preference.palettes);
     theme.confirm(appearanceSelectValue(preference));
     transparentWindow.confirm(preference.transparentWindow);
     chatBackgroundLight.confirm(preference.chatBackgroundLight);
     chatBackgroundDark.confirm(preference.chatBackgroundDark);
+    interfaceFont.confirm(preference.interfaceFont);
+    codeFont.confirm(preference.codeFont);
   };
 
   onSettled(() => {
@@ -106,6 +121,10 @@ export function useAppearanceChoice() {
     changeChatBackgroundLight: chatBackgroundLight.change,
     chatBackgroundDark: chatBackgroundDark.value,
     changeChatBackgroundDark: chatBackgroundDark.change,
+    interfaceFont: interfaceFont.value,
+    changeInterfaceFont: interfaceFont.change,
+    codeFont: codeFont.value,
+    changeCodeFont: codeFont.change,
   };
 }
 
@@ -116,6 +135,18 @@ const CACHED_TRANSPARENT_WINDOW_KEY = "openbot.transparentWindow";
 const CACHED_THEME_PALETTE_KEY = "openbot.themePalette";
 const CACHED_CHAT_BACKGROUND_LIGHT_KEY = "openbot.chatBackgroundLight";
 const CACHED_CHAT_BACKGROUND_DARK_KEY = "openbot.chatBackgroundDark";
+const CACHED_INTERFACE_FONT_KEY = "openbot.interfaceFont";
+const CACHED_CODE_FONT_KEY = "openbot.codeFont";
+
+function cachedFont(key: string): AppFontFamily | null {
+  const font = window.localStorage.getItem(key);
+  return isAppFontFamily(font) ? font : null;
+}
+
+function cacheFont(key: string, font: AppFontFamily | null): void {
+  if (font === null) window.localStorage.removeItem(key);
+  else window.localStorage.setItem(key, font);
+}
 
 function cachedChatBackground(key: string): ChatBackgroundColor | null {
   const color = window.localStorage.getItem(key);
@@ -150,6 +181,8 @@ function cachedPreference(): AppAppearancePreference {
       palettes: palette === null ? [] : [palette],
       chatBackgroundLight: cachedChatBackground(CACHED_CHAT_BACKGROUND_LIGHT_KEY),
       chatBackgroundDark: cachedChatBackground(CACHED_CHAT_BACKGROUND_DARK_KEY),
+      interfaceFont: cachedFont(CACHED_INTERFACE_FONT_KEY),
+      codeFont: cachedFont(CACHED_CODE_FONT_KEY),
     };
   } catch {
     return {
@@ -159,6 +192,8 @@ function cachedPreference(): AppAppearancePreference {
       palettes: [],
       chatBackgroundLight: null,
       chatBackgroundDark: null,
+      interfaceFont: null,
+      codeFont: null,
     };
   }
 }
@@ -172,6 +207,8 @@ function cachePreference(preference: AppAppearancePreference): void {
     else window.localStorage.setItem(CACHED_THEME_PALETTE_KEY, JSON.stringify(palette));
     cacheChatBackground(CACHED_CHAT_BACKGROUND_LIGHT_KEY, preference.chatBackgroundLight);
     cacheChatBackground(CACHED_CHAT_BACKGROUND_DARK_KEY, preference.chatBackgroundDark);
+    cacheFont(CACHED_INTERFACE_FONT_KEY, preference.interfaceFont);
+    cacheFont(CACHED_CODE_FONT_KEY, preference.codeFont);
   } catch {
     // Main's value still applies; only the next first paint can show the default.
   }
@@ -181,16 +218,21 @@ function cachePreference(preference: AppAppearancePreference): void {
  * Keeps a desktop window on the appearance that main keeps. The copy in browser storage gives the
  * first paint; main's value then replaces it. The Dynamic Island does not call this: it stays dark.
  * A selected theme palette gives the light or dark base, and its colors go over that base. The chat
- * background of each scheme goes over both, in conversations only.
+ * background of each scheme goes over both, in conversations only. The chosen fonts go before the
+ * default fonts.
  *
  * Only the main window passes `windowGlass`: main gives the macOS blur to that window alone, so in
  * another window a transparent page would show the desktop with no blur.
+ *
+ * A helper window, such as the agent dock or the browser dock, passes `sweep: false` and changes the
+ * theme at once: a wash across its transparent window does not align with the main window.
  */
-export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
+export function syncAppearance(options: { windowGlass?: boolean; sweep?: boolean } = {}): void {
   let preference = cachedPreference();
   const scheme = syncColorScheme(() => selectedThemePalette(preference)?.scheme ?? preference.appearance);
   applyThemePalette(selectedThemePalette(preference));
   applyChatBackground(preference);
+  applyAppFonts(preference);
   const showGlass = () => {
     if (options.windowGlass)
       document.documentElement.toggleAttribute("data-openbot-window-glass", preference.transparentWindow);
@@ -202,6 +244,7 @@ export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
     scheme.refresh();
     applyThemePalette(selectedThemePalette(next));
     applyChatBackground(next);
+    applyAppFonts(next);
     showGlass();
   };
   // A sweep applies its value later, so each change compares with the last value from main, and a
@@ -219,7 +262,7 @@ export function syncAppearance(options: { windowGlass?: boolean } = {}): void {
   appPort().onAppAppearancePreference((next) => {
     const before = latest;
     latest = next;
-    if (visibleLook(next) === visibleLook(before)) apply(next);
+    if (options.sweep === false || visibleLook(next) === visibleLook(before)) apply(next);
     else sweepTheme(() => apply(latest));
   });
 }

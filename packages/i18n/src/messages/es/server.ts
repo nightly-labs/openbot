@@ -330,6 +330,8 @@ export const messages = {
   "server.settings.later": "Más tarde",
   "server.settings.setUp": "Configurar",
   "server.settings.agents": "Agentes",
+  "server.settings.agentsDescription":
+    "Elige qué pueden hacer los agentes de este servidor cuando no lo configuras para un agente.",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
@@ -351,6 +353,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Preguntar antes",
   "server.settings.skillLearningOff": "Desactivado",
   "server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "server.settings.browsingMemory": "Aprender de mi navegación",
+  "server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
   "server.settings.remoteOnline": "El host está en línea. Su propietario controla la publicación.",
   "server.settings.remoteOffline": "El host está sin conexión. Su propietario controla la publicación.",
   "server.settings.reachable": "Accesible en línea. Solo las personas invitadas pueden iniciar sesión.",
@@ -368,7 +374,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
   "server.settings.hostKeyChanged": "Último cambio",
   "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
-  "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
+  "server.settings.hostKeyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":
     "Elimina este servidor del servicio de cuentas para todos los miembros. Úsalo cuando su equipo ya no esté disponible.",

@@ -114,7 +114,15 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
             </Show>
 
             <Show when={!loading()} fallback={<p class="agent-memory-state">{t("sharedTable.loading")}</p>}>
-              <Show when={tables().length > 0} fallback={<p class="agent-memory-state">{t("sharedTable.empty")}</p>}>
+              <Show
+                when={tables().length > 0}
+                fallback={
+                  // A failed load is not "no tables yet": the alert above says what happened.
+                  <Show when={!error()}>
+                    <p class="agent-memory-state">{t("sharedTable.empty")}</p>
+                  </Show>
+                }
+              >
                 <ul
                   ref={scrollFades.bind}
                   class={["shared-table-list", scrollFades.classes()]}

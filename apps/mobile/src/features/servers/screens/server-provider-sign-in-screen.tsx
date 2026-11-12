@@ -2,6 +2,9 @@ import { type AgentProviderId, isAgentProvider, relayCallbackQuery } from "@open
 import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -14,6 +17,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -314,7 +318,12 @@ export function ServerProviderSignInScreen() {
         />
       ) : (
         <SettingsSection>
-          <SettingsRow disclosure={false} disabled={busy} onPress={startSignIn}>
+          <SettingsRow
+            disclosure={false}
+            disabled={busy}
+            leading={<RowIcon icon={RotateCcw} tone="accent" />}
+            onPress={startSignIn}
+          >
             <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
@@ -422,7 +431,11 @@ function SignInSection({
           </SettingsRow>
         ) : null}
         {url ? (
-          <SettingsRow disclosure={false} onPress={() => onOpen(url)}>
+          <SettingsRow
+            disclosure={false}
+            leading={<RowIcon icon={ExternalLink} tone="accent" />}
+            onPress={() => onOpen(url)}
+          >
             <Typography.Paragraph className="text-accent">{t("mobile.server.providers.openPage")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
@@ -449,7 +462,12 @@ function SignInSection({
       ) : null}
       {signIn.kind === "starting" ? null : (
         <SettingsSection>
-          <SettingsRow disclosure={false} disabled={busy} onPress={onCancel}>
+          <SettingsRow
+            disclosure={false}
+            disabled={busy}
+            leading={<RowIcon icon={X} tone="danger" />}
+            onPress={onCancel}
+          >
             <Typography.Paragraph className="text-danger-text">{t("common.cancel")}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>

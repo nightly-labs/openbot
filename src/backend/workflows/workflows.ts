@@ -44,10 +44,13 @@ import {
   type SaveWorkflowGraphInput,
   type StartWorkflowRunInput,
   WORKFLOW_GITHUB_EVENTS,
+  WORKFLOW_PICTURE_TYPES,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
   type WorkflowGitHubLastEventInput,
   type WorkflowGraph,
+  type WorkflowMediaKind,
+  type WorkflowMediaModel,
   type WorkflowNode,
   type WorkflowNodeKind,
   type WorkflowRun,
@@ -60,6 +63,8 @@ import {
   type WorkflowSummary,
   type WorkflowVersion,
   type WorkflowVersionInput,
+  workflowMediaKind,
+  workflowMediaModel,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -142,6 +147,11 @@ import {
   currentAnswers,
   fieldText,
   inputText,
+  type MediaImageRole,
+  mediaImages,
+  mediaInputs,
+  mediaStepPrompt,
+  mediaVoice,
   modelStepPrompt,
   nextActions,
   runScope,
@@ -183,6 +193,17 @@ interface WorkflowTextRequest {
   prompt: string;
 }
 
+/** One image or video of an image step. */
+interface WorkflowMediaRequest {
+  kind: WorkflowMediaKind;
+  provider: WorkflowMediaModel["provider"];
+  prompt: string;
+  /** The pictures of the image steps before it, as attachment ids, and how the model uses each. */
+  images: readonly { role: MediaImageRole; attachmentId: string }[];
+  /** The preset voice of a video, from `WORKFLOW_VIDEO_VOICES`. */
+  voice: string | null;
+}
+
 /** How a run began, and the key that makes a second start of the same run answer the first. */
 /** The part of a Discord or Telegram send that an output delivery keeps. */
 type ChatOutputSend = { action: "reply" | "post"; text: string } | { action: "react"; emoji: string };
@@ -221,6 +242,20 @@ export interface WorkflowsDependencies {
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   /** One tool-less generation; the failure is a message the user can read. */
   generateText(request: WorkflowTextRequest): Effect.Effect<string, { readonly message: string }>;
+  /**
+   * Makes the image or video of an image step and answers its attachment id; the failure is a message
+   * the user can read. Absent where this host cannot make media: image steps then fail.
+   */
+  generateMedia?: (request: WorkflowMediaRequest) => Effect.Effect<string, { readonly message: string }>;
+  /**
+   * Keeps an attachment draft of `types` as a picture of this host and answers its file id, `missing`
+   * when there is no such draft, or `type` for a draft of another type. Absent where this host cannot
+   * make media.
+   */
+  keepPicture?: (
+    draftId: string,
+    types: ReadonlySet<string>,
+  ) => Effect.Effect<string | "missing" | "type", { readonly cause: unknown }>;
   notify(notice: WorkflowNotice): void;
   /** Whether a messaging connection of this host is on. */
   connectionOn(connectionId: string): boolean;
@@ -359,6 +394,11 @@ interface WorkflowsShape {
   githubLastEvent(input: WorkflowGitHubLastEventInput): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
   /** The repositories that the saved GitHub triggers watch, for the GitHub route at start. */
   githubRepositories(): Effect.Effect<string[], WorkflowFailed>;
+  /**
+   * Keeps a PNG, JPEG or WebP attachment draft as a picture of the host, with no owner agent, for an
+   * asset step. Answers its file id. The draft goes away.
+   */
+  keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -390,6 +430,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const lock = yield* Semaphore.make(1);
         /** One model step at a time, so a run does not take every generation slot of the computer. */
         const generationLock = yield* Semaphore.make(1);
+        /** One image or video at a time. A video takes minutes, so it does not hold the text steps back. */
+        const mediaLock = yield* Semaphore.make(1);
         const { store, runs, github, changed, rearm } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
         /** The model steps that generate and the posts on their way, by step. */
@@ -513,6 +555,46 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             Effect.ensuring(Effect.sync(() => working.delete(step.id))),
           );
           return Effect.forkIn(generate, scope).pipe(
+            Effect.tap((fiber) => Effect.sync(() => working.set(step.id, fiber))),
+            Effect.asVoid,
+          );
+        };
+
+        /** Makes an image step's image or video in a fiber of its own; the pass does not wait for it. */
+        const startMedia = (
+          step: StoredWorkflowStep,
+          node: WorkflowNode,
+          run: StoredWorkflowRun | null,
+        ): Effect.Effect<void> => {
+          const kind = workflowMediaKind(node.fields);
+          const model = workflowMediaModel(node.fields);
+          const generateMedia = dependencies.generateMedia;
+          // The pictures of the image steps before it: the run's newest files, or for a step that runs
+          // alone, the newest files of the workflow.
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const inputs = graph
+            ? mediaInputs(graph, node.id, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
+            : [];
+          const make = Effect.gen(function* () {
+            const result =
+              !generateMedia || !model
+                ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
+                : yield* mediaLock
+                    .withPermit(
+                      generateMedia({
+                        kind,
+                        provider: model.provider,
+                        prompt: mediaStepPrompt(node.fields, kind, step.input),
+                        images: mediaImages(node.fields, kind, inputs),
+                        voice: mediaVoice(node.fields, kind, model),
+                      }),
+                    )
+                    .pipe(Effect.result);
+            if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
+            else settle(step, { status: "done", output: result.success });
+            yield* requestSweep();
+          }).pipe(Effect.ensuring(Effect.sync(() => working.delete(step.id))));
+          return Effect.forkIn(make, scope).pipe(
             Effect.tap((fiber) => Effect.sync(() => working.set(step.id, fiber))),
             Effect.asVoid,
           );
@@ -956,6 +1038,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             case "condition":
               yield* startGeneration(step, node);
               return;
+            case "image":
+              yield* startMedia(step, node, run);
+              return;
+            case "asset":
+              settle(step, { status: "done", output: fieldText(node, "fileId") });
+              return;
             case "approval":
               if (runs.awaitApproval(step.id, now())) {
                 changed(step.workflowId);
@@ -1162,7 +1250,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 yield* sendAgentStep(step);
                 ended = runs.step(step.id)?.status !== "running";
               } else ended = settleFromDelivery(step);
-            } else if (step.kind === "llm" || step.kind === "condition" || step.kind === "output") {
+            } else if (
+              step.kind === "llm" ||
+              step.kind === "condition" ||
+              step.kind === "image" ||
+              step.kind === "output"
+            ) {
               if (working.has(step.id)) continue;
               ended =
                 step.kind === "output"
@@ -1782,6 +1875,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(watchedRepositories);
         });
 
+        const keepPicture = Effect.fn("Workflows.keepPicture")(function* (draftId: string) {
+          const keep = dependencies.keepPicture;
+          if (!keep) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
+          const kept = yield* keep(draftId, WORKFLOW_PICTURE_TYPES).pipe(
+            Effect.mapError(({ cause }) => new WorkflowFailed({ cause })),
+          );
+          if (kept === "missing") return yield* refuse("missing", sourceText("error.workflow.pictureMissing"));
+          if (kept === "type") return yield* refuse("refused", sourceText("error.workflow.pictureType"));
+          return kept;
+        });
+
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
           return yield* locked(
             Effect.gen(function* () {
@@ -1965,6 +2069,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           githubHistory,
           githubLastEvent,
           githubRepositories,
+          keepPicture,
           runStep,
           stopStep,
           stopRun,

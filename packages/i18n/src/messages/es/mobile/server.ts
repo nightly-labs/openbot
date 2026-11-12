@@ -258,6 +258,7 @@ export const messages = {
     "El servidor se detiene y se vuelve a iniciar. Tarda alrededor de un minuto. Los turnos de agentes en curso se detienen y los miembros pierden la conexión hasta que el servidor vuelva. Los archivos y chats se conservan.",
   "mobile.server.settings.restartConfirm": "Reiniciar",
   "mobile.server.settings.restarted": "{name} se está reiniciando",
+  "mobile.server.settings.restartUnsupported": "Actualiza OpenBot en este servidor para reiniciarlo desde aquí.",
   "mobile.server.settings.leaveTitle": "¿Salir de {name}?",
   "mobile.server.settings.leaveBody": "Necesitarás otra invitación para volver a unirte.",
   "mobile.server.settings.leave": "Salir del servidor",
@@ -325,6 +326,8 @@ export const messages = {
   "mobile.server.route.invite": "Invitar personas",
   "mobile.server.route.member": "Miembro",
   "mobile.server.route.timezone": "Zona horaria",
+  "mobile.server.route.personality": "Personalidad del agente",
+  "mobile.server.route.agents": "Agentes",
   "mobile.server.settings.storage": "Almacenamiento",
   "mobile.server.route.storage": "Almacenamiento",
   "mobile.server.route.storageFiles": "Todos los archivos",
@@ -448,6 +451,35 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "No se pudo guardar el límite de recuerdos. Inténtalo de nuevo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su límite de recuerdos.",
+  "mobile.server.settings.memoryReview": "Revisión de recuerdos",
+  "mobile.server.settings.memoryReviewDescription":
+    "Con qué frecuencia los agentes de este servidor guardan en segundo plano datos duraderos de sus chats.",
+  "mobile.server.settings.memoryReviewOff": "Desactivada",
+  "mobile.server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
+  "mobile.server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
+  "mobile.server.settings.skillLearning": "Aprendizaje de habilidades",
+  "mobile.server.settings.skillLearningDescription":
+    "Si los agentes de este servidor guardan lo que aprenden como habilidades.",
+  "mobile.server.settings.skillLearningAutomatic": "Automático",
+  "mobile.server.settings.skillLearningAsk": "Preguntar antes",
+  "mobile.server.settings.skillLearningOff": "Desactivado",
+  "mobile.server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "mobile.server.settings.browsingMemory": "Aprender de mi navegación",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
+  "mobile.server.settings.learningSaveFailed": "No se pudo guardar este ajuste. Inténtalo de nuevo.",
+  "mobile.server.settings.learningUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí este ajuste.",
+  "mobile.server.settings.responseStyleDescription":
+    "Natural: los agentes envían actualizaciones breves mientras trabajan y el chat las muestra. Clásico: los agentes responden una vez, al terminar.",
+  "mobile.server.settings.responseStyleNatural": "Natural",
+  "mobile.server.settings.responseStyleClassic": "Clásico",
+  "mobile.server.settings.personalityLoadFailed": "No se pudo cargar la personalidad del servidor.",
+  "mobile.server.settings.personalitySaveFailed": "No se pudo guardar el estilo de respuesta. Inténtalo de nuevo.",
+  "mobile.server.settings.personalityUnsupported":
+    "Actualiza OpenBot en este servidor para cambiar aquí su estilo de respuesta.",
+  "mobile.server.settings.agentsUnavailable":
+    "Conéctate a este servidor como propietario o administrador para cambiar los ajustes de los agentes.",
   "mobile.server.route.browserProfiles": "Perfiles del navegador",
   "mobile.server.browserProfiles.unavailable":
     "Solo el propietario o un administrador de un servidor en línea puede gestionar sus perfiles del navegador.",
@@ -847,6 +879,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumber": "Número personal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
     "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Desactívalo para un número solo para OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",
@@ -952,7 +987,6 @@ export const messages = {
   "mobile.server.providers.actionFailed": "OpenBot no pudo completar esta acción. Inténtalo de nuevo.",
   "mobile.server.providers.openFailed": "No se pudo abrir la página de inicio de sesión.",
   "mobile.server.providers.copyFailed": "No se pudo copiar el código.",
-  "mobile.server.providers.onHost": "Este proveedor se ejecuta en el equipo de este servidor.",
   "mobile.server.providers.statusLabel": "Estado",
   "mobile.server.providers.account": "Cuenta",
   "mobile.server.providers.version": "Versión",
@@ -994,7 +1028,6 @@ export const messages = {
   "mobile.server.providers.relayNoState": "No es seguro completar aquí la página de acceso del servidor.",
   "mobile.server.providers.download": "Descargar",
   "mobile.server.providers.update": "Actualizar",
-  "mobile.server.providers.updateHint": "La versión {version} está disponible.",
   "mobile.server.providers.retry": "Reintentar",
   "mobile.server.providers.cancelDownload": "Cancelar descarga",
   "mobile.server.providers.checkUpdates": "Buscar actualizaciones",
@@ -1032,12 +1065,26 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Sin instalar",
   "mobile.server.providers.status.checking": "Comprobando",
+  "mobile.server.providers.pool": "Agrupar cuentas",
+  "mobile.server.providers.poolHint":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "mobile.server.providers.accountsPooledHint":
+    "Los agentes comparten estas cuentas. Una cuenta nueva inicia sesión en su página en este teléfono.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Los agentes comparten estas cuentas. Añade una cuenta en OpenBot en un ordenador.",
+  "mobile.server.providers.inUse": "En uso",
+  "mobile.server.providers.notInPool": "Fuera del grupo",
+  "mobile.server.providers.leaveOutOfPool": "Sacar del grupo",
+  "mobile.server.providers.putBackInPool": "Volver al grupo",
   "mobile.server.providers.models": "Modelos",
   "mobile.server.providers.modelsCount": "{shown} de {total}",
   "mobile.server.providers.modelsTitle": "Modelos de {name}",
   "mobile.server.providers.modelsSearch": "Buscar modelos",
-  "mobile.server.providers.modelsShowAll": "Mostrar todos",
-  "mobile.server.providers.modelsHideAll": "Ocultar todos",
+  "mobile.server.providers.modelsSelectAll": "Seleccionar todo",
+  "mobile.server.providers.modelsDeselectAll": "Deseleccionar todo",
+  "mobile.server.providers.modelsOptions": "Opciones de modelos",
+  "mobile.server.providers.modelsSectionSelected": "Seleccionados",
+  "mobile.server.providers.modelsSectionOther": "Otros modelos",
   "mobile.server.providers.modelsReset": "Restablecer",
   "mobile.server.providers.modelsSelected": "Seleccionados: {shown} de {total}.",
   "mobile.server.providers.modelsHint":
@@ -1053,6 +1100,12 @@ export const messages = {
   "mobile.server.providers.promptCacheDefault": "Predeterminado de Claude Code",
   "mobile.server.providers.promptCacheHour": "1 hora",
   "mobile.server.providers.promptCacheLoadFailed": "No se pudo cargar el tiempo de caché de prompts de este servidor.",
+  "mobile.server.providers.compactWindow": "Compactar chats en",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code resume los turnos antiguos de un chat cuando el chat alcanza este tamaño. Menos mantiene los turnos rápidos y baratos. Más conserva más detalle. Un modelo con una ventana más pequeña compacta en su propio límite.",
+  "mobile.server.providers.compactWindowDefault": "Predeterminado de Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} tokens",
+  "mobile.server.providers.compactWindowLoadFailed": "No se pudo cargar el tamaño de compactación de este servidor.",
   "mobile.server.providers.disconnect": "Desconectar",
   "mobile.server.providers.disconnectTitle": "¿Desconectar {name}?",
   "mobile.server.providers.disconnectBody":
@@ -1068,11 +1121,36 @@ export const messages = {
   "mobile.server.providers.resetUsageNoCredit": "A {name} no le quedan créditos de restablecimiento.",
   "mobile.server.providers.resetUsageAlreadyRedeemed": "Este crédito de {name} ya se usó.",
   "mobile.server.providers.resetUsageFailed": "No se pudo restablecer el uso. Inténtalo de nuevo.",
+  "mobile.server.providers.sectionSignIn": "Inicio de sesión",
+  "mobile.server.providers.signInBrowser": "Iniciar sesión en el navegador",
+  "mobile.server.providers.disconnectBlocked": "{agents} no podrán funcionar hasta que vuelvas a iniciar sesión.",
+  "mobile.server.providers.sectionRuntime": "Entorno de ejecución",
+  "mobile.server.providers.updateTo": "Actualizar a {version}",
+  "mobile.server.providers.versionInstalledByUser": "{version} · instalada por ti",
+  "mobile.server.providers.versionDownloaded": "{version} · descargada por OpenBot",
+  "mobile.server.providers.keyFree": "Gratis",
+  "mobile.server.providers.keyOptional": "Opcional. Una clave añade modelos de pago.",
+  "mobile.server.providers.geminiKeyInUse":
+    "Gemini usa esta clave, no tu plan de Google AI. No se muestra el uso del plan.",
+  "mobile.server.providers.claudeKeyInUse":
+    "Anthropic cobra el crédito de API de la clave, no tu plan de Claude. Selecciona la cuenta de la clave de API en el menú de modelos de un agente. Si Claude no tiene la sesión iniciada, todos los agentes usan la clave.",
+  "mobile.server.providers.codexKeyInUse":
+    "ChatGPT usa esta clave, no tu plan de ChatGPT. OpenAI cobra cada solicitud a la clave. No se muestra el uso del plan.",
+  "mobile.server.providers.codexKeyAlternative":
+    "O inicia sesión con una clave de API de OpenAI. OpenAI cobra cada solicitud a la clave.",
+  "mobile.server.providers.sectionUse": "Uso",
+  "mobile.server.providers.unused": "Ningún agente lo usa",
+  "mobile.server.providers.usedByCount": { one: "1 agente lo usa", other: "{count} agentes lo usan" },
+  "mobile.server.providers.defaultForNew": "Predeterminado para agentes nuevos",
+  "mobile.server.providers.startsWith": "Los agentes nuevos empiezan con {name}.",
+  "mobile.server.providers.connectFirst": "Primero conecta {name}.",
   "mobile.server.settings.mcp": "Servidores MCP",
   "mobile.server.settings.mcpCount": { one: "{count} servidor", other: "{count} servidores" },
   "mobile.server.mcp.unsupported": "Actualiza OpenBot en este servidor para gestionar sus servidores MCP aquí.",
   "mobile.server.mcp.unavailable":
     "Conéctate a este servidor como propietario o administrador para gestionar sus servidores MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Actualiza OpenBot en este servidor para elegir quién recibe sus servidores MCP.",
   "mobile.server.mcp.description":
     "Los servidores MCP dan más herramientas a los agentes de este servidor. Los agentes de Claude y Codex solo reciben los servidores de esta lista.",
   "mobile.server.mcp.loading": "Cargando servidores MCP…",
@@ -1146,6 +1224,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Los agentes de este servidor dejan de recibir sus herramientas. Los ajustes no se conservan.",
   "mobile.server.mcp.remove": "Quitar servidor MCP",
+  "mobile.server.mcp.access.title": "Acceso",
+  "mobile.server.mcp.access.agents": "Agentes",
+  "mobile.server.mcp.access.agentsOf": "Agentes que pueden usar {name}",
+  "mobile.server.mcp.access.allAgents": "Todos los agentes",
+  "mobile.server.mcp.access.allAgentsHint": "Todos los agentes también incluye cada agente que se añada después.",
+  "mobile.server.mcp.access.noAgents": "Ningún agente",
+  "mobile.server.mcp.access.someAgents": "{count} de {total}",
+  "mobile.server.mcp.access.use": "Puede usar",
+  "mobile.server.mcp.access.fromEveryone": "Igual que Todos",
+  "mobile.server.mcp.access.level": "Acceso de {role} a {name}",
+  "mobile.server.mcp.access.hint":
+    "Un miembro recibe el nivel más alto de Todos y de sus roles. Los propietarios, los administradores y quien añadió el servidor siempre pueden gestionarlo.",
+  "mobile.server.mcp.access.loadFailed": "No se pudo cargar quién recibe este servidor MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Solo un propietario o administrador de un servidor en línea puede elegir quién recibe este servidor MCP.",
   "mobile.server.usage.agents": "Agentes",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "No hay uso de agentes registrado en este periodo.",
@@ -1305,6 +1398,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agente", other: "{count} agentes" },
   "mobile.server.roles.memberCount": { one: "{count} miembro", other: "{count} miembros" },
   "mobile.server.roles.agentLevel": "Acceso de {role} a {agent}",
+  "mobile.server.roles.changeInEveryone": "Cambiar en Todos",
+  "mobile.server.roles.setAll": "Aplicar a todos",
+  "mobile.server.roles.setAllLabel": "Aplicar a todos: acceso de {role} a todos los agentes",
+  "mobile.server.roles.mixed": "Mixto",
   "mobile.server.roles.delete": "Eliminar rol",
   "mobile.server.roles.deleteTitle": "¿Eliminar {name}?",
   "mobile.server.roles.deleteBody": "Los miembros con este rol pierden los agentes que les da.",
@@ -1388,7 +1485,7 @@ export const messages = {
   "mobile.server.import.reading": "Leyendo la exportación…",
   "mobile.server.import.sending": "Enviando la exportación… {percent} %",
   "mobile.server.import.chooseNote":
-    "Primero pon el archivo en este teléfono, por ejemplo en Archivos. Debe ocupar menos de 100 MB. Verás sus agentes antes de que cambie nada.",
+    "Primero pon el archivo en este teléfono, por ejemplo en Archivos. Verás sus agentes antes de que cambie nada.",
   "mobile.server.import.readFailed": "No se pudo leer la exportación.",
   "mobile.server.import.reviewTitle": "Exportación de {source}",
   "mobile.server.import.exported": "Exportado el {date}",

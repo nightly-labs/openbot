@@ -50,6 +50,11 @@ export const messages = {
   "import.guide.reading": "Leyendo la exportación…",
   "import.guide.choose": "Elegir archivo de exportación",
   "import.guide.chooseNote": "Verás sus agentes antes de que cambie nada.",
+  "import.guide.hermesLedeServer":
+    "Cada perfil de Hermes se convierte en un agente. Lee los perfiles en el servidor o deja que la habilidad de exportación de Hermes los reúna en un solo archivo .zip.",
+  "import.guide.hermesLedeExport":
+    "Cada perfil de Hermes se convierte en un agente. La habilidad de exportación de Hermes los reúne en un solo archivo .zip.",
+  "import.guide.setupServer": "Leer el servidor",
   "import.review.title": "Exportación de {source}",
   "import.review.exported": "Exportado el {date}",
   "import.review.fileSize": "{size} de archivos",
@@ -82,4 +87,10 @@ export const messages = {
   "import.result.channel": "Canal",
   "import.result.notImportedTitle": "Sin importar",
   "import.result.warnings": "Algunos elementos no se trasladaron",
+  "import.source.ledeServer": "OpenBot los copia al servidor. Ves cada elemento antes de que cambie nada.",
+  "import.source.hermesNoteServer": "Lee la carpeta de Hermes en el servidor o exporta un archivo .zip desde Hermes.",
+  "import.source.hermesNoteExport": "Exporta un archivo .zip desde Hermes.",
+  "import.hermes.notFoundServer": "No hay perfiles de Hermes en este servidor",
+  "import.hermes.notFoundServerNote":
+    "OpenBot lee la carpeta de Hermes del servidor. Para importar Hermes desde este ordenador, exporta un archivo .zip desde Hermes.",
 } as const satisfies PartialTranslation<typeof source>;

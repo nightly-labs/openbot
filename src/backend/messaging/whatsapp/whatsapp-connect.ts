@@ -15,7 +15,7 @@ import type { MessagingStore } from "../messaging-store";
 import { maskedNumber, whatsAppCredentials, whatsAppIdentity } from "./whatsapp-driver";
 import { userJid } from "./whatsapp-events";
 import type { WhatsAppConnectionHandle, WhatsAppPolicy, WhatsAppRuntime } from "./whatsapp-runtime";
-import { WhatsAppPairingRequests, type WhatsAppSenderRules } from "./whatsapp-senders";
+import { WhatsAppPairingRequests, type WhatsAppSenderRules, whatsAppNumberForms } from "./whatsapp-senders";
 
 export class WhatsAppConnectFailed extends Schema.TaggedError<WhatsAppConnectFailed>()("WhatsAppConnectFailed", {
   cause: Schema.Defect(),
@@ -23,6 +23,8 @@ export class WhatsAppConnectFailed extends Schema.TaggedError<WhatsAppConnectFai
 
 /** How long a link waits for the phone. WhatsApp shows about six QR codes in that time. */
 const LINK_TIMEOUT_MS = 3 * 60_000;
+/** How long adding a contact waits for WhatsApp to name the form of its number. */
+const REGISTERED_NUMBER_TIMEOUT_MS = 5_000;
 
 const IDLE: WhatsAppLinkState = { status: "idle", qr: null, code: null, workspaceId: null, error: null };
 
@@ -167,6 +169,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       .map((record) => ({
         workspaceId: record.workspaceId,
         ownNumber: this.#ownNumber(record.connectionId),
+        workingMessage: this.workingMessage(record.connectionId),
         allowedSenders: this.#store.allowedSenders(record.connectionId).slice(0, MESSAGING_LIMITS.allowedSenders),
         pendingRequests: this.#requests.list(record.workspaceId),
       }));
@@ -178,10 +181,27 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     sender: WhatsAppSender,
   ) {
     const connectionId = yield* this.#connectionId(workspaceId);
+    const id = sender.kind === "contact" ? yield* this.#registeredNumber(connectionId, sender.id) : sender.id;
     if (this.#store.allowedSenders(connectionId).length >= MESSAGING_LIMITS.allowedSenders)
       return yield* failure("error.messaging.whatsappTooManySenders");
-    this.#store.addAllowedSender(connectionId, sender);
+    this.#store.addAllowedSender(connectionId, { ...sender, id });
   });
+
+  /**
+   * The form of a contact's number that WhatsApp has, so that posts reach the contact. The number as it
+   * was typed when it has only one form, when the number is not connected, or when WhatsApp does not
+   * answer in time.
+   */
+  #registeredNumber(connectionId: string, number: string): Effect.Effect<string> {
+    const session = this.#handle(connectionId)?.session;
+    const forms = whatsAppNumberForms(number);
+    if (!session || forms.length === 1) return Effect.succeed(number);
+    return session.registered(forms).pipe(
+      Effect.map((jids) => forms.find((form) => jids.includes(userJid(form))) ?? number),
+      Effect.timeoutOrElse({ duration: REGISTERED_NUMBER_TIMEOUT_MS, orElse: () => Effect.succeed(number) }),
+      Effect.catch(() => Effect.succeed(number)),
+    );
+  }
 
   readonly removeSender = Effect.fn("WhatsAppConnect.removeSender")(function* (
     this: WhatsAppConnect,
@@ -224,6 +244,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     if (ownNumber) this.#requests.clear(workspaceId);
   });
 
+  readonly setWorkingMessage = Effect.fn("WhatsAppConnect.setWorkingMessage")(function* (
+    this: WhatsAppConnect,
+    workspaceId: string,
+    workingMessage: boolean,
+  ) {
+    const connectionId = yield* this.#connectionId(workspaceId);
+    const values = this.#credentials.get(connectionId);
+    if (!values) return yield* failure("error.messaging.whatsappNotConnected");
+    yield* this.#credentials.set(connectionId, { ...values, workingMessage: workingMessage ? "1" : "0" });
+  });
+
   readonly groups = Effect.fn("WhatsAppConnect.groups")(function* (this: WhatsAppConnect, workspaceId: string) {
     const connectionId = yield* this.#connectionId(workspaceId);
     const handle = this.#handle(connectionId);
@@ -262,12 +293,15 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     yield* this.#end(link, false);
     yield* Effect.gen({ self: this }, function* () {
       const connectionId = yield* this.#hooks.prepare(identity.number, workspaceName);
-      const previous = this.#credentials.get(connectionId)?.storeId;
+      const earlier = this.#credentials.get(connectionId);
+      const previous = earlier?.storeId;
       this.#runtime.promote(link.storeId);
       yield* this.#hooks.finish(connectionId, {
         whatsappStoreKey: Buffer.from(key).toString("base64"),
         storeId: link.storeId,
         ownNumber: ownNumber ? "1" : "0",
+        // A number that links again keeps this setting, as it keeps its allowed senders.
+        ...(earlier?.workingMessage === "0" ? { workingMessage: "0" } : {}),
       });
       // The number's earlier device was replaced by this link, so its keys go, but only once the new
       // link is saved: a failed save keeps the device that worked before.
@@ -332,6 +366,12 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   #ownNumber(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);
     return values ? whatsAppCredentials(values).ownNumber : true;
+  }
+
+  /** True unless the owner turned off the "Working on it…" post of this number. */
+  workingMessage(connectionId: string): boolean {
+    const values = this.#credentials.get(connectionId);
+    return values ? whatsAppCredentials(values).workingMessage : true;
   }
 
   #connectionId(workspaceId: string): Effect.Effect<string, WhatsAppConnectFailed> {

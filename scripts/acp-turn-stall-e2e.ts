@@ -3,6 +3,7 @@
 // agent (`provider-fakes/agents/stall.ts`) and a short stall limit:
 // - a silent prompt fails with the stall message, and the next turn opens the session again;
 // - a stall on a custom endpoint's model names the endpoint, not OpenCode (#3234);
+// - a custom endpoint with a longer limit of its own is not ended at the agent's limit (#3823);
 // - an open tool call longer than the limit is not a stall;
 // - a stop of a prompt that ignores `session/cancel` ends the turn as interrupted;
 // - OpenCode answer text streams before the prompt answers;
@@ -42,6 +43,7 @@ interface Report {
   stall?: { status: string | null; error: string | null; elapsedMs: number; cancelSent: boolean };
   afterStall?: { status: string | null; sessionRestored: boolean };
   endpointStall?: { status: string | null; error: string | null };
+  slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
@@ -155,6 +157,21 @@ try {
     sourceText("error.agent.turnStalled", { provider: "My Lab" }),
     "A stall on a custom endpoint names the endpoint.",
   );
+
+  // A slow endpoint, such as a local model that reads a long prompt, has a longer limit of its own.
+  const slow = await open(
+    "opencode",
+    OPENCODE_ACP_FLAVOR,
+    join(root, "slow-endpoint.jsonl"),
+    { FAKE_QUIET_MS: String(STALL_MS * 2) },
+    () => ({ name: "My Lab", hasCredentials: false, stallMs: STALL_MS * 10 }),
+  );
+  const slowThread = await startThread(slow, { cwd: workspace });
+  const slowTurn = await timed(() => runTurn(slow, slowThread, { text: "quiet", timeoutMs: STALL_MS * 10 }));
+  report.slowEndpoint = { status: slowTurn.value.status, reply: slowTurn.value.reply, elapsedMs: slowTurn.elapsedMs };
+  assert.equal(slowTurn.value.status, "completed", "A slow endpoint turn is not ended at the agent's limit.");
+  assert.equal(slowTurn.value.reply, "working, done", "The slow endpoint's answer is complete.");
+  assert.ok(slowTurn.elapsedMs >= STALL_MS * 2, "The endpoint was silent for longer than the agent's limit.");
 
   // An open tool call is work, not a stall, also when it takes longer than the limit.
   const tool = await timed(() => runTurn(client, thread, { text: "tool" }));

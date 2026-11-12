@@ -11,8 +11,11 @@
 //    loaded session, and the release comes only after that turn ends.
 // 4. Limit: with a long timeout, the end of a turn releases at once the older idle session of the same
 //    app server, and keeps the newer one.
+// 5. Delete: deleting an agent archives its loaded session, and waits for the answer before its folder
+//    goes. Codex unloads an unsubscribed thread only 60 s later, with the processes that it started
+//    in the workspace, and Windows does not remove a folder that a process uses (#6266).
 // `bun run test:codex-idle-thread-release`. Writes .openbot-build/codex-idle-thread-release-e2e/report.json.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -94,6 +97,13 @@ const answer = (message) => {
     case "thread/unsubscribe":
       loaded.delete(params.threadId);
       return write({ id: message.id, result: { status: "unsubscribed" } });
+    case "thread/archive":
+      // The real app server shuts the thread down before it answers.
+      loaded.delete(params.threadId);
+      return setTimeout(() => {
+        write({ id: message.id, result: {} });
+        log({ answered: message.method, threadId: params.threadId });
+      }, 200);
     case "thread/backgroundTerminals/list": {
       const send = () => {
         if (control().holdList) return setTimeout(send, 25);
@@ -172,6 +182,7 @@ interface Report {
     olderNext: ResumedTurn;
     newerReleasedAfterOlderTurn: boolean;
   };
+  delete?: { thread: string; archivedBeforeReturn: boolean; workspaceRemoved: boolean };
   errors?: { agentId: string; code: string; message: string }[];
   error?: string;
 }
@@ -389,6 +400,19 @@ try {
     olderNext,
     newerReleasedAfterOlderTurn: true,
   };
+
+  // 5. Delete. The long timeout keeps the newest session loaded.
+  const deleted = await createAgent(app, "Delete");
+  const workspace = app.store.list().find((agent) => agent.id === deleted.agentId)?.workspacePath ?? "";
+  const deleteFrom = protocol().length;
+  await runCauseEffect(app.agents.deleteAgent(deleted.agentId));
+  report.delete = {
+    thread: deleted.thread,
+    archivedBeforeReturn: protocol()
+      .slice(deleteFrom)
+      .some((line) => line.answered === "thread/archive" && line.threadId === deleted.thread),
+    workspaceRemoved: workspace !== "" && !existsSync(workspace),
+  };
   errors.push(...app.errors);
   report.errors = errors;
 
@@ -400,6 +424,8 @@ try {
     report.race.releasedAfterTurnEnd &&
     report.limit.newerKept &&
     resumedCleanly(report.limit.olderNext) &&
+    report.delete.archivedBeforeReturn &&
+    report.delete.workspaceRemoved &&
     errors.length === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

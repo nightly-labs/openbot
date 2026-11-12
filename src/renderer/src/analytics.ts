@@ -344,7 +344,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   server_transfer_action: {
-    action: "export" | "import";
+    action: "export" | "import" | "copy";
     result: AnalyticsOutcome;
     failure_code?: string;
   };
@@ -554,6 +554,7 @@ const SAFE_FAILURE_CODES = new Set([
   "archive_invalid",
   "checksum_failed",
   "version_mismatch",
+  "cpu_unsupported",
   "cli_update_failed",
   "cli_activate_failed",
   "cli_select_failed",
@@ -641,7 +642,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   connector_action: ["connect_started", "connected", "disconnected", "enabled", "disabled"],
   computer_use_action: ["permission_opened"],
   channel_action: ["created", "archived", "member_added"],
-  server_transfer_action: ["export", "import"],
+  server_transfer_action: ["export", "import", "copy"],
 };
 
 /** Enum values that differ by event. A key that is not here uses PROPERTY_ENUMS. */

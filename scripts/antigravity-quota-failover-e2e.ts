@@ -1,9 +1,9 @@
 // Checks that a spent Gemini quota moves an agent to its backup model, also after the turn started
-// work. Runs the real agent service on a temporary profile with a fake Antigravity 1.4.5 ACP server.
-// A prompt with `QUOTA-NOW` on a `gemini-quota-*` model gets Antigravity's quota text as answer text
-// and the stop reason `refusal`; with `ACT-FIRST` it runs a tool step before that. `gemini-spent`
-// gets the quota text before any step. `gemini-flash` always answers. Each case has its own primary
-// model: a spent quota holds its model for all agents.
+// work. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4.
+// A prompt with `QUOTA-NOW` on a `gemini-quota-*` model gets Antigravity's quota text as answer text,
+// in the 1.5 failure form ("\n⚠ <text>"), and the stop reason `end_turn`; with `ACT-FIRST` it runs a
+// tool step before that. `gemini-spent` gets the quota text before any step. `gemini-flash` always
+// answers. Each case has its own primary model: a spent quota holds its model for all agents.
 // Checks:
 //   1. Quota before work, set to switch without asking: the message runs again on the backup.
 //   2. Quota after a tool step, set to switch without asking: the backup continues the work, with
@@ -25,7 +25,7 @@ const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-quota-failover-")
 const userData = join(root, "user-data");
 const home = join(root, "home");
 const install = join(root, "antigravity");
-const fakeAgy = join(install, "bin", "agy_acp_server");
+const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const BACKUP = "gemini-flash";
 // The continuation note that a backup model gets for work that a usage limit stopped.
@@ -33,6 +33,8 @@ const CONTINUATION = "The previous provider reached its usage limit after starti
 
 // Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
+// Bun's `os.homedir()` does not follow HOME. Keep the Gemini home off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
 mkdirSync(home, { recursive: true });
@@ -43,10 +45,14 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity ACP server that keeps each session's model and sends a spent quota as 1.4.5 does. */
+/** An Antigravity CLI that keeps each session's model and sends a spent quota as a 1.5 failure. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4" + NL);
+  process.exit(0);
+}
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-flash"];
@@ -74,8 +80,8 @@ function handle(message) {
     if (quota) {
       if (text.includes("ACT-FIRST") && model !== "gemini-spent")
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
-      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Usage Limit Reached" + NL + NL + "You have reached your current quota for this period. Your limit will reset in 6 days, 22 hours." } });
-      return write({ id: message.id, result: { stopReason: "refusal" } });
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Usage Limit Reached" + NL + NL + "You have reached your current quota for this period. Your limit will reset in 6 days, 22 hours." } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
     return write({ id: message.id, result: { stopReason: "end_turn" } });
@@ -158,8 +164,7 @@ function prompts(): Prompt[] {
     .map((line) => JSON.parse(line));
 }
 
-await mkdir(join(install, "bin"), { recursive: true });
-await writeFile(join(install, "antigravity-package.json"), `${JSON.stringify({ version: "1.4.5" })}\n`);
+await mkdir(join(install, "1.5.4", "bin"), { recursive: true });
 await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);

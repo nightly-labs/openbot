@@ -572,6 +572,103 @@
   color: var(--openbot-text-primary);
 }
 
+/* The specs of a media step sit on the right of the bar, next to the collapse button. */
+.wfn-media-specs {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  margin-left: auto;
+}
+
+/* On a picture or video, the collapse button has the same box as the specs next to it. */
+.wfn-stage .wfn-media-overlay .wfn-collapse {
+  width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  margin-left: 0;
+  background: var(--wfn-glass);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+  backdrop-filter: var(--wfn-glass-blur);
+}
+
+.wfn-stage .wfn-media-overlay .wfn-collapse svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* The dots of the chat frame fill the card at its final size while the model works. */
+.wfn-generating,
+.wfn-generating .image-generation-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* While the model works, the panel stays in view, so Stop is always one press away. */
+.wfn-node:has(.wfn-generating) .wfn-overlay {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.wfn-elapsed,
+.wfn-clip-length {
+  display: inline-flex;
+  align-items: center;
+  height: var(--openbot-control-xs);
+  padding: 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--wfn-glass);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  font-size: var(--wfn-small);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+}
+
+/*
+ * A video uses the chat player. While it is paused, the card keeps the glass panel to change the
+ * step, and the play button over the frame starts it. While it plays, and in full screen, the player
+ * bar takes the bottom of the card.
+ */
+.wfn-node .media-generation-player:not([data-playing], :popover-open) .media-generation-bar {
+  display: none;
+}
+
+/*
+ * When the canvas zooms out, the bar keeps its size on the screen, so Pause, Mute and Full screen
+ * stay easy to hit. It grows to at most twice its size in the card; below 50% zoom it gets smaller
+ * again. Thus a pixel in the bar is a pixel on the screen from 50% to 100% zoom. The bar uses the full
+ * width of the card.
+ */
+.wfn-node .media-generation-player:not(:popover-open) .media-generation-bar {
+  --wfn-bar-zoom: clamp(1, 1 / var(--wfn-scale, 1), 2);
+
+  container: wfn-video-bar / inline-size;
+  right: auto;
+  width: calc(100% / var(--wfn-bar-zoom));
+  transform-origin: bottom left;
+  scale: var(--wfn-bar-zoom);
+  padding: 20px 6px 4px;
+}
+
+/* In a narrow card the time goes, so the position keeps space. The slider gives the time to a screen reader. */
+@container wfn-video-bar (width < 300px) {
+  .wfn-node .media-generation-time {
+    display: none;
+  }
+}
+
+.wfn-node:has(.media-generation-player[data-playing]) :is(.wfn-overlay, .wfn-clip-length) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The length of a clip, on its top right, as in the chat player. */
+.wfn-clip-length {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  pointer-events: none;
+}
+
 .wfn-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -3314,4 +3411,64 @@ svg.wfn-shape-surface {
   .wfn-edge-label[data-build] {
     animation: none;
   }
+}
+
+/* ------------------------------------------------------- Media inputs */
+
+/* The pictures that come in sit above the description. */
+.wfn-panel[data-inputs] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.wfn-media-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.wfn-stage .wfn-media-input {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--wfn-field);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage button.wfn-media-input {
+  cursor: pointer;
+}
+
+.wfn-media-input img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wfn-media-input > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The mark of a frame, along the bottom of its picture. */
+.wfn-media-input-badge {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 1px 0;
+  background: var(--wfn-glass);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
 }

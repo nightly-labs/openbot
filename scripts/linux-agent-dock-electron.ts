@@ -56,6 +56,8 @@ const PRESENTATION: AgentDockPresentation = {
   display: { kind: "primary" },
   edge: "right",
   autoHide: false,
+  edgeStrip: false,
+  sizePercent: 100,
   offsets: [],
   seats: AGENTS.map((item) => ({ kind: "agent", agent: item, mood: "idle", state: null })),
   available: [],

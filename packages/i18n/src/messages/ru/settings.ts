@@ -16,6 +16,12 @@ export const messages = {
     "Показывать размытый рабочий стол за окном. Сайты и меню тогда используют тему приложения.",
   "settings.interfaceSize.title": "Размер интерфейса",
   "settings.interfaceSize.description": "Размер текста и элементов управления в OpenBot.",
+  "settings.interfaceFont.title": "Шрифт интерфейса",
+  "settings.interfaceFont.description": "Шрифт меню, чатов и настроек.",
+  "settings.interfaceFont.default": "По умолчанию (Inter)",
+  "settings.codeFont.title": "Шрифт кода",
+  "settings.codeFont.description": "Шрифт кода, терминалов и путей к файлам.",
+  "settings.codeFont.default": "По умолчанию",
   "settings.logoColor.title": "Цвет логотипа",
   "settings.logoColor.description": "Отображается в Dock, на панели задач и в Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -91,6 +97,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "Ссылка открылась в основном браузере.",
   "settings.sendShortcut.title": "Сочетание для отправки",
   "settings.sendShortcut.description": "Выберите клавиши для отправки сообщения на этом устройстве и в этом браузере.",
+  "settings.chatOrder.description":
+    "Выберите, где боковая панель показывает непрочитанные чаты на этом устройстве. «Вручную» отключает группу «Непрочитанные».",
   "settings.sendShortcut.enter": "Отправка по Enter",
   "settings.sendShortcut.modEnterMac": "Отправка по ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Отправка по Ctrl+Enter",
@@ -140,6 +148,7 @@ export const messages = {
   "settings.planStart.set": "Задать",
   "settings.automationLimit.sectionTitle": "Лимит",
   "settings.automationLimit.sectionDescription": "Действует для всех агентов на этом компьютере.",
+  "settings.automationLimit.sectionDescriptionServer": "Действует для всех агентов на этом сервере.",
   "settings.automationLimit.title": "Запросов в час",
   "settings.automationLimit.option": "{limit} в час",
   "settings.automationLimit.note":
@@ -256,8 +265,14 @@ export const messages = {
   "settings.agentDock.edge.description": "Перетащите док вверх или вниз, чтобы сдвинуть его вдоль края.",
   "settings.agentDock.edge.right": "Справа",
   "settings.agentDock.edge.left": "Слева",
+  "settings.agentDock.size.title": "Размер дока",
+  "settings.agentDock.size.description":
+    "Перетащите, чтобы изменить размер дока поверх других приложений. В главном окне док следует размеру интерфейса.",
   "settings.agentDock.autoHide.title": "Скрывать, когда не используется",
   "settings.agentDock.autoHide.description": "Док уходит за край. Подведите указатель к краю, чтобы показать его.",
+  "settings.agentDock.edgeStrip.title": "Показывать полоску у края",
+  "settings.agentDock.edgeStrip.description":
+    "Там, где прячется док, остаётся тонкая полоска. Подведите к ней указатель, чтобы показать док. Когда агент о чём-то спрашивает, по полоске проходит цветная волна.",
   "settings.agentDock.results.title": "Показывать готовую работу",
   "settings.agentDock.results.description": "Результаты агентов ненадолго появляются рядом с доком.",
   "settings.agentDock.agents.title": "Агенты в доке",
@@ -520,6 +535,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} готово. Перезапустите, чтобы применить.",
   "settings.updates.status.installing": "Перезапуск для применения {target}…",
   "settings.updates.status.upToDate": "OpenBot обновлён до последней версии канала Stable.",
+  "settings.updates.status.staged": "{target} выпускается поэтапно. Проверьте обновления, чтобы получить его сейчас.",
   "settings.updates.status.checkFailed": "OpenBot не удалось проверить обновления. Повторите попытку.",
   "settings.updates.status.unsupported": "В этой сборке обновления недоступны.",
   "settings.updates.actionFailed": "Не удалось обновить OpenBot.",
@@ -684,6 +700,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Живой голос Codex",
   "settings.voice.speech.codexLive.description":
     "Голосовые разговоры с любым агентом используют живой голос OpenAI с вашим входом в Codex. Ваш голос, ваши запросы и ответы агента передаются в OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Голосовые разговоры с любым агентом используют живой голос OpenAI со входом в Codex на сервере. Ваш голос, ваши запросы и ответы агента передаются в OpenAI.",
   "settings.voice.speech.speed.title": "Скорость",
   "settings.voice.speech.voice.title": "Голос",
   "settings.voice.speech.voice.female": "Женский голос {number}",
@@ -704,8 +722,6 @@ export const messages = {
   "settings.transfer.old.text": "Сохраните его агентов и настройки сервера в файл.",
   "settings.transfer.new.title": "Импорт на этот сервер",
   "settings.transfer.new.text": "Добавьте агентов и настройки сервера из файла.",
-  "settings.transfer.notMoved":
-    "API-ключи, входы в аккаунты, коннекторы, настройки приложения и история чатов не переносятся. Настройте их заново на новом сервере.",
   "settings.transfer.back": "Назад",
   "settings.transfer.loading": "Чтение агентов…",
   "settings.transfer.summary.label": "Что содержит файл",
@@ -715,12 +731,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Нет настроек сервера",
   "settings.transfer.includeAgent": "Включить в перенос: {name}",
   "settings.transfer.export.title": "Экспорт этого сервера",
-  "settings.transfer.export.files": "Включить файлы рабочих пространств",
-  "settings.transfer.export.filesDescription":
-    "Файлы, созданные агентами, и общая папка. Выключите, чтобы файл был меньше.",
-  "settings.transfer.export.settings": "Включить настройки сервера",
+  "settings.transfer.preset.label": "Что попадёт в файл",
+  "settings.transfer.preset.templates": "Шаблоны",
+  "settings.transfer.preset.everything": "Всё",
+  "settings.transfer.meter.files": "из {total} в файлах рабочих пространств",
+  "settings.transfer.part.agents": "Агенты и их настройка",
+  "settings.transfer.part.agentsDescription": "{contents}. Всегда в файле.",
+  "settings.transfer.part.settings": "Настройки сервера",
+  "settings.transfer.part.chats": "История чатов",
+  "settings.transfer.part.chatsDescription":
+    "Чаты и боковые ветки с их файлами, а также история запусков регулярных задач. Агенты продолжат эти чаты с их контекстом.",
+  "settings.transfer.part.channels": "Сообщения каналов",
+  "settings.transfer.part.channelsDescription":
+    "Сообщения каналов, в которых состоят экспортируемые агенты, с их файлами и историей запусков регулярных задач каналов.",
+  "settings.transfer.part.files": "Файлы рабочих пространств",
+  "settings.transfer.part.filesDescription": "Файлы, созданные агентами, и общая папка.",
+  "settings.transfer.part.preferences": "Параметры сервера",
+  "settings.transfer.part.preferencesDescription":
+    "Название, логотип, часовой пояс, характер, настройки агентов по умолчанию, выбор моделей, настройки памяти и навыков, а также уровни уведомлений и закрепления каждого участника.",
   "settings.transfer.export.settingsDescription":
-    "Серверы MCP, собственные провайдеры моделей, разделы боковой панели и схемы регулярных задач.",
+    "Серверы MCP, собственные провайдеры моделей, разделы боковой панели, схемы регулярных задач и общие навыки.",
   "settings.transfer.export.chooseAgents": "Выбрать агентов ({selected} из {total})",
   "settings.transfer.export.hideAgents": "Скрыть агентов",
   "settings.transfer.export.agentsLabel": "Агенты для экспорта",
@@ -747,8 +777,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Агенты в файле",
   "settings.transfer.import.nameExists": "Имя уже занято",
   "settings.transfer.import.settings": "Импортировать настройки сервера",
-  "settings.transfer.import.settingsDescription":
-    "Добавляет серверы MCP, собственные провайдеры моделей и разделы боковой панели, которых нет на этом сервере.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Добавляет серверы MCP, собственные провайдеры моделей, разделы боковой панели и общие навыки, которых нет на этом сервере.",
+  "settings.transfer.import.preferences": "Импортировать параметры сервера",
+  "settings.transfer.import.preferencesDescription":
+    "Заменяет название, логотип и параметры этого сервера, а также уровни уведомлений и закреплённые элементы каждого человека на те, что в файле.",
   "settings.transfer.import.submit": {
     one: "Импортировать {count} агента",
     few: "Импортировать {count} агентов",
@@ -770,4 +803,38 @@ export const messages = {
   "settings.transfer.result.signInButton": "Войти в {provider}",
   "settings.transfer.result.notImported": "Не импортировано",
   "settings.transfer.result.warnings": "Проверьте",
+  "settings.transfer.copy.tileTitle": "Копировать на другой сервер",
+  "settings.transfer.copy.tileText": "Отправьте агентов на другой ваш сервер.",
+  "settings.transfer.copy.title": "Копировать агентов на другой сервер",
+  "settings.transfer.copy.from": "Откуда",
+  "settings.transfer.copy.to": "Куда",
+  "settings.transfer.copy.chooseServer": "Выберите сервер",
+  "settings.transfer.copy.search": "Поиск агентов",
+  "settings.transfer.copy.agentsOn": "Агенты на {server}",
+  "settings.transfer.copy.all": {
+    one: "Все агенты ({count})",
+    few: "Все агенты ({count})",
+    many: "Все агенты ({count})",
+    other: "Все агенты ({count})",
+  },
+  "settings.transfer.copy.noAgents": "На этом сервере нет агентов.",
+  "settings.transfer.copy.new": "Новый",
+  "settings.transfer.copy.notCopied":
+    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+  "settings.transfer.copy.submit": {
+    one: "Копировать {count} агента",
+    few: "Копировать {count} агентов",
+    many: "Копировать {count} агентов",
+    other: "Копировать {count} агента",
+  },
+  "settings.transfer.copy.copying": "Копирование…",
+  "settings.transfer.copy.done": {
+    one: "{count} агент скопирован на {server}.",
+    few: "{count} агента скопированы на {server}.",
+    many: "{count} агентов скопированы на {server}.",
+    other: "{count} агента скопированы на {server}.",
+  },
+  "settings.transfer.copy.open": "Открыть {server}",
+  "settings.transfer.copy.loadFailed": "Не удалось прочитать агентов",
+  "settings.transfer.copy.failed": "Копирование не завершено",
 } as const satisfies PartialTranslation<typeof source>;

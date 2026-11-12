@@ -28,7 +28,7 @@ import { createSignal, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
 import { createWorkflowsController } from "../src/features/workflows/workflows-controller";
-import type { WorkflowHost } from "../src/features/workflows/workflows-port";
+import { keptPicture, type WorkflowHost } from "../src/features/workflows/workflows-port";
 import { createMockGitHubConnector } from "../src/preview/mock-github-connector";
 import { mockWorkflows } from "../src/preview/mock-workflows";
 import { STORY_AGENTS } from "./fixtures";
@@ -156,6 +156,12 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     slackWorkspaces: async () => [],
     agentLevels: async () => null,
     githubSupported: () => true,
+    mediaSupported: () => true,
+    pictures: async () => [],
+    // A story keeps the picture only in the page: its preview is a blob address.
+    uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
+    // A story makes no files.
+    mediaUrl: () => undefined,
     githubConnector: createMockGitHubConnector(),
     hostName: () => undefined,
     // A story opens no browser.

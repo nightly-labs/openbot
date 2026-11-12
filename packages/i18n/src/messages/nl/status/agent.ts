@@ -33,6 +33,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
   "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
+  "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
+  "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
   "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
   "status.agent.serverInstallCommand":
     "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",

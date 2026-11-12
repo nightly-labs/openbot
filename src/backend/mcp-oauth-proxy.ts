@@ -77,6 +77,13 @@ export interface McpOAuthProxyOptions {
   target: (route: string) => Effect.Effect<McpOAuthProxyTarget | null, McpOperationError>;
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  /**
+   * Whether the sign-in of `url` ended after a refusal: the refresh was refused, there was no
+   * refresh token, or the user signed out. It is the opposite of the row's "Signed in". A server can
+   * refuse a request when the sign-in is still good, for example for a tool that the account cannot
+   * use, and then a new sign-in alone does not help.
+   */
+  signInEnded: (url: string) => boolean;
   /** What the proxy tells a server about the client. Without it, the provider's own `clientInfo` goes through. */
   client?: McpOAuthProxyClient;
 }
@@ -99,7 +106,7 @@ export interface McpOAuthProxyRoute {
  *
  * Bytes go through unchanged, event streams included, because the provider and the server speak
  * MCP to each other. This class changes the credential, and it names OpenBot and the agent as the
- * client: the `clientInfo` of `initialize` and the `User-Agent`. Each route has its own bearer, made
+ * client in the `clientInfo` of `initialize`. Each route has its own bearer, made
  * from the secret, so a bearer that one row's provider holds opens no other route. An agent route
  * adds the agent key to the path and to the bearer; the route without one stays valid for the
  * sessions that hold it.
@@ -253,11 +260,24 @@ export class McpOAuthProxy {
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
     const target = yield* this.#options.target(route);
-    if (!target) return signInNeeded(response, method, read);
+    if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
-    if (!upstream) return signInNeeded(response, method, body);
+    if (!(upstream instanceof Response)) {
+      // Only a renewed token that the server refused proves a good sign-in. A renewal that could not
+      // reach the authorization server leaves an expired token, and that sign-in has ended for now.
+      const active = upstream.renewed && !this.#options.signInEnded(target.url);
+      logger.warn("The MCP server refused a request with the sign-in of this computer.", {
+        challengeError: upstream.challengeError,
+        renewed: upstream.renewed,
+        signInActive: active,
+      });
+      const message = active
+        ? sourceText("error.backend.mcpOAuthRequestRefused")
+        : sourceText("error.backend.mcpOAuthSignInNeeded");
+      return refuseRequests(response, method, body, message);
+    }
     const headers: Record<string, string> = {};
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -273,7 +293,7 @@ export class McpOAuthProxy {
     yield* mcpCall(() => pipeBody(stream, response, controller.signal));
   });
 
-  /** The upstream answer, with one renewed token after a 401. `null` when the sign-in is gone. */
+  /** The upstream answer, with one renewed token after a 401, or the last 401 when no token was taken. */
   readonly #forward = Effect.fn("McpOAuthProxy.forward")(function* (
     this: McpOAuthProxy,
     target: McpOAuthProxyTarget,
@@ -281,17 +301,16 @@ export class McpOAuthProxy {
     method: string,
     body: Buffer | null,
     controller: AbortController,
-  ): Effect.fn.Return<Response | null, McpOperationError> {
-    const userAgent = this.#options.client ? `OpenBot/${this.#options.client.version}` : null;
-    const first = yield* send(target, target.token, request, method, body, controller, userAgent);
+  ): Effect.fn.Return<Response | UpstreamRefusal, McpOperationError> {
+    const first = yield* send(target, target.token, request, method, body, controller);
     if (first.status !== 401) return first;
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
-    if (!renewed) return null;
-    const second = yield* send(target, renewed, request, method, body, controller, userAgent);
+    if (!renewed) return { challengeError: challengeError(first), renewed: false };
+    const second = yield* send(target, renewed, request, method, body, controller);
     if (second.status !== 401) return second;
     yield* discard(second);
-    return null;
+    return { challengeError: challengeError(second), renewed: true };
   });
 }
 
@@ -412,9 +431,8 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   method: string,
   body: Buffer | null,
   controller: AbortController,
-  userAgent: string | null,
 ): Effect.fn.Return<Response, McpOperationError> {
-  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request, userAgent));
+  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request));
   const origin = new URL(target.url).origin;
   let url = new URL(target.url);
   // The fragment names the account on this machine. It does not go upstream.
@@ -439,18 +457,14 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   }
 });
 
-function upstreamHeaders(
-  target: McpOAuthProxyTarget,
-  token: string,
-  request: IncomingMessage,
-  userAgent: string | null,
-): Headers {
+function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: IncomingMessage): Headers {
   const headers = new Headers();
   for (const { key, value } of target.headers) {
     if (key.trim().toLowerCase() !== "authorization") headers.set(key.trim(), value);
   }
   // A `User-Agent` that the user wrote on the row is kept. The provider's own does not go upstream.
-  if (userAgent && !headers.has("user-agent")) headers.set("user-agent", userAgent);
+  // There is no `OpenBot/<version>` default: n8n answers each `User-Agent` with "bot" in it
+  // with an empty 204 (#6497). `clientInfo` names OpenBot.
   // Node gives the request header names in lowercase.
   for (const [name, value] of Object.entries(request.headers)) {
     if (
@@ -500,19 +514,32 @@ async function pipeBody(body: ReadableStream<Uint8Array>, response: ServerRespon
   }
 }
 
+/** A request that the server refused with a 401 after the token was renewed, or could not be. */
+interface UpstreamRefusal {
+  /** The `error` of the server's Bearer challenge, such as `invalid_token`, for the log only. */
+  challengeError: string | null;
+  /** Whether the refused request had a token that was renewed after the first refusal. */
+  renewed: boolean;
+}
+
+/** The `error` value of the `WWW-Authenticate` header. It is a short code, never a credential. */
+function challengeError(answer: Response): string | null {
+  return /\berror="?([\w.-]{1,64})/u.exec(answer.headers.get("www-authenticate") ?? "")?.[1] ?? null;
+}
+
 /**
- * The answer when OpenBot holds no usable sign-in for the route: a JSON-RPC error for each request
- * in the body, so the agent reads why the tool is not there and the provider does not sign in by
- * itself. A body with notifications only is accepted, as a server would.
+ * The answer when the server will not take the sign-in that OpenBot holds for the route: a
+ * JSON-RPC error with `message` for each request in the body, so the agent reads why the tool
+ * failed and the provider does not sign in by itself. A body with notifications only is accepted,
+ * as a server would.
  */
-function signInNeeded(response: ServerResponse, method: string, body: Buffer | null): void {
+function refuseRequests(response: ServerResponse, method: string, body: Buffer | null, message: string): void {
   if (method !== "POST") {
     response.writeHead(405, { allow: "POST" });
     response.end();
     return;
   }
   const { batch, requests } = jsonRpcRequests(body);
-  const message = sourceText("error.backend.mcpOAuthSignInNeeded");
   const errors = requests.map((id) => ({ jsonrpc: "2.0", id, error: { code: SIGN_IN_NEEDED_CODE, message } }));
   if (errors.length === 0) {
     response.writeHead(202);

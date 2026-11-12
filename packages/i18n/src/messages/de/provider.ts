@@ -130,6 +130,8 @@ export const messages = {
     "Füge einen OpenAI-kompatiblen Endpunkt hinzu: einen Modellserver auf diesem Computer oder einen Dienst mit Basis-URL und Schlüssel.",
   "provider.picker.customPending":
     "Die Modelle deiner Endpunkte sind noch nicht geladen. Der Anbieter liest sie, sobald seine aktuelle Aufgabe beendet ist.",
+  "provider.picker.customUnlisted": "{name} listet die Modelle deiner Endpunkte nicht auf.",
+  "provider.picker.editEndpoints": "Endpunkte bearbeiten",
   "provider.picker.defaultModelLabel": "{name}, Standard",
   "provider.picker.usageLimit": "Nutzungslimit erreicht",
   "provider.picker.usageLimitWindow": "Limit ({window})",
@@ -140,7 +142,12 @@ export const messages = {
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
   "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
   "provider.picker.fast": "Schnell",
-  "provider.picker.fastLabel": "Schnellmodus",
+  "provider.picker.fastText": "Schnellere Antworten, höhere Nutzung",
+  "provider.picker.speed": "Geschwindigkeit",
+  "provider.picker.standard": "Standard",
+  "provider.picker.standardText": "Standardgeschwindigkeit",
+  "provider.picker.ultrafast": "Ultraschnell",
+  "provider.picker.ultrafastText": "Die schnellsten Antworten, viel höhere Nutzung",
   "provider.picker.selectEffort": "Aufwand auswählen",
   "provider.picker.custom": "Benutzerdefiniert",
   "provider.picker.cliReady": "{cli} bereit",
@@ -224,11 +231,24 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hat kein Guthaben zum Zurücksetzen der Nutzung mehr.",
   "provider.account.resetUsageAlreadyRedeemed": "Dieses Guthaben von {name} wurde bereits verwendet.",
   "provider.account.resetUsageFailed": "Die Nutzung von {name} konnte nicht zurückgesetzt werden.",
+  "provider.account.pool": "Konten bündeln",
+  "provider.account.poolDescription":
+    "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",
+  "provider.account.inUse": "Aktiv",
+  "provider.account.notInPool": "Nicht im Pool",
+  "provider.account.leaveOutOfPool": "Aus Pool nehmen",
+  "provider.account.putBackInPool": "Zurück in Pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool aus {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} aktiv",
+  "provider.settings.accountsPooledDescription": "{count} von {max}. Agenten teilen sich diese Konten.",
   "provider.settings.disconnectTitle": "{name} trennen?",
   "provider.settings.disconnectOthers": "Die anderen {provider}-Konten warten, bis du {provider} wieder verbindest.",
   "provider.settings.disconnectLocal":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Ein gespeicherter Gemini-API-Schlüssel wird statt einer Google-Anmeldung verwendet. Entferne den Schlüssel, um einen Google-Plan und seine Modelle zu nutzen.",
   "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
   "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.cache": "Cache",
@@ -242,7 +262,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Mein Claude-Code-Setup verwenden",
   "provider.settings.claudeUserSetupDescription":
     "Agenten laden deine CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agenten laden CLAUDE.md, Skills, Agenten, Hooks und Plugins aus ~/.claude auf dem Server. Aus: Jeder Zug sendet einen kürzeren Prompt. Dateien des Arbeitsbereichs werden weiter geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Die Claude-Code-Einstellung konnte nicht geladen werden.",
+  "provider.settings.context": "Kontext",
+  "provider.settings.compactWindow": "Chats komprimieren bei",
+  "provider.settings.compactWindowDescription":
+    "Claude Code fasst die älteren Runden eines Chats zusammen, wenn der Chat diese Größe erreicht. Weniger hält Runden schnell und günstig. Mehr behält mehr Details. Ein Modell mit kleinerem Fenster komprimiert an seiner eigenen Grenze.",
+  "provider.settings.compactWindowDefault": "Claude Code-Standard",
+  "provider.settings.compactWindowTokens": "{size} Tokens",
+  "provider.settings.compactWindowLoadFailed": "Die Komprimierungsgröße dieses Servers konnte nicht geladen werden.",
   "provider.settings.models": "Modelle",
   "provider.settings.modelsDescription": {
     one: "{shown} von {count} Modell erscheint in der Modellauswahl.",
@@ -261,4 +290,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Löscht die CLI, die OpenBot für {name} heruntergeladen hat ({size}). Konten, Anmeldungen und Agenten bleiben.",
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal bleibt angemeldet.",
 } as const satisfies PartialTranslation<typeof source>;

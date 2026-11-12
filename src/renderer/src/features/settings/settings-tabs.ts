@@ -67,10 +67,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
+      { titleKey: "sidebar.order.title", descriptionKey: "settings.chatOrder.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
       {
         titleKey: "settings.compactMessageActions.title",
@@ -173,6 +176,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
       { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
       { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.size.title", descriptionKey: "settings.agentDock.size.description" },
       { titleKey: "settings.agentDock.agents.title" },
     ],
   },

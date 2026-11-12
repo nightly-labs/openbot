@@ -117,8 +117,8 @@ export interface SearchConversationMessagesInput {
   cursor?: string;
   limit?: number;
   /**
-   * Also search the open side threads. Only this computer's server reads it: the Team API search
-   * returns the agents' own chats.
+   * Also search the open side threads. A joined server reads it only when its host serves
+   * `thread-message-search-v1`; an older host searches the agents' own chats.
    */
   includeSideThreads?: boolean;
 }

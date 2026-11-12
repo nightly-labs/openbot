@@ -51,7 +51,7 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
 // exact shape of an AWS key ID counts.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|whsec_)[A-Za-z0-9._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
 // A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
 // A PEM private key, with its body. A key that the text cuts off before its END line is removed to
@@ -282,8 +282,12 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
         index = end;
         continue;
       }
-      result += value.slice(index, start + 1);
-      index = start + 1;
+      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
+      // so `{{name}}` costs one scan against the bound and not two.
+      let next = start + 1;
+      while (value[next] === "{" || value[next] === "[") next += 1;
+      result += value.slice(index, next);
+      index = next;
       continue;
     }
     result += value.slice(index, start) + parsed;
@@ -306,12 +310,16 @@ function parseRedacted(candidate: string, emails: boolean): string | null {
  * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
  * dropping when it does not close, because prose loses nothing by staying and a record can hold a
  * credential under a header name no rule can predict.
+ *
+ * Only an object key names what is under it, and a serializer opens an object with a quoted key, so
+ * the first character after the opening brackets must be a quote. A template placeholder such as
+ * `{{name}}` or a link such as `[[Page]]` has none, and an agent's text keeps it as written (#6437).
  */
 function startsLikeJson(value: string, start: number): boolean {
   for (let index = start + 1; index < value.length; index += 1) {
     const char = value[index];
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
-    return char === '"' || char === "{" || char === "[";
+    if (char === " " || char === "\t" || char === "\n" || char === "\r" || char === "{" || char === "[") continue;
+    return char === '"';
   }
   return false;
 }

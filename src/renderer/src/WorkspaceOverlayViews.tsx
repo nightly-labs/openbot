@@ -1,5 +1,6 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
@@ -142,6 +143,7 @@ export function MarketplaceOverlay(props: {
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
           agentServerId={remoteAdminServer(props.server, "agent-install-v1")?.id}
           agentUpdateServerId={remoteAdminServer(props.server, "agent-update-v1")?.id}
+          githubSkills={manage() && serverCanAdminister(props.server, "github-skills-v1")}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -178,6 +180,7 @@ export function MarketplaceOverlay(props: {
             props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1")
           }
           pluginAccounts={serverSupportsCapability(props.server, "mcp-accounts-v1")}
+          pluginAccess={serverCanAdminister(props.server, "mcp-access-v1")}
           onRunPluginPrompt={
             composerFree()
               ? (agentId, prompt) =>
@@ -240,7 +243,15 @@ export function ServerSettingsOverlay(
         {...modal}
         mcpServers={serverCanManageMcp(props.server) ? props.mcpServers : undefined}
         storage={
-          serverHasStorage(props.server) ? { ...props.storage, canManage: canManageStorage(props.server) } : undefined
+          serverHasStorage(props.server)
+            ? {
+                ...props.storage,
+                canManage: canManageStorage(props.server),
+                backgroundProcesses:
+                  props.server.kind === "remote" &&
+                  serverSupportsCapability(props.server, BACKGROUND_PROCESSES_CAPABILITY),
+              }
+            : undefined
         }
         hostUpdate={
           remoteUpdateServer(props.server)

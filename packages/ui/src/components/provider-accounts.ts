@@ -39,6 +39,11 @@ export interface ProviderAccountActions {
    * computer that runs the providers cannot.
    */
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
+  /**
+   * Turns the provider's account pool on or off and sets the accounts that it leaves out. Absent where
+   * the computer that runs the providers has no pool.
+   */
+  setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
   /** True for this computer's providers, whose own sign-in a terminal CLI shares. */
   local?: boolean | undefined;
 }

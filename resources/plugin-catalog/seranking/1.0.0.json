@@ -1,0 +1,33 @@
+{
+  "slug": "seranking",
+  "name": "SE Ranking",
+  "tagline": "SEO data and site audits",
+  "description": "SE Ranking lets agents read keyword, backlink, competitor, and site audit data with the SE Ranking account of the signed-in user.",
+  "category": "research",
+  "creatorName": "SE Ranking",
+  "iconUrl": "https://avatars.githubusercontent.com/u/236332241?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-rankings", "text": "How did my tracked keywords move this week?" },
+    { "id": "prompt-competitor-keywords", "text": "Which keywords does my top competitor rank for that I do not?" },
+    { "id": "prompt-audit-errors", "text": "List the most serious errors from my latest site audit." }
+  ],
+  "apps": [
+    {
+      "id": "app-seranking-mcp",
+      "name": "SE Ranking",
+      "description": "Keyword, backlink, competitor, and audit data, over SE Ranking's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/236332241?s=256&v=4",
+      "server": {
+        "name": "seranking",
+        "transport": "http",
+        "url": "https://api.seranking.com/mcp",
+        "auth": [{ "id": "seranking-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://seranking.com",
+  "privacyPolicyUrl": "https://seranking.com/legal/privacy-statement.html",
+  "termsUrl": "https://seranking.com/legal/terms-of-service.html",
+  "skills": []
+}

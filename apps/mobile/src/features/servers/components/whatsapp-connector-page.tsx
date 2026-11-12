@@ -92,6 +92,7 @@ export function WhatsAppConnectorPage({
     reconnectWhatsAppNumber,
     setWhatsAppEnabled,
     setWhatsAppOwnNumber,
+    setWhatsAppWorkingMessage,
     addWhatsAppOrchestrator,
     removeWhatsAppSender,
     answerWhatsAppRequest,
@@ -240,6 +241,22 @@ export function WhatsAppConnectorPage({
                   dark={theme === "dark"}
                   onValueChange={(ownNumber) =>
                     run(() => setWhatsAppOwnNumber({ workspaceId: connection.workspaceId, ownNumber }, serverId))
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+            {/* An older host cannot set it: its numbers carry no `workingMessage`. */}
+            {settings && settings.workingMessage !== undefined ? (
+              <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.workingMessageDescription")}>
+                <SettingsSwitch
+                  value={settings.workingMessage}
+                  disabled={action.busy}
+                  label={t("mobile.server.connectors.whatsapp.workingMessage")}
+                  dark={theme === "dark"}
+                  onValueChange={(workingMessage) =>
+                    run(() =>
+                      setWhatsAppWorkingMessage({ workspaceId: connection.workspaceId, workingMessage }, serverId),
+                    )
                   }
                 />
               </SettingsRow>

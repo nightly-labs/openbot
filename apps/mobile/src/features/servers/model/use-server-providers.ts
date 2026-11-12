@@ -1,15 +1,18 @@
 import type {
+  AgentProviderId,
   AgentStatus,
   CustomAgentSummary,
   CustomProviderSummary,
   ProviderRuntimeSnapshot,
 } from "@openbot/contracts/ipc";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { type ProviderAdmin, providerRows } from "@/features/servers/model/provider-admin";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 
 /** The host sends no runtime event, so the runtimes are read again while a download runs, as on the web. */
 const RUNTIME_POLL_MS = 1000;
@@ -101,7 +104,8 @@ export function useServerProviders(serverId: string, options: { watchStatus?: bo
 export function useServerCustomProviders(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.customProviders(queryScope, serverId);
+  // The list is read again when the edit capability arrives, as on desktop and the web client.
+  const queryKey = queryKeys.customProviders(queryScope, serverId, Boolean(admin?.updateCustom));
   const keys = useRef(queryKey);
   keys.current = queryKey;
   const list = useQuery({
@@ -147,6 +151,56 @@ export function useRefreshProviderAccounts(serverId: string) {
       }),
     [queryClient, serverId],
   );
+}
+
+/**
+ * The provider that a new agent of the host starts on (`provider-default-v1`), as the Providers page
+ * and each provider page show it. `choose` saves a provider; the host has no "none".
+ */
+export function useHostProviderDefault(serverId: string, setting: ProviderAdmin["defaultProvider"]) {
+  const { t, errorMessage } = useText();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.providerDefault(queryScope, serverId);
+  const current = useQuery({
+    queryKey,
+    retry: false,
+    staleTime: 0,
+    queryFn: setting ? () => setting.read() : skipToken,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const choose = (provider: AgentProviderId) => {
+    if (!setting || saving || provider === current.data?.provider) return;
+    setSaving(true);
+    setError(null);
+    setting
+      .set(provider)
+      .then(async (saved) => {
+        await queryClient.cancelQueries({ queryKey, exact: true });
+        queryClient.setQueryData(queryKey, saved);
+        void haptics.notification("success");
+      })
+      .catch((cause: unknown) => {
+        setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
+        void haptics.notification("error");
+      })
+      .finally(() => setSaving(false));
+  };
+  return { current, saving, error, choose };
+}
+
+/** The state of a provider's API key on the host, as the provider page and the key page show it. */
+export function useProviderKeyState(serverId: string, admin: ProviderAdmin | null, provider: AgentProviderId | null) {
+  const queryScope = useQueryScope();
+  const queryKey = queryKeys.providerKey(queryScope, serverId, provider ?? "");
+  return useQuery({
+    queryKey,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: admin && provider ? () => admin.keyState(provider) : skipToken,
+  });
 }
 
 /** The custom ACP agents of a host, as the Providers page and the custom agent page show them. */
