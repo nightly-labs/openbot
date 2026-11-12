@@ -7,6 +7,8 @@ import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import GitFork from "lucide-react-native/icons/git-fork";
 import Hash from "lucide-react-native/icons/hash";
 import MailDot from "lucide-react-native/icons/mail-dot";
+import Pin from "lucide-react-native/icons/pin";
+import PinOff from "lucide-react-native/icons/pin-off";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
@@ -141,7 +143,7 @@ export function MessageActionsScreen() {
         </View>
       ) : null}
 
-      {request.onReply || request.onBranch || request.onMarkUnread || sendToChannel ? (
+      {request.onReply || request.onBranch || request.onMarkUnread || request.onTogglePin || sendToChannel ? (
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
@@ -168,6 +170,17 @@ export function MessageActionsScreen() {
               onPress={() => run(() => request.onMarkUnread?.())}
             >
               <Typography>{t("mobile.chat.message.markUnread")}</Typography>
+            </SettingsRow>
+          ) : null}
+          {request.onTogglePin ? (
+            <SettingsRow
+              leading={
+                request.pinned ? <PinOff size={ICON_SIZE} color={icon} /> : <Pin size={ICON_SIZE} color={icon} />
+              }
+              disclosure={false}
+              onPress={() => run(() => request.onTogglePin?.())}
+            >
+              <Typography>{request.pinned ? t("mobile.chat.pins.unpin") : t("mobile.chat.pins.pin")}</Typography>
             </SettingsRow>
           ) : null}
           {sendToChannel ? (

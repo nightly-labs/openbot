@@ -136,6 +136,10 @@ export interface ChatViewProps {
   markUnread?: (messageId: string) => void;
   /** The host messages that Mark unread is on. Keep the set stable while its ids stay the same. */
   markUnreadMessageIds?: ReadonlySet<string>;
+  /** Pins or unpins a host message of this chat. Absent where the host cannot pin messages. */
+  togglePin?: (messageId: string, pinned: boolean) => Promise<void>;
+  /** The pinned host messages of this chat. Keep the set stable while its ids stay the same. */
+  pinnedMessageIds?: ReadonlySet<string>;
   /**
    * The host messages from the one where the NEW line shows to the newest, in chat order. The line
    * shows above the first of them that has a row. Null for a chat without the line.
@@ -262,6 +266,8 @@ export function ChatView({
   deletesAnyMessage = false,
   markUnread,
   markUnreadMessageIds,
+  togglePin,
+  pinnedMessageIds,
   unreadLineMessageIds = null,
   sendToChannel,
   questionForm,
@@ -1157,6 +1163,8 @@ export function ChatView({
               deletesAnyMessage={deletesAnyMessage}
               onMarkUnread={markUnread ? markListMessageUnread : undefined}
               markUnreadMessageIds={markUnreadMessageIds}
+              onTogglePin={togglePin ? (message, pinned) => togglePin(message.id, pinned) : undefined}
+              pinnedMessageIds={pinnedMessageIds}
               unreadLineMessageIds={unreadLineMessageIds}
               sendChannels={sendToChannel?.channels}
               onSendToChannel={sendToChannel && !readOnly ? sendMessageToChannel : undefined}

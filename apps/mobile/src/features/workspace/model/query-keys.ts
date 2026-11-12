@@ -236,6 +236,8 @@ export const queryKeys = {
     "reads",
     agentId,
   ],
+  /** The pinned messages of all chats of one agent, from `message-pins-v1`. `message-pins-changed` invalidates it. */
+  messagePins: (scope: QueryScope, serverId: string, agentId: string) => ["message-pins", ...scope, serverId, agentId],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",

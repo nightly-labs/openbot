@@ -19,6 +19,7 @@ export const messages = {
   "mobile.app.route.deletedChannels": "삭제된 채널",
   "mobile.app.route.cropPhoto": "이동 및 확대/축소",
   "mobile.app.route.queuedMessages": "대기 중인 메시지",
+  "mobile.app.route.pinnedMessages": "고정된 메시지",
   "mobile.app.route.thinking": "생각",
   "mobile.app.route.messageOptions": "메시지 옵션",
   "mobile.app.route.editMessage": "메시지 수정",

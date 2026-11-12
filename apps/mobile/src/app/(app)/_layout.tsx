@@ -686,6 +686,18 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="pinned-messages"
+        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="queued-messages"
         options={{
           contentStyle: { backgroundColor: sheetBackground },
