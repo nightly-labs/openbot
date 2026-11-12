@@ -2,12 +2,12 @@ import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { dismissAppSuggestion, useAppSuggestionDismissals } from "@/features/chat/model/app-suggestion-dismissals";
 import { ListingIcon } from "@/features/marketplace/components/marketplace-parts";
-import { appListings, CONNECTOR_TAGLINES, connectorListing } from "@/features/marketplace/model/marketplace-listings";
+import { appListings, CONNECTOR_TAGLINES } from "@/features/marketplace/model/marketplace-listings";
 import { pluginConnectMethod, pluginInstalled } from "@/features/marketplace/model/plugin-connect";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId, type MobileConnectorId } from "@/features/servers/model/connectors";
@@ -24,7 +24,8 @@ import { useText } from "@/shared/lib/text";
 const BUTTON_SHAPE = "rounded-[8px]";
 const ICON_SIZE = 44;
 
-type SuggestionState = "available" | "connected" | "notAllowed" | "unavailable";
+/** `pending` waits for the state of the app on the server: the card shows Skip, but not Connect yet. */
+type SuggestionState = "available" | "pending" | "connected" | "notAllowed" | "unavailable";
 
 /**
  * A Marketplace app that an agent suggests in the chat, as on desktop: the app, Skip, and Connect.
@@ -47,20 +48,28 @@ export function ChatAppSuggestion({
 
 function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; messageId: string; slug: string }) {
   const { session } = useMobileSession();
-  const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   // A member reads no MCP list, so the app shows as not connected; the card then says who can connect it.
-  const { list: mcpServers } = useMcpServerList(serverId);
-  const listing = session?.apiUrl ? appListings(session.apiUrl).find((item) => item.id === slug) : undefined;
+  const { canManage, list: mcpServers } = useMcpServerList(serverId);
+  const apiUrl = session?.apiUrl;
+  const listing = useMemo(
+    () => (apiUrl ? appListings(apiUrl).find((item) => item.id === slug) : undefined),
+    [apiUrl, slug],
+  );
   if (listing?.kind !== "app" || listing.source !== "plugin") return null;
   const { plugin } = listing;
   const app = plugin.apps[0] ?? null;
   const method = app ? pluginConnectMethod(app, canRelay) : null;
-  const state: SuggestionState = pluginInstalled(plugin, mcpServers.data ?? [])
-    ? "connected"
-    : canManage
-      ? "available"
-      : "notAllowed";
+  const state: SuggestionState = !canManage
+    ? "notAllowed"
+    : mcpServers.data
+      ? pluginInstalled(plugin, mcpServers.data)
+        ? "connected"
+        : "available"
+      : // A failed read cannot tell; Connect opens the listing, which shows the real state.
+        mcpServers.isError
+        ? "available"
+        : "pending";
   return (
     <SuggestionCard
       messageId={messageId}
@@ -92,18 +101,21 @@ function ConnectorSuggestion({
   connector: MobileConnectorId;
 }) {
   const { t } = useText();
-  // Only an owner or an admin reads the connectors, so a member has no row.
+  const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageConnectors(serverId));
+  // An owner or admin has no row while the status loads, or when the host does not run the connector.
   const row = useConnectorRows(serverId).find((item) => item.id === connector);
   const name = t(CONNECTOR_TITLE_KEYS[connector]);
   const tagline = t(CONNECTOR_TAGLINES[connector]);
-  const listing = row ? connectorListing(row, name, tagline) : null;
-  const state: SuggestionState = !row
+  const state: SuggestionState = !canManage
     ? "notAllowed"
-    : !listing
-      ? "unavailable"
-      : listing.kind === "app" && listing.source === "connector" && listing.connected
-        ? "connected"
-        : "available";
+    : !row || row.status === "connecting"
+      ? "pending"
+      : row.status === "unavailable"
+        ? "unavailable"
+        : row.status === "connected"
+          ? "connected"
+          : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
+            "available";
   return (
     <SuggestionCard
       messageId={messageId}
@@ -173,7 +185,11 @@ function SuggestionCard({
         <Typography weight="medium" numberOfLines={1}>
           {name}
         </Typography>
-        <Typography type="body-xs" className="text-text-secondary" numberOfLines={state === "available" ? 1 : 2}>
+        <Typography
+          type="body-xs"
+          className="text-text-secondary"
+          numberOfLines={state === "available" || state === "pending" ? 1 : 2}
+        >
           {detail}
         </Typography>
       </View>

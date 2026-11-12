@@ -11,25 +11,27 @@ const MAX_DISMISSALS = 20;
 
 const dismissalsSchema = z.array(z.string().min(1));
 
-function read(): string[] {
+/** The saved list, or null when the store cannot be read, such as before the first unlock after a restart. */
+function read(): string[] | null {
   try {
     const parsed = dismissalsSchema.safeParse(JSON.parse(SecureStore.getItem(key) ?? "[]"));
     return parsed.success ? parsed.data.slice(-MAX_DISMISSALS) : [];
   } catch {
-    return [];
+    return null;
   }
 }
 
 /** The chat rows of the suggestions that the user skipped. The list remounts rows, so the state is here. */
-export const useAppSuggestionDismissals = create<{ ids: readonly string[] }>(() => ({ ids: read() }));
+export const useAppSuggestionDismissals = create<{ ids: readonly string[] }>(() => ({ ids: read() ?? [] }));
 
 export function dismissAppSuggestion(messageId: string, dismissed: boolean): void {
-  const rest = useAppSuggestionDismissals.getState().ids.filter((id) => id !== messageId);
+  // The saved list joins the one in memory, so a list that could not be read at launch is not overwritten.
+  const saved = read();
+  const known = saved ? [...saved, ...useAppSuggestionDismissals.getState().ids] : null;
+  const rest = [...new Set(known ?? useAppSuggestionDismissals.getState().ids)].filter((id) => id !== messageId);
   const ids = dismissed ? [...rest, messageId].slice(-MAX_DISMISSALS) : rest;
   useAppSuggestionDismissals.setState({ ids });
-  try {
-    SecureStore.setItem(key, JSON.stringify(ids));
-  } catch {
-    // A skip must not fail when the store is unavailable. It lasts until the app restarts then.
-  }
+  // A store that cannot be read is not written either. The skip then lasts until the app restarts.
+  if (!saved) return;
+  SecureStore.setItemAsync(key, JSON.stringify(ids)).catch(() => undefined);
 }
