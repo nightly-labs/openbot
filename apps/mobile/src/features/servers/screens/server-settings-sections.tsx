@@ -47,15 +47,23 @@ import { SettingsPicker } from "@/features/settings/components/settings-controls
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { type ServerRowState, serverRowState } from "@/features/workspace/model/server-row-state";
+import type { MobileServer, ServerChecks } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-function LinkRow({ label, icon, pathname, serverId, trailing }: LinkRowProps) {
+/** The state of each row for the role of this member: see `serverRowState`. */
+function useServerRows(serverId: string) {
+  const workspace = useMobileWorkspace();
+  return (permits: (checks: ServerChecks) => unknown) => serverRowState(workspace, serverId, permits);
+}
+
+function LinkRow({ label, icon, pathname, serverId, trailing, disabled }: LinkRowProps) {
   return (
     <SettingsRow
       leading={<RowIcon icon={icon} />}
       trailing={trailing}
+      disabled={disabled}
       onPress={() => router.push({ pathname, params: { serverId } })}
     >
       <Typography.Paragraph>{label}</Typography.Paragraph>
@@ -76,12 +84,16 @@ interface LinkRowProps {
     | "/server-settings/transfer";
   serverId: string;
   trailing?: ReactNode;
+  disabled?: boolean;
 }
 
 /** The role of this member, the members, and the roles and the audit log for a role that the host serves them to. */
 export function ServerPeopleSection({ server }: { server: MobileServer }) {
   const { t } = useText();
-  const { memberCountByServer, canManageServerRoles, canReadServerAudit } = useMobileWorkspace();
+  const { memberCountByServer } = useMobileWorkspace();
+  const row = useServerRows(server.id);
+  const roles = row((checks) => checks.canManageServerRoles(server.id));
+  const audit = row((checks) => checks.canReadServerAudit(server.id));
   const memberCount = memberCountByServer[server.id];
   return (
     <SettingsSection title={t("mobile.server.settings.peopleSection")}>
@@ -112,22 +124,24 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
           )
         }
       />
-      {canManageServerRoles(server.id) ? (
+      {roles === "hidden" ? null : (
         <LinkRow
           label={t("mobile.server.route.roles")}
           icon={ShieldCheck}
           pathname="/server-settings/roles"
           serverId={server.id}
+          disabled={roles === "disabled"}
         />
-      ) : null}
-      {canReadServerAudit(server.id) ? (
+      )}
+      {audit === "hidden" ? null : (
         <LinkRow
           label={t("mobile.server.route.audit")}
           icon={RotateCcwClock}
           pathname="/server-settings/audit"
           serverId={server.id}
+          disabled={audit === "disabled"}
         />
-      ) : null}
+      )}
     </SettingsSection>
   );
 }
@@ -138,12 +152,14 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
  */
 export function ServerAiSection({ serverId }: { serverId: string }) {
   const { t } = useText();
-  const { canManageProviders, canManageMcpServers } = useMobileWorkspace();
-  if (!canManageProviders(serverId) && !canManageMcpServers(serverId)) return null;
+  const row = useServerRows(serverId);
+  const providers = row((checks) => checks.canManageProviders(serverId));
+  const mcp = row((checks) => checks.canManageMcpServers(serverId));
+  if (providers === "hidden" && mcp === "hidden") return null;
   return (
     <SettingsSection title={t("mobile.server.settings.aiSection")}>
-      {canManageProviders(serverId) ? <ServerProvidersRow serverId={serverId} /> : null}
-      {canManageMcpServers(serverId) ? <ServerMcpRow serverId={serverId} /> : null}
+      {providers === "hidden" ? null : <ServerProvidersRow serverId={serverId} disabled={providers === "disabled"} />}
+      {mcp === "hidden" ? null : <ServerMcpRow serverId={serverId} disabled={mcp === "disabled"} />}
     </SettingsSection>
   );
 }
@@ -151,57 +167,60 @@ export function ServerAiSection({ serverId }: { serverId: string }) {
 /** The data that the server keeps, and the moves of agents and servers into and out of it. */
 export function ServerDataSections({ serverId }: { serverId: string }) {
   const { t } = useText();
-  const {
-    canManageVault,
-    canManageBrowserProfiles,
-    canViewHostedSites,
-    canReadServerStorage,
-    canImportAgents,
-    canTransferServer,
-  } = useMobileWorkspace();
+  const row = useServerRows(serverId);
+  const vault = row((checks) => checks.canManageVault(serverId));
+  const browserProfiles = row((checks) => checks.canManageBrowserProfiles(serverId));
+  const sites = row((checks) => checks.canViewHostedSites(serverId));
+  const storage = row((checks) => checks.canReadServerStorage(serverId));
+  const importAgents = row((checks) => checks.canImportAgents(serverId));
+  const transfer = row((checks) => checks.canTransferServer(serverId));
+  const shown = (state: ServerRowState) => state !== "hidden";
   return (
     <>
-      {canManageVault(serverId) ||
-      canManageBrowserProfiles(serverId) ||
-      canViewHostedSites(serverId) ||
-      canReadServerStorage(serverId) ? (
+      {shown(vault) || shown(browserProfiles) || shown(sites) || shown(storage) ? (
         <SettingsSection title={t("mobile.server.settings.dataSection")}>
-          {canManageVault(serverId) ? (
+          {shown(vault) ? (
             <LinkRow
               label={t("mobile.server.settings.vault")}
               icon={KeyRound}
               pathname="/server-settings/vault"
               serverId={serverId}
+              disabled={vault === "disabled"}
             />
           ) : null}
-          {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
-          {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
-          {canReadServerStorage(serverId) ? (
+          {shown(browserProfiles) ? (
+            <ServerBrowserProfilesRow serverId={serverId} disabled={browserProfiles === "disabled"} />
+          ) : null}
+          {shown(sites) ? <ServerSitesRow serverId={serverId} disabled={sites === "disabled"} /> : null}
+          {shown(storage) ? (
             <LinkRow
               label={t("mobile.server.settings.storage")}
               icon={HardDrive}
               pathname="/server-settings/storage"
               serverId={serverId}
+              disabled={storage === "disabled"}
             />
           ) : null}
         </SettingsSection>
       ) : null}
-      {canImportAgents(serverId) || canTransferServer(serverId) ? (
+      {shown(importAgents) || shown(transfer) ? (
         <SettingsSection title={t("mobile.server.settings.moveSection")}>
-          {canImportAgents(serverId) ? (
+          {shown(importAgents) ? (
             <LinkRow
               label={t("mobile.server.settings.importAgents")}
               icon={Download}
               pathname="/server-settings/import"
               serverId={serverId}
+              disabled={importAgents === "disabled"}
             />
           ) : null}
-          {canTransferServer(serverId) ? (
+          {shown(transfer) ? (
             <LinkRow
               label={t("mobile.server.settings.transfer")}
               icon={ArrowLeftRight}
               pathname="/server-settings/transfer"
               serverId={serverId}
+              disabled={transfer === "disabled"}
             />
           ) : null}
         </SettingsSection>
@@ -304,7 +323,12 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const timezone = useServerTimezone(serverId);
   const personality = useServerPersonality(serverId);
   const update = useServerUpdate(serverId, { poll: false });
-  const updateShown = Boolean(update.access || update.query.data);
+  const row = useServerRows(serverId);
+  const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
+  const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
+  const personalityRow = row((checks) => checks.canManageServerPersonality(serverId));
+  const memoryLimitRow = row((checks) => checks.canManageAgentMemoryLimit(serverId));
+  const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
   const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
   const memoryLimitAvailable = canManageAgentMemoryLimit(serverId);
   const memoryLimit = useQuery({
@@ -317,13 +341,14 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!updateShown && !timezone.available && !personality.canManage && !memoryLimitAvailable) return null;
+  if (!updateShown && timezoneRow === "hidden" && personalityRow === "hidden" && memoryLimitRow === "hidden")
+    return null;
   const responseStyle = personality.query.data?.responseStyle;
   const zone = timezone.query.data;
   const limit = memoryLimit.data;
 
   function chooseLimit(next: number) {
-    if (saving || next === limit?.limit) return;
+    if (saving || memoryLimitRow !== "enabled" || next === limit?.limit) return;
     void haptics.selection();
     setSaving(true);
     setError(null);
@@ -354,8 +379,10 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
               : undefined)
       }
     >
-      {updateShown ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
-      {timezone.available ? (
+      {updateShown ? (
+        <ServerUpdatesRow serverId={serverId} update={update} disabled={updateRow === "disabled"} />
+      ) : null}
+      {timezoneRow === "hidden" ? null : (
         <SettingsRow
           leading={<RowIcon icon={Clock} />}
           trailing={
@@ -365,25 +392,27 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
               />
             ) : undefined
           }
-          disabled={!zone}
+          disabled={!zone || timezoneRow === "disabled"}
           onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
         >
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
         </SettingsRow>
-      ) : null}
-      {personality.canManage ? (
+      )}
+      {personalityRow === "hidden" ? null : (
         <SettingsRow
           leading={<RowIcon icon={Smile} />}
           trailing={responseStyle ? <TrailingValue value={t(RESPONSE_STYLE_LABEL_KEYS[responseStyle])} /> : undefined}
+          disabled={personalityRow === "disabled"}
           onPress={() => router.push({ pathname: "/server-settings/personality", params: { serverId } })}
         >
           <Typography.Paragraph>{t("mobile.server.route.personality")}</Typography.Paragraph>
         </SettingsRow>
-      ) : null}
-      {memoryLimitAvailable ? (
+      )}
+      {memoryLimitRow === "hidden" ? null : (
         <SettingsRow
           leading={<RowIcon icon={Brain} />}
           disclosure={false}
+          disabled={memoryLimitRow === "disabled"}
           trailing={
             limit ? (
               <SettingsPicker
@@ -392,7 +421,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
                 options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
                   (choice) => ({ value: choice, label: String(choice) }),
                 )}
-                enabled={!saving}
+                enabled={!saving && memoryLimitRow === "enabled"}
                 dark={theme === "dark"}
                 label={t("mobile.server.settings.memoryLimit")}
                 onChange={chooseLimit}
@@ -402,7 +431,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
         >
           <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
         </SettingsRow>
-      ) : null}
+      )}
     </SettingsSection>
   );
 }
@@ -415,13 +444,13 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
  */
 export function ServerKeySettings({ server }: { server: MobileServer }) {
   const { t, format } = useText();
-  const { canRotateServerKey } = useMobileWorkspace();
+  const keyRow = useServerRows(server.id)((checks) => checks.canRotateServerKey(server.id));
   const { rotateServerKey, reloadServerList } = useMobileWorkspaceActions();
   const locked = useRef(false);
   const [changing, setChanging] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const canRotate = canRotateServerKey(server.id);
+  const canRotate = keyRow !== "hidden";
   // A change from another device arrives with the server list. Read it once when the page opens.
   const reload = useRef(reloadServerList);
   useEffect(() => {
@@ -479,7 +508,7 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
         <SettingsRow
           leading={<RowIcon icon={RotateCcwKey} tone="accent" />}
           disclosure={false}
-          disabled={changing}
+          disabled={changing || keyRow === "disabled"}
           onPress={() =>
             Alert.alert(
               t("mobile.server.settings.keyConfirmTitle", { name: server.name }),
@@ -505,7 +534,15 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
 }
 
 /** Opens the OpenBot update of the host. The value is the version that runs there, or a new one. */
-function ServerUpdatesRow({ serverId, update }: { serverId: string; update: ReturnType<typeof useServerUpdate> }) {
+function ServerUpdatesRow({
+  serverId,
+  update,
+  disabled,
+}: {
+  serverId: string;
+  update: ReturnType<typeof useServerUpdate>;
+  disabled?: boolean;
+}) {
   const { t } = useText();
   const status = update.query.data?.status;
   return (
@@ -522,6 +559,7 @@ function ServerUpdatesRow({ serverId, update }: { serverId: string; update: Retu
           />
         ) : undefined
       }
+      disabled={disabled}
       onPress={() => router.push({ pathname: "/server-settings/updates", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.updates")}</Typography.Paragraph>
@@ -533,7 +571,7 @@ function ServerUpdatesRow({ serverId, update }: { serverId: string; update: Retu
  * The Providers row, for an owner or admin of a host that serves `providers-v1`: the AI providers of
  * the computer that runs the server, and how many are connected.
  */
-function ServerProvidersRow({ serverId }: { serverId: string }) {
+function ServerProvidersRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { status, rows } = useServerProviders(serverId);
   const connected = rows.filter((row) => row.status?.state === "available").length;
@@ -545,6 +583,7 @@ function ServerProvidersRow({ serverId }: { serverId: string }) {
           <TrailingValue value={t("mobile.server.settings.providersConnected", { count: connected })} />
         ) : undefined
       }
+      disabled={disabled}
       onPress={() => router.push({ pathname: "/server-settings/providers", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.providers")}</Typography.Paragraph>
@@ -553,7 +592,7 @@ function ServerProvidersRow({ serverId }: { serverId: string }) {
 }
 
 /** The MCP servers row, for a user who manages the MCP servers of the host (`canManageMcpServers`). */
-function ServerMcpRow({ serverId }: { serverId: string }) {
+function ServerMcpRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { list } = useMcpServerList(serverId);
   return (
@@ -564,6 +603,7 @@ function ServerMcpRow({ serverId }: { serverId: string }) {
           <TrailingValue value={t("mobile.server.settings.mcpCount", { count: list.data.length })} />
         ) : undefined
       }
+      disabled={disabled}
       onPress={() => router.push({ pathname: "/server-settings/mcp", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.mcp")}</Typography.Paragraph>
@@ -572,13 +612,14 @@ function ServerMcpRow({ serverId }: { serverId: string }) {
 }
 
 /** The Browser profiles row, for an owner or admin of a host that serves `browser-profiles-v1`. */
-function ServerBrowserProfilesRow({ serverId }: { serverId: string }) {
+function ServerBrowserProfilesRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { profiles } = useServerBrowserProfiles(serverId);
   return (
     <SettingsRow
       leading={<RowIcon icon={AppWindow} />}
       trailing={profiles ? <TrailingValue value={String(profiles.length)} /> : undefined}
+      disabled={disabled}
       onPress={() => router.push({ pathname: "/server-settings/browser-profiles", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.route.browserProfiles")}</Typography.Paragraph>
@@ -587,7 +628,7 @@ function ServerBrowserProfilesRow({ serverId }: { serverId: string }) {
 }
 
 /** The Sites row, for every member of a host that serves `hosted-sites-v1`. */
-function ServerSitesRow({ serverId }: { serverId: string }) {
+function ServerSitesRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { query } = useServerSites(serverId);
   const list = query.data;
@@ -599,6 +640,7 @@ function ServerSitesRow({ serverId }: { serverId: string }) {
           <TrailingValue value={t("mobile.server.settings.siteCount", { count: list.used, limit: list.limit })} />
         ) : undefined
       }
+      disabled={disabled}
       onPress={() => router.push({ pathname: "/server-settings/sites", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.sites")}</Typography.Paragraph>
