@@ -817,8 +817,10 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile())
+        // The state check does not look in runtime caches, so turning a skill on leaves them out too.
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile())
           files[relative(root, path).replaceAll("\\", "/")] = new Uint8Array(yield* skillIO(() => readFile(path)));
       }
     });
