@@ -63,9 +63,9 @@
 .provider-model-trigger {
   display: flex;
   width: max-content;
-  /* Room for the effort after the model name. The model name shortens first. The trigger never
-     grows past its picker, which shrinks when the header is narrow. */
-  max-width: min(240px, 100%);
+  /* Room for the effort after the model name. The model name shortens first. In the chat header the
+     picker wrapper has the cap and the trigger fills it (see the header rules below). */
+  max-width: 240px;
   height: 28px;
   align-items: center;
   gap: 6px;
@@ -181,7 +181,21 @@
    keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
    still wins. */
 .provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
-  max-width: min(296px, 100%);
+  max-width: 296px;
+}
+
+/* In the chat header the cap is on the picker wrapper. A percentage on the trigger would be cyclic,
+   because the wrapper is sized by its content, so the trigger fills the wrapper instead. */
+.conversation-header .provider-model-picker {
+  max-width: 240px;
+}
+
+.conversation-header .provider-model-picker:has(.provider-model-trigger-fast) {
+  max-width: 296px;
+}
+
+.conversation-header .provider-model-picker > .provider-model-trigger {
+  max-width: 100%;
 }
 
 .provider-model-trigger-fast svg {
