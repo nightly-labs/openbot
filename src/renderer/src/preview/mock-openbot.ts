@@ -580,8 +580,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agentStatus;
   };
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
-  /** The agents that a copy sent to each joined server of the preview. */
-  const copiedAgents = new Map<string, ClientAgentSummary[]>();
   /** The levels of the preview user on each server, kept for the session as each host keeps them. */
   const agentNotificationLevels = new Map<string, Map<string, ServerNotificationLevel>>();
   const notificationLevelsOf = (serverId: string | undefined) => {
@@ -3789,9 +3787,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       discardHermes: async () => undefined,
     },
     instanceTransfer: {
-      summary: async (serverId) =>
+      summary: async () =>
         clone({
-          agents: (serverId === LOCAL_SERVER_ID ? agents : (copiedAgents.get(serverId) ?? [])).map((agent, index) => ({
+          agents: agents.map((agent, index) => ({
             id: agent.id,
             name: agent.name,
             title: agent.title,
@@ -3823,16 +3821,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone({ agents: imported, skipped: [], signIn: ["claude"], warnings: [] });
       },
       discard: async () => undefined,
-      // A joined server of the preview starts with no agents and keeps the agents copied to it.
-      copy: async ({ fromServerId, agentIds }, serverId) => {
-        const source = fromServerId === LOCAL_SERVER_ID ? agents : (copiedAgents.get(fromServerId) ?? []);
-        const copied = source
+      // The servers of the preview share one agent list, as `listAgents` does.
+      copy: async ({ agentIds }) => {
+        const copied = agents
           .filter((agent) => agentIds.includes(agent.id))
           .map((agent) => createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }));
-        if (serverId === LOCAL_SERVER_ID) {
-          agents = [...agents, ...copied];
-          emitAgentEvent({ type: "agents-changed", agents });
-        } else copiedAgents.set(serverId, [...(copiedAgents.get(serverId) ?? []), ...copied]);
+        agents = [...agents, ...copied];
+        emitAgentEvent({ type: "agents-changed", agents });
         return clone({ agents: copied, skipped: [], signIn: ["claude"], warnings: [] });
       },
     },
