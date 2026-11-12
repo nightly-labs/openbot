@@ -110,9 +110,11 @@ function McpServerForm({
   const { saveMcpServer, removeMcpServer, setMcpServerEnabled, testMcpServer, signOutMcpServer } =
     useMobileWorkspaceActions();
   const { action, perform, setList, setSignIns } = mcp;
-  const access = useMcpAccess(serverId);
-  // A member with "Can use" reads and tests the server; only "Can manage" changes it.
-  const readOnly = saved !== undefined && access.mine(saved.id) === "use";
+  // A new server has no access entry yet.
+  const access = useMcpAccess(serverId, saved !== undefined);
+  // A member with "Can use" reads and tests the server; only "Can manage" changes it. While the level
+  // of a member is not known, the page also changes nothing: the host can refuse the change.
+  const readOnly = saved !== undefined && access.mine(saved.id) !== "manage";
   const [draft, setDraft] = useState<McpServerDraft>(() => mcpServerDraft(saved));
   // A new server keeps its switch in the draft. A saved one turns on and off at once.
   const [newEnabled, setNewEnabled] = useState(true);
@@ -401,6 +403,9 @@ function McpServerForm({
         </SettingsRow>
       </SettingsSection>
       {saved && access.admin ? <McpAccessSections serverId={serverId} saved={saved} access={access} /> : null}
+      {saved && access.manages && access.access.isError ? (
+        <SettingsNote>{errorMessage(access.access.error, t("mobile.server.mcp.access.loadFailed"))}</SettingsNote>
+      ) : null}
       {signedIn && saved && !readOnly ? (
         <SettingsSection footer={t("mobile.server.mcp.signedInDescription", { server: mcp.server?.name ?? "" })}>
           <SettingsRow
@@ -475,8 +480,9 @@ function McpAccessSections({
   const entry = access.entry(saved.id);
   const busy = access.action.isPending;
   const have = entry.agents === null ? agentIds.length : agentIds.filter((id) => entry.agents?.includes(id)).length;
+  // "All agents" only for the stored "all": a list that has each agent now gives no agent added later.
   const summary =
-    entry.agents === null || have === agentIds.length
+    entry.agents === null
       ? t("mobile.server.mcp.access.allAgents")
       : have === 0
         ? t("mobile.server.mcp.access.noAgents")

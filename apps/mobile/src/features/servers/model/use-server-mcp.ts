@@ -95,10 +95,9 @@ export function useServerMcp(serverId: string) {
 /**
  * Who gets the MCP servers of one host (`mcp-access-v1`). An owner or admin reads each entry and the
  * roles of the host, and replaces the entry of one MCP server with the revision that it read. A
- * member reads only `mine`, the level of the member for each MCP server. Null `mine` for a member:
- * the levels are unknown, and the page does not limit the member; the host checks each change.
+ * member reads only `mine`, the level of the member for each MCP server. `enabled` false: no request.
  */
-export function useMcpAccess(serverId: string) {
+export function useMcpAccess(serverId: string, enabled = true) {
   const admin = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpAccess(serverId));
   const limited = useMobileWorkspaceSelector((workspace) => workspace.hasMcpAccessLimits(serverId));
   const roleList = useMobileWorkspaceSelector((workspace) => workspace.canManageServerRoles(serverId));
@@ -109,7 +108,7 @@ export function useMcpAccess(serverId: string) {
   const locked = useRef(false);
   const access = useQuery({
     queryKey: key,
-    enabled: admin || limited,
+    enabled: enabled && (admin || limited),
     retry: false,
     staleTime: 0,
     queryFn: () => loadMcpAccess(serverId),
@@ -117,9 +116,11 @@ export function useMcpAccess(serverId: string) {
   // The same query as the Roles pages. A host without roles gives Everyone only.
   const roles = useQuery({
     queryKey: queryKeys.serverRoles(queryScope, serverId),
-    enabled: admin && roleList,
+    enabled: enabled && admin && roleList,
     retry: false,
     staleTime: 0,
+    // As on the Roles pages: a role page must not start from an old revision.
+    gcTime: 0,
     queryFn: () => loadServerRoles(serverId),
   });
   const action = useMutation({
@@ -140,6 +141,8 @@ export function useMcpAccess(serverId: string) {
   });
   const snapshot = access.data;
   return {
+    /** True when this user sets who gets each MCP server, also while the entries load or fail. */
+    manages: admin,
     /** True when this user sets who gets each MCP server, and the entries are on hand. */
     admin: admin && Boolean(snapshot?.servers),
     access,

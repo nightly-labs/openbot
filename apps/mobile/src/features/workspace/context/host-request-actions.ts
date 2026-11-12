@@ -956,9 +956,9 @@ export function createHostRequestActions({
     setMcpServerEnabled: async (mcpServerId, enabled, serverId) =>
       runTeamRequest(setMcpServerEnabled(mcpAdmin(serverId), { mcpServerId, enabled })),
     testMcpServer: async (config, serverId) => runTeamRequest(testMcpServer(mcpAdmin(serverId), { config })),
-    // An older host keeps no sign-ins that a client can read.
     loadMcpAccess: async (serverId) => runTeamRequest(getHostMcpAccess(mcpAccessApi(serverId))),
     setMcpAccess: async (input, serverId) => runTeamRequest(setHostMcpAccess(mcpAccessApi(serverId), input)),
+    // An older host keeps no sign-ins that a client can read.
     listMcpSignIns: async (serverId) =>
       has(serverId, MCP_SIGN_IN_CAPABILITY) ? runTeamRequest(listMcpSignIns(teamApi(serverId))) : [],
     signOutMcpServer: async (mcpServerId, serverId) =>
