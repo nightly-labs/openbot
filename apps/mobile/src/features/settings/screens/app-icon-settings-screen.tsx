@@ -246,6 +246,7 @@ export function AppIconSettingsScreen() {
           fromCurrent={fromCurrent}
           toCurrent={toCurrent}
           currentMix={currentMix}
+          isCurrent={isCurrent}
           disabled={!ready || saving || isCurrent}
           useLabel={t("mobile.settings.appIcon.use")}
           currentLabel={t("mobile.settings.appIcon.current")}
@@ -439,6 +440,7 @@ function ActionButton({
   fromCurrent,
   toCurrent,
   currentMix,
+  isCurrent,
   disabled,
   useLabel,
   currentLabel,
@@ -448,6 +450,8 @@ function ActionButton({
   fromCurrent: SharedValue<number>;
   toCurrent: SharedValue<number>;
   currentMix: SharedValue<number>;
+  /** The icon in the middle is the selected icon. */
+  isCurrent: boolean;
   disabled: boolean;
   useLabel: string;
   currentLabel: string;
@@ -470,7 +474,7 @@ function ActionButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={disabled ? currentLabel : useLabel}
+      accessibilityLabel={isCurrent ? currentLabel : useLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}

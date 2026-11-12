@@ -1,9 +1,9 @@
 import {
   APP_LOGO_COLOR_HEX,
   APP_LOGO_COLORS,
+  APP_LOGO_EYE_HEX,
   type AppLogoColor,
   DEFAULT_APP_LOGO_COLOR,
-  DEFAULT_APP_LOGO_EYE_HEX,
   isAppLogoColor,
 } from "@openbot/contracts/app-logo-color";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -36,7 +36,7 @@ export interface AppIconLook {
  * cannot read it.
  */
 export function appIconLook(color: AppLogoColor): AppIconLook {
-  return { body: APP_LOGO_COLOR_HEX[color], eyes: DEFAULT_APP_LOGO_EYE_HEX };
+  return { body: APP_LOGO_COLOR_HEX[color], eyes: APP_LOGO_EYE_HEX[color] };
 }
 
 /** The names of the desktop logo colors, in the mobile catalog. */
@@ -60,15 +60,29 @@ export const useAppIcon = create<{ value: AppLogoColor | null; ready: boolean; s
   saving: false,
 }));
 
-export async function loadAppIcon(): Promise<void> {
+let loading: Promise<void> | null = null;
+/** Counts the selections, so a read that started before one does not overwrite it. */
+let selections = 0;
+
+/** Reads the icon once. The Appearance row and the picker share the read. */
+export function loadAppIcon(): Promise<void> {
+  if (useAppIcon.getState().ready) return Promise.resolve();
+  loading ??= readAppIcon().finally(() => {
+    loading = null;
+  });
+  return loading;
+}
+
+async function readAppIcon(): Promise<void> {
   if (!native) {
     useAppIcon.setState({ ready: true });
     return;
   }
+  const before = selections;
   try {
     const id = await native.getIcon();
     const value = id === MAIN_ICON ? DEFAULT_APP_LOGO_COLOR : isAppLogoColor(id) ? id : null;
-    useAppIcon.setState({ value });
+    if (selections === before) useAppIcon.setState({ value });
   } finally {
     useAppIcon.setState({ ready: true });
   }
@@ -77,6 +91,7 @@ export async function loadAppIcon(): Promise<void> {
 export async function saveAppIcon(color: AppLogoColor): Promise<void> {
   const { value, saving } = useAppIcon.getState();
   if (!native || saving || value === color) return;
+  selections += 1;
   useAppIcon.setState({ value: color, saving: true });
   try {
     await native.setIcon(color === DEFAULT_APP_LOGO_COLOR ? MAIN_ICON : color);

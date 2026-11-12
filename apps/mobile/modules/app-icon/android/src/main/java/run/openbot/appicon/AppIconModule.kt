@@ -1,9 +1,12 @@
 package run.openbot.appicon
 
+import android.app.Activity
+import android.app.Application
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
@@ -15,12 +18,16 @@ class UnknownIconException(id: String) : CodedException("The app has no icon \"$
 
 /**
  * The app icon of the launcher. `plugins/with-app-icons.js` gives `MainActivity` one launcher alias
- * for each variant of `assets/icons/app-icon-variants.json`, such as `.AppIconMidnight`, and the
- * launcher shows the enabled alias. Some launchers close the app when its launcher activity changes,
- * so the change waits until the app goes to the background. All calls run on the main thread.
+ * for each desktop logo color (`packages/contracts/src/app-logo-color.ts`), such as `.AppIconGreen`,
+ * and `.AppIconDefault` for the main icon. The launcher shows the enabled alias. Some launchers close
+ * the app when its launcher activity changes, so the change waits until no activity of the app shows.
+ * A system dialog, the share sheet or a picker over the app pauses it but does not hide it, so the
+ * change does not wait for a pause. All calls run on the main thread.
  */
 class AppIconModule : Module() {
   private var pending: String? = null
+  private val started = mutableSetOf<Int>()
+  private var callbacks: Application.ActivityLifecycleCallbacks? = null
 
   override fun definition() = ModuleDefinition {
     Name("OpenBotAppIcon")
@@ -35,13 +42,49 @@ class AppIconModule : Module() {
       val context = context() ?: throw UnknownIconException(id)
       if (!aliases(context).containsKey(id)) throw UnknownIconException(id)
       pending = if (id == current(context)) null else id
+      if (pending != null) listen(context)
     }.runOnQueue(Queues.MAIN)
 
-    OnActivityEntersBackground {
-      val id = pending ?: return@OnActivityEntersBackground
-      pending = null
-      context()?.let { apply(it, id) }
+    OnDestroy {
+      val application = context() as? Application
+      callbacks?.let { application?.unregisterActivityLifecycleCallbacks(it) }
+      callbacks = null
     }
+  }
+
+  private fun listen(context: Context) {
+    if (callbacks != null) return
+    val application = context as? Application ?: return
+    // JavaScript calls `setIcon` from a screen that shows.
+    appContext.currentActivity?.let { started.add(System.identityHashCode(it)) }
+    val next = object : Application.ActivityLifecycleCallbacks {
+      override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+
+      override fun onActivityStarted(activity: Activity) {
+        started.add(System.identityHashCode(activity))
+      }
+
+      override fun onActivityResumed(activity: Activity) = Unit
+
+      override fun onActivityPaused(activity: Activity) = Unit
+
+      override fun onActivityStopped(activity: Activity) {
+        started.remove(System.identityHashCode(activity))
+        if (started.isEmpty() && !activity.isChangingConfigurations) applyPending()
+      }
+
+      override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+
+      override fun onActivityDestroyed(activity: Activity) = Unit
+    }
+    application.registerActivityLifecycleCallbacks(next)
+    callbacks = next
+  }
+
+  private fun applyPending() {
+    val id = pending ?: return
+    pending = null
+    context()?.let { apply(it, id) }
   }
 
   private fun context(): Context? = appContext.reactContext?.applicationContext

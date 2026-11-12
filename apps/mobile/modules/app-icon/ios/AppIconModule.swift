@@ -8,9 +8,10 @@ final class AppIconChangeException: GenericException<String> {
 private let iconPrefix = "AppIcon"
 private let defaultIcon = "default"
 
-/// The app icon of the home screen. The icons are the variants of
-/// `assets/icons/app-icon-variants.json`; `plugins/with-app-icons.js` names the icon of the variant
-/// `midnight` `AppIconMidnight`. The first variant is the main icon. All calls run on the main queue.
+/// The app icon of the home screen. The icons are the desktop logo colors
+/// (`packages/contracts/src/app-logo-color.ts`); `plugins/with-app-icons.js` names the icon of the
+/// color `green` `AppIconGreen`. The default color is the main icon, `default` here. All calls run on
+/// the main queue.
 public class AppIconModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OpenBotAppIcon")

@@ -87,12 +87,17 @@ class QuickActionsModule : Module() {
 
   /**
    * Android removes the shortcuts of a launcher activity that the app disables, as when the user
-   * selects another app icon (`modules/app-icon`). The shortcuts go to the new launcher activity.
+   * selects another app icon (`modules/app-icon`). It can do so after the app is back, so the check
+   * compares the activity of the shortcuts with the current launcher activity, not only the count.
+   * After a restart, JavaScript publishes the items again.
    */
   private fun restore() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1 || items.isEmpty()) return
-    val manager = appContext.reactContext?.getSystemService(ShortcutManager::class.java) ?: return
-    if (manager.dynamicShortcuts.isEmpty()) publish(items)
+    val context = appContext.reactContext ?: return
+    val manager = context.getSystemService(ShortcutManager::class.java) ?: return
+    val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return
+    val shortcuts = manager.dynamicShortcuts
+    if (shortcuts.isEmpty() || shortcuts.any { it.activity != launcher }) publish(items)
   }
 
   private fun publish(items: List<QuickActionItem>): Boolean {
@@ -118,6 +123,8 @@ class QuickActionsModule : Module() {
         .setLongLabel(item.title)
         .setIcon(Icon.createWithResource(context, iconResource(item.icon)))
         .setIntent(intent)
+        // The launcher entry that shows the shortcut: the alias of the selected app icon.
+        .setActivity(launcher)
         .setRank(rank)
         .build()
     }
