@@ -407,6 +407,11 @@ interface ActiveTurn {
    * credits. Switch to another model to continue.", so a backup model can take it (#7127).
    */
   balanceSpent: boolean;
+  /**
+   * The CLI refused the turn with `billing_error`, such as "Claude Code can't use your Claude
+   * subscription, usually because a payment is past due", so a backup model can take it (#7491).
+   */
+  billingFailed: boolean;
   /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
   retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
@@ -1617,6 +1622,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       usageLimit: null,
       authenticationFailed: false,
       balanceSpent: false,
+      billingFailed: false,
       retrying: false,
       unprompted,
     };
@@ -1904,6 +1910,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // The CLI's own report of a failed request, such as "Invalid API key · Please run /login", is not
       // an answer. The result after it carries the same text and fails the turn.
       if (message.error === "authentication_failed") turn.authenticationFailed = true;
+      if (message.error === "billing_error") turn.billingFailed = true;
       if (message.error && message.error !== "max_output_tokens") return;
       const thinking = messageThinking(message.message);
       /* The message's own order is all there is to say what came before its thinking. Text the
@@ -2390,10 +2397,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     if (status === "failed" && error) {
       // A sign-in failure moves the turn to a backup model, as an invalid key does, and so do spent
-      // usage credits. The shared classifier does not find these causes in the CLI text, so the
-      // client names them.
+      // usage credits and a subscription that Claude refuses for billing. The shared classifier
+      // does not find these causes in the CLI text, so the client names them.
       const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
-      const balanceSpent = turn.balanceSpent && isBalanceDiagnostic(String(error));
+      const balanceSpent = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       this.emit("notification", {
         method: "error",
         params: {
