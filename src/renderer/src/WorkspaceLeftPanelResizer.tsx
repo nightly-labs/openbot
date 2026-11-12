@@ -31,8 +31,14 @@ export function WorkspaceLeftPanelResizer() {
       defaultValue={LEFT_PANEL_DEFAULT}
       min={LEFT_PANEL_MIN}
       max={layout.leftPanelMaxWidth()}
-      onResize={layout.setLeftPanelWidth}
-      onResizeEnd={(value) => savePanelWidth(LEFT_PANEL_STORAGE_KEY, value)}
+      // With no room beside the chat, the drag can only reach the smallest width. That width is not the
+      // user's choice, so it is not kept.
+      onResize={(value) => {
+        if (layout.leftPanelMaxWidth() > LEFT_PANEL_MIN) layout.setLeftPanelWidth(value);
+      }}
+      onResizeEnd={(value) => {
+        if (layout.leftPanelMaxWidth() > LEFT_PANEL_MIN) savePanelWidth(LEFT_PANEL_STORAGE_KEY, value);
+      }}
       snap={{
         compactValue: LEFT_PANEL_COMPACT,
         compact: layout.leftPanelCompact(),
