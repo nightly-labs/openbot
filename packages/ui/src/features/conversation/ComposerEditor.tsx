@@ -405,6 +405,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
   /* Where the caret was when the editor last had it. A selection in a message takes the caret away. */
   let savedCaret: number | null = null;
   let isComposing = false;
+  /*
+   * The key that starts a composition comes before `compositionstart`, without `isComposing`,
+   * and Chromium marks it with keyCode 229 ("Process"). The `insertText` that follows carries
+   * the raw key; the input method types the composed text itself, so the composer keeps it out.
+   */
+  let imeKeyDown = false;
   const [compositionRevision, setCompositionRevision] = createSignal(0);
   const attachmentTokenActions: AttachmentTokenActions = {
     tooltipId: attachmentTooltipId,
@@ -686,9 +692,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
    */
   function handleBeforeInput(event: InputEvent) {
     if (!editor || props.disabled || isComposing || event.isComposing) return;
+    const imeInsert = imeKeyDown && event.inputType === "insertText";
+    imeKeyDown = false;
     const lineBreak = event.inputType === "insertLineBreak" || event.inputType === "insertParagraph";
     if (!lineBreak && (event.inputType !== "insertText" || !event.data)) return;
     event.preventDefault();
+    // The composition types the kana; this first `insertText` carries only the raw key.
+    if (imeInsert) return;
     if (lineBreak) insertLineBreak(editor);
     else if (event.data) insertPlainText(editor, event.data);
     emitValue();
@@ -914,7 +924,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
      * The browser owns the IME composition buffer. The key that starts a composition comes before
      * `compositionstart` and without `isComposing`; Chromium marks it with keyCode 229 ("Process").
      */
-    if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
+    if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") {
+      imeKeyDown = true;
+      return;
+    }
+    imeKeyDown = false;
     if (handleMentionPickerKeyDown(event)) return;
     if (event.key === "Tab" && props.onSteer && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
       event.preventDefault();
@@ -1100,9 +1114,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onBeforeInput={handleBeforeInput}
         onCompositionStart={() => {
           isComposing = true;
+          imeKeyDown = false;
         }}
         onCompositionEnd={() => {
           isComposing = false;
+          imeKeyDown = false;
           setCompositionRevision((revision) => revision + 1);
         }}
         onPaste={handlePaste}
@@ -1110,6 +1126,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onCut={(event) => handleCopy(event, true)}
         onBlur={() => {
           isComposing = false;
+          imeKeyDown = false;
           // A menu can return the focus to the editor within this delay; keep the picker it opened.
           window.setTimeout(() => {
             const ownerDocument = editor?.ownerDocument;
