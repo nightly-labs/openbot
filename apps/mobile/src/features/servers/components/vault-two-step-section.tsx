@@ -54,7 +54,9 @@ export function VaultTwoStepSection({
   const on = keepsSaved || newKey;
   const savedCodes = useServerVaultCodes(serverId, keepsSaved);
   const draft = useDraftTwoStepCode(newKey ? twoStepKey : "");
-  const now = useSecondClock(on);
+  // A new key has the clock of its draft code; a saved key needs its own.
+  const savedNow = useSecondClock(keepsSaved);
+  const now = newKey ? draft.now : savedNow;
   const code = newKey ? draft.code : saved && keepsSaved ? savedCodes.code(saved.id) : undefined;
   const site = twoStepSite(website, t("mobile.server.vault.twoStep.theSite"));
 

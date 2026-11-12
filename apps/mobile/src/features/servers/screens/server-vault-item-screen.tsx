@@ -71,22 +71,20 @@ function isKind(value: string | undefined): value is VaultItemKind {
   return KINDS.some((kind) => kind === value);
 }
 
-/**
- * Server settings › Vault › one item of a joined server, or a new one of `kind`. The header action
- * saves it. A saved secret is never shown: its field starts empty, and a value typed there replaces it.
- */
 /** A line of the sign-in card: its label at the start, and the field with no frame of its own. */
 function LoginLine({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="flex-row items-center ps-4">
-      <Typography.Paragraph numberOfLines={1} className="w-28 text-grouped-secondary">
-        {label}
-      </Typography.Paragraph>
+      <Typography.Paragraph className="w-28 py-2 pe-2 text-grouped-secondary">{label}</Typography.Paragraph>
       <View className="min-w-0 flex-1">{children}</View>
     </View>
   );
 }
 
+/**
+ * Server settings › Vault › one item of a joined server, or a new one of `kind`. The header action
+ * saves it. A saved secret is never shown: its field starts empty, and a value typed there replaces it.
+ */
 export function ServerVaultItemScreen() {
   const { t } = useText();
   const { serverId, itemId, kind } = useLocalSearchParams<{ serverId: string; itemId?: string; kind?: string }>();

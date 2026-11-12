@@ -11,7 +11,7 @@ import { Typography } from "heroui-native";
 import ImageIcon from "lucide-react-native/icons/image";
 import ScanQrCode from "lucide-react-native/icons/scan-qr-code";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { PasteButton } from "@/features/servers/components/paste-button";
@@ -79,6 +79,14 @@ export function ServerVaultTwoStepScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
+  // Back from this page ends the setup. Done ends it first, so then this does nothing.
+  const startedFor = useRef(formId);
+  useEffect(
+    () => () => {
+      if (startedFor.current) useTwoStepSetup.getState().cancel(startedFor.current);
+    },
+    [],
+  );
   if (!formId) return <NoSetup />;
 
   const check = () => router.push({ pathname: "/server-settings/vault-two-step-check", params: { serverId } });

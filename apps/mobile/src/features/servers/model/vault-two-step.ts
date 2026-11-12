@@ -95,7 +95,12 @@ export function useServerVaultCodes(serverId: string, hasKeys: boolean) {
       return Math.max(250, first - Date.now() + 50);
     },
   });
-  return { code: (id: string) => query.data?.get(id), query };
+  // After a failed load the query keeps its last codes. A code that ran out is not shown or copied.
+  const code = (id: string) => {
+    const live = query.data?.get(id);
+    return live && live.expiresAt > Date.now() ? live : undefined;
+  };
+  return { code, query };
 }
 
 const DIGESTS = {
@@ -133,9 +138,12 @@ export function useDraftTwoStepCode(keyText: string) {
   const now = useSecondClock(key !== null);
   const [shown, setShown] = useState<{ key: TwoStepKey; code: LiveTwoStepCode } | null>(null);
   const run = useRef(0);
-  const current = shown && shown.key === key && shown.code.expiresAt > now ? shown.code : undefined;
+  const ofKey = shown && shown.key === key ? shown.code : undefined;
+  // The tick when no current code is ready, or 0. The effect runs again at each such tick, so a failed
+  // digest tries again.
+  const staleAt = !ofKey || ofKey.expiresAt <= now ? now : 0;
   useEffect(() => {
-    if (!key || current) return;
+    if (!key || staleAt === 0) return;
     const ticket = ++run.current;
     const at = Date.now();
     draftCode(key, at).then(
@@ -143,13 +151,13 @@ export function useDraftTwoStepCode(keyText: string) {
         if (ticket !== run.current) return;
         setShown({ key, code: { code, period: key.period, expiresAt: at + twoStepRemainingMs(key.period, at) } });
       },
-      // A failed digest shows no code. The key is still saved as typed; the host checks it.
-      () => {
-        if (ticket === run.current) setShown(null);
-      },
+      // A failed digest keeps the last code until the next try. The key is still saved as typed; the
+      // host checks it.
+      () => undefined,
     );
-  }, [key, current]);
-  return { code: key ? current : undefined, now, valid: key !== null };
+  }, [key, staleAt]);
+  // The last code stays until the next one is ready, so the digits do not flash a placeholder.
+  return { code: key ? ofKey : undefined, now, valid: key !== null };
 }
 
 /**
@@ -166,6 +174,8 @@ interface TwoStepSetupStore {
   setKeyText: (keyText: string) => void;
   finish: () => void;
   take: (formId: string) => string | null;
+  /** Ends a setup that the user left without Done, so the key does not stay in memory. */
+  cancel: (formId: string) => void;
   clear: (formId: string) => void;
 }
 
@@ -185,6 +195,9 @@ export const useTwoStepSetup = create<TwoStepSetupStore>()((set, get) => ({
     if (finished?.formId !== formId) return null;
     set({ finished: null });
     return finished.keyText;
+  },
+  cancel: (formId) => {
+    if (get().formId === formId) set({ formId: null, site: "", keyText: "" });
   },
   clear: (formId) => {
     const state = get();
