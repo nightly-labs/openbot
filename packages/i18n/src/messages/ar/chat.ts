@@ -613,6 +613,7 @@ export const messages = {
   "chat.suggestion.updated": "تم التحديث",
   "chat.suggestion.saveReply": "نعم، احفظه كمهارة.",
   "chat.suggestion.updateReply": "نعم، أضفه إلى المهارة.",
+  "chat.suggestion.saveFailed": "تعذّر حفظ المهارة. حاول مرة أخرى عندما ينهي الوكيل عمله.",
   "chat.suggestion.detailsNamed": "فتح {name} في المتجر",
   "chat.suggestion.dismissed": "تم تجاهل اقتراح {name}.",
   "chat.suggestion.undo": "تراجع",

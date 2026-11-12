@@ -479,6 +479,8 @@ export const messages = {
   "chat.suggestion.updated": "Aktualisiert",
   "chat.suggestion.saveReply": "Ja, speichere es als Fähigkeit.",
   "chat.suggestion.updateReply": "Ja, füge es der Fähigkeit hinzu.",
+  "chat.suggestion.saveFailed":
+    "Die Fähigkeit konnte nicht gespeichert werden. Versuche es erneut, wenn der Agent fertig ist.",
   "chat.suggestion.detailsNamed": "{name} im Marketplace öffnen",
   "chat.suggestion.dismissed": "Vorschlag für {name} ausgeblendet.",
   "chat.suggestion.undo": "Rückgängig",

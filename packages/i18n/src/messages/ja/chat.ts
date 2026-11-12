@@ -447,6 +447,8 @@ export const messages = {
   "chat.suggestion.updated": "更新済み",
   "chat.suggestion.saveReply": "はい、スキルとして保存して。",
   "chat.suggestion.updateReply": "はい、スキルに追加して。",
+  "chat.suggestion.saveFailed":
+    "スキルを保存できませんでした。エージェントの作業が終わってから、もう一度お試しください。",
   "chat.suggestion.detailsNamed": "マーケットプレイスで {name} を開く",
   "chat.suggestion.dismissed": "{name} の提案を閉じました。",
   "chat.suggestion.undo": "元に戻す",

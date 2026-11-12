@@ -469,6 +469,7 @@ export const messages = {
   "chat.suggestion.updated": "עודכן",
   "chat.suggestion.saveReply": "כן, שמור את זה כמיומנות.",
   "chat.suggestion.updateReply": "כן, הוסף את זה למיומנות.",
+  "chat.suggestion.saveFailed": "לא ניתן היה לשמור את המיומנות. יש לנסות שוב כשהסוכן יסיים את עבודתו.",
   "chat.suggestion.detailsNamed": "פתיחת {name} בחנות",
   "chat.suggestion.dismissed": "ההצעה {name} נסגרה.",
   "chat.suggestion.undo": "ביטול",

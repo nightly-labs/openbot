@@ -845,6 +845,19 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   /**
+   * A message to a working agent waits behind its turn or its queue. A channel has no such queue.
+   * An earlier send that has not failed is about to start a turn, so this one waits behind it.
+   */
+  function sendWaits(target: ConversationTarget): boolean {
+    return (
+      !deps.props.channel &&
+      (Boolean(deps.props.activeTurnId) ||
+        deps.orderedQueuedDeliveries().length > 0 ||
+        deps.pendingSends.list(target).some((send) => send.state !== "failed"))
+    );
+  }
+
+  /**
    * Shows a message at once and sends it after the earlier sends of its chat, so the host stores the
    * chat's messages in the order the user sent them. `draft` is what Edit puts back in the composer.
    */
@@ -860,14 +873,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
     };
     if (onScreen()) deps.followSentMessage();
-    // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
-    // An earlier send that has not failed is about to start a turn, so this one waits behind it.
-    const queued =
-      onScreen() &&
-      !deps.props.channel &&
-      (Boolean(deps.props.activeTurnId) ||
-        deps.orderedQueuedDeliveries().length > 0 ||
-        deps.pendingSends.list(target).some((send) => send.state !== "failed"));
+    const queued = onScreen() && sendWaits(target);
     // Read the send functions now: the send outlives this view when the user switches server.
     const send = deps.props.onSendMessage;
     // An agent whose provider cannot steer takes the message as its next turn: Send now.
@@ -1018,6 +1024,18 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   /**
+   * The user's yes to a skill suggestion. Only the first user message after the suggestion carries it
+   * to the agent, so the yes goes only when it does not wait: behind the agent's turn or queue, it
+   * would come after another message and the agent would not know the skill (#7261). False when it
+   * does not go.
+   */
+  function sendCardReplyNow(body: string): boolean {
+    const target = deps.currentTarget();
+    if (!target || sendWaits(target)) return false;
+    return sendCardMessage(body);
+  }
+
+  /**
    * A card message with a file that the app made, such as the steps of a shown task. The chat shows
    * the short body and the file. False when the chat cannot send now or the host refuses the file.
    */
@@ -1052,6 +1070,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardReplyNow,
     sendCardFile,
     retryPendingSend,
     editPendingSend,

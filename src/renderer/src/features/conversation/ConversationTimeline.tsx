@@ -196,6 +196,7 @@ export function ConversationTimeline() {
     props,
     mcpServers,
     sendCardMessage,
+    sendCardReplyNow,
     saveSkillSuggestion,
     reactToMessage,
     renderedAgentActivity,
@@ -1198,7 +1199,7 @@ export function ConversationTimeline() {
                                           suggestion(),
                                           Boolean(props.activeTurnId),
                                         )}
-                                        onSave={sendCardMessage}
+                                        onSave={sendCardReplyNow}
                                         onSaveSkill={() => saveSkillSuggestion(message()?.id ?? initialMessage.id)}
                                         onOpenSkill={skillOpener()}
                                       />
