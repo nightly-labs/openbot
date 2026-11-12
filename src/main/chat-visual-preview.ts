@@ -101,6 +101,8 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
         Effect.try({
           try: () => {
             this.#previewSession();
+            // The canvas behind a transparent page: the chat background of the theme.
+            const backgroundColor = chatVisualAppTheme(request.appearance)["--background"];
             // Not `offscreen`: after a resize, its capture loses every canvas that does not draw again,
             // so a chart comes out empty.
             const window = new BrowserWindow({
@@ -109,8 +111,7 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
               height: INITIAL_HEIGHT,
               useContentSize: true,
               enableLargerThanScreen: true,
-              // The canvas behind a transparent page: the chat background of the theme.
-              backgroundColor: chatVisualAppTheme(request.appearance)["--background"],
+              ...(backgroundColor ? { backgroundColor } : {}),
               webPreferences: {
                 sandbox: true,
                 contextIsolation: true,
