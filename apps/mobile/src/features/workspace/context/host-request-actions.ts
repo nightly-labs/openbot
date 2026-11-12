@@ -92,6 +92,7 @@ import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
@@ -130,8 +131,11 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -144,6 +148,7 @@ import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/rou
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
@@ -185,8 +190,12 @@ import {
   getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
   getHostAuditLog,
+  getHostBrowsingMemory,
+  getHostMcpAccess,
+  getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
+  getHostSkillLearning,
   getHostTimezone,
   getHostUpdateStatus,
   getRoutineResultDestination,
@@ -241,7 +250,11 @@ import {
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowserProfileProxy,
+  setHostBrowsingMemory,
+  setHostMcpAccess,
+  setHostMemoryReview,
   setHostPersonality,
+  setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
@@ -287,6 +300,7 @@ import {
   listAgentTasks,
   listAgentThreadBranches,
   listAgentThreadReads,
+  listMessagePins,
   loadInstanceTransferSummary,
   markAgentThreadRead,
   readAgentMemories,
@@ -295,6 +309,7 @@ import {
   renameAgentThread,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
+  setMessagePinned,
   stageAgentImport,
   stageAgentImportInParts,
   stageInstanceTransfer,
@@ -342,7 +357,10 @@ export type WorkspaceRequest = <T>(
 /** The host shares its screen through Sunshine and Moonlight Web. */
 const REMOTE_DESKTOP_CAPABILITY = "remote-desktop" satisfies TeamProtocolV1Capability;
 
-type HostRequestChecks = Pick<MobileWorkspaceState, Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">>;
+export type HostRequestChecks = Pick<
+  MobileWorkspaceState,
+  Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
+>;
 
 type HostRequestActions = Pick<
   MobileWorkspaceActions,
@@ -380,6 +398,8 @@ type HostRequestActions = Pick<
   | "branchAgentThread"
   | "loadAgentThreadReads"
   | "markAgentThreadRead"
+  | "loadMessagePins"
+  | "setMessagePinned"
   | "respondToTaskPrompt"
   | "loadAgentSkills"
   | "installAgentSkill"
@@ -423,6 +443,12 @@ type HostRequestActions = Pick<
   | "setServerTimezone"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadMemoryReview"
+  | "setMemoryReview"
+  | "loadSkillLearning"
+  | "setSkillLearning"
+  | "loadBrowsingMemory"
+  | "setBrowsingMemory"
   | "loadServerPersonality"
   | "setServerPersonality"
   | "loadServerRoles"
@@ -505,6 +531,8 @@ type HostRequestActions = Pick<
   | "testMcpServer"
   | "listMcpSignIns"
   | "signOutMcpServer"
+  | "loadMcpAccess"
+  | "setMcpAccess"
   | "setAgentSessionSetting"
   | "resetAgentSessionSetting"
   | "listSharedTables"
@@ -590,6 +618,50 @@ export async function writeHostAgentColor(
   return (await request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColorsSnapshot, { agentId, color })).agents;
 }
 
+/** The checks of the capabilities that each server advertised. */
+export function createHostRequestChecks(capabilities: ServerCapabilities): HostRequestChecks {
+  const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
+  return {
+    canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
+    canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
+    canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
+    canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
+    canPinMessages: (serverId) => has(serverId, MESSAGE_PINS_CAPABILITY),
+    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
+    canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
+    canUseWorkflowGitHub: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
+    canUseWorkflowChats: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
+      has(serverId, ROUTINE_RESULTS_CAPABILITY),
+    canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
+    canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+    canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
+    canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
+    canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+    canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
+    canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
+    canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
+    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
+    canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
+    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
+    attachmentSupport: (serverId) => {
+      const advertised = capabilities.get(serverId) ?? [];
+      return {
+        eml: advertised.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+        media: advertised.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+        zip: advertised.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
+        mp4: advertised.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
+        svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
+        anyFile: advertised.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
+      };
+    },
+  };
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -655,6 +727,9 @@ export function createHostRequestActions({
   /** The read marks of the threads are an optional route set beside the tasks. */
   const threadReadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_READS_CAPABILITY, "mobile.chat.threads.unsupported");
+  /** The pins of an agent's chats are an optional route set. Any member who can message the agent can use it. */
+  const messagePinsApi = (serverId: string) =>
+    capabilityApi(serverId, MESSAGE_PINS_CAPABILITY, "mobile.chat.pins.unsupported");
   /** The branches of a chat are an optional route set beside the tasks. */
   const threadBranchesApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_BRANCHES_CAPABILITY, "mobile.chat.threads.unsupported");
@@ -663,12 +738,22 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  /** How the agents learn from their chats and browsing are optional admin route sets. */
+  const memoryReviewAdmin = (serverId: string) =>
+    capabilityApi(serverId, MEMORY_REVIEW_CAPABILITY, "mobile.server.settings.learningUnsupported");
+  const skillLearningAdmin = (serverId: string) =>
+    capabilityApi(serverId, SKILL_LEARNING_CAPABILITY, "mobile.server.settings.learningUnsupported");
+  const browsingMemoryAdmin = (serverId: string) =>
+    capabilityApi(serverId, BROWSING_MEMORY_CAPABILITY, "mobile.server.settings.learningUnsupported");
   /** Any member reads the personality; the host lets only an owner or admin set it. */
   const personalityApi = (serverId: string) =>
     capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** Who gets each MCP server is an optional admin route set. */
+  const mcpAccessAdmin = (serverId: string) =>
+    capabilityApi(serverId, MCP_ACCESS_CAPABILITY, "mobile.server.mcp.accessUnsupported");
   /** The audit log of the access changes is an optional admin route set. */
   const auditAdmin = (serverId: string) =>
     capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
@@ -724,44 +809,7 @@ export function createHostRequestActions({
         catch: (cause) => new TeamRequestError({ cause }),
       });
   }
-  const checks: HostRequestChecks = {
-    canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
-    canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
-    canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
-    canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
-    canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
-    canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
-    canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
-    canUseWorkflowGitHub: (serverId) =>
-      has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_GITHUB_CAPABILITY),
-    canUseWorkflowChats: (serverId) =>
-      has(serverId, WORKFLOWS_CAPABILITY) &&
-      has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
-      has(serverId, ROUTINE_RESULTS_CAPABILITY),
-    canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
-    canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
-    canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
-    canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
-    canCompactContext: (serverId) => has(serverId, CONTEXT_COMPACT_CAPABILITY),
-    canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-    canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
-    canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
-    canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
-    canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
-    canMarkUnreadFrom: (serverId) => has(serverId, CONVERSATION_UNREAD_FROM_CAPABILITY),
-    canUseLiveVoice: (serverId) => has(serverId, LIVE_VOICE_CAPABILITY),
-    attachmentSupport: (serverId) => {
-      const advertised = capabilities.get(serverId) ?? [];
-      return {
-        eml: advertised.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
-        media: advertised.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
-        zip: advertised.includes(TEAM_ZIP_ATTACHMENTS_CAPABILITY),
-        mp4: advertised.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY),
-        svg: advertised.includes(TEAM_SVG_ATTACHMENTS_CAPABILITY),
-        anyFile: advertised.includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
-      };
-    },
-  };
+  const checks = createHostRequestChecks(capabilities);
   const actions: HostRequestActions = {
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
@@ -769,6 +817,15 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    loadMemoryReview: async (serverId) => runTeamRequest(getHostMemoryReview(memoryReviewAdmin(serverId))),
+    setMemoryReview: async (interval, serverId) =>
+      runTeamRequest(setHostMemoryReview(memoryReviewAdmin(serverId), interval)),
+    loadSkillLearning: async (serverId) => runTeamRequest(getHostSkillLearning(skillLearningAdmin(serverId))),
+    setSkillLearning: async (mode, serverId) =>
+      runTeamRequest(setHostSkillLearning(skillLearningAdmin(serverId), mode)),
+    loadBrowsingMemory: async (serverId) => runTeamRequest(getHostBrowsingMemory(browsingMemoryAdmin(serverId))),
+    setBrowsingMemory: async (enabled, serverId) =>
+      runTeamRequest(setHostBrowsingMemory(browsingMemoryAdmin(serverId), enabled)),
     // A host before host-personality-v1 uses the classic prompt, as the desktop and the web client read it.
     loadServerPersonality: async (serverId) =>
       has(serverId, HOST_PERSONALITY_CAPABILITY)
@@ -957,6 +1014,8 @@ export function createHostRequestActions({
           mcpServerId,
         }),
       ),
+    loadMcpAccess: async (serverId) => runTeamRequest(getHostMcpAccess(mcpAccessAdmin(serverId))),
+    setMcpAccess: async (input, serverId) => runTeamRequest(setHostMcpAccess(mcpAccessAdmin(serverId), input)),
     loadAgentSessionSettings: async (agentId, serverId) =>
       has(serverId, AGENT_SESSION_SETTINGS_CAPABILITY)
         ? runTeamRequest(readAgentSessionSettings(sessionSettingsAdmin(serverId), agentId))
@@ -1163,6 +1222,8 @@ export function createHostRequestActions({
       runTeamRequest(listAgentThreadReads(threadReadsApi(serverId), agentId)),
     markAgentThreadRead: async (input, serverId) =>
       runTeamRequest(markAgentThreadRead(threadReadsApi(serverId), input)),
+    loadMessagePins: async (agentId, serverId) => runTeamRequest(listMessagePins(messagePinsApi(serverId), agentId)),
+    setMessagePinned: async (input, serverId) => runTeamRequest(setMessagePinned(messagePinsApi(serverId), input)),
     respondToTaskPrompt: async (input, serverId) => {
       await request(
         "POST",

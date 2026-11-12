@@ -326,6 +326,7 @@ export const messages = {
   "mobile.server.route.member": "Miembro",
   "mobile.server.route.timezone": "Zona horaria",
   "mobile.server.route.personality": "Personalidad del agente",
+  "mobile.server.route.agents": "Agentes",
   "mobile.server.settings.storage": "Almacenamiento",
   "mobile.server.route.storage": "Almacenamiento",
   "mobile.server.route.storageFiles": "Todos los archivos",
@@ -449,6 +450,25 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "No se pudo guardar el límite de recuerdos. Inténtalo de nuevo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su límite de recuerdos.",
+  "mobile.server.settings.memoryReview": "Revisión de recuerdos",
+  "mobile.server.settings.memoryReviewDescription":
+    "Con qué frecuencia los agentes de este servidor guardan en segundo plano datos duraderos de sus chats.",
+  "mobile.server.settings.memoryReviewOff": "Desactivada",
+  "mobile.server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
+  "mobile.server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
+  "mobile.server.settings.skillLearning": "Aprendizaje de habilidades",
+  "mobile.server.settings.skillLearningDescription":
+    "Si los agentes de este servidor guardan lo que aprenden como habilidades.",
+  "mobile.server.settings.skillLearningAutomatic": "Automático",
+  "mobile.server.settings.skillLearningAsk": "Preguntar antes",
+  "mobile.server.settings.skillLearningOff": "Desactivado",
+  "mobile.server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "mobile.server.settings.browsingMemory": "Aprender de mi navegación",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
+  "mobile.server.settings.learningSaveFailed": "No se pudo guardar este ajuste. Inténtalo de nuevo.",
+  "mobile.server.settings.learningUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí este ajuste.",
   "mobile.server.settings.responseStyleDescription":
     "Natural: los agentes envían actualizaciones breves mientras trabajan y el chat las muestra. Clásico: los agentes responden una vez, al terminar.",
   "mobile.server.settings.responseStyleNatural": "Natural",
@@ -457,8 +477,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "No se pudo guardar el estilo de respuesta. Inténtalo de nuevo.",
   "mobile.server.settings.personalityUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su estilo de respuesta.",
-  "mobile.server.settings.personalityUnavailable":
-    "Conéctate a este servidor como propietario o administrador para cambiar la personalidad del agente.",
+  "mobile.server.settings.agentsUnavailable":
+    "Conéctate a este servidor como propietario o administrador para cambiar los ajustes de los agentes.",
   "mobile.server.route.browserProfiles": "Perfiles del navegador",
   "mobile.server.browserProfiles.unavailable":
     "Solo el propietario o un administrador de un servidor en línea puede gestionar sus perfiles del navegador.",
@@ -1128,6 +1148,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Actualiza OpenBot en este servidor para gestionar sus servidores MCP aquí.",
   "mobile.server.mcp.unavailable":
     "Conéctate a este servidor como propietario o administrador para gestionar sus servidores MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Actualiza OpenBot en este servidor para elegir quién recibe sus servidores MCP.",
   "mobile.server.mcp.description":
     "Los servidores MCP dan más herramientas a los agentes de este servidor. Los agentes de Claude y Codex solo reciben los servidores de esta lista.",
   "mobile.server.mcp.loading": "Cargando servidores MCP…",
@@ -1201,6 +1223,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Los agentes de este servidor dejan de recibir sus herramientas. Los ajustes no se conservan.",
   "mobile.server.mcp.remove": "Quitar servidor MCP",
+  "mobile.server.mcp.access.title": "Acceso",
+  "mobile.server.mcp.access.agents": "Agentes",
+  "mobile.server.mcp.access.agentsOf": "Agentes que pueden usar {name}",
+  "mobile.server.mcp.access.allAgents": "Todos los agentes",
+  "mobile.server.mcp.access.allAgentsHint": "Todos los agentes también incluye cada agente que se añada después.",
+  "mobile.server.mcp.access.noAgents": "Ningún agente",
+  "mobile.server.mcp.access.someAgents": "{count} de {total}",
+  "mobile.server.mcp.access.use": "Puede usar",
+  "mobile.server.mcp.access.fromEveryone": "Igual que Todos",
+  "mobile.server.mcp.access.level": "Acceso de {role} a {name}",
+  "mobile.server.mcp.access.hint":
+    "Un miembro recibe el nivel más alto de Todos y de sus roles. Los propietarios, los administradores y quien añadió el servidor siempre pueden gestionarlo.",
+  "mobile.server.mcp.access.loadFailed": "No se pudo cargar quién recibe este servidor MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Solo un propietario o administrador de un servidor en línea puede elegir quién recibe este servidor MCP.",
   "mobile.server.usage.agents": "Agentes",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "No hay uso de agentes registrado en este periodo.",

@@ -178,6 +178,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем обновите.",
   "error.provider.cliSelectFailed": "OpenBot не смог выбрать установленный управляемый CLI.",
   "error.provider.noAuthenticatedAccount": "{provider} не вернул аккаунт с выполненным входом.",
+  "error.provider.codexModelProvider":
+    "Codex на этом компьютере использует другого поставщика моделей, и этот поставщик не использует вход в ChatGPT или ключ API OpenAI. Агенты ChatGPT уже могут использовать этого поставщика. Чтобы использовать аккаунт ChatGPT, снова выберите OpenAI как поставщика моделей Codex.",
   "error.provider.signInExpired": "Срок входа в {provider} истёк. Войдите снова, чтобы продолжить.",
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
   "error.provider.noMainlandChinaSignIn": "У {provider} нет входа для материкового Китая.",

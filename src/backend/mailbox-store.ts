@@ -3188,6 +3188,8 @@ export class MailboxStore {
     input: {
       sourcePath?: string;
       bytes?: Uint8Array;
+      /** Names the size error. Absent: an image. */
+      kind?: "image" | "video";
       name?: string;
       mimeType?: string;
       ownerAgentId?: string;

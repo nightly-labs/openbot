@@ -4,7 +4,12 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import type { HostedServerEntryPoint, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
+import type {
+  HostedServerCatalogPlan,
+  HostedServerEntryPoint,
+  HostedServerList,
+  HostedServerSummary,
+} from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi, LicenseDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 import type { LicenseOrder, LicenseState, PricingOrder } from "@openbot/contracts/license";
 import { classifyFailure } from "@openbot/telemetry";
@@ -14,19 +19,29 @@ import type {
   HostedServerSetupStatus,
 } from "@openbot/ui/features/servers/AddServerDialog";
 import {
+  guessHostedCurrency,
   HOSTED_BILLING_CURRENCY,
   HOSTED_CURRENCIES,
   type HostedCurrency,
   type HostedServerPlan,
+  hostedCurrencies,
   hostedServerPlansFromCatalog,
 } from "@openbot/ui/features/servers/HostedServerPricing";
-import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, Loading, Show, untrack } from "solid-js";
+import { currentText, useText } from "@openbot/ui/text";
+import type { UserErrorDetails } from "@openbot/user-errors";
+import { Portal } from "@solidjs/web";
+import { createEffect, createStore, Loading, onSettled, type ParentProps, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
-import { AddServerDialog } from "../../lazy-views";
+import { AddServerDialog, HostedPricingPage } from "../../lazy-views";
+import { createPageHeaderFrame } from "../window/page-header-frame";
+import type { PricingPagePlacement } from "../window/window-page-context";
 
 type PlansEvent = DesktopAnalyticsProperties<"hosted_server_plans_action">;
+
+/** The pages that the consent of the pricing page links to. */
+const PRIVACY_URL = "https://openbot.run/privacy";
+const TERMS_URL = "https://openbot.run/terms";
 
 /** How often the dialog reads the new server while it waits for the payment and the setup. */
 const SETUP_POLL_INTERVAL_MS = 3_000;
@@ -55,8 +70,20 @@ interface AddServerOverlayProps {
   resume?: AddServerResume | null | undefined;
   /** The order from the pricing page. The dialog fills it in and goes on to the payment page. */
   order?: PricingOrder | null | undefined;
-  /** Reads the account's license. When the account has none, the dialog sells one with the server for work use. */
-  license?: Pick<LicenseDesktopApi, "getState"> | undefined;
+  /**
+   * Reads the account's license. When the account has none, the pricing page sells one with the server, or alone:
+   * a license alone goes to its own payment page.
+   */
+  license?: Pick<LicenseDesktopApi, "getState" | "openCheckout"> | undefined;
+  /** True in the desktop app, which runs on the user's computer. The pricing page then names this computer. */
+  thisComputer?: boolean | undefined;
+  /**
+   * Shows the pricing page as a page of the desktop window. Without it, as in the web client, the page covers the
+   * app frame.
+   */
+  pricingPage?: PricingPagePlacement | undefined;
+  /** Opens a web page of openbot.run, such as the privacy policy, in the browser. */
+  onOpenUrl: (url: string) => void;
   onClose: () => void;
   onOpenServer: (serverId: string) => void;
   onContactUs?: (() => void) | undefined;
@@ -85,6 +112,17 @@ interface AddServerState {
   currency: HostedCurrency | null;
   /** The pricing page order, as the dialog's choices. */
   order: CreateHostedServerInput | null;
+  /** The plans with their prices, for the order form of the pricing page. */
+  catalog: HostedServerCatalogPlan[];
+  /** True when the account has an open license. A server order then buys the server alone. */
+  ownLicense: boolean;
+  /** True while an order of the pricing page goes to the payment page. */
+  ordering: boolean;
+  /** True after the pricing page ordered a server. The page then stays under the setup dialog until it closes. */
+  orderedFromPage: boolean;
+  orderError: UserErrorDetails | null;
+  /** The title of `orderError`: an order of only a license makes no server. */
+  orderErrorTitle: string;
 }
 
 /** The license offer of an account with no open license. A failed read offers no license. */
@@ -161,7 +199,14 @@ function AddServerSession(
     licenseOffer: null,
     currency: null,
     order: null,
+    catalog: [],
+    ownLicense: false,
+    ordering: false,
+    orderedFromPage: false,
+    orderError: null,
+    orderErrorTitle: "",
   });
+  const { t, errorDetails } = useText();
   const requestIds = untrack(() => props.requestIds);
   const resume = untrack(() => props.resume) ?? null;
   const entryPoint = untrack(() => props.entryPoint) ?? (resume ? "checkout_resume" : undefined);
@@ -209,6 +254,8 @@ function AddServerSession(
         draft.currency =
           HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
         draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
+        draft.catalog = [...catalog.plans];
+        draft.ownLicense = licenseState?.license ? isOpenBillingStatus(licenseState.license.status) : false;
       });
       trackPlans("viewed");
       if (serverLimit() !== null) analytics.track("limit_reached", { kind: "servers", action: "shown" });
@@ -340,6 +387,91 @@ function AddServerSession(
     return { serverId: server.serverId, name: server.name };
   }
 
+  /**
+   * The order of the pricing page. A server goes to the payment page, and the dialog then shows its setup. A license
+   * alone goes to the payment page of the license.
+   */
+  async function submitOrder(order: PricingOrder): Promise<void> {
+    if (state.ordering) return;
+    setState((draft) => {
+      draft.ordering = true;
+      if (order.server) draft.orderedFromPage = true;
+      draft.orderError = null;
+    });
+    try {
+      if (order.server) {
+        await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
+      } else if (order.license) {
+        const license = props.license;
+        if (!license) return;
+        await license.openCheckout({
+          users: order.license.users,
+          currency: order.currency,
+          tier: order.license.tier,
+          interval: order.interval,
+        });
+        props.onClose();
+      }
+    } catch (error) {
+      setState((draft) => {
+        const title = order.server
+          ? t("settings.hostedServers.createFailed")
+          : t("settings.hostedServers.checkoutFailed");
+        draft.orderError = errorDetails(error, title);
+        draft.orderErrorTitle = title;
+        // No server was made, so the page stays open, and a new window page closes the flow.
+        draft.orderedFromPage = false;
+      });
+    } finally {
+      setState((draft) => {
+        draft.ordering = false;
+      });
+    }
+  }
+
+  /** The pricing page shows until the user orders. A server in setup, or an order from the web page, opens the dialog. */
+  const pageOpen = () => state.server === null && state.order === null;
+  /**
+   * The setup dialog of a server that the pricing page ordered shows over the page. The window then stays on the page
+   * and does not go back to the page below it.
+   */
+  const pageShown = () => pageOpen() || state.orderedFromPage;
+  /** The web client has no window page, so the page covers the app frame there. */
+  const overlayMount = () => document.querySelector(".app-window > .app-frame") ?? document.body;
+  const headerFrame = createPageHeaderFrame();
+  const contactUs = () =>
+    props.onContactUs &&
+    (() => {
+      analytics.track("sales_contact_clicked", { entry_point: "add_server" });
+      props.onContactUs?.();
+    });
+  const manageServers = () =>
+    props.onManageServers &&
+    (() => {
+      analytics.track("limit_reached", { kind: "servers", action: "manage_clicked" });
+      props.onManageServers?.();
+    });
+  const joinWithInvite = () =>
+    props.onJoinWithInvite &&
+    (() => {
+      trackPlans("join_opened");
+      props.onJoinWithInvite?.();
+    });
+  const close = () => {
+    trackPlans("closed");
+    props.onClose();
+  };
+  /** Another window page opened. The setup dialog of an ordered server stays; only the page under it goes. */
+  const leavePage = () => {
+    if (!state.orderedFromPage) {
+      close();
+      return;
+    }
+    setState((draft) => {
+      draft.orderedFromPage = false;
+    });
+  };
+
   async function openPayment(): Promise<void> {
     const serverId = state.server?.serverId;
     if (!serverId) return;
@@ -376,55 +508,64 @@ function AddServerSession(
     <Show when={state.plans}>
       {(plans) => (
         <Loading>
-          <AddServerDialog
-            plans={plans()}
-            recommendedPlan="standard"
-            licenseOffer={state.licenseOffer ?? undefined}
-            currency={state.currency ?? undefined}
-            currencyLocked={state.currency !== null}
-            order={state.order ?? undefined}
-            setupStatus={setupStatus()}
-            serverLimit={serverLimit()}
-            onManageServers={
-              props.onManageServers &&
-              (() => {
-                analytics.track("limit_reached", { kind: "servers", action: "manage_clicked" });
-                props.onManageServers?.();
-              })
-            }
-            resume={state.server ? { serverId: state.server.serverId, name: state.server.name } : undefined}
-            onClose={() => {
-              trackPlans("closed");
-              props.onClose();
-            }}
-            onContactUs={
-              props.onContactUs &&
-              (() => {
-                analytics.track("sales_contact_clicked", { entry_point: "add_server" });
-                props.onContactUs?.();
-              })
-            }
-            onJoinWithInvite={
-              props.onJoinWithInvite &&
-              (() => {
-                trackPlans("join_opened");
-                props.onJoinWithInvite?.();
-              })
-            }
-            onCreateLocal={props.onCreateLocal}
-            onInstallServer={props.onInstallServer}
-            onCurrencyChange={(next) => trackPlans("currency_changed", { currency: HOSTED_BILLING_CURRENCY[next] })}
-            onBillingChange={(next) =>
-              trackPlans("interval_changed", { interval: next === "yearly" ? "year" : "month" })
-            }
-            onCreate={create}
-            onRetry={() => void retry()}
-            onOpenServer={() => {
-              const serverId = state.server?.serverId;
-              if (serverId) props.onOpenServer(serverId);
-            }}
-            onOpenPayment={openPayment}
-          />
+          <Show when={pageShown()}>
+            <PricingPagePortal placement={props.pricingPage} overlayMount={overlayMount} onLeave={leavePage}>
+              <HostedPricingPage
+                overlay={props.pricingPage === undefined}
+                headerFrame={props.pricingPage ? headerFrame() : undefined}
+                plans={state.catalog}
+                currency={HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans()))]}
+                currencyLocked={state.currency !== null}
+                used={state.licenseOffer?.used}
+                licenseTrialEnd={state.licenseOffer?.trialEnd}
+                offerLicense={!state.ownLicense && props.license !== undefined}
+                thisComputer={props.thisComputer === true}
+                serverLimit={serverLimit()}
+                busy={state.ordering}
+                error={state.orderError}
+                errorTitle={state.orderErrorTitle}
+                onSubmit={(order) => void submitOrder(order)}
+                onClose={close}
+                onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
+                onOpenTerms={() => props.onOpenUrl(TERMS_URL)}
+                onContactUs={contactUs()}
+                onManageServers={manageServers()}
+                onCreateLocal={props.onCreateLocal}
+                onInstallServer={props.onInstallServer}
+                onJoinWithInvite={joinWithInvite()}
+              />
+            </PricingPagePortal>
+          </Show>
+          <Show when={!pageOpen()}>
+            <AddServerDialog
+              plans={plans()}
+              recommendedPlan="standard"
+              licenseOffer={state.licenseOffer ?? undefined}
+              currency={state.currency ?? undefined}
+              currencyLocked={state.currency !== null}
+              order={state.order ?? undefined}
+              setupStatus={setupStatus()}
+              serverLimit={serverLimit()}
+              onManageServers={manageServers()}
+              resume={state.server ? { serverId: state.server.serverId, name: state.server.name } : undefined}
+              onClose={close}
+              onContactUs={contactUs()}
+              onJoinWithInvite={joinWithInvite()}
+              onCreateLocal={props.onCreateLocal}
+              onInstallServer={props.onInstallServer}
+              onCurrencyChange={(next) => trackPlans("currency_changed", { currency: HOSTED_BILLING_CURRENCY[next] })}
+              onBillingChange={(next) =>
+                trackPlans("interval_changed", { interval: next === "yearly" ? "year" : "month" })
+              }
+              onCreate={create}
+              onRetry={() => void retry()}
+              onOpenServer={() => {
+                const serverId = state.server?.serverId;
+                if (serverId) props.onOpenServer(serverId);
+              }}
+              onOpenPayment={openPayment}
+            />
+          </Show>
         </Loading>
       )}
     </Show>
@@ -450,4 +591,29 @@ function newestInSetup(
 
 function paidCount(list: HostedServerList): number {
   return list.servers.filter((server) => server.state !== "awaiting_payment").length;
+}
+
+/**
+ * Puts the pricing page in the card of the desktop window while it shows, or over the app frame without a window
+ * page. Another page of the window closes the add-server flow.
+ */
+function PricingPagePortal(
+  props: ParentProps<{
+    placement: PricingPagePlacement | undefined;
+    overlayMount: () => Element;
+    onLeave: () => void;
+  }>,
+) {
+  onSettled(() => {
+    const placement = untrack(() => props.placement);
+    placement?.open(() => untrack(() => props.onLeave()));
+    return () => placement?.close();
+  });
+  return (
+    <Show when={props.placement} fallback={<Portal mount={props.overlayMount()}>{props.children}</Portal>}>
+      {(placement) => (
+        <Show when={placement().mount()}>{(mount) => <Portal mount={mount()}>{props.children}</Portal>}</Show>
+      )}
+    </Show>
+  );
 }

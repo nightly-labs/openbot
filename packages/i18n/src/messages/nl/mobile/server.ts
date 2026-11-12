@@ -323,6 +323,7 @@ export const messages = {
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
+  "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -446,6 +447,24 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.memoryReview": "Geheugencontrole",
+  "mobile.server.settings.memoryReviewDescription":
+    "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",
+  "mobile.server.settings.memoryReviewOff": "Uit",
+  "mobile.server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
+  "mobile.server.settings.skillLearning": "Vaardigheden leren",
+  "mobile.server.settings.skillLearningDescription": "Of agents op deze server wat ze leren als vaardigheden opslaan.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatisch",
+  "mobile.server.settings.skillLearningAsk": "Eerst vragen",
+  "mobile.server.settings.skillLearningOff": "Uit",
+  "mobile.server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "mobile.server.settings.browsingMemory": "Leren van mijn browsen",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
+  "mobile.server.settings.learningSaveFailed": "Kan deze instelling niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.learningUnsupported": "Werk OpenBot bij op deze server om deze instelling hier te wijzigen.",
   "mobile.server.settings.responseStyleDescription":
     "Natuurlijk: agents sturen korte updates terwijl ze werken, en de chat toont ze. Klassiek: agents antwoorden één keer, als ze klaar zijn.",
   "mobile.server.settings.responseStyleNatural": "Natuurlijk",
@@ -454,8 +473,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Kan de antwoordstijl niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.personalityUnsupported":
     "Werk OpenBot bij op deze server om de antwoordstijl hier te wijzigen.",
-  "mobile.server.settings.personalityUnavailable":
-    "Maak verbinding met deze server als eigenaar of beheerder om de agentpersoonlijkheid te wijzigen.",
+  "mobile.server.settings.agentsUnavailable":
+    "Maak verbinding met deze server als eigenaar of beheerder om de agentinstellingen te wijzigen.",
   "mobile.server.route.browserProfiles": "Browserprofielen",
   "mobile.server.browserProfiles.unavailable":
     "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",
@@ -1084,6 +1103,7 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",
   "mobile.server.mcp.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de MCP-servers te beheren.",
+  "mobile.server.mcp.accessUnsupported": "Werk OpenBot bij op deze server om te kiezen wie de MCP-servers krijgt.",
   "mobile.server.mcp.description":
     "MCP-servers geven de agents van deze server meer tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst.",
   "mobile.server.mcp.loading": "MCP-servers laden…",
@@ -1156,6 +1176,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "De agents van deze server krijgen de tools ervan niet meer. De instellingen worden niet bewaard.",
   "mobile.server.mcp.remove": "MCP-server verwijderen",
+  "mobile.server.mcp.access.title": "Toegang",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents die {name} mogen gebruiken",
+  "mobile.server.mcp.access.allAgents": "Alle agents",
+  "mobile.server.mcp.access.allAgentsHint": "Alle agents omvat ook elke agent die later wordt toegevoegd.",
+  "mobile.server.mcp.access.noAgents": "Geen agents",
+  "mobile.server.mcp.access.someAgents": "{count} van {total}",
+  "mobile.server.mcp.access.use": "Mag gebruiken",
+  "mobile.server.mcp.access.fromEveryone": "Zoals Iedereen",
+  "mobile.server.mcp.access.level": "Toegang van {role} tot {name}",
+  "mobile.server.mcp.access.hint":
+    "Een lid krijgt het hoogste niveau van Iedereen en van de eigen rollen. Eigenaren, beheerders en wie de server heeft toegevoegd, kunnen hem altijd beheren.",
+  "mobile.server.mcp.access.loadFailed": "Kan niet laden wie deze MCP-server krijgt.",
+  "mobile.server.mcp.access.unavailable":
+    "Alleen een eigenaar of beheerder van een online server kan kiezen wie deze MCP-server krijgt.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Geen agentgebruik vastgelegd in deze periode.",

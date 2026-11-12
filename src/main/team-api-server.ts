@@ -149,6 +149,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
   teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
@@ -1509,6 +1510,7 @@ export class TeamApiServer {
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+        videoGeneration: capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       });
       if (encoded === null) return null;
       const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
@@ -2283,6 +2285,7 @@ export class TeamApiServer {
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+      videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
     };
     // The body is encoded before the head is written. A response the negotiated protocol cannot
     // represent - a route its frozen adapter does not classify - makes the encoder throw, and with

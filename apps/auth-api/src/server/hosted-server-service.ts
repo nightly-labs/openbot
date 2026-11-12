@@ -1,6 +1,7 @@
 import {
   BILLING_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingInterval,
@@ -51,6 +52,7 @@ import {
 import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
+import { priceHasCurrency } from "./stripe-client";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const CLAIM_TTL_MS = 60 * 60_000;
@@ -250,6 +252,7 @@ const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provid
 export type HostedServerBilling = Pick<
   BillingService,
   | "catalog"
+  | "license"
   | "createCheckout"
   | "closeCheckout"
   | "cancelServerPlans"
@@ -453,6 +456,20 @@ export class HostedServerService {
           ((input.plan === "starter" && license.tier !== "starter") || license.users > memberLimitForPlan(input.plan)))
       )
         return yield* invalid("license");
+      // An optional currency, such as BRL, sells only when the Stripe Prices of the plan and of the license
+      // have it. The check comes before the server row, so a refused order leaves no unpaid server.
+      if (isOneOf(BILLING_OPTIONAL_CURRENCIES, input.currency)) {
+        const catalog = yield* billing.catalog().pipe(Effect.mapError(hostedFailure));
+        const currency = input.currency;
+        if (!catalog.plans.some((plan) => plan.id === input.plan && plan.prices[currency] !== undefined))
+          return yield* invalid("currency");
+        if (license) {
+          const licensePrice = yield* billing.license
+            .price({ tier: license.tier, interval: input.interval, bundle: true })
+            .pipe(Effect.mapError(hostedFailure));
+          if (!licensePrice || !priceHasCurrency(licensePrice, currency)) return yield* invalid("currency");
+        }
+      }
       const size = HOSTED_PLAN_SIZE[input.plan];
       const previous = yield* hostedCall(() =>
         dependencies.database

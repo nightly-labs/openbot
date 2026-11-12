@@ -367,6 +367,7 @@ import type {
 } from "./ipc-hosted-sites";
 import type {
   ApplyInstanceTransferInput,
+  CopyInstanceAgentsInput,
   ExportInstanceInput,
   InstanceExportResult,
   InstanceTransferPreview,
@@ -2236,7 +2237,8 @@ export const IPC_ENDPOINTS = {
   },
   // Bound against the instance transfer service: a server's agents and server settings in one file for
   // another server. A remote server is reached with `instance-transfer-v1`; main opens both file
-  // dialogs and moves the file. `showExport` reveals the file this computer saved last.
+  // dialogs and moves the file. `showExport` reveals the file this computer saved last. `copy` takes
+  // the destination as its server and exports from `fromServerId` and imports in main, with no dialog.
   instanceTransfer: {
     summary: scopedQuery<InstanceTransferSummary, "required">()("instance-transfer:summary"),
     export: scopedRequest<ExportInstanceInput, InstanceExportResult, "required">()("instance-transfer:export"),
@@ -2244,6 +2246,7 @@ export const IPC_ENDPOINTS = {
     choose: scopedQuery<InstanceTransferPreview | null, "required">()("instance-transfer:choose"),
     apply: scopedRequest<ApplyInstanceTransferInput, InstanceTransferResult, "required">()("instance-transfer:apply"),
     discard: scopedRequest<string, void, "required">()("instance-transfer:discard"),
+    copy: scopedRequest<CopyInstanceAgentsInput, InstanceTransferResult, "required">()("instance-transfer:copy"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

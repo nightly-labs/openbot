@@ -169,6 +169,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم حدّث.",
   "error.provider.cliSelectFailed": "تعذّر على OpenBot اختيار واجهة CLI المُدارة المثبتة.",
   "error.provider.noAuthenticatedAccount": "لم يُرجع {provider} حسابًا مصادقًا عليه.",
+  "error.provider.codexModelProvider":
+    "يستخدم Codex على هذا الكمبيوتر مزوّد نماذج آخر، وهذا المزوّد لا يستخدم تسجيل الدخول إلى ChatGPT أو مفتاح OpenAI API. يمكن لوكلاء ChatGPT استخدام هذا المزوّد الآن. لاستخدام حساب ChatGPT، أعد مزوّد النماذج في Codex إلى OpenAI.",
   "error.provider.signInExpired": "انتهت صلاحية تسجيل دخولك إلى {provider}. سجّل الدخول مرة أخرى للمتابعة.",
   "error.provider.cliActivateFailed": "تعذّر على OpenBot تفعيل واجهة CLI المُدارة.",
   "error.provider.noMainlandChinaSignIn": "لا يوفر {provider} تسجيل دخول للصين القارية.",

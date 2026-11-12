@@ -55,7 +55,7 @@ import type { DeltaBuffer } from "./delta-buffer";
 import type { FailureContext, FailureSignal } from "./failure-signal";
 import { readCapturedSteps } from "./handoff-tool-steps";
 import type { ImageGenRuntime } from "./image-gen-runtime";
-import { markIncompleteImageGeneration } from "./image-generation";
+import { markIncompleteMediaGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
@@ -1647,7 +1647,7 @@ export class TurnLifecycle {
         message.status = normalizeCompletionStatus(
           repeatable || failedOver || runsAgainHere || compactionContinuation ? "interrupted" : status,
         );
-        markIncompleteImageGeneration(message, message.status);
+        markIncompleteMediaGeneration(message, message.status);
       }
       // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
       for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
@@ -1961,7 +1961,7 @@ export class TurnLifecycle {
         if (message.subagents && this.#trackSubagents(agentId, turnId, message.subagents))
           this.#hooks.emitRuntimeSnapshot();
         message.status = status;
-        markIncompleteImageGeneration(message, status);
+        markIncompleteMediaGeneration(message, status);
         changedIds.add(message.id);
       }
       for (const { delivery } of deliveries) {
@@ -2536,7 +2536,7 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
       message.itemType === CONVERSATION_SUBAGENTS_ITEM_TYPE
     )
       continue;
-    if (message.attachments?.length || message.imageGeneration) continue;
+    if (message.attachments?.length || message.imageGeneration || message.videoGeneration) continue;
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
@@ -2550,7 +2550,8 @@ function isEmptyAttemptText(message: ConversationMessage | undefined, turnId: st
     (message.itemType === "agentMessage" || message.itemType === "commentary") &&
     !message.text.trim() &&
     !message.attachments?.length &&
-    !message.imageGeneration
+    !message.imageGeneration &&
+    !message.videoGeneration
   );
 }
 

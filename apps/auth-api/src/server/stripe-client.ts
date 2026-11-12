@@ -139,6 +139,11 @@ export function isBillingCurrency(value: unknown): value is BillingCurrency {
   return isOneOf(BILLING_CURRENCIES, value);
 }
 
+/** True when the Price can be paid in `currency`: its base currency, or one of its currency options. */
+export function priceHasCurrency(price: StripePrice, currency: BillingCurrency): boolean {
+  return price.currency.toLowerCase() === currency || price.currency_options?.[currency] !== undefined;
+}
+
 export class StripeClient {
   constructor(
     private readonly secretKey: string,
