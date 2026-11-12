@@ -24,6 +24,7 @@ export const messages = {
   "error.host.identityLocalOnly":
     "Le nom et le logo du serveur ne peuvent être modifiés que sur l’ordinateur qui l’exécute.",
   "error.host.timezoneInvalid": "Ce fuseau horaire est inconnu.",
+  "error.host.turnLimitInvalid": "Cette limite de fils n’est pas valide.",
   "error.host.maintenanceInterrupted":
     "La maintenance de l’hôte a été interrompue. Vérifiez l’application et réinitialisez l’état de l’hôte avant de réessayer.",
   "error.host.updateFailed":

@@ -88,6 +88,11 @@ export function ServerTurnLimitsSetting(
   const calls = (): HostTurnLimitsCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostTurnLimits | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
+  /**
+   * False until the host answers. A save sends both values, so a value from an earlier open must not
+   * overwrite a change that another admin made since.
+   */
+  const [loaded, setLoaded] = createSignal(false);
   /** Bumped for each server and each change, so an earlier answer is dropped. */
   let generation = 0;
 
@@ -97,6 +102,7 @@ export function ServerTurnLimitsSetting(
       const current = ++generation;
       setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
+      setLoaded(false);
       untrack(calls)
         .getTurnLimits(serverId)
         .then(
@@ -104,6 +110,7 @@ export function ServerTurnLimitsSetting(
             if (current !== generation) return;
             lastSettings.set(serverId, next);
             setSettings(next);
+            setLoaded(true);
           },
           (error: unknown) => {
             if (current === generation) {
@@ -160,7 +167,7 @@ export function ServerTurnLimitsSetting(
               <Select<TurnLimitChoice>
                 options={TURN_LIMIT_CHOICES}
                 value={turnLimitChoice(current().turnLimit)}
-                disabled={props.disabled}
+                disabled={props.disabled || !loaded()}
                 placement="bottom-end"
                 onChange={(next) => {
                   if (next) save({ turnLimit: turnLimitOf(next) });
@@ -189,7 +196,7 @@ export function ServerTurnLimitsSetting(
               <Select<LimitChoice>
                 options={AGENT_TASK_LIMIT_CHOICES}
                 value={agentTaskLimitChoice(current().agentTaskLimit)}
-                disabled={props.disabled}
+                disabled={props.disabled || !loaded()}
                 placement="bottom-end"
                 onChange={(next) => {
                   if (next) save({ agentTaskLimit: agentTaskLimitOf(next) });

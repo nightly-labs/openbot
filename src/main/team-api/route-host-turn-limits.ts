@@ -35,8 +35,8 @@ export async function routeHostTurnLimits(
   let input: HostTurnLimitsInput;
   try {
     input = parseHostTurnLimitsInput(body);
-  } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Invalid turn limit.");
+  } catch {
+    throw new HttpError(400, sourceText("error.host.turnLimitInvalid"));
   }
   return json(200, await runCauseEffect(turnLimits.set(input)));
 }
