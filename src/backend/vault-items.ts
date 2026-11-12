@@ -102,7 +102,7 @@ export interface VaultAgent {
 }
 
 /** An API key that an agent can read. `own` when the key is for this agent only. */
-export interface VaultAgentKey {
+interface VaultAgentKey {
   name: string;
   value: string;
   own: boolean;
