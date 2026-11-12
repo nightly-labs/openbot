@@ -79,16 +79,42 @@ EXCLUDED=(
   "--exclude=./home/$SERVICE_USER/.Xauthority*"
   "--exclude=./home/$SERVICE_USER/.npm/_cacache"
 )
+# The caches of the browsers in the home, which the browser makes again. A tar pattern `*` also
+# matches `/`, so each pattern matches the folder in each profile.
+BROWSER_HOMES=".config/chromium .config/google-chrome .config/BraveSoftware/Brave-Browser"
+BROWSER_CACHES=("Cache" "Code Cache" "GPUCache" "GrShaderCache" "ShaderCache" "DawnCache" "DawnGraphiteCache"
+  "DawnWebGPUCache" "GraphiteDawnCache" "component_crx_cache" "extensions_crx_cache")
+for browser in $BROWSER_HOMES; do
+  for cache in "${BROWSER_CACHES[@]}"; do
+    EXCLUDED+=("--exclude=./home/$SERVICE_USER/$browser/*/$cache")
+  done
+done
+unset browser cache
+# The folder in ~/.cache that the move keeps: Playwright does not download its browsers again by
+# itself, so a script of the customer would fail. The export leaves out each other entry of ~/.cache.
+KEPT_CACHES=" ms-playwright "
 # The customer can install software outside the home: the service user owns /usr/local and /opt in
 # the sandbox and can use sudo. The move copies what the customer added there, and not what the
 # boat image has. These are the contents of the images in BASE_IMAGES (the value of
-# ~/.base-image-version), from new sandboxes on 2026-11-12, and what provision.sh adds.
+# ~/.base-image-version), from new sandboxes on 2026-11-12, and what provision.sh adds. The other
+# images are from the moves of 2026-11-12 and 2026-11-13: their moves copied only the trees of
+# IMAGE_CLIS and trees of the customer.
 # A newer image can add more: the export then copies it too, and names each tree with its size.
-BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b09885d2 "
-BASE_OPT=" actions-runner ascii ascii-agent ascii-baremetal-setup cmake-3.31.3-linux-x86_64 containerd google
-  gradle-8.12 kimi-code kotlinc moonlight-web OpenBot prime-agent sbt scala3 scala3-3.3.8 scrcpy-linux-x86_64-v3.1 "
+BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b09885d2
+  035a4024-1725-41b0-b527-92345aa06e52 08f1b42f-5ca2-42b9-8810-4f614bf15435 2834754b-4ed4-4046-b59b-b873c7d7a341
+  2f3898e2-33f8-4a3d-899c-c5a895ce9553 3260cfc8-62ef-47a7-8df7-359044f467f1 42c68752-21f8-440d-b16c-0d965e3e3657
+  449032fc-bc32-4678-83c7-8a4704de0286 4bfbf8d0-59f0-450c-acd5-1169314b8bd2 6b9ae075-42a7-4b3a-8bff-192b95a3b2dc
+  6fb5c46a-2b0c-4480-9b89-8067d8982219 78c704da-02e9-4e0d-9891-44e9b2579ebd b27f7fac-f359-49c9-966c-fa16e34b916d
+  b7419fa3-90e0-4b0f-a3a3-24b24b6c2ff4 e23c47d9-fa29-4a53-a391-35bafd1a289a e57a01f6-b5bd-4f54-9917-cbe29f4e76d1
+  f27f3eeb-e2f4-4d96-9619-d72f13e35dd7 f48f0fb0-3c59-43b4-b447-f69aa4080ea9 f7702e0a-1a08-481c-b8d1-54c52cc43712
+  fba0e34a-35a6-453a-b95d-ba4a2eda10db "
+# cursor-agent and hermes-agent are agent CLIs of newer images: IMAGE_CLIS adds them when the customer
+# signed in.
+BASE_OPT=" actions-runner ascii ascii-agent ascii-baremetal-setup cmake-3.31.3-linux-x86_64 containerd cursor-agent
+  google gradle-8.12 kimi-code kotlinc moonlight-web OpenBot prime-agent sbt scala3 scala3-3.3.8
+  scrcpy-linux-x86_64-v3.1 "
 BASE_LOCAL=" bin cargo etc games go include lib lib64 libexec man rustup sbin share src "
-BASE_LIB=" ascii ascii-harnesses node_modules pkgconfig python3.12 R ruby "
+BASE_LIB=" ascii ascii-harnesses hermes-agent node_modules pkgconfig python3.12 R ruby "
 BASE_NPM=" @anthropic-ai/claude-code @earendil-works/pi-coding-agent @openai/codex corepack npm pnpm "
 BASE_BIN=" agent ariana-fswatch ascii-binderfs-add ascii-desktop ascii-desktop-session ascii-proclog
   ascii-record-desktop ascii-setup-binder-devices boat box bun bundle bundler bunx cargo cargo-clippy cargo-fmt
@@ -104,14 +130,23 @@ BASE_APT=" gir1.2-javascriptcoregtk-4.1 gir1.2-webkit2-4.1 libatk1.0-dev libbz2-
   libncurses-dev libpam-systemd libpango1.0-dev libreadline-dev librsvg2-dev libsdl2-2.0-0 libsoup-3.0-dev
   libsqlite3-dev libssl-dev libusb-1.0-0 libwebkit2gtk-4.1-0 libxml2-dev libyaml-dev openjdk-11-jdk
   pkg-config tk-dev zlib1g-dev "
-# The agent CLIs of the image, each with the file that its sign-in makes in the home. The move copies
+# The agent CLIs of the image, each with the files in the home that its sign-in makes. The move copies
 # such a CLI when the customer signed in to it: a VPS has no agent CLI, and OpenBot would ask the
-# customer to download it again.
+# customer to download it again. Without a sign-in, the move does not copy it, and OpenBot offers the
+# download on the VPS. Hermes keeps an API key in `.env`.
 IMAGE_CLIS=(
-  "@anthropic-ai/claude-code .claude/.credentials.json"
-  "@openai/codex .codex/auth.json"
-  "@earendil-works/pi-coding-agent .pi/agent/auth.json"
+  "/usr/local/lib/node_modules/@anthropic-ai/claude-code .claude/.credentials.json"
+  "/usr/local/lib/node_modules/@openai/codex .codex/auth.json"
+  "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent .pi/agent/auth.json"
+  "/opt/cursor-agent .config/cursor/auth.json .cursor/auth.json"
+  "/usr/local/lib/hermes-agent .hermes/auth.json .hermes/.env"
 )
+# The SHA-256 of sign-in files that the image writes and that have no sign-in: the `.env` of Hermes in
+# each image of BASE_IMAGES that has Hermes (seen on 2026-11-13).
+IMAGE_FILES=" ff8ca7fbf619841dedc57f117602b8fc860e69f041ec120a4e8deffa45590919 "
+# The folders of ~/.hermes that the Hermes of the image fills, about 1.5 GB. The move leaves them out
+# when it does not copy that Hermes. The settings, sessions and skills in ~/.hermes stay.
+HERMES_IMAGE_HOME="tools installs cache"
 # Files in the server keyring directory that only carry data from `export` to `import`.
 MOVED_BIN=$KEYRING_HOME/move-bin
 MOVED_CRONTAB=$KEYRING_HOME/move-crontab
@@ -237,8 +272,51 @@ added_trees() {
     echo "$path"
   done
   for entry in "${IMAGE_CLIS[@]}"; do
-    path=/usr/local/lib/node_modules/${entry%% *}
-    if [ -d "$path" ] && [ -s "$USER_HOME/${entry#* }" ]; then echo "$path"; fi
+    path=${entry%% *}
+    if [ -d "$path" ] && [ ! -L "$path" ] && signed_in "${entry#* }"; then echo "$path"; fi
+  done
+}
+
+# True when one of the sign-in files has a sign-in. $1 has the paths in the home, with a space between
+# them. An empty file, a file with only `{}` (Pi writes it before the first sign-in) or a file of
+# IMAGE_FILES has none.
+signed_in() {
+  local file
+  # shellcheck disable=SC2086 # The paths of IMAGE_CLIS have no space.
+  for file in $1; do
+    file=$USER_HOME/$file
+    [ -s "$file" ] && [ ! -L "$file" ] || continue
+    [ "$(tr -d '[:space:]' <"$file")" != "{}" ] || continue
+    listed "$(sha256sum "$file" | cut -d' ' -f1)" "$IMAGE_FILES" && continue
+    return 0
+  done
+  return 1
+}
+
+# The tar options that leave out the cache data of the home and the home files of a Hermes of the image
+# that the move does not copy. $1 has one moved tree on each line.
+home_exclusions() {
+  local trees=$1 path name
+  for path in "$USER_HOME"/.cache/*; do
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    name=${path##*/}
+    # A name with a space or a character of a tar pattern stays in the archive.
+    plain_name "$name" || continue
+    listed "$name" "$KEPT_CACHES" && continue
+    echo "--exclude=./${USER_HOME#/}/.cache/$name"
+  done
+  [ -d /usr/local/lib/hermes-agent ] || return 0
+  grep -qxF /usr/local/lib/hermes-agent <<<"$trees" && return 0
+  for name in $HERMES_IMAGE_HOME; do
+    echo "--exclude=./${USER_HOME#/}/.hermes/$name"
+  done
+  # The image puts commands in ~/.local/bin that start the Hermes of the image. Without it, OpenBot
+  # would find a Hermes that cannot start.
+  for name in hermes hermes-acp hermes-agent; do
+    path=$USER_HOME/.local/bin/$name
+    if [ -f "$path" ] && [ ! -L "$path" ] && grep -qF /usr/local/lib/hermes-agent/ "$path"; then
+      echo "--exclude=./${USER_HOME#/}/.local/bin/$name"
+    fi
   done
 }
 
@@ -509,6 +587,10 @@ export_data() {
   commands=$(added_commands "$trees")
   commands+=$'\n'$(package_commands "$trees" "$commands")
   notes+=$(not_moved)
+  local excluded=("${EXCLUDED[@]}") option
+  while IFS= read -r option; do
+    [ -n "$option" ] && excluded+=("$option")
+  done < <(home_exclusions "$trees")
 
   rm -rf "$MOVED_BIN" "$MOVED_CRONTAB"
   # shellcheck disable=SC2064 # The paths are known now.
@@ -540,11 +622,11 @@ export_data() {
   local created=0
   if [ "$archive" = - ]; then
     tar --create --file - --numeric-owner --acls --xattrs --one-file-system --anchored --directory / \
-      "${EXCLUDED[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}" "${members[@]}" >&3 || created=$?
+      "${excluded[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}" "${members[@]}" >&3 || created=$?
     exec 3>&-
   else
     tar --create --file "$archive" --numeric-owner --acls --xattrs --one-file-system --anchored --directory / \
-      "${EXCLUDED[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}" "${members[@]}" || created=$?
+      "${excluded[@]}" "./${MANIFEST#/}" "./${USER_HOME#/}" "./${KEYRING_HOME#/}" "${members[@]}" || created=$?
   fi
   [ "$created" -eq 0 ] ||
     fail "The archive is not complete. OpenBot stays stopped. Delete $copy and run the export again."

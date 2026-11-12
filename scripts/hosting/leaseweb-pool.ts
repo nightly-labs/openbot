@@ -18,10 +18,12 @@
 //       leaseweb-bootstrap.sh with the public keys of the operators in <file>. Then it restarts each
 //       machine. A new or reinstalled machine has no key: the script then signs in one time with the
 //       root password of the Leaseweb API.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> [--keys=<file>] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--apply]
 //       Moves one Standard or Pro server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. It prepares the machine when it is not
-//       prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`.
+//       prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`. The move does not copy the
+//       systemd units of the customer, so it stops when the sandbox has one. `--units` names the units
+//       that an operator moves by hand, and the move then continues.
 //
 // With no `--apply`, the script only shows what it would do. `--env=test` uses the D1 of the test Worker.
 // Each Leaseweb account has its own key; the script tries each `LEASEWEB_API_KEY_<ACCOUNT>` of the
@@ -806,7 +808,7 @@ exit "$status"`;
     return result.stdout ?? "";
   }
 
-  async move(serverId: string, vpsId: string) {
+  async move(serverId: string, vpsId: string, unitsMovedByHand: readonly string[] = []) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
     const started = Date.now();
     let last = started;
@@ -928,8 +930,12 @@ bash "$d/move-from-boat.sh" packages`,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
-      // The move does not copy systemd units, so a server with units of the customer stays on boat.
-      const units = output.split("\n").flatMap((line) => /^unit=([\w@.:-]+)$/u.exec(line)?.[1] ?? []);
+      // The move does not copy systemd units. A server with units of the customer stays on boat, unless
+      // `--units` names each of them: an operator then moves them by hand.
+      const units = output
+        .split("\n")
+        .flatMap((line) => /^unit=([\w@.:-]+)$/u.exec(line)?.[1] ?? [])
+        .filter((unit) => !unitsMovedByHand.includes(unit));
       if (units.length > 0) {
         throw new Error(
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
@@ -1091,7 +1097,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1103,7 +1109,15 @@ async function main(args: string[]) {
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands);
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1]);
+    await pool.move(
+      operands[0],
+      operands[1],
+      args
+        .find((arg) => arg.startsWith("--units="))
+        ?.slice("--units=".length)
+        .split(",")
+        .filter(Boolean),
+    );
   else throw new Error(USAGE);
 }
 
