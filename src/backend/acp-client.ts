@@ -3917,10 +3917,13 @@ function replayedText(updates: readonly SessionUpdate[], messageId: string): str
     .join("");
 }
 
-/** A tool call that ended and left a background task running (OpenCode 2.2.0 `subagent`). */
+/**
+ * A tool call that ended and left a background task running: an OpenCode 2.2.0 `subagent`, with its
+ * session's `sessionID`, or a shell command in the background, with its `shellID` (#7713).
+ */
 function startsBackgroundTask(rawOutput: unknown): boolean {
   const metadata = getRecord(rawOutput, "metadata");
-  return metadata?.status === "running" && isString(metadata.sessionID);
+  return metadata?.status === "running" && (isString(metadata.sessionID) || isString(metadata.shellID));
 }
 
 /** A missing session, identified by the agent's flavor or by the protocol's `-32002` error. */

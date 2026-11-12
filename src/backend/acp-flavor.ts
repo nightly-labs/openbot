@@ -174,7 +174,8 @@ export interface AcpFlavor {
   /**
    * The agent answers a finished background task in a turn of its own and sends no session update
    * for it. Only its `session/load` replays that turn. A tool call that leaves a task running ends
-   * with `rawOutput.metadata.status` "running" and the task's `sessionID`.
+   * with `rawOutput.metadata.status` "running" and the task's `sessionID`, or the `shellID` of a
+   * shell command that runs in the background.
    */
   unsentBackgroundTurns?: true;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
