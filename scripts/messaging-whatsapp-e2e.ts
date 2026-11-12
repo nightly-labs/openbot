@@ -652,14 +652,13 @@ try {
           await until(() => journaled(marker.key.id), label);
         };
 
-        // On a new link, WhatsApp sends history as `append`: it is not a new request.
+        // The first socket after the link gets the number's history: an old `append` is not a new request.
         const history = held("from before the link", 5);
         phone.current().receive([history], "append");
         await readUpTo("a live message on the new link");
         assert.equal(journaled(history.key.id), false, "A new link answered a message from its history.");
 
-        // The first sync ends, then the computer sleeps and wakes.
-        phone.current().emit("creds.update", { accountSyncCounter: 1 });
+        // The computer sleeps and wakes. The next socket of the number gets no history, only held messages.
         const sockets = phone.sockets.length;
         messaging.resume();
         await until(() => phone.sockets.length > sockets && connection(messaging)?.state === "connected", "the wake");

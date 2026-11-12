@@ -21,8 +21,8 @@ export const WHATSAPP_DIRECT_THREAD = "dm";
 const APPEND_GRACE_MS = 60_000;
 /**
  * WhatsApp sends the messages that it held while this device was away (asleep, closed, a dead socket)
- * as `append` after the connect. A number that synced before gets no history at a connect, so an
- * `append` message this recent is a held message that still gets an answer.
+ * as `append` after the connect. Only the first socket after a link gets history, so on a later socket
+ * an `append` message this recent is a held message that still gets an answer.
  */
 const HELD_MAX_AGE_MS = 20 * 60_000;
 /** A message older than this is not answered: its asker has moved on. */
@@ -62,7 +62,7 @@ export type WhatsAppEvent =
 export interface WhatsAppUpsertWindow {
   /** When the socket opened, in milliseconds. */
   openedAt: number;
-  /** The number had synced before this socket opened, so an `append` is not history. */
+  /** WhatsApp sent the number its history before this socket opened, so an `append` is not history. */
   synced: boolean;
   now: number;
 }

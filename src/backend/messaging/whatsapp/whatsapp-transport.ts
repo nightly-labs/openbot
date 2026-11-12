@@ -88,7 +88,7 @@ export class WhatsAppTransport implements MessagingTransport {
         if (mapped) this.#sink?.state(mapped);
       }),
       session.onUpsert(({ messages, type }) => {
-        const upsertWindow = { openedAt: session.openedAt, synced: session.syncedBefore, now: Date.now() };
+        const upsertWindow = session.upsertWindow();
         for (const message of messages) if (freshUpsert(type, message, upsertWindow)) this.#enqueue(message, true);
       }),
     );

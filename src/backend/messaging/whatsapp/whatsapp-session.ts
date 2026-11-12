@@ -21,6 +21,7 @@ import {
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
 import { MessagingAdapterError, WhatsAppRefusedError } from "../messaging-types";
+import type { WhatsAppUpsertWindow } from "./whatsapp-events";
 
 const logger = createOpenBotLogger("whatsapp");
 
@@ -189,7 +190,13 @@ export class WhatsAppSession {
   /** A QR code was shown in this session, so a 408 means that the codes ran out. */
   #codeShown = false;
   #openedAt = 0;
-  #syncedBefore = false;
+  /**
+   * WhatsApp sent this number its history already: a socket opened with the account before. Only the
+   * first socket after a link gets the history; the store was linked when an earlier run started.
+   */
+  #historySent = false;
+  /** The value of `#historySent` when the socket last opened. */
+  #historySentAtOpen = false;
   #lastFrameAt = 0;
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
   #watchdog: ReturnType<typeof setInterval> | null = null;
@@ -213,12 +220,9 @@ export class WhatsAppSession {
     return this.#openedAt;
   }
 
-  /**
-   * The number had finished a sync before the socket last opened. Read at the open: the first sync of
-   * a new link ends on its socket while WhatsApp still sends it history.
-   */
-  get syncedBefore(): boolean {
-    return this.#syncedBefore;
+  /** The facts that tell a message that WhatsApp held for this device from history, at this time. */
+  upsertWindow(): WhatsAppUpsertWindow {
+    return { openedAt: this.#openedAt, synced: this.#historySentAtOpen, now: this.#now() };
   }
 
   get store(): WhatsAppAuthStore {
@@ -262,6 +266,7 @@ export class WhatsAppSession {
   start(options: { codeLink?: boolean } = {}): void {
     if (this.#started) return;
     this.#started = true;
+    this.#historySent = this.#store.linked;
     this.#browserName = options.codeLink ? "Chrome" : "OpenBot";
     this.#attempt = 0;
     this.#setState("connecting");
@@ -435,7 +440,8 @@ export class WhatsAppSession {
     }
     if (update.connection === "open") {
       this.#openedAt = this.#now();
-      this.#syncedBefore = this.#store.creds.accountSyncCounter > 0;
+      this.#historySentAtOpen = this.#historySent;
+      if (this.#store.linked) this.#historySent = true;
       this.#lastFrameAt = this.#openedAt;
       this.#startWatchdog();
       this.#setState("open");
