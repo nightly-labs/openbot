@@ -889,8 +889,19 @@ exit "$status"`;
       }
       // While boat restores the disk, a directory can show no files, and the export refuses to start.
       const restoreDeadline = Date.now() + RESTORE_WAIT_MS;
-      const restoring =
-        "[ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ] && echo restoring || true";
+      // `hydration-done` comes before boat has made each entry local. tar reads a directory that boat then
+      // makes local, and fails with "file changed as we read it" (seen on 2026-11-12). So walk the home, and
+      // wait until boat has no work and makes no more entries local.
+      const restoring = `l=/var/lib/ascii-lazy
+[ -e "$l/status.json" ] || exit 0
+if [ -e "$l/active" ] && [ ! -e "$l/hydration-done" ]; then echo restoring; exit 0; fi
+work() { python3 -I -c 'import json, sys; s = json.load(open(sys.argv[1])); q = s.get("engineQueues") or {}; print(s.get("materialized"), sum(v for v in q.values() if isinstance(v, int)))' "$l/status.json" 2>/dev/null || true; }
+before=$(work)
+timeout 60 find /home/user -xdev -printf '' 2>/dev/null || true
+sleep 10
+after=$(work)
+# No status: there is nothing to wait for.
+[ -z "$after" ] || { [ "$before" = "$after" ] && [ "\${after##* }" = 0 ]; } || echo restoring`;
       if ((await this.#sandboxRun(sandbox, restoring)).includes("restoring")) {
         logger.info(`boat restores the disk of sandbox ${sandbox}. Wait.`);
         do {

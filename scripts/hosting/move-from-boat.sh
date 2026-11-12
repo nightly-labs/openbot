@@ -69,7 +69,11 @@ CHECKED=(
 )
 # The files of boat, the X authorization of the old displays, and a cache that npm makes again.
 # The installed release in /opt/OpenBot is not in the archive: provision.sh installs it.
+# `import` deletes ~/.ascii and ~/.config/ascii of the boat agent. The agent can write there during the
+# export, and tar then fails (seen on 2026-11-12).
 EXCLUDED=(
+  "--exclude=./home/$SERVICE_USER/.ascii"
+  "--exclude=./home/$SERVICE_USER/.config/ascii"
   "--exclude=./home/$SERVICE_USER/.boat"
   "--exclude=./home/$SERVICE_USER/.boatignore"
   "--exclude=./home/$SERVICE_USER/.Xauthority*"
