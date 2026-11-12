@@ -15,6 +15,9 @@
 // its own log, and keeps the server after a resume in the same process. The session opens again on a
 // new process without the server, and the turn answers. A refused tool of the user's own server
 // leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
+// From #7482: Google refuses a tool schema (an array with no `items`, an empty `enum` value) and names the
+// tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
+// out its server, and the turn answers.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -55,6 +58,7 @@ interface Report {
   ownNames?: string[] | undefined;
   refused?: RefusedEntry[];
   refusedDrops?: McpServerDrop[];
+  googleDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -298,6 +302,47 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+
+  // 8. Google refuses a tool schema and names the tool only by its place in the request (#7482).
+  const googleLog = join(root, "google.jsonl");
+  const googleExecutable = join(root, "agy-google", "bin", "antigravity");
+  await installFakeAgent(googleExecutable, "antigravity-refused-tool", { FAKE_LOG: googleLog });
+  const googleDrops: McpServerDrop[] = [];
+  const googleClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("wiki", "wiki", "https://wiki.example/mcp"),
+        httpServer("ticktick", "ticktick", "https://ticktick.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => googleDrops.push(...dropped),
+    },
+  );
+  clients.push(googleClient);
+  googleClient.start();
+  const googleWorkspace = join(root, "google-workspace");
+  await mkdir(googleWorkspace, { recursive: true });
+  const googleThread = await startThread(googleClient, { cwd: googleWorkspace });
+  const googleTurn = await runTurn(googleClient, googleThread, { text: "Reply with OK only.", timeoutMs: 30_000 });
+  report.turns.googleRefusedTool = googleTurn;
+  report.googleDrops = googleDrops;
+  assert.equal(googleTurn.error, null, "The turn that Google refused has no error.");
+  assert.equal(googleTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    googleDrops.map((drop) => drop.name),
+    ["ticktick"],
+    "Only the server whose tool has the refused fields is left out.",
+  );
+  assert.match(googleDrops[0]?.detail ?? "", /list_tasks/u, "The report names the tool.");
+  const googlePrompts = (await readJsonl<RefusedEntry>(googleLog)).filter((entry) => entry.method === "session/prompt");
+  assert.deepEqual(
+    googlePrompts.map((entry) => entry.refused),
+    ["ticktick", null],
+    "The prompt runs once more, and then without the refused server.",
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -4,8 +4,10 @@
 // error." and ends the turn as a success. A session keeps the servers that its process started, also
 // after a resume without them. This fake does the same: a session with the server `resend` refuses
 // `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`.
-import { appendFileSync, mkdirSync } from "node:fs";
+// user's own `mcp_config.json`. From #7482: the CLI saves the schema of each tool of a server that it starts,
+// and Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its answer
+// names the tool only by its place in the request. A session with the server `ticktick` gets that answer.
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -14,11 +16,39 @@ const MODELS = {
   currentModelId: "gemini-3-flash",
 };
 const flag = (name: string) => process.argv.find((arg) => arg.startsWith(name))?.slice(name.length) ?? "";
-const folder = join(flag("--gemini-dir="), flag("--app-data-dir="), "log");
+const appData = join(flag("--gemini-dir="), flag("--app-data-dir="));
+const folder = join(appData, "log");
 mkdirSync(folder, { recursive: true });
 const logFile = join(folder, `acp-server-20261111_000000-${process.pid}.log`);
 const log = (line: string) => appendFileSync(logFile, `${line}\n`);
 log(`I1111 00:00:00.000000       1 options.go:485] Starting ACP server (pid ${process.pid})`);
+
+/** The tool schemas that the CLI saves for a server that it starts. Only `ticktick` has one that Google refuses. */
+interface SavedTool {
+  name: string;
+  parameters: { type: "object"; properties: object };
+}
+
+const SCHEMAS: Partial<Record<string, SavedTool>> = {
+  ticktick: {
+    name: "list_tasks",
+    parameters: {
+      type: "object",
+      properties: { tags: { type: "array" }, status: { type: "string", enum: ["open", ""] } },
+    },
+  },
+  wiki: {
+    name: "search",
+    parameters: {
+      type: "object",
+      properties: { tags: { type: "array", items: { type: "string" } }, status: { type: "string", enum: ["open"] } },
+    },
+  },
+};
+const GOOGLE_REFUSAL = [
+  "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
+  "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[status].enum[1]: cannot be empty",
+].join("\n");
 
 /** The servers of each session that this process started. A resume does not change them. */
 const started = new Map<string, string[]>();
@@ -27,6 +57,12 @@ let sessions = 0;
 function record(request: AcpRequest, sessionId: string): void {
   const names = (request.params.mcpServers ?? []).map((server) => server.name);
   if (!started.has(sessionId)) started.set(sessionId, names);
+  for (const name of names) {
+    const schema = SCHEMAS[name];
+    if (!schema) continue;
+    mkdirSync(join(appData, "mcp", name), { recursive: true });
+    writeFileSync(join(appData, "mcp", name, `${schema.name}.json`), JSON.stringify(schema));
+  }
   logEntry({ method: request.method, sessionId, pid: process.pid, names });
 }
 
@@ -58,8 +94,14 @@ serveFakeAcpAgent({
     const refused =
       /REFUSE_TOOL=(\S+)/u.exec(text)?.[1] ??
       (started.get(sessionId)?.includes("resend") ? "mcp_resend_get-contact" : null);
-    logEntry({ method: request.method, sessionId, pid: process.pid, refused });
-    if (refused) {
+    const googleRefused = !refused && started.get(sessionId)?.includes("ticktick");
+    logEntry({ method: request.method, sessionId, pid: process.pid, refused: googleRefused ? "ticktick" : refused });
+    if (googleRefused) {
+      log(
+        `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSAL}, Status: INVALID_ARGUMENT`,
+      );
+      peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
+    } else if (refused) {
       log(
         `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`,
       );
