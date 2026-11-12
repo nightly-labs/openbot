@@ -89,6 +89,7 @@ import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -2043,14 +2044,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
+  // With `vault-v2` it also keeps API keys, with `vault-v3` two-step keys, and with `vault-v4` the
+  // agents of each item.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+  const vaultVersion = createMemo((): 1 | 2 | 3 | 4 => {
     const current = server();
+    if (serverCanAdminister(current, VAULT_V4_CAPABILITY)) return 4;
     if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
     return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
   });
@@ -2062,7 +2065,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return {
       store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version, vaultImport())),
       apiKeys: version > 1,
-      twoStep: version === 3,
+      twoStep: version >= 3,
+      listAgents: async () => workspace.profiles(),
     };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
@@ -3620,10 +3624,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     setAgentAvatar({ avatarSeed, avatarHue, avatarColor })
                   }
                   onClose={() => setCreating(false)}
-                  onSaved={async () => {
+                  onSaved={async (agentId) => {
                     await workspace.refresh();
                     setAgentAvatar(newAgentAvatar());
-                    setCreating(false);
+                    // The new agent opens, as on the desktop. `select` also closes the form.
+                    await select(agentId);
                   }}
                 />
               </Show>

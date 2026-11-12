@@ -189,6 +189,7 @@
     "./team-protocol/vault-v1": "./src/team-protocol/vault-v1.ts",
     "./team-protocol/vault-v2": "./src/team-protocol/vault-v2.ts",
     "./team-protocol/vault-v3": "./src/team-protocol/vault-v3.ts",
+    "./team-protocol/vault-v4": "./src/team-protocol/vault-v4.ts",
     "./team-protocol/live-activity-push-v1": "./src/team-protocol/live-activity-push-v1.ts",
     "./team-protocol/push-notification-threads-v1": "./src/team-protocol/push-notification-threads-v1.ts",
     "./team-protocol/push-notifications-v1": "./src/team-protocol/push-notifications-v1.ts",

@@ -6,7 +6,7 @@
 // host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
 // host's password managers (`password-managers-v1`) over the real engine with a stand-in Proton
 // Pass driver and the real Bitwarden adapter, the
-// host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
+// host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
@@ -330,6 +330,7 @@ import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_CODECS,
@@ -8356,6 +8357,98 @@ try {
     const deleted = await v3Call(adaToken, VAULT_V3_ROUTES.delete, { id: loginId });
     check(
       "an admin deletes the login through vault-v3",
+      isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
+      summary(deleted),
+    );
+  }
+
+  // ---- The agents of each item in the host's Vault (vault-v4), and vault-v3 on the same host ----
+  {
+    const v3Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V3_CAPABILITY] });
+    const v4Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V4_CAPABILITY] });
+    const apiKey = {
+      kind: "apiKey",
+      id: null,
+      name: "SCOPED_E2E_KEY",
+      notes: "",
+      key: VAULT_API_KEY,
+      agents: ["agent-a", "agent-b"],
+    };
+    const unsupported = await v3Call(adaToken, VAULT_V4_ROUTES.list);
+    const memberSave = await v4Call(bobToken, VAULT_V4_ROUTES.save, apiKey);
+    const empty = await v4Call(adaToken, VAULT_V4_ROUTES.save, { ...apiKey, agents: [] });
+    check(
+      "the vault-v4 routes need vault-v4 and an owner or admin, and an empty agent list is refused",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(memberSave, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(empty, 400, sourceText("error.vault.agentsRequired")) &&
+        vault.state().items.length === 0,
+      [summary(unsupported), summary(memberSave), summary(empty)],
+    );
+    const saved = await v4Call(adaToken, VAULT_V4_ROUTES.save, apiKey);
+    const keyId = field(saved.body, "items", 0, "id");
+    check(
+      "an admin saves an API key for two agents; the list carries the agents and no key",
+      saved.status === 200 &&
+        isDeepStrictEqual(field(saved.body, "items", 0, "agents"), ["agent-a", "agent-b"]) &&
+        typeof keyId === "string" &&
+        !saved.text.includes(VAULT_API_KEY),
+      summary(saved),
+    );
+    assert.ok(typeof keyId === "string", "the vault-v4 save did not answer an item id.");
+    const v3List = await v3Call(adaToken, VAULT_V3_ROUTES.list);
+    const v3Save = await v3Call(adaToken, VAULT_V3_ROUTES.save, {
+      kind: "apiKey",
+      id: keyId,
+      name: "SCOPED_E2E_KEY",
+      notes: "Changed from vault-v3",
+      key: null,
+      agents: null,
+    });
+    const v4List = await v4Call(adaToken, VAULT_V4_ROUTES.list);
+    check(
+      "vault-v3 on the same host lists the key without agents, and its save keeps the agents",
+      v3List.status === 200 &&
+        field(v3List.body, "items", 0, "id") === keyId &&
+        field(v3List.body, "items", 0, "agents") === undefined &&
+        v3Save.status === 200 &&
+        field(v3Save.body, "items", 0, "agents") === undefined &&
+        field(v4List.body, "items", 0, "notes") === "Changed from vault-v3" &&
+        isDeepStrictEqual(field(v4List.body, "items", 0, "agents"), ["agent-a", "agent-b"]),
+      [summary(v3List), summary(v3Save), summary(v4List)],
+    );
+    const forAll = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: null,
+    });
+    const forOne = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: ["agent-b"],
+    });
+    const kept = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: undefined,
+    });
+    const reveal = await v4Call(adaToken, VAULT_V4_ROUTES.reveal, { id: keyId, field: "key" });
+    check(
+      "null gives the key to every agent, a list to those agents, and no agents keeps them; the key stays",
+      field(forAll.body, "items", 0, "agents") === undefined &&
+        isDeepStrictEqual(field(forOne.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(field(kept.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(reveal.body, { value: VAULT_API_KEY }),
+      [summary(forAll), summary(forOne), summary(kept), summary(reveal)],
+    );
+    const deleted = await v4Call(adaToken, VAULT_V4_ROUTES.delete, { id: keyId });
+    check(
+      "an admin deletes the key through vault-v4",
       isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
       summary(deleted),
     );

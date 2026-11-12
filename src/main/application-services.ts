@@ -2100,10 +2100,11 @@ export async function createApplicationServices({
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
-  // Outside every workspace. Each saved key is masked in the logs before the first agent starts. The
-  // Vault's keys are written only when an agent lists its keys; a file left from the last run that the
-  // Vault no longer holds is removed here.
-  const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), () => vault.items.apiKeys());
+  // Outside every workspace. Each saved key is masked in the logs before the first agent starts. A key
+  // file of one agent from a build before agent scope moves into the Vault here. The Vault's keys are
+  // written only when an agent lists its keys; a file left from the last run that the agent can no
+  // longer use is removed here.
+  const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
   // The schedule triggers of workflows share the routine timer; built after the workflows below.

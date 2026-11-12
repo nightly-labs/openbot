@@ -1279,10 +1279,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpProxyFingerprint: (configs) => this.#mcp.proxyFingerprint(configs).pipe(toMcpOperationError),
       ...(credentials.agentEnvironment ? { agentEnvironment: credentials.agentEnvironment } : {}),
       passwordVaultConnected: () => options.passwordVault?.connected() ?? false,
-      vaultItems: () => ({
+      vaultItems: (agentId) => ({
         available: options.vaultItems?.ready() ?? false,
-        cards: options.vaultItems?.hasCards() ?? false,
-        contacts: options.vaultItems?.hasContacts() ?? false,
+        cards: options.vaultItems?.hasCards(agentId) ?? false,
+        contacts: options.vaultItems?.hasContacts(agentId) ?? false,
         link: options.linkWallet?.connected() ?? false,
       }),
       // Only a server has a memory reading.
