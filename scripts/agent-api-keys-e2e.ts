@@ -450,9 +450,14 @@ try {
       { id, method: "item/tool/call", params: { threadId: THREAD, turnId: "turn-unread" } },
       { blockId: `block-${id}`, spec, apiKey: { name: "UNREAD_TOKEN", vault: true } },
     );
-    const respond = (answers: Record<string, string[]>) =>
-      runCauseEffect(unreadRegistry.respondToPrompt({ requestId: id, answers }));
+    const respond = (answers: Record<string, string[]>, responder?: PromptResponder) =>
+      runCauseEffect(unreadRegistry.respondToPrompt({ requestId: id, answers }, responder));
     const unreadable = /OpenBot could not read the API key/;
+    // A member cannot enter a key at all, so they are not asked to correct one first.
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }, MEMBER),
+      /Only the server owner or an admin can enter an API key/,
+    );
     await assert.rejects(
       respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }),
       unreadable,
