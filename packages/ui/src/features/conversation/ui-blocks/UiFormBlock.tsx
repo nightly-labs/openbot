@@ -90,6 +90,9 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   };
   // An answered form that asked for a secret shows its answer as rows, not as disabled inputs.
   const summarized = () => state().status === "answered" && props.spec.fields.some(isSecretFormField);
+  // One that closed or expired without an answer shows only its outcome: an empty, disabled key field
+  // looks like a field that does not work (#7678).
+  const unanswered = () => frozen() && state().status !== "answered" && props.spec.fields.some(isSecretFormField);
   const answerRows = (): AnswerRow[] =>
     props.spec.fields.flatMap((field): AnswerRow[] => {
       if (isSecretFormField(field)) return [{ field }];
@@ -141,7 +144,10 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       }
       elementRef={props.elementRef}
     >
-      <Show when={!summarized()} fallback={<FormAnswerRows rows={answerRows()} />}>
+      <Show
+        when={!summarized() && !unanswered()}
+        fallback={summarized() ? <FormAnswerRows rows={answerRows()} /> : undefined}
+      >
         <form
           id={formId}
           class="ui-block-form-fields"

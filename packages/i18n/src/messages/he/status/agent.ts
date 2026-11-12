@@ -92,6 +92,7 @@ export const messages = {
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
   "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
+  "status.agent.uiBlockClosedByMessage": "נסגר בגלל הודעה חדשה",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",
   "status.agent.vaultDeleted": "נמחק מהכספת: {name}",

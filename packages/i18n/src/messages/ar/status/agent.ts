@@ -97,6 +97,7 @@ export const messages = {
   "status.agent.mcpServerDisable": "إيقاف خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerRemove": "إزالة خادم MCP {name} وتسجيل دخوله من كل وكيل على هذا الخادم.",
   "status.agent.mcpSignInRequested": "يحتاج خادم MCP {name} إلى تسجيل الدخول. سجّل الدخول من إعدادات الخادم، MCP.",
+  "status.agent.uiBlockClosedByMessage": "أُغلق برسالة جديدة",
   "status.agent.vaultAdded": "تم الحفظ في الخزنة: {name}",
   "status.agent.vaultUpdated": "تم التغيير في الخزنة: {name}",
   "status.agent.vaultDeleted": "تم الحذف من الخزنة: {name}",

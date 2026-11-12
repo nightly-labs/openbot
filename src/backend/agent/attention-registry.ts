@@ -1907,13 +1907,17 @@ export class AttentionRegistry {
         continue;
       if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
       this.#routines.markRunningForTurn(turnId);
-      // The card shows as the user's own skip does.
+      // The card closes as the user's own skip does, and says why: the user did not press Skip (#7678).
+      const uiBlockState = pending.uiBlock
+        ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
+        : undefined;
+      if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
       this.#closePrompt(
         requestId,
         pending,
         userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId),
         { status: "cancelled" },
-        pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+        uiBlockState,
       );
       changed = true;
     }
