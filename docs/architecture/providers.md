@@ -658,24 +658,26 @@ fail with `ServiceUnavailableError` while the CLI starts (OpenCode issue #57204)
 more after two seconds; and a model name starts with the provider id, not its name, so
 `openCodeModelName` restores the group name.
 
-OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
-spawn without `OPENCODE_API_KEY` lists the free OpenCode Go models, and a spawn with one lists the
-paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
-from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
-at every spawn, which is what lets a key saved in Settings reach the next process with no other
-plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
-update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
-`safeStorage` in a `0o600` envelope under `userData`. Only a status (`missing`, `saved` or
-`unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
+OpenCode has no login step OpenBot can drive, because the account is one key: a spawn without it
+lists the free models, and a spawn with it lists the paid Go catalog. OpenBot sends the stored key
+only as `options.apiKey` of the `opencode-go` provider in `OPENCODE_CONFIG_CONTENT`, never as
+`OPENCODE_API_KEY` or on the free `opencode` provider. OpenCode gives the free tier its anonymous key
+only while that provider has no key, so a refused key there failed every free model with
+"provider authentication required" (#7550). So `AcpAgentClient` derives `#signedIn` from the models
+`session/new` returns, not from a credential, and a keyless OpenCode reports `available`.
+`AcpProviderOptions.extraEnv` is read at every spawn, which is what lets a key saved in Settings
+reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
+managed install so the CLI cannot update past the pin. `src/main/provider-credential-store.ts` holds
+that optional key, encrypted by `safeStorage` in a `0o600` envelope under `userData`.
+Only a status (`missing`, `saved` or `unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
 startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
 user saves or removes a key. The store writes a change to disk before it changes memory, so a
 failed write changes neither. `ProviderRuntime.changeProviderCredential` applies a key change inside
 the provider's serialized connection command. It refuses a provider that is running a turn, holds
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
-That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
-catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
-supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
+OpenCode reports OpenCode Zen and OpenCode Go as a single catalog, on the separate endpoints
+`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
 drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driver's
 `catalog.usableWithStoredKey`) while OpenBot is the one supplying the key;
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
