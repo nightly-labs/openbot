@@ -300,6 +300,28 @@ export function WorkspaceShell(props: {
     />
   );
 
+  // A server that this window saw with no agents stays in its first run after the owner leaves it,
+  // for example with the close button of its provider step, until it shows agents.
+  const [emptyServers, setEmptyServers] = createSignal<ReadonlySet<string>>(new Set());
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.kind === "remote" && agentListSettled()
+        ? { id: server.id, empty: agentList().length === 0 }
+        : null;
+    },
+    (seen) => {
+      if (!seen) return;
+      setEmptyServers((current) => {
+        if (current.has(seen.id) === seen.empty) return current;
+        const next = new Set(current);
+        if (seen.empty) next.add(seen.id);
+        else next.delete(seen.id);
+        return next;
+      });
+    },
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -310,6 +332,11 @@ export function WorkspaceShell(props: {
               online: server.id === activeServer()?.id ? scope.loaded() : server.state === "online",
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
+              // Until the agents load, the open server could be new; a notice that waits shows after them.
+              firstRun:
+                server.id === activeServer()?.id
+                  ? !agentListSettled() || agentList().length === 0
+                  : emptyServers().has(server.id),
             },
           ]
         : [],

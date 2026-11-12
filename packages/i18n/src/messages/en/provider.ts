@@ -178,6 +178,8 @@ export const messages = defineMessages("provider", {
   "provider.geminiKey.title": "Gemini API key",
   "provider.geminiKey.description":
     "Save a Gemini API key on this computer. A saved key is used instead of your Google account. To sign in with Google, remove the key and select Connect on the Gemini row.",
+  "provider.geminiKey.descriptionHost":
+    "Save a Gemini API key on the host. A saved key is used instead of your Google account. To sign in with Google, remove the key and select Connect on the Gemini row.",
   "provider.geminiKey.label": "Gemini API key",
   "provider.claudeKey.title": "Anthropic API key",
   "provider.claudeKey.description":
@@ -192,14 +194,20 @@ export const messages = defineMessages("provider", {
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":
     "Save an Inception API key on this computer to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.inceptionKey.descriptionHost":
+    "Save an Inception API key on the host to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.inceptionKey.label": "Inception API key",
   "provider.deepseekKey.title": "DeepSeek API key",
   "provider.deepseekKey.description":
     "Save a DeepSeek API key on this computer to use the DeepSeek models. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.deepseekKey.descriptionHost":
+    "Save a DeepSeek API key on the host to use the DeepSeek models. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.deepseekKey.label": "DeepSeek API key",
   "provider.openrouterKey.title": "OpenRouter API key",
   "provider.openrouterKey.description":
     "Save an OpenRouter API key on this computer to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.openrouterKey.descriptionHost":
+    "Save an OpenRouter API key on the host to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
 
   // The optional OpenCode Go key dialog.

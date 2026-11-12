@@ -3326,6 +3326,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onClose={hostedServers.closeAddServer}
                     onOpenServer={(serverId) => {
                       hostedServers.closeAddServer();
+                      // Billing can open this dialog; the server opens in front of it.
+                      setBillingOpen(false);
                       selectServer(serverId);
                     }}
                     onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}

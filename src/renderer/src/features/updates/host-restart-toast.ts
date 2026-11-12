@@ -1,6 +1,6 @@
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
-import { type Accessor, createEffect, onCleanup } from "solid-js";
+import { type Accessor, createEffect, createSignal, onCleanup } from "solid-js";
 
 export interface HostRestartView {
   id: string;
@@ -9,6 +9,11 @@ export interface HostRestartView {
   /** What the host said about its restart into an update (`host-update-v1`). */
   restart: "waiting" | "restarting" | null;
   version: string | null;
+  /**
+   * A server in its first run: it has no agents yet. Its owner sets it up, and the restart of a staged
+   * update does not stop any work, so the notice that the restart waits does not show yet.
+   */
+  firstRun?: boolean;
 }
 
 /**
@@ -21,6 +26,23 @@ type Phase = "waiting" | "restarting" | "away" | "expired";
 const RESTART_NOTICE_MS = 10 * 60_000;
 
 const toastId = (id: string) => `host-restart:${id}`;
+
+const [heldServers, setHeldServers] = createSignal<ReadonlySet<string>>(new Set());
+
+/**
+ * Holds the restart notice of a server whose hosted setup shows in this window: the owner sets the
+ * server up there, and the server is not open yet, so this window does not know that it has no agents.
+ * The returned function releases the hold.
+ */
+export function holdHostRestartNotice(serverId: string): () => void {
+  setHeldServers((current) => new Set(current).add(serverId));
+  return () =>
+    setHeldServers((current) => {
+      const next = new Set(current);
+      next.delete(serverId);
+      return next;
+    });
+}
 
 /**
  * Tells a member why a joined host goes away: it restarts into an update. The notice stays while the
@@ -36,7 +58,10 @@ export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView
     expiries.delete(id);
   };
   createEffect(
-    () => hosts().map((host) => ({ ...host })),
+    () => {
+      const held = heldServers();
+      return hosts().map((host) => ({ ...host, firstRun: host.firstRun || held.has(host.id) }));
+    },
     (views) => {
       const { t } = currentText();
       const seen = new Set<string>();
@@ -44,6 +69,12 @@ export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView
         seen.add(host.id);
         const previous = phases.get(host.id) ?? null;
         const next = nextPhase(previous, host);
+        if (next === "waiting" && host.firstRun) {
+          // Not recorded, so the notice shows when the first run ends and the restart still waits.
+          if (previous === "waiting") toast.dismiss(toastId(host.id));
+          phases.delete(host.id);
+          continue;
+        }
         if (next === previous) continue;
         if (next === "restarting" || next === "away") {
           if (!expiries.has(host.id))

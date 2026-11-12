@@ -34,6 +34,7 @@ import { createEffect, createStore, Loading, onSettled, type ParentProps, Show, 
 import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
 import { AddServerDialog, HostedPricingPage } from "../../lazy-views";
+import { holdHostRestartNotice } from "../updates/host-restart-toast";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { PricingPagePlacement } from "../window/window-page-context";
 
@@ -60,7 +61,7 @@ interface AddServerOverlayProps {
   /** Where the user opened the plans. Analytics only. */
   entryPoint?: HostedServerEntryPoint | undefined;
   calls: AddServerCalls;
-  /** The servers on the rail. The new server is ready when it shows here. */
+  /** The servers on the rail. The new server is ready when it shows here and is online. */
   servers: readonly ServerSummary[];
   /**
    * Reads the rail servers again, while the new server runs but is not on the rail yet. Without it,
@@ -283,12 +284,25 @@ function AddServerSession(
       case "starting":
       case "waking":
         return "starting";
+      // The machine runs before OpenBot on it answers. The server is ready when OpenBot on it
+      // answered this client, so "Open server" opens a server that works and not a start notice.
+      // A server of another version also answered: it shows its own notice when it opens.
       case "running":
-        return props.servers.some((entry) => entry.id === server.serverId) ? "ready" : "connecting";
+        return props.servers.some(
+          (entry) => entry.id === server.serverId && (entry.state === "online" || entry.state === "incompatible"),
+        )
+          ? "ready"
+          : "connecting";
       default:
         return "error";
     }
   };
+
+  // The owner sets this server up here, so a staged update does not announce its restart yet.
+  createEffect(
+    () => state.server?.serverId ?? null,
+    (serverId) => (serverId ? holdHostRestartNotice(serverId) : undefined),
+  );
 
   createEffect(
     () => {
@@ -309,7 +323,11 @@ function AddServerSession(
     try {
       const [list] = await Promise.all([
         props.calls.list().catch(() => null),
-        setupStatus() === "connecting" ? props.onRefreshServers?.().catch(() => undefined) : undefined,
+        // Only a server that is not on the rail yet needs a new read. A server on the rail connects by
+        // itself, and a new read would start its connection again.
+        setupStatus() === "connecting" && !props.servers.some((entry) => entry.id === serverId)
+          ? props.onRefreshServers?.().catch(() => undefined)
+          : undefined,
       ]);
       const server = list?.servers.find((entry) => entry.serverId === serverId);
       if (server && state.server?.serverId === serverId) {

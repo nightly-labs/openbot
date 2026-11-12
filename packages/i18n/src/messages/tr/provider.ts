@@ -167,6 +167,8 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API anahtarı",
   "provider.geminiKey.description":
     "Bu bilgisayara bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
+  "provider.geminiKey.descriptionHost":
+    "Ana makineye bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
   "provider.geminiKey.label": "Gemini API anahtarı",
   "provider.claudeKey.title": "Anthropic API anahtarı",
   "provider.claudeKey.description":
@@ -175,14 +177,20 @@ export const messages = {
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":
     "Mercury modellerini kullanmak için bu bilgisayara bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury modellerini kullanmak için ana makineye bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.inceptionKey.label": "Inception API anahtarı",
   "provider.deepseekKey.title": "DeepSeek API anahtarı",
   "provider.deepseekKey.description":
     "DeepSeek modellerini kullanmak için bu bilgisayara bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek modellerini kullanmak için ana makineye bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.deepseekKey.label": "DeepSeek API anahtarı",
   "provider.openrouterKey.title": "OpenRouter API anahtarı",
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter modellerini kullanmak için ana makineye bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
