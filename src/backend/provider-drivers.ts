@@ -96,6 +96,7 @@ import {
   customAgentStatePaths,
   devinDataDirectory,
   devinStatePaths,
+  grokHomeDirectory,
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
@@ -962,6 +963,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
+    // `grok login` writes its sign-in in `auth.json` of the Grok home.
+    signInFiles: () => [join(grokHomeDirectory(), "auth.json")],
     // Only for the own sign-in: an account folder is removed without it.
     signOut: { argv: ["--no-auto-update", "logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveGrokCli,
