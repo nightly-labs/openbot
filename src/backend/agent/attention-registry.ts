@@ -2114,7 +2114,7 @@ export class AttentionRegistry {
         "field-kind",
         kind === "password"
           ? "the field target is not a password input."
-          : 'the field targets are not code fields. A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, 2fa, or verification code in its id, name, or aria-label and no backup, recovery, email, phone, or SMS word.',
+          : 'the field targets are not code fields. A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.',
       );
     const found = yield* Effect.result(
       Effect.gen(function* () {
