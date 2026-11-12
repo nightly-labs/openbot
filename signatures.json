@@ -849,6 +849,16 @@
       "method": "email",
       "url": "https://github.com/nightly-labs/openbot/pull/6777",
       "text": "Signed PDF of the OpenBot Contributor License Agreement 2.0, sent to licenses@openbot.run."
+    },
+    {
+      "login": "whiteyhat",
+      "userId": 31220861,
+      "version": "2.0",
+      "signedAt": "2026-11-12T12:27:32.514Z",
+      "pullRequest": 7669,
+      "method": "email",
+      "url": "https://github.com/nightly-labs/openbot/pull/7669",
+      "text": "Signed PDF of the OpenBot Contributor License Agreement 2.0, sent to licenses@openbot.run."
     }
   ]
 }
