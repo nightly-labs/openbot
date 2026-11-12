@@ -144,6 +144,13 @@ const decodeVersionGraph = guardedDecoder(isWorkflowGraph, "remote workflow vers
 const decodeWorkflowSummaries = guardedListDecoder(isWorkflowSummary, "remote workflow list");
 const decodeWorkflowVersions = guardedListDecoder(isWorkflowVersion, "remote workflow versions");
 
+/** The `workflows-media-v1` keep-picture route answers `{ fileId }`; the app keeps only the id. */
+export function decodeRemoteWorkflowPicture(value: unknown): string {
+  if (!isDynamicRecord(value) || typeof value.fileId !== "string" || !value.fileId)
+    throw new Error("Invalid remote workflow picture.");
+  return value.fileId;
+}
+
 /** The `workflows-v1` list route wraps its list as `{ workflows }`. */
 export function decodeRemoteWorkflowList(value: unknown) {
   if (!isDynamicRecord(value) || !Array.isArray(value.workflows)) throw new Error("Invalid remote workflow list.");

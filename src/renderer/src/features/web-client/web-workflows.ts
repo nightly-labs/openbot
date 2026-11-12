@@ -1,31 +1,50 @@
 // The Workflows page of the joined server in the browser client. The host serves the workflows
 // through `workflows-v1`, and the GitHub catalog, options, history and last-event runs through
-// `workflows-github-v1`. The targets of an output use the same capabilities as on desktop.
+// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. The targets of an
+// output use the same capabilities as on desktop.
 
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AttachmentSummary,
+  STORAGE_CAPABILITY,
+  type TeamRealtimeEvent,
+  type WorkflowMediaKind,
+} from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
-import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import {
   getHostAgentAccess,
+  getStorageUsage,
   listRoutineResultOptions,
   type TeamAdminRequestError,
 } from "@openbot/team-client/team-admin-requests";
-import { type TeamApiRequest, teamChannelsApi } from "@openbot/team-client/team-api-requests";
+import {
+  discardAttachmentDraft,
+  type TeamApiRequest,
+  teamChannelsApi,
+  uploadAttachmentDraft,
+} from "@openbot/team-client/team-api-requests";
 import {
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
   decodeRemoteWorkflowSaveResult,
@@ -35,10 +54,11 @@ import {
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
 } from "@openbot/team-client/workflow-decoding";
+import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import type { GitHubConnectorPort } from "../connectors/github-connector-port";
-import type { WorkflowHost } from "../workflows/workflows-port";
+import { checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
 import { openWebLink } from "./web-attachments";
 
 /**
@@ -57,6 +77,22 @@ export interface WebWorkflowHostOptions {
   /** Calls `listener` each time the connected host is online again. Returns the unsubscribe function. */
   onReconnect: (listener: () => void) => () => void;
   githubConnector: GitHubConnectorPort;
+  /** The object URLs of the chat's host files. A media step shows its file through them. */
+  attachmentMedia: AttachmentMediaSource | undefined;
+}
+
+/** The host sends only the id of a media step's file, so the name and type come from the step kind. */
+function mediaSummary(id: string, kind: WorkflowMediaKind): AttachmentSummary {
+  const video = kind === "video";
+  return {
+    id,
+    name: video ? "video.mp4" : "image.png",
+    mimeType: video ? "video/mp4" : "image/png",
+    size: 0,
+    kind: video ? "file" : "image",
+    previewKind: video ? "none" : "image",
+    previewUrl: null,
+  };
 }
 
 export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
@@ -74,6 +110,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   };
   const postGitHub = async <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> => {
     if (!githubSupported()) throw tooOld();
+    return post(path, decode, body);
+  };
+  const postMedia = async <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> => {
+    if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
     return post(path, decode, body);
   };
   const empty = () => undefined;
@@ -107,6 +147,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         postGitHub(WORKFLOWS_GITHUB_ROUTES.history, decodeRemoteWorkflowGitHubHistory, { workflowId }),
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
+      keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -166,7 +207,45 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       if (options.admin() || !has(AGENT_ACCESS_CAPABILITY)) return null;
       return (await run(getHostAgentAccess)).mine;
     },
+    async pictures() {
+      if (!has(WORKFLOWS_MEDIA_CAPABILITY) || !has(STORAGE_CAPABILITY)) return [];
+      // The browser gets no preview address: the canvas reads each picture through `mediaUrl`.
+      const usage = await run((request) => getStorageUsage(request, { scope: "host" }));
+      return libraryPictures(usage).map((file) => ({ ...file, previewUrl: null }));
+    },
+    // The draft goes to the host as a chat attachment does; a draft that the host does not keep goes
+    // away. The canvas reads the picture through `mediaUrl`.
+    async uploadPicture(file) {
+      if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
+      checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const request = options.request();
+      const draft = await runTeamEffect(
+        uploadAttachmentDraft(request, {
+          name: file.name,
+          mimeType: file.type,
+          base64: bytesToBase64(bytes),
+          maxBytes: TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
+        }).pipe(Effect.mapError((error) => error.cause)),
+      );
+      const fileId = await postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, {
+        draftId: draft.id,
+      }).catch(async (error: unknown) => {
+        await runTeamEffect(
+          discardAttachmentDraft(request, draft.id).pipe(Effect.mapError((failure) => failure.cause)),
+        ).catch(() => undefined);
+        throw error;
+      });
+      return keptPicture(fileId, file, null);
+    },
     githubSupported,
+    mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
+    mediaUrl(attachmentId, kind) {
+      const media = options.attachmentMedia;
+      if (!media) return undefined;
+      void media.load(mediaSummary(attachmentId, kind));
+      return media.url(attachmentId);
+    },
     githubConnector: options.githubConnector,
     hostName: options.hostName,
     openUrl: openWebLink,

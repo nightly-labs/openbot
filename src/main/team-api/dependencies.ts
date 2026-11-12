@@ -459,6 +459,7 @@ export type TeamApiWorkflows = Pick<
   | "workflowOf"
   | "githubHistory"
   | "githubLastEvent"
+  | "keepPicture"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**

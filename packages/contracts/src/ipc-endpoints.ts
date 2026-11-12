@@ -1918,6 +1918,12 @@ export const IPC_ENDPOINTS = {
     githubRunLastEvent: scopedRequest<WorkflowGitHubLastEventInput, WorkflowRunDetail>()(
       "workflows:github-run-last-event",
     ),
+    /**
+     * Keeps an attachment draft (a PNG, JPEG or WebP picture) as a picture of the host for an asset
+     * step, and answers its file id. The draft goes away. A joined server answers through
+     * `workflows-media-v1`.
+     */
+    keepPicture: scopedRequest<string, string>()("workflows:keep-picture"),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host

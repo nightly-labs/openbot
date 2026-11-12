@@ -117,6 +117,7 @@ import {
   resizeCursor,
   takesKeys,
   type WfnEdge,
+  type WfnFields,
   type WfnHandle,
   type WfnPoint,
   type WfnSize,
@@ -484,6 +485,7 @@ const NO_DRAG = [
   ".wfn-edge-actions",
   "button:not(.wfn-asset-trigger)",
   "[role=tab]",
+  ".ui-seek-slider",
 ].join(", ");
 
 /** A node of the canvas. Its fields are on the board, so each node reads them from there. */
@@ -1360,7 +1362,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
    * Adds a node with its top-left corner at a world point, or centred in the view. A node centred in the
    * view moves to the right past each card that it would cover, so it does not hide them.
    */
-  const addNode = (kind: WorkflowNodeKind, point?: WfnPoint): string => {
+  const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
     const { width, height } = view();
     const center = toWorld({ x: width / 2, y: height / 2 });
@@ -1379,7 +1381,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setPositions((draft) => {
       draft[id] = at;
     });
-    canvas.putFields(id, hostDefaults(kind, props.catalogs, props.features));
+    canvas.putFields(id, { ...fields, ...hostDefaults(kind, props.catalogs, props.features, fields) });
     setNodes((list) => [...list, kind === "trigger" ? { id, kind, schedule: newTriggerSchedule() } : { id, kind }]);
     return id;
   };
@@ -1705,9 +1707,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return addGroups(allowed)
       .map((group) => ({
         label: group.label,
-        items: group.items.filter(
-          (item) => kinds.includes(item) && t(KIND_LABEL[item.kind]).toLowerCase().includes(words),
-        ),
+        items: group.items.filter((item) => kinds.includes(item) && t(item.label).toLowerCase().includes(words)),
       }))
       .filter((group) => group.items.length > 0);
   };
@@ -1739,20 +1739,20 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return open !== undefined && ("edge" in open || "start" in open);
   };
   /** Adds a node where the line ends, with its matching port on the end, and connects it. */
-  const pickDrop = (kind: WorkflowNodeKind) => {
+  const pickDrop = (item: AddItem) => {
     const open = drop();
     if (!open) return;
     setDrop(undefined);
-    if ("edge" in open) return insertNode(kind, open.edge, open.at);
+    if ("edge" in open) return insertNode(item, open.edge, open.at);
     if (!("start" in open)) {
-      canvas.select([addNode(kind, open.at)]);
+      canvas.select([addNode(item.kind, open.at, item.fields)]);
       return;
     }
     const { start } = open;
     // The node, its place and its connection are one undo step.
     commit();
     const release = edits.join();
-    const id = addNode(kind, open.at);
+    const id = addNode(item.kind, open.at, item.fields);
     afterLayout(() => {
       const element = slot(id);
       const side = start.side === "out" ? "in" : "out";
@@ -1780,10 +1780,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
    * Puts a new node in the middle of a connection. When the nodes are too close for it, the nodes
    * from the end of the connection to the right move right to make room.
    */
-  const insertNode = (kind: WorkflowNodeKind, edge: WfnEdge, at: WfnPoint) => {
+  const insertNode = (item: AddItem, edge: WfnEdge, at: WfnPoint) => {
     commit();
     const release = edits.join();
-    const id = addNode(kind, at);
+    const id = addNode(item.kind, at, item.fields);
     afterLayout(() => {
       const element = slot(id);
       const from = boxOf(edge.from);
@@ -2116,6 +2116,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
     };
     const onWheel = (event: WheelEvent) => {
+      // A popover, such as a video in full screen, is in the canvas but over it.
+      if (event.target instanceof Element && event.target.closest(":popover-open")) return;
       if (event.target instanceof Element && event.target.closest("textarea, [data-wfn-portal]")) return;
       event.preventDefault();
       // A wheel can count in lines or in pages, not pixels.
@@ -2377,6 +2379,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       }
     };
     const onDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest(":popover-open")) return;
       if ((event.button !== 0 && event.button !== 1) || !(event.target instanceof Element)) return;
       // A press takes the camera where it is.
       stopGlide();
@@ -2630,7 +2633,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onShortcut = (event: KeyboardEvent) => {
       const active = document.activeElement;
-      if (deleted() || !inCanvas(root, active)) return;
+      if (deleted() || active?.closest(":popover-open") || !inCanvas(root, active)) return;
       const editing = isEditable(active);
       const mod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
@@ -3366,7 +3369,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           >
             <Search />
           </HudButton>
-          <WorkflowAddMenu allowed={props.features.kinds} getAnchorRect={hudBarRect} onAdd={(kind) => addNode(kind)} />
+          <WorkflowAddMenu
+            allowed={props.features.kinds}
+            getAnchorRect={hudBarRect}
+            onAdd={(item) => addNode(item.kind, undefined, item.fields)}
+          />
         </div>
 
         <Show when={ui.search}>

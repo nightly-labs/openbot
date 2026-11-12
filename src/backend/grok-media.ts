@@ -1,4 +1,5 @@
-// The image and video tools of Grok CLI 1.0.77 (`image_gen`, `image_edit`, `reference_to_video`).
+// The image and video tools of Grok CLI 1.0.77 (`image_gen`, `image_edit`, `image_to_video`,
+// `reference_to_video`).
 // ACP shows them as plain tool calls. Only the first updates of a call name the tool, in
 // `_meta["x.ai/tool"].name`; a later update renames the call to "imagine: <prompt>". The completed
 // update gives the file that Grok wrote in its session folder as `rawOutput.path`, with
@@ -10,22 +11,30 @@ import { getRecord, getString, isRecord, type ThreadItem } from "./protocol";
 const TOOL_KINDS: Record<string, GeneratedMediaKind> = {
   image_gen: "image",
   image_edit: "image",
+  image_to_video: "video",
   reference_to_video: "video",
 };
+
+/** The Grok tools that make an image or a video. */
+export const GROK_MEDIA_TOOLS: readonly string[] = Object.keys(TOOL_KINDS);
 
 const OUTPUT_KINDS: Record<string, GeneratedMediaKind> = {
   ImageGen: "image",
   ImageEdit: "image",
+  ImageToVideo: "video",
   ReferenceToVideo: "video",
 };
 
 /** The media kind of a Grok tool update, or null when the update does not name a media tool. */
 export function grokMediaKind(update: {
   _meta?: unknown;
+  title?: string | null;
   rawInput?: unknown;
   rawOutput?: unknown;
 }): GeneratedMediaKind | null {
-  const tool = isRecord(update._meta) ? getString(getRecord(update._meta, "x.ai/tool"), "name") : null;
+  // The first update and a permission request can also name the tool only in the title.
+  const tool =
+    (isRecord(update._meta) ? getString(getRecord(update._meta, "x.ai/tool"), "name") : null) ?? update.title ?? null;
   if (tool && Object.hasOwn(TOOL_KINDS, tool)) return TOOL_KINDS[tool] ?? null;
   for (const value of [update.rawOutput, update.rawInput]) {
     const type = isRecord(value) ? (getString(value, "type") ?? getString(value, "variant")) : null;

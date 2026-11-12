@@ -13,6 +13,10 @@ import {
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
   WORKFLOW_RUN_STEP_LIMIT,
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -46,6 +50,7 @@ import { runEventsEffect } from "./route-events";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
+const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTES));
 
 function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
@@ -155,11 +160,14 @@ export async function routeWorkflows(
   const { method, url, capabilities, member, request, json, protocol } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
-  if (method !== "POST" || !(githubPath || WORKFLOW_PATHS.has(path))) return "unmatched";
+  const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
+  if (method !== "POST" || !(githubPath || mediaPath || WORKFLOW_PATHS.has(path))) return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const github = workflows.github;
   if (githubPath && (!github || !capabilities.has(WORKFLOWS_GITHUB_CAPABILITY)))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (mediaPath && !capabilities.has(WORKFLOWS_MEDIA_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   // `readJson` has already run the body through the workflows wire codec.
   const body = await readJson(request);
@@ -357,6 +365,11 @@ export async function routeWorkflows(
       await usableDetail(input.workflowId, "manage");
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
     }
+  }
+  // Each member can keep a picture, as each member can send a draft. The draft id is known only to
+  // its sender.
+  if (path === WORKFLOWS_MEDIA_ROUTES.keepPicture) {
+    return json(200, { fileId: await run(workflows.keepPicture(stringField(body, "draftId"))) });
   }
   if (!github) return "unmatched";
   switch (path) {

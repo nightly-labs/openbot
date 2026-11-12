@@ -1,11 +1,16 @@
 // Workflows: graphs of steps drawn on a canvas. This computer's host answers from its own runtime,
 // and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
-// its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`.
+// its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
+// keeps an uploaded picture through `workflows-media-v1`.
 
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -14,6 +19,7 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
   decodeRemoteWorkflowSaveResult,
@@ -41,6 +47,7 @@ import {
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
   parseStartWorkflowRun,
+  parseWorkflowDraftId,
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
   parseWorkflowId,
@@ -54,7 +61,7 @@ import {
 interface WorkflowRemoteServers {
   supportsCapability(
     serverId: string,
-    capability: typeof WORKFLOWS_CAPABILITY | typeof WORKFLOWS_GITHUB_CAPABILITY,
+    capability: typeof WORKFLOWS_CAPABILITY | typeof WORKFLOWS_GITHUB_CAPABILITY | typeof WORKFLOWS_MEDIA_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -188,6 +195,14 @@ export function workflowIpcHandlers({
         local: (input) => runCauseEffect(workflows.githubLastEvent(input)),
         remote: (input, serverId) =>
           remoteGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
+      }),
+      keepPicture: scopedHandler(parseWorkflowDraftId, {
+        local: (draftId) => runCauseEffect(workflows.keepPicture(draftId)),
+        remote: (draftId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId });
+        },
       }),
     },
   };

@@ -184,6 +184,14 @@ import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-g
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
+import {
+  decodeGeneratedImage,
+  type GeneratedMediaKind,
+  generatedImageName,
+  generatedMediaKind,
+  generatedVideoName,
+  imageGenerationFailure,
+} from "./agent/image-generation";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
@@ -289,7 +297,7 @@ import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
-import { decodeRecordResponse, getString } from "./protocol";
+import { decodeRecordResponse, getRecord, getString, type ThreadItem } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext, requireProviderDriver } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -302,6 +310,7 @@ import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import type { WorkflowTools } from "./workflows/workflow-tools";
+import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
 import type { WorkflowRunEnd } from "./workflows/workflows";
 import {
   listWorkspaceDirectory,
@@ -2807,6 +2816,121 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     },
     Effect.mapError(
       (failure) => new AgentLifecycleFailed({ operation: "generate workflow text", cause: failure.cause }),
+    ),
+  ).bind(this);
+
+  /**
+   * Makes the image or video of one workflow step with the media tool of `provider`, in a side turn
+   * whose only tools make media. The file goes to Storage with no owner agent. Returns its attachment.
+   */
+  readonly generateWorkflowMedia = Effect.fn("AgentService.generateWorkflowMedia")(
+    function* (
+      this: AgentService,
+      input: {
+        kind: GeneratedMediaKind;
+        provider: "codex" | "grok";
+        prompt: string;
+        images: readonly { role: MediaImageRole; attachmentId: string }[];
+        voice: string | null;
+      },
+    ) {
+      const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
+      const provider = input.provider;
+      const images: { role: MediaImageRole; path: string }[] = [];
+      for (const image of input.images) {
+        const file = yield* this.#mailbox
+          .resolveAttachment(image.attachmentId)
+          .pipe(Effect.mapError(() => failed(sourceText("error.workflow.mediaInputMissing"))));
+        if (!file) return yield* failed(sourceText("error.workflow.mediaInputMissing"));
+        if (!file.mimeType.startsWith("image/")) return yield* failed(sourceText("error.workflow.mediaInputNotImage"));
+        images.push({ role: image.role, path: file.path });
+      }
+      const prompt = [input.prompt, mediaInputText(provider, input.kind, images, input.voice)]
+        .filter(Boolean)
+        .join("\n\n");
+      const paths = [...new Set(images.map((image) => image.path))];
+      if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+      if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
+      yield* this.#providers.ensureProvider(provider);
+      if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+      if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
+      const models = this.#endpoints.available().filter((model) => model.provider === provider);
+      const model =
+        models.find((candidate) => candidate.id === agentProviderDescriptor(provider).defaultModel) ??
+        startingModel(provider, models, this.#preference());
+      if (!model) return yield* failed(sourceText("error.provider.noModel"));
+      const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
+        ? "low"
+        : model.defaultReasoningEffort;
+      const client = yield* Effect.try({
+        try: () => this.#providers.createMediaClient(provider),
+        catch: () => failed(sourceText("error.workflow.mediaFailed")),
+      });
+      const usage = workflowUsageObserver(this.#store.database.usage, provider, model.id);
+      // A holder, not a `let`: the callback writes it, so TypeScript must not narrow it to null.
+      const made: { item: ThreadItem | null } = { item: null };
+      const observe = (notification: { method: string; params?: unknown }) => {
+        usage(notification);
+        if (notification.method !== "item/completed") return;
+        const record = getRecord(notification.params, "item");
+        const type = getString(record, "type");
+        if (!record || !type) return;
+        const item: ThreadItem = { ...record, type };
+        if (generatedMediaKind(item) === input.kind) made.item = item;
+      };
+      yield* this.#profileClients
+        .run(client, (cancelled) =>
+          generateTextWithoutTools(
+            client,
+            { ...model, defaultReasoningEffort: effort },
+            prompt,
+            cancelled,
+            observe,
+            "media",
+            paths,
+          ),
+        )
+        .pipe(
+          Effect.tapError((failure) =>
+            Effect.sync(() => logger.warn("Could not make workflow media.", { provider, error: failure.cause })),
+          ),
+          Effect.mapError((failure) =>
+            failed(
+              failure instanceof GenerationUsageLimitError
+                ? sourceText("error.provider.usageLimitReached")
+                : sourceText("error.workflow.mediaFailed"),
+            ),
+          ),
+        );
+      const item = made.item;
+      if (!item) return yield* failed(sourceText("error.workflow.mediaFailed"));
+      const failure = imageGenerationFailure(item);
+      if (failure || item.status === "failed")
+        return yield* failed(failure ?? sourceText("error.workflow.mediaFailed"));
+      const savedPath = getString(item, "saved_path");
+      const result = input.kind === "image" ? getString(item, "result") : null;
+      const stored = savedPath
+        ? yield* Effect.result(
+            this.#mailbox.storeGeneratedAttachment({
+              sourcePath: savedPath,
+              kind: input.kind,
+              name: input.kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+            }),
+          )
+        : null;
+      if (stored && Result.isSuccess(stored)) return stored.success.id;
+      if (!result) return yield* failed(sourceText("error.workflow.mediaFailed"));
+      const bytes = yield* Effect.try({
+        try: () => decodeGeneratedImage(result),
+        catch: () => failed(sourceText("error.workflow.mediaFailed")),
+      });
+      const attachment = yield* this.#mailbox
+        .storeGeneratedAttachment({ bytes, name: "generated-image.png", mimeType: "image/png" })
+        .pipe(Effect.mapError(() => failed(sourceText("error.workflow.mediaFailed"))));
+      return attachment.id;
+    },
+    Effect.mapError(
+      (failure) => new AgentLifecycleFailed({ operation: "generate workflow media", cause: failure.cause }),
     ),
   ).bind(this);
 

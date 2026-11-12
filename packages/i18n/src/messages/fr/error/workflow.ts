@@ -20,6 +20,12 @@ export const messages = {
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
+  "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
+  "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
+  "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
+  "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",
+  "error.workflow.mediaInputNotImage":
+    "Cette étape n’accepte que des images, pas des vidéos. Supprimez la connexion depuis la vidéo.",
   "error.workflow.stepMissing": "Cette étape n’existe plus.",
   "error.workflow.nodeMissing": "Cette étape n’est pas dans le workflow.",
   "error.workflow.runMissing": "Cette exécution n’existe plus.",

@@ -18,6 +18,12 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
+  "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
+  "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
+  "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
+  "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaInputNotImage":
+    "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",
   "error.workflow.nodeMissing": "This step is not in the workflow.",
   "error.workflow.runMissing": "This run no longer exists.",

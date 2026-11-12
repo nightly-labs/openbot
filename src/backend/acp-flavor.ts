@@ -30,7 +30,12 @@ export interface AcpFlavor {
    * from the tool item with all updates so far and the content of the last update.
    */
   mediaTools?: {
-    kind(update: { _meta?: unknown; rawInput?: unknown; rawOutput?: unknown }): GeneratedMediaKind | null;
+    kind(update: {
+      _meta?: unknown;
+      title?: string | null;
+      rawInput?: unknown;
+      rawOutput?: unknown;
+    }): GeneratedMediaKind | null;
     item(kind: GeneratedMediaKind, call: ThreadItem, content: unknown): ThreadItem;
   };
   /** The `clientInfo` that `initialize` sends. Absent: `OPENBOT_ACP_CLIENT_INFO`. */

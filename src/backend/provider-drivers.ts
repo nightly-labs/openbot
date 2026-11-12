@@ -708,6 +708,11 @@ export interface BuiltInProviderDriver {
    * started without tools starts that way here. Without this hook the normal client is used.
    */
   createProfileClient?(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
+  /**
+   * The client that makes one image or video for a workflow, when the provider needs a different one:
+   * it may run only the provider's media tools. Without this hook the profile client is used.
+   */
+  createMediaClient?(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
   authState(account: AccountReadResult["account"]): AgentAuthState;
   validateAccount(account: NonNullable<AccountReadResult["account"]>): void;
 }
@@ -981,6 +986,18 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         cli,
         requestTimeoutMs,
         true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        accountEnvironment && (() => accountEnvironment),
+      ),
+    createMediaClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
+      new GrokAgentClient(
+        cli,
+        requestTimeoutMs,
+        "media",
         undefined,
         undefined,
         undefined,
