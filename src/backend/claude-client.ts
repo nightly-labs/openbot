@@ -2397,17 +2397,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     if (status === "failed" && error) {
       // A sign-in failure moves the turn to a backup model, as an invalid key does, and so do spent
-      // usage credits and a subscription that Claude refuses for billing. The shared classifier
-      // does not find these causes in the CLI text, so the client names them.
+      // usage credits and a billing refusal. The shared classifier does not find these causes in
+      // all CLI texts, such as "Credit balance is too low", so the client names them.
       const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
-      const balanceSpent = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
+      const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
           message: claudeTurnError(error, this.#usesApiKey()),
-          ...(signInFailed ? { causeCode: "authentication" } : balanceSpent ? { causeCode: "billing" } : {}),
+          ...(signInFailed ? { causeCode: "authentication" } : billing ? { causeCode: "billing" } : {}),
         },
       });
     }
