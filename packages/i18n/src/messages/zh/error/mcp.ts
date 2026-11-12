@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/error/mcp";
 export const messages = {
   // MCP sign-in errors, and the sign-in page in the browser.
   "error.mcp.redirectByName": "无法通过名称访问该地址。",
-  "error.mcp.redirectGetOnly": "该地址只响应 GET 请求。",
   "error.mcp.redirectNotSignIn": "该地址不属于任何登录流程。",
   "error.mcp.redirectRefused": "登录被拒绝，请返回 OpenBot 重试。",
   "error.mcp.redirectNoSignIn": "没有等待处理的登录，它可能已结束。",

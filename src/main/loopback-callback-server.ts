@@ -12,8 +12,11 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { Socket } from "node:net";
 import type { AppTextKey } from "@openbot/i18n";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { LanguageService } from "./language-service";
 import { listenLoopback, listenLoopbackExact } from "./listen-loopback";
+
+const logger = createOpenBotLogger("loopback-callback-server");
 
 /** The names a request may claim to have reached. Anything else is a page rebinding a name here. */
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
@@ -52,8 +55,10 @@ export async function startLoopbackCallbackServer(
   // every one of them - so shutdown would sit on a socket nobody is using. They are ended by hand.
   // A socket whose page is still on its way is ended when the page is sent: the callback that ends a
   // sign-in can close this listener before the browser has the page that says so.
+  // A socket whose form is still arriving has no page to wait for, so it is ended at once.
   const sockets = new Set<Socket>();
   const answering = new Set<Socket>();
+  const reading = new Set<Socket>();
   let closing = false;
   const server: Server = createServer((request, response) => {
     const socket = request.socket;
@@ -75,10 +80,17 @@ export async function startLoopbackCallbackServer(
     if (!(checked instanceof URL)) return send(checked);
     if (request.method !== "POST") return send(options.receive(checked));
     // A server that answers with `response_mode=form_post` posts the same fields as a form (#7709).
-    // They take the place of the query, so the sign-in reads them exactly as it reads a redirect.
+    // They are added to the query, so the sign-in reads them exactly as it reads a redirect.
+    reading.add(socket);
     void readFormBody(request).then((form) => {
-      if (form === null) return send({ status: 400, message: "error.mcp.redirectNotSignIn" });
-      checked.search = form;
+      reading.delete(socket);
+      if (form === null) {
+        logger.warn("A sign-in callback was posted with a body that OpenBot cannot read.", {
+          contentType: request.headers["content-type"] ?? null,
+        });
+        return send({ status: 400, message: "error.mcp.redirectNotSignIn" });
+      }
+      for (const [name, value] of new URLSearchParams(form)) checked.searchParams.set(name, value);
       send(options.receive(checked));
     });
   });
@@ -95,7 +107,7 @@ export async function startLoopbackCallbackServer(
     port,
     close: async () => {
       closing = true;
-      for (const socket of sockets) if (!answering.has(socket)) socket.destroy();
+      for (const socket of sockets) if (!answering.has(socket) || reading.has(socket)) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
@@ -117,7 +129,7 @@ function checkCallbackRequest(
   // so a request naming anything but the loopback address is not from a redirect this sent.
   if (!isLoopbackHost(host)) return { status: 403, message: "error.mcp.redirectByName" };
   if (method !== "GET" && method !== "HEAD" && method !== "POST") {
-    return { status: 405, message: "error.mcp.redirectGetOnly" };
+    return { status: 405, message: "error.mcp.redirectNotSignIn" };
   }
   let url: URL;
   try {
@@ -129,7 +141,7 @@ function checkCallbackRequest(
   return url;
 }
 
-/** More than a grant needs. The rest of a larger body is read and dropped. */
+/** More than a grant needs. A larger body is refused as soon as it passes this size. */
 const FORM_BODY_LIMIT = 16 * 1024;
 
 /** The body of a urlencoded form post, or `null` when it is another type, too large, or cut off. */
@@ -145,9 +157,12 @@ function readFormBody(request: IncomingMessage): Promise<string | null> {
     request.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size <= FORM_BODY_LIMIT) chunks.push(chunk);
+      else resolve(null);
     });
     request.on("end", () => resolve(size <= FORM_BODY_LIMIT ? Buffer.concat(chunks).toString("utf8") : null));
+    // A request that ends any other way, such as a closed tab, gets no grant. After `end` this does nothing.
     request.on("error", () => resolve(null));
+    request.on("close", () => resolve(null));
   });
 }
 
