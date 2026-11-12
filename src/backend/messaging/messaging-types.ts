@@ -202,6 +202,11 @@ export interface MessagingAdapter {
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
   places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  /**
+   * The id of a place that an agent named, as `places` lists it, for a platform where one place has
+   * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
+   */
+  placeId?(placeId: string): string;
   /** The roles a person can have in this workspace, highest first, for a platform with role lists. */
   roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;
