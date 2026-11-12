@@ -648,6 +648,32 @@ try {
     !memberKey.success && memberKey.text.includes("request_api_key") && vaultKey("CHANNEL_TOKEN") === pastedKey,
     memberKey.text,
   );
+  // Other members' words can still pick a token of the request, so a channel never replaces a saved key.
+  const replaced = await fromChannel(
+    "replace a saved key from the user's channel request",
+    "save_api_key",
+    { name: "CHANNEL_TOKEN", key: "e2e-channel-key-6369-new" },
+    PERSON,
+  );
+  pass(
+    "A channel request cannot replace a saved key",
+    !replaced.success && replaced.text.includes("saved already") && vaultKey("CHANNEL_TOKEN") === pastedKey,
+    replaced.text,
+  );
+  // A pasted NAME=value line: the escaped key in the call is not in the text, so only the line gives it.
+  const envKey = "e2e-env-key-6369-c3";
+  const fromEnvLine = await fromChannel(
+    "save a key from a NAME=value line",
+    "save_api_key",
+    {},
+    PERSON,
+    '{"__tool":"save_api_key","name":"ENV_TOKEN","key":"e2e-env-k\\u0065y-6369-c3","notes":"ENV_TOKEN=e2e-env-key-6369-c3"}',
+  );
+  pass(
+    "A key after NAME= in the user's channel request goes to the Vault",
+    fromEnvLine.success && vaultKey("ENV_TOKEN") === envKey,
+    fromEnvLine.text,
+  );
   const formArgs = { name: "FORM_TOKEN", title: "Form token" };
   const formKey = "e2e-form-key-6369-b2";
   const promptsBefore = prompts.length;

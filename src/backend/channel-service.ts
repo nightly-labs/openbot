@@ -4116,8 +4116,11 @@ function withoutOwnNameLabel(text: string, name: string, streaming = false): str
 
 /** The shortest key that a channel request can give to the Vault, as for log redaction. */
 const CHANNEL_KEY_MIN_LENGTH = 8;
-/** A character that continues a key, so it cannot stand next to the key in the request. */
-const KEY_CHARACTER = /[\p{L}\p{N}_\-+/=~.]/u;
+/**
+ * A character that continues a key, so it cannot stand next to the key in the request. Not `=`: a
+ * pasted `NAME=value` line gives the key after it.
+ */
+const KEY_CHARACTER = /[\p{L}\p{N}_\-+/~.]/u;
 
 /**
  * Whether `text` holds `value` as a whole token: a key that the person wrote, not a word or a part

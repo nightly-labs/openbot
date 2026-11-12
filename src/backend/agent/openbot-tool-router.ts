@@ -1048,16 +1048,22 @@ export class OpenBotToolRouter {
     // A team member, a routine, another agent or a web page must not replace the key of every agent.
     // In a channel, the key must be in the request of this computer's user that started the task.
     const channelId = this.#channels.store.channelForThread(threadId);
-    if (
-      channelId &&
-      !(yield* this.#channels
-        .localRequestHolds(channelId, agentId, params.turnId, key)
-        .pipe(Effect.catch(() => Effect.succeed(false))))
-    )
-      return openBotToolFailure(
-        "In a channel, you can save only a key that this computer's user wrote in the request that started your task. Call request_api_key: the user types the key in a form.",
-      );
-    if (!channelId && !this.#requestedByPerson(agentId, params.turnId, threadId))
+    if (channelId) {
+      if (
+        !(yield* this.#channels
+          .localRequestHolds(channelId, agentId, params.turnId, key)
+          .pipe(Effect.catch(() => Effect.succeed(false))))
+      )
+        return openBotToolFailure(
+          "In a channel, you can save only a key that this computer's user wrote in the request that started your task. Call request_api_key: the user types the key in a form.",
+        );
+      // Other members' words can still choose a token of the request, so a channel never replaces a saved key.
+      const existing = yield* Effect.result(apiKeys.list(agentId));
+      if (Result.isFailure(existing) || existing.success.some((entry) => entry.name === name))
+        return openBotToolFailure(
+          `In a channel, you can only add a key with a new name, and ${name} is saved already. Call request_api_key: the user types the new key in a form.`,
+        );
+    } else if (!this.#requestedByPerson(agentId, params.turnId, threadId))
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
