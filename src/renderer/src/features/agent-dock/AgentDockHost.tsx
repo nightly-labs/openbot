@@ -215,8 +215,10 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     (previous: readonly AgentDockSeatRef[] = []): AgentDockSeatRef[] => {
       if (!preference().activeSeats) return [];
       const open = openSeat();
+      const savedKeys = new Set(seatRefs().map(agentDockSeatKey));
       const shows = (seat: AgentDockSeatRef, state: SidebarAgentState | undefined) =>
-        !seated(seat) && (callsForUser(state) || (open?.kind === seat.kind && open.id === seat.id));
+        !savedKeys.has(agentDockSeatKey(seat)) &&
+        (callsForUser(state) || (open?.kind === seat.kind && open.id === seat.id));
       const active = [
         ...shownAgents().flatMap((agent): AgentDockSeatRef[] => {
           const seat: AgentDockSeatRef = { kind: "agent", id: agent.id };
@@ -231,8 +233,14 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       const kept = previous.filter((seat) => activeKeys.has(agentDockSeatKey(seat)));
       const keptKeys = new Set(kept.map(agentDockSeatKey));
       const added = active.filter((seat) => !keptKeys.has(agentDockSeatKey(seat)));
-      /* The dock window shows at most AGENT_DOCK_LIMITS.seats seats; the seats of the user come first. */
-      return [...kept, ...added].slice(0, Math.max(0, AGENT_DOCK_LIMITS.seats - seatRefs().length));
+      /* The dock window shows at most AGENT_DOCK_LIMITS.seats seats; the seats of the user come first.
+         A saved seat of a deleted or hidden agent does not show, so it takes no place. */
+      const shownKeys = new Set([
+        ...shownAgents().map((agent) => agentDockSeatKey({ kind: "agent", id: agent.id })),
+        ...shownChannels().map((channel) => agentDockSeatKey({ kind: "channel", id: channel.id })),
+      ]);
+      const savedShown = [...savedKeys].filter((key) => shownKeys.has(key)).length;
+      return [...kept, ...added].slice(0, Math.max(0, AGENT_DOCK_LIMITS.seats - savedShown));
     },
     { equals: sameAgentDockSeats },
   );
@@ -406,7 +414,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     },
   );
 
-  /* The unread answers of the seated agents, for the finished-work shelf. The shelf hides each one
+  /* The unread answers of the agents on the dock, temporary seats too, for the finished-work shelf. The shelf hides each one
      after some time; the seat keeps its unread badge. Channels have no results. */
   let firstSeen = new Map<string, number>();
   const results = createMemo((): AgentDockResult[] => {
