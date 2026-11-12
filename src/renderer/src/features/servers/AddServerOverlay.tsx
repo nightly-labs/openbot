@@ -446,9 +446,10 @@ function AddServerSession(
     });
     try {
       // The user chose on the last answers. When the new ones change the first choices, the page starts again with
-      // them, and the user must look at it again before an order.
+      // them, and the user must look at it again before an order. A server in setup in the new answers opens its
+      // setup dialog and does not get a second server.
       const shownKey = state.plans && pageKey(state.plans);
-      if (!(await loaded) || (state.plans && pageKey(state.plans)) !== shownKey) {
+      if (!(await loaded) || state.server !== null || (state.plans && pageKey(state.plans)) !== shownKey) {
         setState((draft) => {
           draft.orderedFromPage = false;
         });
