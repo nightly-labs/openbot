@@ -781,9 +781,10 @@ export class HostedServerService {
     yield* Effect.gen({ self: this }, function* () {
       if (!(yield* billing.subscriptionEnded(newest.stripe_subscription_id).pipe(Effect.mapError(hostedFailure))))
         return;
-      // As in `#cancelPlans`: a renewal that the owner paid just now keeps the server, and its webhook starts it.
+      // A renewal that the owner paid just now keeps the server, and its webhook starts it. When the close
+      // fails, the page stays open and the owner can still pay, so the next tick tries again.
       const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
-      if (checkout && (yield* this.#closeCheckout(checkout)) === "paid") return;
+      if (checkout && (yield* this.#closeCheckout(checkout)) !== "closed") return;
       const claimed = yield* hostedCall(() =>
         dependencies.database
           .prepare(

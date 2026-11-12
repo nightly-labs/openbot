@@ -160,6 +160,8 @@ async function run() {
     return Response.json({ ok: true });
   };
   const stripeCalls: string[] = [];
+  // The close of an open renewal Checkout page fails until a check sets this.
+  const checkout = { closes: false };
   const billing = new BillingService({
     database: sqliteD1(database),
     secretKey: "sk_test_none",
@@ -167,6 +169,11 @@ async function run() {
     fetch: async (input, init) => {
       const url = new URL(input);
       stripeCalls.push(`${init.method ?? "GET"} ${url.pathname}`);
+      if (url.pathname.startsWith("/v1/checkout/sessions/")) {
+        return checkout.closes
+          ? Response.json({ id: "cs_open", url: null, status: "expired", metadata: {}, subscription: null })
+          : Response.json({ error: { type: "api_error" } }, { status: 500 });
+      }
       const id = decodeURIComponent(url.pathname.replace("/v1/subscriptions/", ""));
       const stored = database
         .prepare("SELECT server_id, status FROM billing_subscriptions WHERE stripe_subscription_id = ?")
@@ -468,6 +475,29 @@ async function run() {
   );
   const notOnTheHour = await scheduledSnapshots(database, scheduledAt + MINUTE);
   check("the Worker cron sends no snapshot at another minute", notOnTheHour.length === 0, notOnTheHour);
+
+  // On reinstalled machines: a plan whose renewal page is still open, and a first payment that never came.
+  const late = t0 + 40 * DAY;
+  const ended = { desired: "stopped", observed: "stopped", error: "plan_ended", planEndedAt: late - 31 * DAY };
+  server("checkout-open", { ...ended, machine: "leaseweb:104", status: "canceled" });
+  database.prepare("UPDATE hosted_servers SET checkout_session_id = 'cs_open' WHERE server_id = 'checkout-open'").run();
+  server("never-paid", { ...ended, machine: "leaseweb:105", status: "incomplete_expired" });
+  await tick(late);
+  check(
+    "a renewal page that does not close keeps the server, and a first payment that never came ends the plan",
+    row("checkout-open")?.desired_state === "stopped" &&
+      stripeCalls.includes("POST /v1/checkout/sessions/cs_open/expire") &&
+      row("never-paid")?.observed_state === "deleted" &&
+      removed.includes("never-paid"),
+    { checkoutOpen: row("checkout-open"), neverPaid: row("never-paid"), removed },
+  );
+  checkout.closes = true;
+  await tick(late + 5 * MINUTE);
+  check(
+    "the next check closes the renewal page and deletes the server",
+    row("checkout-open")?.observed_state === "deleted" && removed.includes("checkout-open"),
+    row("checkout-open"),
+  );
 }
 
 /** The `hosted_pool_snapshot` request bodies that one run of the Worker cron sends to OpenPanel. */
