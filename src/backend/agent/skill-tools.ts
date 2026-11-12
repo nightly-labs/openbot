@@ -83,7 +83,7 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "set_skill_enabled",
     description:
-      "Turn an installed skill on or off for yourself or another local agent. Omit agentId for yourself. Get the skillId from read_agent. Refuses to turn off a skill whose files were changed. Cannot change a workspace folder skill.",
+      "Turn an installed skill on or off for yourself or another local agent. Omit agentId for yourself. Get the skillId from read_agent. Refuses to turn off a skill whose files were changed.",
     shape: setSkillEnabledSchema.shape,
   },
   {
