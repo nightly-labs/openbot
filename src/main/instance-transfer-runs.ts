@@ -34,6 +34,7 @@ export function transferRuns(runs: readonly RoutineRunFields[]): TransferRun[] {
     status: run.status,
     error: run.error,
     ...(run.missed ? { missed: run.missed } : {}),
+    ...(run.quiet ? { quiet: true as const } : {}),
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   }));
@@ -46,7 +47,7 @@ export function transferRuns(runs: readonly RoutineRunFields[]): TransferRun[] {
 export function decodeRuns(values: readonly unknown[] | undefined, channel: boolean): TransferRun[] {
   return (values ?? []).slice(0, INPUT_LIMITS.routineRunsPage).flatMap((value): TransferRun[] => {
     if (!isDynamicRecord(value)) return [];
-    const { id, kind, source, scheduledFor, routineName, instruction, status, error, missed } = value;
+    const { id, kind, source, scheduledFor, routineName, instruction, status, error, missed, quiet } = value;
     const createdAt = isoTime(value.createdAt);
     const updatedAt = isoTime(value.updatedAt);
     const scheduled = isoTime(scheduledFor);
@@ -77,6 +78,8 @@ export function decodeRuns(values: readonly unknown[] | undefined, channel: bool
         // A long error, such as a provider's dump, is cut; the run stays.
         error: error ? error.slice(0, ERROR_LIMIT) : null,
         ...(decodedMissed ? { missed: decodedMissed } : {}),
+        // Only an agent routine run keeps it. Any other value is no flag: the run stays.
+        ...(quiet === true && !channel ? { quiet: true as const } : {}),
         createdAt,
         updatedAt,
       },

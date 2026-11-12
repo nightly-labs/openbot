@@ -92,6 +92,8 @@ export interface ImportedRoutineRun {
   status: RoutineRunStatus;
   error: string | null;
   missed?: { count: number; until: string | null };
+  /** The run ended with nothing to report. Only an agent routine run keeps it. */
+  quiet?: true;
   createdAt: string;
   updatedAt: string;
 }
@@ -944,7 +946,7 @@ export class RoutineStore {
    */
   protected importRunRows(routineId: string, ownerId: string, runs: readonly ImportedRoutineRun[]): string[] {
     if (runs.length === 0) return [];
-    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn } = this.tables;
+    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn, quietRunColumn } = this.tables;
     const runIds = runs.map(() => randomUUID());
     return this.database.dispatch(
       `${commandPrefix}-run:import:${routineId}:${randomUUID()}`,
@@ -958,8 +960,8 @@ export class RoutineStore {
         const insert = db.prepare(
           `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, run_source, scheduled_for, routine_name,
-             instruction, status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             instruction, status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence${quietRunColumn ? ", quiet" : ""}
+           ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${quietRunColumn ? ", ?" : ""})`,
         );
         for (const [index, run] of runs.entries())
           insert.run(
@@ -978,6 +980,7 @@ export class RoutineStore {
             run.createdAt,
             run.updatedAt,
             sequences[index] ?? 0,
+            ...(quietRunColumn ? [run.quiet ? 1 : 0] : []),
           );
         return runIds;
       },

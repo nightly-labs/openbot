@@ -491,6 +491,8 @@ try {
         (run) => run.id === sourceRun.id && ["succeeded", "failed", "interrupted", "cancelled"].includes(run.status),
       ),
   );
+  // The run had nothing to report, as a scheduled run that called the no-update tool records (#6034).
+  source.database.connection.prepare("UPDATE projection_routine_runs SET quiet = 1 WHERE run_id = ?").run(sourceRun.id);
   const sourceHistory = source.agents.readTransferHistory(writer.id);
   const sourceMain = sourceHistory.find((thread) => thread.main);
   assert.ok(sourceMain, "The source chat has no messages.");
@@ -835,11 +837,12 @@ try {
     : [];
   const movedRun = newRuns.find((run) => run.createdAt === finishedRun.createdAt);
   pass(
-    "the run history of a routine moves as finished runs with their times",
+    "the run history of a routine moves as finished runs with their times and their quiet flag",
     movedRun !== undefined &&
       movedRun.id !== finishedRun.id &&
       movedRun.status === finishedRun.status &&
       movedRun.source === "test" &&
+      movedRun.quiet === true &&
       movedRun.triggerId === null &&
       movedRun.deliveryId === null,
     JSON.stringify({ finishedRun, newRuns }),
