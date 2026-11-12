@@ -14,6 +14,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
+import type { LiveVoiceRelayed } from "./live-voice";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import { pendingSkillSuggestionNote } from "./skill-suggestion";
 
@@ -93,6 +94,8 @@ export interface DeliveryPromptSources {
    * session. That session closed with the run, so the answer gives the task again (#6457).
    */
   answeredRoutine?: AnsweredRoutine | null;
+  /** How live voice relayed this message, or null for a message that the user wrote. */
+  liveVoice?: LiveVoiceRelayed | null;
 }
 
 /** A routine run's name and task, for the answer to a request that the run sent. */
@@ -283,6 +286,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       displayText || "(The reply contains attachments only.)",
     ].join("\n");
   }
+  if (delivery.sender.kind === "user" && sources.liveVoice) text = liveVoicePrompt(sources.liveVoice, text);
   // Only `start_task` sends an agent's message to itself: it is the brief of a task.
   if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
@@ -400,6 +404,37 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/** The most characters of the voice call that a relayed message gives: the newest lines. */
+const LIVE_VOICE_CALL_LIMIT = 4000;
+
+/**
+ * A message that live voice relayed, framed so that the agent knows that the voice is not the user
+ * (#7256). The voice model writes the request itself, so it can be a summary or its own question.
+ * When the transcript has the user's words, `text` is those words and the voice's request is only context.
+ */
+function liveVoicePrompt({ request, heard }: LiveVoiceRelayed, text: string): string {
+  const spoken = heard.some((line) => line.role === "user");
+  const call: string[] = [];
+  let length = 0;
+  if (heard.some((line) => line.role === "assistant"))
+    for (const line of heard.toReversed()) {
+      const entry = `${line.role === "user" ? "User" : "Voice assistant"}: ${line.text}`;
+      length += entry.length + 1;
+      if (length > LIVE_VOICE_CALL_LIMIT && call.length > 0) break;
+      call.unshift(entry);
+    }
+  return [
+    "The user spoke this message in a live voice call. A voice assistant hears the user, gives each request to you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    spoken
+      ? "Act on the user's own words. Use the voice assistant's text only to understand them."
+      : "The user's exact words are not available. The message below is the voice assistant's text of the request.",
+    ...(call.length ? ["--- voice call since the previous request ---", ...call] : []),
+    ...(spoken && request !== text ? ["--- the request as the voice assistant wrote it ---", request] : []),
+    spoken ? "--- user message ---" : "--- request from the voice assistant ---",
+    text,
+  ].join("\n");
 }
 
 /**

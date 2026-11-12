@@ -22,6 +22,7 @@ import type { CustomEndpoints } from "./custom-endpoints";
 import { agentNamesById, deliveryPromptInput, type TagReferenceSource } from "./delivery-content";
 import { steerNote } from "./developer-instructions";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
+import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
@@ -38,6 +39,8 @@ export interface QueueControlsHooks {
   /** The tabs and threads of this agent, as the tags of a steered message name them. */
   /** `threadId` is the public thread that gets the prompt. */
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
+  /** How live voice relayed this delivery, or null for a message that the user wrote. */
+  liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
 }
 
 export interface QueueControlsOptions {
@@ -308,6 +311,7 @@ export class QueueControls {
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
+              liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
             }),
           ],
         },

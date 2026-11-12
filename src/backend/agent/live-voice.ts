@@ -65,7 +65,8 @@ const RELAY_SUMMARY_WORDS = 150;
 /** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
 const LONG_ANSWER_MARK = "[long answer]";
 const RELAY_INSTRUCTIONS =
-  "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
+  "You relay requests. For every user request, call ask_agent exactly once with the user's complete request " +
+  "in the user's own words, as the transcript gives them. Do not shorten or summarize it, and add no question of your own. " +
   "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
   `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
   `its most important facts in ${RELAY_SUMMARY_WORDS} words or fewer, in the language of the answer. ` +
@@ -86,6 +87,9 @@ const RELAY_VOICE_RULE =
   "Keep that language when a short or unclear phrase sounds like a different one. " +
   "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
+
+/** The most transcript lines that a session keeps between two requests. */
+const HEARD_LINE_LIMIT = 20;
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -122,14 +126,34 @@ export interface LiveVoiceOwner {
   readonly sender: ConversationMessageSender | undefined;
 }
 
+/** One final line of the voice call transcript: what the user said, or what the voice said. */
+export interface LiveVoiceLine {
+  readonly role: "user" | "assistant";
+  readonly text: string;
+}
+
+/**
+ * How the voice relayed a request (#7256). The voice model writes `request` itself, so it can be a
+ * summary or its own question. The agent reads it with the call, and knows that the voice is not the user.
+ */
+export interface LiveVoiceRelayed {
+  readonly request: string;
+  /** The final transcript lines since the previous request, oldest first. */
+  readonly heard: readonly LiveVoiceLine[];
+}
+
 export interface LiveVoiceHooks {
   agent(agentId: string): AgentSummary;
   /** A new Codex process that is not started yet. It runs no agent: it only connects the voice. */
   relay(agent: AgentSummary): Effect.Effect<LiveVoiceRelay, { readonly cause: unknown }>;
-  /** Sends a spoken request to the agent as the user's message, and gives its delivery id. */
+  /**
+   * Sends a spoken request to the agent as the user's message, and gives its delivery id. `text` is
+   * what the chat shows: the user's own words, or the voice's request when the transcript has none.
+   */
   send(
     agentId: string,
     text: string,
+    relayed: LiveVoiceRelayed,
     sender: ConversationMessageSender | undefined,
   ): Effect.Effect<string, { readonly cause: unknown }>;
   /** The reply to a delivery, or null while the agent still works on it. */
@@ -146,6 +170,8 @@ interface LiveSession {
   readonly client: AgentClient;
   readonly cwd: string;
   threadId: string | null;
+  /** The final transcript lines since the last request. The next request takes them. */
+  readonly heard: LiveVoiceLine[];
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -165,8 +191,9 @@ interface PendingAsk {
  * Audio goes between the renderer and OpenAI. OpenBot never reads the Codex credentials.
  *
  * The voice runs on a relay thread of that process, not on the agent's thread. When the voice model
- * hands a request off, the relay calls `ask_agent`, and OpenBot sends the request to the agent as the
- * user's message. The agent's answer goes back to the voice, which speaks it: a short answer as it
+ * hands a request off, the relay calls `ask_agent`, and OpenBot sends the user's own words from the
+ * transcript to the agent as the user's message. The agent also reads the request as the voice wrote it,
+ * marked as the voice's. The agent's answer goes back to the voice, which speaks it: a short answer as it
  * is, a long one as a summary. So the voice does not depend on the agent's provider or model, and a
  * model change does not end it. The chat shows each request and the full answer as usual.
  *
@@ -207,6 +234,7 @@ export class LiveVoice {
       client: relay.client,
       cwd,
       threadId: null,
+      heard: [],
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
@@ -343,6 +371,12 @@ export class LiveVoice {
             { type: "transcript", sessionId: session.id, role, text, final },
             session.owner?.memberId ?? null,
           );
+        const line = final ? text?.trim() : undefined;
+        // The control message is in the conversation as the user's, but the user did not say it.
+        if (line && !(role === "user" && line === RELAY_VOICE_RULE)) {
+          session.heard.push({ role, text: line });
+          if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
+        }
         return;
       }
     }
@@ -359,13 +393,16 @@ export class LiveVoice {
       session.client.respondError(request.id, { code: -32601, message: "Live voice answers only ask_agent." });
       return;
     }
-    const text = getString(getRecord(params, "arguments"), "request")?.trim();
-    if (!text) {
+    const asked = getString(getRecord(params, "arguments"), "request")?.trim();
+    if (!asked) {
       session.client.respond(request.id, toolResult({ success: false, text: "The request is empty." }));
       return;
     }
+    // The chat shows what the user said. The voice's own text of the request can be a summary.
+    const heard = session.heard.splice(0);
+    const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
     Effect.runFork(
-      this.#hooks.send(session.agentId, text, session.owner?.sender).pipe(
+      this.#hooks.send(session.agentId, said || asked, { request: asked, heard }, session.owner?.sender).pipe(
         Effect.match({
           onFailure: (failure) =>
             this.#respond(session, request.id, {
