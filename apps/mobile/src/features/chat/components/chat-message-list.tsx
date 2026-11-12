@@ -992,7 +992,8 @@ const MessageRow = memo(function MessageRow({
       {message.author === "agent" ? (
         <ChatMessageGesture
           selecting={selecting}
-          onReply={shared.canReply ? () => actions.reply(message) : undefined}
+          // A progress update is a step of its turn: it takes no reply, as on desktop.
+          onReply={shared.canReply && !message.progress ? () => actions.reply(message) : undefined}
           onHold={messageActions.open}
         >
           {withReactions}
