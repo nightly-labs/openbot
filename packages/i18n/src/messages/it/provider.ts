@@ -246,6 +246,10 @@ export const messages = {
     "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
+  "provider.settings.otherVersionDownloaded": "Non in uso: {version} · scaricata da OpenBot",
+  "provider.settings.useInstalledVersion": "Usa quella installata",
+  "provider.settings.useDownloadedVersion": "Usa quella di OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":

@@ -497,6 +497,7 @@ function ServerSettings() {
     providerAccounts,
     restartProvider,
     cancelProviderRestart,
+    chooseInstalledCli,
     connection,
     providerKeys,
     hostCustomProviders,
@@ -819,6 +820,7 @@ function ServerSettings() {
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
+      onChooseInstalledCli: local ? chooseInstalledCli : undefined,
       get providerDetection() {
         return detectionOf()?.detection();
       },

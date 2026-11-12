@@ -866,6 +866,13 @@ export const IPC_ENDPOINTS = {
     restartProvider: request<AgentProviderId, AgentStatus>()("app:restart-provider"),
     cancelProviderRestart: request<AgentProviderId, AgentStatus>()("app:cancel-provider-restart"),
     /**
+     * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer; false runs the
+     * newer of the two. The provider restarts when its turns end. Only a provider of this computer.
+     */
+    chooseInstalledCli: request<{ provider: ManagedProviderId; installed: boolean }, AgentStatus>()(
+      "app:choose-installed-cli",
+    ),
+    /**
      * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
      * so the version they end on is whatever that updater fetches, which owes nothing to the version
      * OpenBot pins for the runtime it manages.

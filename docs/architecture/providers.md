@@ -551,7 +551,14 @@ the one Update button, and one entry point in the runtime store, `startProviderU
 runs behind it, whoever owns the CLI: the download installs the managed copy and
 `updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
 Later resolutions keep that copy while it is newer than the system install, which is left where it
-is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+is; when the user's CLI catches up, the user's CLI runs again. The user's CLI can be a launcher that
+sets up its own environment, such as a `pi` script that picks `PI_CODING_AGENT_DIR` (#6327). The
+status row therefore names the other CLI in `otherCliVersion`, and the Runtime section offers "Use
+installed version". `chooseInstalledCli` saves the choice in the `installed` list of
+`openbot-provider-use-v1.json`, and `chooseInstalledFirst` then runs the user's CLI also when the copy
+is newer. The row then offers "Use OpenBot's version", and an update clears the choice. The offer
+compares the release with the newer of the two CLIs, so a copy that is already the newest offers no
+update. When the user's CLI goes away, main calls
 `providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
