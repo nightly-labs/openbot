@@ -6,7 +6,7 @@ const DAY_MS = 24 * 60 * 60_000;
 /** The location and the product of a machine that `operator_hosts` does not list. */
 const UNLISTED = "unknown";
 /** The location and the product of the group that counts each machine. */
-export const POOL_TOTAL = "all";
+const POOL_TOTAL = "all";
 
 class HostedPoolSnapshotError extends Schema.TaggedError<HostedPoolSnapshotError>()("HostedPoolSnapshotError", {}) {}
 
