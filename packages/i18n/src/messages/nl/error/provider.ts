@@ -239,6 +239,8 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.toolCallAsText":
+    "Het model wilde een tool gebruiken, maar schreef het verzoek als tekst, dus er is niets uitgevoerd. Stuur het bericht opnieuw, of kies een ander model.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",

@@ -230,6 +230,8 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
+  "error.provider.toolCallAsText":
+    "The model tried to use a tool but wrote the request as text, so nothing ran. Send the message again, or choose a different model.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

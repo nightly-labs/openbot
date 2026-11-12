@@ -219,6 +219,8 @@ export const messages = {
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
+  "error.provider.toolCallAsText":
+    "حاول النموذج استخدام أداة لكنه كتب الطلب كنص، لذا لم يُنفَّذ أي شيء. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",

@@ -66,6 +66,23 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   return items;
 }
 
+const CODE_SPANS = /```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`/gu;
+const TOOL_CALL_MARKUP =
+  /<tool_call>\s*(?:<function=|\{\s*"name"\s*:)[\s\S]*?<\/tool_call>|<function=[^\s>]+>[\s\S]*?<\/function>/u;
+
+/**
+ * True when an assistant message ends the run with a complete tool call written as text, such as
+ * Qwen's `<tool_call><function=…>` or `<tool_call>{"name": …}`. An OpenAI-compatible server that does
+ * not parse the model's own markup sends it as text, so no tool runs (#7441). Markup in code is an
+ * example, not a call.
+ */
+export function piWroteToolCallAsText(message: unknown): boolean {
+  if (getString(message, "stopReason") !== "stop") return false;
+  const content = getArray(message, "content");
+  if (content.some((block) => isRecord(block) && block.type === "toolCall")) return false;
+  return TOOL_CALL_MARKUP.test(piText(content).replace(CODE_SPANS, ""));
+}
+
 export const piPrompt = Effect.fn("Pi.prompt")(function* (params: unknown) {
   const texts: string[] = [];
   const images: Array<{ type: "image"; data: string; mimeType: string }> = [];

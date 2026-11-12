@@ -244,6 +244,8 @@ export const messages = {
     "OpenCode のモデルが、推論のあと回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
+  "error.provider.toolCallAsText":
+    "モデルがツールを使おうとしましたが、リクエストをテキストとして書いたため、何も実行されませんでした。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
