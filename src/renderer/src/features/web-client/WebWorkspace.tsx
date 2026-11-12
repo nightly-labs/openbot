@@ -3619,10 +3619,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     setAgentAvatar({ avatarSeed, avatarHue, avatarColor })
                   }
                   onClose={() => setCreating(false)}
-                  onSaved={async () => {
+                  onSaved={async (agentId) => {
                     await workspace.refresh();
                     setAgentAvatar(newAgentAvatar());
-                    setCreating(false);
+                    // The new agent opens, as on the desktop. `select` also closes the form.
+                    await select(agentId);
                   }}
                 />
               </Show>
