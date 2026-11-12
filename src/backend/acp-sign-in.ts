@@ -264,22 +264,19 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           if (options.logoutOnly) settle(null);
           else authenticate();
         } else if (message.id === 2 && options.onSignInUrl) {
-          const result = isDynamicRecord(message.result) ? message.result : undefined;
-          const meta = isDynamicRecord(result?._meta) ? result._meta[options.methodId] : undefined;
-          const attempt = isDynamicRecord(meta) ? meta : undefined;
+          const attempt = delegatedResult(message.result, options.methodId);
           const page = typeof attempt?.signInUrl === "string" ? URL.parse(attempt.signInUrl) : null;
-          if (page?.protocol !== "https:" || typeof attempt?.attemptId !== "string")
+          if (page?.protocol !== "https:" || page.username || page.password || typeof attempt?.attemptId !== "string")
             return signInFailed(sourceText("error.provider.codeLoginNoLink"));
-          // The page names the sign-in attempt. It is registered as a secret and never logged.
+          // The page and the attempt name the sign-in. They are registered as secrets and never logged.
           registerSecretValue(page.toString());
+          registerSecretValue(attempt.attemptId);
           options.onSignInUrl(page.toString());
           const params = { methodId: options.methodId, _meta: { action: "complete", attemptId: attempt.attemptId } };
           send({ id: 4, method: "authenticate", params });
         } else if (message.id === 4) {
           // Only a finished sign-in ends it. Another answer, such as a new attempt, is not one.
-          const result = isDynamicRecord(message.result) ? message.result : undefined;
-          const meta = isDynamicRecord(result?._meta) ? result._meta[options.methodId] : undefined;
-          if (isDynamicRecord(meta) && meta.status === "completed") settle(null);
+          if (delegatedResult(message.result, options.methodId)?.status === "completed") settle(null);
           else signInFailed(sourceText("error.provider.acpSignInFailed"));
         } else if (message.id === 2) {
           settle(null);
@@ -312,6 +309,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   );
   return { child, done: Fiber.join(done) };
 });
+
+/** The `_meta` record of a delegated sign-in's answer, under the name of its method. */
+function delegatedResult(result: unknown, methodId: string): DynamicRecord | undefined {
+  const meta = isDynamicRecord(result) && isDynamicRecord(result._meta) ? result._meta[methodId] : undefined;
+  return isDynamicRecord(meta) ? meta : undefined;
+}
 
 /** How often the page file is read while the server has not opened its page. */
 const OPENER_POLL_MS = 250;

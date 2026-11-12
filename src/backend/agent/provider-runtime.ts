@@ -95,7 +95,7 @@ import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
-import { CliCodeLoginFailed, type CliCodePrompt, startCliCodeLogin } from "./cli-code-login";
+import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -140,8 +140,6 @@ const logger = createOpenBotLogger("provider-runtime");
 const stderrLogger = createOpenBotLogger("provider-stderr");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
-/** How long a delegated ACP sign-in has to give its page, as a CLI has to print its link. */
-const ACP_SIGN_IN_PAGE_TIMEOUT_MS = 30_000;
 /** A read this recent answers a second request, such as one that waited for the read before it. */
 const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 /** A released `acp` shows its last answers for this long, then starts again to read new ones. */
@@ -2178,18 +2176,16 @@ export class ProviderRuntime implements ProviderPort {
               Effect.map(({ child, done }) => ({
                 child,
                 done,
-                // The server's page, or the reason it stopped before it gave one.
+                // The server's page, null when it signed in with no page, or the reason it stopped first.
                 prompt: Effect.raceFirst(
                   Deferred.await(page).pipe(
                     Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl })),
                   ),
                   done.pipe(
-                    Effect.andThen(Effect.never),
+                    Effect.as(null),
                     Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
                   ),
-                ).pipe(
-                  Effect.timeoutOrElse({ duration: ACP_SIGN_IN_PAGE_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
-                ),
+                ).pipe(Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) })),
                 submit() {
                   throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
                 },
