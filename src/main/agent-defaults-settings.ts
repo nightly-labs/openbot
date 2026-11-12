@@ -10,7 +10,7 @@ import {
   type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Schema } from "effect";
+import { Effect, Schema, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AgentNotFoundError } from "./agent-admin-settings";
@@ -52,6 +52,10 @@ export function createAgentDefaultsSettings({
   agentDefaults,
   busyMessageMode,
 }: AgentDefaultsSettingsDependencies): AgentDefaultsSettingsService {
+  // Each update reads, merges and writes the defaults. Two updates that overlap, such as one from a
+  // phone and one from a desktop, must not merge from the same old value, or the second loses the first.
+  const updates = Semaphore.makeUnsafe(1);
+
   function read(): AgentDefaultsOverview {
     return {
       defaults: agentDefaults.get(),
@@ -97,7 +101,7 @@ export function createAgentDefaultsSettings({
 
   return {
     read,
-    update: (input) => update(input).pipe(Effect.uninterruptible),
+    update: (input) => update(input).pipe(updates.withPermit, Effect.uninterruptible),
     setChoice: (input) => setChoice(input).pipe(Effect.uninterruptible),
   };
 }
