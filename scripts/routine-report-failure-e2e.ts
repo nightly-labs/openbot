@@ -6,7 +6,7 @@
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
 // still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
 // a teammate's update that wants no answer can end quiet (#6821), that a teammate's request can end
-// quiet after its result went back with send_message (#7585), that
+// quiet after its result went back with send_message but not without it (#7585), that
 // a flow skips the agents after a failed owner or linked step, and that a result destination gets the
 // answer of a reported failure but not of a provider failure.
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
@@ -83,7 +83,8 @@ const listRoutines: FakeCall = { tool: "list_routines", arguments: {} };
  * `PROVIDER-FAIL` ends the turn failed with an error and no answer. `EMPTY-ANSWER` does the same with
  * the `empty_answer` cause, as Grok does when the model sends only its reasoning. An input with
  * `TEAMMATE-QUIET` and no calls calls `routine_no_update`. A teammate's request with `TEAMMATE-ANSWER`
- * sends its result with `send_message` and then calls `routine_no_update`.
+ * sends its result with `send_message` and then calls `routine_no_update`. One with `TEAMMATE-NOREPLY`
+ * calls only `routine_no_update`.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -159,7 +160,7 @@ const answer = (message) => {
       const request = /recipientAgentIds \\["([^"]+)"\\], replyToMessageId "([^"]+)"/.exec(task);
       const turnCalls = named
         ? JSON.parse(named[1])
-        : task.includes("TEAMMATE-QUIET")
+        : task.includes("TEAMMATE-QUIET") || task.includes("TEAMMATE-NOREPLY")
           ? [{ tool: "routine_no_update", arguments: {} }]
           : task.includes("TEAMMATE-ANSWER") && request
             ? [
@@ -521,6 +522,55 @@ try {
       requestAnswers.length > 0 &&
       requestAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE),
     { replyResult, requestQuietResult, requestEvent, requestAnswers },
+  );
+
+  // A request with no reply stays shown after routine_no_update, and OpenBot relays its answer. That
+  // relayed answer does not count as the agent's own reply, so a restart does not make the turn quiet.
+  const unanswered: FakeCall = {
+    tool: "send_message",
+    arguments: { recipientAgentIds: [checker.id], text: "Check the backup logs. TEAMMATE-NOREPLY" },
+  };
+  const unansweredReceipt = await runCauseEffect(
+    agents.sendMessage({ agentId: relay.id, text: `Ask the checker again. ${calls(unanswered)}` }),
+  );
+  const unansweredSenderId = unansweredReceipt.deliveries[0]?.id;
+  assert.ok(unansweredSenderId);
+  await waitFor("the second request sender's turn", () =>
+    ended(mailbox.getDelivery(unansweredSenderId)?.delivery.status),
+  );
+  const unansweredMessageId = /"messageId":"([^"]+)"/.exec(
+    toolResults(mailbox.getDelivery(unansweredSenderId)?.delivery.turnId ?? null, "send_message")[0]?.result
+      ?.contentItems[0]?.text ?? "",
+  )?.[1];
+  assert.ok(unansweredMessageId);
+  const unansweredTurnId = await waitFor(
+    "the second request's turn",
+    () =>
+      fakeEntries().find(
+        (entry) =>
+          entry.method === "turn/start" &&
+          entry.text?.includes("Check the backup logs.") === true &&
+          !entry.text.includes("<<CALLS"),
+      )?.turnId,
+  );
+  const unansweredEvent = await waitFor("the second request's turn-completed", () =>
+    events.find((event) => event.type === "turn-completed" && event.turnId === unansweredTurnId),
+  );
+  const shownResult = toolResults(unansweredTurnId, "routine_no_update")[0]?.result;
+  const answerRelayed = await waitFor("the relayed answer", () =>
+    mailbox.hasReplyFrom(checker.id, unansweredMessageId) ? true : null,
+  );
+  const unansweredAnswers = store.database.readTurnAssistantMessages(checker.id, unansweredTurnId);
+  pass(
+    "A teammate's request with no reply stays shown after routine_no_update, and its answer is relayed",
+    shownResult?.success === true &&
+      shownResult.contentItems.some((item) => item.text.includes('"shown"')) &&
+      unansweredEvent.type === "turn-completed" &&
+      unansweredEvent.quiet !== true &&
+      latestTurnAnswer(unansweredAnswers, unansweredTurnId)?.text === FAILED_ANSWER &&
+      answerRelayed &&
+      !mailbox.hasSentReplyFrom(checker.id, unansweredMessageId),
+    { shownResult, unansweredEvent, unansweredAnswers },
   );
 
   // A Test run that reports a failure.

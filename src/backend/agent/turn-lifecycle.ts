@@ -33,7 +33,13 @@ import type { BrowserOperationError } from "../browser-effects";
 import type { BrowserDynamicToolHooks } from "../browser-tool-actions";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
-import { channelLane, type DeliveryContext, type MailboxStore, type UsageLimitContinuation } from "../mailbox-store";
+import {
+  AUTO_RESULT_KEY,
+  channelLane,
+  type DeliveryContext,
+  type MailboxStore,
+  type UsageLimitContinuation,
+} from "../mailbox-store";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
@@ -1439,13 +1445,14 @@ export class TurnLifecycle {
 
   /**
    * A teammate's update, or a request that this agent already answered with openbot.send_message.
-   * The auto-relay uses the same reply check, so a quiet request turn sends the requester nothing less.
+   * The auto-relay skips a request with such a reply, so a quiet request turn sends the requester
+   * nothing less. Its own relayed answer does not count: that turn was shown.
    */
   #quietTeammateDelivery(delivery: QueueDelivery): boolean {
     return (
       quietTeammateDelivery(delivery) ||
       (quietTeammateDelivery(delivery, true) &&
-        this.#mailbox.hasReplyFrom(delivery.recipientAgentId, delivery.messageId))
+        this.#mailbox.hasSentReplyFrom(delivery.recipientAgentId, delivery.messageId))
     );
   }
 
@@ -2202,7 +2209,7 @@ export class TurnLifecycle {
         // The requested result, not a new request. The chain-origin guard above already stops a
         // second relay; this is what tells the recipient it owes no acknowledgement for one.
         expectsReply: false,
-        idempotencyKey: `auto-result:${turnId}:${messageId}`,
+        idempotencyKey: `${AUTO_RESULT_KEY}${turnId}:${messageId}`,
       })
       .pipe(toTurnOperationFailed);
     const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
