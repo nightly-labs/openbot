@@ -235,7 +235,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   configDirectory: string,
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
-  processToolSearch: string | undefined,
+  processEnvironment: NodeJS.ProcessEnv,
 ) {
   const projectFiles = [
     ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
@@ -246,11 +246,14 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   // A settings `env` value replaces the process value, and a later file replaces an earlier one.
   // Without the user setup, `claudeSignInSettings` copies the user `env` into the flag settings,
   // which come before the project and local settings.
-  const toolSearch =
-    (sources.includes("user") ? [userSettings, ...projectSettings] : [...projectSettings, userSettings])
-      .map((file) => (isDynamicRecord(file.env) ? file.env.ENABLE_TOOL_SEARCH : undefined))
+  const envFiles = sources.includes("user") ? [userSettings, ...projectSettings] : [...projectSettings, userSettings];
+  const environmentValue = (name: string) =>
+    envFiles
+      .map((file) => (isDynamicRecord(file.env) ? file.env[name] : undefined))
       .filter(isString)
-      .at(-1) ?? processToolSearch;
+      .at(-1) ?? processEnvironment[name];
+  // On Bedrock, Vertex or a gateway, the CLI can choose a different tool search default than `true`.
+  const firstPartyApi = CLAUDE_OTHER_API_VARIABLES.every((name) => !environmentValue(name));
   const ownSkills = new Set([
     ...(sources.includes("user") ? yield* skillFolderNames(join(configDirectory, "skills")) : []),
     ...(sources.includes("project") ? yield* skillFolderNames(join(cwd, ".claude", "skills")) : []),
@@ -266,10 +269,24 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
     disableRemoteControl: true,
     skillOverrides: Object.fromEntries(overrides.filter(([skill]) => !ownSkills.has(skill) && !ownOverride(skill))),
-    ...(isClaudeAutoToolSearch(toolSearch) ? { env: { ENABLE_TOOL_SEARCH: "true" } } : {}),
+    ...(firstPartyApi && isClaudeAutoToolSearch(environmentValue("ENABLE_TOOL_SEARCH"))
+      ? { env: { ENABLE_TOOL_SEARCH: "true" } }
+      : {}),
   };
   return settings;
 });
+
+/** The variables that send Claude requests to an API other than the Anthropic API. */
+const CLAUDE_OTHER_API_VARIABLES = [
+  "ANTHROPIC_BASE_URL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+  "CLAUDE_CODE_USE_GATEWAY",
+  "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+  "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+  "CLAUDE_CODE_USE_MANTLE",
+];
 
 /**
  * Whether an `ENABLE_TOOL_SEARCH` value is an automatic mode: `auto`, or `auto:N` with N between 0
@@ -277,10 +294,11 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
  * `auto`) of the context window, and a late MCP server changes the cached tool list
  * (pingdotgg/t3code#24654). The OpenBot tools (about 26k tokens) fit under 10% of a 1M context:
  * `scripts/claude-mcp-cache-bench.ts` measured 39k prompt tokens per request there, 13k with tool
- * search. OpenBot sets `true`, the CLI default,
- * for these modes. `false`, `auto:0` and `auto:100` stay as the user set them. The CLI clamps N to
- * 0–100 and reads a value that is not a number as `auto`. A thread that ran in an automatic mode
- * writes its prompt cache again once, at its first request with tool search.
+ * search. OpenBot sets `true`, the CLI default on the Anthropic API, for these modes. It does not
+ * change the mode on another API backend (`CLAUDE_OTHER_API_VARIABLES`). `false`, `auto:0` and
+ * `auto:100` stay as the user set them. The CLI clamps N to 0–100 and reads a value that is not a
+ * number as `auto`. A thread that ran in an automatic mode writes its prompt cache again once, at
+ * its first request with tool search.
  */
 function isClaudeAutoToolSearch(value: string | undefined): boolean {
   if (value === "auto") return true;
@@ -1377,13 +1395,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
     const openBotSettings: Settings = config.profileGeneration
       ? {}
-      : yield* claudeFlagSettings(
-          userSettingsFile,
-          configDirectory,
-          config.cwd,
-          settingSources,
-          cliEnvironment.ENABLE_TOOL_SEARCH,
-        );
+      : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
     const flagSettings: Settings = {
       ...openBotSettings,
       ...nodeOptionsSettings,
