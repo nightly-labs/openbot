@@ -891,7 +891,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * only for an authorization server with no RFC 7591 registration endpoint; ElevenLabs accepts only
    * this. The SDK uses it only when the server sets `client_id_metadata_document_supported`. A server
    * with a registration endpoint keeps the registration, so a sign-in that works now does not change
-   * to a different client.
+   * to a different client. When that server refuses the registration, `watchRegistration` gives the
+   * SDK the document client instead.
    */
   clientMetadataUrl?: string;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
@@ -1118,8 +1119,33 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         response = await fetch(input, retry);
       }
       this.#registrationStatus = response.status;
-      return response;
+      if (!this.#documentReplacesRefusal(response.status)) return response;
+      await response.body?.cancel();
+      return Response.json(
+        {
+          client_id: MCP_CLIENT_METADATA_URL,
+          redirect_uris: [this.#options.redirectUrl],
+          token_endpoint_auth_method: "none",
+        },
+        { status: 201 },
+      );
     };
+  }
+
+  /**
+   * Whether the client metadata document takes the place of a registration that the authorization
+   * server refused. Railway lists a registration endpoint, answers each registration with 403
+   * ("Dynamic client registration is disabled"), and accepts the document (#7855). A server that
+   * registers OpenBot keeps that registration: only a refusal changes the client. The document has
+   * no secret, so the server must list `none`.
+   */
+  #documentReplacesRefusal(status: number): boolean {
+    if (status !== 401 && status !== 403) return false;
+    const metadata = this.#discoveryState?.authorizationServerMetadata;
+    return (
+      metadata?.client_id_metadata_document_supported === true &&
+      (metadata.token_endpoint_auth_methods_supported?.includes("none") ?? false)
+    );
   }
 
   /**
