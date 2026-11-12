@@ -12,7 +12,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
-import { loadAvatarFile } from "./avatar-file";
+import { type AvatarImageDecoder, loadAvatarFile } from "./avatar-file";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -206,6 +206,8 @@ function channelResult(channel: Channel, agents: readonly AgentSummary[]) {
 export interface ChannelAgentToolDependencies {
   channels: ChannelService;
   listAgents(): AgentSummary[];
+  /** Decodes the picture file of `imagePath`; null where this process has no image decoder. */
+  decodeAvatar: AvatarImageDecoder | null;
   /**
    * The channel of the channel task that makes the call, if any. `update_channel` does not change it:
    * the channel tools change it, write the change note, and do not stop the work of the caller.
@@ -223,7 +225,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   senderAgentId: string,
   dependencies: ChannelAgentToolDependencies,
 ) {
-  const { channels, listAgents, taskChannelId } = dependencies;
+  const { channels, listAgents, decodeAvatar, taskChannelId } = dependencies;
   // The drafts read the agents again at their turn in the queue. The sender and the member names
   // of the result come from this one read.
   const agents = listAgents();
@@ -233,7 +235,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   const picture = (path: string | null | undefined) =>
     path === undefined || path === null
       ? Effect.succeed(path)
-      : loadAvatarFile(path, sender.workspacePath).pipe(toToolOperationFailed);
+      : loadAvatarFile(path, sender.workspacePath, decodeAvatar).pipe(toToolOperationFailed);
   const removeImage = (channel: Channel) =>
     channel.imageUrl ? channels.setImage(channel.id, null) : Effect.succeed(channel);
 

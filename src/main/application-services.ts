@@ -2134,6 +2134,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),

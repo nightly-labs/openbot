@@ -104,7 +104,7 @@ import type { AgentMemories } from "./agent-memories";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
-import { loadAvatarFile } from "./avatar-file";
+import { type AvatarImageDecoder, loadAvatarFile } from "./avatar-file";
 import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
@@ -412,6 +412,8 @@ export interface OpenBotToolRouterOptions {
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
   videoReader?: VideoReaderHost | null | undefined;
+  /** Decodes the picture files that agents give; null where this process has no image decoder. */
+  avatarDecoder?: AvatarImageDecoder | null | undefined;
   /** The MCP servers of this OpenBot server, for the MCP tools; null where nothing holds them. */
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
@@ -467,6 +469,7 @@ export class OpenBotToolRouter {
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
+  readonly #avatarDecoder: AvatarImageDecoder | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #githubConnected: () => boolean;
@@ -518,6 +521,7 @@ export class OpenBotToolRouter {
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
+    this.#avatarDecoder = options.avatarDecoder ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#githubConnected = options.githubConnected ?? (() => false);
@@ -1683,6 +1687,7 @@ export class OpenBotToolRouter {
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
         listAgents: () => this.#hooks.listAgents(),
+        decodeAvatar: this.#avatarDecoder,
         taskChannelId: channelId,
       });
     }
@@ -2740,7 +2745,7 @@ export class OpenBotToolRouter {
       const image =
         avatarPath === undefined
           ? undefined
-          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(toToolOperationFailed);
+          : yield* loadAvatarFile(avatarPath, sender.workspacePath, this.#avatarDecoder).pipe(toToolOperationFailed);
       const input: UpdateAgentInput = {
         agentId,
         ...(fields.name === undefined ? {} : { name: fields.name }),
