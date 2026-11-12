@@ -3025,6 +3025,103 @@ export async function createApplicationServices({
           .list(agentId)
           .pipe(Effect.map((keys) => keys.filter((key) => key.source !== "vault").map((key) => key.name))),
     },
+    ownerMemberId: () => (teamStore.configured ? teamStore.getOwnerMemberId() : null),
+    // The owner's choices travel as the owner's (`preferences`, `serverPreferences`), so not here.
+    memberPreferences: {
+      read: () =>
+        (teamStore.configured ? teamStore.memberAccounts() : [])
+          .filter((member) => !member.owner)
+          .map(({ memberId, accountId }) => ({
+            accountId,
+            server: agentNotificationLevels.serverLevel(memberId),
+            agents: [...agentNotificationLevels.levels(memberId)].map(([agentId, level]) => ({ agentId, level })),
+            pins: sidebarPins.snapshot(memberId).items,
+          })),
+      apply: (preferences, owner) =>
+        Effect.gen(function* () {
+          const member = (teamStore.configured ? teamStore.memberAccounts() : []).find(
+            (candidate) => candidate.accountId === preferences.accountId,
+          );
+          // Only the owner changes the owner's own choices.
+          if (!member || (member.owner && !owner)) return false;
+          const levelKey = member.owner ? OWNER_NOTIFICATION_KEY : member.memberId;
+          const pinKey = member.owner ? OWNER_PIN_KEY : member.memberId;
+          if (preferences.server !== null) yield* agentNotificationLevels.setServer(levelKey, preferences.server);
+          for (const choice of preferences.agents) yield* agentNotificationLevels.set(levelKey, choice);
+          // The imported agents and channels are new here, so the member's own pins stay and these follow.
+          const current = sidebarPins.snapshot(pinKey).items;
+          const added = preferences.pins.filter(
+            (pin) => !current.some((item) => item.kind === pin.kind && item.id === pin.id),
+          );
+          if (added.length > 0) yield* sidebarPins.set(pinKey, [...current, ...added]);
+          return true;
+        }),
+    },
+    sharedSkills: (() => {
+      // A server without the local library has no shared skills; that is a failure, not a crash.
+      const library = Effect.try({ try: () => skills.requireLocalLibrary(), catch: (cause) => cause });
+      return {
+        list: () =>
+          library.pipe(
+            Effect.flatMap((local) => local.list()),
+            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+          ),
+        assigned: (agentIds: readonly string[]) =>
+          Effect.forEach(agentIds, (agentId) =>
+            skills.lockedSkillIds(agentId).pipe(Effect.orElseSucceed(() => [])),
+          ).pipe(Effect.map((ids) => new Set(ids.flat()))),
+        bundle: (id: string, version: number) => library.pipe(Effect.flatMap((local) => local.bundle(id, version))),
+        add: (bytes: Uint8Array) => library.pipe(Effect.flatMap((local) => local.createFromBundle(bytes))),
+      };
+    })(),
+    serverIdentity: {
+      read: () => {
+        const identity = teamStore.configured ? teamStore.getIdentity() : null;
+        if (!identity) return null;
+        const logo = teamStore.resolveLogo();
+        return { name: identity.serverName, logo: logo ? { path: logo.path, mimeType: logo.mimeType } : null };
+      },
+      // The save of Server settings > General: the account check, the event to clients and the account list.
+      save: (input) => host.updateIdentity(input),
+    },
+    // The stores that Server settings and Agent defaults write, with the same follow-up steps.
+    serverPreferences: {
+      timezone: { get: () => serverTimezone.get().timezone, set: (timezone) => serverTimezone.set(timezone) },
+      personality: { get: () => serverPersonality.get(), set: (personality) => serverPersonality.set(personality) },
+      busyMessageMode: { get: () => busyMessageMode.get(), set: (mode) => busyMessageMode.set(mode) },
+      agentDefaults: {
+        get: () => agentDefaults.get(),
+        set: (defaults) => {
+          const previous = agentDefaults.get();
+          return agentDefaults
+            .set(defaults)
+            .pipe(Effect.tap(() => Effect.sync(() => service.agentDefaultsChanged(previous))));
+        },
+      },
+      memoryLimit: { get: () => agentMemoryLimit.get(), set: (limit) => agentMemoryLimit.set(limit) },
+      memoryReview: { get: () => memoryReview.get(), set: (review) => memoryReview.set(review) },
+      skillLearning: { get: () => skillLearning.get(), set: (mode) => skillLearning.set(mode) },
+      promptCacheTtl: { get: () => promptCacheTtl.get().ttl, set: (ttl) => promptCacheTtl.set(ttl) },
+      ownerNotificationLevel: {
+        get: () => agentNotificationLevels.serverLevel(OWNER_NOTIFICATION_KEY),
+        set: (level) => agentNotificationLevels.setServer(OWNER_NOTIFICATION_KEY, level),
+      },
+      // `onChange` of the store clears the browsing steps when the memory is turned off.
+      browsingMemory: { get: () => browsingMemory.get(), set: (value) => browsingMemory.set(value) },
+      claudeUserSetup: {
+        get: () => claudeUserSetupSetting.get().enabled,
+        set: (enabled) => claudeUserSetupSetting.set(enabled),
+      },
+      claudeCompactWindow: {
+        get: () => claudeCompactWindowSetting.get().tokens,
+        set: (tokens) => claudeCompactWindowSetting.set(tokens),
+      },
+      machineAlerts: { get: () => machineAlerts.alerts(), set: (settings) => machineAlerts.setAlerts(settings) },
+      modelVisibility: {
+        get: () => modelVisibility.hiddenModels(),
+        set: (models) => modelVisibility.replaceHidden(models),
+      },
+    },
     appVersion: app.getVersion(),
     uploadDirectory: join(app.getPath("userData"), "instance-transfer-uploads"),
     timezone: () => serverTimezone.effective(),

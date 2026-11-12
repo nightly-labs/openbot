@@ -67,6 +67,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: модель «{model}» здесь пока недоступна, поэтому агент использует модель по умолчанию. Выберите модель снова, когда её провайдер будет готов.",
   "error.import.transferSettingSkipped": "{name}: не импортировано. {reason}",
+  "error.import.transferRunsSkipped": "{name}: история запусков регулярной задачи «{routine}» не импортирована.",
+  "error.import.transferSharedSkillsSkipped": "Не удалось прочитать общие навыки, поэтому их нет в файле.",
+  "error.import.transferSharedSkillsNotAdded": "Не удалось добавить на этот сервер общие навыки из файла.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Не удалось сохранить выбор {count} участника.",
+    few: "Не удалось сохранить выбор {count} участников.",
+    many: "Не удалось сохранить выбор {count} участников.",
+    other: "Не удалось сохранить выбор {count} участника.",
+  },
+  "error.import.transferSharedSkillExists": "На этом сервере уже есть общий навык с таким названием и другими файлами.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} параметр сервера в файле здесь недопустим, поэтому он не импортируется.",
+    few: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    many: "{count} параметров сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    other: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+  },
   "error.import.transferRoutineFlowSkipped": "Схема регулярной задачи не импортирована. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: собственные агенты не импортируются, потому что они запускают команду. Проверьте команду «{command}» и снова добавьте агента в настройках.",

@@ -1,4 +1,6 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
+import { bytesToBase64 } from "./base64";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
@@ -38,6 +40,7 @@ import {
   decodeRemoteInstanceTransferResult,
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
+  INSTANCE_TRANSFER_LIMITS,
   type InstalledSkill,
   type InstanceTransferPreview,
   type InstanceTransferSummary,
@@ -107,6 +110,11 @@ import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-thr
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  INSTANCE_TRANSFER_CHUNK_BYTES,
+  INSTANCE_TRANSFER_CHUNKS_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -579,6 +587,165 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
   );
 });
 
+/** The host's export in parts: the whole file's size and SHA-256, and the SHA-256 of each part. */
+export interface InstanceTransferExportState {
+  exportId: string;
+  size: number;
+  sha256: string;
+  chunkBytes: number;
+  chunks: string[];
+  warnings: string[];
+}
+
+const SHA256 = /^[0-9a-f]{64}$/u;
+
+const isPartBytes = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
+
+/**
+ * The `export/begin` body of `instance-transfer-full-copy-v1`: every part as a field. The channel
+ * messages follow the chat history when the input does not name them, as they did before.
+ */
+export function fullCopyExportBody(input: ExportInstanceInput) {
+  const includeHistory = input.includeHistory === true;
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    includeHistory,
+    includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+    includeServerPreferences: input.includeServerPreferences === true,
+  };
+}
+
+/** The `export/begin` answer of `instance-transfer-chunks-v1`, checked against the file limits. */
+export function decodeInstanceTransferExportState(value: unknown): InstanceTransferExportState {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.exportId) ||
+    typeof value.size !== "number" ||
+    !Number.isSafeInteger(value.size) ||
+    value.size <= 0 ||
+    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
+    !isString(value.sha256) ||
+    !SHA256.test(value.sha256) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.chunks) ||
+    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
+    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every(isString)
+  )
+    throw new Error("The host returned an invalid transfer export.");
+  return {
+    exportId: value.exportId,
+    size: value.size,
+    sha256: value.sha256,
+    chunkBytes: value.chunkBytes,
+    chunks: value.chunks,
+    warnings: value.warnings,
+  };
+}
+
+/**
+ * Starts an export in parts with each part of the file chosen. Send it only to a host that serves
+ * `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`.
+ */
+export const beginInstanceTransferFullCopy = Effect.fn("TeamClient.beginInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ExportInstanceInput,
+): Effect.fn.Return<InstanceTransferExportState, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeInstanceTransferExportState, {
+      ...fullCopyExportBody(input),
+    }),
+  );
+});
+
+/** One part of the host's export, as Base64. The transport must let one part answer this request. */
+export const readInstanceTransferExportPart = Effect.fn("TeamClient.readInstanceTransferExportPart")(function* (
+  request: TeamApiRequest,
+  part: { exportId: string; index: number },
+): Effect.fn.Return<RemoteFileUpload, TeamRequestError> {
+  return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, decodeTransferFile, part));
+});
+
+/** Ends the host's export, which removes its file. */
+export const finishInstanceTransferExport = Effect.fn("TeamClient.finishInstanceTransferExport")(function* (
+  request: TeamApiRequest,
+  exportId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, ignoreResponse, { exportId }));
+});
+
+/** A transfer file that the client reads in parts, so it never holds the whole file at once. */
+export interface TransferFileParts {
+  name: string;
+  size: number;
+  readBytes(offset: number, length: number): Promise<Uint8Array>;
+}
+
+const decodeUploadState = (value: unknown): { uploadId: string; chunkBytes: number; received: number[] } => {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.uploadId) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.received) ||
+    !value.received.every((index) => typeof index === "number" && Number.isSafeInteger(index) && index >= 0)
+  )
+    throw new Error("The host returned an invalid transfer upload.");
+  return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
+};
+
+const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+/** The SHA-256 of `bytes` as the transfer routes write it: 64 lower-case hexadecimal digits. */
+export function sha256Hex(bytes: Uint8Array): string {
+  return hex(sha256(bytes));
+}
+
+/**
+ * Sends a transfer file to the host in parts and answers the preview of `instance-transfer-v1` stage.
+ * The whole file's SHA-256 is read first, in parts. A part that the host already has from an earlier
+ * try is not sent again. Send it only to a host that serves `instance-transfer-chunks-v1`.
+ */
+export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceTransferInParts")(function* (
+  request: TeamApiRequest,
+  file: TransferFileParts,
+): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
+  const whole = sha256.create();
+  for (let offset = 0; offset < file.size; offset += INSTANCE_TRANSFER_CHUNK_BYTES)
+    whole.update(
+      yield* teamCall(() => file.readBytes(offset, Math.min(INSTANCE_TRANSFER_CHUNK_BYTES, file.size - offset))),
+    );
+  const upload = yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, decodeUploadState, {
+      size: file.size,
+      sha256: hex(whole.digest()),
+    }),
+  );
+  const received = new Set(upload.received);
+  for (let index = 0; index * upload.chunkBytes < file.size; index++) {
+    if (received.has(index)) continue;
+    const offset = index * upload.chunkBytes;
+    const bytes = yield* teamCall(() => file.readBytes(offset, Math.min(upload.chunkBytes, file.size - offset)));
+    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: sha256Hex(bytes) });
+    yield* teamCall(() =>
+      request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
+        name: file.name,
+        mimeType: "application/octet-stream",
+        base64: bytesToBase64(bytes),
+        maxBytes: upload.chunkBytes,
+      }),
+    );
+  }
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, decodeRemoteInstanceTransferPreview, {
+      uploadId: upload.uploadId,
+    }),
+  );
+});
+
 /** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */
 export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer")(function* (
   request: TeamApiRequest,
@@ -588,6 +755,26 @@ export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer
     request("POST", INSTANCE_TRANSFER_ROUTES.stage, decodeRemoteInstanceTransferPreview, undefined, {
       ...upload,
       maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
+    }),
+  );
+});
+
+/**
+ * Imports a staged file and also replaces the server preferences when the input asks. Send it only to
+ * a host that serves `instance-transfer-full-copy-v1`.
+ */
+export const applyInstanceTransferFullCopy = Effect.fn("TeamClient.applyInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ApplyInstanceTransferInput,
+  timezone: string,
+): Effect.fn.Return<RemoteInstanceTransferResult, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, decodeRemoteInstanceTransferResult, {
+      token: input.token,
+      keys: input.keys,
+      includeSettings: input.includeSettings,
+      includeServerPreferences: input.includeServerPreferences === true,
+      timezone,
     }),
   );
 });

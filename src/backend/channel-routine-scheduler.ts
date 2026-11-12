@@ -19,7 +19,13 @@ import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { causeHelpers } from "./effect-boundary";
 import { recordRestartActivity } from "./restart-activity";
-import type { OwnedRoutineRecord, ReceivedWebhookEvent, RoutineHoldWindow, RoutineRecordInput } from "./routine-store";
+import type {
+  ImportedRoutineRun,
+  OwnedRoutineRecord,
+  ReceivedWebhookEvent,
+  RoutineHoldWindow,
+  RoutineRecordInput,
+} from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
 export interface ChannelRoutineHooks {
@@ -131,6 +137,11 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       }
     }
     return false;
+  }
+
+  /** Writes the finished runs that a server transfer brought. Returns the new run ids in order. */
+  importRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.#routines.importRuns(this.#requireChannel(channelId), routineId, runs);
   }
 
   listRuns(input: ListChannelRoutineRunsInput, withSkipped = false): ChannelRoutineRun[] {

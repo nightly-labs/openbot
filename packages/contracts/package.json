@@ -164,6 +164,7 @@
     "./team-protocol/agent-import-v2": "./src/team-protocol/agent-import-v2.ts",
     "./team-protocol/instance-transfer-v1": "./src/team-protocol/instance-transfer-v1.ts",
     "./team-protocol/instance-transfer-chunks-v1": "./src/team-protocol/instance-transfer-chunks-v1.ts",
+    "./team-protocol/instance-transfer-full-copy-v1": "./src/team-protocol/instance-transfer-full-copy-v1.ts",
     "./team-protocol/agent-install-v1": "./src/team-protocol/agent-install-v1.ts",
     "./team-protocol/agent-publish-v1": "./src/team-protocol/agent-publish-v1.ts",
     "./team-protocol/agent-update-v1": "./src/team-protocol/agent-update-v1.ts",

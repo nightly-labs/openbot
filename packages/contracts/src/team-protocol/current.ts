@@ -94,6 +94,7 @@ import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
@@ -311,6 +312,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -590,6 +592,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
 ] as const;
 
@@ -804,6 +807,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
     capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+    capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
     capability !== GITHUB_SKILLS_CAPABILITY,
 );
 /**
@@ -893,6 +897,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1066,6 +1071,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
       capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+      capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
       capability !== GITHUB_SKILLS_CAPABILITY,
   );
 }
