@@ -63,6 +63,14 @@ export const ConnectedSingleDisplay: Story = {
   },
 };
 
+// A host with `remote-desktop-quality-v1`: the viewer chooses the stream quality.
+export const QualityChoice: Story = {
+  args: {
+    quality: "smooth",
+    onSelectQuality: fn(async () => undefined),
+  },
+};
+
 export const Connecting: Story = {
   args: {
     session: { ...session, phase: "connecting", transport: "unknown", message: "Connecting through Sunshine…" },

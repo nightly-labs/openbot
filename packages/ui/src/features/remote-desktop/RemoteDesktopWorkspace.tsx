@@ -1,4 +1,9 @@
 import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
+import {
+  REMOTE_DESKTOP_QUALITIES,
+  REMOTE_DESKTOP_QUALITY_PRESETS,
+  type RemoteDesktopQuality,
+} from "@openbot/contracts/team-protocol/remote-desktop-quality-v1";
 import { ArrowLeft, Button, Monitor, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
@@ -22,12 +27,24 @@ interface RemoteDesktopWorkspaceProps {
   onDisconnect: () => Promise<void>;
   onRetry: () => Promise<void>;
   onSelectDisplay: (serverId: string, displayId: string) => Promise<void>;
+  /** The stream quality, when the host can change it. A change starts a new stream. */
+  quality?: RemoteDesktopQuality | undefined;
+  onSelectQuality?: ((quality: RemoteDesktopQuality) => Promise<void>) | undefined;
 }
 
 type ViewerState = "idle" | "connecting" | "connected" | "error";
 // Room for Moonlight's own WebRTC timeout and for the host to start the streams queued before this one.
 const STREAM_READY_TIMEOUT_MS = 60_000;
 type RemoteDisplay = RemoteDesktopSession["displays"][number];
+interface QualityOption {
+  value: RemoteDesktopQuality;
+  label: string;
+}
+const QUALITY_LABEL = {
+  fast: "remoteDesktop.qualityFast",
+  smooth: "remoteDesktop.qualitySmooth",
+  saver: "remoteDesktop.qualitySaver",
+} as const;
 const viewerMessageSchema = z.object({
   source: z.literal("openbot-moonlight"),
   type: z.literal("viewer-state"),
@@ -41,7 +58,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
   const { t, errorMessage } = useText();
   const [viewerState, setViewerState] = createSignal<ViewerState>("idle");
   const [viewerError, setViewerError] = createSignal<string | null>(null);
-  const [actionBusy, setActionBusy] = createSignal<"retry" | "disconnect" | "display" | null>(null);
+  const [actionBusy, setActionBusy] = createSignal<"retry" | "disconnect" | "display" | "quality" | null>(null);
   let workspaceElement: HTMLElement | undefined;
   let viewerFrame: HTMLIFrameElement | undefined;
   let activeSessionId = "";
@@ -65,6 +82,13 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
   const selectedDisplay = createMemo(() =>
     displays().find((display) => display.id === props.session?.selectedDisplayId),
   );
+  const qualityOptions = createMemo<QualityOption[]>(() =>
+    REMOTE_DESKTOP_QUALITIES.map((value) => ({
+      value,
+      label: t(QUALITY_LABEL[value], { fps: REMOTE_DESKTOP_QUALITY_PRESETS[value].fps }),
+    })),
+  );
+  const selectedQuality = createMemo(() => qualityOptions().find((option) => option.value === props.quality));
   createEffect(
     () => props.visible,
     (visible) => {
@@ -172,6 +196,22 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     }
   }
 
+  async function selectQuality(quality: RemoteDesktopQuality) {
+    const select = props.onSelectQuality;
+    if (actionBusy() || !select) return;
+    setActionBusy("quality");
+    setViewerState("connecting");
+    setViewerError(null);
+    try {
+      await select(quality);
+    } catch (error) {
+      setViewerState("error");
+      setViewerError(errorMessage(error, t("remoteDesktop.startFailed")));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   return (
     <Portal mount={props.mount ?? document.body}>
       <main
@@ -207,6 +247,27 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                   <SelectContent class="remote-desktop-display-select-content" />
                 </Select>
               </div>
+            </Show>
+            <Show when={props.onSelectQuality && selectedQuality()}>
+              {(quality) => (
+                <div class="no-drag remote-desktop-display-controls">
+                  <Select<QualityOption>
+                    class="remote-desktop-display-select"
+                    options={qualityOptions()}
+                    optionValue="value"
+                    optionTextValue="label"
+                    value={quality()}
+                    disabled={actionBusy() !== null}
+                    onChange={(option) => option && void selectQuality(option.value)}
+                    itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.label}</SelectItem>}
+                  >
+                    <SelectTrigger size="sm" aria-label={t("remoteDesktop.qualityLabel")}>
+                      <SelectValue<QualityOption>>{(state) => state.selectedOption()?.label}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent class="remote-desktop-display-select-content" />
+                  </Select>
+                </div>
+              )}
             </Show>
             <div class="no-drag remote-desktop-actions">
               <Button

@@ -1201,6 +1201,7 @@ function RemoteDesktop() {
     remoteDesktopWorkspaceServer,
     remoteDesktopWorkspaceVisible,
     remoteDesktopWorkspaceSession,
+    remoteDesktopWorkspaceQuality,
     remoteDesktopConnectingServerId,
     remoteDesktopConnectionError,
     remoteDesktopConnectionErrorCode,
@@ -1209,6 +1210,7 @@ function RemoteDesktop() {
     disconnectRemoteDesktopWorkspace,
     retryRemoteDesktopWorkspace,
     selectRemoteDesktopDisplay,
+    selectRemoteDesktopQuality,
   } = useRemoteDesktop();
 
   return (
@@ -1230,6 +1232,8 @@ function RemoteDesktop() {
               onDisconnect={() => disconnectRemoteDesktopWorkspace()}
               onRetry={retryRemoteDesktopWorkspace}
               onSelectDisplay={selectRemoteDesktopDisplay}
+              quality={remoteDesktopWorkspaceQuality()}
+              onSelectQuality={remoteDesktopWorkspaceQuality() ? selectRemoteDesktopQuality : undefined}
             />
           </Loading>
         )}

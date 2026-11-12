@@ -195,6 +195,7 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { REMOTE_DESKTOP_QUALITY_CAPABILITY } from "@openbot/contracts/team-protocol/remote-desktop-quality-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
@@ -2496,6 +2497,8 @@ export class TeamApiServer {
             return (
               this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined
             );
+          // The viewer page that the gateway serves applies the quality, so each remote screen host has it.
+          if (capability === REMOTE_DESKTOP_QUALITY_CAPABILITY) return this.#options.remoteScreen !== undefined;
           if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
           if (capability === LIVE_VOICE_CAPABILITY) return this.#options.liveVoice !== undefined;
           // Each account signs in with the browser, so it needs the sign-in routes too.

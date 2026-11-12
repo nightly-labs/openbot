@@ -93,6 +93,7 @@
     "./team-protocol/provider-account-relays": "./src/team-protocol/provider-account-relays.ts",
     "./team-protocol/provider-account-models-v1": "./src/team-protocol/provider-account-models-v1.ts",
     "./team-protocol/provider-account-pool-v1": "./src/team-protocol/provider-account-pool-v1.ts",
+    "./team-protocol/remote-desktop-quality-v1": "./src/team-protocol/remote-desktop-quality-v1.ts",
     "./team-protocol/provider-accounts-v1": "./src/team-protocol/provider-accounts-v1.ts",
     "./team-protocol/provider-sign-out-v1": "./src/team-protocol/provider-sign-out-v1.ts",
     "./team-protocol/provider-usage-reset-v1": "./src/team-protocol/provider-usage-reset-v1.ts",

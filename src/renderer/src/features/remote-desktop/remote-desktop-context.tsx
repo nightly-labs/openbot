@@ -1,4 +1,9 @@
 import type { RemoteDesktopConnectResult, RemoteDesktopErrorCode, RemoteDesktopSession } from "@openbot/contracts/ipc";
+import {
+  REMOTE_DESKTOP_QUALITY_CAPABILITY,
+  type RemoteDesktopQuality,
+  remoteDesktopViewerUrlWithQuality,
+} from "@openbot/contracts/team-protocol/remote-desktop-quality-v1";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -34,6 +39,11 @@ import { remoteDesktopPort } from "./remote-desktop-port";
  * - `remoteDesktopViewerFailed` is the viewer's last word on the stream. A
  *   session whose stream failed has nothing to resume, so hiding the workspace
  *   ends it instead of keeping it, and the header no longer shows it as active.
+ * - `remoteDesktopQuality` is the quality of the next stream, for this app run, as on the phone.
+ *   `remoteDesktopServerQualities` is the quality that each server's last connect asked for. It is set
+ *   before the request, because main announces the new session before the request answers, and a
+ *   viewer address that changed after the frame opened would reuse the one-time grant. Only a host
+ *   with `remote-desktop-quality-v1` gets a quality.
  */
 const RemoteDesktop = createSimpleContext({
   name: "Remote desktop",
@@ -49,6 +59,8 @@ const RemoteDesktop = createSimpleContext({
       createSignal<RemoteDesktopErrorCode | null>(null);
     const [remoteDesktopSessionEstablished, setRemoteDesktopSessionEstablished] = createSignal(false);
     const [remoteDesktopViewerFailed, setRemoteDesktopViewerFailed] = createSignal(false);
+    const [remoteDesktopQuality, setRemoteDesktopQuality] = createSignal<RemoteDesktopQuality>("smooth");
+    const remoteDesktopServerQualities = new Map<string, RemoteDesktopQuality>();
     let remoteDesktopRestoreTarget: HTMLElement | null = null;
     let remoteDesktopConnectPromise: Promise<RemoteDesktopSession | undefined> | null = null;
     /** Bumped by every open, retry and disconnect, so a late connect cannot revive a closed workspace. */
@@ -59,8 +71,18 @@ const RemoteDesktop = createSimpleContext({
       setRemoteDesktopConnectionErrorCode(null);
     }
 
+    function serverChoosesRemoteDesktopQuality(serverId: string): boolean {
+      return serverSupportsCapability(
+        servers().find((server) => server.id === serverId),
+        REMOTE_DESKTOP_QUALITY_CAPABILITY,
+      );
+    }
+
     async function connectRemoteDesktop(serverId: string): Promise<RemoteDesktopConnectResult> {
       const analytics = desktopAnalytics.scope();
+      if (serverChoosesRemoteDesktopQuality(serverId))
+        remoteDesktopServerQualities.set(serverId, remoteDesktopQuality());
+      else remoteDesktopServerQualities.delete(serverId);
       try {
         const result = await remoteDesktopPort().remoteDesktop.connect({ serverId });
         if (result.status === "refused") {
@@ -236,6 +258,13 @@ const RemoteDesktop = createSimpleContext({
       if (remoteDesktopConnectPromise === connection) remoteDesktopConnectPromise = null;
     }
 
+    /** Moonlight reads the stream settings only when a stream starts, so a new quality needs a new session. */
+    async function selectRemoteDesktopQuality(quality: RemoteDesktopQuality): Promise<void> {
+      if (quality === remoteDesktopQuality()) return;
+      setRemoteDesktopQuality(quality);
+      await retryRemoteDesktopWorkspace();
+    }
+
     async function disconnectRemoteDesktopWorkspace(restoreFocus = true): Promise<void> {
       const serverId = remoteDesktopWorkspaceServerId();
       if (!serverId) return;
@@ -265,7 +294,16 @@ const RemoteDesktop = createSimpleContext({
     });
     const remoteDesktopWorkspaceSession = createMemo(() => {
       const serverId = remoteDesktopWorkspaceServerId();
-      return serverId ? latestRemoteDesktopSession(serverId) : undefined;
+      const session = serverId ? latestRemoteDesktopSession(serverId) : undefined;
+      const quality = session ? remoteDesktopServerQualities.get(session.serverId) : undefined;
+      return session && quality
+        ? { ...session, viewerUrl: remoteDesktopViewerUrlWithQuality(session.viewerUrl, quality) }
+        : session;
+    });
+    /** The quality choice of the workspace, or undefined when its host cannot change the quality. */
+    const remoteDesktopWorkspaceQuality = createMemo(() => {
+      const serverId = remoteDesktopWorkspaceServerId();
+      return serverId && serverChoosesRemoteDesktopQuality(serverId) ? remoteDesktopQuality() : undefined;
     });
 
     createEffect(
@@ -312,6 +350,7 @@ const RemoteDesktop = createSimpleContext({
       activeRemoteDesktopSession,
       remoteDesktopWorkspaceServer,
       remoteDesktopWorkspaceSession,
+      remoteDesktopWorkspaceQuality,
       remoteDesktopWorkspaceVisible,
       remoteDesktopConnectingServerId,
       remoteDesktopConnectionError,
@@ -322,6 +361,7 @@ const RemoteDesktop = createSimpleContext({
       retryRemoteDesktopWorkspace,
       disconnectRemoteDesktopWorkspace,
       selectRemoteDesktopDisplay,
+      selectRemoteDesktopQuality,
     };
   },
 });

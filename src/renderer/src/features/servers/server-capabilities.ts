@@ -25,6 +25,7 @@ export function serverSupportsCapability(
 ): boolean {
   if (
     (capability === "remote-desktop-setup" ||
+      capability === "remote-desktop-quality-v1" ||
       capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||

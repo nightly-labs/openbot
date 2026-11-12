@@ -289,6 +289,7 @@ import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/con
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { REMOTE_DESKTOP_QUALITY_CAPABILITY } from "@openbot/contracts/team-protocol/remote-desktop-quality-v1";
 import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
@@ -3595,6 +3596,18 @@ try {
         ],
       ),
       merged,
+    );
+  }
+
+  // ---- Remote desktop quality (remote-desktop-quality-v1) ----
+  {
+    // This host serves no remote screen, so a client must not offer a quality choice for it.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "a host without a remote screen does not advertise remote-desktop-quality-v1",
+      compatibility.status === 200 &&
+        !list(field(compatibility.body, "capabilities")).includes(REMOTE_DESKTOP_QUALITY_CAPABILITY),
+      [summary(compatibility)],
     );
   }
 
