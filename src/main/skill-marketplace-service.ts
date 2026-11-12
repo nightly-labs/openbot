@@ -47,6 +47,8 @@ import {
   FINDER_METADATA_FILE,
   inspectArchive,
   inspectSkillMarkdown,
+  isRuntimeCacheFile,
+  isRuntimeCacheFolder,
   normalizedFiles,
 } from "./skill-package";
 
@@ -875,8 +877,10 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile())
+        // The state check does not look in runtime caches, so turning a skill on leaves them out too.
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile())
           files[relative(root, path).replaceAll("\\", "/")] = new Uint8Array(yield* skillIO(() => readFile(path)));
       }
     });
@@ -973,8 +977,9 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
         const path = join(directory, entry.name);
         const name = relative(root, path).replaceAll("\\", "/");
         if (entry.isSymbolicLink()) return true;
-        // A save leaves the Finder file out, so a copy that has it has no edit there (#7072).
+        // A save leaves out the Finder file and runtime caches, so a copy with them has no edit (#7072, #7350).
         if (entry.isDirectory()) {
+          if (isRuntimeCacheFolder(entry.name)) continue;
           if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (yield* visit(path))) return true;
         } else if (!entry.isFile() || (!(name in expected) && entry.name !== FINDER_METADATA_FILE)) return true;
       }
@@ -1036,6 +1041,7 @@ const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
   if (Result.isFailure(unexpected) || unexpected.success) return false;
   for (const [name, hash] of Object.entries(files)) {
+    if (isRuntimeCacheFile(name)) continue;
     const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
     if (Result.isFailure(content)) return false;
     const bytes = new Uint8Array(content.success);
@@ -1062,6 +1068,8 @@ const installedFolderState = Effect.fn("SkillMarketplace.installedFolderState")(
     const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
     if (Result.isFailure(unexpected) || unexpected.success) return "modified";
     for (const [name, hash] of Object.entries(files)) {
+      // Python writes the cache files that an older package kept again, so their bytes are not an edit.
+      if (isRuntimeCacheFile(name)) continue;
       const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
       if (Result.isSuccess(content)) {
         if (sha256(new Uint8Array(content.success)) !== hash) return "modified";
