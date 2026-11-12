@@ -160,6 +160,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "{provider} CLI 正在处理对话，请等它结束后再更新。",
   "error.provider.cliSelectFailed": "OpenBot 无法选择已安装的托管 CLI。",
   "error.provider.noAuthenticatedAccount": "{provider} 未返回已验证的账号。",
+  "error.provider.codexModelProvider":
+    "此电脑上的 Codex 使用其他模型提供方，该提供方不使用 ChatGPT 登录或 OpenAI API 密钥。ChatGPT 智能体现在可以使用该提供方。要使用你的 ChatGPT 账号，请将 Codex 的模型提供方改回 OpenAI。",
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
   "error.provider.noMainlandChinaSignIn": "{provider} 没有中国大陆的登录方式。",

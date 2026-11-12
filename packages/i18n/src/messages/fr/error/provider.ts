@@ -200,6 +200,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "La CLI {provider} traite un tour. Attendez la fin, puis mettez à jour.",
   "error.provider.cliSelectFailed": "OpenBot n’a pas pu sélectionner la CLI gérée installée.",
   "error.provider.noAuthenticatedAccount": "{provider} n’a renvoyé aucun compte authentifié.",
+  "error.provider.codexModelProvider":
+    "Sur cet ordinateur, Codex utilise un autre fournisseur de modèles, et ce fournisseur n’utilise ni connexion ChatGPT ni clé d’API OpenAI. Les agents ChatGPT peuvent utiliser ce fournisseur dès maintenant. Pour utiliser votre compte ChatGPT, remettez OpenAI comme fournisseur de modèles de Codex.",
   "error.provider.signInExpired": "Votre connexion à {provider} a expiré. Reconnectez-vous pour continuer.",
   "error.provider.cliActivateFailed": "OpenBot n’a pas pu activer la CLI gérée.",
   "error.provider.noMainlandChinaSignIn": "{provider} n’a pas de connexion pour la Chine continentale.",

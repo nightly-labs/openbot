@@ -182,6 +182,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 업데이트하세요.",
   "error.provider.cliSelectFailed": "OpenBot이 설치된 관리형 CLI를 선택할 수 없었어요.",
   "error.provider.noAuthenticatedAccount": "{provider}이(가) 인증된 계정을 반환하지 않았어요.",
+  "error.provider.codexModelProvider":
+    "이 컴퓨터의 Codex는 다른 모델 제공자를 사용하고, 이 제공자는 ChatGPT 로그인이나 OpenAI API 키를 사용하지 않아요. ChatGPT 에이전트는 지금 이 제공자를 사용할 수 있어요. ChatGPT 계정을 사용하려면 Codex의 모델 제공자를 OpenAI로 다시 설정하세요.",
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
   "error.provider.noMainlandChinaSignIn": "{provider}에는 중국 본토용 로그인이 없습니다.",
