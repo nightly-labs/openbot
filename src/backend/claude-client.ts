@@ -228,18 +228,28 @@ const CLAUDE_NAME_ONLY_SKILLS = [
  * Flag settings come before the user, project and local settings, so a value of OpenBot would
  * replace a value that the user set. The query leaves out each skill override whose name is a skill
  * of the user or the project that the query loads, and each key that a settings file it loads sets.
+ * The exception is an automatic `ENABLE_TOOL_SEARCH` mode: see `isClaudeAutoToolSearch`.
  */
 const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
   configDirectory: string,
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
+  processToolSearch: string | undefined,
 ) {
-  const files = [
-    ...(sources.includes("user") ? [join(configDirectory, "settings.json")] : []),
+  // The `env` of the user settings applies also without the user setup: `claudeSignInSettings` copies it.
+  const userSettings = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
+  const projectFiles = [
     ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
     ...(sources.includes("local") ? [join(cwd, ".claude", "settings.local.json")] : []),
   ];
-  const ownSettings = yield* Effect.forEach(files, readClaudeSettingsFile);
+  const projectSettings = yield* Effect.forEach(projectFiles, readClaudeSettingsFile);
+  const ownSettings = [...(sources.includes("user") ? [userSettings] : []), ...projectSettings];
+  // A settings `env` value replaces the process value, and a later file replaces an earlier one.
+  const toolSearch =
+    [userSettings, ...projectSettings]
+      .map((file) => (isDynamicRecord(file.env) ? file.env.ENABLE_TOOL_SEARCH : undefined))
+      .filter(isString)
+      .at(-1) ?? processToolSearch;
   const ownSkills = new Set([
     ...(sources.includes("user") ? yield* skillFolderNames(join(configDirectory, "skills")) : []),
     ...(sources.includes("project") ? yield* skillFolderNames(join(cwd, ".claude", "skills")) : []),
@@ -255,9 +265,28 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
     disableRemoteControl: true,
     skillOverrides: Object.fromEntries(overrides.filter(([skill]) => !ownSkills.has(skill) && !ownOverride(skill))),
+    ...(isClaudeAutoToolSearch(toolSearch) ? { env: { ENABLE_TOOL_SEARCH: "true" } } : {}),
   };
   return settings;
 });
+
+/**
+ * Whether an `ENABLE_TOOL_SEARCH` value is an automatic mode: `auto`, or `auto:N` with N between 0
+ * and 100. Then the CLI sends each tool schema in full while the schemas fit under N% (10% for
+ * `auto`) of the context window, and a late MCP server changes the cached tool list
+ * (pingdotgg/t3code#24654). The OpenBot tools (about 26k tokens) fit under 10% of a 1M context:
+ * `scripts/claude-mcp-cache-bench.ts` measured 39k prompt tokens per request there, 13k with tool
+ * search. OpenBot sets `true`, the CLI default,
+ * for these modes. `false`, `auto:0` and `auto:100` stay as the user set them. The CLI clamps N to
+ * 0–100 and reads a value that is not a number as `auto`. A thread that ran in an automatic mode
+ * writes its prompt cache again once, at its first request with tool search.
+ */
+function isClaudeAutoToolSearch(value: string | undefined): boolean {
+  if (value === "auto") return true;
+  if (!value?.startsWith("auto:")) return false;
+  const percent = Number.parseFloat(value.slice("auto:".length));
+  return Number.isNaN(percent) || (percent > 0 && percent < 100);
+}
 
 /** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
 const TOOL_DESCRIPTION_LIMIT = 120;
@@ -1337,11 +1366,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
     const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
     const settingSources = claudeSettingSources(config, userSetup);
+    const cliEnvironment: NodeJS.ProcessEnv = {
+      ...claudeEnvironment(this.#cli),
+      // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
+      // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
+      ...(launchPath ? { PATH: launchPath } : {}),
+      ...this.#environment(this.#onApiKey),
+    };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
     const openBotSettings: Settings = config.profileGeneration
       ? {}
-      : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources);
-    const flagSettings: Settings = { ...openBotSettings, ...nodeOptionsSettings };
+      : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources, cliEnvironment.ENABLE_TOOL_SEARCH);
+    const flagSettings: Settings = {
+      ...openBotSettings,
+      ...nodeOptionsSettings,
+      ...(openBotSettings.env || nodeOptionsSettings.env
+        ? { env: { ...openBotSettings.env, ...nodeOptionsSettings.env } }
+        : {}),
+    };
     const sandbox = config.workspaceOnly
       ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
       : null;
@@ -1354,7 +1396,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
               ...signInSettings,
               ...openBotSettings,
-              env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+              env: { ...signInSettings.env, ...openBotSettings.env, ...nodeOptionsSettings.env },
               ...(sandbox ? { sandbox } : {}),
             }).pipe(
               Effect.catch((error) =>
@@ -1437,13 +1479,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(plugins.length ? { plugins } : {}),
           mcpServers,
           env: {
-            ...withClaudeClientLabels({
-              ...claudeEnvironment(this.#cli),
-              // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
-              // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
-              ...(launchPath ? { PATH: launchPath } : {}),
-              ...this.#environment(this.#onApiKey),
-            }),
+            ...withClaudeClientLabels(cliEnvironment),
+            // The CLI connects MCP servers in the background. On a resume, the first request could
+            // go out before a slow server was ready: the CLI told the agent that the server had
+            // disconnected and added its tools again on a later request (pingdotgg/t3code#34822).
+            // A resume waits for the servers, up to `MCP_CONNECT_TIMEOUT_MS` (5 s by default). CLI
+            // 2.1.322 already holds the first turn of a query until they connect, so this guards
+            // other CLI versions. A new session does not wait. A value of the user wins.
+            ...(resume && cliEnvironment.MCP_CONNECTION_NONBLOCKING === undefined
+              ? { MCP_CONNECTION_NONBLOCKING: "0" }
+              : {}),
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
