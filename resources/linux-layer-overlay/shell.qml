@@ -118,8 +118,13 @@ ShellRoot {
         property int fw: 1
         property int fh: 1
         property bool showA: true
-        /** The surface's top on its output: the pointer's height there is this plus the y in the surface. */
-        property real topOffset: 0
+        /**
+         * Where OpenBot's page sits in the surface. The dock's surface is as tall as its output and never
+         * moves: only the page moves in it. So the pointer's height on the output is the y in the surface,
+         * and it stays right while a drag moves the dock. (A surface that moved with the drag gave pointer
+         * heights against its old place until the compositor moved it, and the dock ran ahead of the pointer.)
+         */
+        property real contentY: 0
         function frame(m) {
             surf.fw = m.width; surf.fh = m.height; surf.live = true;
             const url = "file://" + m.file + "?" + m.seq;
@@ -127,7 +132,7 @@ ShellRoot {
         }
         function sendInput(ev) {
             root.send({ type: "input", surface: surf.name, event: ev,
-                        screenY: ev.y !== undefined ? Math.round(surf.topOffset + ev.y) : null });
+                        screenY: ev.y !== undefined ? Math.round(surf.contentY + ev.y) : null });
         }
         function held(buttons) {
             const r = [];
@@ -156,58 +161,62 @@ ShellRoot {
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
         implicitWidth: fw
-        implicitHeight: fh
+        implicitHeight: fh + contentY
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "openbot-" + name
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
         mask: Region {
             x: surf.bbox ? surf.bbox.x : 0
-            y: surf.bbox ? surf.bbox.y : 0
+            y: surf.bbox ? surf.contentY + surf.bbox.y : 0
             width: surf.bbox ? surf.bbox.width : 0
             height: surf.bbox ? surf.bbox.height : 0
         }
 
         // double-buffered: the shown frame stays until the next one is decoded, so nothing flickers
-        Image { id: imgA; anchors.fill: parent; cache: false; asynchronous: true; smooth: false; visible: surf.showA
-            onStatusChanged: if (status === Image.Ready && !surf.showA) surf.showA = true }
-        Image { id: imgB; anchors.fill: parent; cache: false; asynchronous: true; smooth: false; visible: !surf.showA
-            onStatusChanged: if (status === Image.Ready && surf.showA) surf.showA = false }
+        // the page, where OpenBot puts it in the surface
+        Item {
+            id: page; x: 0; y: surf.contentY; width: surf.fw; height: surf.fh
+            Image { id: imgA; anchors.fill: parent; cache: false; asynchronous: true; smooth: false; visible: surf.showA
+                onStatusChanged: if (status === Image.Ready && !surf.showA) surf.showA = true }
+            Image { id: imgB; anchors.fill: parent; cache: false; asynchronous: true; smooth: false; visible: !surf.showA
+                onStatusChanged: if (status === Image.Ready && surf.showA) surf.showA = false }
 
-        FocusScope {
-            anchors.fill: parent
-            focus: true
-            Keys.onPressed: e => {
-                const code = root.keyName(e);
-                if (code) surf.sendInput({ type: "keyDown", keyCode: code, modifiers: surf.mods(e.modifiers) });
-                if (e.text && e.text.length === 1 && e.text.charCodeAt(0) >= 32 && !(e.modifiers & Qt.ControlModifier))
-                    surf.sendInput({ type: "char", keyCode: e.text, modifiers: surf.mods(e.modifiers) });
-                e.accepted = true;
-            }
-            Keys.onReleased: e => {
-                const code = root.keyName(e);
-                if (code) surf.sendInput({ type: "keyUp", keyCode: code, modifiers: surf.mods(e.modifiers) });
-                e.accepted = true;
-            }
-            MouseArea {
+            FocusScope {
                 anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                cursorShape: surf.cursor === "pointer" || surf.cursor === "hand" ? Qt.PointingHandCursor
-                           : surf.cursor === "text" ? Qt.IBeamCursor
-                           : surf.cursor === "grab" ? Qt.OpenHandCursor
-                           : surf.cursor === "grabbing" ? Qt.ClosedHandCursor
-                           : surf.cursor === "not-allowed" ? Qt.ForbiddenCursor : Qt.ArrowCursor
-                function btn(b) { return b === Qt.RightButton ? "right" : b === Qt.MiddleButton ? "middle" : "left"; }
-                onEntered: surf.sendInput({ type: "mouseEnter", x: Math.round(mouseX), y: Math.round(mouseY) })
-                onExited: surf.sendInput({ type: "mouseLeave", x: Math.round(mouseX), y: Math.round(mouseY) })
-                onPositionChanged: m => surf.sendInput({ type: "mouseMove", x: Math.round(m.x), y: Math.round(m.y),
-                                                         modifiers: surf.mods(m.modifiers).concat(surf.held(m.buttons)) })
-                onPressed: m => { parent.forceActiveFocus();
-                    surf.sendInput({ type: "mouseDown", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 1,
-                                     modifiers: surf.mods(m.modifiers).concat(surf.held(m.buttons)) }); }
-                onReleased: m => surf.sendInput({ type: "mouseUp", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 1, modifiers: surf.mods(m.modifiers) })
-                onDoubleClicked: m => surf.sendInput({ type: "mouseDown", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 2 })
-                onWheel: w => surf.sendInput({ type: "mouseWheel", x: Math.round(w.x), y: Math.round(w.y), deltaX: w.angleDelta.x, deltaY: w.angleDelta.y, canScroll: true })
+                focus: true
+                Keys.onPressed: e => {
+                    const code = root.keyName(e);
+                    if (code) surf.sendInput({ type: "keyDown", keyCode: code, modifiers: surf.mods(e.modifiers) });
+                    if (e.text && e.text.length === 1 && e.text.charCodeAt(0) >= 32 && !(e.modifiers & Qt.ControlModifier))
+                        surf.sendInput({ type: "char", keyCode: e.text, modifiers: surf.mods(e.modifiers) });
+                    e.accepted = true;
+                }
+                Keys.onReleased: e => {
+                    const code = root.keyName(e);
+                    if (code) surf.sendInput({ type: "keyUp", keyCode: code, modifiers: surf.mods(e.modifiers) });
+                    e.accepted = true;
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                    cursorShape: surf.cursor === "pointer" || surf.cursor === "hand" ? Qt.PointingHandCursor
+                               : surf.cursor === "text" ? Qt.IBeamCursor
+                               : surf.cursor === "grab" ? Qt.OpenHandCursor
+                               : surf.cursor === "grabbing" ? Qt.ClosedHandCursor
+                               : surf.cursor === "not-allowed" ? Qt.ForbiddenCursor : Qt.ArrowCursor
+                    function btn(b) { return b === Qt.RightButton ? "right" : b === Qt.MiddleButton ? "middle" : "left"; }
+                    onEntered: surf.sendInput({ type: "mouseEnter", x: Math.round(mouseX), y: Math.round(mouseY) })
+                    onExited: surf.sendInput({ type: "mouseLeave", x: Math.round(mouseX), y: Math.round(mouseY) })
+                    onPositionChanged: m => surf.sendInput({ type: "mouseMove", x: Math.round(m.x), y: Math.round(m.y),
+                                                             modifiers: surf.mods(m.modifiers).concat(surf.held(m.buttons)) })
+                    onPressed: m => { parent.forceActiveFocus();
+                        surf.sendInput({ type: "mouseDown", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 1,
+                                         modifiers: surf.mods(m.modifiers).concat(surf.held(m.buttons)) }); }
+                    onReleased: m => surf.sendInput({ type: "mouseUp", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 1, modifiers: surf.mods(m.modifiers) })
+                    onDoubleClicked: m => surf.sendInput({ type: "mouseDown", x: Math.round(m.x), y: Math.round(m.y), button: btn(m.button), clickCount: 2 })
+                    onWheel: w => surf.sendInput({ type: "mouseWheel", x: Math.round(w.x), y: Math.round(w.y), deltaX: w.angleDelta.x, deltaY: w.angleDelta.y, canScroll: true })
+                }
             }
         }
     }
@@ -237,10 +246,10 @@ ShellRoot {
         anchors.left: edge === "left"
         anchors.right: edge === "right"
         anchors.top: true
-        topOffset: {
+        anchors.bottom: true
+        contentY: {
             const room = Math.max(0, (screen ? screen.height : fh) - fh);
             return placeY < 0 ? Math.round(room / 2) : Math.min(room, Math.round(placeY));
         }
-        margins.top: topOffset
     }
 }
