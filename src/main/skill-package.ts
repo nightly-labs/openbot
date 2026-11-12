@@ -16,6 +16,18 @@ export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
 /** The file macOS Finder writes into each folder it opens. A package made from a folder leaves it out. */
 export const FINDER_METADATA_FILE = ".DS_Store";
+/**
+ * Folders that Python and its test and lint tools write when they run a skill's scripts. The tool
+ * writes them again, so they are not part of the skill: a package leaves them out (#7350).
+ */
+const RUNTIME_CACHE_FOLDERS = new Set(["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+export function isRuntimeCacheFolder(name: string): boolean {
+  return RUNTIME_CACHE_FOLDERS.has(name);
+}
+/** True for a skill file in a runtime cache folder, such as one that an older package kept. */
+export function isRuntimeCacheFile(path: string): boolean {
+  return path.split("/").slice(0, -1).some(isRuntimeCacheFolder);
+}
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
   let expandedSize = 0;
@@ -26,8 +38,9 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile()) {
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile()) {
           const name = relative(root, path).replaceAll("\\", "/");
           expandedSize += (yield* archiveIO(() => lstat(path))).size;
           if (expandedSize > MAX_BYTES)
