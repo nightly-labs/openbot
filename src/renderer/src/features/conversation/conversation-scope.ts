@@ -1895,7 +1895,6 @@ export function createConversationViewScope(props: ConversationProps) {
         if (lastConversationIdentity !== undefined) closeChatSearch(false);
         lastConversationIdentity = conversationIdentity;
         setStickToLatest(true);
-        setAgentActivitySpaceReserved(false);
         holdChatGlides();
       }
       if (loaded !== lastLoaded) {
