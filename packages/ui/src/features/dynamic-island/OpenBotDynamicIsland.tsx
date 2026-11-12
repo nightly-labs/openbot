@@ -130,6 +130,11 @@ const OPENBOT_COMPACT_HOVER_MOTION = {
   outwardTranslateX: 10,
   translateY: 4,
 } as const;
+/**
+ * The answers given on an open question card. The card closes when the island shuts, so the answers stay
+ * here until the last answer is sent, and the card opens again at the next unanswered question.
+ */
+const questionCardAnswers = new Map<string, Record<string, string[]>>();
 const QUESTION_PROGRESS_DURATION = 300;
 const QUESTION_PROGRESS_BLUR = 2;
 const COMPACT_LEADING_SIZE = 20;
@@ -1360,25 +1365,33 @@ function QuestionContent(props: {
   onClose: () => void;
 }): JSX.Element {
   const { t } = useText();
-  const [questionIndex, setQuestionIndex] = createSignal(0);
-  const [answers, setAnswers] = createSignal<Record<string, string[]>>({});
+  // A provider can use a request id again after a restart, so the questions are part of the key.
+  const cardKey = createMemo(() =>
+    JSON.stringify([
+      props.serverId,
+      props.item.agent.id,
+      props.item.requestId,
+      props.item.questions.map((question) => [question.id, question.question]),
+    ]),
+  );
+  const savedAnswers = () => questionCardAnswers.get(cardKey()) ?? {};
+  const [questionIndex, setQuestionIndex] = createSignal(untrack(() => Object.keys(savedAnswers()).length));
+  const [answers, setAnswers] = createSignal<Record<string, string[]>>(untrack(savedAnswers));
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
   let questionPrompt: HTMLSpanElement | undefined;
   let questionStep: HTMLDivElement | undefined;
   let questionAnimations: Animation[] = [];
   let questionDisposed = false;
   let questionTransitionVersion = 0;
-  createEffect(
-    () => `${props.item.requestId}:${props.item.questions.map((question) => question.id).join(",")}`,
-    () => {
-      questionTransitionVersion += 1;
-      cancelQuestionAnimations();
-      clearQuestionHidden(questionTransitionElements());
-      setQuestionTransitioning(false);
-      setQuestionIndex(0);
-      setAnswers({});
-    },
-  );
+  createEffect(cardKey, () => {
+    questionTransitionVersion += 1;
+    cancelQuestionAnimations();
+    clearQuestionHidden(questionTransitionElements());
+    setQuestionTransitioning(false);
+    const saved = savedAnswers();
+    setQuestionIndex(Object.keys(saved).length);
+    setAnswers(saved);
+  });
   const questions = () => props.item.questions;
   const directAnswerAvailable = createMemo(
     () =>
@@ -1414,18 +1427,28 @@ function QuestionContent(props: {
     // The field keeps a typed answer that did not go anywhere.
     if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
+    const key = cardKey();
     if (questionIndex() < questions().length - 1) {
+      questionCardAnswers.set(key, nextAnswers);
       props.onHaptic?.();
       void showNextQuestion(nextAnswers);
       return;
     }
-    return props.onAction({
+    const sent = props.onAction({
       type: "answer-prompt",
       serverId: props.serverId,
       agentId: props.item.agent.id,
       requestId: props.item.requestId,
       answers: nextAnswers,
     });
+    // The caller of `answerWith` handles a failure of `sent`.
+    void sent?.then(
+      (done) => {
+        if (done) questionCardAnswers.delete(key);
+      },
+      () => undefined,
+    );
+    return sent;
   }
 
   async function showNextQuestion(nextAnswers: Record<string, string[]>): Promise<void> {
