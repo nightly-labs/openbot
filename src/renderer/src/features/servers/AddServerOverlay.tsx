@@ -206,7 +206,8 @@ function AddServerSession(
   props: AddServerOverlayProps & {
     requestIds: Map<string, RequestKey>;
     lastRead: AddServerRead | null;
-    onRead: (read: AddServerRead) => void;
+    /** Null removes the answers, when this opening changed the servers. */
+    onRead: (read: AddServerRead | null) => void;
     onPendingResume: (resume: AddServerResume | null) => void;
   },
 ) {
@@ -421,6 +422,8 @@ function AddServerSession(
         throw error;
       });
     key.serverId = server.serverId;
+    // The answers of this opening do not have the new server. The next opening then waits for new answers.
+    props.onRead(null);
     setState((draft) => {
       draft.server = server;
       draft.paid = false;
