@@ -185,6 +185,27 @@ export const ReducedMotion: Story = {
   parameters: { chromatic: { prefersReducedMotion: "reduce" } },
 };
 
+/** After `openbot.send_feedback` opens the issue: the thank-you card with the issue link. */
+export const FeedbackSent: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Feedback sent card">
+        <ChatActionMarker
+          marker={{
+            kind: "feedback-sent",
+            title: "The chat stops scrolling after a long reply",
+            number: 5712,
+            url: "https://github.com/nightly-labs/openbot/issues/5712",
+            timestamp: "2026-11-08T10:02:00.000Z",
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+        />
+      </section>
+    </main>
+  ),
+};
+
 export const RoutineRunSummary: Story = {
   render: () => (
     <main class="foundation-story">
@@ -488,6 +509,20 @@ function SkillMarkers() {
           onOpenSkill={setSelected}
         />
       ))}
+      <ChatActionMarker
+        marker={{
+          kind: "skill-lifecycle",
+          action: "installed",
+          skillId: "skill-release-notes",
+          revision: 3,
+          skillName: "Release notes",
+          timestamp: "2026-09-13T12:01:00Z",
+          installMessageIds: Array.from({ length: 38 }, (_, index) => `install-${index}`),
+        }}
+        agents={agents}
+        onSelectAgent={onSelectAgent}
+        onOpenSkill={setSelected}
+      />
       <AgentSkillsModal
         open={Boolean(selected())}
         selectionRequest={selected()}

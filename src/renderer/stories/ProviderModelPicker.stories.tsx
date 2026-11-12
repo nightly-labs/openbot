@@ -40,6 +40,18 @@ export const AllEffortLevels: Story = {
   },
 };
 
+/** A Codex model that offers Fast and Ultrafast, with Ultrafast on. */
+export const Ultrafast: Story = {
+  args: {
+    value: "gpt-5.6-sol",
+    reasoningEffort: "high",
+    onReasoningEffortChange: fn(),
+    fastMode: true,
+    ultrafast: true,
+    onFastModeChange: fn(),
+  },
+};
+
 export const Field: Story = {
   args: { variant: "field", label: "Model" },
 };
@@ -231,6 +243,27 @@ export const CustomTabWithModels: Story = {
   },
 };
 
+/** Saved endpoints that wait for OpenCode to restart: their models come after the current task. */
+export const CustomTabPending: Story = {
+  args: {
+    provider: "opencode",
+    value: "opencode/example",
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: true }] },
+    customProviders,
+    onAddCustomProvider: fn(),
+    onManageProviders: fn(),
+    modelOptions: openCodeCatalog([["opencode/example", "OpenCode Zen/Example"]]),
+  },
+};
+
+/** OpenCode read the saved endpoints but lists none of their models, so no restart brings them. */
+export const CustomTabUnlisted: Story = {
+  args: {
+    ...CustomTabPending.args,
+    agentStatus: { ...STORY_AGENT_STATUS, providers: [{ ...openCodeStatus.providers[0], endpointsPending: false }] },
+  },
+};
+
 /** The same catalog on the OpenCode tab, which must not list the two custom endpoints again. */
 export const OpenCodeTabExcludesCustom: Story = {
   args: {
@@ -238,3 +271,34 @@ export const OpenCodeTabExcludesCustom: Story = {
     value: "opencode/example-free",
   },
 };
+
+/** Three days from when the story loads, so the window has not ended yet. */
+const spentWeekResetsAt = Math.floor(Date.now() / 1_000) + 3 * 24 * 60 * 60;
+
+const usageLimitArgs: Parameters<typeof ProviderModelPicker>[0] = {
+  ...args,
+  provider: "claude",
+  value: "claude-opus-5-5",
+  reasoningEffort: "high",
+  onReasoningEffortChange: fn(),
+  accountUsage: {
+    limits: [
+      {
+        id: "claude",
+        primary: { usedPercent: 64, windowDurationMins: 300, resetsAt: spentWeekResetsAt - 2 * 24 * 60 * 60 },
+        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: spentWeekResetsAt },
+      },
+      {
+        id: "codex",
+        primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: spentWeekResetsAt },
+        secondary: null,
+      },
+    ],
+  },
+};
+
+/**
+ * The Claude weekly window is spent: a chip beside the provider name gives the window and its reset.
+ * The rows and the tab show no mark; their names tell a screen reader. Codex has quota left.
+ */
+export const UsageLimitReached: Story = { render: () => <ProviderModelPicker {...usageLimitArgs} /> };

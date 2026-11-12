@@ -3,8 +3,16 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("error.agent", {
   "error.agent.historyUnavailable":
     "History is unavailable for this request. Read recent history again, or use channel_history for channel work.",
+  "error.agent.historyArgumentsInvalid":
+    "Incorrect history arguments: {detail} Correct the arguments and try again. openbot.tool_describe gives the schema.",
   "error.agent.toolRequestInvalid":
     "Invalid tool discovery arguments. Use the declared schema and an original qualified tool name.",
+  "error.agent.toolCallArgumentsNotObject":
+    "The tool did not run. In tool_call, arguments must be a JSON object, not text. Send the call again with arguments as an object.",
+  "error.agent.toolCallDiscoveryTool":
+    "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
@@ -47,6 +55,8 @@ export const messages = defineMessages("error.agent", {
     "No {provider} model is available now. Call list_models to see the available models.",
   "error.agent.reasoningEffortUnsupported":
     'Model "{model}" does not support reasoning effort "{effort}". Supported efforts: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable":
+    'Model "{model}" has no reasoning effort setting, so you cannot change its effort.',
   "error.agent.noStartingModelInSettings":
     "{provider} has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Server settings → Providers.",
   "error.agent.noStartingModel":
@@ -56,6 +66,7 @@ export const messages = defineMessages("error.agent", {
     "Tasks of this agent are running. Wait for them to finish, or stop them, before changing provider.",
   "error.agent.waitBeforeClearContext": "Wait for the active turn and queue to finish before starting a new chat.",
   "error.agent.waitBeforeCompactContext": "Wait for the active turn and queue to finish before compacting the context.",
+  "error.agent.waitBeforeDeleteHistory": "Wait for the active turn and queue to finish before deleting the history.",
   "error.agent.compactContextUnavailable": "This agent cannot compact its context now.",
   "error.agent.unknown": "Unknown agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -72,6 +83,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.endpointRemoved": "The endpoint this agent used was removed. Choose another model for it.",
   "error.agent.turnStalled":
     "{provider} stopped responding, so OpenBot ended this turn. Send the message again, or choose another model.",
+  "error.agent.compactionConnectionLost":
+    "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection, then send a message to continue.",
   "error.agent.selectedGone": "The selected agent no longer exists.",
   "error.agent.profileEndpointsChanged": "The custom endpoints changed while this was generating. Try again.",
   "error.agent.profileInvalid": "The provider returned an invalid profile. Try revising your prompt.",
@@ -102,6 +115,9 @@ export const messages = defineMessages("error.agent", {
   "error.agent.quickAcknowledgementLocalOnly": "Only the computer that runs the agent can change this setting.",
   "error.agent.sideQuestionBusy": "Too many side questions are running. Try again shortly.",
   "error.agent.sideQuestionFailed": "The agent could not answer the side question. Try again.",
+  "error.agent.webSearchSignIn": "Web search needs a Codex sign-in with a ChatGPT account.",
+  "error.agent.webSearchBusy": "Too many searches and side questions are running. Try again shortly.",
+  "error.agent.webSearchFailed": "The web search did not finish. Try again.",
   "error.agent.busyMessageModeLocalOnly":
     "What messages do while the agent works can only be set on the computer that runs the agent.",
   "error.agent.backupModelsLocalOnly": "Backup models can only be set on the computer that runs the agent.",
@@ -133,6 +149,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
   "error.agent.mcpServerKeysMove":
     "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Server settings, MCP.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} is part of OpenBot, so the MCP tools cannot test, turn on or off, or remove it. The user controls it on the computer that runs OpenBot: the GitHub connection in Marketplace, Apps, GitHub, and Computer Use in Settings, Computer Use.",
   "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",
   "error.agent.screenCaptureWindowMissing":
     "That window is not open now. Call list_capture_sources to get the current window ids.",

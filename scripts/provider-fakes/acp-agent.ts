@@ -21,6 +21,8 @@ export interface AcpParams {
   text?: string;
   interjectionId?: string;
   content?: { type: string; text?: string; mimeType?: string }[];
+  /** `initialize`. OpenCode reads the `_meta` key that asks for its subagents' sessions. */
+  clientCapabilities?: { _meta?: { "opencode/child-session-updates"?: boolean } };
 }
 
 export interface AcpRequest {
@@ -42,6 +44,8 @@ export interface AcpPeer {
   say(sessionId: string | undefined, text: string): void;
   /** Sends one `session/update` with this update for the session. */
   update(sessionId: string | undefined, update: SessionUpdate): void;
+  /** Sends a request to the client. Resolves with its result, or with `{ error }` when it fails. */
+  ask(method: string, params: unknown): Promise<unknown>;
 }
 
 export type AcpHandler = (request: AcpRequest, peer: AcpPeer) => void;
@@ -52,12 +56,14 @@ export type LogValue = string | number | boolean | null | undefined | readonly s
 type OutgoingMessage =
   | { id: AcpRequest["id"]; result: unknown }
   | { id: AcpRequest["id"]; error: AcpError }
-  | { method: string; params: unknown };
+  | { id?: string; method: string; params: unknown };
 
 interface IncomingMessage {
   id?: number | string;
   method?: unknown;
   params?: AcpParams;
+  result?: unknown;
+  error?: unknown;
 }
 
 const NL = "\n";
@@ -78,15 +84,28 @@ export function serveFakeAcpAgent(
 ): void {
   const write = (message: OutgoingMessage) =>
     process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}${NL}`);
+  /** The requests to the client that wait for their answer, by id. */
+  const asked = new Map<string, (result: unknown) => void>();
   const peer: AcpPeer = {
     reply: (request, result) => write({ id: request.id, result }),
     fail: (request, error) => write({ id: request.id, error }),
     say: (sessionId, text) =>
       peer.update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text } }),
     update: (sessionId, update) => write({ method: "session/update", params: { sessionId, update } }),
+    ask: (method, params) =>
+      new Promise((answered) => {
+        const id = `agent-${asked.size + 1}-${Date.now()}`;
+        asked.set(id, answered);
+        write({ id, method, params });
+      }),
   };
   const handle = (message: IncomingMessage) => {
-    if (typeof message.method !== "string") return;
+    if (typeof message.method !== "string") {
+      const answered = typeof message.id === "string" ? asked.get(message.id) : undefined;
+      if (typeof message.id === "string") asked.delete(message.id);
+      answered?.(message.error === undefined ? message.result : { error: message.error });
+      return;
+    }
     if (message.id === undefined) {
       options.onNotification?.(message.method, message.params ?? {});
       return;

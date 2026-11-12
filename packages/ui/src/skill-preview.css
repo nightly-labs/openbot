@@ -103,6 +103,11 @@
 .skill-preview-request button {
   flex-shrink: 0;
 }
+
+/* Try points to the end of the reading direction. */
+.skill-preview-request .ui-icon-button > svg[class~="lucide-arrow-right"]:dir(rtl) {
+  transform: scaleX(-1);
+}
 .skill-preview-unavailable {
   margin: 0;
   color: var(--openbot-text-muted);
@@ -143,6 +148,13 @@
 }
 .t-page-slide .t-page[data-page-id="2"] {
   --t-page-from-x: var(--page-slide-distance);
+}
+/* The next page comes in from the end of the reading direction. */
+.t-page-slide:dir(rtl) .t-page[data-page-id="1"] {
+  --t-page-from-x: var(--page-slide-distance);
+}
+.t-page-slide:dir(rtl) .t-page[data-page-id="2"] {
+  --t-page-from-x: calc(var(--page-slide-distance) * -1);
 }
 .t-page-slide .t-page {
   position: absolute;

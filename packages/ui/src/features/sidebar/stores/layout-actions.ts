@@ -229,6 +229,9 @@ export function createSidebarLayoutActions(deps: {
   }
 
   function moveChatAction(chatId: string, target: ChatDropTarget): SidebarLayoutAction | null {
+    // The "unread first" order shows the rows by activity, not in the saved order. A drop next to a
+    // row there must not write a position that the user cannot see: the chat goes to the end.
+    if (props.chatOrder === "unread-first") return appendChatAction(chatId, target.sectionId);
     const idsWithoutSource = sectionChatIdsWithout(target.sectionId, chatId);
     const targetIndex = idsWithoutSource.indexOf(target.chatId);
     if (targetIndex < 0) return null;

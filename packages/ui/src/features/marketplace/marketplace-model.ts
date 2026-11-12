@@ -5,6 +5,8 @@ import type {
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillSummary,
+  McpAccessChange,
+  McpServerAccess,
   McpServerConfig,
   SkillCategory,
 } from "@openbot/contracts/ipc";
@@ -42,6 +44,13 @@ export type SkillRead = "idle" | "loading" | "loaded" | "failed";
 
 /** `connecting`: a sign-in started and waits, such as for a GitHub device code. */
 export type MarketplaceAppStatus = "connected" | "attention" | "connecting" | "idle";
+
+/**
+ * Why this account cannot connect catalog apps on the joined server. `checking`: the app has not read
+ * what the host serves yet; Connect is available when it has. `update`: the host is too old for apps.
+ * `member`: only an owner or admin connects apps on that host.
+ */
+export type MarketplaceAppsBlock = { reason: "checking" } | { reason: "update" | "member"; host: string };
 
 interface AppBase {
   id: string;
@@ -81,6 +90,11 @@ export interface MarketplaceAppConnection {
    * separate sign-in for each account (`mcp-accounts-v1`).
    */
   multipleAccounts: boolean;
+  /**
+   * The first row holds the key that a key flow of the listing names. A listing with a sign-in and
+   * a key then shows the key, not the sign-in. Absent is false.
+   */
+  keySaved?: boolean;
 }
 
 /**
@@ -110,8 +124,10 @@ const CONNECTOR_SETUP = {
   slack: "channel",
   discord: "channel",
   telegram: "channel",
+  whatsapp: "channel",
   onepassword: "vault",
   bitwarden: "vault",
+  protonpass: "vault",
   github: "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 
@@ -162,6 +178,16 @@ export interface MarketplaceMacAutomation {
  * What the Marketplace view reads and asks for. The renderer builds it from its IPC calls, and a
  * story builds it from fixtures. Each action reports its own failure through `error`.
  */
+/** The agents and the role levels of the MCP rows of the server. */
+export interface MarketplaceMcpAccess {
+  /** The access of one MCP row. A row with no stored entry has the default. */
+  entry: (mcpServerId: string) => McpServerAccess;
+  roles: () => readonly { id: string; name: string }[];
+  busy: () => boolean;
+  /** A full replace for each row. False when the host refused one; the error shows in the window. */
+  set: (changes: readonly McpAccessChange[]) => Promise<boolean>;
+}
+
 export interface MarketplaceModel {
   listAgents: CatalogList<MarketplaceAgentSummary>;
   agentHomeCache?: MarketplaceHomeCache<MarketplaceAgentSummary> | undefined;
@@ -217,6 +243,8 @@ export interface MarketplaceModel {
   apps: () => readonly MarketplaceApp[];
   /** False for a member of a joined server, who browses and connects no catalog app. */
   canConnectApps: () => boolean;
+  /** Why `canConnectApps` is false. Absent when it is true, or when no reason is known. */
+  appsBlocked?: (() => MarketplaceAppsBlock | undefined) | undefined;
   appBusy: (id: string) => boolean;
   /** Runs the connect step of a catalog app. False when the user closed it. */
   connectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => Promise<boolean>;
@@ -247,6 +275,11 @@ export interface MarketplaceModel {
   disconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => void;
   /** Removes a custom MCP server. */
   removeServer: (id: string) => Promise<boolean>;
+  /**
+   * Who gets the MCP servers of an app (`mcp-access-v1`). Absent while the host does not have it, the
+   * user is not an owner or admin, or the answer did not arrive.
+   */
+  mcpAccess?: MarketplaceMcpAccess | undefined;
   /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
   addServer?: (() => void) | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;

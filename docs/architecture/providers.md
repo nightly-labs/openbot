@@ -11,6 +11,16 @@ Claude uses its native question tool instead of `ask_user`. The direct tools are
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
 `routine_report_failure`. External plugin registration stays with each provider adapter.
 
+A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
+and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
+turn with no more text. Without the variable, Claude Code asked the model for a visible answer, and
+the agent wrote its result again (#6923). The CLI reads only direct tool names, not a `tool_call`.
+The two tools are always loaded (`alwaysLoad`): behind the CLI's tool search the model did not see
+them, and it used `tool_call`, as the channel instructions say for a tool that is not in its list.
+Claude gets a refused call of these tools (`accepted: false`) as a failed call, so the CLI still asks
+for an answer after it. The other providers keep the refusal as a result. Other threads do not get
+these tools, so their requests do not grow.
+
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or
 one `query` string, because models often send one string. Up to three strong results, an exact name or
@@ -21,12 +31,17 @@ such as "read", does not make a result strong. The other results have a short de
 strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
 schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
 multi-step tool (see [Browser](browser.md)). The instructions
-tell the agent to describe a tool only when no search result gave its schema. `tool_describe` accepts `names`, or
+tell the agent to describe a tool only when no search result gave its schema. A search with ready schemas, and each
+`tool_describe` result, starts with a `call` note: the tools are not direct tools, so run them with `tool_call`.
+Claude loads its own deferred tools with a search and then calls them directly, and it called a found
+`openbot.list_workflows` as `mcp__openbot__list_workflows`. A search that names a workflow does not get the
+browser note. `tool_describe` accepts `names`, or
 one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
-`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`. The router resolves only
+`tool_call` accepts `{ name: "namespace.tool", arguments: { ... } }`, and `tool` as an alias of `name`, because
+a refused call costs a model step. The router resolves only
 original built-in names. It preserves the request, thread, turn, and call identifiers and the abort
 signal, then enters the same dispatch as a direct call. Existing decoders, secure browser input,
 approval cards, image results, cancellation, and message idempotency remain at their existing owners.
@@ -51,6 +66,62 @@ catalog, and the guidance in bytes, and fails when one of them grows. See
 later add context and can add model steps. Provider prompts, external plugins, caching, billing, and
 native model serialization are outside this measurement.
 
+Claude Code adds its own system prompt, tools, and skill listing to each Claude request.
+`claude-client.ts` turns off the bundled skills that cannot work in an OpenBot agent, lists the
+bundled coding skills by name only, and turns off Remote Control, commit attribution, and the tools and
+agent types made for a Claude Code host (`CLAUDE_HOST_TOOLS`). These flag settings come before the
+user, project and local settings, so the client leaves out a skill override for a user or project skill
+of the same name, and each key that a settings file that the query loads sets. Git instructions and the built-in
+`general-purpose`, `Explore`, `Plan` and `web-fetch` agents stay. `bun run bench:claude-prompt-settings`
+runs real Haiku turns and reports the prompt tokens, tools, and skills of each settings variant in
+`.openbot-build/claude-prompt-settings-bench/report.json`. `bun run smoke:claude-agent` runs one agent
+session through the core tools, a subagent, a skill, a deferred tool, and a commit, and writes
+`.openbot-build/claude-agent-smoke/report-setup-<on|off>.json`.
+
+Pi adds its own system prompt, tools, and skill listing to each request of the Pi-based providers
+(`pi`, `inception`, `deepseek`, `openrouter`). The MCP extension of `pi-mcp.ts` removes Pi's `<docs>`
+section, which gives the paths of Pi's own documentation, from the copy of the messages that each
+request gets (`context_with_system`). A prompt returned from `before_agent_start` would also drop the
+`<mcp_servers>` section that names the user's deferred servers. The OpenBot bridge hides
+`request_api_key` and `suggest_marketplace_app` from Pi (`PI_SEARCH_ONLY_OPENBOT_TOOLS`). The agent
+finds and runs these two tools through OpenBot's `tool_search` and `tool_call`. They are `hidden`, not
+`deferred`: a deferred tool adds Pi's own `tool_search` and an `<mcp_servers>` line. `ask_ui` stays
+declared for its confirm card. The user's Pi settings, extensions, and skills stay, and a user extension
+can still change the prompt. `bun run bench:pi-prompt-settings`
+runs real Mercury turns and reports the system prompt sections, tools, and prompt tokens of each
+variant in `.openbot-build/pi-prompt-settings-bench/report.json`. `bun run smoke:pi-agent` runs one
+agent session through the core tools, a commit, and a hidden tool, checks each request, and writes
+`.openbot-build/pi-agent-smoke/report.json`.
+
+Codex adds its own base prompt, tools, and skill listing to each Codex request.
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
+for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
+The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
+adds only the skills that no entry names. A feature counts as the user's only when a file layer of
+`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
+and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
+stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
+`.openbot-build/codex-prompt-settings-bench/report.json`. `bun run smoke:codex-agent` runs one thread
+through `update_plan`, the shell, `apply_patch`, a subagent, a skill, a deferred OpenBot tool, Codex's
+own web search, and a commit, and writes `.openbot-build/codex-agent-smoke/report.json`.
+
+Codex keeps its own inline web search (`web__run`, about 2,450 tokens in each request). Agents on a
+provider with no web search of its own (the Pi-based providers and custom ACP agents) get the deferred
+`openbot.web_search` instead (`AgentService.searchWeb`; `OWN_WEB_SEARCH_PROVIDERS` in
+`agent/tool-catalog.ts` lists the providers whose CLI searches). It
+runs one side Codex thread that can only search the web (`generateTextWithoutTools` in `webSearch` mode)
+on the Codex sign-in of this computer, and returns a short answer with source URLs. A search has two
+requests, about 13,500 input tokens on GPT-6 Luna. The side thread turns off the permissions,
+environment, collaboration and skill texts (about 2,060 tokens in each request), and all toolless
+threads set `agents.enabled = false`: the model catalog turns on the multi-agent tools for each GPT-6
+model, and only this key turns them off (about 1,560 tokens). `bun run bench:codex-web-search` (writes
+`.openbot-build/codex-web-search-bench/report.json`) compares both on a Codex agent, in a chat of seven
+turns with three searches: `openbot.web_search` used 7% fewer input tokens but 8% more uncached tokens,
+because the first request of each side thread misses the prompt cache, and each search turn took 9.5 to
+12 seconds against 4 to 6 seconds inline. Both gave the same answers. For that reason a Codex agent does
+not get `openbot.web_search`.
+
 ## History retrieval and replacement sessions
 
 A replacement provider session receives a handoff of at most 32,000 characters, including headers
@@ -64,7 +135,8 @@ Two deferred tools recover omitted text without model calls for search or summar
 
 - `history_search` searches the calling conversation, with five results by default and ten maximum.
   Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
-- `history_read` returns recent messages, a named message, or a page before a returned cursor.
+- `history_read` returns recent messages, a named message, or a page before a returned cursor or
+  a returned `messageId` of the same conversation.
   It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
   `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
   as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work
@@ -98,9 +170,18 @@ own count: the agent's own chat and each side thread. A review starts after 20 c
 conversation, after 15 minutes with no turn in a conversation that has 3 or more new turns, when
 the user clears the chat, and when a side thread with new turns closes. Turns of channels,
 messaging threads and routine runs do not count. A turn in which the agent changes its memories
-itself starts the count again. A deleted side thread is not reviewed, and its running review ends.
+itself starts the count again. While skill learning is not Off, the next review still reads that
+turn, because a saved memory does not hold how the agent did the task; with Off, the turn moves the
+last reviewed message. A deleted side thread is not reviewed, and its running review ends.
 The counts and the last reviewed message are in memory only; after a restart, a review reads the
 latest messages.
+
+While reviews run (Memory review is not Off), the developer instructions tell the agent to apply a
+correction of how it does one kind of task without a memory call or a word about saving it, unless
+the user asks it to remember: the review keeps it, as a skill or, with skill learning Off, as a
+memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a session. A smoke run
+measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
+five requests when the agent saved the memory itself.
 
 The number of turns is a setting of the server that runs the agents: Server settings > General >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
@@ -136,6 +217,133 @@ and shows nothing. A usage limit is skipped silently and does not mark the model
 memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
 While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
 
+### Skill suggestions
+
+The same review can ask the user to save a skill. Main passes `reviewSkills` to the agent service:
+the local read of the agent's skills (`listInstalledForChatTags`), with no Marketplace request.
+Without it, or when it fails, the review suggests nothing. The prompt adds the agent's skills, with
+`canUpdate` true only for a skill of the local library (`local-skill-<uuid>`), the texts of the
+latest earlier skill questions in the chat, and the tool steps of the reviewed turns from their
+traces, failed steps and the step after each first, at most 80. Step text passes through the secret
+redaction too. The skill rules follow the background skill review of Hermes Agent (MIT): a signal
+must fire (a correction of how the agent does a class of task, a technique that is not obvious and
+worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
+a new skill has a class-level name, and environment failures, claims that a tool does not work,
+errors that went away, tasks done once and attempts that never worked are not skills. The review
+suggests at most one skill, and only when a signal fired.
+
+Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
+sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
+`openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to
+the agent service, which reads it at each review. Off sends no skill rules, skills or work steps to
+the review. Ask first shows the suggestion as a question, as below. Automatic saves the skill
+without a question, as Hermes does.
+
+In the Automatic mode, the review's message is the lesson in one to three sentences, not a question.
+After the review commits its memory changes, a second profile-client generation without tools
+writes the skill (`agent/skill-learning.ts`, after the Hermes skill review): the procedure first,
+pitfalls on their steps, general rules only, in the user's language. It reads the lesson, the
+redacted reviewed chat and its work steps, and for an update the current description and
+instructions; it keeps every part that the chat does not show is wrong. It answers
+`{description, instructions}` as JSON, at most 500 and 12,000 characters. Main's
+`localSkillLearner` saves it in the local library: a new skill gets a YAML-safe `SKILL.md`, and an
+update keeps the other files and frontmatter keys of the current revision, at that revision. The new
+revision is installed for the agent only; when the install fails, the revision is withdrawn. The
+chat then shows a "Created skill" or "Revised skill" line with the review's turn id, and a later
+review reads it as an earlier skill line, so it does not save the same lesson again. The review
+does not rewrite a skill whose text the redaction changes. When that is the case, when no
+profile-client slot is free, or when the writer, the save or the install fails, the review shows
+the question instead, so the lesson is not lost.
+
+The answer's optional `skill` field is decoded apart from the operations, so a bad suggestion is
+dropped and the memory changes still apply. The review also drops an update of a skill that is not
+in the local library or that the agent does not have, and a new skill with the name of one the agent
+has, and an update of a skill that has a skill line (created, revised or installed) in the reviewed
+turns, because the agent already changed it. A line with a `memory-review-` turn id does not
+count: after a clear, the line of the clear's review comes after the reset marker, so it is in the
+next reviewed turns, and the next lesson for that skill must still revise it. In the Ask first mode, an accepted suggestion is a system message with the item type `skill-suggestion:create` or
+`skill-suggestion:update:<skillId>` and the model's question as its text, shown after the
+memory-changes line, also when the review changed no memory. Clients that do not know the item type
+show it as the agent's message, and it counts as unread. The provider history does not have it, so
+`deliveryPromptInput` puts it, with the skill-writing rules, before the user's first message after
+it (`agent/skill-suggestion.ts`). When the user agrees, the agent saves the skill with
+`create_skill`, or with `read_local_skill` and `revise_skill`, and the usual skill line shows. A later user message gets no note. When a clear of the context comes between
+the reviewed chat and the user's answer, as when the clear started the review, the provider no
+longer has that chat. Then the note also repeats it: the transcript of the cleared chat, newest
+part first within 24,000 characters, and its tool steps.
+
+The message also carries `skillSuggestion: { name }`: the skill name, redacted, and for an update the
+name from the agent's skill list, not the model's. The field is in the stored message JSON, so it
+needs no migration. The frozen Team API projections drop it; under `skill-learning-v1` the host adds
+it back after the projection, and the team client copies it back after the decode (see
+[servers.md](servers.md)). The mobile app and older clients show the text. The renderer draws a message with the name as the skill variant of the Marketplace suggestion
+card (`SkillSuggestionChatCard`). Save, or Update, calls `agent.saveSkillSuggestion` with the agent
+and the message id. `MemoryReview.saveSuggestion` reads the question and the chat that its review
+read (`reviewedChat`), and runs the Automatic writer and save above, not a turn of the agent: about
+7,500 tokens instead of a full turn with the agent's tools and history. The skill line then comes
+with a `memory-review-` turn id; during a turn it waits, as a review's lines do. A second press, as
+from another window, returns at once; a press after the skill line saves nothing again. The note
+above is not added after a suggestion that a later skill line already saved. When the host saves
+nothing (the message is gone, no model, the writer or the save fails, or a joined host does not serve
+`skill-learning-v1`), the call returns `saved: false`, and the card sends a short yes as the user's
+message, which the note turns into the save. On a joined server and in the web client, Save sends
+`POST /v1/skill-suggestions/save` to the host, which runs the same save. The card is busy from the press, and done
+when a skill line for the same skill follows (created for a new skill; revised or installed with the
+same id for an update). After a user message that saved nothing, the card has no action, because a
+later message gets no note. Dismiss and undo use the local dismissals of Marketplace suggestions.
+
+### Skill fixes while the agent works
+
+When skill learning is Automatic, an agent can also fix one of its local skills in the turn, without
+a question first. This follows the skill patch of Hermes Agent: the developer instructions
+(`skillRevision`) tell the agent to revise a `local-skill-` skill when the user corrects how it
+follows that skill, or when a step fails and it finds the fix, and to change only that step. Not for
+a one-time preference. Ask first and Off leave the line out, so the agent changes a skill only when
+the user asks. The line is not in `tools/agent-context/budget.json`, because that fixture has no
+setting.
+
+`revise_skill` publishes the next revision and installs it for the calling agent when that agent has
+the skill (`installedRevision` is not null), so the chat shows one "Revised skill" line. Other agents
+keep their revision until an explicit install. When the installed copy has changes that are not in
+the lock file, the install is refused and the tool error says that the revision was saved and the
+copy was kept; the agent installs it with `install_local_skill` and does not revise again.
+
+There is no Undo control. Revisions are never deleted and a revision reaches only the agent that
+made it, so the user asks the agent to undo the change: the guidance tells it to read the revision
+before with `read_local_skill` and publish its files with `revise_skill`.
+
+## Idle provider sessions
+
+A loaded provider session holds processes: the CLI, its MCP servers and its background terminals.
+OpenBot unloads a session that has no turn, keeps its identity, and resumes it at the next turn.
+
+- Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
+  (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+- One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
+  when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
+  releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
+  each idle session of the same app server except the newest one. `ThreadLifecycle.releaseIdleSession`
+  keeps a session whose agent has a running, starting or compacting turn, a pending approval,
+  question or browser takeover, or whose thread has a background terminal (`thread/backgroundTerminals/list`). It drops
+  the routing before it sends `thread/unsubscribe`, so the next turn sends `thread/resume` after the
+  unsubscribe. Codex unloads a thread with no subscriber after `thread_unload_delay_secs` (60 s by
+  default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
+  An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
+  so Windows can remove the workspace (#6266).
+- When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
+- A routine session is ephemeral and is not released.
+- Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
+  (`src/backend/provider-process-group.ts`). When the CLI exits, OpenBot sends SIGTERM to what is
+  left of the group, then SIGKILL after 2 seconds. A child of an MCP server outlived the Claude CLI
+  without this. Shell commands run in groups of their own, so a server that the agent started keeps
+  running. Windows stops the tree with `taskkill /T`.
+
+`bun run test:codex-idle-thread-release` checks the Codex release with a fake app server.
+`scripts/provider-session-reuse-e2e.ts` checks that the group ends with the Claude and Codex CLIs.
+ACP agents get no group: some leave their shell commands in the agent's group, and the group stop
+would end a server that the user started from the agent.
+
 ## Compaction ownership
 
 Codex and Muse complete explicit compaction through turn events. Pi completes it through the request
@@ -170,14 +378,13 @@ adds its rule there, not in the catalog.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, Pi and Kimi, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
-for Grok, the `muse-stable` channel for Muse, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
+`releases/latest` for Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini (`google-antigravity/antigravity-cli`), the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
+for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entry `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex, Pi and Kimi, the manifest `checksum` for Muse, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
-so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
-`dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
+Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
+so a Grok or Cursor release is trusted on TLS alone. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
 registry date, and keep the pinned command. An upstream install writes `openbot-install.json` with the SHA-256 of each
 file it installed, and every start verifies that record and the binary's `--version` before the
@@ -282,8 +489,10 @@ binary, never stops startup.
 
 A provider that is off in this profile runs no CLI, so the manager does not stamp its versions. Pi
 counts as in use while a key-only provider that runs on it is on. Its
-provider page in Settings offers Remove download (#3321), which removes every version of that CLI and
-this profile's partial downloads of it, and leaves accounts and sign-ins alone. It is refused while
+provider page in Settings offers Delete (#3321), which removes every version of that CLI and
+this profile's partial downloads of it, and leaves accounts and sign-ins alone. On a provider that
+is on and runs the CLI that OpenBot downloaded, Delete first turns the provider off. An agent that
+uses the provider stops it, as it stops the switch. It is refused while
 the provider is on, while its download runs, and for a provider with an explicit CLI path. The same
 age rule keeps a version another instance stamped, with one change: the manager remembers its own
 last stamp of each directory, and a directory whose mtime is not later than that stamp counts as
@@ -350,6 +559,22 @@ install rather than reading as the managed copy. A failure keeps the reason the 
 in one error that goes to the provider row and to the caller - and on, through the Team API, to the
 team's connected clients.
 
+A hosted server (`OPENBOT_HOSTED_SERVER=1`, packaged Linux) has system Claude and Codex CLIs from its image, and the
+image updates them at boot. That update can fail with no error, and the user cannot install a CLI
+there. When a row is `outdated`, main calls `download` for the provider once per start, so the
+managed copy replaces the old CLI with no offer (#4995). The row has no `cliSource`, because the
+resolution failed. An off provider is left alone.
+
+Codex keeps a lease on its state database backfill for 15 minutes, and a process that stops during
+the backfill keeps it. Each Codex start in that time exits with "timed out waiting for state db
+backfill", for any version. `ProviderRuntime` replaces that exit text with
+`error.provider.codexStateBusy`, and an update whose new copy fails this way keeps the copy. Codex
+gets `LONG_START_TIMEOUT_MS` on each start that has no wait of its own: at launch, also when the
+launch starts all providers, and for an agent's own process. A stop in the request timeout during a
+slow backfill (the first start after a hosted server's restore) starts the lease. At launch this
+default is not a learned wait: a timeout after it gives the next start `LONG_START_TIMEOUT_MS` again,
+not twice that time.
+
 Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
 other one, while the agent status beside it describes whichever server is open. The store therefore
 takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
@@ -383,6 +608,40 @@ configuration and model discovery. `src/backend/acp-client.ts` owns session star
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
+agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
+`question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
+`opencode_read_mcp_resource` tools (OpenBot's MCP servers serve no resources), and the `report` and
+`opencode` skills. These rules go in an `OPENCODE_CONFIG` file in the provider state folder, not in
+`OPENCODE_CONFIG_CONTENT`, so a rule in the project's `opencode.json` comes after them and wins. The
+global config (the XDG folder and `OPENCODE_CONFIG_DIR`) comes before that file, so the driver leaves
+out each rule that a global name or pattern matches, also in an agent's rules. The global catch-all `"*"` only sets how OpenCode asks for tools and does not count.
+When the user sets `OPENCODE_CONFIG`, or a global config file cannot be decoded, OpenBot adds no rule.
+The `models` tool, the `explore` agent and all OpenBot tools stay; with two tools gone, the Code Mode
+catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the others. On OpenCode 2.2.6
+a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
+12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
+model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
+that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
+Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
+switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an
+OpenBot agent does not use: feedback (`GROK_FEEDBACK_ENABLED`), workflows (`GROK_WORKFLOWS`), the
+turn summary (`GROK_TURN_SUMMARY`) and the skills of `~/.claude/skills` (`GROK_CLAUDE_SKILLS_ENABLED`).
+An environment value wins over every Grok config layer, so OpenBot sets a switch only when the
+user's environment and the layers below it (`$GROK_HOME/managed_config.toml`, `$GROK_HOME/config.toml`,
+`GROK_CONFIG_PATH` and `GROK_CONFIG`) all leave its key unset. When a layer does not read or parse,
+OpenBot sets no switch. A user can turn each feature back on in `config.toml`. On Grok CLI 1.0.70
+and Grok Build Fast, feedback and workflows cost 1,707 prompt tokens in each request, the turn summary
+is one more request of about 1,600 after each turn, and one developer's Claude skills cost 2,811 in
+each request. The image, video, search, subagent and question tools stay: together they cost about
+6,100, but an agent can use each of them. The session title request (about 500) has no switch. `bun run bench:grok-prompt-settings` measures these features
+through a local proxy and a copy of the user's Grok login without its refresh token.
+`bun run smoke:grok-agent` checks that an agent can still use a skill, the file and terminal tools,
+a subagent and git, and that the user's `config.toml` value wins.
 
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
@@ -437,10 +696,19 @@ SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
 services the user signed in to before its own — so the fallback used to pick a model behind a token
-OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first with Muse ahead of
-the rest, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
+OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first, with
+`OPENCODE_RECOMMENDED_FREE_MODELS` (`packages/contracts/src/agent-providers.ts`, chosen by
+`bun run bench:opencode-free-models`) ahead of the rest in their order, then OpenCode's own paid models, then everything behind a separate sign-in. Inside one
 tier the newest version comes first. The sort is stable, so the CLI's order stays between models of
 one version.
+
+When a fresh catalog no longer lists an agent's model, `moveAgentsOffUnlistedModels`
+(`src/backend/agent/custom-endpoints.ts`) moves the agent on the same provider: to the listed model
+whose effort the saved id names (`effortVariant`), else to the newest listed model of the same family
+(`newestOfFamily`: the id without versions, dates and effort words, so `claude-opus-4-6` goes to
+`claude-opus-5-5`), else to the default or the first model. Between two models of one version, the one
+with the same variant wins, so `claude-opus-4-6-thinking` goes to `claude-opus-5-5-thinking`. The effort
+that the saved id names, such as `high` in `gemini-3.1-pro-high`, comes before the stored effort.
 
 Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
@@ -498,36 +766,70 @@ accept only `AGENT_PROVIDERS` and reject other values before they write an event
 
 ### Gemini
 
-The Gemini provider (id `antigravity`) starts Google's Antigravity ACP server
-(`agy_acp_server`). Google's license does not allow redistribution, so the runtime manager
-downloads the zip on the user's computer. `extractZipFiles` in `src/main/provider-runtime-archive.ts`
-accepts only the server and `localharness_external`, which the server starts from its own folder.
-The server has no `--version`, so staging writes `antigravity-package.json` and
-`verifyInstalledRuntime` reads the version from that file (`versionFile`). OpenBot never searches
-`PATH`, because the Antigravity editor installs an `antigravity` command that is not this server.
+The Gemini provider (id `antigravity`) starts the `acp` command of Google's Antigravity CLI
+(`antigravity`, from GitHub `google-antigravity/antigravity-cli`). Google's license does not allow
+redistribution, so the runtime manager downloads the archive on the user's computer. Each archive
+holds only the program, which `nativeProviderRuntime` stages as `bin/antigravity`. The CLI prints its
+version with `--version`. OpenBot never searches `PATH`, because the Antigravity editor installs an
+`antigravity` command that is not this CLI. Up to 1.4.5 the provider ran the ACP server
+`agy_acp_server` from the ACP registry; an install of it is not used (`legacyExecutableNames`), and
+`antigravityTakesStateFolders` (1.5.3 and later) gates the accounts after the first.
 
-The server offers its Claude and GPT models only to a client whose `initialize` `clientInfo.name` is
-`zed`, `xcode`, `jetbrains.*` or `android studio*` (`supports_third_party_models` in 1.4.3). Other
-clients get only the Gemini models. So `ANTIGRAVITY_ACP_FLAVOR.clientInfo` sends the name `zed` and
-the title `OpenBot`. The server also sends the name and version to Google in its User-Agent
-(`_surface`), so Google sees OpenBot's requests as `zed/0.1.0`.
+The 1.5 CLI offers its Claude and GPT models to every client, so the flavor sends OpenBot's own
+`clientInfo`. (1.4 offered them only to a client named `zed`.)
+
+The CLI lists the plan's models best first, and the catalog keeps that order (`ownOrder`): an Ultra
+plan on 1.5.5 lists Gemini 4 Argon, Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5 and GPT-OSS
+120B, a free plan Gemini 3.8 Flash first. The provider has no `defaultProviderModel`, so a new agent
+runs the first one. A version sort puts Claude Opus 5.5 ahead of Gemini 4 Argon, and before
+`modelVersion` skipped parameter counts, "GPT-OSS 120B" read as version 120 and came first. Google
+lists Gemini 4 Carbon for a Google sign-in on a plan that has it (seen in #7913); CLI 1.5.5 also
+added it for an Application Default Credentials sign-in (`AGY_ADC_AUTH`), which OpenBot does not use.
+A saved Gemini API key lists the key's models: Gemini 4 Argon, the Flash models and Gemini 3.1 Pro,
+with no Carbon, Claude or GPT. The key comes before the own Google sign-in, so an agent on Carbon
+moves to another model (`moveAgentsOffUnlistedModels`), and the own account's row says that the key
+is used in its place. Its Reconnect and Disconnect are hidden then, because the key would still serve
+the turns.
+
+The CLI ignores `GEMINI_HOME`. It takes its folders as flags: `--gemini-dir` as an absolute path
+and `--app-data-dir` relative to the Gemini home (`antigravityArgv`). A relative `--gemini-dir` logs
+`Failed to resolve GeminiDir ... must be an absolute path ... falling back to default`, and on
+Windows no relative path reaches another drive. OpenBot passes the account's `GEMINI_HOME` (default `~/.gemini`) and
+`antigravity-acp`, the folder that 1.4 used. On macOS the CLI keeps the Google token in one Keychain
+item (`gemini`/`antigravity`) that every account would share. With `WSL_DISTRO_NAME` set it keeps the
+token in the file `antigravity-oauth-token` in the app data folder, so every Antigravity process gets
+`WSL_DISTRO_NAME=OpenBot` (`ANTIGRAVITY_ENV`). The CLI gives the variable to its tools and MCP
+servers too. On Linux the CLI still opens the sign-in page with `xdg-open` (checked in Docker with
+1.5.4). `SSH_CONNECTION` also selects the file, but then the CLI refuses a browser sign-in. A confined process also cannot write the Keychain (#2988).
+
+1.4 kept the token in `acp_token.json`, which 1.5 does not read. Before each start,
+`importAntigravityToken` (`src/backend/antigravity-token-import.ts`) copies the old refresh token into
+a new `antigravity-oauth-token` once, with an expired access token that the CLI refreshes, and writes
+the marker `openbot-token-imported`. An account whose `settings.json` names another sign-in method gets
+no copy. The old file stays, and after a sign-out the marker stops a second copy.
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
-(`src/backend/acp-sign-in.ts`). On Linux, OpenBot reads the Google sign-in link from the
-server and opens it with the desktop browser. The server browser launch is disabled for this
-process so the page opens once. A failed browser launch gives an actionable error; the OAuth
-link and browser error details are not logged. Other platforms let the server open the browser.
-A valid saved Google token answers `authenticate` with no browser page. So a Reconnect of a
-connected Google sign-in, with no saved key, first calls ACP `logout` when `initialize` advertises
-`agentCapabilities.auth.logout` (runtime 1.4.1 and later). The Google page then opens. The token is
-shared by every OpenBot profile on the computer, so they all sign out. A Reconnect is refused while
-a Gemini turn runs. When the sign-in stops after the logout answered, OpenBot stops the old client
-and reports Gemini signed out; a failure keeps its own reason. A status probe must never call `authenticate`. The serving client does not call it.
-OpenBot checks authentication through model discovery (`session/new`), not the auth methods
-advertised by `initialize`. The runtime can answer "Authentication required", which OpenBot
-reports as sign-in required. In runtime 1.3.0, a saved OAuth method with no valid token can also
-start interactive authentication during `session/new`; this can leave the probe waiting until
-its existing deadline. Runtime installation alone does not confirm authentication.
+(`src/backend/acp-sign-in.ts`). The CLI writes no sign-in link; it runs `open` (macOS) or `xdg-open`
+(Linux) from `PATH`. So the sign-in process gets a private folder first on `PATH` with an `open` and an
+`xdg-open` script that write the link to a file. OpenBot accepts only an `accounts.google.com` OAuth
+page, registers it as a secret, and opens it in the desktop browser or in the host's private tab. A
+failed browser launch gives an actionable error; the OAuth link and browser error details are not
+logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FileProtocolHandler` by its
+absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
+(`googleSignInByOpenBot`): the page opens from the CLI itself. A remote host cannot relay it, as
+with 1.4.5 (#4521), so OpenBot refuses a sign-in from another device before the process starts, and
+a Reconnect does not sign the account out. The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
+`initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
+and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old
+refresh token still gets new access tokens. The Google page then opens. A Reconnect is
+refused while a Gemini turn runs. When the sign-in stops after the logout answered, OpenBot stops the
+old client and reports Gemini signed out; a failure keeps its own reason. A status probe must never
+call `authenticate`. The serving client does not call it. OpenBot checks authentication through model
+discovery (`session/new`), not the auth methods advertised by `initialize`. A session process
+refreshes the token when its session opens. When Google refuses it, 1.5.4 answers `session/new` with
+ACP's `authRequired` error and opens no browser; the flavor's `authRequiredSignsOut` then reports the
+sign-out. Runtime installation alone does not confirm authentication.
 On Ubuntu 24.04, install a desktop browser and `xdg-utils` before sign-in. The Google
 callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session on that same
 VM. A browser on another computer cannot complete this loopback callback. A server with no
@@ -545,80 +847,66 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 available; "Connected" requires a successful provider check. A known authentication or launch
 error takes priority over runtime readiness.
 
-#### Download and external runtime recovery
+#### External runtime
 
-Issue #1776 reports an HTTP 404 for the official 1.3.0 Linux archive from an OVH IPv6 pool,
-and HTTP 200 over IPv4. This cause is not confirmed: checks from another host on 2026-10-10
-returned HTTP 200 over both families. An HTTP failure occurs before archive extraction or
-ACP startup; it is separate from browser sign-in and missing runtime files. OpenBot keeps
-the download error and Retry action and does not change the host's network settings.
+Set `OPENBOT_ANTIGRAVITY_PATH` to an Antigravity CLI executable, 1.5.3 or later, that the OpenBot host
+user can run, and restart OpenBot. The variable names the executable, not the directory. OpenBot reads
+the version with `--version`. An invalid override remains an error: OpenBot does not replace it with
+the managed runtime. Managed updates do not change the explicit override.
 
-For an affected host, an operator can compare bounded requests to the exact failing URL
-with `curl --ipv4 --head --connect-timeout 10 --max-time 30 <url>` and the corresponding
-`--ipv6` command. If IPv4 works, download that same official archive with
-`curl --ipv4 --fail --connect-timeout 10 --max-time 300 --output <new-archive-path> <url>`.
-Verify the archive against a trusted release checksum before extraction. This affects only
-that request. Do not disable IPv6. The report's claimed `::1` kernel requirement was not
-confirmed in the ACP Python source; a native harness requirement remains unverified.
+The CLI runs confined; `antigravityStatePaths` gives it the app data folder, `artifacts` and
+`config/projects` in the Gemini home, and protects its settings files. Migration 22 adds `antigravity`
+to `projection_provider_sessions`.
 
-An external installation must preserve this layout (1.3.0 is an example):
-
-```text
-/var/lib/openbot/antigravity-acp-1.3.0/
-  antigravity-package.json    {"version":"1.3.0"}
-  bin/
-    agy_acp_server.par
-    localharness_external
-```
-
-Both programs must be executable by the OpenBot host user. Set
-`OPENBOT_ANTIGRAVITY_PATH=/var/lib/openbot/antigravity-acp-1.3.0/bin/agy_acp_server.par`
-in that process's environment and restart OpenBot. The variable names the executable, not
-the directory. OpenBot requires the version manifest two levels above it; extraction alone
-does not create that manifest. An invalid override remains an error: OpenBot does not replace
-it with the managed runtime. Managed updates do not change the explicit override.
-
-The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravity-acp` and
-`~/.gemini/artifacts` and protects its settings files. On macOS, runtime 1.4.0 and later keep the
-Google sign-in in the login Keychain only when a test item can be written there at start, and a
-confined process cannot write the Keychain (#2988). So every Antigravity process, the sign-in
-included, gets `AGY_ACP_FORCE_FILE_STORAGE=1` and keeps the token in
-`~/.gemini/antigravity-acp/acp_token.json`, as on Linux and Windows. A token that an earlier
-version saved in the Keychain is not read, so the user signs in again once. Migration 22 adds `antigravity` to
-`projection_provider_sessions`.
-
-From 1.4.0 the server keeps the token, `settings.json` (which names the sign-in method) and its
-conversations in `$GEMINI_HOME/antigravity-acp`, with `~/.gemini` when the variable is not set. So
-Gemini can hold more than one account: each account after the first gets `GEMINI_HOME` set to its
-own folder (`antigravityReadsGeminiHome` gates the rows, the sign-in, the checks, the usage reads and
-the agent start), and `antigravityStatePaths` confines its process to that folder. Each new session
-leaves a conversation database in that folder, so a usage read of an account with no agent process
-starts no process: the account shows its reading from the sign-in check. The sandbox cannot create folders in a new account's home, so OpenBot makes them.
+The CLI keeps the token, `settings.json` (which names the sign-in method) and its conversations in the
+app data folder. Its own log there (`log/`) contains the Google account email (`applyAuthResult`).
+OpenBot does not read that folder into its log or a diagnostics export. In the 1.5.4 tests the CLI wrote
+nothing to stderr. So Gemini can hold more than one account: each account after the first gets
+`GEMINI_HOME` set to its own folder, which `antigravityArgv` passes as `--gemini-dir`, and
+`antigravityStatePaths` confines its process to that folder. A usage read needs an access token that
+has not expired, and only a running CLI refreshes it, so a usage read of an account with no agent
+process starts no process: the account shows its reading from the sign-in check. The sandbox cannot
+create folders in a new account's home, so OpenBot makes them.
+A plan can serve models that the first account's does not, so the account check also reads the account's own
+`model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as
+`models` only the ones that the provider's catalogue does not list: the picker shows the catalogue on the
+account's entry, with the models an admin turned off left out, and then these. `updateAgent` accepts a model
+of the agent's account. A failed list keeps the last one. `provider-accounts-v1` does not carry it;
+`provider-account-models-v1` does, so the web client, a joined desktop and mobile show these models for the account.
 The account sign-in is the same ACP `authenticate` call as the first account's; a Reconnect calls
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
-first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server relays the account's sign-in to the
+first account: an account process never gets `GEMINI_API_KEY`. The ACP server reports no email. The driver's `readAccount`
+(`readAntigravityEmail`) reads `id_token_email` from the account's token file instead, so each row names its Google
+account, and a second account with the same email is refused as already added. A token that OpenBot copied from the
+1.4 server has an empty email, and the row then shows its label. With a saved key, the first account names no email. A joined server relays the account's sign-in to the
 client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
 names Codex and Claude only, signs the account in through the live view.
 
-From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
-reads the Google account's quota summary and sends one Markdown answer. The driver's
-`readRateLimits` sends it in a session that no thread owns (`privatePrompt` in
-`src/backend/acp-client.ts`). Each process keeps that one session for every read, because each new
-Antigravity session leaves a conversation database in `~/.gemini/antigravity-acp/conversations`,
-also after it closes. `src/backend/antigravity-usage.ts` reads one group of the answer's
-"Quota Limits" section into the windows. Google can give a model a group of its own, such as Gemini 4
+Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
+(`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
+Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
+`retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
+unless the User-Agent is `antigravity/<version> <os>/<arch>`, and it sends the "Gemini Models" group only
+to the desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). 
+`loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
+that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
+"spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
+does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
+reading. Only a new CLI session refreshes the token, so an idle sign-in loses it after an hour. The
+driver sets `usageLeavesSession`: an account after the first and the own sign-in keep their last
+reading when a read gives none, so the account stays in the usage popover. A sign-out, a sign-in or a
+key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
+(`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
+Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
 and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
 send `groups`, so a remote client shows the one reading. The Claude and GPT models that Antigravity
-also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold. An
-older runtime, an
-API key sign-in ("Not applicable for current authentication method") and an answer that does not
-parse give no reading. A saved Gemini API key comes before the Google sign-in, so the provider
+also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold.
+A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
 not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
 
@@ -627,16 +915,16 @@ many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
 `src/backend/acp-flavor-antigravity.ts` names a rate limit or quota, an unavailable model, and a
 service failure from Google's status text. Antigravity does not document these texts.
 
-Antigravity 1.3.0 reports a spent per-user quota as answer text, `Usage Limit Reached` and Google's
-reset time. The flavor shows it with `error.provider.antigravityQuotaReached`, not the rate-limit
+Antigravity reports a spent per-user quota as answer text, `Usage Limit Reached` and Google's
+reset time; 1.5 puts `⚠ ` before it. A failed MCP server gets the same prefix. The flavor shows it with `error.provider.antigravityQuotaReached`, not the rate-limit
 text, because the quota resets in days. The server names no bucket, so the message says that the
 limit can be for one model and that the plan's usage page can still show room.
 
-Antigravity 1.3.0 and later send ACP `usage_update` after each model step: `used` is the size of
+Antigravity 1.3.0 to 1.4.5 send ACP `usage_update` after each model step: `used` is the size of
 the last model call, and `size` is the model's context window. The adapter turns it into
-`thread/tokenUsage/updated`, also after a turn that OpenBot already ended. 1.2.1, the pinned
-first-install version, sends none, so the ring stays hidden until the runtime updates. The update
-has no category breakdown.
+`thread/tokenUsage/updated`, also after a turn that OpenBot already ended. The update has no
+category breakdown. The 1.5.4 CLI sends no `usage_update` (checked on macOS and Windows), so a
+Gemini agent shows no context reading until the CLI sends it again.
 
 Antigravity 1.4.3 also returns `usage` from `session/prompt`: the tokens of that prompt only, measured
 from the session's total at the turn's start. A restored session starts from its saved total.
@@ -690,8 +978,15 @@ then `~/.cursor/auth.json`; on Linux `$XDG_CONFIG_HOME/cursor/auth.json` or
 `~/.config/cursor/auth.json`; on Windows `%APPDATA%\Cursor\auth.json`. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
-`cursor` row, because both windows have the same length. The composer notice uses only the window of the selected model (`usageWindowsForModel`): a spent API window does not warn while the agent runs Auto or Composer, and the reverse. A plan with only `totalPercentUsed` fills
-the primary window. The reader also sends `GetPlanInfo`: on a merged plan (`isMerged`), such as an X
+`cursor` row, because both windows have the same length. The total of that split plan
+(`totalPercentUsed`), which the Cursor CLI shows first as "Included", goes to `tertiary`: the dock
+lists it first as "Total", and the rail ring shows it, or a window that is used up, because the
+models of that window then stop. Only the usage list and the ring read `tertiary`; the usage limit
+check reads the two windows, and the Team API does not send it, so a peer shows the two windows. The
+composer notice uses only the window of the selected model (`usageWindowsForModel` via
+`spentUsageWindow`): a spent API window does not warn while the agent runs Auto or Composer, and the
+reverse. A plan with only `totalPercentUsed` fills the primary window. The reader also sends
+`GetPlanInfo`: on a merged plan (`isMerged`), such as an X
 subscription, the included usage covers Grok and Composer only, so `totalPercentUsed` alone fills the
 primary window and the dock shows no other models window, as the Cursor app does. The Cursor app
 keeps the split for a merged Enterprise team plan; the reader cannot see the membership type, so it
@@ -731,6 +1026,120 @@ adds `cline` to `projection_provider_sessions`.
 Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
 from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
+### Devin
+
+The Devin provider (id `devin`) starts Cognition's Devin CLI with `devin acp`. The runtime manager
+reads `static.devin.ai/cli/current/manifest.json` and downloads
+`devin-<version>-<triple>.tar.gz` (`.zip` on Windows) from `static.devin.ai/cli/<version>/`. The
+archives hold only `bin/` and `share/`. Staging keeps both, because Devin CLI 3000.11.234 has a
+skill that reads its documentation in `share/devin/docs`, and refuses links and other special files.
+The manifest gives a SHA-256 for each target and no size, so a `GET` with `Range: bytes=0-0` gives
+the download size. `OPENBOT_DEVIN_PATH` selects another executable.
+
+Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
+browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
+(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
+the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
+empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+
+`devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
+`devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
+`devin/cli/plugins` stay read-only, because every other Devin process loads them. `.devin` and
+`.windsurf` in a workspace are project settings, so a confined process cannot write them. A model
+change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
+and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
+session.
+
+No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
+state from peers below protocol 8, and `providers-v8` carries it.
+
+### GitHub Copilot
+
+The GitHub Copilot provider (id `copilot`, issue #4637) starts GitHub's Copilot CLI with
+`copilot --acp --no-auto-update`. The runtime manager reads `releases/latest` of
+`github/copilot-cli` and downloads `copilot-<target>.tar.gz` (`.zip` on Windows). Each archive holds
+only `copilot` (`copilot.exe`). The licence lets an app include the CLI only unchanged, so OpenBot
+downloads it and does not ship it. `OPENBOT_COPILOT_PATH` selects another executable. Every Copilot
+process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`.
+
+The executable unpacks its JavaScript package into `pkg/<platform>/<version>` of its cache folder
+when that folder is missing. A confined process gets `COPILOT_CACHE_HOME` and
+`COPILOT_PKG_CACHE_HOME` in its own temporary folder (`COPILOT_CONFINED_ENV`), so it never writes a
+package that an unconfined process runs.
+
+Sign in runs `copilot login`, which opens GitHub's page in the system browser and takes the result
+on a `127.0.0.1` callback. A joined computer signs in the host with `copilot login --device-code`,
+which prints "visit PAGE and enter code CODE". Copilot CLI 1.0.105 keeps the token in the system
+keychain. It prefers `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` and `GITHUB_TOKEN`, in that order, to the
+keychain sign-in, so one of them in OpenBot's environment selects the account. The CLI has no
+sign-out command: Sign out starts its ACP server and calls the ACP `logout` method
+(`acpLogout`). It cannot sign out a token from the environment. A signed-out process answers
+`session/new` with `-32000`. Not confirmed: a Linux server with no keychain service, and the form
+of Copilot's error for a lost session, which `DEFAULT_ACP_FLAVOR` reads with the `-32002` rule.
+
+`copilotStatePaths` lets a confined process write `~/.copilot` (or `$COPILOT_HOME`), with its
+settings, instructions, hooks, skills, agents, plugins, MCP configuration and `pkg` read-only,
+because every other Copilot process loads them. In a workspace, `.mcp.json`, `.github/mcp.json`,
+`.github/copilot`, `.github/hooks`, `.github/skills` and `.github/agents` are project settings, so a
+confined process cannot write them. Their parent folders, `.github` and the workspace, cannot be
+renamed or removed, so the rules stay on those paths. The CLI reads `.github/instructions` and
+`.github/copilot-instructions.md` as well; a confined process can write them, as it can write
+`AGENTS.md`.
+
+No frozen Team API protocol knows `copilot`. The host hides Copilot agents, models, status, and
+sign-in state from peers below protocol 8, as for Devin.
+
+### Mistral
+
+The Mistral provider (id `mistral`) starts `vibe-acp`, the ACP server of Mistral Vibe. The runtime
+manager reads `releases/latest` of `mistralai/mistral-vibe` and downloads
+`vibe-acp-<triple>-<version>.tar.gz` (`.zip` on Windows). Each archive is a PyInstaller onedir build:
+`vibe-acp` and its `_internal` folder both go to `bin/`, and the macOS and Linux links stay links, as
+for Kimi. The licence is Apache-2.0. The archive holds it in
+`_internal/mistral_vibe-<version>.dist-info/licenses/LICENSE`, so the lock pins its hash in `files`.
+`OPENBOT_MISTRAL_PATH` selects another executable. The `vibe` command is the terminal app, not the
+ACP server, so the system search looks for `vibe-acp`.
+
+Every Mistral process gets `VIBE_ENABLE_TELEMETRY=false` (`MISTRAL_ENV` in `provider-drivers.ts`).
+In Vibe 3.1.0 this stops its usage events, its OpenTelemetry traces and its experiment fetch. An
+organization's managed configuration from Mistral is a higher layer, so it can turn telemetry on
+again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
+not confirmed in a run).
+
+Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
+has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
+`$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
+`config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
+`session/new` with `-32000` and "Missing API key for mistral provider.". Sign out starts the ACP
+server and calls `_auth/signOut` (`acpLogout`). It cannot sign out a key from the environment:
+Vibe refuses with `-32602`. The keychain item is global, so Mistral has no added accounts.
+
+`mistralStatePaths` lets a confined process write `$VIBE_HOME` (`~/.vibe`) for its logs, locks,
+history and caches. Its settings stay read-only, because every other Vibe process loads them:
+`config.toml`, `.env`, `trusted_folders.toml`, `hooks.toml`, `AGENTS.md`, `tools`, `skills`,
+`skills.toml`, `skills-registry-cache`, `agents`, `prompts`, `plugins`, `projects.toml`,
+`local_projects.toml`, `managed_config_cache.json` and `connector_bootstrap_cache.json`. Vibe writes
+`trusted_folders.toml` at startup when it is missing, and stops when it cannot. So OpenBot makes an
+empty file first (`makeMistralTrustedFolders`), and never changes one that exists. `.vibe` in a
+workspace is project settings, so a confined process cannot write it.
+
+Vibe 3.1.0 reads `AGENTS.md`, `.vibe` and `.agents/skills` only in a trusted folder. Its ACP trust
+decision writes `trusted_folders.toml`, so OpenBot sends the workspace in the session's
+`additionalDirectories` instead (`workspaceAsAdditionalDirectory` in `MISTRAL_ACP_FLAVOR`). A folder
+there is trusted for that session only.
+
+A model or thinking change with `session/set_config_option` applies to the session, and then Vibe
+saves it as the default in `config.toml`. A confined process cannot write that file, and the save
+fails with `-32602` and "Layer 'user-toml': cannot write config file". `AcpFlavor.configSetUnsaved`
+reads that failure as a change that applied. A Full access Mistral agent saves the value, so it
+becomes the default of each new Vibe session, also in a terminal. Vibe answers a lost session with
+`-32602` and `{ session_id: <id> }`, which `MISTRAL_ACP_FLAVOR` reads as a missing session.
+
+No frozen Team API protocol knows `mistral`. The host hides Mistral agents, models, status, and
+sign-in state from peers below protocol 8, and `providers-v8` carries it.
+
 ### Kimi
 
 The Kimi provider (id `kimi`) starts the Kimi Code CLI with `kimi acp`. The runtime manager
@@ -759,6 +1168,22 @@ Kimi CLI 1.52.0 has no ACP configuration options, so OpenBot changes the model w
 and the path in `data.details`. `AcpFlavor.modelSetUnsaved` reads that failure as a model change
 that applied. A Full access Kimi agent saves the model, so it becomes the default model of each new
 Kimi session, also in a terminal.
+
+The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/kimi-usage.ts`)
+sends the request of the CLI's `/usage` command, `GET <base_url>/usages`, with the CLI's access
+token. The CLI's version selects the folder: `KIMI_SHARE_DIR` or `~/.kimi` for the Python CLI 1.x,
+`KIMI_CODE_HOME` or `~/.kimi-code` for Kimi Code 2.x. Both write `base_url` and the token key into
+`[providers."managed:kimi-code"]` of `config.toml`, and the token into `credentials/<key without
+"oauth/">.json`. `KIMI_CODE_BASE_URL` comes first, then `base_url`, then `https://api.kimi.com/coding/v1`.
+The reader accepts only an `https` address. The rolling 5-hour window (the shortest window of
+`limits[]`, else `usages.limit_5h`) fills the primary window. The weekly quota (`usage`, else
+`usages.limit_7d`) and the monthly quota (`usages.limit_month_total`) share the secondary window and
+`tertiary`, as OpenCode's do: the one that stops a turn first is the secondary window. No sign-in, a
+401, 403 or 404, or an answer with no quota gives no reading. The token lasts 15 minutes, and the CLI refreshes it only during a turn, so an
+expired token fails the read and the dock keeps the last reading. An account with no Kimi Code plan
+has no reading, so a Kimi limit failure stays a turn error. The dock poll calls `readKimiUsage`
+directly, with the CLI that the last Kimi client ran on, so it does not start or wake the CLI for a
+reading. Before a Kimi client runs, the poll has no reading.
 
 No frozen Team API protocol knows `kimi`. The host hides Kimi agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
@@ -814,11 +1239,25 @@ The Hermes provider (id `hermes`) starts the user's own Hermes Agent with `herme
 no managed runtime for it: a newer Hermes moves `state.db` and `config.yaml` in `~/.hermes` forward,
 and the user's own older Hermes then cannot read them. `resolveHermesCli` looks for `hermes` on
 `PATH` and in `~/.local/bin`, and reads the version from `Hermes Agent vX.Y.Z` in `hermes --version`.
-A missing CLI is `not-installed`, and the row opens the `hermes-install` guide. The process keeps
+
+A missing CLI is `not-installed`. On macOS and Linux, with no `OPENBOT_HERMES_PATH`, its row has a
+Download: `HermesInstaller` (`src/main/hermes-installer.ts`) runs the official installer as the
+OpenBot user. The script is pinned to the commit of one release (`HERMES_INSTALLER`), and OpenBot
+checks its SHA-256 before it runs. It runs one `--stage <name> --json` at a time, with no browser,
+computer-use or setup stage, so each stage moves the progress bar and Cancel stops its process
+group. Hermes goes to `~/.hermes` and `~/.local/bin/hermes`, as a terminal install puts it, and
+OpenBot does not update or remove it. The installer status is an optional `providers.hermes` in the
+runtime snapshot: `not-downloaded`, `downloading`, `finishing`, `download-error`, and `ready` when
+Hermes is installed, so that a server's row offers its Connect. Team API protocols below 8 never
+carry it; `providers-v8` adds the row, and an older client drops it. On Windows and with
+`OPENBOT_HERMES_PATH`, the row opens the `hermes-install` guide. The process keeps
 the user's `HERMES_HOME` (or `~/.hermes`, `%LOCALAPPDATA%\hermes` on Windows), so the user's memories,
 skills, sign-ins and `SOUL.md` apply. `hermesStatePaths` lets a confined process write that folder
 and protects the Hermes code, `config.yaml`, `.env`, `SOUL.md`, skills, hooks, cron, plugins and
-profiles in it.
+profiles in it. On a server, that is the Hermes of the service user (`/var/lib/openbot`, or `/data` in
+Docker); the server packages include `libatomic1`, which the Node.js of the Hermes installer needs.
+`scripts/hermes-server-e2e.ts` installs Hermes in the release image with `HermesInstaller` and runs a
+turn on a mock model.
 
 Sign in runs `hermes auth add nous --type oauth`, the Nous Portal device-code login. Its first
 question imports shared Nous credentials, and EOF answers yes, so the code sign-in closes the CLI's
@@ -836,6 +1275,26 @@ Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
 protocols below 8 hide Hermes; protocol 8 and newer carry it as any other provider id.
+
+OpenBot gives its Hermes agents two `agent` settings, `HERMES_AGENT_SETTINGS` in
+`src/backend/hermes-settings.ts`: `coding_context: focus` shows the skills of non-coding categories
+by name only, and `disabled_toolsets: [browser]` removes the Hermes browser tools, because each agent
+has `openbot_browser`. `hermesSettingsEnvironment` writes them to a `config.yaml` in
+`<provider state>/hermes-settings/<hash>/` and sets `HERMES_MANAGED_DIR` to that folder. Hermes
+merges a managed `config.yaml` over the user's, and a Hermes process that saves its settings removes
+the managed keys from the user's file. So OpenBot sets only the keys that the user's `config.yaml`
+does not have, and sets nothing when `HERMES_MANAGED_DIR` is set, when `/etc/hermes` exists, or when
+it cannot read the user's file. The chat client and the profile client both get the folder. This has
+two limits. Commands that the agent runs keep `HERMES_MANAGED_DIR`, so in them
+`hermes config set` refuses the two keys as "managed by your administrator". OpenBot reads the
+user's file when the Hermes process starts, so a key that the user adds while an agent runs applies
+only after the next start, and a settings save of that process can remove it from the user's file.
+`bun run bench:hermes-prompt-settings` measures each setting with real
+turns on a free Nous Portal model in a temporary Hermes profile, and writes
+`.openbot-build/hermes-prompt-settings-bench/report.json`. On Hermes 0.21.5 the two settings take a
+reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.hermes` installs its
+own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
+user's runtime, and stops when the launchers change.
 
 ### Custom agents
 
@@ -986,15 +1445,20 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
-Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+Codex, Grok, Muse, Cursor, Devin, GitHub Copilot, Mistral and Gemini (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
-Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
-for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
-(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+Grok, Muse, Cursor, Devin, GitHub Copilot, Mistral and Gemini have a driver `signOut` (`grok logout`, `muse logout`,
+`cursor-agent logout`, `devin auth logout`, the ACP `logout` method of `copilot --acp` and of
+`antigravity acp`, and the `_auth/signOut` extension method of `vibe-acp`)
+for the own sign-in only. Gemini's `logout` deletes the token file of the default Gemini home, as a
+Reconnect does; it does not revoke the token at Google. A Gemini account after the first has no
+sign-out: **Remove account** deletes its folder. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
-the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+the confirmation says so. Gemini is the exception: OpenBot keeps its sign-in in a token file of
+its own (`ANTIGRAVITY_ENV`), so a terminal Gemini CLI keeps its sign-in, and the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
 Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
 sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
 need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`
@@ -1029,7 +1493,11 @@ Pi uses its native `--mode rpc` interface. It does not use an ACP wrapper. Reque
 clears queued work before abort. Session paths and the active conversation branch are preserved.
 Models come from the running CLI. A small extension uses Pi's `registerMcpServer` interface to
 register configured MCP servers and OpenBot tools. Secrets are supplied through process state,
-not copied into the extension source.
+not copied into the extension source. A Workspace only Pi runs in a sandbox that its MCP servers
+would inherit, so OpenBot starts each stdio server itself (`mcp-stdio-relay.ts`) and registers it
+in Pi as a Streamable HTTP server on 127.0.0.1, with a bearer token. Each Pi session of the server
+starts its own process, and the process stops with that session or with the thread. The Access
+setting does not limit MCP servers, as for Claude and Codex (#6191).
 
 Managed Pi archives come from official GitHub releases and use the published SHA-256 digest.
 Sign-in opens Pi in a host terminal. Close Pi after sign-in to refresh models in OpenBot.

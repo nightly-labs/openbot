@@ -32,18 +32,29 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} esiste già, quindi questa copia viene salvata come {saved}.",
   "error.import.fileSkipped": "{name}: il file {file} viene saltato. {reason}",
   "error.import.chooseZip": "Scegli un file .zip.",
-  "error.import.zipTooLarge": "L'esportazione deve essere un file .zip sotto i 500 MB.",
   "error.import.unsafeFile": "L'esportazione contiene un file non sicuro: {name}",
-  "error.import.expandedTooLarge":
+  "error.import.tooManyFiles": "L'esportazione deve contenere al massimo {limit} file.",
+  "error.import.diskSpace":
+    "{name}: i suoi file richiedono {size} GB di spazio libero su disco e ne sono liberi {free} GB. Libera spazio, poi importa di nuovo l'agente.",
+  "error.import.remoteExpandedTooLarge":
     "L'esportazione, una volta estratta, deve occupare meno di 500 MB e contenere al massimo {limit} file.",
   "error.import.zipInvalid":
     "Il file selezionato non è un .zip valido. Se Grok Bot lo sta ancora salvando, attendi e sceglilo di nuovo.",
+  "error.import.entryDamaged": "Il file è danneggiato nell'esportazione.",
+  "error.import.foldersSkipped":
+    "{number} file nelle cartelle .git e node_modules sono esclusi. Uno strumento può ricrearli.",
   "error.import.empty": "L'esportazione è vuota.",
   "error.import.remoteZipTooLarge":
     "Per importare in un server a cui ti sei unito, l'esportazione deve essere un file .zip sotto i 100 MB.",
   "error.import.hostBusy": "Il server sta leggendo altre esportazioni. Riprova tra qualche minuto.",
+  "error.import.uploadDiskSpace":
+    "L'esportazione richiede {size} GB di spazio libero sul server, e ne sono liberi {free} GB. Libera spazio sul server, poi scegli di nuovo l'esportazione.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Questo server accetta un'esportazione fino a 100 MB. Aggiorna OpenBot sul server per importare un'esportazione più grande.",
   "error.import.skillKept":
     "{name}: il server ha già la skill «{skill}», quindi l'agente usa quella skill. Chiedi a un amministratore di aggiornarla.",
+  "error.import.skillRenamed":
+    "{name}: il nome della skill «{skill}» è troppo simile a quello di un'altra skill, quindi viene salvata come «{renamed}».",
   "error.import.transferRemoteTooLarge":
     "Un file di trasferimento per un server a cui ti sei unito deve pesare meno di 100 MB. Disattiva i file del workspace o esporta meno agenti.",
   "error.import.transferNotFile": "Questo file non è un file di trasferimento OpenBot.",

@@ -1,5 +1,6 @@
 import {
   type AgentSummary,
+  type AvatarColor,
   type ClientAgentSummary,
   type ForeignProviderId,
   foreignProvider,
@@ -30,7 +31,11 @@ export type RemoteAgent = Pick<
     >
   > & { foreignProvider?: ForeignProviderId | undefined };
 
-export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
+/**
+ * The agent as the phone shows it. `avatarColor` comes from the `agent-colors-v1` route, because the
+ * released agent routes do not carry it.
+ */
+export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: AvatarColor | null): MobileAgent {
   return {
     id: agent.id,
     serverId,
@@ -48,6 +53,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent 
     avatarUrl: agent.avatarUrl ?? null,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
+    avatarColor,
     marketplaceSource: agent.marketplaceSource
       ? { listingId: agent.marketplaceSource.listingId, version: agent.marketplaceSource.version }
       : undefined,
@@ -103,9 +109,16 @@ export function decodeAgentSummaries(value: unknown): RemoteAgent[] {
   return value.map(decodeAgent);
 }
 
-export function decodeConversationReads(value: unknown): Record<string, { unreadCount: number }> {
+/** The host read state of one agent chat that the phone keeps. */
+export interface MobileConversationRead {
+  unreadCount: number;
+  /** The first unread message, where the chat shows its NEW line. */
+  firstUnreadMessageId: string | null;
+}
+
+export function decodeConversationReads(value: unknown): Record<string, MobileConversationRead> {
   if (!isDynamicRecord(value)) throw new Error("The server returned invalid read states.");
-  const reads: Record<string, { unreadCount: number }> = {};
+  const reads: Record<string, MobileConversationRead> = {};
   for (const [agentId, readState] of Object.entries(value)) {
     if (
       !isDynamicRecord(readState) ||
@@ -115,14 +128,16 @@ export function decodeConversationReads(value: unknown): Record<string, { unread
     ) {
       throw new Error("The server returned an invalid read state.");
     }
-    reads[agentId] = { unreadCount: readState.unreadCount };
+    // Only the line reads it, so a value the phone cannot use shows no line rather than refuse the state.
+    const firstUnreadMessageId = isString(readState.firstUnreadMessageId) ? readState.firstUnreadMessageId : null;
+    reads[agentId] = { unreadCount: readState.unreadCount, firstUnreadMessageId };
   }
   return reads;
 }
 
 export function ignoreResponse(): void {}
 
-export function updateAgentPayload(input: UpdateAgentInput): TeamProtocolV2Json {
+export function updateAgentPayload(input: UpdateAgentInput): { [key: string]: TeamProtocolV2Json } {
   return {
     agentId: input.agentId,
     ...(input.name === undefined ? {} : { name: input.name }),

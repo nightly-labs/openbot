@@ -1,6 +1,7 @@
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
-import { createMemo, Loading, lazy, Show } from "solid-js";
+import { createMemo, Loading, Show } from "solid-js";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps, PromptAnswerOptions } from "./conversation-types";
 
@@ -51,6 +52,7 @@ export function ConversationQuestionPrompt(props: {
                   sendShortcut={deviceSendShortcut(view.platform)}
                   onSubmit={answer}
                   onResolutionPresented={presentResolution}
+                  onOpenLink={(url) => void openExternalMessageUrl(url)}
                 />
               }
             >
@@ -73,8 +75,3 @@ export function ConversationQuestionPrompt(props: {
     </Show>
   );
 }
-
-const QuestionPromptBubble = lazy(() =>
-  import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
-);
-const UiBlockPrompt = lazy(() => import("./UiBlockPrompt").then((module) => ({ default: module.UiBlockPrompt })));

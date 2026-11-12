@@ -30,6 +30,8 @@ export type {
   WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
 export {
+  SIGNAL_CLIENT_RECONNECT_GRACE_MS,
+  SIGNAL_DEFAULT_RECONNECT_GRACE_MS,
   SIGNAL_MESSAGE_BYTES_LIMIT,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
@@ -163,6 +165,9 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     githubRoute: z.string().min(1).max(16_384).optional(),
     telegramRoute: z.string().min(1).max(16_384).optional(),
     queueKey: z.string().max(128).optional(),
+    // Unknown formats are kept but never used: Signal sends only the formats it knows. A list that a
+    // later host sends in a shape this Signal does not know is dropped, not the whole hello.
+    webhookFormats: z.array(z.string().min(1).max(64)).max(8).optional().catch(undefined),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),

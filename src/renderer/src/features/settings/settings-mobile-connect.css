@@ -275,7 +275,7 @@
   justify-content: flex-start;
   border-style: dashed;
   font-weight: var(--openbot-weight-regular);
-  text-align: left;
+  text-align: start;
   white-space: normal;
 }
 
@@ -330,7 +330,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--openbot-space-4) var(--openbot-space-4) 0 var(--openbot-space-6);
+  padding-block: var(--openbot-space-4) 0;
+  padding-inline: var(--openbot-space-6) var(--openbot-space-4);
 }
 
 .settings-mobile-dialog-title {
@@ -382,7 +383,7 @@
   justify-content: flex-start;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-3) var(--openbot-space-4);
-  text-align: left;
+  text-align: start;
   white-space: normal;
 }
 
@@ -412,11 +413,11 @@
   display: grid;
   gap: var(--openbot-space-1-5);
   margin: 0;
-  padding-left: var(--openbot-space-4);
+  padding-inline-start: var(--openbot-space-4);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
-  text-align: left;
+  text-align: start;
 }
 
 .settings-mobile-steps > li::marker {

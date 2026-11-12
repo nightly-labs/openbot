@@ -81,7 +81,7 @@ export const messages = {
   "vault.importMenu": "Importeren uit CSV",
   "vault.importTitle": "Importeren uit een CSV-bestand",
   "vault.importDescription":
-    "Importeer logins uit een CSV-bestand dat 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Wachtwoorden of LastPass exporteert. OpenBot leest het bestand op deze computer en uploadt het niet.",
+    "Importeer logins uit een CSV-bestand dat 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Wachtwoorden, LastPass of Proton Pass exporteert. OpenBot leest het bestand op deze computer en uploadt het niet.",
   "vault.importChoose": "CSV-bestand kiezen",
   "vault.importDone": "Geïmporteerd: {imported}. Overgeslagen: {skipped}.",
   "vault.unavailableTitle": "Deze computer kan geen geheimen bewaren",
@@ -98,6 +98,31 @@ export const messages = {
   "vault.request.addLogin": "Login toevoegen",
   "vault.request.addCard": "Kaart toevoegen",
   "vault.request.addContact": "Adres toevoegen",
-  "vault.request.notNow": "Niet nu",
   "vault.request.saved": "Opgeslagen in de Kluis",
+  "vault.twoStep.title": "Verificatiecode",
+  "vault.twoStep.on": "Aan",
+  "vault.twoStep.off": "Uit. Agents vragen jou om de code.",
+  "vault.twoStep.setUp": "Instellen",
+  "vault.twoStep.copy": "Code kopiëren",
+  "vault.twoStep.copyFor": "Verificatiecode voor {site} kopiëren: {code}",
+  "vault.twoStep.remaining": {
+    one: "{count} seconde tot de volgende code",
+    other: "{count} seconden tot de volgende code",
+  },
+  "vault.twoStep.setupTitle": "Verificatiecode instellen",
+  "vault.twoStep.setupIntro":
+    "Zet op {site} verificatie in twee stappen aan met een authenticator-app. Als de site een QR-code toont, geef OpenBot de sleutel.",
+  "vault.twoStep.keyLabel": "Instelsleutel of otpauth://-link",
+  "vault.twoStep.keyHint":
+    "De meeste sites tonen hem onder de QR-code, als “Kun je niet scannen?” of “Sleutel handmatig invoeren”.",
+  "vault.twoStep.keyInvalid": "Dit is geen sleutel voor verificatie in twee stappen.",
+  "vault.twoStep.or": "of",
+  "vault.twoStep.chooseImage": "Screenshot van de QR-code kiezen",
+  "vault.twoStep.noQrCode": "Er staat geen QR-code in deze afbeelding.",
+  "vault.twoStep.checkIntro": "Voer deze code in op {site} om af te ronden. Als de site hem accepteert, kies Klaar.",
+  "vault.twoStep.checkHint": {
+    one: "De code verandert elke {count} seconde. De site accepteert ook de vorige.",
+    other: "De code verandert elke {count} seconden. De site accepteert ook de vorige.",
+  },
+  "vault.twoStep.theSite": "de site",
 } as const satisfies PartialTranslation<typeof source>;

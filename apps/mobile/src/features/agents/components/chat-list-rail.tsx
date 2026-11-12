@@ -3,13 +3,17 @@ import { Link } from "expo-router";
 import { memo, type ReactNode, useMemo } from "react";
 import { FlatList, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
-import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
-import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import {
+  useAgentListUnreadCount,
+  useAgentListUnreadThreads,
+  useAgentListWaitReason,
+} from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
 import { useBarTop } from "@/shared/lib/native-bar";
@@ -57,14 +61,26 @@ function RailUnreadDot() {
 const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
-  const unread = useAgentUnread(agent.id);
-  const waitReason = useAgentWaitReason(agent.id);
+  const unreadCount = useAgentListUnreadCount(agent.id);
+  const unreadThreads = useAgentListUnreadThreads(agent.id);
+  const openLabel = t("mobile.agent.list.open", { name: agent.name });
+  const waitReason = useAgentListWaitReason(agent.id);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
         chatId={agent.id}
         accessibilityRole="button"
-        accessibilityLabel={t("mobile.agent.list.open", { name: agent.name })}
+        accessibilityLabel={
+          unreadCount > 0 || unreadThreads
+            ? t("mobile.agent.list.withState", {
+                label: openLabel,
+                state:
+                  unreadCount > 0
+                    ? t("mobile.agent.list.unread", { count: unreadCount })
+                    : t("mobile.agent.list.unreadThreads"),
+              })
+            : openLabel
+        }
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >
@@ -73,14 +89,19 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
             agentId={agent.id}
             serverId={agent.serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={AVATAR_SIZE}
             animateIdle={false}
             rings
+            withThreads
           />
-          {waitReason ? <AgentWaitBadge reason={waitReason} size={16} /> : null}
+          {waitReason ? (
+            <AgentWaitBadge reason={waitReason} size={16} />
+          ) : unreadCount > 0 || unreadThreads ? (
+            <AgentUnreadBadge count={unreadCount} avatarSize={AVATAR_SIZE} ringColor={background} />
+          ) : null}
         </View>
-        {unread && !waitReason ? <RailUnreadDot /> : null}
       </ChatLinkPressable>
     </Link>
   );
@@ -110,7 +131,7 @@ const RailChannel = memo(function RailChannel({
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >
-        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} />
+        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />
         {unread ? <RailUnreadDot /> : null}
       </ChatLinkPressable>
     </Link>

@@ -41,3 +41,32 @@ export function openBrowserProfilesPage(stack: BrowserProfileStack, serverId: st
       params: { agentId: stack.agentId, serverId },
     });
 }
+
+/**
+ * Opens one saved proxy or member computer, or a new proxy when `proxyId` is absent. `assignTo` gives
+ * a new proxy to that named profile.
+ */
+export function openBrowserProxyPage(
+  stack: BrowserProfileStack,
+  serverId: string,
+  params: { proxyId?: string; assignTo?: string } = {},
+): void {
+  if (stack.kind === "server")
+    router.push({ pathname: "/server-settings/browser-proxy", params: { serverId, ...params } });
+  else
+    router.push({
+      pathname: "/agent-info/[agentId]/browser-proxy",
+      params: { agentId: stack.agentId, serverId, ...params },
+    });
+}
+
+/** Opens the proxy choice of one named profile. */
+export function openBrowserProfileProxyPage(stack: BrowserProfileStack, serverId: string, profileId: string): void {
+  if (stack.kind === "server")
+    router.push({ pathname: "/server-settings/browser-profile-proxy", params: { serverId, profileId } });
+  else
+    router.push({
+      pathname: "/agent-info/[agentId]/browser-profile-proxy",
+      params: { agentId: stack.agentId, serverId, profileId },
+    });
+}

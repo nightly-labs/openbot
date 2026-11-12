@@ -55,6 +55,10 @@ const args: FirstAgentSetupProps = {
   value: DEFAULT_FIRST_AGENT_DRAFT,
   suggestions: FIRST_AGENT_SUGGESTIONS,
   submitting: false,
+  // The app always passes the model catalog, so every story shows the model picker.
+  modelOptions: STORY_MODELS,
+  agentStatus: STORY_AGENT_STATUS,
+  onManageProviders: fn(),
   onChange: fn(),
   onSubmit: fn(),
 };
@@ -103,11 +107,6 @@ export const SmallWindow: Story = {
   parameters: { viewport: { defaultViewport: "firstAgentSmall" } },
 };
 
-/** The model picker lists only the providers that can run, and its plus opens the provider settings. */
-export const ModelPicker: Story = {
-  args: { modelOptions: STORY_MODELS, agentStatus: STORY_AGENT_STATUS, onManageProviders: fn() },
-};
-
 export const LongPrompt: Story = {
   args: {
     value: {
@@ -117,8 +116,6 @@ export const LongPrompt: Story = {
         (_, index) => `Task ${index + 1}: Help me organize my notes, errands, and plans for the week.`,
       ).join("\n"),
     },
-    modelOptions: STORY_MODELS,
-    agentStatus: STORY_AGENT_STATUS,
   },
   parameters: { viewport: { defaultViewport: "firstAgentSmall" } },
 };

@@ -8,8 +8,10 @@ import {
   detectDownloadPlatform,
 } from "../../lib/download-platforms";
 import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import type { LandingPageText } from "../../lib/landing-page-text";
 import { detectMobilePlatform, MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "../../lib/mobile-apps";
 import { LandingIcon } from "./LandingIcon";
+import { useLandingText } from "./LandingText";
 
 type HeroPlatform = DownloadPlatform | MobilePlatform;
 
@@ -23,10 +25,14 @@ interface HeroOffer {
   external: boolean;
 }
 
-function heroOffer(platform: HeroPlatform): HeroOffer {
-  if (platform === "ios" || platform === "android") return { ...MOBILE_APPS[platform], external: true };
+function heroOffer(platform: HeroPlatform, text: LandingPageText): HeroOffer {
+  const { available, desktop, phone } = text.download;
+  if (platform === "ios" || platform === "android")
+    return { ...MOBILE_APPS[platform], ...phone[platform], status: available, external: true };
   const { href, ...details } = DOWNLOAD_PLATFORMS[platform];
-  return details.available && href ? { ...details, href, external: false } : { ...details, external: false };
+  // A platform that is not out yet keeps its English status: no catalog key names it.
+  if (!details.available || !href) return { ...details, external: false };
+  return { ...details, action: desktop[platform], status: available, href, external: false };
 }
 
 interface HeroMenuItemProps {
@@ -36,7 +42,8 @@ interface HeroMenuItemProps {
 }
 
 function HeroMenuItem(props: HeroMenuItemProps) {
-  const offer = () => heroOffer(props.platform);
+  const text = useLandingText();
+  const offer = () => heroOffer(props.platform, text());
   return (
     <Show
       when={offer().href}
@@ -77,12 +84,13 @@ function HeroMenuItem(props: HeroMenuItemProps) {
 
 export function HeroDownloadSelector() {
   const menuId = createUniqueId();
+  const text = useLandingText();
   const [platform, setPlatform] = createSignal<HeroPlatform>("macos");
   const [open, setOpen] = createSignal(false);
   let root: HTMLDivElement | undefined;
   let trigger: HTMLButtonElement | undefined;
 
-  const current = () => heroOffer(platform());
+  const current = () => heroOffer(platform(), text());
   const menuItems = () => Array.from(root?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
 
   function closeMenu(restoreFocus = false): void {
@@ -183,7 +191,7 @@ export function HeroDownloadSelector() {
           ref={trigger}
           class="landing-download-trigger"
           type="button"
-          aria-label="Choose download platform"
+          aria-label={text().hero.choosePlatform}
           aria-haspopup="menu"
           aria-expanded={open() ? "true" : "false"}
           aria-controls={menuId}
@@ -199,7 +207,7 @@ export function HeroDownloadSelector() {
           id={menuId}
           class="landing-download-menu"
           role="menu"
-          aria-label="Download platforms"
+          aria-label={text().hero.platforms}
           onKeyDown={handleKeyDown}
         >
           <For each={DOWNLOAD_PLATFORM_ORDER}>
@@ -213,7 +221,7 @@ export function HeroDownloadSelector() {
           </For>
           <hr class="landing-download-menu-separator" />
           <span class="landing-download-menu-label" aria-hidden="true">
-            Phone apps
+            {text().hero.phoneApps}
           </span>
           <For each={MOBILE_APP_ORDER}>
             {(menuPlatform) => (

@@ -18,6 +18,7 @@ import {
   conversationForCapabilities,
   markerExclusionsForCapabilities,
   memberSender,
+  messageTextCut,
   nullableString,
   pageAnchor,
   pageLimit,
@@ -61,8 +62,23 @@ export async function routeAgentConversation(
     // rest as older pages. A page larger than the frame cannot reach a remote client.
     for (let limit = pageLimit(url); ; limit = Math.floor(limit / 2)) {
       const page = await runCauseEffect(agents.readConversationPageFor(agentId, member.id, anchor, limit, exclusions));
-      if (Buffer.byteLength(JSON.stringify(page)) <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
-      if (limit === 1) throw new HttpError(413, sourceText("error.team.conversationPageTooLarge"));
+      const bytes = Buffer.byteLength(JSON.stringify(page));
+      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
+      if (limit === 1) {
+        // One message alone is too large: cut its text, so the chat opens and the older pages load.
+        const references = Object.entries(page.references);
+        const cut = messageTextCut(
+          [...page.messages, ...references.map(([, message]) => message)],
+          bytes - WEBRTC_FRAME_BODY_BUDGET,
+        );
+        const fitted = {
+          ...page,
+          messages: page.messages.map(cut),
+          references: Object.fromEntries(references.map(([id, message]) => [id, cut(message)])),
+        };
+        if (Buffer.byteLength(JSON.stringify(fitted)) <= WEBRTC_FRAME_BODY_BUDGET) return json(200, fitted);
+        throw new HttpError(413, sourceText("error.team.conversationPageTooLarge"));
+      }
     }
   }
   if (method === "POST" && action === "conversation/unread") {

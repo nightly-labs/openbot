@@ -65,6 +65,11 @@ already has is left out. The desktop read-only Skills view reads the same route 
 info with their `~/.agents/skills/<slug>` location. The provider text of a `home:<slug>` tag names the skill's `SKILL.md`
 (`displayMessageReferences`); a person, and the released Team API adapters, see the name alone.
 
+In a channel, the `$` list holds the skills of each agent in the channel, one entry for each skill id
+(`src/renderer/src/features/conversation/stores/skills-store.ts`). A tag reaches each agent by its
+name, so an agent without that skill reads the name only. When the list of one agent fails, the list
+shows the skills that loaded and tries again after a reconnect.
+
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
 `~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor, Cline and
@@ -88,9 +93,18 @@ each session start and resume, because most users have no vault. The agent servi
 uses it in two places: `openbot_browser.list_logins` returns the logins saved for the tab's HTTPS
 site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
-secure card, with no card. On an origin where an agent ran `evaluate` during this app session,
-`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because the agent's script
-could read the filled fields. A login matches by 1Password's autofill rule, on the registrable domain
+secure card, with no card. While agent code from `evaluate` can still run in the page,
+`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
+the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+A script can also write Cache Storage that a service worker serves as page code, also to a page that
+the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
+page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
+connected popup or opener keeps that mark, each other open page of the origin must navigate before
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
+own code runs a stored value as code is not protected, as from any other script that the site
+loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
 with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
 password or a code.
 
@@ -104,9 +118,11 @@ CLI output. Disconnect cancels active calls, and a late call cannot return a cre
 old session. Eight hours without a successful vault call ends the connection.
 
 Connect requires exactly one folder named `Shared with OpenBot`. Its id scopes later reads.
-Each fill syncs and checks the current item, its folder, its saved HTTPS origin, its deleted state,
-and its master-password prompt setting. Default, domain, and host URI rules use exact HTTPS origin
-matching. Other URI rules are not supported; those logins use the manual secret card.
+Each fill syncs and checks the current item, its folder, its saved URI, its deleted state,
+and its master-password prompt setting. Only an HTTPS saved URI and an HTTPS page match; a URI with
+no scheme counts as HTTPS. The default and base domain URI rules compare the registrable domain, as
+Bitwarden does, so `myaccount.google.com` also fills on `accounts.google.com`. The host rule needs
+the same host and port. Other URI rules are not supported; those logins use the manual secret card.
 The session key can decrypt the wider vault; the folder limit is enforced by OpenBot, not Bitwarden.
 All local agents share this grant. Prompt injection can still use an approved account on its own
 site; this feature does not authorize or constrain actions after sign-in.
@@ -114,16 +130,36 @@ site; this feature does not authorize or constrain actions after sign-in.
 API keys that a task needs, such as for a script or a service, use `openbot.request_api_key`. The
 router builds a `form` UI block with one required secret field (`apiKeyFormSpec` in
 `src/backend/agent/prompts.ts`), so every client that shows `ask_ui` shows it; no IPC or Team API
-contract changed. When the user submits it, `AttentionRegistry` saves the value with `AgentApiKeys`
-(`src/backend/agent-api-keys.ts`) before the prompt resolves, as `<userData>/agent-api-keys/<agentId>/<NAME>`:
-a 0600 file in a 0700 folder, outside every workspace, and not encrypted. The agent gets only the name
-and the path, and reads the file in its own command. Only the server owner or an admin can answer. The
+contract changed. When the Vault is ready, the form also has a segmented "Save for" field: "All agents
+(Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
+value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
+`save_api_key` does; every agent then reads the `.vault/<NAME>` file. Otherwise, `AttentionRegistry` saves the value with
+`AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as
+`<userData>/agent-api-keys/<agentId>/<NAME>`: a 0600 file in a 0700 folder, outside every workspace,
+and not encrypted. A failed save leaves the form open. The agent gets only the name and the path, and
+reads the file in its own command. Only the server owner or an admin can answer. The
 value is registered for log redaction when it is saved and at startup, and the stored block keeps no
 secret field value. `list_api_keys` and `remove_api_key` are the reverse actions, and deleting the agent
 deletes its folder. The form is refused in Slack, Discord and Telegram chats.
 
-`password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
-`bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection
+When the agent already has a secret, such as one that the user pasted in the chat, `openbot.save_api_key`
+saves it in the encrypted Vault as an `apiKey` item for every agent (`VaultItems.saveApiKey`), and
+`openbot_browser.save_vault_item kind=login` saves a website password (`VaultItems.saveLogin`). Both
+register a value of 8 or more characters for log redaction when the call arrives, before any check;
+the Vault registers a shorter value when it saves it. Both work only when a
+person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
+external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
+password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
+Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
+transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
+delete a Vault key: for a name that only the Vault has, `remove_api_key` fails and tells the agent
+that the user deletes it in Server settings > Vault.
+
+`password-vault-router.ts` joins metadata from every manager and prefixes Bitwarden ids with
+`bitwarden:` and Proton Pass ids with `proton:`. Existing 1Password ids stay unchanged. The
+router reads 1Password and Bitwarden from their services, and one source for each driver of the
+password-manager engine (see [integrations](integrations.md#password-managers-on-a-joined-server)). A failed list stops automatic account selection
 rather than hiding a source and selecting a different account. Main returns only connection state
 through the local Bitwarden IPC group. The shared panel is used in desktop Marketplace and server
 settings.
@@ -156,7 +192,13 @@ the user token to `POST /v1/github/installation-tokens` on the account Worker
 (`apps/auth-api/src/server/github-installation-tokens.ts`). The Worker holds the app's private key
 (`GITHUB_APP_PRIVATE_KEY`, PKCS #8) and signs an app JWT. It mints one installation token for each
 installation of this app, limited to the repositories where the user can push, maintain or
-administer, and stores nothing. With no key it answers 503, and the desktop keeps the user token.
+administer, and stores nothing. The request names the permissions that the installation granted,
+without `administration`: GitHub limits a user token to what its user can do, but not an
+installation token, so a user with push access would get admin access through one. The app asks
+for `administration: write` only because GitHub needs it to create a repository. Creation uses the
+user token, so a user creates only where GitHub lets that user create. When an installation has not
+granted the permission, the proxy adds an explanation to the `create_repository` error that the
+agent can give to the user. With no key it answers 503, and the desktop keeps the user token.
 `src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
 - `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
   `provider-state/github/repositories`, or else the user token.
@@ -174,6 +216,8 @@ person.
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
+
+`create_skill` and `revise_skill` publish a folder of the agent's workspace. An agent often writes a plain frontmatter value with a colon, such as `description: Use when: ...`, which YAML refuses. When the frontmatter does not parse, the library quotes each top-level plain value that has a colon and tries again. When that parses, the bundle gets the quoted `SKILL.md`; the folder in the workspace does not change. Otherwise the publish fails as before.
 
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 

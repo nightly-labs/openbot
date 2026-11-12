@@ -129,7 +129,9 @@ export interface TargetChoice {
  *
  * The agent's own last request is the answer whenever it named a window or an application: it says
  * where the agent works even while the driver acts in the background and leaves the window behind
- * everything else.
+ * everything else. When the rim cannot mark that place - an OpenBot window, a window on another
+ * Space, one that is minimized or gone - the rim goes down. Any other window would be one the agent
+ * does not touch, and often the one the user works in.
  *
  * Without such a request - a browser tool names a tab, not a window - the front window is the only
  * evidence left. Front order also moves each time the user clicks, so the rim holds the window it
@@ -150,6 +152,7 @@ export function chooseTarget({
   const candidates = workableWindows(visible, ownPid);
   const acted = actedWindow(candidates, action);
   if (acted) return asTarget(acted, visible);
+  if (action) return null;
   const held = previous ? candidates.find((window) => window.windowId === previous.windowId) : undefined;
   if (held && session.idleSeconds > AGENT_ACTION_SECONDS) return asTarget(held, visible);
   const front = frontWindow(candidates);

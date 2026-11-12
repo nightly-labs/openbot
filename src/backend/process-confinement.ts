@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
@@ -10,9 +10,9 @@ import { isPathInside } from "./path-containment";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity, Cursor, Cline and Kimi take no sandbox per session, so a Workspace only
- * agent on them gets a provider process of its own, and OpenBot starts that process inside an
- * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
+ * Grok, OpenCode, Antigravity, Cursor, Cline, Kimi and Devin take no sandbox per session, so a
+ * Workspace only agent on them gets a provider process of its own, and OpenBot starts that process
+ * inside an operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
  * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
  * has the sandbox now: on Linux and Windows the process does not start, and the user must choose
  * Full access.
@@ -65,9 +65,14 @@ class ProcessConfinementUnavailableError extends Error {
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
+/** The state directory of the Grok CLI: `$GROK_HOME`, or `~/.grok`. */
+export function grokHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.GROK_HOME?.trim() || join(home, ".grok");
+}
+
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  const grokHome = grokHomeDirectory(env, home);
   return {
     writable: [grokHome],
     protected: [
@@ -112,16 +117,17 @@ export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home
 }
 
 /**
- * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
- * the Gemini home, and hook scratch files in `artifacts`. The shared `config` folder, with the
- * global hooks, skills and MCP servers, is not in the list, so it stays read-only. `settings.json`
- * selects the sign-in and `trusted_workspaces.json` trusts folders for every other process.
+ * The Antigravity CLI keeps its sign-in, sessions and harness files in `antigravity-acp` under the
+ * Gemini home (`--app-data-dir`), hook scratch files in `artifacts`, and the state of each project in
+ * `config/projects`. The rest of the shared `config` folder, with the global hooks, skills, plugins
+ * and MCP servers, is not in the list, so it stays read-only. `settings.json` selects the sign-in and
+ * `trusted_workspaces.json` trusts folders for every other process.
  */
 export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const geminiHome = env.GEMINI_HOME?.trim() || join(home, ".gemini");
   const acp = join(geminiHome, "antigravity-acp");
   return {
-    writable: [acp, join(geminiHome, "artifacts")],
+    writable: [acp, join(geminiHome, "artifacts"), join(geminiHome, "config", "projects")],
     protected: [join(acp, "settings.json"), join(acp, "trusted_workspaces.json")],
   };
 }
@@ -323,13 +329,101 @@ export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
  * servers, plugins, skills and downloaded tools are in that folder too, and every other Kimi process
  * loads them, so they stay read-only.
  */
+/** The state directory of the Python Kimi CLI: `$KIMI_SHARE_DIR`, or `~/.kimi`. */
+export function kimiHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+}
+
 export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const kimiHome = env.KIMI_SHARE_DIR?.trim() || join(home, ".kimi");
+  const kimiHome = kimiHomeDirectory(env, home);
   return {
     writable: unique([kimiHome, join(home, ".kimi", "plans")]),
     protected: ["config.toml", "config.json", "mcp.json", "plugins", "skills", "bin"].map((name) =>
       join(kimiHome, name),
     ),
+  };
+}
+
+/** The home folder of Mistral Vibe: `$VIBE_HOME`, or `~/.vibe`. */
+export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.VIBE_HOME?.trim() || join(home, ".vibe");
+}
+
+/**
+ * Mistral Vibe 3.1.0 writes its session logs, history, caches, locks and the folders that it trusts
+ * in its home folder. Its settings and MCP servers (`config.toml`), the saved API key (`.env`), the
+ * trusted folders, hooks, instructions, tools, skills, agents, prompts and plugins are in that folder
+ * too, and every other Vibe process loads them, so they stay read-only. The admin settings cache and
+ * the model catalogue cache are settings layers, so they stay read-only too: the provider's shared
+ * process saves the catalogue, and a confined process reads it. Vibe 3.1.0 only logs a failed save. On macOS the CLI reads the API key of a sign-in from the
+ * login Keychain with `security` (`keychainLockFiles`).
+ */
+export function mistralStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const vibeHome = mistralHomeDirectory(env, home);
+  makeMistralTrustedFolders(vibeHome);
+  return {
+    writable: [vibeHome],
+    writableContents: keychainLockFiles(),
+    protected: [
+      "config.toml",
+      ".env",
+      "trusted_folders.toml",
+      "hooks.toml",
+      "AGENTS.md",
+      "tools",
+      "skills",
+      "skills.toml",
+      "skills-registry-cache",
+      "agents",
+      "prompts",
+      "plugins",
+      "projects.toml",
+      "local_projects.toml",
+      "managed_config_cache.json",
+      "model_catalog_cache.json",
+      "connector_bootstrap_cache.json",
+    ].map((name) => join(vibeHome, name)),
+  };
+}
+
+/**
+ * At each start, Mistral Vibe 3.1.0 writes an empty `trusted_folders.toml` when the file is missing.
+ * When it cannot, it stops, and a confined process cannot write that file. Thus OpenBot makes the
+ * file when it is missing, with the same contents.
+ */
+function makeMistralTrustedFolders(vibeHome: string): void {
+  mkdirSync(vibeHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(join(vibeHome, "trusted_folders.toml"), "trusted = []\nuntrusted = []\n", {
+      flag: "wx",
+      mode: 0o600,
+    });
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+}
+
+/** The folder of Devin's sign-in and sessions: `$XDG_DATA_HOME/devin`, on macOS too. */
+export function devinDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "devin");
+}
+
+/**
+ * Devin CLI 3000.11.234 writes its sessions, session locks and logs in `devin/cli` of the XDG data
+ * folder, its MCP sign-ins in `devin/mcp`, its caches in the XDG cache folder and its plans in
+ * `~/.devin/plans`. Its settings and MCP servers in the XDG config folder, its sign-in and its
+ * plugins load settings or code for every other Devin process, so they stay read-only.
+ */
+export function devinStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const data = devinDataDirectory(env, home);
+  return {
+    writable: [
+      join(data, "cli"),
+      join(data, "mcp"),
+      join(env.XDG_CACHE_HOME?.trim() || join(home, ".cache"), "devin"),
+      join(home, ".devin", "plans"),
+    ],
+    protected: [join(data, "cli", "plugins")],
   };
 }
 
@@ -350,14 +444,19 @@ export function piAgentDirectory(env: NodeJS.ProcessEnv = process.env, home = ho
 /**
  * Pi can write sessions, but cannot change the sign-in, settings or extensions a later full-access
  * run loads. Pi 1.4.0 takes a lock folder beside `auth.json`, `settings.json` and `trust.json` each
- * time it reads one, and a read stops with EPERM when it cannot make that folder.
+ * time it reads one, and a read stops with EPERM when it cannot make that folder. Pi also locks its
+ * saved model catalog, `models-store.json`, to read it. Without that lock Pi lists the catalog of
+ * its release, which does not have the models that OpenBot's refresh saved (#4926). The catalog
+ * itself stays read-only.
  */
 export function piStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const agentDirectory = piAgentDirectory(env, home);
   return {
     writable: [join(agentDirectory, "sessions")],
     protected: [],
-    lockFolders: ["auth.json", "settings.json", "trust.json"].map((name) => join(agentDirectory, `${name}.lock`)),
+    lockFolders: ["auth.json", "settings.json", "trust.json", "models-store.json"].map((name) =>
+      join(agentDirectory, `${name}.lock`),
+    ),
   };
 }
 
@@ -373,6 +472,77 @@ export function museStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
     protected: [],
   };
 }
+
+/** The home folder of the GitHub Copilot CLI: `$COPILOT_HOME`, or `~/.copilot`. */
+export function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.COPILOT_HOME?.trim() || join(home, ".copilot");
+}
+
+/**
+ * GitHub Copilot CLI 1.0.105 writes its sessions, session database, command history and logs in its
+ * home folder. Its settings, trusted folders, MCP servers, hooks, skills, agents, plugins and
+ * instructions are in that folder too, and every other Copilot process loads them, so they stay
+ * read-only. On macOS the CLI reads its sign-in from the login Keychain with `security`
+ * (`keychainLockFiles`). The CLI runs JavaScript that it unpacks into a cache folder, so a confined
+ * process gets a cache of its own: `COPILOT_CONFINED_ENV`.
+ */
+export function copilotStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const copilotHome = copilotHomeDirectory(env, home);
+  makeCopilotConfig(copilotHome);
+  return {
+    writable: [copilotHome, COPILOT_CONFINED_CACHE],
+    writableContents: keychainLockFiles(),
+    protected: [
+      "config.json",
+      "config",
+      "settings.json",
+      "mcp-config.json",
+      "lsp-config.json",
+      "permissions-config.json",
+      "mcp-oauth-config",
+      "mcp-oauth-config.json",
+      "copilot-instructions.md",
+      "instructions",
+      "hooks",
+      "skills",
+      "agents",
+      "plugins",
+      "installed-plugins",
+      "extensions",
+      "pkg",
+    ].map((name) => join(copilotHome, name)),
+  };
+}
+
+/**
+ * At its first start, GitHub Copilot CLI 1.0.105 writes `firstLaunchAt` in `config.json`. When it
+ * cannot, it stops with no message, and a confined process cannot write that file. Thus OpenBot makes
+ * the file when it is missing, with the same value. The CLI keeps the other values in it.
+ */
+function makeCopilotConfig(copilotHome: string): void {
+  mkdirSync(copilotHome, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(
+      join(copilotHome, "config.json"),
+      `${JSON.stringify({ firstLaunchAt: new Date().toISOString() }, null, 2)}\n`,
+      { flag: "wx", mode: 0o600 },
+    );
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+}
+
+const COPILOT_CONFINED_CACHE = join(tmpdir(), "openbot-confined-copilot-cache");
+
+/**
+ * The environment of a confined Copilot process: its own cache, apart from the one outside. Both
+ * variables are set, because the package cache variable comes first when the user's own environment
+ * sets it.
+ */
+export const COPILOT_CONFINED_ENV: Readonly<Record<string, string>> = {
+  COPILOT_CACHE_HOME: COPILOT_CONFINED_CACHE,
+  COPILOT_PKG_CACHE_HOME: join(COPILOT_CONFINED_CACHE, "pkg"),
+};
 
 /** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
@@ -399,6 +569,13 @@ const PROJECT_SETTINGS = [
   ".clinerules",
   // Kimi reads its project skills and instructions from `.kimi`.
   ".kimi",
+  // Mistral Vibe reads its project settings, MCP servers, hooks, tools, skills, agents and prompts
+  // from `.vibe`.
+  ".vibe",
+  // Devin reads its project settings, MCP servers, hooks and skills from `.devin`, and Windsurf
+  // rules and hooks from `.windsurf`.
+  ".devin",
+  ".windsurf",
   ".pi",
   ".muse",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.
@@ -407,6 +584,15 @@ const PROJECT_SETTINGS = [
   ".agent",
   "_agents",
   "_agent",
+  // GitHub Copilot reads MCP servers from `.mcp.json` and `.github/mcp.json`, and its project
+  // settings, hooks, skills and agents from `.github`. The rest of `.github`, such as the workflows,
+  // stays writable, so `.github` itself cannot be removed, renamed or made (`seatbeltProfile`).
+  ".mcp.json",
+  ".github/mcp.json",
+  ".github/copilot",
+  ".github/hooks",
+  ".github/skills",
+  ".github/agents",
 ];
 
 /**
@@ -426,7 +612,14 @@ export function confineSpawnTarget(
     ...excluded,
     ...confinement.writableRoots.flatMap((root) => PROJECT_SETTINGS.map((name) => join(root, name))),
   ];
-  if (platform === "darwin") {
+  // A protected path in a writable folder must not move out of its rule with that folder.
+  const held = [
+    ...excluded,
+    ...confinement.writableRoots.flatMap((root) =>
+      PROJECT_SETTINGS.filter((name) => name.includes("/")).map((name) => join(root, name)),
+    ),
+  ];
+  if (canConfineProcesses(platform)) {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
       command: SANDBOX_EXEC,
@@ -438,7 +631,7 @@ export function confineSpawnTarget(
           state.protectedInProjects,
           state.writableContents ?? [],
           state.lockFolders ?? [],
-          excluded,
+          held,
         ),
         target.command,
         ...target.args,
@@ -451,6 +644,11 @@ export function confineSpawnTarget(
   throw new ProcessConfinementUnavailableError(sourceText("error.agent.workspaceOnlyMacOnly"));
 }
 
+/** Whether `confineSpawnTarget` can make a sandbox on this platform. Only macOS has one now. */
+export function canConfineProcesses(platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "darwin";
+}
+
 function unavailable(tool: string): string {
   return sourceText("error.agent.workspaceOnlyToolMissing", { tool });
 }
@@ -460,7 +658,9 @@ function unavailable(tool: string): string {
  * in a Seatbelt profile the last rule that matches wins. `file-write-data` allows writes in an
  * existing file, not its removal, a rename or a link in its place. A lock folder allows every write
  * on the folder itself, but a create there only of a folder. A folder that holds an excluded folder
- * cannot be removed or renamed, because the excluded folder would move with it out of its rule.
+ * or a protected project path cannot be removed or renamed, because that path would move with it
+ * out of its rule. When that folder does not exist, it cannot be made: a folder renamed or linked
+ * into its place would bring a protected path with no write on that path, such as `.github/mcp.json`.
  * Everything else stays open, as the Access setting says: reads, the network and process starts.
  */
 function seatbeltProfile(
@@ -469,12 +669,12 @@ function seatbeltProfile(
   inProjects: ProviderStatePaths["protectedInProjects"],
   contents: readonly string[],
   lockFolders: readonly string[],
-  excluded: readonly string[],
+  held: readonly string[],
 ): string {
   const writableReal = unique(writable.flatMap(realPaths));
   const allowed = writableReal.map((path) => `(subpath ${sbplString(path)})`);
   const holders = unique(
-    excluded.flatMap(realPaths).flatMap((folder) => writableReal.flatMap((root) => holderFolders(root, folder))),
+    held.flatMap(realPaths).flatMap((folder) => writableReal.flatMap((root) => holderFolders(root, folder))),
   ).map((path) => `(literal ${sbplString(path)})`);
   const files = unique(contents.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
   // `utimes`, which refreshes a lock, has no file-write operation of its own, so the folder gets
@@ -505,7 +705,7 @@ function seatbeltProfile(
       : []),
     '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
-    ...(holders.length > 0 ? [`(deny file-write-unlink ${holders.join(" ")})`] : []),
+    ...(holders.length > 0 ? [`(deny file-write-unlink file-write-create ${holders.join(" ")})`] : []),
     "",
   ].join("\n");
 }

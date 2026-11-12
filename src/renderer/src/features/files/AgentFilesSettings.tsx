@@ -1,5 +1,6 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { AgentFilesView } from "@openbot/ui/features/files/AgentFilesView";
+import type { FilesPort } from "./files-port";
 import type { StorageUsageResource } from "./storage-usage";
 
 export interface AgentFilesOptions {
@@ -11,6 +12,8 @@ export interface AgentFilesOptions {
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
   onOpenConversation: (conversationId: string) => void;
+  /** The storage calls of a client without the desktop port. Absent, preload sends them. */
+  calls?: FilesPort | undefined;
 }
 
 /**

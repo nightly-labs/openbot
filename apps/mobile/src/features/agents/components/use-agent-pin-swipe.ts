@@ -11,6 +11,7 @@ import { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
+import { END_X } from "@/shared/lib/text-direction";
 
 export const PIN_REVEAL_DISTANCE = 88;
 export const PIN_COMMIT_DISTANCE = 144;
@@ -40,9 +41,12 @@ export function useAgentPinSwipe(
   const [pinPending, setPinPending] = useState(false);
 
   const close = useCallback(() => swipeable.current?.close(), []);
+  // The offsets are toward the end of the row: the action is on the right, or on the left in a
+  // right-to-left layout, and a swipe toward the start reveals it.
   const restore = useCallback(() => {
-    if (restOffset.get() < 0) swipeable.current?.openRight();
-    else swipeable.current?.close();
+    if (restOffset.get() >= 0) swipeable.current?.close();
+    else if (END_X === 1) swipeable.current?.openRight();
+    else swipeable.current?.openLeft();
   }, [restOffset]);
 
   const pin = useCallback(
@@ -88,7 +92,7 @@ export function useAgentPinSwipe(
     () => ({
       manualActivation: true,
       enableTrackpadTwoFingerGesture: true,
-      // A closed row yields rightward movement to the drawer. An exposed row owns
+      // A closed row yields movement toward the end to the drawer. An exposed row owns
       // the same movement so it can close without opening the drawer.
       block: openingGesture,
       requireToFail: dragGesture,
@@ -110,7 +114,7 @@ export function useAgentPinSwipe(
           GestureStateManager.fail(event.handlerTag);
           return;
         }
-        const dx = touch.absoluteX - origin.get().x;
+        const dx = (touch.absoluteX - origin.get().x) * END_X;
         const dy = touch.absoluteY - origin.get().y;
         if (Math.abs(dy) > 10) GestureStateManager.fail(event.handlerTag);
         else if (dx < -10 || (restOffset.get() < 0 && dx > 10)) GestureStateManager.activate(event.handlerTag);
@@ -125,7 +129,7 @@ export function useAgentPinSwipe(
       },
       onUpdate: (event) => {
         "worklet";
-        const distance = Math.max(0, -(start.get() + event.translationX));
+        const distance = Math.max(0, -(start.get() + event.translationX * END_X));
         if (distance >= PIN_COMMIT_DISTANCE && !armed.get()) {
           armed.set(true);
           if (!pinBlocked && !feedbackPlayed.get()) {
@@ -165,26 +169,32 @@ export function useAgentPinSwipe(
 
   // On Android the swipe takes a drag that moves 10 points sideways, also while the list scrolls, and
   // then the list stops. The swipe waits for this guard to fail, and the guard fails only when the drag
-  // moves sideways before it moves down or up. It never activates, so a vertical drag stays with the list.
+  // moves sideways before it moves down or up. A drag that moves down or up first stays vertical until
+  // the touch ends, so a later sideways drift does not release the swipe. The guard never activates, so
+  // a vertical drag stays with the list.
   const guardOrigin = useSharedValue({ x: 0, y: 0 });
+  const guardVertical = useSharedValue(false);
   const guardConfig = useMemo<PanGestureConfig>(
     () => ({
       manualActivation: true,
       onTouchesDown: (event) => {
         "worklet";
         const touch = event.allTouches[0];
-        if (touch) guardOrigin.set({ x: touch.absoluteX, y: touch.absoluteY });
+        if (!touch || event.numberOfTouches > 1) return;
+        guardOrigin.set({ x: touch.absoluteX, y: touch.absoluteY });
+        guardVertical.set(false);
       },
       onTouchesMove: (event) => {
         "worklet";
         const touch = event.allTouches[0];
-        if (!touch) return;
+        if (!touch || guardVertical.get()) return;
         const dx = Math.abs(touch.absoluteX - guardOrigin.get().x);
         const dy = Math.abs(touch.absoluteY - guardOrigin.get().y);
         if (dx > 10 && dx > dy) GestureStateManager.fail(event.handlerTag);
+        else if (dy > 10) guardVertical.set(true);
       },
     }),
-    [guardOrigin],
+    [guardOrigin, guardVertical],
   );
   const scrollGuard = usePanGesture(guardConfig);
   const guardedGesture = useSimultaneousGestures(gesture, scrollGuard);

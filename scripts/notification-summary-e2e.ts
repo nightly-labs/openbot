@@ -1,7 +1,8 @@
 // Checks that a phone notification and a Live Activity show the lead of an agent message, not all of
 // it, and in words that a person reads (issue #3930): no code blocks, headings, mail headers, tool
 // names or redaction marks. The secrets stay hidden, and a command with a hidden secret cannot be
-// approved from the Live Activity.
+// approved from the Live Activity. A run in a routine thread shows its answer from that thread, and
+// the notification opens that thread.
 //
 // It runs the real phone notification service and the real Live Activity push service, with a
 // synthetic conversation, runtime snapshot and read state, and a send that records the requests. It
@@ -19,6 +20,7 @@ import type {
   AgentRuntimeSnapshot,
   AgentSummary,
   ConversationPage,
+  ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -40,6 +42,9 @@ const MEMBER = "fixture-member";
 const ANDROID = "android-session";
 const IPHONE = "iphone-session";
 const AGENT = "fixture-agent";
+const ROUTINE_TASK = "fixture-routine-task";
+const ROUTINE_THREAD = "fixture-routine-thread";
+const ROUTINE_ANSWER = "The nightly report is ready. Two builds failed on Linux.";
 const SECRET_COMMAND =
   "curl -H 'Authorization: Bearer sk-live-4f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c' https://api.example.com";
 const logger = createOpenBotLogger("notification-summary-e2e");
@@ -134,6 +139,27 @@ function page(): ConversationPage {
   };
 }
 
+/** The routine thread. Its run's answer is not in the agent's chat page. */
+function routineThread(agentId: string, taskId: string): ConversationSnapshot {
+  if (agentId !== AGENT || taskId !== ROUTINE_TASK) throw new Error("The routine thread is unknown.");
+  return {
+    agentId: AGENT,
+    threadId: ROUTINE_THREAD,
+    activeTurnId: null,
+    revision: 1,
+    messages: [
+      {
+        id: "turn-routine-answer",
+        turnId: "turn-routine",
+        author: "assistant",
+        text: ROUTINE_ANSWER,
+        createdAt: "2026-10-30T00:00:00.000Z",
+        status: "completed",
+      },
+    ],
+  };
+}
+
 function snapshot(): AgentRuntimeSnapshot {
   return {
     agents: [
@@ -166,6 +192,7 @@ const agents = {
   off: (_name: "event", listener: (event: AgentEvent) => void) => events.off("event", listener),
   listAgents: () => [summary],
   readConversationPageFor: () => Effect.succeed(page()),
+  readTask: routineThread,
   getRuntimeSnapshot: snapshot,
   listConversationReads: () =>
     Object.fromEntries(
@@ -219,6 +246,7 @@ const iphoneSecret = randomBytes(LIVE_ACTIVITY_SECRET_BYTES);
 /** The fields of an opened send that this check reads: a notification body, or Live Activity props. */
 interface OpenedSend {
   body: string | null;
+  threadId: string | null;
   mode: string | null;
   detail: string | null;
   /** Whether each Live Activity button is the prominent one, as Approve is. */
@@ -233,6 +261,7 @@ function open(sealed: string, keys: { seal: Uint8Array; tag: Uint8Array }): Open
   const field = (name: string) => (typeof value[name] === "string" ? value[name] : null);
   return {
     body: field("body"),
+    threadId: field("threadId"),
     mode: field("mode"),
     detail: field("detail"),
     prominentButtons: Array.isArray(value.buttons)
@@ -333,6 +362,28 @@ try {
       return { body };
     });
   }
+
+  await step("phone notification: a run in a routine thread shows its answer and opens the thread", async () => {
+    const from = sent.length;
+    events.emit("event", {
+      type: "thread-turn-completed",
+      taskId: ROUTINE_TASK,
+      routine: true,
+      turn: {
+        type: "turn-completed",
+        agentId: AGENT,
+        threadId: ROUTINE_THREAD,
+        turnId: "turn-routine",
+        status: "completed",
+        origin: "routine",
+      },
+    });
+    const request = await waitFor("phone notification", () => sent[from] ?? null);
+    const content = open(request.push.sealed, pushNotificationKeys(androidSecret));
+    assert.equal(content.body, ROUTINE_ANSWER);
+    assert.equal(content.threadId, ROUTINE_THREAD);
+    return { body: content.body, threadId: content.threadId };
+  });
 
   liveActivity.register(
     IPHONE,

@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取るか、チャンネルの作業には channel_history を使用してください。",
+  "error.agent.historyArgumentsInvalid":
+    "履歴の引数が正しくありません: {detail} 引数を修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.toolRequestInvalid":
     "ツール検出の引数が無効です。宣言されたスキーマと、元の修飾されたツール名を使用してください。",
+  "error.agent.toolCallArgumentsNotObject":
+    "ツールは実行されませんでした。tool_call の arguments はテキストではなく JSON オブジェクトにする必要があります。arguments をオブジェクトにして、もう一度呼び出してください。",
+  "error.agent.toolCallDiscoveryTool":
+    "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
   "error.agent.accessLocalOnly":
     "エージェントへのアクセスは、そのエージェントを実行しているコンピューターでのみ変更できます。",
@@ -50,6 +58,8 @@ export const messages = {
     "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
   "error.agent.reasoningEffortUnsupported":
     "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
+  "error.agent.reasoningEffortNotConfigurable":
+    "モデル「{model}」には推論レベルの設定がないため、推論レベルを変更できません。",
   "error.agent.noStartingModelInSettings":
     "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、サーバー設定 → プロバイダーでデフォルトのプロバイダーを変更してください。",
   "error.agent.noStartingModel":
@@ -62,6 +72,7 @@ export const messages = {
     "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.waitBeforeCompactContext":
     "コンテキストを圧縮する前に、実行中のターンとキューが終わるのを待ってください。",
+  "error.agent.waitBeforeDeleteHistory": "履歴を削除する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.compactContextUnavailable": "このエージェントは今コンテキストを圧縮できません。",
   "error.agent.unknown": "不明なエージェントです: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -81,6 +92,8 @@ export const messages = {
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
   "error.agent.turnStalled":
     "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.compactionConnectionLost":
+    "エージェントがコンテキストを圧縮している間に接続が切れたため、タスクが停止しました。インターネット接続を確認してから、メッセージを送って続けてください。",
   "error.agent.selectedGone": "選択したエージェントはもう存在しません。",
   "error.agent.profileEndpointsChanged": "生成中にカスタムエンドポイントが変更されました。もう一度お試しください。",
   "error.agent.profileInvalid": "プロバイダーが無効なプロフィールを返しました。指示を修正してみてください。",
@@ -114,6 +127,9 @@ export const messages = {
     "この設定を変更できるのは、エージェントを実行しているコンピューターだけです。",
   "error.agent.sideQuestionBusy": "実行中のサイド質問が多すぎます。しばらくしてからもう一度お試しください。",
   "error.agent.sideQuestionFailed": "エージェントはサイド質問に回答できませんでした。もう一度お試しください。",
+  "error.agent.webSearchSignIn": "Web 検索には ChatGPT アカウントでの Codex へのサインインが必要です。",
+  "error.agent.webSearchBusy": "実行中の検索とサイド質問が多すぎます。少し待ってからもう一度お試しください。",
+  "error.agent.webSearchFailed": "Web 検索が完了しませんでした。もう一度お試しください。",
   "error.agent.busyMessageModeLocalOnly":
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":

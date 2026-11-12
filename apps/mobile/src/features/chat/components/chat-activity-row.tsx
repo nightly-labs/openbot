@@ -8,6 +8,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -71,7 +72,7 @@ export interface ChatActivitySpec {
   key: string;
   label: string;
   accessibilityLabel: string;
-  agent?: Pick<MobileAgent, "id" | "serverId" | "avatarHue" | "avatarSeed">;
+  agent?: Pick<MobileAgent, "id" | "serverId" | "avatarHue" | "avatarSeed" | "avatarColor">;
   mood: AvatarMood;
   online: boolean;
   animateAvatar: boolean;
@@ -124,6 +125,7 @@ export function ChatActivityRow({
               agentId={spec.agent.id}
               serverId={spec.agent.serverId}
               hue={spec.agent.avatarHue}
+              color={spec.agent.avatarColor}
               seed={spec.agent.avatarSeed}
               size={36}
               disconnected={!spec.online}
@@ -140,7 +142,7 @@ export function ChatActivityRow({
               enabled={spec.shimmer}
             />
           </View>
-          {onPress ? <ChevronRight size={16} color={muted} /> : null}
+          {onPress ? <ChevronRight size={16} color={muted} style={MIRROR_IN_RTL} /> : null}
         </Animated.View>
       </Pressable>
     </Animated.View>

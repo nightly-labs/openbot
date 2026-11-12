@@ -12,13 +12,14 @@ export interface AgentLiveActivityNative {
   setSealKeys(keys: { seal: string; tag: string } | null, fallback: AgentLiveActivityProps): void;
   /**
    * Writes an agent picture where the widget extension can read it and returns its file name, or
-   * `null` when the App Group is not available. `name` must be unique for the picture version.
+   * `null` when the App Group is not available. A larger picture is reduced to the largest view of
+   * the activity. `name` must be unique for the picture version.
    */
   saveAvatar(name: string, dataUrl: string): string | null;
   /** Whether the App Group has the picture file already. */
   hasAvatar(file: string): boolean;
-  /** Draws the agent bloub with the face of `mood` as a PNG data URL, for `saveAvatar`. */
-  renderBloub(seed: string, hue: AvatarHue | null, mood: AvatarMood): string | null;
+  /** Draws the agent plush with the face of `mood` as a PNG data URL, for `saveAvatar`. */
+  renderBloub(seed: string, hue: AvatarHue | null, mood: AvatarMood): Promise<string>;
   /** Deletes the picture files that `keep` does not name. */
   removeAvatars(keep: ReadonlySet<string>): void;
 }

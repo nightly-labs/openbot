@@ -20,16 +20,16 @@ import {
   ItemTitle,
   Link2Off,
   Lock,
+  PlushLoader,
   Search,
   SettingsSection,
-  Spinner,
   Text,
   TriangleAlert,
   UserAvatar,
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { GitHubMark } from "./brand-marks";
+import { GitHubTile } from "./brand-marks";
 import {
   DangerZone,
   IntegrationPage,
@@ -132,7 +132,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   return (
     <IntegrationPage
       class="github-connector"
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       name={t("connector.github.title")}
       status={header().status}
       statusLabel={t(header().label)}
@@ -395,7 +395,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
       closeLabel={running() ? t("connector.github.cancelConnecting") : t("connector.github.close")}
       dismissible={!running()}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link={link()}
       title={title()}
       description={description()}
@@ -467,7 +467,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
       <Switch>
         <Match when={step() === "waiting"}>
           <div class="github-connector-center">
-            <Spinner label={t("connector.github.waiting")} />
+            <PlushLoader size={48} label={t("connector.github.waiting")} />
           </div>
         </Match>
         <Match when={step() === "code" && props.status.userCode}>
@@ -475,7 +475,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
             <>
               <DeviceCode code={code()} />
               <div class="github-connector-waiting" aria-live="polite">
-                <Spinner size="sm" />
+                <PlushLoader size={32} />
                 <Text variant="caption" tone="muted">
                   {t("connector.github.waiting")}
                 </Text>
@@ -557,7 +557,7 @@ function DisconnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.github.close")}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link="broken"
       title={t("connector.github.disconnectConfirmTitle")}
       description={

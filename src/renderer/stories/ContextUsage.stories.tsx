@@ -71,7 +71,8 @@ const ACP_NO_SUMMARY: ContextUsageView = {
 
 /** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
 function ComposerToolbar(props: {
-  usage: ContextUsageView;
+  /** Undefined until the provider reports usage: the toolbar then shows no ring. */
+  usage: ContextUsageView | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onCompact?: (() => Promise<void>) | undefined;
 }) {
@@ -81,11 +82,15 @@ function ComposerToolbar(props: {
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <ContextUsageMeter
-          usage={props.usage}
-          newChat={props.onStartNewChat ? { agent: STORY_AGENT, start: props.onStartNewChat } : undefined}
-          compact={props.onCompact}
-        />
+        <Show when={props.usage}>
+          {(usage) => (
+            <ContextUsageMeter
+              usage={usage()}
+              newChat={props.onStartNewChat ? { agent: STORY_AGENT, start: props.onStartNewChat } : undefined}
+              compact={props.onCompact}
+            />
+          )}
+        </Show>
         <Button type="button" variant="ghost" class="dictation-button" aria-label="Dictate">
           <Mic aria-hidden="true" />
         </Button>
@@ -98,7 +103,7 @@ function ComposerToolbar(props: {
 }
 
 function Composer(props: {
-  usage: ContextUsageView;
+  usage: ContextUsageView | undefined;
   notice?: JSX.Element;
   width?: string;
   onStartNewChat?: (() => Promise<void>) | undefined;
@@ -186,7 +191,9 @@ export const CodexTotal: Story = {
   render: (args) => <Composer usage={args.usage} />,
 };
 
-/** A local agent: the popover ends with a New chat row. The second ring shows a failed start. */
+/**
+ * A local agent: the popover ends with a New chat row. The second ring shows a failed start.
+ */
 export const NewChat: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
   render: (args) => (

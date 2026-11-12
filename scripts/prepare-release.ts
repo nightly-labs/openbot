@@ -1,6 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import {
@@ -10,6 +8,7 @@ import {
   MOBILE_CHANGELOG,
   MOBILE_FRAGMENT_DIR,
   MOBILE_VERSION_FILES,
+  releaseFragments,
   releaseNotesProblems,
   UNRELEASED,
 } from "./release-notes";
@@ -50,7 +49,7 @@ const MOBILE: ReleaseTarget = {
   versionFiles: MOBILE_VERSION_FILES,
   lockWorkspace: "apps/mobile",
   inReview: true,
-  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight and bun run mobile:android:release:play. When a store makes the build available, run bun run mobile:release:published ios (or android), and again for the other store. Before the second store, write the Discord highlights in apps/mobile/release-announcement.json (apps/mobile/README.md#discord-announcement)",
+  next: "commit the files, merge them to main, then build with bun run mobile:release (step 2). When a store makes the build available, mark it with step 3, and again for the other store. Before the first store, write the Discord highlights in apps/mobile/release-announcement.json (apps/mobile/README.md#discord-announcement)",
 };
 
 /** The first `"version"` in the file, which is the top-level one in each file that this script changes. */
@@ -162,25 +161,6 @@ function withLockVersion(lock: string, workspace: string, version: string): stri
   );
   if (!entry.test(lock)) throw new Error(`bun.lock has no version for ${workspace}.`);
   return lock.replace(entry, `$1${version}$2`);
-}
-
-/** The fragments in `directory`, oldest commit first. A fragment with no commit is last. */
-async function releaseFragments(directory: string): Promise<string[]> {
-  // Recursive, as the hook and the workflow check a fragment in a subdirectory too.
-  const names = (await readdir(directory, { recursive: true })).filter(
-    (name) => name.endsWith(".md") && name !== "README.md",
-  );
-  const added = (path: string) => {
-    const time = execFileSync("git", ["log", "--diff-filter=A", "--format=%ct", "-1", "--", path], {
-      encoding: "utf8",
-    }).trim();
-    return time === "" ? Number.POSITIVE_INFINITY : Number(time);
-  };
-  return names
-    .map((name) => join(directory, name))
-    .map((path) => ({ path, time: added(path) }))
-    .sort((a, b) => a.time - b.time || a.path.localeCompare(b.path))
-    .map(({ path }) => path);
 }
 
 function bumpVersion(version: string, selectedIncrement: Increment): string {

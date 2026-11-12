@@ -17,6 +17,10 @@ import {
 } from "./routine-store";
 import { ROUTINE_TABLES } from "./routine-tables";
 
+// The `command_id` of the one-time pause of the routines of hidden agents. Its receipt stops the pause
+// from running again, so the id never changes.
+const HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID = "routine:hidden-agent-pause:v1";
+
 export interface DueRoutineTrigger {
   routine: Routine;
   triggerId: string;
@@ -58,6 +62,7 @@ export class AgentRoutineStore extends RoutineStore {
             schedule: routine.trigger.schedule,
             ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
             ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+            ...(routine.runIn ? { runIn: routine.runIn } : {}),
           },
           now,
         ),
@@ -74,6 +79,42 @@ export class AgentRoutineStore extends RoutineStore {
   update(input: UpdateRoutineInput, now = new Date()): Routine {
     const { agentId, ...fields } = input;
     return toRoutine(this.updateRoutine(agentId, fields, now));
+  }
+
+  /**
+   * Turns off, one time, each active routine of these agents, and answers the ids of the routines it
+   * turned off. Before a hidden agent could work, a hide stopped the routines of the agent. The user
+   * chose that stop, so the update must not start them: each one stays off until the user turns it on.
+   * The receipt of the command is the marker that stops a second run. A hard delete of an agent
+   * removes the receipts of the events with the id of the agent as aggregate id. The aggregate id
+   * here is the command id: its ":" makes it no agent id, so the receipt stays. A new database has no
+   * hidden agent and gets the receipt at its first start.
+   */
+  pauseForAgentsHiddenBeforeWork(agentIds: readonly string[], now = new Date()): string[] {
+    if (this.database.commandResult(HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID) !== undefined) return [];
+    const routineIds = agentIds.flatMap((agentId) =>
+      this.listRecords(agentId).flatMap((routine) => (routine.active ? [routine.id] : [])),
+    );
+    this.database.dispatch(
+      HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID,
+      [
+        {
+          aggregateType: "agent-hidden-routine-pause",
+          aggregateId: HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID,
+          eventType: "routine.hidden-agents-paused",
+          payload: { agentIds, routineIds },
+        },
+      ],
+      (db, sequences) => {
+        const pause = db.prepare(
+          `UPDATE ${this.tables.routineTable} SET active = 0, updated_at = ?, last_event_sequence = ?
+           WHERE routine_id = ? AND active = 1`,
+        );
+        for (const routineId of routineIds) pause.run(now.toISOString(), sequences[0] ?? 0, routineId);
+        return null;
+      },
+    );
+    return routineIds;
   }
 
   listRuns(agentId: string, routineId: string, limit = 50, withSkipped = false): RoutineRun[] {

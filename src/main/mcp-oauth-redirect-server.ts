@@ -10,7 +10,8 @@
  * wants, and it is accepted by every other signed-in listing OpenBot ships.
  *
  * So the deep link stays as the fallback for the rare machine where no loopback port can be bound,
- * and this is what a sign-in registers and sends when it is running. The port is
+ * and for a server whose firewall blocks both loopback names (#7230). This is what a sign-in
+ * registers and sends when it is running. The port is
  * `MCP_OAUTH_REDIRECT_PORT` when it is free, so an administrator can register one exact callback
  * for a sign-in app: many authorization servers compare the port, although RFC 8252 says they must
  * not. When another program holds that port, the operating system gives one, and the registration

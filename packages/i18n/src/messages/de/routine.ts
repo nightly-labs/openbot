@@ -311,6 +311,13 @@ export const messages = {
     "Das aktuelle Geheimnis funktioniert sofort nicht mehr. Damit signierte Anfragen werden abgelehnt, bis der Absender das neue Geheimnis verwendet.",
   "routine.webhook.regenerateConfirm": "Neu erstellen",
   "routine.webhook.regenerateFailed": "Das Signaturgeheimnis konnte nicht neu erstellt werden.",
+  "routine.webhook.useSenderSecret": "Geheimnis des Absenders verwenden",
+  "routine.webhook.senderSecretTitle": "Signaturgeheimnis des Absenders verwenden?",
+  "routine.webhook.senderSecretDescription":
+    "Einige Absender wie Composio und Svix erstellen ihr eigenes Signaturgeheimnis. Füge es hier ein. Das aktuelle Geheimnis funktioniert sofort nicht mehr.",
+  "routine.webhook.senderSecretLabel": "Geheimnis des Absenders",
+  "routine.webhook.senderSecretConfirm": "Verwenden",
+  "routine.webhook.senderSecretFailed": "Das Geheimnis des Absenders konnte nicht gespeichert werden.",
   "routine.webhook.statusFailed": "Es konnte nicht geprüft werden, ob der Host mit dem Relay verbunden ist.",
   "routine.settings.instruction": "Anweisung",
   "routine.settings.instructionPlaceholderAgent": "Beschreibe, was dieser Agent tun soll.",
@@ -323,6 +330,9 @@ export const messages = {
   "routine.settings.missedPolicy": "Wenn OpenBot zur geplanten Zeit geschlossen war",
   "routine.settings.missedPolicy.skip": "Diese Ausführung überspringen",
   "routine.settings.missedPolicy.runOnce": "Einmal ausführen, wenn OpenBot öffnet",
+  "routine.settings.runInThread": "In einem eigenen Thread ausführen",
+  "routine.settings.runInSaveFailed":
+    "Die Routine ist gespeichert, die Einstellung für den eigenen Thread aber nicht. Versuche es erneut.",
   "routine.settings.resultDestination": "Antworten senden an",
   "routine.settings.resultDestination.none": "Nur dieser Chat",
   "routine.settings.resultDestination.place": "{connection} · {place}",

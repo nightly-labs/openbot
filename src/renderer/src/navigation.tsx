@@ -64,9 +64,14 @@ const Navigation = createSimpleContext({
       nonce: number;
     } | null>(null);
 
-    /** False when the chat opens in another window. */
-    function selectAgent(agentId: string): boolean {
+    /**
+     * False when the chat opens in another window. With `tabId`, the agent opens at that thread tab, not
+     * at the tab it showed last: a link from a message opens a conversation of that message.
+     */
+    function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
+      // The tab is written first, so a chat window that opens for the agent reads it.
+      if (tabId !== undefined) agentThreads.open(agentId, tabId);
       // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
       // opens in its own chat window, from search, a schedule or the Dynamic Island.
       const chatWindow = platform.chatWindow;
@@ -178,24 +183,25 @@ const Navigation = createSimpleContext({
       void openAgentMessage(agentId, messageId);
     }
 
-    async function openAgentMessage(agentId: string, messageId: string): Promise<void> {
+    /** Opens the agent's own chat at a message. Resolves false when the chat does not have the message. */
+    async function openAgentMessage(agentId: string, messageId: string): Promise<boolean> {
       const serverId = activeServerId();
       await Promise.resolve();
-      if (!scopeIsCurrent()) return;
+      if (!scopeIsCurrent()) return false;
       try {
         const page = await loadAgentMessagePage(agentId, messageId);
-        if (!page) return;
+        if (!page) return false;
         setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
         try {
           let readBoundary = page.messages.at(-1)?.id ?? messageId;
           try {
-            if (!scopeIsCurrent()) return;
+            if (!scopeIsCurrent()) return true;
             const latestPage = await appPort().agent.readConversationPage({
               agentId,
               anchor: { type: "latest" },
               limit: 1,
             });
-            if (!scopeIsCurrent()) return;
+            if (!scopeIsCurrent()) return true;
             readBoundary = latestPage.messages.at(-1)?.id ?? readBoundary;
           } catch {
             // The focused page still gives us a safe read boundary when the latest-page refresh fails.
@@ -204,8 +210,10 @@ const Navigation = createSimpleContext({
         } catch (error) {
           appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
         }
+        return true;
       } catch (error) {
         appendUiError(agentId, error, currentText().t("app.errorStatus.messageLoad"), serverId);
+        return false;
       }
     }
 
@@ -255,7 +263,12 @@ const Navigation = createSimpleContext({
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
-    const goBack = () => goInHistory(-1);
+    /** Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. */
+    const goBack = () => {
+      const pageBack = windowPage.pageBack();
+      if (pageBack) pageBack.back();
+      else goInHistory(-1);
+    };
     const goForward = () => goInHistory(1);
 
     /** A dialog or menu over the chat keeps its keys and mouse buttons. */
@@ -297,7 +310,7 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, goBack, goForward },
+      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
     };
   },
 });

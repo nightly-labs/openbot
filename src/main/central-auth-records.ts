@@ -1,6 +1,11 @@
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
-import type { CentralAuthUser, MobileConnectedDevice } from "@openbot/contracts/ipc";
+import {
+  type AvatarColor,
+  type CentralAuthUser,
+  isAvatarColor,
+  type MobileConnectedDevice,
+} from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 
@@ -30,6 +35,10 @@ export interface RemoteHostSummary {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
+  restartAvailable?: boolean;
+  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
+  storageGb?: number;
 }
 
 export interface RemoteInviteRecord {
@@ -60,6 +69,8 @@ export interface RemoteMemberRecord {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The member's account chat color. Missing: the account service is older and sends none. */
+  chatColor?: AvatarColor | null;
   role: "owner" | "admin" | "member";
   status: "active" | "revoked";
   createdAt: number;
@@ -94,7 +105,17 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     name,
     avatarUrl,
     analyticsEnabled,
+    ...optionalChatColor(record.chatColor),
   };
+}
+
+/**
+ * The account chat color of a user or a member. An account service from before chat colors sends
+ * none, and the field stays missing. A value that is not a color counts as no color.
+ */
+function optionalChatColor(value: unknown): { chatColor?: AvatarColor | null } {
+  if (value === undefined) return {};
+  return { chatColor: isAvatarColor(value) ? value : null };
 }
 
 export function decodeTicketResponse(value: unknown): { ticket: string; expiresAt: number } {
@@ -163,6 +184,8 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
     // A bad limit drops only the limit, so the host list still loads.
     const memberLimit = host.memberLimit;
     const validLimit = isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1;
+    const storageGb = host.storageGb;
+    const validStorage = isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1;
     return {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
@@ -175,6 +198,8 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       ...(validLimit ? { memberLimit } : {}),
       // A bad value drops only the flag, as for the limit.
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
+      ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
+      ...(validStorage ? { storageGb } : {}),
     };
   });
 }
@@ -270,6 +295,7 @@ function decodeRemoteMember(value: unknown): RemoteMemberRecord {
     email: requiredString(record, "email"),
     name: record.name,
     avatarUrl: record.avatarUrl,
+    ...optionalChatColor(record.chatColor),
     role: record.role,
     status: record.status,
     createdAt: record.createdAt,

@@ -170,12 +170,23 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   });
   onCleanup(stopListening);
 
+  // A hidden window, such as a minimized one, shows no frames, so the host stops its screencast.
+  const [pageVisible, setPageVisible] = createSignal(!document.hidden);
+  const updatePageVisible = () => setPageVisible(!document.hidden);
+  document.addEventListener("visibilitychange", updatePageVisible);
+  onCleanup(() => document.removeEventListener("visibilitychange", updatePageVisible));
+  /** The tab whose view stopped because the window was hidden. Its last frame stays until a new one. */
+  let pausedTabId: string | undefined;
+
   createEffect(
-    () => ({ tabId: props.tabId, active: props.active }),
-    ({ tabId, active }) => {
-      if (!active) return;
+    () => ({ tabId: props.tabId, open: props.active, visible: pageVisible() }),
+    ({ tabId, open, visible }) => {
+      // A closed panel connects again when it opens, as before.
+      if (!open) pausedTabId = undefined;
+      if (!open || !visible) return;
       abandonStream();
-      setState(() => ({ live: false, message: null, reference: null }));
+      if (pausedTabId !== tabId || !state.live) setState(() => ({ live: false, message: null, reference: null }));
+      pausedTabId = undefined;
       void runtime.startLiveView(tabId).catch((error: unknown) =>
         setState(() => ({
           live: false,
@@ -183,7 +194,10 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
           reference: errorReference(error),
         })),
       );
-      return () => void runtime.stopLiveView().catch(() => undefined);
+      return () => {
+        pausedTabId = document.hidden ? tabId : undefined;
+        void runtime.stopLiveView().catch(() => undefined);
+      };
     },
   );
 

@@ -1,34 +1,63 @@
+import { CHAT_COLOR_PRESETS } from "@openbot/brand/chat-colors";
+import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
-const key = "openbot.mobile.agent-color-messages.v1";
-/** When enabled, the user's messages in an agent chat use that agent's color. */
-export const useAgentColorMessages = create<{ enabled: boolean; ready: boolean; saving: boolean }>(() => ({
-  enabled: true,
+/**
+ * The color of the user's own message bubbles. `agent` uses the color of the agent in an agent chat
+ * and no color in a channel. `custom` uses `customColor` in every chat.
+ */
+export type MessageColorMode = "none" | "agent" | "custom";
+
+export interface MessageColorValue {
+  mode: MessageColorMode;
+  customColor: AvatarColor;
+}
+
+const key = "openbot.mobile.message-color.v1";
+/** The earlier on/off switch for the agent color. `"false"` was no color. */
+const agentColorKey = "openbot.mobile.agent-color-messages.v1";
+
+const DEFAULT_CUSTOM_MESSAGE_COLOR: AvatarColor =
+  CHAT_COLOR_PRESETS.find((preset) => preset.id === "blue")?.value ?? "#4699fe";
+
+export const useMessageColor = create<MessageColorValue & { ready: boolean }>(() => ({
+  mode: "agent",
+  customColor: DEFAULT_CUSTOM_MESSAGE_COLOR,
   ready: false,
-  saving: false,
 }));
 
-export async function loadAgentColorMessages(): Promise<void> {
-  if (useAgentColorMessages.getState().ready) return;
+function parseStored(stored: string | null): MessageColorValue | null {
+  let value: unknown = null;
   try {
-    const stored = await SecureStore.getItemAsync(key);
+    value = stored === null ? null : JSON.parse(stored);
+  } catch {
+    return null;
+  }
+  const fields = new Map<string, unknown>(typeof value === "object" && value !== null ? Object.entries(value) : []);
+  const mode = fields.get("mode");
+  const customColor = fields.get("customColor");
+  if (mode !== "none" && mode !== "agent" && mode !== "custom") return null;
+  return { mode, customColor: isAvatarColor(customColor) ? customColor : DEFAULT_CUSTOM_MESSAGE_COLOR };
+}
+
+export async function loadMessageColor(): Promise<void> {
+  if (useMessageColor.getState().ready) return;
+  try {
+    const value =
+      parseStored(await SecureStore.getItemAsync(key)) ??
+      ((await SecureStore.getItemAsync(agentColorKey)) === "false" ? { mode: "none" as const } : null);
     // A second startup read must not overwrite a change made in Settings.
-    if (!useAgentColorMessages.getState().ready) {
-      useAgentColorMessages.setState({ enabled: stored === null || stored === "true" });
-    }
+    if (value && !useMessageColor.getState().ready) useMessageColor.setState(value);
   } finally {
-    useAgentColorMessages.setState({ ready: true });
+    useMessageColor.setState({ ready: true });
   }
 }
 
-export async function saveAgentColorMessages(enabled: boolean): Promise<void> {
-  if (!useAgentColorMessages.getState().ready || useAgentColorMessages.getState().saving) return;
+export async function saveMessageColor(change: Partial<MessageColorValue>): Promise<void> {
+  if (!useMessageColor.getState().ready) return;
   // Apply immediately, including when storage fails.
-  useAgentColorMessages.setState({ enabled, saving: true });
-  try {
-    await SecureStore.setItemAsync(key, String(enabled));
-  } finally {
-    useAgentColorMessages.setState({ saving: false });
-  }
+  useMessageColor.setState(change);
+  const { mode, customColor } = useMessageColor.getState();
+  await SecureStore.setItemAsync(key, JSON.stringify({ mode, customColor }));
 }

@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "Historia jest niedostępna dla tego żądania. Odczytaj ponownie najnowszą historię lub użyj channel_history do pracy z kanałem.",
+  "error.agent.historyArgumentsInvalid":
+    "Nieprawidłowe argumenty historii: {detail} Popraw argumenty i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.toolRequestInvalid":
     "Nieprawidłowe argumenty wyszukiwania narzędzi. Użyj zadeklarowanego schematu i oryginalnej kwalifikowanej nazwy narzędzia.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Narzędzie nie zostało uruchomione. W tool_call pole arguments musi być obiektem JSON, a nie tekstem. Wyślij wywołanie ponownie z arguments jako obiektem.",
+  "error.agent.toolCallDiscoveryTool":
+    "Narzędzie nie zostało uruchomione. tool_call nie może uruchomić openbot.tool_search ani openbot.tool_describe. Wywołaj je bezpośrednio z tymi samymi argumentami.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Harmonogram rutyny jest nieprawidłowy: {detail} Popraw harmonogram i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",
   "error.agent.accessLocalOnly": "Dostęp agenta można zmienić tylko na komputerze, na którym działa agent.",
   "error.agent.duplicateCleanupFailed": "Duplikowanie agenta nie powiodło się i nie udało się usunąć niepełnej kopii.",
@@ -47,6 +55,8 @@ export const messages = {
     "Żaden model {provider} nie jest teraz dostępny. Wywołaj list_models, aby zobaczyć dostępne modele.",
   "error.agent.reasoningEffortUnsupported":
     "Model „{model}” nie obsługuje poziomu rozumowania „{effort}”. Obsługiwane poziomy: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model „{model}” nie ma ustawienia poziomu rozumowania, więc nie można go zmienić.",
   "error.agent.noStartingModelInSettings":
     "{provider} nie ma dostępnego modelu i nie ma go też żaden inny zalogowany dostawca. Zaloguj się do dostawcy lub zmień domyślnego dostawcę w sekcji Ustawienia serwera → Dostawcy.",
   "error.agent.noStartingModel":
@@ -57,6 +67,7 @@ export const messages = {
   "error.agent.waitBeforeClearContext":
     "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim rozpoczniesz nowy czat.",
   "error.agent.waitBeforeCompactContext": "Zanim skompaktujesz kontekst, poczekaj na koniec aktywnej tury i kolejki.",
+  "error.agent.waitBeforeDeleteHistory": "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim usuniesz historię.",
   "error.agent.compactContextUnavailable": "Ten agent nie może teraz skompaktować kontekstu.",
   "error.agent.unknown": "Nieznany agent: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -74,6 +85,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
   "error.agent.turnStalled":
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
+  "error.agent.compactionConnectionLost":
+    "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
   "error.agent.profileEndpointsChanged": "Własne endpointy zmieniły się w trakcie generowania. Spróbuj ponownie.",
   "error.agent.profileInvalid": "Dostawca zwrócił nieprawidłowy profil. Spróbuj zmienić prompt.",
@@ -104,6 +117,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Tylko komputer, na którym działa agent, może zmienić to ustawienie.",
   "error.agent.sideQuestionBusy": "Trwa zbyt wiele pytań pobocznych. Spróbuj ponownie za chwilę.",
   "error.agent.sideQuestionFailed": "Agent nie mógł odpowiedzieć na pytanie poboczne. Spróbuj ponownie.",
+  "error.agent.webSearchSignIn": "Wyszukiwanie w sieci wymaga zalogowania się do Codex kontem ChatGPT.",
+  "error.agent.webSearchBusy": "Działa zbyt wiele wyszukiwań i pytań pobocznych. Spróbuj ponownie za chwilę.",
+  "error.agent.webSearchFailed": "Wyszukiwanie w sieci nie zostało ukończone. Spróbuj ponownie.",
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",

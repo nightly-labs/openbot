@@ -1,8 +1,8 @@
-import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSplitLayout } from "@/shared/components/adaptive-split";
 import { GLASS_CAPSULE_HEIGHT } from "@/shared/components/glass-capsule";
 import { composerBottomGap, restingComposerHeight } from "@/shared/lib/composer-metrics";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isAndroid } from "@/shared/lib/platform";
 
 /**
@@ -12,7 +12,7 @@ import { isAndroid } from "@/shared/lib/platform";
  */
 export function useBottomFieldMetrics(): { height: number; bottomGap: number } {
   const besideComposer = useSplitLayout() !== null;
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const insets = useSafeAreaInsets();
   if (besideComposer) return { height: restingComposerHeight(fontScale), bottomGap: composerBottomGap(insets.bottom) };
   // iOS sets the field into the home indicator area. The Android gesture handle is lower in the

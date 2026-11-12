@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "未连接",
   "mcp.connect.close": "关闭连接 {name}",
   "mcp.connect.getKey": "获取密钥",
+  "mcp.connect.useKey": "改用 API 密钥",
+  "mcp.connect.useSignIn": "改为登录",
   "mcp.connect.keyDescription": "粘贴你 {name} 账号的凭据。OpenBot 会用它连接，并保存在 {host} 上。",
   "mcp.connect.thisComputer": "这台电脑",
   "mcp.connect.noCredentialDescription": "{name} 不需要凭据。OpenBot 会连接一次，看看它提供哪些工具。",
@@ -133,11 +135,10 @@ export const messages = {
   "mcp.panel.removeApp": "移除应用",
   "mcp.panel.appSaved": "应用已保存，登录后即可使用。",
   "mcp.panel.appRemoved": "应用已移除。",
-  "mcp.signIn.relayDescription":
-    "确认登录页面是 {page}，然后在浏览器中打开它。完成后，OpenBot 会把登录结果发送到 {host}。",
+  "mcp.signIn.relayDescription": "在浏览器中登录 {page}。完成后，OpenBot 会把登录结果发送到 {host}。",
   "mcp.signIn.relayOpenDescription":
-    "在浏览器中打开 {page} 的登录页面。完成后，把浏览器显示的地址粘贴到这里，OpenBot 会把登录结果发送到 {host}。",
-  "mcp.signIn.relayDeviceDescription": "确认登录页面是 {page}，然后在浏览器中打开并完成。{host} 会自动获取登录结果。",
+    "在浏览器中登录 {page}。完成后，把浏览器显示的地址粘贴到这里，OpenBot 会把登录结果发送到 {host}。",
+  "mcp.signIn.relayDeviceDescription": "在浏览器中登录 {page} 并完成。{host} 会自动获取登录结果。",
   "mcp.signIn.relayOpen": "打开登录页面",
   "mcp.signIn.relayPasteHint": "如果浏览器没有跳回 OpenBot，请复制它显示的地址并粘贴到这里。",
   "mcp.signIn.relayPasteRequired": "OpenBot 无法自行从浏览器获取登录结果。完成后，请复制浏览器显示的地址并粘贴到这里。",

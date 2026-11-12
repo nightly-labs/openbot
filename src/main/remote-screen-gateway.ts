@@ -33,6 +33,7 @@ import {
   SunshineMoonlightRuntime,
   type SunshineMoonlightRuntimeState,
 } from "./sunshine-moonlight-runtime";
+import { HttpError } from "./team-api/http-error";
 import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const GRANT_TTL_MS = 60_000;
@@ -42,6 +43,8 @@ const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
 const MAX_CLIPBOARD_BYTES = 1_048_576;
+/** The member of the loopback test session that the host owner starts in Settings on this computer. */
+export const LOCAL_TEST_MEMBER_ID = "local-setup";
 // Served here, not by Moonlight. They sit under `moonlight/` because the released Team API adapters
 // forward only the viewer routes of that family.
 const PASTE_SCRIPT_PATH = "/openbot-paste.js";
@@ -76,6 +79,7 @@ interface RemoteScreenGatewayOptions {
   runtimeStateDirectory: string;
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
+  getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -87,6 +91,10 @@ interface RemoteScreenGatewayOptions {
   // Called only when the answer changes, so the host owner's screen can show the one refusal a
   // member cannot act on themselves -- and stop showing it once a member gets through.
   onScreenRecordingDenied?: (denied: boolean) => void;
+  // Runs before a member's session starts, and fails to refuse it, such as when the person at this
+  // computer does not allow it. The loopback test session of the host owner skips it. The gateway
+  // stops the wait when the request closes, the member's team session ends, or the host stops.
+  confirmSession?: (memberId: string) => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 export interface RemoteScreenRuntime {
@@ -152,6 +160,13 @@ export class RemoteScreenGateway {
   readonly #localTestServers = new Map<string, Server>();
   readonly #sessions = new Map<string, ManagedRemoteScreenSession>();
   readonly #pendingStreamStarts: Array<{ sessionId: string; start: () => void }> = [];
+  // The session requests that wait for `confirmSession`. Aborting one refuses it.
+  readonly #pendingConfirmations = new Map<AbortController, { memberId: string; teamSessionId: string }>();
+  /**
+   * The requests between the question and their session. The runtime can take seconds to start
+   * after Allow, and a revoke or Stop all in that time must refuse the session that comes after it.
+   */
+  readonly #requestsAfterQuestion = new Set<{ memberId: string; teamSessionId: string; refused: boolean }>();
   readonly #layer: Layer.Layer<ScreenDependencies>;
   #scope = Scope.makeUnsafe();
   readonly #operations = new Set<Deferred.Deferred<void>>();
@@ -449,7 +464,7 @@ export class RemoteScreenGateway {
         );
         const session = yield* this.createSession({
           serverId: "local",
-          memberId: "local-setup",
+          memberId: LOCAL_TEST_MEMBER_ID,
           teamSessionId: randomUUID(),
           teamSessionExpiresAt: new Date(Date.now() + 180_000).toISOString(),
           publicHttpBaseUrl: `http://127.0.0.1:${port}`,
@@ -475,7 +490,7 @@ export class RemoteScreenGateway {
   ) {
     if (!this.#localTestServers.has(sessionId))
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.localTestNotFound")) });
-    return yield* this.test(sessionId, "local-setup", action);
+    return yield* this.test(sessionId, LOCAL_TEST_MEMBER_ID, action);
   }).bind(this);
 
   readonly closeLocalTestSession = Effect.fn("RemoteScreenGateway.closeLocalTestSession")(
@@ -489,13 +504,7 @@ export class RemoteScreenGateway {
   readonly createSession = Effect.fn("RemoteScreenGateway.createSession")(
     function* (
       this: RemoteScreenGateway,
-      input: {
-        serverId: string;
-        memberId: string;
-        teamSessionId: string;
-        teamSessionExpiresAt: string;
-        publicHttpBaseUrl: string;
-      },
+      input: RemoteScreenSessionRequest,
     ): Effect.fn.Return<RemoteDesktopSession, RemoteWorkflowError> {
       if (this.#stopping)
         return yield* new RemoteWorkflowError({
@@ -521,13 +530,7 @@ export class RemoteScreenGateway {
 
   readonly #createSession = Effect.fn("RemoteScreenGateway.createSession")(function* (
     this: RemoteScreenGateway,
-    input: {
-      serverId: string;
-      memberId: string;
-      teamSessionId: string;
-      teamSessionExpiresAt: string;
-      publicHttpBaseUrl: string;
-    },
+    input: RemoteScreenSessionRequest,
   ): Effect.fn.Return<RemoteDesktopSession, RemoteWorkflowError> {
     this.#pruneExpiredGrants();
     if (this.#sessions.size >= REMOTE_DESKTOP_MAX_SESSIONS) {
@@ -549,9 +552,19 @@ export class RemoteScreenGateway {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
       });
-    yield* this.#ensureRuntime().pipe(
-      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
+    // After the checks that need no answer, so the person at this computer is not asked about a
+    // request that fails anyway.
+    const starting = { memberId: input.memberId, teamSessionId: input.teamSessionId, refused: false };
+    this.#requestsAfterQuestion.add(starting);
+    yield* this.#confirm(input).pipe(
+      Effect.andThen(
+        this.#ensureRuntime().pipe(
+          Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
+        ),
+      ),
+      Effect.ensuring(Effect.sync(() => this.#requestsAfterQuestion.delete(starting))),
     );
+    if (starting.refused) return yield* new RemoteWorkflowError({ cause: remoteControlDeclined() });
     if (this.#testSessionId)
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
@@ -625,6 +638,44 @@ export class RemoteScreenGateway {
     });
     return structuredClone(snapshot);
   });
+
+  #confirm(input: RemoteScreenSessionRequest): Effect.Effect<void, RemoteWorkflowError> {
+    const confirm = this.#options.confirmSession;
+    if (!confirm || input.memberId === LOCAL_TEST_MEMBER_ID) return Effect.void;
+    return Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const controller = new AbortController();
+        this.#pendingConfirmations.set(controller, { memberId: input.memberId, teamSessionId: input.teamSessionId });
+        return controller;
+      }),
+      (controller) =>
+        Effect.raceFirst(
+          confirm(input.memberId),
+          untilAborted(input.signal ? AbortSignal.any([controller.signal, input.signal]) : controller.signal),
+        ),
+      (controller) =>
+        Effect.sync(() => {
+          this.#pendingConfirmations.delete(controller);
+        }),
+    );
+  }
+
+  #abortConfirmations(matches: (pending: { memberId: string; teamSessionId: string }) => boolean): void {
+    for (const [controller, pending] of this.#pendingConfirmations) if (matches(pending)) controller.abort();
+    for (const starting of this.#requestsAfterQuestion) if (matches(starting)) starting.refused = true;
+  }
+
+  /** Ends every session, the host owner's test included, and refuses each request that waits for an answer. */
+  readonly closeAllSessions = Effect.fn("RemoteScreenGateway.closeAllSessions")(
+    function* (this: RemoteScreenGateway): Effect.fn.Return<void, RemoteWorkflowError> {
+      this.#abortConfirmations(() => true);
+      yield* Effect.all(
+        [...this.#sessions.keys()].map((id) => this.closeSession(id, "session_revoked")),
+        { concurrency: "unbounded" },
+      );
+    },
+    (operation) => this.#provide(operation),
+  ).bind(this);
 
   readonly selectDisplay = Effect.fn("RemoteScreenGateway.selectDisplay")(
     function* (this: RemoteScreenGateway, displayId: string): Effect.fn.Return<void, RemoteWorkflowError> {
@@ -900,6 +951,7 @@ export class RemoteScreenGateway {
 
   readonly revokeTeamSession = Effect.fn("RemoteScreenGateway.revokeTeamSession")(
     function* (this: RemoteScreenGateway, teamSessionId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+      this.#abortConfirmations((pending) => pending.teamSessionId === teamSessionId);
       yield* Effect.all(
         [...this.#sessions.entries()]
           .filter(([, session]) => session.teamSessionId === teamSessionId)
@@ -912,6 +964,7 @@ export class RemoteScreenGateway {
 
   readonly revokeMember = Effect.fn("RemoteScreenGateway.revokeMember")(
     function* (this: RemoteScreenGateway, memberId: string): Effect.fn.Return<void, RemoteWorkflowError> {
+      this.#abortConfirmations((pending) => pending.memberId === memberId);
       yield* Effect.all(
         [...this.#sessions.entries()]
           .filter(([, session]) => session.memberId === memberId)
@@ -926,6 +979,8 @@ export class RemoteScreenGateway {
     if (this.#stopping) return yield* Deferred.await(this.#stopping);
     const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     this.#stopping = stopped;
+    // A request that waits for an answer is an operation below, so it must end first.
+    this.#abortConfirmations(() => true);
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#stopSessions();
       for (const request of this.#httpRequests) request.destroy();
@@ -1044,6 +1099,7 @@ export class RemoteScreenGateway {
         platform: this.#options.platform,
         credentials: yield* dependencies.credentials(),
         getDisplays: () => this.#options.getDisplays?.() ?? [],
+        getDisplayScreenOrigin: this.#options.getDisplayScreenOrigin,
         getIceServers: () =>
           Effect.gen({ self: this }, function* () {
             // Loopback tests need no account or Signal service. Keep remote ICE configuration
@@ -1248,6 +1304,38 @@ export class RemoteScreenGateway {
       }
     }
   }
+}
+
+export interface RemoteScreenSessionRequest {
+  serverId: string;
+  memberId: string;
+  teamSessionId: string;
+  teamSessionExpiresAt: string;
+  publicHttpBaseUrl: string;
+  /** Aborted when the request that asked for the session closes. */
+  signal?: AbortSignal;
+}
+
+/**
+ * The refusal of a session that the person at this computer did not allow. It has no code: each
+ * released Team API protocol reads only its own closed list of codes, so an older client shows the
+ * message as it shows any failed request.
+ */
+export function remoteControlDeclined(): HttpError {
+  return new HttpError(403, sourceText("error.remote.controlDeclined"));
+}
+
+/** Fails with `remoteControlDeclined` when the signal aborts. */
+function untilAborted(signal: AbortSignal): Effect.Effect<never, RemoteWorkflowError> {
+  return Effect.callback<never, RemoteWorkflowError>((resume) => {
+    const abort = () => resume(Effect.fail(new RemoteWorkflowError({ cause: remoteControlDeclined() })));
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    return Effect.sync(() => signal.removeEventListener("abort", abort));
+  });
 }
 
 export class RemoteScreenError extends Schema.TaggedError<RemoteScreenError>()("RemoteScreenError", {

@@ -36,6 +36,8 @@ const voiceRuntimeFiles = [
   "sherpa-onnx-c-api.dll",
   "onnxruntime.dll",
   "onnxruntime_providers_shared.dll",
+  // ONNX Runtime session settings that the voice hosts read.
+  "no-arena.cfg",
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
@@ -50,8 +52,10 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-Unified-EN-0.6B-LICENSE")),
   access(resolve(resourcesPath, "licenses/Underdog-Bark-3.0-Plus-LICENSE")),
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Cohere-Transcribe-LICENSE")),
   access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceHostPath),
@@ -84,11 +88,16 @@ await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-win32-x64"));
 
-// The Parakeet, Bark, Whisper and Supertonic models are downloaded on demand.
+// The dictation models and Supertonic are downloaded on demand.
 if (
-  ["voice/model", "voice/bark-3.0-plus-int8", "voice/whisper-turbo-int8", "voice/supertonic-3-int8"].some((path) =>
-    existsSync(resolve(resourcesPath, path)),
-  ) ||
+  [
+    "voice/model",
+    "voice/parakeet-unified-en-0.6b-int8",
+    "voice/bark-3.0-plus-int8",
+    "voice/whisper-turbo-int8",
+    "voice/cohere-transcribe-14-lang-int8",
+    "voice/supertonic-3-int8",
+  ].some((path) => existsSync(resolve(resourcesPath, path))) ||
   ["encoder.int8.onnx", "turbo-encoder.int8.onnx", "vocoder.int8.onnx"].some((name) =>
     existsSync(resolve(voiceRuntimePath, name)),
   )

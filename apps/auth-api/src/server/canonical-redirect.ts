@@ -41,3 +41,12 @@ export function permanentTrailingSlashRedirect(request: Request, response: Respo
 export function installReturnPage(path: string, callbackUrl: URL): URL {
   return new URL(path, callbackUrl.hostname === `api.${SITE_HOST}` ? SITE_ORIGIN : callbackUrl);
 }
+
+/**
+ * The account API origin for a sign-in that the browser client starts. The company provider knows one
+ * callback, on `api.openbot.run`, and the browser client runs on `openbot.run`. Another origin, such as
+ * a development one, keeps its own.
+ */
+export function companySignInApiOrigin(siteUrl: URL): string {
+  return siteUrl.hostname === SITE_HOST ? `${siteUrl.protocol}//api.${SITE_HOST}` : siteUrl.origin;
+}

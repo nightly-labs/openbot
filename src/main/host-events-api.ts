@@ -9,6 +9,7 @@ import type {
   ListEventRoutinesInput,
   SaveEventRoutineInput,
   SaveEventRoutineResult,
+  SetWebhookSecretInput,
   WebhookSecret,
   WebhookTestResult,
 } from "@openbot/contracts/ipc-events";
@@ -43,6 +44,7 @@ export interface HostEventsApi {
   deleteRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
   testRoutine(input: EventRoutineRef): Effect.Effect<void, HostEventsFailure>;
   rotateSecret(input: EventRoutineRef): Effect.Effect<WebhookSecret, HostEventsFailure>;
+  setSecret(input: SetWebhookSecretInput): Effect.Effect<void, HostEventsFailure>;
   sendTestEvent(input: EventRoutineRef): Effect.Effect<WebhookTestResult, HostEventsFailure>;
   listActivity(input: ListEventActivityInput): Effect.Effect<EventActivity[], HostEventsFailure>;
   listRoutineRuns(input: ListEventRoutineRunsInput): Effect.Effect<EventRoutineRun[], HostEventsFailure>;

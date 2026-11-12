@@ -1,54 +1,34 @@
 import { ProviderLogo } from "@openbot/brand";
-import {
-  BrowserBackIcon,
-  BrowserControlIcon,
-  BrowserForwardIcon,
-  BrowserReloadIcon,
-  CloseIcon,
-  EditIcon,
-  PlusIcon,
-  QueueIcon,
-  SteerIcon,
-  TrashIcon,
-} from "@openbot/ui/features/conversation/ConversationIcons";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import {
-  LANDING_BROWSER_FIELD,
-  LANDING_BROWSER_HEADING,
-  LANDING_BROWSER_SUBMIT,
-  LANDING_BROWSER_TABS,
-  LANDING_BROWSER_TYPED,
-  LANDING_BROWSER_URL,
-  LANDING_FEATURES,
-  LANDING_LOCAL_DATA,
-  LANDING_LOCAL_TITLE,
-  LANDING_PERSIST_AFTER,
-  LANDING_PERSIST_AGENT,
-  LANDING_PERSIST_BEFORE,
-  LANDING_PERSIST_EARLIER,
-  LANDING_PERSIST_REQUEST,
-  LANDING_PERSIST_SWITCH,
+  ADA,
+  LANDING_FEATURE_IDS,
+  LANDING_MULTIPLAYER_AGENTS,
+  LANDING_MULTIPLAYER_INVITED,
+  LANDING_MULTIPLAYER_PEOPLE,
+  LANDING_MULTIPLAYER_SENDERS,
+  LANDING_PERSIST_SENDERS,
   LANDING_PROVIDERS,
-  LANDING_QUEUE,
-  LANDING_QUEUE_DRAFT,
-  LANDING_QUEUE_HOLD,
-  LANDING_QUEUE_PLACEHOLDER,
-  LANDING_QUEUE_STEER,
   LANDING_TEAM,
-  LANDING_TEAM_CHANNEL,
-  LANDING_TEAM_HANDOFF,
-  LANDING_TEAM_MESSAGES,
-  LANDING_TEAM_REPLY,
-  type LandingFeature,
+  LANDING_TEAM_REPLY_SENDER,
+  LANDING_TEAM_SENDERS,
+  LANDING_WORKFLOW_AGENTS,
   type LandingFeatureId,
-  type LandingPersistReply,
-  type LandingTeamMessage,
+  type LandingMultiplayerSender,
+  type LandingPersistSender,
+  type LandingPerson,
   type LandingTeammate,
+  type LandingTeamSender,
+  type LandingWorkflowStepId,
 } from "../../lib/landing-content";
+import type { FeatureDescriptionPart } from "../../lib/landing-page-text";
+import { LANDING_WORKFLOW_EDGE_MS, LANDING_WORKFLOW_PATHS, workflowTiming } from "../../lib/landing-workflow";
 import { createLandingReveal } from "./createLandingReveal";
+import { LandingFace } from "./LandingFace";
 import { LandingIcon } from "./LandingIcon";
+import { useLandingText } from "./LandingText";
 
 // Loaded after the page is in the browser, as on the agent template page: the
 // avatar engine is too large for the first load of the home page.
@@ -59,12 +39,23 @@ const AgentAvatar = lazy(() =>
 /** The second marquee row runs the other way, so it starts from the other end of the list. */
 const PROVIDER_ROWS = [LANDING_PROVIDERS, [...LANDING_PROVIDERS].reverse()];
 
+/**
+ * The second marquee row and the second copy in each track (the copy closes the loop) are hidden
+ * from screen readers, so they read each provider once.
+ */
+function hiddenFromReaders(hidden: boolean) {
+  return hidden ? "true" : undefined;
+}
+
 /** Tiles whose avatars move when the pointer is on the tile. */
-const AVATAR_HOVER_FEATURES: ReadonlySet<LandingFeatureId> = new Set(["team", "persist"]);
+const AVATAR_HOVER_FEATURES: ReadonlySet<LandingFeatureId> = new Set(["team", "multiplayer", "workflows", "persist"]);
 
 export function FeaturesSection() {
   let sectionRef: HTMLElement | undefined;
   const revealed = createLandingReveal(() => sectionRef);
+  const landing = useLandingText();
+  const text = () => landing().features;
+  const picture = () => landing().picture;
   // The Worker renders an empty circle of each avatar's size, and the browser fills it in.
   const [mounted, setMounted] = createSignal(false);
   onSettled(() => {
@@ -82,27 +73,79 @@ export function FeaturesSection() {
     </Show>
   );
 
-  const message = (entry: LandingTeamMessage) => (
+  /** A person has a drawn face, so people and agents are easy to tell apart. */
+  const personAvatar = (person: LandingPerson, size: "large" | "small") => (
+    <LandingFace person={person} class={`landing-team-avatar landing-team-avatar-${size}`} />
+  );
+
+  const messageRow = (face: JSX.Element, name: string, time: string, words: string) => (
     <>
-      {avatar(entry.from, "large")}
+      {face}
       <span class="landing-team-copy">
         <span class="landing-team-meta">
-          <span class="landing-team-name">{entry.from.name}</span>
-          <span class="landing-team-time">{entry.time}</span>
+          <span class="landing-team-name">{name}</span>
+          <span class="landing-team-time">{time}</span>
         </span>
-        <span class="landing-team-text">{entry.text}</span>
+        <span class="landing-team-text">{words}</span>
       </span>
     </>
   );
 
-  const persistReply = (reply: LandingPersistReply) => (
+  const message = (entry: LandingTeamSender, words: string) =>
+    messageRow(avatar(entry.from, "large"), entry.from.name, entry.time, words);
+
+  const multiplayerMessage = (entry: LandingMultiplayerSender, words: string) =>
+    messageRow(
+      entry.kind === "person" ? personAvatar(entry.from, "large") : avatar(entry.from, "large"),
+      entry.from.name,
+      entry.time,
+      words,
+    );
+
+  /** Where a step of the workflow picture is, and when it runs on hover. */
+  const workflowStep = (id: LandingWorkflowStepId, column: number) => {
+    const timing = workflowTiming(id);
+    return {
+      "--landing-workflow-column": column + 1,
+      "--landing-workflow-start": `${timing.startMs}ms`,
+      "--landing-workflow-run": `${timing.runMs}ms`,
+    };
+  };
+
+  /** A ring that turns while the step runs, and a check when it is done. */
+  const workflowStatus = () => (
+    <span class="landing-workflow-status">
+      <span class="landing-workflow-spinner" />
+      <LandingIcon name="check" class="landing-workflow-done" />
+    </span>
+  );
+
+  const workflowEdges = (layout: "wide" | "tall") => (
+    <svg
+      class={`landing-workflow-edges landing-workflow-edges-${layout}`}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <For each={LANDING_WORKFLOW_PATHS}>
+        {(edge) => (
+          <g style={{ "--landing-workflow-start": `${edge.startMs}ms` }}>
+            <path class="landing-workflow-edge" d={edge[layout]} />
+            <path class="landing-workflow-edge-run" d={edge[layout]} />
+          </g>
+        )}
+      </For>
+    </svg>
+  );
+
+  const persistReply = (reply: LandingPersistSender, words: string) => (
     <>
       <span class="landing-persist-meta">
         <ProviderLogo provider={reply.from.provider} class="landing-persist-logo" />
         {reply.from.name}
         <span class="landing-team-time">{reply.time}</span>
       </span>
-      <span class="landing-team-text">{reply.text}</span>
+      <span class="landing-team-text">{words}</span>
     </>
   );
 
@@ -112,19 +155,19 @@ export function FeaturesSection() {
         <div class="landing-window-bar">
           <span class="landing-team-channel">
             <span class="landing-team-hash">#</span>
-            {LANDING_TEAM_CHANNEL}
+            {picture().channel}
           </span>
           <span class="landing-team-stack">
             <For each={LANDING_TEAM}>{(teammate) => avatar(teammate, "small")}</For>
           </span>
         </div>
         <ul class="landing-team">
-          <For each={LANDING_TEAM_MESSAGES}>
+          <For each={LANDING_TEAM_SENDERS}>
             {(entry, index) => (
               <>
-                <li class="landing-team-message">{message(entry)}</li>
+                <li class="landing-team-message">{message(entry, picture().team.messages[index()] ?? "")}</li>
                 <Show when={index() === 0}>
-                  <li class="landing-team-system">{LANDING_TEAM_HANDOFF}</li>
+                  <li class="landing-team-system">{picture().team.handoff}</li>
                 </Show>
               </>
             )}
@@ -135,7 +178,9 @@ export function FeaturesSection() {
               <span />
               <span />
             </span>
-            <span class="landing-team-message landing-team-reply">{message(LANDING_TEAM_REPLY)}</span>
+            <span class="landing-team-message landing-team-reply">
+              {message(LANDING_TEAM_REPLY_SENDER, picture().team.reply)}
+            </span>
           </li>
         </ul>
       </div>
@@ -143,12 +188,16 @@ export function FeaturesSection() {
     providers: () => (
       <div class="landing-marquee">
         <For each={PROVIDER_ROWS}>
-          {(row) => (
-            <div class="landing-marquee-row">
+          {(row, rowIndex) => (
+            <div class="landing-marquee-row" aria-hidden={hiddenFromReaders(rowIndex() > 0)}>
               <ul class="landing-marquee-track">
                 <For each={[...row, ...row]}>
-                  {(entry) => (
-                    <li class="landing-provider-pill" data-provider={entry.provider}>
+                  {(entry, index) => (
+                    <li
+                      class="landing-provider-pill"
+                      data-provider={entry.provider}
+                      aria-hidden={hiddenFromReaders(index() >= row.length)}
+                    >
                       <ProviderLogo provider={entry.provider} class="landing-provider-pill-logo" />
                       {entry.name}
                     </li>
@@ -163,14 +212,14 @@ export function FeaturesSection() {
     local: () => (
       <div class="landing-window landing-local-window">
         <div class="landing-window-bar">
-          <span class="landing-local-title">{LANDING_LOCAL_TITLE}</span>
+          <span class="landing-local-title">{picture().local.title}</span>
           <svg class="landing-lock" viewBox="0 0 24 24" aria-hidden="true">
             <path class="landing-lock-shackle" d="M7 11V7a5 5 0 0 1 10 0v4" />
             <rect x="3" y="11" width="18" height="11" rx="2" />
           </svg>
         </div>
         <ul class="landing-local-files">
-          <For each={LANDING_LOCAL_DATA}>
+          <For each={picture().local.items}>
             {(item) => (
               <li>
                 <LandingIcon name="folder" class="landing-local-folder" />
@@ -181,14 +230,96 @@ export function FeaturesSection() {
         </ul>
       </div>
     ),
+    multiplayer: () => (
+      <div class="landing-window landing-team-window landing-multiplayer-window">
+        <div class="landing-window-bar">
+          <span class="landing-team-channel">
+            <span class="landing-team-hash">#</span>
+            {picture().channel}
+          </span>
+          <span class="landing-team-stack">
+            <For each={LANDING_MULTIPLAYER_PEOPLE}>{(person) => personAvatar(person, "small")}</For>
+            <span class="landing-multiplayer-joined">{personAvatar(LANDING_MULTIPLAYER_INVITED, "small")}</span>
+            <For each={LANDING_MULTIPLAYER_AGENTS}>{(teammate) => avatar(teammate, "small")}</For>
+          </span>
+          <span class="landing-multiplayer-invite">
+            <LandingIcon name="user-plus" class="landing-multiplayer-invite-icon" />
+            {picture().multiplayer.invite}
+          </span>
+        </div>
+        <ul class="landing-team">
+          <For each={LANDING_MULTIPLAYER_SENDERS}>
+            {(entry, index) => (
+              <li class="landing-team-message">
+                {multiplayerMessage(entry, picture().multiplayer.messages[index()] ?? "")}
+              </li>
+            )}
+          </For>
+        </ul>
+      </div>
+    ),
+    workflows: () => (
+      <div class="landing-workflow" style={{ "--landing-workflow-edge": `${LANDING_WORKFLOW_EDGE_MS}ms` }}>
+        {workflowEdges("wide")}
+        {workflowEdges("tall")}
+        <ol class="landing-workflow-steps">
+          <li class="landing-workflow-node" data-step="trigger" style={workflowStep("trigger", 0)}>
+            <span class="landing-workflow-card">
+              <span class="landing-workflow-head">
+                <span class="landing-workflow-badge">
+                  <LandingIcon name="zap" class="landing-workflow-icon" />
+                </span>
+                <span class="landing-workflow-title">{picture().workflows.trigger}</span>
+                {workflowStatus()}
+              </span>
+              <span class="landing-workflow-text">{picture().workflows.schedule}</span>
+            </span>
+          </li>
+          <For each={LANDING_WORKFLOW_AGENTS}>
+            {(step) => (
+              <li class="landing-workflow-node" data-lane={step.lane} style={workflowStep(step.id, step.column)}>
+                <span class="landing-workflow-card">
+                  <span class="landing-workflow-head">
+                    {avatar(step.teammate, "small")}
+                    <span class="landing-workflow-title">{step.teammate.name}</span>
+                    <ProviderLogo provider={step.provider} class="landing-workflow-provider" />
+                    {workflowStatus()}
+                  </span>
+                  <span class="landing-workflow-text">{picture().workflows[step.id]}</span>
+                </span>
+              </li>
+            )}
+          </For>
+          <li class="landing-workflow-node" data-step="approval" style={workflowStep("approval", 3)}>
+            <span class="landing-workflow-card">
+              <span class="landing-workflow-head">
+                <span class="landing-workflow-badge">
+                  <LandingIcon name="user-check" class="landing-workflow-icon" />
+                </span>
+                <span class="landing-workflow-title">{picture().workflows.approval}</span>
+                {workflowStatus()}
+              </span>
+              <span class="landing-workflow-text">{picture().workflows.question}</span>
+              <span class="landing-workflow-decision">
+                <span class="landing-workflow-approve">{picture().workflows.approve}</span>
+                <span class="landing-workflow-approved">
+                  <LandingIcon name="check" class="landing-workflow-icon" />
+                  {picture().workflows.approved}
+                </span>
+              </span>
+            </span>
+          </li>
+        </ol>
+      </div>
+    ),
     persist: () => (
       <div class="landing-window landing-persist-window">
         <div class="landing-window-bar">
-          {avatar(LANDING_PERSIST_AGENT, "small")}
-          <span class="landing-team-name">{LANDING_PERSIST_AGENT.name}</span>
+          {avatar(ADA, "small")}
+          <span class="landing-team-name">{ADA.name}</span>
           <span class="landing-persist-select">
             <span class="landing-persist-swap">
-              <For each={[LANDING_PERSIST_BEFORE, LANDING_PERSIST_AFTER]}>
+              <For each={[LANDING_PERSIST_SENDERS.before, LANDING_PERSIST_SENDERS.after]}>
                 {(reply) => (
                   <span class="landing-persist-provider">
                     <ProviderLogo provider={reply.from.provider} class="landing-persist-logo" />
@@ -201,93 +332,22 @@ export function FeaturesSection() {
           </span>
         </div>
         <ul class="landing-persist-thread">
-          <li class="landing-persist-reply">{persistReply(LANDING_PERSIST_EARLIER)}</li>
-          <li class="landing-persist-request">{LANDING_PERSIST_REQUEST}</li>
-          <li class="landing-persist-reply">{persistReply(LANDING_PERSIST_BEFORE)}</li>
+          <li class="landing-persist-reply">
+            {persistReply(LANDING_PERSIST_SENDERS.earlier, picture().persist.earlier)}
+          </li>
+          <li class="landing-persist-request">{picture().persist.request}</li>
+          <li class="landing-persist-reply">
+            {persistReply(LANDING_PERSIST_SENDERS.before, picture().persist.before)}
+          </li>
           <li class="landing-persist-later">
             <ul>
-              <li class="landing-team-system">{LANDING_PERSIST_SWITCH}</li>
-              <li class="landing-persist-reply">{persistReply(LANDING_PERSIST_AFTER)}</li>
+              <li class="landing-team-system">{picture().persist.switch}</li>
+              <li class="landing-persist-reply">
+                {persistReply(LANDING_PERSIST_SENDERS.after, picture().persist.after)}
+              </li>
             </ul>
           </li>
         </ul>
-      </div>
-    ),
-    browser: () => (
-      <div class="landing-window landing-browser">
-        <div class="landing-browser-tabs">
-          <For each={LANDING_BROWSER_TABS}>
-            {(title, index) => (
-              <span class="landing-browser-tab" data-controlled={index() === 0 ? "" : undefined}>
-                <Show when={index() === 0}>
-                  <span class="landing-browser-control">
-                    <BrowserControlIcon />
-                  </span>
-                </Show>
-                <span class="landing-browser-tab-title">{title}</span>
-                <CloseIcon />
-              </span>
-            )}
-          </For>
-          <span class="landing-browser-new">
-            <PlusIcon />
-          </span>
-        </div>
-        <div class="landing-browser-toolbar">
-          <BrowserBackIcon />
-          <BrowserForwardIcon />
-          <BrowserReloadIcon />
-          <span class="landing-browser-address">{LANDING_BROWSER_URL}</span>
-        </div>
-        <div class="landing-browser-page">
-          <span class="landing-browser-heading">{LANDING_BROWSER_HEADING}</span>
-          <span class="landing-browser-label">{LANDING_BROWSER_FIELD}</span>
-          <span class="landing-browser-input">
-            <span class="landing-browser-typed">{LANDING_BROWSER_TYPED}</span>
-            <span class="landing-browser-caret" />
-          </span>
-          <span class="landing-browser-submit">{LANDING_BROWSER_SUBMIT}</span>
-        </div>
-      </div>
-    ),
-    queue: () => (
-      <div class="landing-queue">
-        <div class="landing-queue-panel">
-          <span class="landing-queue-hold">{LANDING_QUEUE_HOLD}</span>
-          <ul class="landing-queue-list">
-            <For each={LANDING_QUEUE}>
-              {(item) => (
-                <li class="landing-queue-row">
-                  <QueueIcon />
-                  <span class="landing-queue-text">{item}</span>
-                  <span class="landing-queue-actions">
-                    <span class="landing-queue-steer">
-                      <SteerIcon />
-                      {LANDING_QUEUE_STEER}
-                    </span>
-                    <EditIcon />
-                    <TrashIcon />
-                  </span>
-                </li>
-              )}
-            </For>
-            <li class="landing-queue-added">
-              <span class="landing-queue-row">
-                <QueueIcon />
-                <span class="landing-queue-text">{LANDING_QUEUE_DRAFT}</span>
-              </span>
-            </li>
-          </ul>
-        </div>
-        <div class="landing-queue-composer">
-          <span class="landing-queue-input">
-            <span class="landing-queue-draft">{LANDING_QUEUE_DRAFT}</span>
-            <span class="landing-queue-placeholder">{LANDING_QUEUE_PLACEHOLDER}</span>
-          </span>
-          <span class="landing-queue-send">
-            <LandingIcon name="arrow-right" class="landing-queue-send-icon" />
-          </span>
-        </div>
       </div>
     ),
   };
@@ -311,25 +371,25 @@ export function FeaturesSection() {
       </svg>
       <div class="landing-section-inner">
         <header class="landing-section-heading">
-          <h2 id="features-title">What OpenBot does</h2>
-          <p>One desktop app for a team of AI agents that work on your computer, with the AI plans you have.</p>
+          <h2 id="features-title">{text().title}</h2>
+          <p>{text().description}</p>
         </header>
         <ul class="landing-features-grid">
-          <For each={LANDING_FEATURES}>
+          <For each={LANDING_FEATURE_IDS}>
             {(feature, index) => (
               <li
                 class="landing-feature"
-                data-feature={feature.id}
-                data-avatar-hover={AVATAR_HOVER_FEATURES.has(feature.id) ? "" : undefined}
+                data-feature={feature}
+                data-avatar-hover={AVATAR_HOVER_FEATURES.has(feature) ? "" : undefined}
                 style={{ "--landing-index": index() }}
               >
                 <div class="landing-feature-visual" aria-hidden="true">
-                  {visuals[feature.id]()}
+                  {visuals[feature]()}
                 </div>
                 <div class="landing-feature-copy">
-                  <h3>{feature.title}</h3>
+                  <h3>{text().items[feature].title}</h3>
                   <p>
-                    <FeatureDescription description={feature.description} />
+                    <FeatureDescription parts={text().items[feature].description} />
                   </p>
                 </div>
               </li>
@@ -342,10 +402,9 @@ export function FeaturesSection() {
 }
 
 /** A tile's sentence. A part with a slug links to its provider page. */
-function FeatureDescription(props: { description: LandingFeature["description"] }) {
-  const parts = () => (typeof props.description === "string" ? [props.description] : props.description);
+function FeatureDescription(props: { parts: readonly FeatureDescriptionPart[] }) {
   return (
-    <For each={parts()}>
+    <For each={props.parts}>
       {(part) =>
         typeof part === "string" ? (
           part

@@ -22,6 +22,8 @@ export const messages = {
   "usage.column.tokens": "Tokens",
   "usage.column.date": "Data",
   "usage.column.costUsd": "Custo · USD",
+  "usage.column.loads": "Carregamentos",
+  "usage.column.agents": "Agentes",
   "usage.empty": "Nenhum uso registrado neste período.",
   "usage.partial":
     "Dados parciais · {turns} turnos sem uso informado; {unpriced} registros sem estimativa de custo; {incomplete} registros com dados de tokens incompletos.",
@@ -49,9 +51,12 @@ export const messages = {
   "usage.breakdown.model": "Modelo",
   "usage.breakdown.agent": "Agente",
   "usage.breakdown.day": "Dia",
+  "usage.breakdown.skill": "Habilidade",
   "usage.breakdown.byModel": "Uso por modelo",
   "usage.breakdown.byAgent": "Uso por agente",
   "usage.breakdown.byDay": "Uso e custo diários",
+  "usage.breakdown.bySkill": "Uso por habilidade",
+  "usage.breakdown.skillEmpty": "Nenhuma habilidade carregada neste período.",
   "usage.unknownModel": "Modelo desconhecido",
   "usage.footer": "Coleta iniciada em {started} · Atualizado em {updated}",
   "usage.updatedNever": "nunca",
@@ -72,4 +77,6 @@ export const messages = {
   "usage.panel.unsupported":
     "Este computador anfitrião não oferece análises dos agentes. Atualize-o para usar esta visualização.",
   "usage.panel.loadFailed": "Não foi possível carregar o uso. Verifique a conexão e o período.",
+  "usage.machine.label": "Uso da máquina. CPU: {cpu}, memória: {memory}",
+  "usage.machine.openStorage": "Abrir Armazenamento. Disco: {percent}, {detail}",
 } as const satisfies PartialTranslation<typeof source>;

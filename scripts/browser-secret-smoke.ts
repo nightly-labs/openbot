@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { webContents } from "electron";
 import type { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -11,9 +12,12 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
   if (!seedContents) throw new Error("Missing authentication fixture session.");
   const protocol = seedContents.session.protocol;
+  /** While true, the sign-in page of the takeover view case does not load. */
+  let stuckPageFails = false;
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
+    if (url.pathname === "/stuck" && stuckPageFails) return Response.error();
     if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
     if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
     const html =
@@ -27,7 +31,13 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           ? `<form method="get" action="/search"><label>Search password<input id="get-password" name="password" type="password"></label></form>
       <form action="/search"><label>Default password<input id="default-password" name="password" type="password"></label></form>
       <form method="post" action="/search"><label>Override password<input id="override-password" name="password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
+      <label>One-time code<input id="otp" name="otp" type="text" autocomplete="off"></label>
+      <label>MFA code<input id="totpmfa" name="totpmfa" type="text"></label>
+      <label>Recovery code<input id="recovery-otp" name="recoveryOtp" type="text"></label>
+      <label>SMS code<input id="sms-otp" name="smsOtp" type="text"></label>
+      <label>Phone<input id="two-factor-phone" name="twoFactorPhone" type="tel"></label>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
+      <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); setTimeout(() => this.submit())"><label>Checked password<input id="checked-password" name="password" type="password"></label></form>`
           : ""
@@ -105,7 +115,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(tab.id));
       }
     }
-    // A field built for something else must not take a vault password: its value can reach a URL.
+    // A field built for something else must not take a vault password: its value can reach a URL. A
+    // text field that the page masks as a password, as some bank sign-in pages do, is a password field.
     // A password field may, in any form, but a navigation that carries a vault value is blocked and the
     // user finishes. A form that the page sends with its own script, as many sign-in forms with no
     // method do, still signs in.
@@ -117,6 +128,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       ["#override-password", true, "/login", "takeover"],
       ["#checked-password", true, "/login", "takeover"],
       ["#post-password", true, "/session", "submitted"],
+      ["#masked-password", true, "/session", "submitted"],
       ["#script-password", true, "/complete", "submitted"],
     ] as const) {
       const tab = await runCauseEffect(
@@ -153,6 +165,42 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           throw new Error(
             `A vault password in ${selector} reached ${snapshot.url} (${result}), not ${path} (${outcome}).`,
           );
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    // A vault code goes only to a code field. An older Keycloak page names it otp with no
+    // autocomplete="one-time-code"; a recovery, SMS, or phone field or a plain numeric field does not take it.
+    for (const [selector, fillable] of [
+      ["#otp", true],
+      ["#totpmfa", true],
+      ["#recovery-otp", false],
+      ["#sms-otp", false],
+      ["#two-factor-phone", false],
+      ["#code", false],
+    ] as const) {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
+      );
+      try {
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `vault-code-${selector}`,
+            arguments: {
+              tabId: tab.id,
+              method: "authenticator",
+              targets: [{ kind: "css", selector }],
+              submission: "enter",
+            },
+          }),
+        );
+        handoff.cancel();
+        if (handoff.vaultFillable !== fillable) throw new Error(`${selector} was classified wrongly for a vault code.`);
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
@@ -242,6 +290,75 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       } finally {
         await runCauseEffect(browser.close(wrongTab.id));
       }
+    }
+    // A submission that leaves the value in the page, and a reload that fails, keep the tab protected.
+    // The live view of its takeover loads the page again, so a person on another computer can sign in
+    // by hand and never sees the value.
+    const stuckTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/stuck", "secret-thread", "secret-agent"),
+    );
+    try {
+      const stuckContents = webContents.getAllWebContents().find((item) => item.getURL() === stuckTab.url);
+      if (!stuckContents) throw new Error("Missing takeover view fixture.");
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "takeover-view",
+          arguments: {
+            tabId: stuckTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      const secret = "fixture-password-640271";
+      stuckPageFails = true;
+      const submission = await runCauseEffect(handoff.submit(secret, false)).catch(() => "failed" as const);
+      stuckPageFails = false;
+      const refused = await runCauseEffect(browser.startView(stuckTab.id, () => {})).then(
+        async (stop) => {
+          await runCauseEffect(stop());
+          return false;
+        },
+        () => true,
+      );
+      await runCauseEffect(browser.beginTakeover(stuckTab.id));
+      let frames = 0;
+      const stopView = await runCauseEffect(
+        browser.startView(stuckTab.id, () => {
+          frames += 1;
+        }),
+      );
+      try {
+        const deadline = Date.now() + 10_000;
+        while (frames === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+      } finally {
+        await runCauseEffect(stopView());
+      }
+      const page = await stuckContents.executeJavaScript(
+        "JSON.stringify([document.title, document.querySelector('#password')?.value ?? null, document.body.innerText])",
+        true,
+      );
+      browser.endTakeover(stuckTab.id);
+      const report = {
+        status:
+          submission !== "submitted" && refused && frames > 0 && !page.includes(secret) ? "passed" : "issues_found",
+        submission,
+        viewRefusedBeforeTakeover: refused,
+        takeoverViewFrames: frames > 0,
+        secretInPage: page.includes(secret),
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-takeover-view.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`The takeover view of a protected tab is wrong: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(stuckTab.id));
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

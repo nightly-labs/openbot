@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Não conectado",
   "mcp.connect.close": "Fechar janela de conexão de {name}",
   "mcp.connect.getKey": "Obter uma chave",
+  "mcp.connect.useKey": "Usar uma chave de API em vez disso",
+  "mcp.connect.useSignIn": "Entrar em vez disso",
   "mcp.connect.keyDescription":
     "Cole uma credencial da sua conta de {name}. O OpenBot usa a credencial para conectar. Local de armazenamento: {host}.",
   "mcp.connect.thisComputer": "este computador",
@@ -143,11 +145,11 @@ export const messages = {
   "mcp.panel.appSaved": "App salvo. Entre para usá-lo.",
   "mcp.panel.appRemoved": "App removido.",
   "mcp.signIn.relayDescription":
-    "Confirme que a página de login está em {page} e abra-a no seu navegador. Quando você terminar, o OpenBot envia o login para {host}.",
+    "Faça login em {page} no seu navegador. Quando você terminar, o OpenBot envia o login para {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abra a página de login de {page} no seu navegador. Quando terminar, cole aqui o endereço que o navegador mostra. O OpenBot então envia o login para {host}.",
+    "Faça login em {page} no seu navegador. Quando terminar, cole aqui o endereço que o navegador mostra. O OpenBot então envia o login para {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Confirme que a página de login está em {page}, abra-a no seu navegador e termine lá. {host} detecta o login sozinho.",
+    "Faça login em {page} no seu navegador e termine lá. {host} detecta o login sozinho.",
   "mcp.signIn.relayOpen": "Abrir página de login",
   "mcp.signIn.relayPasteHint": "Se o navegador não voltar ao OpenBot, copie o endereço que ele mostra e cole aqui.",
   "mcp.signIn.relayPasteRequired":

@@ -8,6 +8,7 @@ import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/pr
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { Toaster } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { saveRemoteWorkspaceFrame } from "../src/features/servers/remote-workspace-frame";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import type { WebRuntimeFactory } from "../src/features/web-client/web-client-context";
 import { WebHostOtherTabError } from "../src/features/web-client/web-host-lock";
@@ -93,6 +94,35 @@ const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
     );
   },
 });
+
+/** How long the host takes to answer in `SavedFrameSlowConnect`, so the loading screen and its exit both show. */
+const SLOW_CONNECT_MS = 6_000;
+
+/** The last visit saved a frame of the workspace, and the host answers slowly. */
+const savedFrameSlowRuntime: WebRuntimeFactory = (accountId, events) => {
+  const mock = createMockOpenBot();
+  const runtime = mockWebRuntimeFor(mock, events);
+  const saved = mock.api.agent.listAgents().then((agents) => {
+    saveRemoteWorkspaceFrame(accountId, "preview-host", { agents, selectedAgentId: agents[0]?.id ?? null });
+  });
+  return {
+    ...runtime,
+    // The frame is read when the connect starts, so the host list waits for the write.
+    listHosts: async () => {
+      await saved;
+      return runtime.listHosts();
+    },
+    connect: async (host, options) => {
+      await new Promise((resolve) => setTimeout(resolve, SLOW_CONNECT_MS));
+      return runtime.connect(host, options);
+    },
+  };
+};
+
+/** A new page with a saved frame: the chat shows the loader of its history until the host answers. */
+export const SavedFrameSlowConnect: Story = {
+  args: { createRuntime: savedFrameSlowRuntime },
+};
 
 export const NoHost: Story = {
   args: { accountEmail: "you@example.com", createRuntime: noHostRuntime },
@@ -195,7 +225,7 @@ const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) =>
     },
     listAgents: async () => (onNewServer() ? [] : base.listAgents()),
     status: async () => (onNewServer() ? status : base.status()),
-    admin: { request, team: team.api.host },
+    admin: { request, download: request, team: team.api.host },
     dispose: async () => {
       team.dispose();
       await base.dispose();
@@ -247,7 +277,7 @@ const threadsRuntime: WebRuntimeFactory = (_accountId, events) => {
   return {
     ...base,
     connect: async (host) => [...(await base.connect(host)), AGENT_TASKS_CAPABILITY, AGENT_THREADS_CAPABILITY],
-    admin: { request, team: mock.api.host },
+    admin: { request, download: request, team: mock.api.host },
   };
 };
 

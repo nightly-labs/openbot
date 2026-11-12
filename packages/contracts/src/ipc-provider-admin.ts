@@ -6,11 +6,14 @@
 
 import { isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentModelOption, isAgentModelOption, isReasoningEffort } from "./ipc-agent-identity";
 import {
   type AccountUsage,
+  type HostProviderAccountModels,
   type HostProviderAccounts,
   isAccountUsage,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_USAGE_RESET_OUTCOMES,
@@ -93,6 +96,75 @@ export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts
   return { providers, agents };
 }
 
+/**
+ * The models of a `provider-account-models-v1` list. The route codec has checked the fields. A
+ * provider this client does not know is left out, and so is a model whose default reasoning effort
+ * it does not know; an unknown effort is left out of the supported ones.
+ */
+export function decodeHostProviderAccountModels(value: unknown): HostProviderAccountModels {
+  const invalid = () => new Error("Invalid provider account models.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.providers)) throw invalid();
+  const providers = value.providers.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row) || !Array.isArray(row.accounts) || row.accounts.length > MAX_PROVIDER_ACCOUNTS)
+      throw invalid();
+    const provider = row.provider;
+    if (!isAgentProvider(provider)) return [];
+    const accounts = row.accounts.map((account: unknown) => {
+      if (!isDynamicRecord(account) || !isProviderAccountId(account.accountId) || !Array.isArray(account.models))
+        throw invalid();
+      const models = account.models.flatMap((model: unknown): AgentModelOption[] => {
+        if (!isDynamicRecord(model) || !Array.isArray(model.supportedReasoningEfforts)) throw invalid();
+        const option = {
+          ...model,
+          provider,
+          supportedReasoningEfforts: model.supportedReasoningEfforts.filter(isReasoningEffort),
+        };
+        return isAgentModelOption(option) ? [option] : [];
+      });
+      return { accountId: account.accountId, models };
+    });
+    return [{ provider, accounts }];
+  });
+  return { providers };
+}
+
+/**
+ * The pools of a `provider-account-pool-v1` list. The route codec has checked the fields. A provider
+ * this client does not know is left out.
+ */
+export function decodeHostProviderAccountPools(value: unknown): NonNullable<HostProviderAccounts["pools"]> {
+  const invalid = () => new Error("Invalid provider account pools.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.pools)) throw invalid();
+  return value.pools.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row)) throw invalid();
+    const pool = { leftOut: row.leftOut, inUse: row.inUse };
+    if (!isProviderAccountPool(pool)) throw invalid();
+    return isAgentProvider(row.provider) ? [{ provider: row.provider, pool }] : [];
+  });
+}
+
+/** The accounts with the models that `models` gives for each. An account it does not name keeps its own. */
+export function withHostProviderAccountModels(
+  accounts: HostProviderAccounts,
+  models: HostProviderAccountModels,
+): HostProviderAccounts {
+  const byAccount = new Map(
+    models.providers.flatMap((row) =>
+      row.accounts.map((account) => [`${row.provider}\n${account.accountId}`, account.models] as const),
+    ),
+  );
+  return {
+    ...accounts,
+    providers: accounts.providers.map((row) => ({
+      ...row,
+      accounts: row.accounts.map((account) => {
+        const extra = byAccount.get(`${row.provider}\n${account.id}`);
+        return extra?.length ? { ...account, models: extra } : account;
+      }),
+    })),
+  };
+}
+
 /** Each reading names its account: the released usage routes give the provider's own sign-in. */
 export function decodeHostProviderAccountUsage(value: unknown): AccountUsage {
   if (!isAccountUsage(value) || value.limits.some((limit) => limit.accountId === undefined))
@@ -164,6 +236,13 @@ function decodeProviderRuntimeStatus(value: unknown): ProviderRuntimeStatus {
   };
 }
 
+/** A managed runtime that `providers-v1` did not send. */
+function decodeLaterRuntime(value: unknown): ProviderRuntimeStatus {
+  return value === undefined
+    ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+    : decodeProviderRuntimeStatus(value);
+}
+
 export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSnapshot {
   if (
     !isDynamicRecord(value) ||
@@ -174,41 +253,28 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
     throw new Error("Invalid provider runtimes.");
   }
   const { providers, toolRuntimes } = value;
+  // `providers-v1` sends Codex, Claude, Grok and OpenCode. A runtime that a later route set added
+  // reads as not downloaded where the host sends none: this client cannot download it there. The
+  // record is closed, so a runtime added to `ManagedProviderId` without a line here does not compile.
   return {
     revision: value.revision,
     providers: {
-      pi:
-        providers.pi === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.pi),
-      muse:
-        providers.muse === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.muse),
       codex: decodeProviderRuntimeStatus(providers.codex),
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),
       opencode: decodeProviderRuntimeStatus(providers.opencode),
-      // `providers-v1` has no Gemini entry, and this client cannot download Gemini on that host, so
-      // the status is "not downloaded". `providers-v2` has one.
-      antigravity:
-        providers.antigravity === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.antigravity),
-      // Only `providers-v4` carries Cursor and Cline; on an older host this client cannot download them.
-      cursor:
-        providers.cursor === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.cursor),
-      cline:
-        providers.cline === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.cline),
-      // A host before Kimi sends no Kimi row; this client cannot download Kimi there.
-      kimi:
-        providers.kimi === undefined
-          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
-          : decodeProviderRuntimeStatus(providers.kimi),
+      antigravity: decodeLaterRuntime(providers.antigravity),
+      cursor: decodeLaterRuntime(providers.cursor),
+      cline: decodeLaterRuntime(providers.cline),
+      kimi: decodeLaterRuntime(providers.kimi),
+      devin: decodeLaterRuntime(providers.devin),
+      copilot: decodeLaterRuntime(providers.copilot),
+      mistral: decodeLaterRuntime(providers.mistral),
+      pi: decodeLaterRuntime(providers.pi),
+      muse: decodeLaterRuntime(providers.muse),
+      // Only a `providers-v8` host that can install Hermes sends a Hermes row. Without one the row
+      // shows the install guide, as it does for a host before the Hermes installer.
+      ...(providers.hermes === undefined ? {} : { hermes: decodeProviderRuntimeStatus(providers.hermes) }),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

@@ -9,9 +9,12 @@ const requireModule = createRequire(import.meta.url);
 interface ObjcRuntime {
   pointerOf: (handle: Buffer) => unknown;
   sel: (name: string) => unknown;
+  getClass: (name: string) => unknown;
   sendPointer: (receiver: unknown, selector: unknown) => unknown;
   sendRespondsTo: (receiver: unknown, selector: unknown, query: unknown) => boolean;
   sendBool: (receiver: unknown, selector: unknown, value: boolean) => void;
+  sendCString: (receiver: unknown, selector: unknown, value: string) => unknown;
+  sendSetPointer: (receiver: unknown, selector: unknown, value: unknown) => void;
 }
 
 let runtime: ObjcRuntime | null = null;
@@ -25,9 +28,12 @@ function objcRuntime(): ObjcRuntime {
   runtime = {
     pointerOf: (handle) => koffi.decode(handle, "void *"),
     sel: objc.func("void *sel_registerName(const char *name)"),
+    getClass: objc.func("void *objc_getClass(const char *name)"),
     sendPointer: objc.func("objc_msgSend", "void *", ["void *", "void *"]),
     sendRespondsTo: objc.func("objc_msgSend", "bool", ["void *", "void *", "void *"]),
     sendBool: objc.func("objc_msgSend", "void", ["void *", "void *", "bool"]),
+    sendCString: objc.func("objc_msgSend", "void *", ["void *", "void *", "const char *"]),
+    sendSetPointer: objc.func("objc_msgSend", "void", ["void *", "void *", "void *"]),
   };
   return runtime;
 }
@@ -56,5 +62,53 @@ export function preventPanelActivation(window: BrowserWindow): void {
     objc.sendBool(nsWindow, setPreventsActivation, true);
   } catch (error) {
     logger.warn("Unable to stop the panel from activating OpenBot:", toLogValue(error));
+  }
+}
+
+/**
+ * Tells window switchers, such as AltTab, that a macOS panel is not a window to switch to.
+ *
+ * An Electron panel reports the `AXStandardWindow` subrole, and a focused panel also reports itself as
+ * the main window. A window switcher then lists it as a window of OpenBot. `AXFloatingWindow` is the
+ * subrole of a floating palette, which window switchers do not list.
+ */
+export function hidePanelFromWindowSwitchers(window: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const objc = objcRuntime();
+    const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const setSubrole = objc.sel("setAccessibilitySubrole:");
+    if (!nsWindow || !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), setSubrole)) {
+      logger.warn("The panel window has no setAccessibilitySubrole: method.");
+      return;
+    }
+    const subrole = objc.sendCString(objc.getClass("NSString"), objc.sel("stringWithUTF8String:"), "AXFloatingWindow");
+    if (!subrole) {
+      logger.warn("Unable to make the floating window subrole.");
+      return;
+    }
+    objc.sendSetPointer(nsWindow, setSubrole, subrole);
+  } catch (error) {
+    logger.warn("Unable to hide the panel from window switchers:", toLogValue(error));
+  }
+}
+
+/**
+ * Keeps a macOS panel on screen when the user hides OpenBot (Hide OpenBot, ⌘H). AppKit hides every
+ * window of a hidden application unless the window sets `canHide` to NO. Electron has no option for it.
+ */
+export function keepPanelThroughAppHide(window: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  try {
+    const objc = objcRuntime();
+    const nsWindow = objc.sendPointer(objc.pointerOf(window.getNativeWindowHandle()), objc.sel("window"));
+    const setCanHide = objc.sel("setCanHide:");
+    if (!nsWindow || !objc.sendRespondsTo(nsWindow, objc.sel("respondsToSelector:"), setCanHide)) {
+      logger.warn("The panel window has no setCanHide: method.");
+      return;
+    }
+    objc.sendBool(nsWindow, setCanHide, false);
+  } catch (error) {
+    logger.warn("Unable to keep the panel on screen when OpenBot hides:", toLogValue(error));
   }
 }

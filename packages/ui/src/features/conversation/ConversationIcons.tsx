@@ -68,6 +68,17 @@ export function ReplyIcon() {
   );
 }
 
+/** Three dots: more actions. The action row fills the dots. */
+export function MoreIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
+      <circle cx="4.75" cy="10" r="1.35" />
+      <circle cx="10" cy="10" r="1.35" />
+      <circle cx="15.25" cy="10" r="1.35" />
+    </svg>
+  );
+}
+
 /** A new thread that goes out from a message. */
 export function BranchIcon() {
   return (
@@ -163,7 +174,11 @@ export function BrowserControlIcon() {
 
 export function BrowserBackIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m12 4-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
@@ -171,7 +186,11 @@ export function BrowserBackIcon() {
 
 export function BrowserForwardIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current ui-rtl-mirror"
+    >
       <path d="m8 4 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );

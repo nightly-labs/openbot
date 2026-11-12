@@ -30,8 +30,11 @@ export interface AgentInstructionsFileCalls {
 export interface AgentInstructionsCalls extends AgentInstructionsFileCalls {
   /** Opens a link of the formatted text. */
   openLink: (url: string) => void;
-  /** Shows the file in the file manager. Main finds the file from the agent id. */
-  reveal: (agentId: string) => Promise<void>;
+  /**
+   * Shows the file in the file manager. Main finds the file from the agent id. Absent when the file is
+   * on another computer.
+   */
+  reveal?: ((agentId: string) => Promise<void>) | undefined;
 }
 
 export function AgentInstructionsView(props: {
@@ -95,9 +98,9 @@ export function AgentInstructionsView(props: {
     }),
   );
 
-  function reveal(): void {
+  function reveal(show: (agentId: string) => Promise<void>): void {
     const agentId = props.agentId;
-    props.calls.reveal(agentId).catch((failure: unknown) => {
+    show(agentId).catch((failure: unknown) => {
       if (shown === agentId) setError(errorMessage(failure, t("error.agent.instructionsReadFailed")));
     });
   }
@@ -127,9 +130,18 @@ export function AgentInstructionsView(props: {
                           {(folder) => <span class="agent-instructions-bar-folder">{breakablePath(folder())}</span>}
                         </Show>
                       </div>
-                      <IconButton label={t("files.action.reveal")} variant="ghost" size="icon-sm" onClick={reveal}>
-                        <FolderOpen />
-                      </IconButton>
+                      <Show when={props.calls.reveal}>
+                        {(show) => (
+                          <IconButton
+                            label={t("files.action.reveal")}
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => reveal(show())}
+                          >
+                            <FolderOpen />
+                          </IconButton>
+                        )}
+                      </Show>
                       <Button
                         size="sm"
                         variant="secondary"

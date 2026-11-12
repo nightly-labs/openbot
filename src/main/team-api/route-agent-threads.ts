@@ -11,9 +11,17 @@ import {
   AGENT_THREAD_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import {
+  AGENT_THREAD_PAGES_CAPABILITY,
+  AGENT_THREAD_PAGES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-pages-v1";
+import {
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_READS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import {
+  AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REPLIES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
@@ -22,6 +30,7 @@ import type { TeamApiAgentTasks } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
+  conversationSnapshotForCapabilities,
   markerExclusionsForCapabilities,
   memberSender,
   readJson,
@@ -29,6 +38,7 @@ import {
   requireListedAgent,
   stringArray,
   stringField,
+  WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 
 /**
@@ -129,6 +139,37 @@ export async function routeAgentThreadFiles(
 }
 
 /**
+ * `agent-thread-replies-v1`: send a reply to a message of a side thread, with text, attachment drafts that
+ * the member uploaded, or both. The same member who can send to the agent can use it, with the agent level
+ * of a task message, and is the sender. An agent that this peer cannot see (`hiddenAgentIds`) answers as a
+ * missing agent does. The frozen codec has already checked the ids, the bounds, and that text or a file is there.
+ */
+export async function routeAgentThreadReplies(
+  context: TeamApiRequestContext,
+  tasks: TeamApiAgentTasks | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, member, json } = context;
+  if (method !== "POST" || url.pathname !== AGENT_THREAD_REPLIES_ROUTES.send) return "unmatched";
+  if (!tasks || !capabilities.has(AGENT_THREAD_REPLIES_CAPABILITY))
+    throw new HttpError(400, sourceText("error.backend.threadRemoteUnsupported"));
+  const body = await readJson(request);
+  const agentId = stringField(body, "agentId");
+  if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireListedAgent(tasks, agentId);
+  requireAgentLevel(context, agentId, "chat");
+  const message = {
+    agentId,
+    taskId: stringField(body, "taskId"),
+    text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+    attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+    replyToMessageId: stringField(body, "replyToMessageId"),
+    ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
+  };
+  return json(202, await runCauseEffect(tasks.sendMessage(message, memberSender(member))));
+}
+
+/**
  * `agent-thread-branches-v1`: branch a conversation of the agent into a new side thread, and the links
  * of the branches among the listed tasks. A branch needs the agent level of a task start; the list
  * needs what the `agent-tasks-v1` list needs. The member who branches has read the copy. An agent that
@@ -182,4 +223,33 @@ export async function routeAgentThreadBranches(
     }
   }
   throw failure.cause;
+}
+
+/**
+ * `agent-thread-pages-v1`: the older messages of a side thread, before a message that the client holds.
+ * A member who can read the thread with `agent-tasks-v1` can read them. An agent that this peer cannot
+ * see (`hiddenAgentIds`) answers as a missing agent does. The frozen codec has already checked the ids
+ * and the limit. Long messages make a page of fewer messages, so it fits one WebRTC frame; the client
+ * reads the rest as the next page.
+ */
+export async function routeAgentThreadPages(
+  context: TeamApiRequestContext,
+  tasks: TeamApiAgentTasks | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  if (method !== "POST" || url.pathname !== AGENT_THREAD_PAGES_ROUTES.readOlder) return "unmatched";
+  if (!tasks || !capabilities.has(AGENT_THREAD_PAGES_CAPABILITY))
+    throw new HttpError(400, sourceText("error.backend.threadRemoteUnsupported"));
+  const body = await readJson(request);
+  const agentId = stringField(body, "agentId");
+  if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireListedAgent(tasks, agentId);
+  const input = { agentId, taskId: stringField(body, "taskId"), beforeMessageId: stringField(body, "beforeMessageId") };
+  for (let limit = typeof body.limit === "number" ? body.limit : 50; ; limit = Math.floor(limit / 2)) {
+    const page = tasks.readTaskPage({ ...input, limit }, markerExclusionsForCapabilities(capabilities));
+    const answer = { ...page, conversation: conversationSnapshotForCapabilities(page.conversation, capabilities) };
+    if (Buffer.byteLength(JSON.stringify(answer)) <= WEBRTC_FRAME_BODY_BUDGET) return json(200, answer);
+    if (limit <= 1) throw new HttpError(413, sourceText("error.team.conversationPageTooLarge"));
+  }
 }

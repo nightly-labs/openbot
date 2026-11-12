@@ -118,8 +118,9 @@ export interface McpSignInRelaySource {
 
 export interface McpSignInRelayActions {
   /**
-   * Opens the page. Nothing opens it before: the host chose the page, so the user checks its host name
-   * first. A browser also blocks a page that no click opened. A rejection is shown under the field.
+   * Opens the page. The desktop app already opened it when the sign-in started, so there this opens it
+   * again. A browser blocks a page that no click opened, so the web client opens it only here. A
+   * rejection is shown under the field.
    */
   onOpen: () => void | Promise<void>;
   /** Sends the address that the browser shows. A rejection is shown under the field. */

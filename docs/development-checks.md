@@ -46,6 +46,11 @@ findings when it was turned on. `exactOptionalPropertyTypes` is not on yet: it h
 files of the projects that extend `tsconfig.base.json` on 2026-09-26. The type ratchet holds it to
 those counts.
 
+The root `dependencies` are what electron-builder copies into `app.asar`, and what the main and
+preload builds load from `node_modules` at run time. A package that the renderer uses, or that the
+main build bundles (the `@openbot/*` workspaces), goes in `devDependencies`: Vite puts its code in
+`out/`, and a copy in `app.asar` only makes each download and hosted server wake larger.
+
 The Signal Dockerfile installs from a pruned checkout with one manifest copy per workspace.
 CI does not build that image. When you change workspace dependencies, make sure that the copied
 manifests cover the workspace dependency graph.
@@ -102,14 +107,14 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check` and `bun run types:ratchet` in parallel |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check`, `bun run types:ratchet`, `bun run check:agent-context` and `bun scripts/whats-new-translations.ts` in parallel |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser`, then `xvfb-run -a bun run test:browser-agent-session` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Signal E2E | `ubuntu-latest` | `bun run test:signal`, when `remote/` or `scripts/` changes |
 | Local scripts CLI E2E | `ubuntu-latest` | `bun run test:automation-cli` |
 | Team API routes E2E | `ubuntu-latest` | `bun run test:team-api-routes`, when desktop code changes |
-| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:zip-attachments`, `test:mp4-attachments` and `test:svg-attachments`, each with `bun run` in its own step, when the `desktop` lane runs |
-| Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
+| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:messaging-discord-embeds`, `test:messaging-place-history`, `test:messaging-slack-ping-reply`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:acp-subagents`, `test:codex-subagent-steps`, `test:subagent-status`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:codex-idle-thread-release`, `test:zip-attachments`, `test:mp4-attachments`, `test:svg-attachments`, `test:any-file-attachments`, `test:channel-notifications`, `test:memory-review` and `test:skill-revision`, each with `bun run` in its own step, when the `desktop` lane runs |
+| Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:agent-database-host-start`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
 | Surfaces | `ubuntu-latest` | Parallel groups described below, then `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
@@ -136,6 +141,12 @@ The `Provider CLI canary` workflow is not a pull request check. It runs every si
 upstream provider CLIs, which reach users without an OpenBot release; see
 [Provider CLI updates](architecture/providers.md#provider-cli-updates).
 
+The `Release regression report` workflow is not a pull request check either. Once a day, it compares
+the two newest releases from production analytics and posts the result to a private Discord channel
+when a status changed, on Monday, or on a manual run. It runs only on `main`, with the secrets of the
+`analytics` environment, and its log shows no data. A regression does not fail the run; only a broken
+run fails. See the `openpanel` skill.
+
 `check:api` ends with `api:build:check`, which is the preview build of the Worker, so the API job
 uploads that build as the `cloudflare-preview` artifact. The job has no secrets. After the CI run completes, the trusted
 [cloudflare-preview.yml](../.github/workflows/cloudflare-preview.yml) workflow runs its `main`
@@ -159,11 +170,11 @@ renderer bundles it. Then it selects the lanes:
 | --- | --- | --- |
 | `code` | Check, Tests (desktop) | anything that is left |
 | `docs` | Check, with only `check:doc-links` when `code` is off | any Markdown file, before the removal above, or `scripts/check-doc-links.ts` |
-| `desktop` | Browser smoke, Local scripts CLI E2E, Team API and reverse actions E2E | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `apps/status`, `remote` and `docker` |
+| `desktop` | Browser smoke, Local scripts CLI E2E, Team API and reverse actions E2E | outside `apps/auth-api`, `apps/mobile`, `apps/mobile-updates`, `apps/site-router`, `apps/status`, `remote` and `docker` |
 | `api` | API | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
 | `remote` | Signal E2E | in `remote` or `scripts` |
 | `storybook` | Storybook build | in `src`, `apps/auth-api`, `apps/status`, `.storybook`, `resources`, `marketplace` or `build` |
-| `surfaces` | Surfaces | in `apps/mobile`, `apps/site-router`, `apps/status`, `remote` or `scripts` |
+| `surfaces` | Surfaces, Mobile update server E2E, Mobile runtime version | in `apps/mobile`, `apps/mobile-updates`, `apps/site-router`, `apps/status`, `remote` or `scripts` |
 
 A path every workspace reads (`package.json`, `bun.lock`, `bunfig.toml`, `.nvmrc`, `tsconfig*.json`, `biome.json`,
 `.github/`, `packages/`, `tools/`, `patches/`, `vendor/`) runs every lane. `code` runs for a

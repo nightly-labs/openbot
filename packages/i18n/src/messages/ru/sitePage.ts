@@ -81,10 +81,16 @@ export const messages = {
   "sitePage.pricing.description":
     "Облачные серверы и лицензия для команд. OpenBot бесплатен для личного использования на своём компьютере.",
   "sitePage.pricing.heading": "Цены",
+  "sitePage.pricing.personal.title": "Для личного использования бесплатно",
+  "sitePage.pricing.personal.body":
+    "Все функции, на своём компьютере, с подписками на ИИ, за которые вы уже платите. Без сервера и без лицензии.",
   "sitePage.pricing.enterprise.title": "Корпоративный",
   "sitePage.pricing.enterprise.body":
     "Более крупные серверы, участников больше {count} или всё остальное, что вам нужно. С корпоративной поддержкой.",
   "sitePage.pricing.enterprise.contact": "Связаться с отделом продаж",
+  "sitePage.pricing.consent.statement": "Я подтверждаю, что принимаю {policy}, {terms}.",
+  "sitePage.pricing.consent.policy": "политику конфиденциальности",
+  "sitePage.pricing.consent.terms": "условия и право на отказ от договора",
   "sitePage.marketplace.agents.title": "Агенты — каталог OpenBot",
   "sitePage.marketplace.agents.description":
     "Агенты, которых другие люди создали в OpenBot. Добавьте агента в OpenBot вместе с его навыками и регулярными задачами.",

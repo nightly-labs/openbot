@@ -1,0 +1,33 @@
+{
+  "slug": "dida365",
+  "name": "DIDA",
+  "tagline": "Tasks and lists",
+  "description": "DIDA (滴答清单) lets agents read, add and update tasks and lists. Each user signs in to their own DIDA account through the browser.",
+  "category": "productivity",
+  "creatorName": "Hangzhou Suishouji Network Technology",
+  "iconUrl": "https://cncdn.dida365.com/web/static/img/apple-touch-icon-152x152.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-today", "text": "Which DIDA tasks are due today?" },
+    { "id": "prompt-capture", "text": "Add these action items to my DIDA Inbox." },
+    { "id": "prompt-week", "text": "Which DIDA tasks did I complete last week?" }
+  ],
+  "apps": [
+    {
+      "id": "app-dida365-mcp",
+      "name": "DIDA",
+      "description": "Tasks and lists, over DIDA's MCP server with browser sign-in.",
+      "iconUrl": "https://cncdn.dida365.com/web/static/img/apple-touch-icon-152x152.png",
+      "server": {
+        "name": "dida365",
+        "transport": "http",
+        "url": "https://mcp.dida365.com",
+        "auth": [{ "id": "dida365-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://dida365.com",
+  "privacyPolicyUrl": "https://dida365.com/about/privacy",
+  "termsUrl": "https://dida365.com/about/tos",
+  "skills": []
+}

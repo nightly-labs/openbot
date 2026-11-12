@@ -8,7 +8,11 @@ reads delivery results, changes the agent's model and account, and starts a new 
 commands. The listener runs only while at least one agent has `allowAutomation`, and binds
 `127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
 (folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
-`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
+agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
+a script that loops cannot spend the user's quota. The value is an account default
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
+Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
@@ -49,7 +53,8 @@ waits for the answer of such a run (`quietRoutineRun`). The run history stores w
 run in `run_source` (`test`, `script` or `webhook`); a manual run from before migration 35 has none
 and is read as a Test run. The agent calls the
 `routine_no_update` tool, which the run prompt names, or the user asks in the routine task
-for an answer of only `[[no-update]]`. Models often write a short sentence instead of an exact
+for an answer of only `[[no-update]]`. An answer of only `[SILENT]`, the Hermes Agent cron token
+that the Hermes import copies, is also the marker. Models often write a short sentence instead of an exact
 token, so the tool is the main path. There is no setting. The tool and the marker do not
 depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
 held in memory until the turn completes; the history import finds it again by the tool name, as
@@ -64,6 +69,14 @@ and its `turn-completed`
 event has `quiet: true`, which stops the desktop notification and the completion sound. The run
 marker and the run history stay. A marker inside a longer answer is a report and is shown. A Test run
 is never quiet.
+
+A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
+that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
+turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
+write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
+of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
+path and in the history import. The desktop chat shows its quiet answers under the marker of the
+last update of the turn, which starts closed (`teammateUpdateAnswers`).
 
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
@@ -99,19 +112,70 @@ the marker it skips the turn's thinking too, so a later import does not bring a 
 
 ## Routine sessions
 
-A routine run in an agent's own chat (no task, channel or messaging delivery) does not resume the
-chat's provider session. `DrainScheduler.startDelivery` starts a new session for it with
-`ThreadLifecycle.startRoutineThread`: the chat's thread parameters, with `ephemeral: true` and
-`persistSession: false`. `ConversationRuntime` binds the session to the agent's public thread, so the
-run's items show in the chat, and `registerRoutineSession` marks it. The first message reads a short
-handoff of the newest chat messages (`renderRoutineHandoff`, 8,000 characters). Interrupt and steer
-go to the routine session while it runs. Usage records of the run use the session id
-`routine:<external id>`; their origin stays `routine`.
+An agent routine runs in the agent's own chat, unless its `runIn` is `thread` (migration 57; existing
+routines got `chat`, the place of runs before 0.61). Then it runs in its own side thread, the routine
+thread. The routine settings show a switch for it on this computer's host, and on a joined host with
+the optional `routine-run-place-v1` capability (`packages/contracts/src/team-protocol/routine-run-place-v1.ts`,
+host route `routeRoutineRunPlace` in `src/main/team-api/route-routine-run-place.ts`). The released
+routine routes and the `events-v1` and `routine-recovery-v1` routes do not carry `runIn`, so the remote
+adapters (main IPC for desktop, `@openbot/team-client` for `/app`) read the places on their own list
+route and send a change to the set route after the save. Any member reads the places of an agent that
+they can see; a change needs manage access. The host saves the stored record again with only the new
+place, for schedule and webhook routines. A save without `runIn`, or to a host without the capability,
+keeps the saved place. The `create_routine`,
+`update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
+the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+`AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
+(migration 54; a unique index keeps one thread for each routine of an agent, also when it is
+archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
+thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
+enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
+against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
+agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
+new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
+count against the limits of tasks that the agent starts, and that cleanup does not archive them.
+Deleting the routine archives its thread. `listQueue` hides side-thread deliveries, so
+`MailboxStore.taskRoutineDeliveries` gives the routine deliveries of side threads to the code that
+follows run status (`MailboxSync.emitQueue`) and to the skip policy of a spent plan. Routine flows,
+routine result destinations and local scripts read the answer of a run with
+`readTurnAssistantMessages(agentId, turnId)`: the `projection_turns` row names the thread that ran the
+turn, so the answer of a run in a routine thread is found. A turn in a routine thread sends no
+`turn-completed` event outside `AgentTasks`, as for other side threads, so the chat keeps its turn
+state. When the turn of a side thread is not quiet, `AgentTasks` sends the local-only
+`thread-turn-completed` event (`taskId`, `routine` and the inner `turn`). For a routine thread
+(`routine: true`), the desktop notification, the phone push and the completion sound use it as a
+`turn-completed`, read the answer from the routine thread (`readTask`), and a click opens the routine
+thread. For another side thread, only the phone push uses it (see
+[side thread notifications](channels-and-messaging.md#side-thread-notifications)). The Team API
+adapters drop this event, so a remote client gets no notification for a turn in a side thread. The released `agent-tasks-v1` routes do not send
+`routineId`; only this computer's IPC list has it.
 
-When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A non-quiet run adds a
-short digest of its answer to the chat session's pending handoff (`appendRoutineDigest`: 1,500
-characters for each run, 6,000 in total), so the next chat turn reads it. The chat session keeps its
-id and its context. A restart during a run marks the run interrupted: the session is not saved.
+A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
+scheduled run that drives a desktop app has no person to continue the step in the chat. The
+routine thread and the chat of one agent can then drive the screen at the same time, as two agents
+can. Its runs also keep the tools of the chat that side threads do not have:
+`OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
+`await_event` and `start_task`.
+
+A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
+`DrainScheduler.startDelivery` starts a new session for each run with
+`ThreadLifecycle.startRoutineThread`: the thread parameters of the agent's chat, with
+`ephemeral: true` and `persistSession: false`. `ConversationRuntime` binds the session to the public
+thread of the run, the routine thread or the chat, so the run's items show there, and
+`registerRoutineSession` marks it. The first message reads a handoff (`renderRoutineHandoff`, 8,000
+characters): the newest messages of earlier runs from the routine thread, at most half, and then the
+newest chat messages. Interrupt and steer go to the routine session while it runs. Usage records of
+the run use the session id `routine:<external id>`; their origin stays `routine`.
+
+When the turn ends, `TurnLifecycle` closes the session (`closeRoutineThread`). A quiet run in a
+routine thread drops its answer as a quiet run in the chat does. A non-quiet run adds a short digest
+of its answer to the pending handoff of the chat session, and of the routine thread's session
+(`appendRoutineDigest`: 1,500 characters for each run, 6,000 in total), so the next turn of each reads
+it. The chat can start a turn while the digest arrives: one permit orders the digest writes and the
+cleanup after a turn start, and the cleanup removes only the part that the turn sent
+(`unsentHandoff`), so a later digest stays for the next turn. The answer stays in the routine thread; the chat shows the run marker, with an "Open thread" link
+when the thread is in the task list. A Test run from the routine settings opens the routine thread in
+the chat. A restart during a run marks the run interrupted: the session is not saved.
 
 ## Routine calendar feed
 
@@ -225,33 +289,163 @@ changed, on this computer and on a joined host.
   workflow. A GitHub output (`github-output.ts`) changes GitHub as the App's bot through
   `src/main/github-rest.ts`, with 10 actions. "Agent chooses" asks a model to choose labels or a
   person from the repository's own lists, and drops other values. `workflow_github_actions` keeps
-  each change, so a restart does not post a comment, review or issue again.
+  each change, so a restart does not post a comment, review or issue again. When a Discord mention
+  started the run, a new issue or a comment links the files of the mention and of the message that it
+  replies to (`discordTriggerFiles` in `discord-matching.ts`). GitHub has no attachment API for an App
+  token, so `attachFiles` in `github-rest.ts` commits them, before the change is recorded as sent, with the Git Data API to the orphan `openbot-attachments` branch, which has no workflow files
+  and so starts no Actions. A file that it cannot copy keeps its Discord link, which expires.
 - A restart keeps approvals and agent steps, because their state is in the database and the
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
   post that was on its way fails as uncertain, and the user retries the step.
 - Image, asset, file output and message trigger nodes are kept in the graph but do not run yet; a
   run that reaches one fails with `nodeUnsupported`.
+- Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
+  `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
+  are not in the visible set, so before `tool_search` finds them they cost only their names. A search
+  word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
+  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
+  (the agent id, prompt, rule or question), so the agent does not read the workflow again.
+  `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
+  them as one graph with `saveGraph`; a `ref` names a new node for later operations in the same call.
+  The host places nodes, so the agent sends no coordinates. The layout uses the card width of each
+  kind (`CARD_SIZE` in `workflow-tools.ts` copies `workflow-nodes.css`, or the node's `size`) and
+  leaves a 120 px column gap and a 64 px row gap, so each connection and its port chips show. A new node
+  goes one column right of the node before it, at the same top; a condition's "no" child goes below its
+  "yes" child; a node with no input goes below all nodes. After the operations, a new node that a
+  later `connect` links is placed again: a node put between existing nodes moves them and the nodes
+  after them right by its column. A workflow with no steps before the call, or a call with `tidy`,
+  gets a full layout: a column for each step after its inputs. Locked nodes, text, notes, shapes and
+  nodes that the agent placed stay. Bad arguments, a graph rule, an unknown agent or a locked
+  node is a tool failure that the model reads. On a conflict, the operations apply once more to the newer graph.
+  `Workflows` is built after the agent service, so the tool router reads it through a getter.
+- A tool create or save adds the agent's id to the local `workflows-changed` event. The canvas then
+  plays the change (`workflow-build.ts`): a cursor with the agent's name and avatar colour goes to
+  each node that the agent added, changed or moved, in graph order, and the node and the connections
+  that it completes show one after the other. The Workflows page opens a workflow that an agent made
+  while the page is open. A click on the canvas, reduced motion or an agent that the catalog does not
+  know stops or skips the play. `workflows-v1` still sends only `workflowId`, and its decoder drops
+  the agent id, so a joined desktop reloads the graph with no play.
+- As for channels, only a person's message can use `edit_workflow`, `delete_workflow` or
+  `run_workflow`, in the agent's own chat or in a side thread that the person opened or branched
+  (`AgentTasks.isPersonThread`: origin `user`, no routine, no messaging link or channel). A routine or
+  workflow run, an external chat, a thread that the agent started, an agent message or a team
+  member's message gets a tool failure: a run can carry text from outside, such as a webhook body, and
+  a run can send messages and post to outside services. Reads stay open. No tool waits for a run, so
+  the guidance tells the agent to read the run once and report what still runs.
+- `delete_workflow` also waits for the person's approval card (`awaitToolApproval` with `alwaysAsk`),
+  also for an agent with Full access: a delete loses the runs and versions. A decline is a tool
+  failure that tells the agent not to try again. The guidance tells the agent not to ask in chat
+  first, so the person answers once. `scripts/agent-workflow-gate-e2e.ts` checks both rules.
 
 ## Hidden agents
 
-A user hides an agent from its sidebar menu in place of a delete. The agent keeps its thread, files,
-memories, settings, pin and section. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`,
-so the state needs no SQL migration and a duplicate does not copy it. The host refuses new messages
-to a hidden agent with `error.backend.recipientHidden`, on IPC, channels, MCP `send_message`, the
-automation server and external messaging. Its routines do not run, and its queued messages wait
-behind the drain hold `"hidden"`. A turn that runs at the hide finishes. A hidden agent is not in
-`list_agents`, the teammates prompt, the mention picker, the counts or "Needs you". A hidden lead does not
-route channel requests, and `ChannelService.releaseAgent` gives the queued and starting channel
-assignments of the agent back to their channels.
+A user hides an agent from its sidebar menu to take it out of the list. The agent keeps its thread,
+files, memories, settings, pin and section, and it keeps working: it gets messages on each path
+(IPC, channels, MCP `send_message`, the automation server and external messaging), its routines run,
+its queue drains, it routes and does channel work, and other agents see it in `list_agents`, the
+teammates prompt and mentions. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`, so the
+state needs no SQL migration and a duplicate does not copy it. The host reads the flag only to list
+the hidden agents and to lower their notifications. A hide or a restore changes no routine and no
+queue.
 
-Restore marks the missed routine runs as skipped before it clears the flag, so the timer does not
-run a backlog. Then it arms the routines and drains the queue. IPC `agent:hidden:list` and
-`agent:hidden:set` change the state, and the event `hidden-agents-changed` carries the whole list.
-A joined desktop, the web client and the mobile app use the optional `agent-hidden-v1` capability
+A client keeps a hidden agent in the collapsed "Hidden" group of the sidebar, and out of the dock and
+the ⌘1-9 order. It stays in the mention picker, and its unread replies count for "Mark all read". A
+hidden agent that waits for the user (a question, an approval or a browser
+handoff) shows in "Needs you". When the server level is "all" and the user set no level for the
+agent, a hidden agent notifies at "needs-me" (`agentNotificationLevel`), on the desktop, the web
+client and the host's push to a phone. A failed turn does not notify at that level.
+
+Up to version 0.68.0 a hide stopped the agent: the host refused its messages with
+`error.backend.recipientHidden`, held its queue and did not run its routines. The first start of a
+later version turns off, one time, each active routine of an agent that is hidden then
+(`AgentRoutineStore.pauseForAgentsHiddenBeforeWork`, with the command receipt
+`routine:hidden-agent-pause:v1`), so the update starts no routine that the user stopped. The user
+turns each one on again. The queued messages and channel tasks of such an agent run at the update.
+A transfer file from such a version has `preferences.hidden` and no `preferences.hiddenWorks`; the
+import then adds the routines of that agent turned off (`hiddenAgentWasStopped`).
+
+IPC `agent:hidden:list` and `agent:hidden:set` change the state, and the event
+`hidden-agents-changed` carries the whole list. A joined desktop, the web client and the mobile app
+use the optional `agent-hidden-v1` capability
 (`packages/contracts/src/team-protocol/agent-hidden-v1.ts`). Any member reads the list; only an
-owner or an admin hides or restores an agent on a host.
-`/v1/agents` and the released agent codecs do not carry `hiddenAt`.
+owner or an admin hides or restores an agent on a host. `/v1/agents` and the released agent codecs
+do not carry `hiddenAt`. A host that keeps a hidden agent at work also advertises the optional
+marker capability `agent-hidden-work` on protocol 9. It adds no route. Without it, a client shows a
+hidden agent as paused ("Paused since"), keeps it out of "Needs you" and the mention picker, and does
+not lower its notifications, because that host stops the agent. `scripts/agent-hide-restore-e2e.ts` checks the
+routes, a message and a routine run of a hidden agent, and the one-time step.
+
+## New agent welcome
+
+A new agent starts with a setup message from `agentWelcomeMessage`
+(`packages/contracts/src/agent-welcome.ts`), not with a message from the user. The chat does not show
+it; until the welcome turn starts, the queue snapshot reports `welcome: true` and the chat shows the
+agent's working line. The agent writes in the app language, or in the language of its profile. Its welcome is the text
+of one question (`AskUserQuestion` on Claude, `openbot.ask_user` on other providers) with three first
+tasks and free text. The answered question card keeps that text, so the welcome stays in the chat
+after the answer; text written before a question goes back into the turn's steps. When the iPhone
+onboarding has a first task, the setup message asks only for a welcome, and the task follows as the
+user's own message. A local create always marks the message; a remote host does
+it when the client sends `agent-welcome-v1` (see [Team API](team-api.md)). Agents that other agents
+create keep a visible first message.
+
+## Exact agent colours
+
+An agent can have an exact colour, `avatarColor` (`#rrggbb`, lower case). The store also keeps the
+nearest released `avatarHue`, so an older app draws a near colour. `avatarColor: null` removes the
+colour. A hue change without a colour removes the colour too.
+
+The released Team API codecs remove `avatarColor`. A joined desktop and the web client use the
+optional `agent-colors-v1` capability (`packages/contracts/src/team-protocol/agent-colors-v1.ts`,
+protocol 9 only). Host route `routeAgentColors` (`src/main/team-api/route-agent-colors.ts`):
+
+- `POST /v1/agent-colors` gives `{agents: [{agentId, color}]}` for the agents that the member can
+  see. An agent that is not in the list draws its hue.
+- `POST /v1/agent-colors/set` takes `{agentId, color | null}`. It needs manage access to the agent,
+  as the avatar on the released agent route, and goes through `agents.updateAgent`.
+- After each `agents-changed`, the host sends `agent-colors-changed` with the whole list to each peer
+  that has the capability, without the agents that the peer cannot see. It sends the list also when
+  no colour changed, so a peer that can now see an agent gets its colour; a client ignores a list
+  that did not change. A peer that declares the capability on the event socket gets the list at once.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the colours into each `agents-changed` list and each agent
+result, so the renderer does not get `agent-colors-changed`. A save with a colour or `null` calls the
+set route first. With a colour, the released `PATCH` then leaves out `avatarHue`, because a hue on
+that route removes the colour. With `null`, the hue stays on the `PATCH`. A server without the
+capability gets only the hue. A create sends the hue, then sets the colour; a failed colour change
+does not fail the create. The web client (`web-runtime.ts`, `web-client-context.tsx`) does the same
+and keeps the list in its state.
+
+## Agent chat colours
+
+An agent can have a chat colour, `chatColor` (`#rrggbb`, lower case), for its chat bubbles. It is
+not the avatar colour, and it does not change `avatarColor` or `avatarHue`. `chatColor: null`
+removes it. The colour is in `agent_json`, and an instance transfer carries it. A team member record
+has an optional `chatColor` that comes from the member's account.
+
+The released Team API codecs remove `chatColor` from agents, `/v1/members` and presence. A joined
+desktop and the web client use the optional `chat-colors-v1` capability
+(`packages/contracts/src/team-protocol/chat-colors-v1.ts`, protocol 9 only). Host route
+`routeChatColors` (`src/main/team-api/route-chat-colors.ts`):
+
+- `POST /v1/chat-colors` gives `{agents: [{agentId, color}], members: [{memberId, color}]}`: the
+  agents that the member can see, and all members (at most 100).
+- `POST /v1/chat-colors/set` takes exactly `{agentId, color | null}`. It needs manage access to the
+  agent and goes through `agents.updateAgent`. No route sets a member's colour.
+- The host sends `chat-colors-changed` with the whole list after each `agents-changed`, after each
+  presence change, and when a peer declares the capability. Each peer gets the list without the
+  agents that it cannot see, and only when its list changed.
+
+The main process of a joined desktop keeps the last list of each server
+(`RemoteServerEventRefresh`). It puts the agent colours into each agent list and agent result, and
+the member colours into each presence snapshot and members list. The renderer does not get
+`chat-colors-changed`. A save with `chatColor` calls the set route before the released `PATCH`. A
+server without the capability refuses a change of only the chat colour with
+`error.team.chatColorsUnsupported`; with other fields, the other fields change. The web client
+(`web-runtime.ts`, `web-client-context.tsx`) does the same and keeps the list in its state.
 
 ## Sidebar folders
 
@@ -276,7 +470,9 @@ released actions, `parentId` on `create`, and `nest`. A peer with the capability
 `sidebar-folders-changed`; other peers get `sidebar-layout-changed`, and the released
 `/v1/sidebar-layout` routes leave out `parentId`. A peer without the capability shows each folder at
 the top level, and its changes keep the parents. The iPhone app shows nested folders as one list,
-with the path in each name. An instance transfer creates each folder at the top level, because its
+as the desktop does: "Parent / Name", a folder icon, and the unread count of a closed folder. A closed
+folder hides the folders in it. With the capability, its folder menu has "New folder inside" and
+"Move to" (`nest`). An instance transfer creates each folder at the top level, because its
 file has no field for the parent.
 
 ## Browser profile
@@ -306,7 +502,7 @@ of a side thread is `legacy_task_id ?? thread_id`, so a stored mailbox message a
 that name the task still find it. A mailbox message with a `taskId` belongs to that side thread, and `DrainScheduler` drains each task as its own lane. The main chat
 lane does not count toward the task limit. At most `limit` task turns of one agent run at the same
 time. `agentTaskLimit` gives the limit: the agent's local `taskLimit` setting (1 to
-`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (2). An owner or admin of
+`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (4). An owner or admin of
 a joined server reads and sets it on `agent-task-limit-v1`. A provider whose
 descriptor has `concurrentTurns: false` (custom ACP agents) gets 1, and its chat and tasks run one
 turn at a time. Other task messages wait with a `hold` reason: `task-limit`, `agent-restarting`,
@@ -323,6 +519,21 @@ restores it. Rename sets a `user` title, which later messages do not change. Del
 at once and shows an Undo toast; when the toast ends, `AgentService.deleteTask` cancels the queued
 messages and deletes the thread with its conversation, attachments, event history and provider
 session. It refuses a thread with a running turn. The main thread has no archive, rename or delete.
+
+An agent reads its other conversations with `openbot.history_search` and `openbot.history_read`
+(`src/backend/agent/history-tools.ts`). Memory keeps facts, not a log of work, so these tools answer
+"what did we do today?". `history_search` without `query` lists the own chat (`taskId` `main`) and the
+side threads, open and archived, with activity since `after` (`24h`, `7d`, a date or an ISO time),
+the newest first, each with its last request and reply as redacted excerpts. With `query` and no
+`taskId`, it searches the current conversation first, then the own chat and the 8 newest side
+threads, and gives each match from another conversation its `taskId` (`searchAll`). Its `nextCursor`
+continues only the current conversation. With `query` or with `history_read`, a `taskId` names one
+conversation; a `taskId` without `query` reads that conversation's newest messages. Models often skip the tool
+description, so the search of all conversations makes their first call work. Each conversation is
+readable only after its latest context reset. The router (`openbot-tool-router.ts`) allows a
+`taskId`, the list and the search of all conversations only from the own chat or a side thread of the
+same agent: a messaging chat, where other people write, searches only itself, and a channel gets no
+history.
 
 "Branch from here" (`AgentService.branchTask`, `AgentTasks.branch`, `AgentThreadStore.branch`) makes a
 new side thread of the same agent from the last agent message of a finished turn, in the main thread
@@ -369,8 +580,21 @@ mark of each open side thread, and a move of one. The marks are rows of `project
 under the side thread's own `threadId`, so the member's devices share them and no migration was
 needed. A desktop marks the open thread read while its window has focus (`markTaskRead` over IPC, or
 the route for a joined server); the phone marks it while the thread screen is in front, and shows a
-dot on the agent's name for an open thread with unread agent messages. The host sends no event when
-a mark moves; a client reads the marks again when `agent-tasks-changed` arrives or a screen that
+dot on the agent's name for an open thread with unread agent messages. The desktop reads the marks
+with `listTaskReads` (`agent:tasks:reads` over IPC, or the `reads` route for a joined server). It shows
+a dot on the tab and the menu row of an idle thread with unread agent messages. The number on the
+agent's sidebar row counts only the agent's chat. When only its open side threads have unread agent
+messages, the row shows the same badge with no number (`unread` with count 0 from
+`computeSidebarAgentStates`; the phone does the same with `useAgentListUnreadThreads`). Earlier the
+number added the thread messages, so a routine that runs often raised a number that opening the chat
+did not clear (#5973). A closed folder counts only the agents' chats. The Dynamic Island keeps the
+chat-only count: it shows and opens a message of the agent's chat, and a side thread's messages are
+not in it. "Mark all read" reads the agent's chat and each open side thread with unread agent
+messages, such as a routine's thread (`agentUnreadReplies` in `conversation-context.tsx`). The desktop
+reads the marks of an agent only after it reads that agent's thread list, so after a start an agent
+that is not open shows no thread badge until a thread event arrives or the person opens it. The host sends no event when
+a mark moves; a client reads the marks again when `agent-tasks-changed` arrives with a thread whose state, outcome or
+last change moved (not for a progress line), or a screen that
 shows them opens. The optional `agent-thread-files-v1` capability
 (`packages/contracts/src/team-protocol/agent-thread-files-v1.ts`, host route `routeAgentThreadFiles` in
 `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{start-with-files,send-with-files}`:
@@ -379,6 +603,14 @@ and text that can be empty. The answers are the frozen `agent-tasks-v1` task and
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
 and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-replies-v1` capability (`packages/contracts/src/team-protocol/agent-thread-replies-v1.ts`, host
+route `routeAgentThreadReplies` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/send-reply`: a message to a side thread with `replyToMessageId`, text, and up to 10
+attachment drafts. The answer is the frozen `agent-tasks-v1` receipt. The host keeps the reply on the delivery,
+as for the main chat; the agent's prompt and the thread quote the message when the thread has it, and the host
+does not refuse an id that the thread does not have. The team client and a joined desktop use this route only for
+a reply. Desktop and the web show Reply on a side thread message only on this computer or on a server with the
+capability; the phone does not reply in a thread. The optional
 `agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
 route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
 `POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs
@@ -389,7 +621,19 @@ the links among the listed tasks. `sourceTitle` is null for the agent's own chat
 list can leave out an archived source, so the divider takes its title from the link. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
 the web read `branches` after the task list and add the links, and read the list again when an event names a task
 that they do not know. A server without the capability does not show "Branch from here", and a joined desktop
-refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A server without either shows only
+refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A thread read has the
+newest 100 messages of the thread. The optional `agent-thread-pages-v1` capability
+(`packages/contracts/src/team-protocol/agent-thread-pages-v1.ts`, host route `routeAgentThreadPages` in
+`src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/read-older` with
+`{agentId, taskId, beforeMessageId, limit}`. It answers `{conversation, hasOlder}`: the messages from before that message, oldest first, in the
+frozen `agent-tasks-v1` conversation shape. The page has whole turns: the host adds turns until it has
+`limit` (0 to 100) messages or the next turn does not fit, so it can have more or fewer than `limit`, and
+never more than 100. A turn of more than 100 messages is split over pages. A limit of 0
+asks only for `hasOlder`, and a message that the thread does not hold has none. The host makes a page smaller
+until it fits one WebRTC frame. A thread tab on desktop and the web asks once after its read, and shows "Load older
+messages" when the thread has more; a new conversation of the thread keeps the pages that it read
+(`src/renderer/src/features/agent-tasks/agent-tasks-state.ts`). A server without the capability shows only the
+newest messages. The Tasks rail page and the phone do not read older pages. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`
@@ -415,7 +659,8 @@ opens the task.
 
 Shared writes: each task thread owns its own browser tabs and tab queue. Computer Use is an MCP
 server that the provider starts, so OpenBot cannot queue its calls; `ThreadLifecycle` starts a task
-session without it, and the instructions send desktop work to the agent's own chat. Tasks share the
+session without it, and the instructions send desktop work to the agent's own chat. A routine thread
+is the exception (see above). Tasks share the
 workspace, and OpenBot does not lock files; the `start_task` guidance warns the agent about this.
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
@@ -431,6 +676,24 @@ still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
 change, because the remote client cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`.
+
+## Deleted chat messages
+
+`AgentService.deleteConversationMessage` (`src/backend/agent/message-deletion.ts`) deletes one shown
+message from an agent's own chat or, with `taskId`, from a side thread. Without `deleteAny`, a person
+can delete only a user message that they sent: its `senderMember.id` is their member id, or it has no
+`senderMember` for the user of this computer. A message of the running turn, a streaming message and
+a queued, starting or running delivery are `busy`.
+
+The delete removes the mailbox copy first (`MailboxStore.deleteShownMessage`): a person's message loses
+its delivery to the agent, and the message, its reactions, idempotency keys and unused files go when no
+other delivery remains. A teammate's and a routine's message stay in the mailbox for the other chat and
+the run. Then one `conversation.message-deleted` event removes the projection row and adds a row to
+`projection_deleted_thread_messages` (migration 55). Each read mark on the message moves to the message
+before it. Earlier events of the thread lose the message (`scrubDeletedMessageEvents`), so the event
+log and a replay keep no copy of its text. The record keeps the message out of each later write,
+provider history import, mailbox sync, replay and live publish. The record goes with its thread. The
+provider session, the thread summary text, the event `detail` and usage records are not changed.
 
 ## Agent communication policy
 
@@ -506,12 +769,48 @@ When the last copy ends, the waiting answers start in one turn, and the prompt n
 whose copy ended with no answer. A message from the person does not wait: it starts at once and
 takes the answers that are already in. Each end of a copy schedules a drain for the requester.
 
-A message from another agent follows the recipient's busy-message mode, as a message from the
-person does. When the mode is "steer", the provider steers natively and the recipient runs a chat
-turn, `send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). Channel, messaging and task work, and each answer to a request
-that went to two or more teammates, stay queued (`MailboxStore.steersChatTurn`), so those answers
-still start together. A message from an agent that cannot steer gets no fallback reason on its row.
+Nothing else wakes the requester, so a turn of teammate results that ends with no answer and no
+step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
+with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
+(a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
+by the user. The error waits for the end
+of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
+error. With no backup, a turn that only teammate results started runs once more on the same model;
+the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
+shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+
+A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
+running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
+Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
+reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
+"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
+modes.
+
+A steered message joins work that the model already does, and a model that gets it as plain user
+text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block
+(`steerNote` in `src/backend/agent/developer-instructions.ts`) in front of a message from the person
+or a teammate: the message adds to the current work, a question gets a short answer first, a
+correction applies from this point, and the unfinished work continues unless the message stops it.
+The block is a text item of its own, as the turn context blocks are, so the history readers remove
+it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
+with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
+block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
+block.
+
+A message from another agent that only gives information follows the recipient's busy-message mode,
+as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
+When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
+`send_message` and the result relay take the message into that turn
+(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
+turn automatically, in each mode: it asks for work and a result, and in a running turn that result
+and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
+tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
+Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
+messaging and task work, and each answer to a request that went to two or more teammates, stay
+queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
+agent that cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.
@@ -572,7 +871,8 @@ and account), the same choices that the settings page offers. OpenBot checks eac
 account against the lists before it writes, and the agent service checks the primary account; an
 account change, like a provider change, waits until the agent is idle. These changes apply at once,
 as the other profile fields do. `read_agent` and the `update_profile` result return the account,
-the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). An unknown
+the backup models and `usageLimitReturn`, the model that the agent left for a usage limit or a provider error (`cause: "provider-error"`). A spent credit balance
+that names no reset sets no `usageLimitReturn`, so the agent does not go back to it by itself. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
 it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
 provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
@@ -607,7 +907,8 @@ to ungroup an agent; deleting a section also ungroups its agents without deletin
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 
-`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. The router
+`html_render` publishes a visual reply: an HTML page that shows above the agent's reply. On desktop
+and in the web client, a button on the page opens it as a file tab of the side panel too. The router
 stores the page as a generated `text/html` attachment and adds an assistant message with the item
 type `visual-reply:<height>` and the page title as its text (`@openbot/contracts/chat-visual`). A
 client that does not know the item type shows the title and the file. A visual message is not
@@ -617,14 +918,17 @@ the page on `openbot-visual:` (`openbot-remote-visual:` for a remote host) with
 the same sandbox without `allow-same-origin`. The page runs its scripts and can load files from the
 network, but it has an opaque origin, gets no permission, and talks to the app only with the checked
 messages of `parseChatVisualMessage`: its height, its theme, its display mode, a link, a message, its
-context, an image and an app shortcut. The frame script gives the page `window.openbotPage`
+context, the selected text, an image and an app shortcut. The frame script gives the page `window.openbotPage`
 (`sendMessage`, `setContext`, `requestFullscreen`, `exitFullscreen`, `displayMode`) over the MCP Apps
 methods `ui/message`, `ui/update-model-context` and `ui/request-display-mode`. A link, a message, the
 context, an image, full screen and a shortcut need the frame to have the focus and the user's
 activation, so a page acts only after a click or a key in it. A message goes at the end of the draft,
-and the user sends it. The context is a quote tag of the visual message
-at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
-page's next context replaces it. Full screen puts the frame's
+and the user sends it. The context is a quote tag of the visual message (in the side panel, of the
+message that holds the page) at the start of the draft, so it shows as a quote chip and is saved and sent with the draft; the
+page's next context replaces it. The frame script reports the text that the user selects in the
+page, and the chat or the panel shows the Quote action of a chat selection over it. Quote, or the
+quote shortcut in the page, adds the text as a quote of the page file, so the chip opens the page in
+the side panel. In the chat, full screen puts the frame's
 box in the top layer with the Popover API, so the frame does not load again; it exits before the app
 opens a dialog for the page. Only the renderer's allowlist of shortcuts (`chat-visual-shortcuts.ts`)
 leaves the page, as a key event on the frame element. Mobile runs the
@@ -744,14 +1048,18 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
 ## Agent import
 
 Server Settings > Import moves agents from a `.zip` export into the local host, or into a remote host
-that serves `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
+that serves `agent-import-v2` or `agent-import-v1` (see [Agent import from a joined server](servers.md#agent-import-from-a-joined-server)).
 The format is `openbot-import.json` plus `agents/<key>/`
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change
 of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
-`AgentImportService` keeps the checked export and its SHA-256 under a single-use token; `apply`
-refuses a file that changed. `stage` measures entries without inflating them and rejects paths that
-`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` checks all
+`AgentImportService` keeps the checked export under a single-use token, with the SHA-256 of its size
+and central directory; `apply` refuses a file that changed. `src/main/agent-archive.ts` reads only the
+central directory (ZIP64 too) and inflates one entry at a time from disk, with its size and CRC
+checked, so a local import has no size limit, only 200,000 files. Files in `.git` and
+`node_modules` folders are left out with one warning, for this import and the transfer. `stage` rejects paths that
+`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` skips an
+agent whose workspace files need more free disk space than there is, checks all
 skills of an agent, creates it through `AgentService` and publishes skills through the local skill
 library; an agent whose step fails is deleted with the skill revisions it published, and the others
 continue. An optional `channels` list carries Grok Bot group chats. After the agents, each selected
@@ -768,8 +1076,8 @@ one `.zip` file. It is a separate format from the Grok Bot agent import. The fir
 from this server" and "Import into this server". The section shows for this computer's server, and for a
 joined server with `instance-transfer-v1` when the user is an owner or admin (see
 [Instance transfer with a joined server](servers.md#instance-transfer-with-a-joined-server)). The web
-client and mobile do not show it. App preferences, the default model and the providers that are off
-belong to the app, not to a server, so they are not in the file.
+client does not show it; the phone shows it for a joined server. App preferences, the default model and
+the providers that are off belong to the app, not to a server, so they are not in the file.
 
 The file has `openbot-transfer.json` at its root, `agents/<key>/` folders (`avatar.<ext>`,
 `skills/<slug>/` and `workspace/`), and `shared/` for `~/OpenBot/Shared`. The manifest is
@@ -779,7 +1087,8 @@ between app versions, so add only optional fields and raise `version` for a chan
 with a higher `version` is refused. An invalid agent is left out with a warning and the others are
 offered; invalid settings are left out the same way.
 
-Each agent carries its profile (name, title, instructions, avatar seed and image), provider, model
+Each agent carries its profile (name, title, instructions, avatar seed, colour and image; the exact
+colour is in the optional `avatarColor` field, and an older app draws the nearest `avatarHue`), provider, model
 and reasoning effort, notifications and busy-message mode, its routines (schedule, limit and missed
 policies; one-time routines are in the optional `oneTimeRoutines` field, so an older app skips them and
 keeps the agent), its memories (with the essential or searchable choice the user made) and the skill folders
@@ -787,23 +1096,67 @@ in `.agents/skills` and `.claude/skills` that OpenBot does not manage. Workspace
 and leave out `.openbot/`, the skill folders, links, and every path `isUnsafeArchivePath` refuses
 (`.git`, `node_modules`, `.env*`, private keys, nested archives). Server settings are optional: MCP servers,
 custom model providers, custom ACP agents (as a warning, see below), sidebar sections and routine flows
-between exported agents. A custom provider model keeps its optional `contextWindow`; an app that
-does not know the field ignores it.
+between exported agents. A custom provider model keeps its optional `contextWindow`, `maxOutput`,
+`reasoningEfforts` and `inputs`; an app that does not know a field ignores it.
 
 No secret is in the file: MCP variable and header values are empty, custom providers have no key or
 headers, custom agents keep only the names of their variables, and `signedIn` lists provider ids,
 never tokens. Arguments and URLs can hold a token too, so the export empties the value of a flag or
 `name=value` argument whose name says it is a secret, and removes the user, password, query and
 fragment of a URL, also of a URL in an argument such as a connection string. An MCP address keeps only
-its origin, because some services keep the access key in the path; `cleared` names each item it changed, and the import asks for those values again. Chat history, messaging connections, connectors, team and account sessions, browser
-data, approval automation and the per-agent access, Computer Use and automation settings are not
-exported, so an imported agent gets the defaults of a new agent on the new computer. Shared tables
-(`Shared/Data/agent-data.db`) are left out because their owners are agent ids.
+its origin, because some services keep the access key in the path; `cleared` names each item it changed, and the import asks for those values again. Messaging connections, connectors, team and account
+sessions, browser data, agent API key values, folders outside the workspace and webhook secrets are not
+exported. Shared tables (`Shared/Data/agent-data.db`) are left out: their owners are agent ids, and the
+only read path for them (`AgentTables`) cuts long cells, so a copy needs a database host operation.
+`Shared/Transfers`, which holds the files of messages, is not copied as files: those files go with the
+chat history.
+
+Fields added after version 1 shipped are optional, so an older app ignores them:
+
+- `agents[].preferences` (`src/main/instance-transfer-preferences.ts`): access, Computer Use, the agent
+  defaults, fast mode, backup models, hidden state (`hidden`, with `hiddenWorks` from an app that keeps
+  a hidden agent at work), and the owner's notification level, pin and
+  approval choice, plus the names of the agent's API keys and the count of its outside folders. A file
+  can come from anywhere, so the import applies only values that keep the agent at or below a new
+  agent's permissions (`workspace` access, Computer Use off, a setting off, "ask first"). "Local
+  scripts", "Agent starts new chats" and "always allow" that were on become warnings. A member's
+  import does not change the owner's pin, level or approval choice.
+- `channels` and `exporter`: each channel with at least one exported member, with its title,
+  instructions, members and lead as agent keys, icon, image (`channels/<key>/image.<ext>`), isolated
+  and archived state, memories, routines and webhook routines. The import creates a channel with the
+  imported members only, as the importing person (`channelActor`, or the member). A channel step that
+  fails deletes that channel.
+- `agents[].webhookRoutines`, `channels[].webhookRoutines`: routines that a webhook starts, with their
+  event type and filters. The import saves each one through `HostEventsService`, which gives it a new
+  address and secret, and a warning tells the user to give them to the sender.
+- `settings.workflows` (`src/main/instance-transfer-workflows.ts`): each workflow's graph, with an
+  agent step and a channel output named by key. A messaging connection is left empty and the
+  workflow is marked `relink`; a webhook trigger needs a new address, which the user makes in the
+  workflow, because its secret shows only once.
+- `settings.routineFlowPositions`: the places on each routine canvas, as `routine:<key>` or
+  `agent:<key>`.
+- With "Include chat history" (`includeHistory`, this computer's server only; `instance-transfer-v1`
+  does not carry it), `agents[].history` names `agents/<key>/history/index.json`, which lists the
+  agent's own chat and side threads (title, title source, origin, archived state, routine key) and the
+  files of their messages. Messages are in JSON parts of 200 (`src/main/instance-transfer-history.ts`)
+  without queue state or reactions; a sender agent is named by its key. `channels[].messages` names
+  the parts of a channel's shown messages; their file cards stay behind.
+
+The import writes chats after every agent and routine exists (`AgentHistoryTransfer`,
+`src/backend/agent-history-transfer.ts`). Each batch of 200 messages is one `thread.history-imported`
+event through `persistConversationChanges`, with its files copied as generated attachments of the chat
+in the same transaction, as a branch copies them. Messages get new ids; a reply, a sender agent and a
+routine card point to the copies. `ThreadLifecycle.buildProviderHandoff` gives the first session of a
+thread with that event and no provider session the imported history, as it does for a branch. Channel
+messages go through `ChannelStore.update`, so their `channel.changed` events keep them; each gets a new
+id and no task, and the person who exported becomes the person who imports. Imported chats and
+channels are marked read for the importing person.
 
 `InstanceTransferService` (`src/main/instance-transfer-service.ts`) writes the archive one file at a
 time, stored and not compressed, to `<name>.zip.part`, and renames it when it is complete. Import uses
-the same checks as the agent import (`src/main/agent-archive.ts`): the file stays under a single-use
-token with its SHA-256, under 2 GB and 50,000 files. `apply` first adds the custom providers that are missing. It never saves a custom ACP agent:
+the same reader and checks as the agent import (`src/main/agent-archive.ts`): the file stays under a
+single-use token with the SHA-256 of its central directory, under 2 GB and 50,000 files, because the
+writer does not write ZIP64. `apply` first adds the custom providers that are missing. It never saves a custom ACP agent:
 a saved custom agent starts its command to list its models, so a warning names the agent and its command,
 and the user adds it again after checking it. The models of an added provider are not listed yet: a save does not wait for
 model discovery, and the provider has no key until the user enters it. So an agent on such a model starts

@@ -36,9 +36,7 @@
 }
 
 .billing-server-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
 .billing-server-title {
@@ -142,6 +140,7 @@
 .billing-license-icon svg {
   width: 18px;
   height: 18px;
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .billing-license-row .ui-item-actions {

@@ -3,6 +3,7 @@
 // protocol 8 needs no new protocol version. Versions 1-7 retain their own lists.
 // The schema is in `provider-aware-codec.ts`; this file holds only what protocol 8 accepts.
 import { createProviderAwareCodec, decodeTeamProtocolSupportProviderAware } from "./provider-aware-codec";
+import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
 
 export type {
   TeamProtocolProviderAwareCapability as TeamProtocolV8BaseCapability,
@@ -38,6 +39,10 @@ const codec = createProviderAwareCodec({
   authKinds: "open",
   // The protocol 7 charset of `isAgentModel`.
   agentModel: /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u,
+  // A host sends `none`, `minimal` and `ultra` only under reasoning-efforts-v1, so a present one is
+  // always kept. To a peer without it, the host sends the nearest of the five levels that protocol 8
+  // shipped with.
+  reasoningEfforts: TEAM_REASONING_EFFORTS,
 });
 
 export const decodeTeamProtocolV8BaseEvent = codec.decodeEvent;

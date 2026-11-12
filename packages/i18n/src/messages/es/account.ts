@@ -41,7 +41,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} min",
   "account.usage.window.cursorModels": "Modelos de Cursor",
   "account.usage.window.otherModels": "Otros modelos",
+  "account.usage.window.total": "Total",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} restante",
   "account.update.failedRetry": "La actualización falló. Vuelve a intentarlo.",
   "account.update.managedByHost": "Gestionado por el host",
   "account.update.restart": "Reiniciar",
@@ -67,6 +69,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot no puede acceder al servicio de cuentas en este momento.",
   "account.login.signInDescription":
     "Usa tu correo para iniciar sesión o crear una cuenta. Te enviaremos un código de un solo uso.",
+  "account.login.keyringChangedDescription":
+    "El llavero del sistema perdió tu último inicio de sesión. OpenBot ahora guarda los inicios de sesión en su propio archivo en este equipo. Inicia sesión una vez más.",
   "account.login.codeAccepted": "Tu código se ha aceptado.",
   "account.login.codeSent": "Hemos enviado un código a {email}.",
   "account.login.connectingSecurely": "Conectando de forma segura…",

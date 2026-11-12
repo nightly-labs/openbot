@@ -1,7 +1,7 @@
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useAgentThreadReads } from "@/features/chat/components/use-agent-thread-reads";
 import { useOpenAgentTasks } from "@/features/chat/components/use-open-agent-tasks";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -45,14 +45,20 @@ export interface ChatThreadMenu {
  * a host without `agent-tasks-v1`; the agent's name then opens the agent's info, as before.
  */
 export function useChatThreadMenu(
-  agent: { id: string; serverId: string; avatarSeed: string; avatarHue: AvatarHue | null },
+  agent: {
+    id: string;
+    serverId: string;
+    avatarSeed: string;
+    avatarHue: AvatarHue | null;
+    avatarColor: AvatarColor | null;
+  },
   activeId: string,
 ): ChatThreadMenu | undefined {
   const { t } = useText();
   const supported = useMobileWorkspaceSelector((current) => current.canUseTasks(agent.serverId));
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const reads = useAgentThreadReads(agent.serverId, agent.id);
-  const agentColor = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
+  const agentColor = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   return useMemo(() => {
     if (!supported) return undefined;
     const inThread = activeId !== MAIN_THREAD_ID;

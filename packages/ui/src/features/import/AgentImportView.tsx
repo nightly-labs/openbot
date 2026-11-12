@@ -69,8 +69,10 @@ export interface AgentImportViewProps {
   onSetupChange: (setup: AgentImportSetup) => void;
   onOpenExportAgent: () => void;
   onSaveExportSkill: () => void;
-  /** Hermes on this computer: reads its folder with no export. Without it, Hermes offers the export only. */
+  /** Hermes on the server: reads its folder with no export. Without it, Hermes offers the export only. */
   onReadFolder?: (() => void) | undefined;
+  /** The Hermes folder is on a joined server, not on this computer. */
+  folderOnServer?: boolean;
   onChoose: () => void;
   onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
@@ -111,6 +113,7 @@ export function AgentImportView(props: AgentImportViewProps) {
         <ImportGuide
           source={props.source ?? "grok-bot"}
           onReadFolder={props.onReadFolder}
+          folderOnServer={props.folderOnServer === true}
           reading={props.phase === "reading"}
           error={props.error}
           setup={props.setup}
@@ -128,6 +131,7 @@ export function AgentImportView(props: AgentImportViewProps) {
 function ImportGuide(props: {
   source: AgentImportSkillSource;
   onReadFolder?: (() => void) | undefined;
+  folderOnServer: boolean;
   reading: boolean;
   error?: string | null | undefined;
   setup: AgentImportSetup;
@@ -140,6 +144,11 @@ function ImportGuide(props: {
   const { t, format, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
   const hermes = () => props.source === "hermes-agent";
+  // The lede names the folder only when the panel can read it.
+  function hermesLede() {
+    if (!props.onReadFolder) return t("import.guide.hermesLedeExport");
+    return t(props.folderOnServer ? "import.guide.hermesLedeServer" : "import.guide.hermesLede");
+  }
   // Reading the Hermes folder needs no export, so its tab has one step.
   const exports = () => props.setup !== "folder";
   const prompt = () => (hermes() ? HERMES_EXPORT_PROMPT : AGENT_IMPORT_PROMPT);
@@ -149,7 +158,7 @@ function ImportGuide(props: {
         <h3 id={headingId} class="agent-import-heading">
           {hermes() ? t("import.guide.hermesTitle") : t("import.guide.title")}
         </h3>
-        <p class="agent-import-lede">{hermes() ? t("import.guide.hermesLede") : t("import.guide.lede")}</p>
+        <p class="agent-import-lede">{hermes() ? hermesLede() : t("import.guide.lede")}</p>
       </header>
 
       <Show when={props.error}>
@@ -178,7 +187,9 @@ function ImportGuide(props: {
                 aria-label={hermes() ? t("import.guide.hermesSetupLabel") : t("import.guide.setupLabel")}
               >
                 <Show when={hermes() && props.onReadFolder}>
-                  <SlidingTabs.Trigger value="folder">{t("import.guide.setupFolder")}</SlidingTabs.Trigger>
+                  <SlidingTabs.Trigger value="folder">
+                    {props.folderOnServer ? t("import.guide.setupServer") : t("import.guide.setupFolder")}
+                  </SlidingTabs.Trigger>
                 </Show>
                 <Show
                   when={hermes()}

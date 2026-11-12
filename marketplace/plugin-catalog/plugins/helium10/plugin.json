@@ -1,0 +1,36 @@
+{
+  "slug": "helium10",
+  "name": "Helium 10",
+  "tagline": "Amazon seller research",
+  "description": "Helium 10 lets agents research Amazon products and keywords and read seller data with the signed-in Helium 10 account. Each user signs in to their own Helium 10 account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Helium 10",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/75/34/66/75346691-9022-825b-29ab-300fbbf28116/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-keywords", "text": "Find high-volume keywords for a stainless steel water bottle on Amazon US." },
+    { "id": "prompt-product-research", "text": "Compare the top 10 listings for yoga mats by sales and reviews." },
+    {
+      "id": "prompt-listing-draft",
+      "text": "Draft a product title and five bullet points for my bamboo cutting board."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-helium10-mcp",
+      "name": "Helium 10",
+      "description": "Product, keyword, and seller data access, over Helium 10's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/75/34/66/75346691-9022-825b-29ab-300fbbf28116/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "helium10",
+        "transport": "http",
+        "url": "https://mcp.helium10.com/mcp",
+        "auth": [{ "id": "helium10-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.helium10.com",
+  "privacyPolicyUrl": "https://www.helium10.com/privacy-policy/",
+  "termsUrl": "https://www.helium10.com/terms-and-conditions/"
+}

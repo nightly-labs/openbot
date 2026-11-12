@@ -13,6 +13,9 @@ import type {
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { Effect } from "effect";
 
+/** GitHub refuses a longer comment, review or issue text. */
+export const GITHUB_BODY_LIMIT = 65_536;
+
 /** One change that a GitHub output makes. */
 export interface WorkflowGitHubChange {
   action: WorkflowGitHubAction;
@@ -27,6 +30,26 @@ export interface WorkflowGitHubChange {
   /** The logins to assign, or to ask for a review. */
   people: string[];
   reason: WorkflowGitHubCloseReason;
+  /** The files that a new issue or a comment links, such as those of the Discord mention that started the run. */
+  files: WorkflowGitHubFiles | null;
+}
+
+/** One file that a GitHub output copies to the repository, from a signed address that expires. */
+export interface WorkflowGitHubFile {
+  name: string;
+  contentType: string;
+  size: number;
+  url: string;
+}
+
+/**
+ * The files of one change. The adapter commits them to a branch of the repository, under `folder`, and
+ * links them below the text. GitHub has no API that attaches a file to an issue for an App.
+ */
+export interface WorkflowGitHubFiles {
+  /** The same for each try of one change, such as `discord/<message id>`. */
+  folder: string;
+  files: WorkflowGitHubFile[];
 }
 
 /** What GitHub made: the comment, the review or the issue, when the change makes one. */
@@ -61,6 +84,12 @@ export interface WorkflowGitHubRecentEvent {
 }
 
 export interface WorkflowGitHubApi {
+  /**
+   * The change with the links of its files in its text, and no files. It copies the files first, so the
+   * workflow calls it before it records the change as sent. A file that cannot be copied keeps its own
+   * link.
+   */
+  attachFiles(change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChange>;
   change(change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChangeResult, WorkflowGitHubApiFailure>;
   options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, WorkflowGitHubApiFailure>;
   /** The newest events of the repository that can be `event`, newest first. */
