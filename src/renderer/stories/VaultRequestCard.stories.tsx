@@ -88,6 +88,7 @@ function Request(props: {
   const [saved, setSaved] = createSignal(props.saved);
   const [values, setValues] = createSignal(props.values);
   const scope = () => (props.kind === "apiKey" ? API_KEY_SCOPE : undefined);
+  const keyPlaceholder = () => (props.kind === "apiKey" ? "crm_live_…" : undefined);
   return (
     <VaultRequestCard
       kind={props.kind}
@@ -95,6 +96,7 @@ function Request(props: {
       agentName="Atlas"
       prefill={REQUESTS[props.kind].prefill}
       scope={scope()}
+      keyPlaceholder={keyPlaceholder()}
       status={status()}
       saved={saved()}
       values={values()}

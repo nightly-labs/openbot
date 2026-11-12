@@ -17,7 +17,7 @@ import { UiBlockingBlock } from "@openbot/ui/features/conversation/ui-blocks/UiB
 import type { VaultRequestScope } from "@openbot/ui/features/vault/VaultPanel";
 import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
 export interface UiBlockPromptProps {
@@ -66,6 +66,7 @@ interface ApiKeyRequest {
   /** The secret field, whose label is the name of the key. */
   keyFieldId: string;
   name: string;
+  placeholder: string | undefined;
   scope: VaultRequestScope;
 }
 
@@ -80,6 +81,7 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
   return {
     keyFieldId: key.id,
     name: key.label ?? key.id,
+    placeholder: "placeholder" in key ? key.placeholder : undefined,
     scope: { label: scope.label ?? scope.id, options: scope.options, value: scope.value ?? first },
   };
 }
@@ -145,7 +147,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     void send(answers, { status: "closed" });
   }
 
-  const apiKeyRequest = () => apiKeyRequestOf(props.block);
+  const apiKeyRequest = createMemo(() => apiKeyRequestOf(props.block));
 
   /** The fields that the agent filled in, or the name of a requested API key. */
   const prefill = () => {
@@ -210,6 +212,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           agentName={props.agents.find((agent) => agent.id === props.agentId)?.name}
           prefill={prefill()}
           scope={apiKeyRequest()?.scope}
+          keyPlaceholder={apiKeyRequest()?.placeholder}
           status={state().status}
           saved={props.block.vault?.saved}
           values={state().response?.values}

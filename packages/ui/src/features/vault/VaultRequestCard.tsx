@@ -30,6 +30,8 @@ export interface VaultRequestCardProps {
   prefill: Readonly<Record<string, string>>;
   /** Only for an API key: who can use it. */
   scope?: VaultRequestScope | undefined;
+  /** Only for an API key: the agent's hint for the key, such as sk-…. */
+  keyPlaceholder?: string | undefined;
   status: UiBlockStatus;
   /** The item that the user saved. */
   saved?: UiVaultSavedItem | undefined;
@@ -184,6 +186,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
             title={props.title}
             prefill={props.prefill}
             scope={props.scope}
+            keyPlaceholder={props.keyPlaceholder}
             onSave={(input, scope) => save()(input, scope)}
             onClose={() => setDialogOpen(false)}
           />

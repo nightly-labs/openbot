@@ -1061,7 +1061,7 @@ function SecretInput(props: {
   saved: boolean;
   maxlength: number;
   inputMode?: "numeric";
-  placeholder?: string;
+  placeholder?: string | undefined;
   onChange: (value: string) => void;
   onReveal: () => Promise<string>;
   onRevealFailed: (error: unknown) => void;
@@ -1131,6 +1131,8 @@ function ItemDialog(props: {
   onCopyCode?: ((code: string) => void) | undefined;
   /** The choice of who can use a requested API key, which the dialog shows in place of the agents. */
   scope?: VaultRequestScope | undefined;
+  /** The agent's hint for a requested API key, such as sk-…. */
+  keyPlaceholder?: string | undefined;
   /** Saves the item, with the chosen option of `scope` when the dialog has one. */
   onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
@@ -1518,6 +1520,7 @@ function ItemDialog(props: {
             <Field label={keyLabel(apiKey())} class="vault-wide">
               <SecretInput
                 {...secretProps("key")}
+                placeholder={props.keyPlaceholder}
                 maxlength={VAULT_API_KEY_LIMIT}
                 value={apiKey().key}
                 onChange={(key) => set(apiKey(), { key })}
@@ -1647,6 +1650,8 @@ export function VaultRequestDialog(props: {
   prefill: Readonly<Record<string, string>>;
   /** Only for an API key: who can use it. */
   scope?: VaultRequestScope | undefined;
+  /** Only for an API key: the agent's hint for the key, such as sk-…. */
+  keyPlaceholder?: string | undefined;
   /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
   onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onClose: () => void;
@@ -1663,6 +1668,7 @@ export function VaultRequestDialog(props: {
       prefill={props.prefill}
       fromChat
       scope={props.scope}
+      keyPlaceholder={props.keyPlaceholder}
       onSave={props.onSave}
       onReveal={() => Promise.resolve("")}
       onClose={props.onClose}
