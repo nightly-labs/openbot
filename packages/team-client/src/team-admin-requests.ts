@@ -172,6 +172,7 @@ import {
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
+  decodeHostVaultCodes,
   decodeHostVaultImport,
   decodeHostVaultState,
   decodeInstalledSkills,
@@ -280,6 +281,7 @@ import {
   type VaultHostImportResult,
   type VaultSaveInput,
   type VaultState,
+  type VaultTwoStepCodes,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import {
@@ -362,6 +364,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
@@ -1977,30 +1980,43 @@ export function passwordManagerRequest(
   );
 }
 
-/** The routes of `vault-v2` when the host serves it, else of `vault-v1`, which has no API keys. */
-function vaultRoutes(v2: boolean) {
-  return v2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
+/**
+ * The newest Vault capability of the host: 3 is `vault-v3` with two-step keys, 2 is `vault-v2` with API
+ * keys, 1 is `vault-v1`.
+ */
+export type HostVaultVersion = 1 | 2 | 3;
+
+function vaultRoutes(version: HostVaultVersion) {
+  return version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
 }
 
 /**
- * The host's Vault (`vault-v2`, or `vault-v1` without API keys). No list item carries a password, a
- * card number, a security code or an API key.
+ * The host's Vault (`vault-v3`, `vault-v2` without two-step keys, or `vault-v1` without API keys). No
+ * list item carries a password, a card number, a security code, an API key or a two-step key.
  */
-export function listHostVault(request: TeamApiRequest, v2: boolean): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(v2).list, decodeHostVaultState, {}));
+export function listHostVault(
+  request: TeamApiRequest,
+  version: HostVaultVersion,
+): Effect.Effect<VaultState, TeamAdminRequestError> {
+  return adminCall(() => request("POST", vaultRoutes(version).list, decodeHostVaultState, {}));
+}
+
+/** The current two-step code of each host login with a key (`vault-v3`). The key stays on the host. */
+export function listHostVaultCodes(request: TeamApiRequest): Effect.Effect<VaultTwoStepCodes, TeamAdminRequestError> {
+  return adminCall(() => request("POST", VAULT_V3_ROUTES.codes, decodeHostVaultCodes, {}));
 }
 
 /** Adds or changes one item of the host's Vault. A null secret keeps the saved one; a new one goes to the host once. */
 export function saveHostVaultItem(
   request: TeamApiRequest,
   input: VaultSaveInput,
-  v2: boolean,
+  version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
   // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
   // key, and an absent key keeps the saved one. JSON has no undefined, so an absent field stays out.
   const { fillSites, twoStepKey, ...item } = { fillSites: undefined, twoStepKey: undefined, ...input };
   return adminCall(() =>
-    request("POST", vaultRoutes(v2).save, decodeHostVaultState, {
+    request("POST", vaultRoutes(version).save, decodeHostVaultState, {
       ...item,
       ...(fillSites === undefined ? {} : { fillSites }),
       ...(twoStepKey === undefined ? {} : { twoStepKey }),
@@ -2011,9 +2027,9 @@ export function saveHostVaultItem(
 export function deleteHostVaultItem(
   request: TeamApiRequest,
   id: string,
-  v2: boolean,
+  version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(v2).delete, decodeHostVaultState, { id }));
+  return adminCall(() => request("POST", vaultRoutes(version).delete, decodeHostVaultState, { id }));
 }
 
 /** Adds the logins of a CSV password export (`vault-import-v1`). The answer has only the counts. */

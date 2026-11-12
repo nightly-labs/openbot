@@ -923,7 +923,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   two-step key, and one of the first four goes to them only when they show or copy it. A server with
   `vault-v3` also sends the current two-step codes, each valid for its short period. The iPhone app shows the same list and never
   asks for a password, a card number, a security code or an API key: a new one that the owner or admin types on
-  the phone goes once to the server, and the phone does not keep it. Other team members cannot read it. An agent gets the login sites and usernames, the card names with their last
+  the phone goes once to the server, and the phone does not keep it. The same applies to a two-step key that the
+  owner or admin pastes, scans with the camera or reads from a screenshot on the phone: the phone keeps it in memory
+  only, makes the first codes from it so the user can check it on the site, and sends it once to the server on save.
+  The camera picture and the screenshot stay on the phone. Other team members cannot read it. An agent gets the login sites and usernames, the card names with their last
   four digits and expiry, and the contact info; it never gets a password, a card number, a security
   code, two-step key or login notes. It can enter a two-step code into a sign-in page with the secure
   sign-in card, as it does a password, and save a setup key that a site shows when the user asks it to

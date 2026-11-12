@@ -73,6 +73,7 @@ import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -2496,6 +2497,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         hasCapability(serverCapabilities.current, serverId, AGENT_IMPORT_CAPABILITY),
       canTransferServer: (serverId) => administers(serverId, INSTANCE_TRANSFER_CAPABILITY),
       canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
+      canManageVaultTwoStep: (serverId) => administers(serverId, VAULT_V3_CAPABILITY),
       canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
       canManageBrowserProxies: (serverId) => administers(serverId, BROWSER_PROXIES_CAPABILITY),
       // The same rule as the Updates section of the desktop Server Settings.
