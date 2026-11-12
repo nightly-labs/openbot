@@ -208,6 +208,9 @@ Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
+The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
+server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
+change it, change it in both places and deploy the Worker.
 
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
