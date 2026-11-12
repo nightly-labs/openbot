@@ -175,6 +175,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "코드를 기다리는 로그인이 없어요. 로그인을 다시 시작하세요.",
   "error.provider.codeLoginBadCode": "로그인 페이지에 표시된 코드를 붙여넣으세요.",
   "error.provider.codeLoginRefused": "제공자가 코드를 수락하지 않았어요. 로그인을 다시 시작하세요.",
+  "error.provider.signInNetwork":
+    "로그인 중 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결과 프록시를 확인한 후 다시 시도해 주세요.",
   "error.provider.codeLoginUnsupported":
     "이 서버는 붙여넣은 코드로 로그인할 수 없어요. 서버 컴퓨터의 브라우저에서 로그인하세요.",
   "error.provider.cliBusyRetry": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 시도해 주세요.",

@@ -120,12 +120,14 @@ import {
 } from "./provider-diagnostics";
 import {
   isProviderTimeout,
+  ProviderProcessFailed,
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
+import { readOutputTail, signInNetworkFailure } from "./sign-in-network-failure";
 import { providerForAgent, providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 import { checkAgentFolders, workspaceExcludedFolders, workspaceWritableRoots } from "./workspace-sandbox";
@@ -1744,7 +1746,8 @@ export class ProviderRuntime implements ProviderPort {
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
                       env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
-                      stdio: "ignore",
+                      // The error output says why a sign-in failed, such as no network (#7377).
+                      stdio: ["ignore", "ignore", "pipe"],
                       shell: false,
                       windowsHide: process.platform === "win32",
                       windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -1753,7 +1756,17 @@ export class ProviderRuntime implements ProviderPort {
                 }),
                 (child) => stopProcessTree(child).pipe(Effect.orDie),
               );
-              return { child, done: waitForSuccessfulProcess(child, signIn.command.timeoutMs) };
+              const errors = readOutputTail(child.stderr);
+              const done = waitForSuccessfulProcess(child, signIn.command.timeoutMs).pipe(
+                Effect.catch((failure) =>
+                  signInNetworkFailure(child, errors).pipe(
+                    Effect.flatMap((network) =>
+                      Effect.fail(network ? new ProviderProcessFailed({ cause: network }) : failure),
+                    ),
+                  ),
+                ),
+              );
+              return { child, done };
             }),
           )
           .pipe(toProviderOperationFailed);

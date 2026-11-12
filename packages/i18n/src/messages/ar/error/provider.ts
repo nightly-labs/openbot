@@ -162,6 +162,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "لا يوجد تسجيل دخول ينتظر رمزًا. ابدأ تسجيل الدخول مرة أخرى.",
   "error.provider.codeLoginBadCode": "الصق الرمز الذي تعرضه صفحة تسجيل الدخول.",
   "error.provider.codeLoginRefused": "لم يقبل المزوّد الرمز. ابدأ تسجيل الدخول مرة أخرى.",
+  "error.provider.signInNetwork":
+    "تعذّر على تسجيل الدخول الاتصال بالمزوّد. تحقق من اتصال الشبكة والوكيل للحاسوب الذي يشغّل OpenBot، ثم أعد المحاولة.",
   "error.provider.codeLoginUnsupported":
     "لا يمكن لهذا الخادم تسجيل الدخول برمز ملصوق. سجّل الدخول على حاسوب الخادم، في متصفحه.",
   "error.provider.cliBusyRetry": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم أعد المحاولة.",

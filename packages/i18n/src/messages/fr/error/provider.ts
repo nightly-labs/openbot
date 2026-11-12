@@ -192,6 +192,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Aucune connexion n’attend de code. Relancez la connexion.",
   "error.provider.codeLoginBadCode": "Collez le code affiché par la page de connexion.",
   "error.provider.codeLoginRefused": "Le fournisseur n’a pas accepté le code. Relancez la connexion.",
+  "error.provider.signInNetwork":
+    "La connexion n’a pas pu joindre le fournisseur. Vérifiez la connexion réseau et le proxy de l’ordinateur qui exécute OpenBot, puis réessayez.",
   "error.provider.codeLoginUnsupported":
     "Ce serveur ne peut pas se connecter avec un code collé. Connectez-vous sur l’ordinateur du serveur, dans son navigateur.",
   "error.provider.cliBusyRetry": "La CLI {provider} traite un tour. Attendez la fin, puis réessayez.",

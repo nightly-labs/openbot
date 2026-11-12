@@ -178,6 +178,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Nessun accesso è in attesa di un codice. Riavvia l'accesso.",
   "error.provider.codeLoginBadCode": "Incolla il codice mostrato dalla pagina di accesso.",
   "error.provider.codeLoginRefused": "Il provider non ha accettato il codice. Riavvia l'accesso.",
+  "error.provider.signInNetwork":
+    "L'accesso non è riuscito a connettersi al provider. Controlla la connessione di rete e il proxy del computer che esegue OpenBot, poi riprova.",
   "error.provider.codeLoginUnsupported":
     "Questo server non supporta l'accesso con un codice incollato. Accedi sul computer del server, nel suo browser.",
   "error.provider.cliBusyRetry": "La CLI di {provider} sta lavorando a un turno. Attendi che finisca, poi riprova.",

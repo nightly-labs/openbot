@@ -181,6 +181,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "コードを待っているサインインはありません。サインインをやり直してください。",
   "error.provider.codeLoginBadCode": "サインインページに表示されたコードを貼り付けてください。",
   "error.provider.codeLoginRefused": "プロバイダーがコードを受け付けませんでした。サインインをやり直してください。",
+  "error.provider.signInNetwork":
+    "サインインでプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続とプロキシを確認してから、もう一度お試しください。",
   "error.provider.codeLoginUnsupported":
     "このサーバーでは、貼り付けたコードでサインインできません。サーバーのコンピューターのブラウザーでサインインしてください。",
   "error.provider.cliBusyRetry": "{provider} CLI はターンを処理中です。終わるまで待ってから、もう一度お試しください。",

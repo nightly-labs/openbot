@@ -163,6 +163,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "אין התחברות שממתינה לקוד. יש להתחיל את ההתחברות מחדש.",
   "error.provider.codeLoginBadCode": "יש להדביק את הקוד שדף ההתחברות מציג.",
   "error.provider.codeLoginRefused": "הספק לא קיבל את הקוד. יש להתחיל את ההתחברות מחדש.",
+  "error.provider.signInNetwork":
+    "ההתחברות לא הצליחה להגיע לספק. יש לבדוק את חיבור הרשת ואת ה-proxy של המחשב שמריץ את OpenBot ואז לנסות שוב.",
   "error.provider.codeLoginUnsupported": "השרת הזה לא יכול להתחבר עם קוד מודבק. יש להתחבר במחשב השרת, בדפדפן שלו.",
   "error.provider.cliBusyRetry": "ה-CLI של {provider} עובד על פעולה. יש להמתין לסיומה ואז לנסות שוב.",
   "error.provider.cliSigningIn": "ה-CLI של {provider} מתחבר. יש לסיים או לבטל את ההתחברות ואז לעדכן.",
