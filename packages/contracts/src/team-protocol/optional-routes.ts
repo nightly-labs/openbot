@@ -61,6 +61,7 @@ import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
+import { GITHUB_SKILLS_CODECS } from "./github-skills-v1";
 import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
@@ -211,6 +212,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CLAUDE_COMPACT_WINDOW_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
+  ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
   ...HERMES_IMPORT_CODECS,
