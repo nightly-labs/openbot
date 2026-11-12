@@ -502,4 +502,11 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.vaultRequest.skipped": "Not added to Vault",
   "mobile.chat.vaultRequest.gone": "This request is no longer open.",
   "mobile.chat.vaultRequest.notAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "mobile.chat.appSuggestion.skip": "Skip",
+  "mobile.chat.appSuggestion.skipNamed": "Skip {name}",
+  "mobile.chat.appSuggestion.connectNamed": "Connect {name}",
+  "mobile.chat.appSuggestion.skipped": "{name} skipped",
+  "mobile.chat.appSuggestion.undo": "Undo",
+  "mobile.chat.appSuggestion.notAllowed": "Only the server owner or an admin can connect {name}.",
+  "mobile.chat.appSuggestion.unavailable": "This server cannot connect {name}.",
 });

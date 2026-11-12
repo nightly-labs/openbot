@@ -547,4 +547,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "Czeka na Ciebie w kanale {channel}",
   "mobile.chat.channelWork.open": "{label}. Otwiera kanał.",
   "mobile.chat.viewOnly": "Możesz tylko przeglądać tego agenta.",
+  "mobile.chat.appSuggestion.skip": "Pomiń",
+  "mobile.chat.appSuggestion.skipNamed": "Pomiń {name}",
+  "mobile.chat.appSuggestion.connectNamed": "Połącz {name}",
+  "mobile.chat.appSuggestion.skipped": "Pominięto {name}",
+  "mobile.chat.appSuggestion.undo": "Cofnij",
+  "mobile.chat.appSuggestion.notAllowed": "Tylko właściciel serwera lub administrator może połączyć {name}.",
+  "mobile.chat.appSuggestion.unavailable": "Ten serwer nie może połączyć {name}.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,6 +19,7 @@ import {
   CONVERSATION_PLAN_ITEM_TYPE,
   channelRoutingConversationEvent,
   isContextResetMarker,
+  marketplaceSuggestionEvent,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -52,6 +53,8 @@ export type ChatMessage =
     }
   /** Where a new chat started: the agent does not see the messages above it. */
   | { id: string; kind: "context-reset" }
+  /** A Marketplace app that the agent suggests. The user connects it from the card, or skips it. */
+  | { id: string; kind: "app-suggestion"; appId: string }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
   | {
       id: string;
@@ -188,6 +191,7 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedSuggestions = new WeakMap<ConversationMessage, ChatMessage>();
 
 const ROUTINE_RUN_LABELS = {
   queued: "mobile.chat.routine.invoked",
@@ -363,6 +367,18 @@ export function projectChatMessages(
     if (isContextResetMarker(message)) {
       result.push(
         projectedMarker(projectedResets, message, () => ({ id: `context-reset:${message.id}`, kind: "context-reset" })),
+      );
+      continue;
+    }
+    // A suggestion is a system message too. Like desktop, it shows as its card, not as its text.
+    const suggestion = marketplaceSuggestionEvent(message);
+    if (suggestion) {
+      result.push(
+        projectedMarker(projectedSuggestions, message, () => ({
+          id: message.id,
+          kind: "app-suggestion",
+          appId: suggestion.appId,
+        })),
       );
       continue;
     }
@@ -717,6 +733,8 @@ function projectChannelMessage(
           : entry.message.questionPrompt,
     };
   }
+  const suggestion = marketplaceSuggestionEvent(entry.message);
+  if (suggestion) return { id: entry.id, kind: "app-suggestion", appId: suggestion.appId };
   const routing = channelRoutingConversationEvent(entry.message);
   if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
   // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.

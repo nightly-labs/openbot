@@ -505,4 +505,11 @@ export const messages = {
   "mobile.chat.vaultRequest.skipped": "לא נוסף לכספת",
   "mobile.chat.vaultRequest.gone": "הבקשה הזו כבר אינה פתוחה.",
   "mobile.chat.vaultRequest.notAllowed": "רק הבעלים או מנהל של השרת יכולים להוסיף פריט לכספת.",
+  "mobile.chat.appSuggestion.skip": "דילוג",
+  "mobile.chat.appSuggestion.skipNamed": "דילוג על {name}",
+  "mobile.chat.appSuggestion.connectNamed": "חיבור {name}",
+  "mobile.chat.appSuggestion.skipped": "דילגת על {name}",
+  "mobile.chat.appSuggestion.undo": "ביטול",
+  "mobile.chat.appSuggestion.notAllowed": "רק הבעלים או מנהל של השרת יכולים לחבר את {name}.",
+  "mobile.chat.appSuggestion.unavailable": "השרת הזה לא יכול לחבר את {name}.",
 } as const satisfies PartialTranslation<typeof source>;

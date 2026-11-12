@@ -494,4 +494,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "{channel} であなたを待っています",
   "mobile.chat.channelWork.open": "{label}。チャンネルを開きます。",
   "mobile.chat.viewOnly": "このエージェントは表示のみできます。",
+  "mobile.chat.appSuggestion.skip": "スキップ",
+  "mobile.chat.appSuggestion.skipNamed": "{name} をスキップ",
+  "mobile.chat.appSuggestion.connectNamed": "{name} を接続",
+  "mobile.chat.appSuggestion.skipped": "{name} をスキップしました",
+  "mobile.chat.appSuggestion.undo": "元に戻す",
+  "mobile.chat.appSuggestion.notAllowed": "{name} を接続できるのはサーバーの所有者または管理者だけです。",
+  "mobile.chat.appSuggestion.unavailable": "このサーバーは {name} を接続できません。",
 } as const satisfies PartialTranslation<typeof source>;

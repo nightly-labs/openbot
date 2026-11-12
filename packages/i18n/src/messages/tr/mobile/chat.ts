@@ -500,4 +500,11 @@ export const messages = {
   "mobile.chat.channelWork.waiting": "{channel} kanalında sizi bekliyor",
   "mobile.chat.channelWork.open": "{label}. Kanalı açar.",
   "mobile.chat.viewOnly": "Bu ajanı yalnızca görüntüleyebilirsiniz.",
+  "mobile.chat.appSuggestion.skip": "Atla",
+  "mobile.chat.appSuggestion.skipNamed": "{name} uygulamasını atla",
+  "mobile.chat.appSuggestion.connectNamed": "{name} uygulamasını bağla",
+  "mobile.chat.appSuggestion.skipped": "{name} atlandı",
+  "mobile.chat.appSuggestion.undo": "Geri al",
+  "mobile.chat.appSuggestion.notAllowed": "{name} uygulamasını yalnızca sunucu sahibi veya bir yönetici bağlayabilir.",
+  "mobile.chat.appSuggestion.unavailable": "Bu sunucu {name} uygulamasını bağlayamaz.",
 } as const satisfies PartialTranslation<typeof source>;
