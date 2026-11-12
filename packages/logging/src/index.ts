@@ -248,8 +248,8 @@ const UNSCANNED = "[redacted-unscanned]";
  *
  * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
  * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
- * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
- * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
+ * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
+ * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
  */
 function redactEmbeddedJson(value: string, emails: boolean): string {
   let result = "";
@@ -296,12 +296,44 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
   return result + value.slice(index);
 }
 
+/**
+ * The redacted form of a JSON payload, or the payload as written when no rule changed it.
+ *
+ * Writing an unchanged payload again is not neutral: `JSON.parse` rounds an integer past 2^53, so a
+ * 19-digit ID in a skill example reached the agent with other digits, and the spacing went too
+ * (#7760). The original is kept only when the parse lost no key: with a key written twice, the parse
+ * keeps the last value, and the first could hold a secret that no rule then read.
+ */
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
-    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>(), emails)) ?? null;
+    const parsed = JSON.parse(candidate);
+    const redacted = JSON.stringify(convertValue(parsed, new Set<object>(), emails));
+    // An equal result means the conversion stayed under its depth bound, so the count recurses safely.
+    if (redacted === JSON.stringify(parsed) && writtenKeyCount(candidate) === parsedKeyCount(parsed)) return candidate;
+    return redacted ?? null;
   } catch {
     return null;
   }
+}
+
+/** The keys a JSON text writes: each string that a `:` follows. The text is known to parse. */
+function writtenKeyCount(text: string) {
+  let count = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== '"') continue;
+    index += 1;
+    while (text[index] !== '"') index += text[index] === "\\" ? 2 : 1;
+    let next = index + 1;
+    while (text[next] === " " || text[next] === "\t" || text[next] === "\n" || text[next] === "\r") next += 1;
+    if (text[next] === ":") count += 1;
+  }
+  return count;
+}
+
+function parsedKeyCount(value: unknown): number {
+  if (Array.isArray(value)) return value.reduce((sum: number, entry) => sum + parsedKeyCount(entry), 0);
+  if (value === null || typeof value !== "object") return 0;
+  return Object.values(value).reduce((sum: number, entry) => sum + 1 + parsedKeyCount(entry), 0);
 }
 
 /**
@@ -372,14 +404,11 @@ function redactSerializedJson(value: string, emails: boolean): string | null {
   // truncation that follows keeps only the first characters - which would be
   // the unredacted ones.
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
-  try {
-    return JSON.stringify(convertValue(JSON.parse(trimmed), new Set<object>(), emails)) ?? null;
-  } catch {
-    // Neither a parse failure nor a conversion failure may become the failure
-    // the caller was trying to report: fall back to the regex rules, which
-    // scan the text without recursing.
-    return null;
-  }
+  // Neither a parse failure nor a conversion failure may become the failure
+  // the caller was trying to report: `null` falls back to the regex rules,
+  // which scan the text without recursing.
+  const redacted = parseRedacted(trimmed, emails);
+  return redacted === trimmed ? value : redacted;
 }
 
 // The `typeof` checks below narrow caller-provided unions rather than
