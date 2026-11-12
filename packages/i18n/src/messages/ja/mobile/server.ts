@@ -320,6 +320,7 @@ export const messages = {
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
   "mobile.server.route.personality": "エージェントの性格",
+  "mobile.server.route.agents": "エージェント",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -443,6 +444,26 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.memoryReview": "メモリーの見直し",
+  "mobile.server.settings.memoryReviewDescription":
+    "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",
+  "mobile.server.settings.memoryReviewOff": "オフ",
+  "mobile.server.settings.memoryReviewTurns": { other: "{count} ターンごと" },
+  "mobile.server.settings.memoryReviewLoadFailed": "メモリーの見直しの設定を読み込めませんでした。",
+  "mobile.server.settings.skillLearning": "スキル学習",
+  "mobile.server.settings.skillLearningDescription":
+    "このサーバーのエージェントが学んだことをスキルとして保存するかどうか。",
+  "mobile.server.settings.skillLearningAutomatic": "自動",
+  "mobile.server.settings.skillLearningAsk": "先に確認",
+  "mobile.server.settings.skillLearningOff": "オフ",
+  "mobile.server.settings.skillLearningLoadFailed": "スキル学習の設定を読み込めませんでした。",
+  "mobile.server.settings.browsingMemory": "自分の閲覧から学習",
+  "mobile.server.settings.browsingMemoryDescription":
+    "エージェントのブラウザーを操作すると、使ったページとボタンからエージェントがサイトの使い方を学習します。入力したテキストは保存されません。",
+  "mobile.server.settings.browsingMemoryLoadFailed": "閲覧の設定を読み込めませんでした。",
+  "mobile.server.settings.learningSaveFailed": "この設定を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.learningUnsupported":
+    "ここでこの設定を変更するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.settings.responseStyleDescription":
     "ナチュラル: エージェントは作業中に短い進捗を送り、チャットに表示されます。クラシック: エージェントは完了時に一度だけ答えます。",
   "mobile.server.settings.responseStyleNatural": "ナチュラル",
@@ -451,8 +472,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "応答スタイルを保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.personalityUnsupported":
     "ここで応答スタイルを変更するには、このサーバーの OpenBot を更新してください。",
-  "mobile.server.settings.personalityUnavailable":
-    "エージェントの性格を変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.settings.agentsUnavailable":
+    "エージェントの設定を変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.route.browserProfiles": "ブラウザープロファイル",
   "mobile.server.browserProfiles.unavailable":
     "オンラインのサーバーのオーナーまたは管理者だけが、そのブラウザープロファイルを管理できます。",

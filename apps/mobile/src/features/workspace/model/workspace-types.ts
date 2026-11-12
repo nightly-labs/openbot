@@ -67,14 +67,17 @@ import type {
   HostAgentMemoryLimit,
   HostAnalytics,
   HostAnalyticsInput,
+  HostBrowsingMemory,
   HostedSiteList,
   HostGitHubConnectorStatus,
+  HostMemoryReview,
   HostMessagingConnectInput,
   HostMessagingWorkspaceInput,
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
+  HostSkillLearning,
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
@@ -497,6 +500,21 @@ export interface MobileWorkspaceContextValue {
   /** How many memories each agent of the server can keep, and the values that the host permits. */
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  /** An owner or admin of an online host that serves `memory-review-v1`. The host checks the role again. */
+  canManageMemoryReview: (serverId: string) => boolean;
+  /** How many completed turns pass between two background memory reviews, and the values that the host permits. */
+  loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
+  setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
+  /** An owner or admin of an online host that serves `skill-learning-v1`. The host checks the role again. */
+  canManageSkillLearning: (serverId: string) => boolean;
+  /** What the memory reviews do when a chat teaches a skill, and the values that the host permits. */
+  loadSkillLearning: (serverId: string) => Promise<HostSkillLearning>;
+  setSkillLearning: (mode: string, serverId: string) => Promise<HostSkillLearning>;
+  /** An owner or admin of an online host that serves `browsing-memory-v1`. The host checks the role again. */
+  canManageBrowsingMemory: (serverId: string) => boolean;
+  /** "Learn from my browsing". Off deletes what the host recorded. */
+  loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
+  setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
   /** An owner or admin of an online host that serves `host-personality-v1`. The host checks the role again. */
   canManageServerPersonality: (serverId: string) => boolean;
   /** An online host that serves `host-personality-v1`. Any member reads its personality. */
@@ -1193,6 +1211,9 @@ type ServerCheckKey =
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMemoryReview"
+  | "canManageSkillLearning"
+  | "canManageBrowsingMemory"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"

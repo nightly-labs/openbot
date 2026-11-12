@@ -426,6 +426,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.member": "Member",
   "mobile.server.route.timezone": "Timezone",
   "mobile.server.route.personality": "Agent personality",
+  "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Storage",
   "mobile.server.route.storage": "Storage",
   "mobile.server.route.storageFiles": "All files",
@@ -546,6 +547,25 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
   "mobile.server.settings.memoryLimitSaveFailed": "Could not save the memory limit. Try again.",
   "mobile.server.settings.memoryLimitUnsupported": "Update OpenBot on this server to change its memory limit here.",
+  // Server settings › General: how agents learn. The text matches the desktop.
+  "mobile.server.settings.memoryReview": "Memory review",
+  "mobile.server.settings.memoryReviewDescription":
+    "How often agents on this server save lasting facts from their chats in the background.",
+  "mobile.server.settings.memoryReviewOff": "Off",
+  "mobile.server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
+  "mobile.server.settings.skillLearning": "Skill learning",
+  "mobile.server.settings.skillLearningDescription": "Whether agents on this server save what they learn as skills.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatic",
+  "mobile.server.settings.skillLearningAsk": "Ask first",
+  "mobile.server.settings.skillLearningOff": "Off",
+  "mobile.server.settings.skillLearningLoadFailed": "Could not load the skill learning setting.",
+  "mobile.server.settings.browsingMemory": "Learn from my browsing",
+  "mobile.server.settings.browsingMemoryDescription":
+    "When you control an agent's browser, the agent learns how sites work from the pages and buttons you use. Typed text is not kept.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Could not load the browsing setting.",
+  "mobile.server.settings.learningSaveFailed": "Could not save this setting. Try again.",
+  "mobile.server.settings.learningUnsupported": "Update OpenBot on this server to change this setting here.",
   "mobile.server.settings.responseStyleDescription":
     "Natural: agents send short updates while they work, and the chat shows them. Classic: agents answer once, when they are done.",
   "mobile.server.settings.responseStyleNatural": "Natural",
@@ -553,8 +573,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.personalityLoadFailed": "Could not load the server personality.",
   "mobile.server.settings.personalitySaveFailed": "Could not save the response style. Try again.",
   "mobile.server.settings.personalityUnsupported": "Update OpenBot on this server to change its response style here.",
-  "mobile.server.settings.personalityUnavailable":
-    "Connect to this server as an owner or admin to change its agent personality.",
+  "mobile.server.settings.agentsUnavailable":
+    "Connect to this server as an owner or admin to change its agent settings.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
   "mobile.server.route.browserProfiles": "Browser profiles",

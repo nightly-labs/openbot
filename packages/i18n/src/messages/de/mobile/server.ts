@@ -332,6 +332,7 @@ export const messages = {
   "mobile.server.route.member": "Mitglied",
   "mobile.server.route.timezone": "Zeitzone",
   "mobile.server.route.personality": "Agent-Persönlichkeit",
+  "mobile.server.route.agents": "Agenten",
   "mobile.server.settings.storage": "Speicher",
   "mobile.server.route.storage": "Speicher",
   "mobile.server.route.storageFiles": "Alle Dateien",
@@ -460,6 +461,27 @@ export const messages = {
     "Das Erinnerungslimit konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um sein Erinnerungslimit hier zu ändern.",
+  "mobile.server.settings.memoryReview": "Erinnerungsprüfung",
+  "mobile.server.settings.memoryReviewDescription":
+    "Wie oft Agenten auf diesem Server im Hintergrund dauerhafte Fakten aus ihren Chats speichern.",
+  "mobile.server.settings.memoryReviewOff": "Aus",
+  "mobile.server.settings.memoryReviewTurns": { one: "Alle {count} Runde", other: "Alle {count} Runden" },
+  "mobile.server.settings.memoryReviewLoadFailed":
+    "Die Einstellung für die Erinnerungsprüfung konnte nicht geladen werden.",
+  "mobile.server.settings.skillLearning": "Fähigkeiten lernen",
+  "mobile.server.settings.skillLearningDescription":
+    "Ob Agenten auf diesem Server das Gelernte als Fähigkeiten speichern.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatisch",
+  "mobile.server.settings.skillLearningAsk": "Zuerst fragen",
+  "mobile.server.settings.skillLearningOff": "Aus",
+  "mobile.server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "mobile.server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
+  "mobile.server.settings.learningSaveFailed": "Die Einstellung konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.learningUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um diese Einstellung hier zu ändern.",
   "mobile.server.settings.responseStyleDescription":
     "Natürlich: Agenten senden während der Arbeit kurze Updates, und der Chat zeigt sie. Klassisch: Agenten antworten einmal, wenn sie fertig sind.",
   "mobile.server.settings.responseStyleNatural": "Natürlich",
@@ -469,8 +491,8 @@ export const messages = {
     "Der Antwortstil konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.personalityUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Antwortstil hier zu ändern.",
-  "mobile.server.settings.personalityUnavailable":
-    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Agent-Persönlichkeit zu ändern.",
+  "mobile.server.settings.agentsUnavailable":
+    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Agent-Einstellungen zu ändern.",
   "mobile.server.route.browserProfiles": "Browser-Profile",
   "mobile.server.browserProfiles.unavailable":
     "Nur Besitzer oder Admins eines Online-Servers können seine Browser-Profile verwalten.",

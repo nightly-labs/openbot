@@ -314,6 +314,7 @@ export const messages = {
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
   "mobile.server.route.personality": "에이전트 성격",
+  "mobile.server.route.agents": "에이전트",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -429,6 +430,24 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.memoryReview": "메모리 검토",
+  "mobile.server.settings.memoryReviewDescription":
+    "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",
+  "mobile.server.settings.memoryReviewOff": "끄기",
+  "mobile.server.settings.memoryReviewTurns": { other: "{count}턴마다" },
+  "mobile.server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
+  "mobile.server.settings.skillLearning": "스킬 학습",
+  "mobile.server.settings.skillLearningDescription": "이 서버의 에이전트가 배운 내용을 스킬로 저장할지 여부입니다.",
+  "mobile.server.settings.skillLearningAutomatic": "자동",
+  "mobile.server.settings.skillLearningAsk": "먼저 묻기",
+  "mobile.server.settings.skillLearningOff": "끄기",
+  "mobile.server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
+  "mobile.server.settings.browsingMemory": "내 브라우징에서 학습",
+  "mobile.server.settings.browsingMemoryDescription":
+    "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
+  "mobile.server.settings.learningSaveFailed": "이 설정을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.learningUnsupported": "여기에서 이 설정을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.responseStyleDescription":
     "자연형: 에이전트가 작업 중에 짧은 업데이트를 보내고 채팅에 표시돼요. 클래식: 에이전트가 끝나면 한 번만 답해요.",
   "mobile.server.settings.responseStyleNatural": "자연형",
@@ -437,7 +456,7 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "응답 스타일을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.personalityUnsupported":
     "여기에서 응답 스타일을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
-  "mobile.server.settings.personalityUnavailable": "에이전트 성격을 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
+  "mobile.server.settings.agentsUnavailable": "에이전트 설정을 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.route.browserProfiles": "브라우저 프로필",
   "mobile.server.browserProfiles.unavailable": "온라인 서버의 소유자나 관리자만 브라우저 프로필을 관리할 수 있습니다.",
   "mobile.server.browserProfiles.unsupported":
