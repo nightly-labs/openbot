@@ -1463,8 +1463,9 @@ export class OpenBotToolRouter {
   });
 
   #requireAgent(agentId: string): AgentSummary {
-    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    const agents = this.#hooks.listAgents();
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    if (!agent) throw new Error(unknownAgentMessage(agentId, agents));
     return agent;
   }
 

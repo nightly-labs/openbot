@@ -157,12 +157,27 @@ try {
     assert.equal(first?.ok, true);
     assert.equal(first?.notifications, false, "The result has the agent's new settings.");
     assert.equal("description" in (first ?? {}), false, "The result leaves out the agent's instructions.");
-    assert.equal(unknown?.error, sourceText("error.agent.unknown", { id: "no-such-agent" }));
+    assert.equal(unknown?.error, sourceText("error.backend.agentIdUnknown", { id: "no-such-agent" }));
     assert.equal(busy?.error, sourceText("error.agent.waitBeforeProviderChange"));
     assert.equal(agent(writer.id).notifications, false);
     assert.equal(agent(writer.id).model, writer.model);
     assert.notEqual(agent(reviewer.id).notifications, false, "The busy agent keeps all its settings.");
     assert.equal(agent(reviewer.id).model, NEW_MODEL);
+    return value;
+  });
+
+  await step("An id with one wrong character names the agent with the near id and changes nothing", async () => {
+    // A model that copies a long id from list_agents can drop a character (#7306).
+    const miscopied = tester.id.slice(0, -1);
+    const { success, value } = await call({ agentIds: [miscopied], notifications: false });
+    assert.equal(success, true);
+    assert.equal(value.failed, 1);
+    const [result] = Array.isArray(value.results) ? value.results.filter(isDynamicRecord) : [];
+    assert.equal(
+      result?.error,
+      sourceText("error.backend.agentIdNear", { id: miscopied, name: JSON.stringify(tester.name), nearId: tester.id }),
+    );
+    assert.notEqual(agent(tester.id).notifications, false, "The tool never changes the near agent.");
     return value;
   });
 

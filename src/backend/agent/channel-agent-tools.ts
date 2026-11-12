@@ -16,6 +16,7 @@ import { loadAvatarFile } from "./avatar-file";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
+import { unknownAgentMessage } from "./unknown-agent";
 
 /** The tools an agent creates and changes channels with, from its own chat or a channel task that a person started. */
 export const CHANNEL_AGENT_TOOL_NAMES: ReadonlySet<string> = new Set(["create_channel", "update_channel"]);
@@ -109,7 +110,7 @@ const OWN_CHANNEL_IN_TASK =
 /** An agent that a channel can take: one that exists. */
 function requireAvailable(agents: readonly AgentSummary[], id: string): AgentSummary {
   const agent = agents.find((candidate) => candidate.id === id);
-  if (!agent) throw new Error(`No agent has the id ${id}. Get the ids from openbot.list_agents.`);
+  if (!agent) throw new Error(unknownAgentMessage(id, agents));
   return agent;
 }
 
