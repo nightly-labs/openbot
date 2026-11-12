@@ -30,7 +30,7 @@ export interface AgentDefaultsSettingsService {
   setChoice(input: SetAgentDefaultChoiceInput): Effect.Effect<AgentDefaultsOverview, AgentDefaultsSettingsFailure>;
 }
 
-export class AgentDefaultsSettingsFailure extends Schema.TaggedError<AgentDefaultsSettingsFailure>()(
+class AgentDefaultsSettingsFailure extends Schema.TaggedError<AgentDefaultsSettingsFailure>()(
   "AgentDefaultsSettingsFailure",
   { cause: Schema.Defect() },
 ) {}
