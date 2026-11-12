@@ -179,7 +179,8 @@ export function ServerStorageScreen() {
       )
     : [];
   const removableBytes = removable.reduce((sum, entry) => sum + entry.bytes, 0);
-  const freeBytes = planGb === null ? usage.freeBytes : disk.data ? hostedPlanDisk(disk.data, planGb).freeBytes : null;
+  // As on desktop: the free space of the disk until the plan value comes, or when the host cannot send it.
+  const freeBytes = planGb !== null && disk.data ? hostedPlanDisk(disk.data, planGb).freeBytes : usage.freeBytes;
 
   return (
     <SettingsContent>

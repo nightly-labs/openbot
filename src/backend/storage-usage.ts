@@ -66,7 +66,7 @@ export interface StorageUsageSources {
    */
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
   /** The bytes of the files of the server's user. Only a hosted server has it. */
-  userFiles?: Pick<UserFilesBytes, "read" | "dispose">;
+  userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
 }
 
 export interface StorageChannelFile {
@@ -594,7 +594,7 @@ export class StorageUsageService {
   readonly deleteFile = Effect.fn("StorageUsage.deleteFile")(function* (this: StorageUsageService, fileId: string) {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
       return yield* new StoredStateFailure({ cause: new StorageNotFoundError(sourceText("error.backend.fileGone")) });
-    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.invalidate())));
+    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.#afterRemove())));
   }).bind(this);
 
   disk() {
@@ -610,7 +610,7 @@ export class StorageUsageService {
 
   clear(category: ClearableStorageCategory) {
     return clearStorageCategory(this.#sources.roots, category).pipe(
-      Effect.ensuring(Effect.sync(() => this.invalidate())),
+      Effect.ensuring(Effect.sync(() => this.#afterRemove())),
     );
   }
 
@@ -618,6 +618,12 @@ export class StorageUsageService {
     return Scope.close(this.#scope, Exit.void).pipe(
       Effect.andThen(this.#sources.userFiles ? this.#sources.userFiles.dispose() : Effect.void),
     );
+  }
+
+  /** A delete or a clear also makes the measured user files old, so the free space of the plan shows it. */
+  #afterRemove(): void {
+    this.invalidate();
+    this.#sources.userFiles?.forget();
   }
 
   invalidate(): void {

@@ -10,7 +10,8 @@ const MEASURE_INTERVAL_MS = 10 * 60_000;
 /** The first request waits this long; after that it answers null and the next request gets the value. */
 const FIRST_ANSWER_WAIT_MS = 15_000;
 const DU_TIMEOUT_MS = 5 * 60_000;
-const DU_MAX_BUFFER = 64 * 1024;
+/** Also the limit of stderr, which has one line for each folder of another user in `/tmp`. */
+const DU_MAX_BUFFER = 4 * 1024 * 1024;
 const TEMPORARY_FOLDERS = ["/tmp", "/var/tmp"];
 /**
  * Docker keeps images and containers in its own folder, which the user cannot read, so `du` does not
@@ -85,8 +86,13 @@ export class UserFilesBytes {
   readonly #home: string;
   readonly #now: () => number;
   readonly #scope = Scope.makeUnsafe();
-  #last: { at: number; bytes: number | null } | null = null;
-  #running: Fiber.Fiber<number | null> | null = null;
+  /**
+   * `at` is the start of the measurement. `epoch` counts the deletes and clears before it started: a
+   * delete during a measurement makes its value old.
+   */
+  #last: { at: number; epoch: number; bytes: number | null } | null = null;
+  #running: { token: object; epoch: number; fiber: Fiber.Fiber<number | null> } | null = null;
+  #epoch = 0;
 
   constructor(dataRoot: string, home: string, now: () => number = Date.now) {
     this.#dataRoot = dataRoot;
@@ -94,17 +100,30 @@ export class UserFilesBytes {
     this.#now = now;
   }
 
-  /** The last value, and a new measurement in the background when it is old. Null before the first one. */
+  /**
+   * The last value, and a new measurement in the background when it is old. The first read, and the
+   * first read after `forget`, waits for the new value. Null when there is no value.
+   */
   readonly read = Effect.fn("UserFilesBytes.read")(function* (this: UserFilesBytes) {
-    const last = this.#last;
+    const last = this.#last?.epoch === this.#epoch ? this.#last : null;
     if (last && this.#now() - last.at < MEASURE_INTERVAL_MS) return last.bytes;
-    const fiber = this.#running ?? (yield* this.#start());
+    const running = this.#running?.epoch === this.#epoch ? this.#running.fiber : null;
+    const fiber = running ?? (yield* this.#start());
     if (last) return last.bytes;
     return Option.getOrNull(yield* Fiber.join(fiber).pipe(Effect.timeoutOption(FIRST_ANSWER_WAIT_MS)));
   }).bind(this);
 
+  /** After a delete or a clear: the next read waits for a measurement that starts after it. */
+  forget(): void {
+    this.#epoch += 1;
+  }
+
   #start() {
     return Effect.gen({ self: this }, function* () {
+      const at = this.#now();
+      const epoch = this.#epoch;
+      const token = {};
+      let ended = false;
       const fiber = yield* userFolders(this.#dataRoot, this.#home).pipe(
         Effect.flatMap((folders) => (folders ? diskUsage(folders) : Effect.succeed(null))),
         Effect.catch((error) =>
@@ -115,17 +134,21 @@ export class UserFilesBytes {
         ),
         Effect.tap((bytes) =>
           Effect.sync(() => {
-            this.#last = { at: this.#now(), bytes };
+            const last = this.#last;
+            if (!last || epoch > last.epoch || (epoch === last.epoch && at >= last.at))
+              this.#last = { at, epoch, bytes };
           }),
         ),
         Effect.ensuring(
           Effect.sync(() => {
-            this.#running = null;
+            ended = true;
+            if (this.#running?.token === token) this.#running = null;
           }),
         ),
         Effect.forkIn(this.#scope),
       );
-      this.#running = fiber;
+      // A fiber that ended before this line must not stay as the running measurement.
+      if (!ended) this.#running = { token, epoch, fiber };
       return fiber;
     });
   }
