@@ -3414,15 +3414,21 @@ export class ChannelService {
       // A result after the task completed, as after a background job, is new to the task that waits
       // for it. That task went on with the member's earlier answer, so it runs again and reads the
       // result: at once when it completed, or after its running turn. A waiting or queued task reads
-      // it when it starts. Before, the lead kept the earlier status (#7450).
-      const parent =
-        assignment.state === "completed" && task.parentTaskId
-          ? tasks.find((item) => item.id === task.parentTaskId)
-          : undefined;
+      // it when it starts. Before, the lead kept the earlier status (#7450). A stop or a cancel leaves
+      // the completed tasks of a run as they are, so a task under a stopped one does not run again.
+      const parentOf = (item: ChannelTask) =>
+        item.parentTaskId ? tasks.find((other) => other.id === item.parentTaskId) : undefined;
+      const candidate = assignment.state === "completed" ? parentOf(task) : undefined;
+      let stopped = false;
+      for (let above = candidate; above && !stopped; above = parentOf(above))
+        stopped = above.state === "paused" || above.state === "failed" || above.state === "cancelled";
+      const parent = stopped ? undefined : candidate;
+      // A pending correction keeps the assignment at its earlier revision, so the revision does not
+      // select it.
       const parentAssignment =
         parent?.state === "running"
           ? (yield* channelSync(() => this.store.assignments(channelId))).find(
-              (item) => item.taskId === parent.id && item.taskRevision === parent.revision && activeAssignment(item),
+              (item) => item.taskId === parent.id && item.state === "running",
             )
           : undefined;
       yield* channelSync(() =>
