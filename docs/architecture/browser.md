@@ -698,7 +698,8 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+waits up to five seconds, then empties the filled fields and their `value` attributes, which React
+keeps in step with the value. When every field is empty and an automation-world scan finds the
 value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
 document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
 opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
