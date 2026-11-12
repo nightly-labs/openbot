@@ -454,6 +454,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Kan de antwoordstijl niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.personalityUnsupported":
     "Werk OpenBot bij op deze server om de antwoordstijl hier te wijzigen.",
+  "mobile.server.settings.personalityUnavailable":
+    "Maak verbinding met deze server als eigenaar of beheerder om de agentpersoonlijkheid te wijzigen.",
   "mobile.server.route.browserProfiles": "Browserprofielen",
   "mobile.server.browserProfiles.unavailable":
     "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",

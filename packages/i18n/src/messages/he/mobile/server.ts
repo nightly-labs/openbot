@@ -572,6 +572,7 @@ export const messages = {
   "mobile.server.settings.personalityLoadFailed": "לא ניתן לטעון את אישיות השרת.",
   "mobile.server.settings.personalitySaveFailed": "לא ניתן לשמור את סגנון התגובה. אפשר לנסות שוב.",
   "mobile.server.settings.personalityUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את סגנון התגובה שלו.",
+  "mobile.server.settings.personalityUnavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לשנות את אישיות הסוכן שלו.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
   "mobile.server.route.browserProfiles": "פרופילי דפדפן",

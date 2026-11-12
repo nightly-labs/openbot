@@ -510,6 +510,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Не удалось сохранить стиль ответов. Повторите попытку.",
   "mobile.server.settings.personalityUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его стиль ответов.",
+  "mobile.server.settings.personalityUnavailable":
+    "Подключитесь к этому серверу как владелец или администратор, чтобы изменить личность агента.",
   "mobile.server.route.browserProfiles": "Профили браузера",
   "mobile.server.browserProfiles.unavailable":
     "Управлять профилями браузера сервера в сети может только владелец или администратор.",

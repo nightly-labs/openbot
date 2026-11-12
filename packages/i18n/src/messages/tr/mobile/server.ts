@@ -461,6 +461,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Yanıt stili kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.personalityUnsupported":
     "Yanıt stilini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.personalityUnavailable":
+    "Ajan kişiliğini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.route.browserProfiles": "Tarayıcı profilleri",
   "mobile.server.browserProfiles.unavailable":
     "Çevrimiçi bir sunucunun tarayıcı profillerini yalnızca sahibi veya bir yönetici yönetebilir.",

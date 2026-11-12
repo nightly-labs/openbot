@@ -3,7 +3,10 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export const RESPONSE_STYLE_LABEL_KEYS = {
@@ -17,13 +20,18 @@ export const RESPONSE_STYLE_LABEL_KEYS = {
  * then. The last known value stays while the server is offline.
  */
 export function useServerPersonality(serverId: string | undefined) {
-  const { servers, servesServerPersonality, canManageServerPersonality } = useMobileWorkspace();
   const { loadServerPersonality, setServerPersonality } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const id = serverId ?? "";
-  const served = Boolean(serverId) && servesServerPersonality(id);
-  const online = servers.some((server) => server.id === serverId && server.state === "online");
+  // Selectors, so a chat does not render again for each unrelated change of the workspace.
+  const served = useMobileWorkspaceSelector((workspace) => Boolean(serverId) && workspace.servesServerPersonality(id));
+  const canManage = useMobileWorkspaceSelector(
+    (workspace) => Boolean(serverId) && workspace.canManageServerPersonality(id),
+  );
+  const online = useMobileWorkspaceSelector((workspace) =>
+    workspace.servers.some((server) => server.id === serverId && server.state === "online"),
+  );
   const queryKey = queryKeys.serverPersonality(queryScope, id);
   const query = useQuery({
     queryKey,
@@ -37,13 +45,15 @@ export function useServerPersonality(serverId: string | undefined) {
   // A read before the host's capabilities arrived answered "classic", so the host is read again.
   const wasServed = useRef(served);
   useEffect(() => {
-    if (served && !wasServed.current)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.serverPersonality(queryScope, id), exact: true });
+    const key = queryKeys.serverPersonality(queryScope, id);
+    // Each mounted chat sees the change. The first one reads the host again; the others see that read.
+    if (served && !wasServed.current && queryClient.isFetching({ queryKey: key, exact: true }) === 0)
+      void queryClient.invalidateQueries({ queryKey: key, exact: true });
     wasServed.current = served;
   }, [served, queryClient, queryScope, id]);
   return {
     /** An owner or admin of a host that serves `host-personality-v1`. */
-    canManage: Boolean(serverId) && canManageServerPersonality(id),
+    canManage,
     query,
     /** Resolves with the personality that the host saved. */
     async save(personality: HostPersonality): Promise<HostPersonality> {

@@ -221,6 +221,23 @@ function shownProgressUpdate(message: ConversationMessage, provider: AgentProvid
   return message.status !== "streaming" && Boolean(message.text.trim()) && isNarrationItemId(message.id, provider);
 }
 
+/**
+ * When each turn first answered. Text that the agent writes after its answer, such as a "Done.", stays
+ * in the steps, as on desktop: it is not progress.
+ */
+function answerTimes(messages: Iterable<ConversationMessage>): ReadonlyMap<string, string> {
+  const times = new Map<string, string>();
+  for (const message of messages)
+    if (message.turnId && isAgentAnswer(message) && !times.has(message.turnId))
+      times.set(message.turnId, message.createdAt);
+  return times;
+}
+
+function beforeAnswer(message: ConversationMessage, answered: ReadonlyMap<string, string>): boolean {
+  const answer = message.turnId ? answered.get(message.turnId) : undefined;
+  return !answer || message.createdAt <= answer;
+}
+
 function progressBubble(id: string, message: ConversationMessage): Extract<ChatMessage, { kind: "message" }> {
   return {
     id,
@@ -400,6 +417,7 @@ export function projectChatMessages(
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
+  const answered = progressUpdates ? answerTimes(sorted) : undefined;
   for (const message of sorted) {
     // Routine events are system messages, skipped below. Like desktop, a routine instruction shows only as its marker.
     const routine = projectRoutineMarker(message, latestRuns);
@@ -455,7 +473,10 @@ export function projectChatMessages(
         result.push(thinking);
       }
       // The steps keep a progress update too, as the desktop steps do.
-      const update = progressUpdates ? shownProgressUpdate(message, progressUpdates.provider(undefined)) : false;
+      const update =
+        progressUpdates && answered
+          ? shownProgressUpdate(message, progressUpdates.provider(undefined)) && beforeAnswer(message, answered)
+          : false;
       thinking.steps.push(
         update ? { id: message.id, text: message.text, progress: true } : { id: message.id, text: message.text },
       );
@@ -492,18 +513,26 @@ export function projectChatMessages(
   return progressUpdates ? withStepsAfterUpdates(result, thinkingByTurn) : result;
 }
 
-/** The steps row of a turn goes under its progress updates, as on desktop. */
+/** The steps row of a turn goes under its progress updates, as on desktop. One pass over the rows. */
 function withStepsAfterUpdates(
   rows: ChatMessage[],
   thinkingByTurn: ReadonlyMap<string, Extract<ChatMessage, { kind: "thinking" }>>,
 ): ChatMessage[] {
-  let placed = rows;
+  const afterUpdate = new Map<string, ChatMessage>();
+  const moved = new Set<ChatMessage>();
   for (const thinking of thinkingByTurn.values()) {
     const lastUpdate = thinking.steps.findLast((step) => step.progress)?.id;
     if (!lastUpdate) continue;
-    const without = placed.filter((row) => row !== thinking);
-    const at = without.findIndex((row) => row.id === lastUpdate);
-    placed = [...without.slice(0, at + 1), thinking, ...without.slice(at + 1)];
+    afterUpdate.set(lastUpdate, thinking);
+    moved.add(thinking);
+  }
+  if (moved.size === 0) return rows;
+  const placed: ChatMessage[] = [];
+  for (const row of rows) {
+    if (moved.has(row)) continue;
+    placed.push(row);
+    const thinking = afterUpdate.get(row.id);
+    if (thinking) placed.push(thinking);
   }
   return placed;
 }
@@ -752,22 +781,8 @@ export function latestReadBoundaryMessage(messages: ConversationMessage[]) {
 
 const projectedChannelMessages = new WeakMap<
   ChannelMessage,
-  { self: boolean; latest: boolean; progress: boolean; message: ChatMessage | null }
+  { self: boolean; latest: boolean; progress: boolean; rows: readonly ChatMessage[] }
 >();
-
-/**
- * When each turn of a channel first answered. A member's text after its answer, such as a "Done.",
- * stays in the steps, as on desktop: it is not progress.
- */
-function channelAnswerTimes(messages: readonly ChannelMessage[]): ReadonlyMap<string, string> {
-  const times = new Map<string, string>();
-  for (const entry of messages) {
-    const { message } = entry;
-    if (entry.author.kind === "agent" && message.turnId && isAgentAnswer(message) && !times.has(message.turnId))
-      times.set(message.turnId, message.createdAt);
-  }
-  return times;
-}
 
 function projectChannelMessage(
   entry: ChannelMessage,
@@ -856,14 +871,14 @@ export function projectChannelMessages(
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
-  const answeredAt = progressUpdates ? channelAnswerTimes(messages) : undefined;
-  const showsUpdate = (entry: ChannelMessage) => {
-    if (!progressUpdates || !answeredAt || entry.author.kind !== "agent" || entry.superseded) return false;
-    if (entry.message.itemType !== "commentary") return false;
-    if (!shownProgressUpdate(entry.message, progressUpdates.provider(entry.author.id))) return false;
-    const answer = entry.message.turnId ? answeredAt.get(entry.message.turnId) : undefined;
-    return !answer || entry.message.createdAt <= answer;
-  };
+  const answered = progressUpdates ? answerTimes(messages.map((entry) => entry.message)) : undefined;
+  const showsUpdate = (entry: ChannelMessage) =>
+    Boolean(progressUpdates && answered) &&
+    entry.author.kind === "agent" &&
+    !entry.superseded &&
+    entry.message.itemType === "commentary" &&
+    shownProgressUpdate(entry.message, progressUpdates?.provider(entry.author.id)) &&
+    (!answered || beforeAnswer(entry.message, answered));
   return messages
     .filter(
       (entry) =>
@@ -878,9 +893,24 @@ export function projectChannelMessages(
       const latest = latestRuns.has(entry.message.id);
       const progress = showsUpdate(entry);
       if (cached && cached.self === self && cached.latest === latest && cached.progress === progress)
-        return cached.message ?? [];
+        return cached.rows;
       const message = projectChannelMessage(entry, self, latestRuns, progress);
-      projectedChannelMessages.set(entry, { self, latest, progress, message });
-      return message ?? [];
+      // A progress update keeps a steps row of its own, so the activity row knows that the member's
+      // latest step is this update and does not show an older thought.
+      const rows: readonly ChatMessage[] = !message
+        ? []
+        : progress
+          ? [
+              message,
+              {
+                id: `${entry.id}:step`,
+                kind: "thinking",
+                turnId: entry.message.turnId,
+                steps: [{ id: entry.id, text: entry.message.text, progress: true }],
+              },
+            ]
+          : [message];
+      projectedChannelMessages.set(entry, { self, latest, progress, rows });
+      return rows;
     });
 }

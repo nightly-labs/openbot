@@ -31,13 +31,13 @@ export function ServerPersonalityScreen() {
   if (!canManage || !current)
     return (
       <SettingsContent>
-        {!canManage || query.isError ? (
-          <SettingsNote>
-            {!canManage
-              ? t("mobile.server.settings.personalityUnsupported")
-              : errorMessage(query.error, t("mobile.server.settings.personalityLoadFailed"))}
-          </SettingsNote>
-        ) : null}
+        <SettingsNote>
+          {!canManage
+            ? t("mobile.server.settings.personalityUnavailable")
+            : query.isError
+              ? errorMessage(query.error, t("mobile.server.settings.personalityLoadFailed"))
+              : t("common.loading")}
+        </SettingsNote>
       </SettingsContent>
     );
 

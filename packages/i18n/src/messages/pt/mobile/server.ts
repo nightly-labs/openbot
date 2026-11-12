@@ -457,6 +457,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Não foi possível salvar o estilo de resposta. Tente de novo.",
   "mobile.server.settings.personalityUnsupported":
     "Atualize o OpenBot neste servidor para alterar o estilo de resposta aqui.",
+  "mobile.server.settings.personalityUnavailable":
+    "Conecte-se a este servidor como proprietário ou admin para alterar a personalidade do agente.",
   "mobile.server.route.browserProfiles": "Perfis do navegador",
   "mobile.server.browserProfiles.unavailable":
     "Só o proprietário ou um administrador de um servidor online pode gerenciar os perfis do navegador dele.",

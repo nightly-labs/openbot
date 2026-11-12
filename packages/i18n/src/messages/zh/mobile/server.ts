@@ -434,6 +434,7 @@ export const messages = {
   "mobile.server.settings.personalityLoadFailed": "无法加载服务器个性。",
   "mobile.server.settings.personalitySaveFailed": "无法保存回复风格，请重试。",
   "mobile.server.settings.personalityUnsupported": "请更新该服务器上的 OpenBot，才能在此更改其回复风格。",
+  "mobile.server.settings.personalityUnavailable": "请以所有者或管理员身份连接该服务器，以更改其助手个性。",
   "mobile.server.route.browserProfiles": "浏览器配置文件",
   "mobile.server.browserProfiles.unavailable": "只有在线服务器的所有者或管理员可以管理其浏览器配置文件。",
   "mobile.server.browserProfiles.unsupported": "请更新此服务器上的 OpenBot,以便在这里管理其浏览器配置文件。",

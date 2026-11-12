@@ -469,6 +469,8 @@ export const messages = {
     "Der Antwortstil konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.settings.personalityUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Antwortstil hier zu ändern.",
+  "mobile.server.settings.personalityUnavailable":
+    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Agent-Persönlichkeit zu ändern.",
   "mobile.server.route.browserProfiles": "Browser-Profile",
   "mobile.server.browserProfiles.unavailable":
     "Nur Besitzer oder Admins eines Online-Servers können seine Browser-Profile verwalten.",

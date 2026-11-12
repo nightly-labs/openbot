@@ -553,6 +553,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.personalityLoadFailed": "Could not load the server personality.",
   "mobile.server.settings.personalitySaveFailed": "Could not save the response style. Try again.",
   "mobile.server.settings.personalityUnsupported": "Update OpenBot on this server to change its response style here.",
+  "mobile.server.settings.personalityUnavailable":
+    "Connect to this server as an owner or admin to change its agent personality.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
   "mobile.server.route.browserProfiles": "Browser profiles",

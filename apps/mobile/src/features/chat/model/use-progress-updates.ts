@@ -1,3 +1,4 @@
+import { type AgentProviderRef, isAgentProviderRef } from "@openbot/contracts/agent-providers";
 import { useMemo } from "react";
 import { useServerResponseStyle } from "@/features/servers/model/use-server-personality";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -14,9 +15,19 @@ export function useProgressUpdates(
   ownerId?: string,
 ): ProgressUpdates | undefined {
   const style = useServerResponseStyle(serverId);
+  // The agent list changes at each status or activity update. Only a change of a provider makes the
+  // chat project its messages again.
+  const providerList = agents
+    .map((agent) => `${agent.id}\t${agent.provider ?? agent.foreignProvider ?? ""}`)
+    .join("\n");
   return useMemo(() => {
     if (style !== "natural") return undefined;
-    const providers = new Map(agents.map((agent) => [agent.id, agent.provider ?? agent.foreignProvider]));
+    const providers = new Map(
+      providerList.split("\n").map((line): [string, AgentProviderRef | undefined] => {
+        const [id = "", provider = ""] = line.split("\t");
+        return [id, isAgentProviderRef(provider) ? provider : undefined];
+      }),
+    );
     return { provider: (agentId) => providers.get(agentId ?? ownerId ?? "") };
-  }, [style, agents, ownerId]);
+  }, [style, providerList, ownerId]);
 }

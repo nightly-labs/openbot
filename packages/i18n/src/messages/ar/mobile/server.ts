@@ -534,6 +534,7 @@ export const messages = {
   "mobile.server.settings.personalityLoadFailed": "تعذّر تحميل شخصية الخادم.",
   "mobile.server.settings.personalitySaveFailed": "تعذّر حفظ نمط الرد. أعد المحاولة.",
   "mobile.server.settings.personalityUnsupported": "حدّث OpenBot على هذا الخادم لتغيير نمط الرد من هنا.",
+  "mobile.server.settings.personalityUnavailable": "اتصل بهذا الخادم بصفتك مالكًا أو مسؤولًا لتغيير شخصية الوكيل.",
   "mobile.server.route.browserProfiles": "ملفات تعريف المتصفح",
   "mobile.server.browserProfiles.unavailable": "يمكن فقط لمالك خادم متصل أو مسؤوله إدارة ملفات تعريف المتصفح فيه.",
   "mobile.server.browserProfiles.unsupported": "حدّث OpenBot على هذا الخادم لإدارة ملفات تعريف المتصفح من هنا.",
