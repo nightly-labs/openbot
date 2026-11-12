@@ -190,8 +190,8 @@
 }
 
 /* The outcome of a short block takes the place of its buttons, so it has their size and shape, as the
-   Connected button of a Marketplace suggestion. */
-.ui-block-card[data-inline-actions] .ui-block-header > .ui-block-status {
+   Connected button of a Marketplace suggestion. Every outcome badge has this shape, so the cards agree. */
+.ui-block-card:is([data-inline-actions], :not([data-status="pending"])) .ui-block-header > .ui-block-status {
   height: var(--openbot-control-md);
   padding-inline: var(--openbot-space-4);
   border-radius: var(--openbot-radius-pill);
@@ -200,17 +200,14 @@
 }
 
 /* An answer is a status: the same success fill as Connected. On-light text keeps AA on the dark-theme fill. */
-.ui-block-card[data-inline-actions][data-status="answered"] .ui-block-header > .ui-block-status {
+.ui-block-card[data-status="answered"] .ui-block-header > .ui-block-status {
   border-color: transparent;
   background: var(--openbot-success);
   color: var(--openbot-text-on-light);
 }
 
 /* On-light text on the light-theme success fill is 3:1. The darker success-text fill keeps AA. */
-:root[data-openbot-color-scheme="light"]
-  .ui-block-card[data-inline-actions][data-status="answered"]
-  .ui-block-header
-  > .ui-block-status {
+:root[data-openbot-color-scheme="light"] .ui-block-card[data-status="answered"] .ui-block-header > .ui-block-status {
   background: var(--openbot-success-text);
 }
 
