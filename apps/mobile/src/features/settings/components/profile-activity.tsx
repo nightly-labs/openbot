@@ -318,7 +318,7 @@ export function ProfileActivity({ activity }: { activity: ProfileActivityState }
   const title = t("mobile.settings.profile.activity.title", { server: server.name });
   const percent = (value: number) => format.percent(value, { maximumFractionDigits: 0 });
   const connecting = server.state === "connecting" || server.state === "unknown";
-  const loading = !stats && (online ? report.isPending || report.isFetching : connecting);
+  const loading = !stats && (online ? report.isPending : connecting);
 
   if (!online && !stats && !connecting)
     return <SettingsNote>{t("mobile.settings.profile.activity.offline", { server: server.name })}</SettingsNote>;
