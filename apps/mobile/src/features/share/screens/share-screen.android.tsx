@@ -6,15 +6,14 @@ import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
-import SendHorizontal from "lucide-react-native/icons/send-horizontal";
 import X from "lucide-react-native/icons/x";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AttachmentThumbnail } from "@/features/chat/components/attachment-preview";
-import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
+import { LARGE_TEXT_LENGTH, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useOutbox } from "@/features/chat/context/outbox-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import {
@@ -25,12 +24,13 @@ import {
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { discardIncomingShare, type IncomingShare, takeIncomingShare } from "../model/incoming-share";
 import { loadLastShareTarget, type ShareTarget, saveLastShareTarget } from "../model/last-share-target";
-import { endShareSheetRequest } from "../model/share-sheet-opener";
+import { endShareSheetRequest, openShareSheet, setOpenShareSheet } from "../model/share-sheet-opener";
 
 /** The route name of an agent chat in the app stack, `app/(app)/chat/[agentId].tsx`. */
 const CHAT_ROUTE = "chat/[agentId]";
@@ -55,49 +55,67 @@ export function ShareScreen() {
   const [lastTarget, setLastTarget] = useState<ShareTarget | null>(null);
   const [chosen, setChosen] = useState<ShareTarget | null>(null);
   const [message, setMessage] = useState("");
-  // The servers whose open state the user changed. See `isOpen`.
-  const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set());
+  // The servers that the user opened (true) or closed (false). See `isOpen`.
+  const [folds, setFolds] = useState<Readonly<Record<string, boolean>>>({});
   const [sending, setSending] = useState(false);
   const received = useRef<IncomingShare | null>(null);
   const sendingRef = useRef(false);
+  const mounted = useRef(true);
+  // A new share that came while a send read the files. The sheet takes it after the send.
+  const nextShareWaits = useRef(false);
   // The host of the selected agent decides which files it takes. The read of the files asks it.
   const supportServer = useRef("");
   const attachments = useChatAttachments([], undefined, () => attachmentSupport(supportServer.current));
 
-  useEffect(() => {
-    let mounted = true;
+  /** Takes the waiting share. A share that came while the sheet is open takes the place of the last one. */
+  const takeShare = useCallback(() => {
+    setShare(undefined);
     takeIncomingShare().then(
       (next) => {
         endShareSheetRequest();
-        if (!mounted) {
+        if (!mounted.current) {
           discardIncomingShare(next);
           return;
         }
+        if (received.current) discardIncomingShare(received.current);
         received.current = next;
         setShare(next.text || next.files.length > 0 ? next : null);
       },
       () => {
         endShareSheetRequest();
-        if (mounted) setShare(null);
+        if (mounted.current) setShare(null);
       },
     );
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    takeShare();
+    // A second sheet would delete the files of this one, so this sheet takes the next share.
+    const stopTaking = setOpenShareSheet(() => {
+      if (sendingRef.current) nextShareWaits.current = true;
+      else takeShare();
+    });
     return () => {
-      mounted = false;
+      mounted.current = false;
+      stopTaking();
       // A sent message keeps its files in the outbox, so the copies of the share can go in all cases.
       if (received.current) discardIncomingShare(received.current);
+      // The chat took the place of the sheet. A share that came during the send gets a new sheet.
+      if (nextShareWaits.current) openShareSheet();
     };
-  }, []);
+  }, [takeShare]);
 
   const apiUrl = session?.apiUrl;
   const userId = session?.user.id;
   useEffect(() => {
     if (!apiUrl || !userId) return;
-    let mounted = true;
+    let current = true;
     void loadLastShareTarget(apiUrl, userId).then((target) => {
-      if (mounted) setLastTarget(target);
+      if (current) setLastTarget(target);
     });
     return () => {
-      mounted = false;
+      current = false;
     };
   }, [apiUrl, userId]);
 
@@ -108,7 +126,9 @@ export function ShareScreen() {
   // and disables Send, so the share never goes to an agent the user did not select.
   const selected = chosen ? agentFor(chosen) : lastAgent;
   const selectedKey = chosen ?? lastTarget;
-  const canSend = Boolean(share) && selected !== null && !sending;
+  // The shared text goes in the same message, after the user's words and an empty line. Longer
+  // text becomes a file, as in the composer.
+  const inlineTextLength = share?.text && share.text.length <= LARGE_TEXT_LENGTH ? share.text.length + 2 : 0;
 
   function close(): void {
     if (router.canGoBack()) router.back();
@@ -132,9 +152,15 @@ export function ShareScreen() {
       sharedText = text;
     });
     attachments.clear();
+    // The user closed the sheet during the read: nothing is sent.
+    if (!mounted.current) return;
     if (refused) {
       sendingRef.current = false;
       setSending(false);
+      if (nextShareWaits.current) {
+        nextShareWaits.current = false;
+        takeShare();
+      }
       return;
     }
     // The user's words go before the shared content, in the same message, as on iOS.
@@ -154,17 +180,13 @@ export function ShareScreen() {
     selectedKey?.serverId === agent.serverId && selectedKey.agentId === agent.id;
 
   // The first server and the server of the selected agent start open, so a long list of one server
-  // does not hide the others. One server needs no fold.
+  // does not hide the others. One server needs no fold. A server that the user opened or closed
+  // keeps that state.
   const isOpen = (server: MobileServer, index: number) =>
-    servers.length === 1 ||
-    (index === 0 || server.id === selectedKey?.serverId ? !toggled.has(server.id) : toggled.has(server.id));
+    servers.length === 1 || (folds[server.id] ?? (index === 0 || server.id === selectedKey?.serverId));
 
-  function toggle(serverId: string): void {
-    setToggled((current) => {
-      const next = new Set(current);
-      if (!next.delete(serverId)) next.add(serverId);
-      return next;
-    });
+  function toggle(server: MobileServer, open: boolean): void {
+    setFolds((current) => ({ ...current, [server.id]: !open }));
   }
 
   return (
@@ -175,14 +197,20 @@ export function ShareScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      <AndroidHeaderButton placement="left" icon={X} accessibilityLabel={t("common.close")} onPress={close} />
       <AndroidHeaderButton
-        placement="right"
-        icon={SendHorizontal}
-        hidden={!share}
-        disabled={!canSend}
-        accessibilityLabel={selected ? t("mobile.share.extension.send") : t("mobile.share.chooseAgent")}
-        onPress={() => void send()}
+        placement="left"
+        icon={X}
+        accessibilityLabel={t("common.close")}
+        disabled={sending}
+        onPress={close}
+      />
+      <SheetSaveAction
+        dirty={Boolean(share)}
+        canSave={selected !== null}
+        pending={sending}
+        label={selected ? t("mobile.share.extension.send") : t("mobile.share.chooseAgent")}
+        pendingLabel={selected ? t("mobile.share.extension.sending", { name: selected.name }) : undefined}
+        onSave={() => void send()}
       />
       {share === undefined ? (
         <Typography.Paragraph align="center" className="pt-6 text-grouped-secondary">
@@ -224,7 +252,7 @@ export function ShareScreen() {
             onChangeText={setMessage}
             editable={!sending}
             multiline
-            maxLength={INPUT_LIMITS.messageText}
+            maxLength={INPUT_LIMITS.messageText - inlineTextLength}
             hint={
               sending && selected
                 ? t("mobile.share.extension.sending", { name: selected.name })
@@ -285,7 +313,7 @@ function ServerHeader({
   server: MobileServer;
   count: number;
   open: boolean;
-  onToggle: (serverId: string) => void;
+  onToggle: (server: MobileServer, open: boolean) => void;
 }) {
   const { format } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
@@ -301,7 +329,7 @@ function ServerHeader({
           <Chevron size={18} color={muted} strokeWidth={1.5} style={open ? undefined : MIRROR_IN_RTL} />
         </View>
       }
-      onPress={() => onToggle(server.id)}
+      onPress={() => onToggle(server, open)}
     >
       <Typography.Paragraph numberOfLines={1} className="font-semibold">
         {server.name}

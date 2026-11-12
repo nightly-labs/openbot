@@ -1,7 +1,7 @@
 import { AppState, Linking } from "react-native";
 import { hasIncomingShare } from "./incoming-share";
 import { isIncomingShareLink } from "./share-link";
-import { endShareSheetRequest, openShareSheet } from "./share-sheet-opener";
+import { endShareSheetRequest, openShareSheet, releaseShareSheet } from "./share-sheet-opener";
 
 /**
  * Opens the share sheet for each share that Android gives the signed-in app. The share link opens
@@ -22,7 +22,10 @@ export function watchAndroidShares(): () => void {
   const appState = AppState.addEventListener("change", (state) => {
     if (state === "active") openWaitingShare();
     // A sheet that did not open, as behind the app lock, does not stop the next share.
-    else if (state === "background") endShareSheetRequest();
+    else if (state === "background") {
+      endShareSheetRequest();
+      releaseShareSheet();
+    }
   });
   return () => {
     link.remove();

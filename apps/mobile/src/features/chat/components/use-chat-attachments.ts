@@ -42,7 +42,7 @@ export interface ChatAttachment extends RemoteFileUpload {
 }
 
 /** Longer pasted or shared text goes in as a text file, not into the composer. */
-const LARGE_TEXT_LENGTH = 4_000;
+export const LARGE_TEXT_LENGTH = 4_000;
 
 function base64(bytes: Uint8Array) {
   let binary = "";

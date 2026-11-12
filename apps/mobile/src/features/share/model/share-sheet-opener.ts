@@ -7,6 +7,19 @@ let pending = false;
  * the return to the app can all ask for the sheet, and one share opens one sheet.
  */
 let requested = false;
+/**
+ * Android: true while the route `/incoming-share` comes or shows. The sheet opens after that route
+ * goes, so that the push of the sheet always goes into the signed-in stack, never over that route.
+ */
+let held = false;
+/** Android: the open sheet, which takes a new share in place of a second sheet. */
+let takeInOpenSheet: (() => void) | null = null;
+
+function flush(): void {
+  if (!pending || !open || held) return;
+  pending = false;
+  open();
+}
 
 /**
  * Opens the share sheet over the chat list. When a share starts the app, the signed-in stack mounts
@@ -16,10 +29,15 @@ let requested = false;
 export function openShareSheet(): void {
   if (isAndroid) {
     if (requested) return;
+    // A second sheet would delete the files of the first one when it reads its share.
+    if (takeInOpenSheet) {
+      takeInOpenSheet();
+      return;
+    }
     requested = true;
   }
-  if (open) open();
-  else pending = true;
+  pending = true;
+  flush();
 }
 
 /**
@@ -30,13 +48,29 @@ export function endShareSheetRequest(): void {
   requested = false;
 }
 
+/** Android: the link of a share opens `/incoming-share`. The sheet waits until that route goes. */
+export function holdShareSheet(): void {
+  if (isAndroid) held = true;
+}
+
+/** Android: `/incoming-share` has gone, or the app went to the background. A waiting sheet opens. */
+export function releaseShareSheet(): void {
+  held = false;
+  flush();
+}
+
+/** Android: the open sheet takes the next share itself. */
+export function setOpenShareSheet(take: () => void): () => void {
+  takeInOpenSheet = take;
+  return () => {
+    if (takeInOpenSheet === take) takeInOpenSheet = null;
+  };
+}
+
 /** The signed-in stack opens the share sheet. A request that came before opens now. */
 export function setShareSheetOpener(next: () => void): () => void {
   open = next;
-  if (pending) {
-    pending = false;
-    next();
-  }
+  flush();
   return () => {
     if (open === next) open = null;
   };
