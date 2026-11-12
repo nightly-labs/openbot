@@ -210,11 +210,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
       return sourceText("error.provider.opencodeServiceFailure");
     // Each turn on the model sends the effort again, so only the model's efforts in the endpoint
-    // settings fix it. The endpoint's own text goes to the log.
-    if (endpoint && isReasoningEffortRefusal(error)) {
-      log(`A custom endpoint refused the reasoning effort: ${detail}`);
+    // settings fix it. No `log` here: a diagnostic shows as a second, technical error.
+    if (endpoint && isReasoningEffortRefusal(error))
       return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
-    }
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,
