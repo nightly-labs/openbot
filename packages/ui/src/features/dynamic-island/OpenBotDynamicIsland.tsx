@@ -1374,9 +1374,9 @@ function QuestionContent(props: {
 }): JSX.Element {
   const { t } = useText();
   const agentKey = () => JSON.stringify([props.serverId, props.item.agent.id]);
-  const requestKey = createMemo(() =>
-    JSON.stringify([props.item.requestId, props.item.questions.map((question) => question.id)]),
-  );
+  const requestKey = () => JSON.stringify([props.item.requestId, props.item.questions.map((question) => question.id)]);
+  // The card can show the prompt of another server or agent with the same request id.
+  const cardKey = createMemo(() => `${agentKey()}\n${requestKey()}`);
   const savedAnswers = () => {
     const saved = questionCardAnswers.get(agentKey());
     return saved?.requestKey === requestKey() ? saved.answers : {};
@@ -1389,7 +1389,7 @@ function QuestionContent(props: {
   let questionAnimations: Animation[] = [];
   let questionDisposed = false;
   let questionTransitionVersion = 0;
-  createEffect(requestKey, () => {
+  createEffect(cardKey, () => {
     questionTransitionVersion += 1;
     cancelQuestionAnimations();
     clearQuestionHidden(questionTransitionElements());
