@@ -96,6 +96,7 @@ import type {
   PasswordManagerConnectInput,
   PasswordManagerId,
   PasswordManagerStatus,
+  PinnedMessagesSnapshot,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
@@ -125,6 +126,7 @@ import type {
   SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
   SetMcpAccessInput,
+  SetMessagePinnedInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
@@ -996,6 +998,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `message-pins-v1`: a member who can message an agent can pin its messages. */
+  canPinMessages: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
   canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
@@ -1068,6 +1072,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
   markAgentThreadRead: (input: MarkAgentTaskReadInput, serverId: string) => Promise<AgentTaskReadState>;
+  /** The pinned messages of all chats of the agent, the newest pin first. */
+  loadMessagePins: (agentId: string, serverId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Pins or unpins one message of the agent's chat or of one of its threads. Answers the new list. */
+  setMessagePinned: (input: SetMessagePinnedInput, serverId: string) => Promise<PinnedMessagesSnapshot>;
   /** Answers a question of a task turn. The host finds the question by its request, on any thread. */
   respondToTaskPrompt: (input: RespondToPromptInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
@@ -1167,6 +1175,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canPinMessages"
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
