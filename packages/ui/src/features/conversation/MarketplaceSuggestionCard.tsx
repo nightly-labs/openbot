@@ -38,6 +38,8 @@ export interface MarketplaceSuggestionCardProps {
   state: MarketplaceSuggestionState;
   /** Why the user cannot connect it here. Shown under the header when `unavailable`. */
   unavailableText?: string;
+  /** Why the last action did not go through. Shown above the action, which the user can start again. */
+  error?: string | undefined;
   /** The user dismissed the card. It stays as one line with Undo. */
   dismissed?: boolean;
   /** Runs the connect or install step. The approval and sign-in dialogs stay in the consumer. */
@@ -92,6 +94,7 @@ export function MarketplaceSuggestionCard(props: MarketplaceSuggestionCardProps)
         // The action stays on the card when it is done: the same button turns into Connected.
         status="pending"
         inlineActions={!props.fullDescription}
+        error={props.error}
         title={
           <Show when={props.onOpenDetails} fallback={props.name}>
             <Button

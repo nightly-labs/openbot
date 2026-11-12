@@ -541,6 +541,7 @@ export const messages = {
   "chat.suggestion.updated": "Обновлено",
   "chat.suggestion.saveReply": "Да, сохрани это как навык.",
   "chat.suggestion.updateReply": "Да, добавь это в навык.",
+  "chat.suggestion.saveFailed": "Не удалось сохранить навык. Повторите попытку, когда агент закончит работу.",
   "chat.suggestion.detailsNamed": "Открыть {name} в каталоге",
   "chat.suggestion.dismissed": "Предложение «{name}» скрыто.",
   "chat.suggestion.undo": "Отменить",

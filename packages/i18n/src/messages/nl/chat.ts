@@ -447,6 +447,7 @@ export const messages = {
   "chat.suggestion.updated": "Bijgewerkt",
   "chat.suggestion.saveReply": "Ja, sla het op als vaardigheid.",
   "chat.suggestion.updateReply": "Ja, voeg het toe aan de vaardigheid.",
+  "chat.suggestion.saveFailed": "De vaardigheid kon niet worden opgeslagen. Probeer het opnieuw als de agent klaar is.",
   "chat.suggestion.detailsNamed": "{name} openen in de marktplaats",
   "chat.suggestion.dismissed": "Suggestie {name} genegeerd.",
   "chat.suggestion.undo": "Ongedaan maken",

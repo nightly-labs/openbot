@@ -437,6 +437,7 @@ export const messages = {
   "chat.suggestion.updated": "업데이트됨",
   "chat.suggestion.saveReply": "네, 스킬로 저장해 줘.",
   "chat.suggestion.updateReply": "네, 스킬에 추가해 줘.",
+  "chat.suggestion.saveFailed": "스킬을 저장할 수 없어요. 에이전트가 작업을 마친 후 다시 시도해 주세요.",
   "chat.suggestion.detailsNamed": "마켓플레이스에서 {name} 열기",
   "chat.suggestion.dismissed": "{name} 추천을 닫았어요.",
   "chat.suggestion.undo": "실행 취소",

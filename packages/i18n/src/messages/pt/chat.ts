@@ -444,6 +444,8 @@ export const messages = {
   "chat.suggestion.updated": "Atualizada",
   "chat.suggestion.saveReply": "Sim, salve como habilidade.",
   "chat.suggestion.updateReply": "Sim, adicione à habilidade.",
+  "chat.suggestion.saveFailed":
+    "Não foi possível salvar a habilidade. Tente novamente quando o agente terminar o trabalho.",
   "chat.suggestion.detailsNamed": "Abrir {name} na loja",
   "chat.suggestion.dismissed": "Sugestão de {name} dispensada.",
   "chat.suggestion.undo": "Desfazer",

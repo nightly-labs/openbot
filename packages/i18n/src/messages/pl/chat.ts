@@ -546,6 +546,7 @@ export const messages = {
   "chat.suggestion.updated": "Zaktualizowano",
   "chat.suggestion.saveReply": "Tak, zapisz to jako umiejętność.",
   "chat.suggestion.updateReply": "Tak, dodaj to do umiejętności.",
+  "chat.suggestion.saveFailed": "Nie udało się zapisać umiejętności. Spróbuj ponownie, gdy agent skończy pracę.",
   "chat.suggestion.detailsNamed": "Otwórz {name} w Marketplace",
   "chat.suggestion.dismissed": "Odrzucono propozycję: {name}.",
   "chat.suggestion.undo": "Cofnij",

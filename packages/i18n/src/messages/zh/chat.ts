@@ -436,6 +436,7 @@ export const messages = {
   "chat.suggestion.updated": "已更新",
   "chat.suggestion.saveReply": "好的，把它保存为技能。",
   "chat.suggestion.updateReply": "好的，把它加到这个技能里。",
+  "chat.suggestion.saveFailed": "无法保存技能。请在代理完成工作后重试。",
   "chat.suggestion.detailsNamed": "在市场中查看 {name}",
   "chat.suggestion.dismissed": "已关闭 {name} 的推荐。",
   "chat.suggestion.undo": "撤销",

@@ -459,6 +459,8 @@ export const messages = {
   "chat.suggestion.updated": "Actualizada",
   "chat.suggestion.saveReply": "Sí, guárdalo como habilidad.",
   "chat.suggestion.updateReply": "Sí, añádelo a la habilidad.",
+  "chat.suggestion.saveFailed":
+    "No se pudo guardar la habilidad. Inténtalo de nuevo cuando el agente termine su trabajo.",
   "chat.suggestion.detailsNamed": "Abrir {name} en Marketplace",
   "chat.suggestion.dismissed": "Sugerencia de {name} descartada.",
   "chat.suggestion.undo": "Deshacer",

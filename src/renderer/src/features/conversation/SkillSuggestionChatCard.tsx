@@ -60,12 +60,14 @@ export interface SkillSuggestionChatCardProps {
 /**
  * A memory review's question to save a skill from the chat. Save asks the host to write the skill in
  * the background, and the card turns to Saved when the skill line comes. When the host saves nothing,
- * Save sends the user's yes to the agent, which saves the skill in a turn.
+ * Save sends the user's yes to the agent, which saves the skill in a turn. When the yes cannot go
+ * either, as while the agent works, the card says so and Save is available again.
  */
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
   /* The save or the yes runs before the chat shows its result, so the card waits from the click. */
   const [sent, setSent] = createSignal(false);
+  const [failed, setFailed] = createSignal(false);
   const state = () => {
     if (props.outcome === "saved") return "connected";
     if (props.outcome === "working" || (sent() && props.outcome === "open")) return "busy";
@@ -73,11 +75,14 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   };
   const save = async () => {
     if (sent()) return;
+    setFailed(false);
     setSent(true);
     if (await props.onSaveSkill?.()) return;
     const text =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
-    if (!props.onSave?.(text)) setSent(false);
+    if (props.onSave?.(text)) return;
+    setSent(false);
+    setFailed(true);
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";
@@ -96,6 +101,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
       fullDescription
       iconUrl={null}
       state={state()}
+      error={failed() && props.outcome === "open" ? t("chat.suggestion.saveFailed") : undefined}
       dismissed={marketplaceSuggestionDismissed(props.messageId)}
       onConnect={onSave()}
       onOpenDetails={openSkill()}

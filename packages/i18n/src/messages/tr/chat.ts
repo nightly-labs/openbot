@@ -454,6 +454,7 @@ export const messages = {
   "chat.suggestion.updated": "Güncellendi",
   "chat.suggestion.saveReply": "Evet, beceri olarak kaydet.",
   "chat.suggestion.updateReply": "Evet, beceriye ekle.",
+  "chat.suggestion.saveFailed": "Beceri kaydedilemedi. Ajan işini bitirdiğinde tekrar deneyin.",
   "chat.suggestion.detailsNamed": "{name} uygulamasını Pazaryerinde aç",
   "chat.suggestion.dismissed": "{name} önerisi kapatıldı.",
   "chat.suggestion.undo": "Geri al",
