@@ -265,6 +265,21 @@ added_commands() {
       echo "file=$name"
     fi
   done
+  # In a newer image, `/usr/local/bin/cursor-agent` is a shim of boat, and its link into the moved tree
+  # `/opt/cursor-agent` is in this image directory. Seen on 2026-11-12: Cursor had no command after a move.
+  for entry in /usr/local/lib/ascii-harnesses/bin/*; do
+    name=${entry##*/}
+    plain_name "$name" && [ -L "$entry" ] || continue
+    target=$(readlink -f "$entry") || continue
+    while read -r tree; do
+      [ -n "$tree" ] || continue
+      case $target in "$tree"/*)
+        echo "link=$name $target"
+        break
+        ;;
+      esac
+    done <<<"$trees"
+  done
 }
 
 # The commands of each moved npm package that the loop of added_commands did not give. The image
@@ -437,6 +452,9 @@ export_data() {
 
   # The same order as openbot-boat-pre-stop: the marker first, so that nothing starts OpenBot again.
   touch /run/openbot-pre-stop
+  # A timer of an earlier stop try of boat starts OpenBot when the marker is 5 minutes old. An export of
+  # many GB takes longer (seen on 2026-11-12: OpenBot started after 7 minutes, and tar failed).
+  systemctl stop openbot-pre-stop-restart.timer 2>/dev/null || true
   systemctl stop openbot.service
   if openbot_runs; then fail "OpenBot still runs. Nothing was archived."; fi
 

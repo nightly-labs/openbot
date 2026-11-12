@@ -515,7 +515,9 @@ class Pool {
     options: { input?: string; capture?: boolean; quiet?: boolean; password?: string | undefined } = {},
   ) {
     if (!machine.address) throw new Error(`VPS ${machine.id} has no public IPv4 address.`);
-    const args = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15"];
+    // A connection to a VPS sometimes times out once. ssh then tries again; the command runs only one time.
+    const args = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-o", "ConnectionAttempts=3"];
+    args.push("-o", "ServerAliveInterval=15");
     const env = { ...process.env };
     const askpass = options.password === undefined ? undefined : mkdtempSync(join(tmpdir(), "openbot-askpass-"));
     if (askpass && options.password !== undefined) {

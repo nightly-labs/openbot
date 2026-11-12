@@ -1224,6 +1224,13 @@ no restart of the VPS starts a second host. Make sure that the sandbox is stoppe
 the row back to boat. The next client request resumes the sandbox, and the resume starts OpenBot
 there. The work that the server did on the VPS is not in the sandbox.
 
+When the export failed before the import, the sandbox still runs with OpenBot stopped and
+`/run/openbot-pre-stop` set. Delete `/root/openbot-move` and the marker, and start `openbot.service`
+in the sandbox. Delete `/root/openbot-move.tar` on the VPS. Then give the row back with the statement
+below, but with `desired_state` and `observed_state` of before the move. On 2026-11-12 an export of
+24 GB took 9 minutes; a restart timer of boat started OpenBot during it, and tar stopped the export.
+The export now stops that timer.
+
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
   operator_host = NULL, desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
