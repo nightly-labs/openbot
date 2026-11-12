@@ -1,6 +1,7 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
@@ -10,6 +11,8 @@ import {
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
+
+const logger = createOpenBotLogger("provider-runtime");
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -210,9 +213,12 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
       return sourceText("error.provider.opencodeServiceFailure");
     // Each turn on the model sends the effort again, so only the model's efforts in the endpoint
-    // settings fix it. No `log` here: a diagnostic shows as a second, technical error.
-    if (endpoint && isReasoningEffortRefusal(error))
+    // settings fix it. The endpoint's text goes to the log file only: a `log` diagnostic shows as a
+    // second, technical error beside this text.
+    if (endpoint && isReasoningEffortRefusal(error)) {
+      logger.warn("A custom endpoint refused the reasoning effort.", { detail });
       return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
+    }
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,
