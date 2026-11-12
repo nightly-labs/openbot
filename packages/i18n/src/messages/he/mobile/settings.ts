@@ -42,7 +42,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "ניסיון",
   "mobile.settings.billing.status.pastDue": "התשלום נכשל",
   "mobile.settings.billing.status.unpaid": "לא שולם",
-  "mobile.settings.billing.status.incomplete": "ממתין לתשלום",
   "mobile.settings.billing.status.paused": "מושהה",
   "mobile.settings.billing.footer":
     "כדי לשנות תוכנית או אמצעי תשלום, או לראות חשבוניות, יש לפתוח הגדרות ← חיוב ב-OpenBot במחשב.",

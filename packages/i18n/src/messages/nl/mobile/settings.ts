@@ -43,7 +43,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "Proefperiode",
   "mobile.settings.billing.status.pastDue": "Betaling mislukt",
   "mobile.settings.billing.status.unpaid": "Onbetaald",
-  "mobile.settings.billing.status.incomplete": "Wacht op betaling",
   "mobile.settings.billing.status.paused": "Gepauzeerd",
   "mobile.settings.billing.footer":
     "Open Instellingen → Facturering in OpenBot op je computer om een abonnement of de betaalmethode te wijzigen of facturen te bekijken.",

@@ -21,12 +21,17 @@ export const useHostedServerAvailability = create<{
   checkedAt: number;
 }>(() => ({ userId: null, available: false, serverIds: null, ownsServers: false, checkedAt: 0 }));
 
+/** The hosted servers that the account still has: all except the deleted ones. */
+export function ownedHostedServers(list: HostedServerList) {
+  return list.servers.filter((server) => server.state !== "deleted");
+}
+
 /** The store values that one read of the account's hosted servers gives. */
 export function hostedServerListState(list: HostedServerList) {
   return {
     available: list.available,
     serverIds: new Set(list.servers.map((server) => server.serverId)),
-    ownsServers: list.servers.some((server) => server.state !== "deleted"),
+    ownsServers: ownedHostedServers(list).length > 0,
   };
 }
 

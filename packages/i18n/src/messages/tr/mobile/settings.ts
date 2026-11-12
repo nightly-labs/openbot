@@ -43,7 +43,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "Deneme",
   "mobile.settings.billing.status.pastDue": "Ödeme başarısız",
   "mobile.settings.billing.status.unpaid": "Ödenmedi",
-  "mobile.settings.billing.status.incomplete": "Ödeme bekleniyor",
   "mobile.settings.billing.status.paused": "Duraklatıldı",
   "mobile.settings.billing.footer":
     "Bir planı veya ödeme yöntemini değiştirmek ya da faturaları görmek için bilgisayarınızdaki OpenBot'ta Ayarlar → Faturalandırma bölümünü açın.",

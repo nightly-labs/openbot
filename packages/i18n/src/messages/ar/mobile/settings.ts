@@ -50,7 +50,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "تجربة",
   "mobile.settings.billing.status.pastDue": "فشل الدفع",
   "mobile.settings.billing.status.unpaid": "غير مدفوع",
-  "mobile.settings.billing.status.incomplete": "بانتظار الدفع",
   "mobile.settings.billing.status.paused": "متوقف مؤقتًا",
   "mobile.settings.billing.footer":
     "لتغيير خطة أو طريقة الدفع، أو لعرض الفواتير، افتح الإعدادات ← الفوترة في OpenBot على حاسوبك.",

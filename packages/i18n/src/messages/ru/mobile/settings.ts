@@ -48,7 +48,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "Пробный период",
   "mobile.settings.billing.status.pastDue": "Платёж не прошёл",
   "mobile.settings.billing.status.unpaid": "Не оплачен",
-  "mobile.settings.billing.status.incomplete": "Ожидает оплаты",
   "mobile.settings.billing.status.paused": "Приостановлен",
   "mobile.settings.billing.footer":
     "Чтобы сменить тариф или способ оплаты или посмотреть счета, откройте «Настройки» → «Оплата» в OpenBot на компьютере.",

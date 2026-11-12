@@ -51,7 +51,7 @@ export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
   /** The plans of the account's hosted servers, as Settings > Billing reads them. */
-  billing: (scope: QueryScope) => ["billing", ...scope],
+  billing: (...scope: [QueryScope] | []) => ["billing", ...(scope[0] ?? [])],
   /** The server IDs of the owner's hosted servers, as Server settings reads them. */
   ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],

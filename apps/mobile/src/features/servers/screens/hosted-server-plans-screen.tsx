@@ -18,6 +18,7 @@ import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { LocalServerOptions } from "@/features/servers/components/local-server-options";
 import {
   hostedServerListState,
+  ownedHostedServers,
   rememberHostedServer,
   useHostedServerAvailability,
 } from "@/features/servers/model/hosted-server-availability";
@@ -113,7 +114,7 @@ function PlansReady({
   cloudServersOn: boolean;
 }) {
   const { t } = useText();
-  const owned = list.servers.filter((server) => server.state !== "deleted");
+  const owned = ownedHostedServers(list);
   const showPlans = (devFeatureOverride("cloudServers") ?? (list.available && cloudServersOn)) && plans.length > 0;
   // A plan that a server of the account uses, so its row shows "Your plan".
   const ownedPlans = new Set(owned.map((server) => server.plan));

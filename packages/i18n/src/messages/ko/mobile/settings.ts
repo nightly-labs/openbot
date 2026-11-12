@@ -43,7 +43,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "체험",
   "mobile.settings.billing.status.pastDue": "결제 실패",
   "mobile.settings.billing.status.unpaid": "미결제",
-  "mobile.settings.billing.status.incomplete": "결제 대기 중",
   "mobile.settings.billing.status.paused": "일시 중지됨",
   "mobile.settings.billing.footer":
     "요금제나 결제 수단을 바꾸거나 청구서를 보려면 컴퓨터의 OpenBot에서 설정 → 결제를 여세요.",

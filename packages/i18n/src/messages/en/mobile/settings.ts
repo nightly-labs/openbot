@@ -42,7 +42,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.billing.status.trialing": "Trial",
   "mobile.settings.billing.status.pastDue": "Payment failed",
   "mobile.settings.billing.status.unpaid": "Unpaid",
-  "mobile.settings.billing.status.incomplete": "Waiting for payment",
   "mobile.settings.billing.status.paused": "Paused",
   "mobile.settings.billing.footer":
     "To change a plan or the payment method, or to see invoices, open Settings → Billing in OpenBot on your computer.",

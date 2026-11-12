@@ -48,7 +48,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "Okres próbny",
   "mobile.settings.billing.status.pastDue": "Płatność nieudana",
   "mobile.settings.billing.status.unpaid": "Nieopłacony",
-  "mobile.settings.billing.status.incomplete": "Czeka na płatność",
   "mobile.settings.billing.status.paused": "Wstrzymany",
   "mobile.settings.billing.footer":
     "Aby zmienić plan lub metodę płatności albo zobaczyć faktury, otwórz Ustawienia → Rozliczenia w OpenBot na komputerze.",

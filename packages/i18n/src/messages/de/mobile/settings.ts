@@ -43,7 +43,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "Testphase",
   "mobile.settings.billing.status.pastDue": "Zahlung fehlgeschlagen",
   "mobile.settings.billing.status.unpaid": "Unbezahlt",
-  "mobile.settings.billing.status.incomplete": "Wartet auf Zahlung",
   "mobile.settings.billing.status.paused": "Pausiert",
   "mobile.settings.billing.footer":
     "Um einen Tarif oder die Zahlungsmethode zu ändern oder Rechnungen zu sehen, öffne in OpenBot auf deinem Computer Einstellungen → Abrechnung.",

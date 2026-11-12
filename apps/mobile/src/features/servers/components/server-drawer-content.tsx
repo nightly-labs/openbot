@@ -295,7 +295,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     (state) => state.userId === session.user.id && state.ownsServers,
   );
   const cloudServersOn = useMobileFeature(session.apiUrl, "cloudServers");
-  const showsPlans = (devFeatureOverride("cloudServers") ?? (accountHasPlans && cloudServersOn)) || ownsHostedServers;
+  const showsPlans = devFeatureOverride("cloudServers") ?? ((accountHasPlans && cloudServersOn) || ownsHostedServers);
   useEffect(() => {
     if (!open) return;
     void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));

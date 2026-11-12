@@ -43,8 +43,8 @@ export function SettingsScreen() {
     });
   }
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
-  // Billing shows only while the cloudServers feature flag is on. With the flag off, the phone does
-  // not show plans or prices, also to an account that has hosted servers.
+  // Billing shows only while the cloudServers feature flag is on and the account server has billing.
+  // With the flag off, Settings has no Billing row, also for an account that has hosted servers.
   const apiUrl = session?.apiUrl ?? "";
   const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
   useEffect(() => {

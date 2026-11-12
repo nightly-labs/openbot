@@ -4,13 +4,13 @@ import { useFocusEffect } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Monitor from "lucide-react-native/icons/monitor";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { HOSTED_PLAN_TEXT } from "@/features/servers/model/hosted-server-plans";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useBillingState } from "@/features/settings/model/billing";
-import { useMobileFeature } from "@/shared/lib/mobile-features";
+import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
@@ -25,7 +25,7 @@ const STATUS_TEXT = {
   past_due: "mobile.settings.billing.status.pastDue",
   unpaid: "mobile.settings.billing.status.unpaid",
   canceled: null,
-  incomplete: "mobile.settings.billing.status.incomplete",
+  incomplete: null,
   incomplete_expired: null,
   paused: "mobile.settings.billing.status.paused",
 } as const satisfies Record<BillingSubscriptionStatus, MobileTextKey | null>;
@@ -38,8 +38,13 @@ const STATUS_TEXT = {
 export function BillingSettingsScreen() {
   const { t, errorMessage } = useText();
   const { session } = useMobileSession();
-  // A link can open this page also while the flag is off. It then reads and shows nothing.
-  const cloudServersOn = useMobileFeature(session?.apiUrl ?? "", "cloudServers");
+  // A link can open this page also while the flag is off, or before Settings read the flags. It reads
+  // the flags, and while the flag is off it reads and shows nothing.
+  const apiUrl = session?.apiUrl ?? "";
+  const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
+  useEffect(() => {
+    if (apiUrl) void refreshMobileFeatures(apiUrl);
+  }, [apiUrl]);
   const billing = useBillingState(cloudServersOn);
   const { refetch } = billing;
   useFocusEffect(
@@ -48,7 +53,8 @@ export function BillingSettingsScreen() {
     }, [cloudServersOn, refetch]),
   );
 
-  if (!cloudServersOn) return <SettingsContent />;
+  // An account server with no billing has no plans to show, and the user cannot get one.
+  if (!cloudServersOn || billing.data?.available === false) return <SettingsContent />;
 
   if (billing.isError && !billing.data) {
     return (

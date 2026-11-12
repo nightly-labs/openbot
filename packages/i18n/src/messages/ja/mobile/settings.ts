@@ -43,7 +43,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "試用中",
   "mobile.settings.billing.status.pastDue": "支払いに失敗",
   "mobile.settings.billing.status.unpaid": "未払い",
-  "mobile.settings.billing.status.incomplete": "支払い待ち",
   "mobile.settings.billing.status.paused": "一時停止中",
   "mobile.settings.billing.footer":
     "プランや支払い方法の変更、請求書の確認は、コンピューターの OpenBot で「設定」→「お支払い」を開いてください。",

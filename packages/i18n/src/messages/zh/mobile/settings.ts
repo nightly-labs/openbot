@@ -41,7 +41,6 @@ export const messages = {
   "mobile.settings.billing.status.trialing": "试用",
   "mobile.settings.billing.status.pastDue": "付款失败",
   "mobile.settings.billing.status.unpaid": "未付款",
-  "mobile.settings.billing.status.incomplete": "等待付款",
   "mobile.settings.billing.status.paused": "已暂停",
   "mobile.settings.billing.footer": "要更改套餐或付款方式，或查看发票，请在电脑上的 OpenBot 中打开“设置 → 账单”。",
   "mobile.settings.support.help": "获取帮助",
