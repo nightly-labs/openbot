@@ -1701,8 +1701,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent;
       },
       relay: (agent) => this.#liveVoiceRelay(agent),
-      send: (agentId, text, relayed, sender) =>
-        this.#sendUserMessage({ agentId, text }, sender, undefined, undefined, false, relayed).pipe(
+      send: (agentId, relayed, sender) =>
+        this.#sendUserMessage({ agentId, text: relayed.shown }, sender, undefined, undefined, false, relayed).pipe(
           Effect.flatMap((receipt) => {
             const deliveryId = receipt.deliveries[0]?.id;
             return deliveryId

@@ -286,7 +286,9 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       displayText || "(The reply contains attachments only.)",
     ].join("\n");
   }
-  if (delivery.sender.kind === "user" && sources.liveVoice) text = liveVoicePrompt(sources.liveVoice, text);
+  // A queued message that the user edited is the user's own text, not the voice's.
+  const voice = sources.liveVoice;
+  if (delivery.sender.kind === "user" && voice && delivery.text === voice.shown) text = liveVoicePrompt(voice);
   // Only `start_task` sends an agent's message to itself: it is the brief of a task.
   if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
@@ -408,32 +410,32 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
 
 /** The most characters of the voice call that a relayed message gives: the newest lines. */
 const LIVE_VOICE_CALL_LIMIT = 4000;
+/** The most characters of one line, so that a long answer that the voice read aloud leaves room for the user's words. */
+const LIVE_VOICE_LINE_LIMIT = 1000;
 
 /**
  * A message that live voice relayed, framed so that the agent knows that the voice is not the user
- * (#7256). The voice model writes the request itself, so it can be a summary or its own question.
- * When the transcript has the user's words, `text` is those words and the voice's request is only context.
+ * (#7256). The voice model writes the request itself, so it can be a summary, its own question, or one
+ * part of what the user said. The request says what to do; the call gives its details in the user's words.
  */
-function liveVoicePrompt({ request, heard }: LiveVoiceRelayed, text: string): string {
-  const spoken = heard.some((line) => line.role === "user");
+function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
   const call: string[] = [];
   let length = 0;
-  if (heard.some((line) => line.role === "assistant"))
-    for (const line of heard.toReversed()) {
-      const entry = `${line.role === "user" ? "User" : "Voice assistant"}: ${line.text}`;
-      length += entry.length + 1;
-      if (length > LIVE_VOICE_CALL_LIMIT && call.length > 0) break;
-      call.unshift(entry);
-    }
+  for (const line of heard.toReversed()) {
+    const entry = `${line.role === "user" ? "User" : "Voice assistant"}: ${line.text}`;
+    const clipped = entry.length > LIVE_VOICE_LINE_LIMIT ? `${entry.slice(0, LIVE_VOICE_LINE_LIMIT - 1)}…` : entry;
+    length += clipped.length + 1;
+    if (length > LIVE_VOICE_CALL_LIMIT && call.length > 0) break;
+    call.unshift(clipped);
+  }
   return [
-    "The user spoke this message in a live voice call. A voice assistant hears the user, gives each request to you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
-    spoken
-      ? "Act on the user's own words. Use the voice assistant's text only to understand them."
-      : "The user's exact words are not available. The message below is the voice assistant's text of the request.",
+    "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    call.length
+      ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
+      : "The user's exact words are not available.",
     ...(call.length ? ["--- voice call since the previous request ---", ...call] : []),
-    ...(spoken && request !== text ? ["--- the request as the voice assistant wrote it ---", request] : []),
-    spoken ? "--- user message ---" : "--- request from the voice assistant ---",
-    text,
+    "--- request from the voice assistant ---",
+    request,
   ].join("\n");
 }
 

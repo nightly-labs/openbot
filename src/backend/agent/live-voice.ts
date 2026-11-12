@@ -90,6 +90,9 @@ const RELAY_VOICE_RULE =
 
 /** The most transcript lines that a session keeps between two requests. */
 const HEARD_LINE_LIMIT = 20;
+/** Text with each run of spaces and line breaks as one space, so an echo of the control message still matches. */
+const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
+const RELAY_VOICE_RULE_LINE = oneLine(RELAY_VOICE_RULE);
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -137,6 +140,8 @@ export interface LiveVoiceLine {
  * summary or its own question. The agent reads it with the call, and knows that the voice is not the user.
  */
 export interface LiveVoiceRelayed {
+  /** What the chat shows: the user's own words, or `request` when the transcript has none. */
+  readonly shown: string;
   readonly request: string;
   /** The final transcript lines since the previous request, oldest first. */
   readonly heard: readonly LiveVoiceLine[];
@@ -146,13 +151,9 @@ export interface LiveVoiceHooks {
   agent(agentId: string): AgentSummary;
   /** A new Codex process that is not started yet. It runs no agent: it only connects the voice. */
   relay(agent: AgentSummary): Effect.Effect<LiveVoiceRelay, { readonly cause: unknown }>;
-  /**
-   * Sends a spoken request to the agent as the user's message, and gives its delivery id. `text` is
-   * what the chat shows: the user's own words, or the voice's request when the transcript has none.
-   */
+  /** Sends a spoken request to the agent as the user's message, and gives its delivery id. */
   send(
     agentId: string,
-    text: string,
     relayed: LiveVoiceRelayed,
     sender: ConversationMessageSender | undefined,
   ): Effect.Effect<string, { readonly cause: unknown }>;
@@ -191,9 +192,9 @@ interface PendingAsk {
  * Audio goes between the renderer and OpenAI. OpenBot never reads the Codex credentials.
  *
  * The voice runs on a relay thread of that process, not on the agent's thread. When the voice model
- * hands a request off, the relay calls `ask_agent`, and OpenBot sends the user's own words from the
- * transcript to the agent as the user's message. The agent also reads the request as the voice wrote it,
- * marked as the voice's. The agent's answer goes back to the voice, which speaks it: a short answer as it
+ * hands a request off, the relay calls `ask_agent`, and OpenBot sends it to the agent as the user's
+ * message. The chat shows the user's own words from the transcript. The agent reads the request as the
+ * voice's, with the call for its details. The agent's answer goes back to the voice, which speaks it: a short answer as it
  * is, a long one as a summary. So the voice does not depend on the agent's provider or model, and a
  * model change does not end it. The chat shows each request and the full answer as usual.
  *
@@ -373,7 +374,7 @@ export class LiveVoice {
           );
         const line = final ? text?.trim() : undefined;
         // The control message is in the conversation as the user's, but the user did not say it.
-        if (line && !(role === "user" && line === RELAY_VOICE_RULE)) {
+        if (line && !(role === "user" && oneLine(line) === RELAY_VOICE_RULE_LINE)) {
           session.heard.push({ role, text: line });
           if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
         }
@@ -402,13 +403,17 @@ export class LiveVoice {
     const heard = session.heard.splice(0);
     const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
     Effect.runFork(
-      this.#hooks.send(session.agentId, said || asked, { request: asked, heard }, session.owner?.sender).pipe(
+      this.#hooks.send(session.agentId, { shown: said || asked, request: asked, heard }, session.owner?.sender).pipe(
         Effect.match({
-          onFailure: (failure) =>
+          onFailure: (failure) => {
+            // The request did not reach the agent, so a request that the user repeats gets the call again.
+            session.heard.unshift(...heard);
+            session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
             this.#respond(session, request.id, {
               success: false,
               text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
-            }),
+            });
+          },
           onSuccess: (deliveryId) => {
             if (request.signal?.aborted || !this.#sessions.has(session.id)) return;
             const ask: PendingAsk = { session, requestId: request.id, deliveryId };
