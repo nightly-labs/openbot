@@ -3,6 +3,7 @@ import Share from "lucide-react-native/icons/share";
 import { useEffect, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { discardWaitingShare, hasIncomingShare } from "../model/incoming-share";
 import { openShareSheet } from "../model/share-sheet-opener";
@@ -21,6 +22,15 @@ export function IncomingShareScreen() {
   useEffect(() => {
     if (!signedIn || opened.current) return;
     opened.current = true;
+    if (isAndroid) {
+      // The signed-in stack opens the sheet when it finds the share (`(app)/_layout.tsx`), also when
+      // this route does not open. So only this screen goes: a dismiss to the chat list would also
+      // close a sheet that is open already. With no workspace under this screen, `dismissTo` replaces
+      // it with one.
+      if (router.canGoBack()) router.back();
+      else router.dismissTo("/connected");
+      return;
+    }
     // Return to the running workspace, then open the sheet in its stack. A replace from this root
     // screen would mount a second workspace, which opens a second connection to each host. With no
     // workspace under this screen, `dismissTo` replaces this screen with one, and the sheet opens
