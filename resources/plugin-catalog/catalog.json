@@ -772,9 +772,9 @@
     },
     {
       "slug": "highlevel",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "4cbf826e4921fafe5120059c745fea2ea94710916141687b6209372d9fbc24b7"
+      "detailSha256": "50bf58de77f174276da93bfeec699f2883dc646f3a16cfcb0727fe0e2a051eac"
     },
     {
       "slug": "hospitable",

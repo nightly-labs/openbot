@@ -232,3 +232,24 @@ Troubleshooting:
 
 - The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
   listens on another port that the document does not list. Close that program and restart OpenBot.
+
+## HighLevel
+
+The listing connects to HighLevel's MCP server at `https://services.leadconnectorhq.com/mcp` with a
+Private Integration token (<https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html>)
+in `Authorization: Bearer pit-…` and the sub-account ID in a `locationId` header. Some tools take
+`locationId` as an argument, and other tools have no location input.
+
+The listing has no browser sign-in (#7595). The server's metadata lists 154 scopes, and its
+authorization page refuses 8 of them ("Invalid scope(s): emails/templates.readonly, …"), so a
+sign-in with the published scope list never finishes. The per-client addresses in HighLevel's guide
+(`/mcp/anthropic/v2`, `/mcp/openai/v2`, `/mcp/cursor/v2`) list the same 8 scopes and refuse a client
+that they do not recognize (#7753). Add a `link` flow again only when a sign-in with the published
+scopes finishes.
+
+Troubleshooting:
+
+- A tool answers "Invalid Private Integration token": the token is wrong, was rotated, or belongs to
+  another sub-account. Create a new token and connect again.
+- HighLevel refuses one tool but not others: the token may not have the scope that the tool needs.
+  Edit the Private Integration in HighLevel and select that scope.

@@ -788,9 +788,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "highlevel",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "4cbf826e4921fafe5120059c745fea2ea94710916141687b6209372d9fbc24b7",
+      detailSha256: "50bf58de77f174276da93bfeec699f2883dc646f3a16cfcb0727fe0e2a051eac",
     },
     {
       slug: "hospitable",
@@ -6195,11 +6195,11 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "HighLevel",
     tagline: "CRM and marketing workspace",
     description:
-      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
     category: "productivity",
     creatorName: "HighLevel",
     iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-new-leads", text: "List the contacts that were added this week." },
       { id: "prompt-pipeline", text: "Summarize the opportunities in my sales pipeline by stage." },
@@ -6210,13 +6210,37 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-highlevel-mcp",
         name: "HighLevel",
         description:
-          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
         iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
         server: {
           name: "highlevel",
           transport: "http",
           url: "https://services.leadconnectorhq.com/mcp",
-          auth: [{ id: "highlevel-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "highlevel-key",
+              kind: "key",
+              label: "Private Integration token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Private Integration token",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "pit-…",
+                  hint: "In your HighLevel sub-account, open Settings > Private Integrations and create a token.",
+                },
+                {
+                  id: "location-id",
+                  label: "Location ID",
+                  header: "locationId",
+                  hint: "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID.",
+                },
+              ],
+              docsUrl: "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+              docsLabel: "Create a token",
+            },
+          ],
         },
       },
     ],
