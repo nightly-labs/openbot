@@ -19,6 +19,7 @@ import {
   isAgentContextCategories,
   latestTurnAnswer,
   PLAN_CONTINUATION_ITEM_TYPE,
+  type QueueDelivery,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -761,7 +762,7 @@ export class TurnLifecycle {
       deliveries.length === 0 ||
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
-      deliveries.every(({ delivery }) => quietTeammateDelivery(delivery)) ||
+      deliveries.every(({ delivery }) => this.#quietTeammateDelivery(delivery)) ||
       this.#quietRoutineTurn(agentId, threadId, deliveries)
     )
       return false;
@@ -1375,8 +1376,8 @@ export class TurnLifecycle {
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs and
    * teammate updates, so its completion keeps the text answers as quiet answers; `shown` when a
    * person waits for the answer, as in a Test run; null when neither a routine run nor a teammate
-   * update started the turn. The completion decides again, because a message can join the turn after
-   * the call. `channelRun` is a turn that owns a main task of a channel routine's request: the channel
+   * update or an answered teammate request started the turn. The completion decides again, because
+   * a message can join the turn after the call. `channelRun` is a turn that owns a main task of a channel routine's request: the channel
    * then posts no message for the turn (#7166).
    */
   requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun = false): "quiet" | "shown" | null {
@@ -1385,7 +1386,7 @@ export class TurnLifecycle {
       return this.#reportedFailures.has(turnId) ? "shown" : "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || quietTeammateDelivery(delivery)))
+    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || this.#quietTeammateDelivery(delivery)))
       return null;
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
@@ -1428,10 +1429,15 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
-          quietTeammateDelivery(delivery) ||
+          this.#quietTeammateDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)),
       )
     );
+  }
+
+  /** A teammate's update, or a request that this agent already answered with openbot.send_message. */
+  #quietTeammateDelivery(delivery: QueueDelivery): boolean {
+    return quietTeammateDelivery(delivery, this.#mailbox.hasReplyFrom(delivery.recipientAgentId, delivery.messageId));
   }
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(

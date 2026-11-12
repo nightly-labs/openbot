@@ -72,7 +72,8 @@ is never quiet.
 
 A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
 that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
-turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
+turn. A teammate's request is quiet in the same way after the agent sent its result back with
+`send_message` (#7585); before that, the requester waits for the turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
 write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
 of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
