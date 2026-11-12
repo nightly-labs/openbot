@@ -18,4 +18,6 @@ export const messages = {
   "error.kind.permission": "Bu eylemi tamamlamak için izniniz yok. Sahibinden erişim isteyin.",
   "error.kind.rateLimit": "Çok fazla istek. Bir süre bekleyin, ardından tekrar deneyin.",
   "error.kind.service": "Hizmet kullanılamıyor. Bir süre bekleyin, ardından tekrar deneyin.",
+  "error.kind.clock":
+    "OpenBot'u çalıştıran bilgisayarın tarihi veya saati muhtemelen yanlış olduğu için güvenli bağlantı kurulamadı. Tarihi ve saati düzeltin, ardından tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -17,4 +17,6 @@ export const messages = {
   "error.kind.permission": "Vous n’avez pas l’autorisation d’effectuer cette action. Demandez l’accès au propriétaire.",
   "error.kind.rateLimit": "Trop de requêtes. Patientez un instant, puis réessayez.",
   "error.kind.service": "Le service est indisponible. Patientez un instant, puis réessayez.",
+  "error.kind.clock":
+    "La connexion sécurisée a échoué, car la date ou l’heure de l’ordinateur qui exécute OpenBot est probablement incorrecte. Corrigez la date et l’heure, puis réessayez.",
 } as const satisfies PartialTranslation<typeof source>;
