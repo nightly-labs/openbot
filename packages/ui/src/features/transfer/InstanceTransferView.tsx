@@ -22,13 +22,15 @@ import {
   Lock,
   Monitor,
   Settings,
+  SlidingTabs,
   Sparkles,
   SwitchField,
   TriangleAlert,
   Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
@@ -42,6 +44,8 @@ export interface InstanceExportOptions {
   includeFiles: boolean;
   includeSettings: boolean;
   includeHistory?: boolean;
+  includeChannelMessages?: boolean;
+  includeServerPreferences?: boolean;
 }
 
 export interface InstanceTransferViewProps {
@@ -57,6 +61,11 @@ export interface InstanceTransferViewProps {
   onExport: (options: InstanceExportOptions) => void;
   /** The server can put the chat history in the file. */
   historyAvailable?: boolean | undefined;
+  /**
+   * The server can choose the channel messages apart from the chats, and can put its server
+   * preferences in the file: this computer, or a host with `instance-transfer-full-copy-v1`.
+   */
+  fullCopyAvailable?: boolean | undefined;
   /** Shows the saved file in its folder. Absent in a browser, which saves to its own download folder. */
   onShowExport?: (() => void) | undefined;
   onExportAgain: () => void;
@@ -65,7 +74,8 @@ export interface InstanceTransferViewProps {
   result: InstanceTransferResult | null;
   importError: string | null;
   onChoose: () => void;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  /** `includeServerPreferences`: only where `fullCopyAvailable`; the file's preferences replace this server's. */
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancelImport: () => void;
   onImportDone: () => void;
   /** Absent for a joined server: its providers are signed in on that computer. */
@@ -150,24 +160,92 @@ export function InstanceTransferView(props: InstanceTransferViewProps) {
   );
 }
 
+/** A part of the file that the user can leave out. The agents are always in it. */
+type ExportPart = "settings" | "history" | "channels" | "files" | "preferences";
+
+/** "Templates" is the agents and the server settings: a new server that starts with the same team. */
+const TEMPLATE_PARTS: ReadonlySet<ExportPart> = new Set(["settings"]);
+
 function ExportScreen(props: InstanceTransferViewProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [choosing, setChoosing] = createSignal(false);
-  const [files, setFiles] = createSignal(true);
-  const [settings, setSettings] = createSignal(true);
-  const [history, setHistory] = createSignal(true);
+  const [parts, setParts] = createSignal<ReadonlySet<ExportPart>>(TEMPLATE_PARTS);
   const agents = () => props.summary?.agents ?? [];
   const selected = createMemo(() => agents().filter((agent) => !excluded().has(agent.id)));
   const busy = () => props.exportPhase === "exporting";
-  const totals = () => ({
-    agents: selected().length,
-    skills: selected().reduce((total, agent) => total + agent.skillCount, 0),
-    routines: selected().reduce((total, agent) => total + agent.routineCount, 0),
-    memories: selected().reduce((total, agent) => total + agent.memoryCount, 0),
-    fileBytes: files() ? selected().reduce((total, agent) => total + agent.fileBytes, 0) : null,
-    settings: settings(),
+  const has = (part: ExportPart) => parts().has(part);
+  /** The parts this server offers, in the order of the list. */
+  const available = createMemo((): ExportPart[] => [
+    "settings",
+    ...(props.historyAvailable ? (["history"] as const) : []),
+    ...(props.historyAvailable && props.fullCopyAvailable ? (["channels"] as const) : []),
+    "files",
+    ...(props.fullCopyAvailable ? (["preferences"] as const) : []),
+  ]);
+  const everything = () => available().every(has);
+  const templates = () => available().every((part) => has(part) === TEMPLATE_PARTS.has(part));
+  const preset = () => (templates() ? "templates" : everything() ? "everything" : "custom");
+  // The pill fades in place when a preset follows a custom choice, and does not slide in from the edge.
+  let lastPreset = untrack(preset);
+  const fromCustom = createMemo(() => {
+    const next = preset();
+    const result = lastPreset === "custom" && next !== "custom";
+    lastPreset = next;
+    return result;
   });
+  // `fromCustom` is read on each change, also while the choice is custom, so it sees each step.
+  const pill = () => {
+    const appear = fromCustom();
+    return preset() === "custom" ? "none" : appear ? "appear" : undefined;
+  };
+  const toggle = (part: ExportPart, on: boolean) => {
+    const next = new Set(parts());
+    if (on) next.add(part);
+    else next.delete(part);
+    setParts(next);
+  };
+  const allFileBytes = () => agents().reduce((total, agent) => total + agent.fileBytes, 0);
+  const fileBytes = () => (has("files") ? selected().reduce((total, agent) => total + agent.fileBytes, 0) : 0);
+  const contents = () =>
+    [
+      t("import.count.agent", { count: selected().length }),
+      t("import.count.skill", { count: selected().reduce((total, agent) => total + agent.skillCount, 0) }),
+      t("import.count.routine", { count: selected().reduce((total, agent) => total + agent.routineCount, 0) }),
+      t("import.count.memory", { count: selected().reduce((total, agent) => total + agent.memoryCount, 0) }),
+    ].join(" · ");
+  const row = (part: ExportPart) => {
+    switch (part) {
+      case "settings":
+        return {
+          label: t("settings.transfer.part.settings"),
+          description: t("settings.transfer.export.settingsDescription"),
+        };
+      case "history":
+        return {
+          label: t("settings.transfer.part.chats"),
+          // Without the full copy, the chat history also carries the channel messages.
+          description: props.fullCopyAvailable
+            ? t("settings.transfer.part.chatsDescription")
+            : t("settings.transfer.export.historyDescription"),
+        };
+      case "channels":
+        return {
+          label: t("settings.transfer.part.channels"),
+          description: t("settings.transfer.part.channelsDescription"),
+        };
+      case "files":
+        return {
+          label: t("settings.transfer.part.files"),
+          description: `${format.fileSize(selected().reduce((total, agent) => total + agent.fileBytes, 0))} · ${t("settings.transfer.part.filesDescription")}`,
+        };
+      case "preferences":
+        return {
+          label: t("settings.transfer.part.preferences"),
+          description: t("settings.transfer.part.preferencesDescription"),
+        };
+    }
+  };
 
   return (
     <Show
@@ -187,34 +265,54 @@ function ExportScreen(props: InstanceTransferViewProps) {
         {(error) => <TransferAlert title={t("settings.transfer.export.failed")} description={error()} />}
       </Show>
       <Show when={props.summary} fallback={<p class="agent-import-lede">{t("settings.transfer.loading")}</p>}>
-        <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
+        <div class="instance-transfer-meter">
+          <div class="instance-transfer-meter-head">
+            <RollingPrice value={fileBytes()} format={format.fileSize} class="instance-transfer-meter-total" />
+            <span class="instance-transfer-meter-of">
+              {t("settings.transfer.meter.files", { total: format.fileSize(allFileBytes()) })}
+            </span>
+            {/* A custom choice selects no preset: the tabs need a selected value, else they select
+                the first one and call onChange, so a hidden, disabled value holds it. */}
+            <SlidingTabs.Root
+              class="instance-transfer-presets"
+              data-pill={pill()}
+              value={preset()}
+              disabled={busy()}
+              onChange={(value: string) => {
+                if (value === "templates") setParts(TEMPLATE_PARTS);
+                else if (value === "everything") setParts(new Set(available()));
+              }}
+            >
+              <SlidingTabs.List aria-label={t("settings.transfer.preset.label")}>
+                <SlidingTabs.Trigger value="templates">{t("settings.transfer.preset.templates")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="everything">{t("settings.transfer.preset.everything")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="custom" disabled class="instance-transfer-preset-custom">
+                  {t("settings.transfer.preset.label")}
+                </SlidingTabs.Trigger>
+              </SlidingTabs.List>
+            </SlidingTabs.Root>
+          </div>
+        </div>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             class="settings-modal-row"
-            checked={files()}
-            disabled={busy()}
-            onChange={setFiles}
-            label={t("settings.transfer.export.files")}
-            description={t("settings.transfer.export.filesDescription")}
+            checked
+            disabled
+            label={t("settings.transfer.part.agents")}
+            description={t("settings.transfer.part.agentsDescription", { contents: contents() })}
           />
-          <SwitchField
-            class="settings-modal-row"
-            checked={settings()}
-            disabled={busy()}
-            onChange={setSettings}
-            label={t("settings.transfer.export.settings")}
-            description={t("settings.transfer.export.settingsDescription")}
-          />
-          <Show when={props.historyAvailable}>
-            <SwitchField
-              class="settings-modal-row"
-              checked={history()}
-              disabled={busy()}
-              onChange={setHistory}
-              label={t("settings.transfer.export.history")}
-              description={t("settings.transfer.export.historyDescription")}
-            />
-          </Show>
+          <For each={available()}>
+            {(part) => (
+              <SwitchField
+                class="settings-modal-row"
+                checked={has(part)}
+                disabled={busy()}
+                onChange={(on: boolean) => toggle(part, on)}
+                label={row(part).label}
+                description={row(part).description}
+              />
+            )}
+          </For>
         </ItemGroup>
         <Button
           type="button"
@@ -238,8 +336,8 @@ function ExportScreen(props: InstanceTransferViewProps) {
               skillCount: agent.skillCount,
               routineCount: agent.routineCount,
               memoryCount: agent.memoryCount,
-              fileCount: files() ? agent.fileCount : 0,
-              fileBytes: files() ? agent.fileBytes : 0,
+              fileCount: has("files") ? agent.fileCount : 0,
+              fileBytes: has("files") ? agent.fileBytes : 0,
               nameExists: false,
             }))}
             excluded={excluded()}
@@ -257,9 +355,14 @@ function ExportScreen(props: InstanceTransferViewProps) {
             onClick={() =>
               props.onExport({
                 agentIds: selected().map((agent) => agent.id),
-                includeFiles: files(),
-                includeSettings: settings(),
-                ...(props.historyAvailable && history() ? { includeHistory: true } : {}),
+                includeFiles: has("files"),
+                includeSettings: has("settings"),
+                ...(props.historyAvailable && has("history") ? { includeHistory: true } : {}),
+                // Sent only where the server takes it apart from the chats.
+                ...(props.historyAvailable && props.fullCopyAvailable
+                  ? { includeChannelMessages: has("channels") }
+                  : {}),
+                ...(props.fullCopyAvailable && has("preferences") ? { includeServerPreferences: true } : {}),
               })
             }
           >
@@ -355,6 +458,8 @@ function ImportScreen(props: InstanceTransferViewProps) {
         {(preview) => (
           <ImportReview
             preview={preview}
+            // A host that answers with the v1 preview does not say; then the switch shows.
+            preferencesAvailable={props.fullCopyAvailable === true && preview.hasServerPreferences !== false}
             importing={props.importPhase === "importing"}
             error={props.importError}
             onImport={props.onImport}
@@ -371,14 +476,17 @@ function ImportScreen(props: InstanceTransferViewProps) {
 
 function ImportReview(props: {
   preview: InstanceTransferPreview;
+  /** The server takes the file's preferences, name, logo and members' choices. */
+  preferencesAvailable: boolean;
   importing: boolean;
   error: string | null;
-  onImport: (keys: string[], includeSettings: boolean) => void;
+  onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
   onCancel: () => void;
 }) {
   const { t, format } = useText();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [settings, setSettings] = createSignal(props.preview.hasSettings);
+  const [preferences, setPreferences] = createSignal(untrack(() => props.preferencesAvailable));
   const selected = createMemo(() => props.preview.agents.filter((agent) => !excluded().has(agent.key)));
   const totals = () => ({
     agents: selected().length,
@@ -434,20 +542,33 @@ function ImportReview(props: {
             disabled={props.importing}
             onChange={setSettings}
             label={t("settings.transfer.import.settings")}
-            description={t("settings.transfer.import.settingsDescription")}
+            description={t("settings.transfer.import.settingsAndPreferences")}
+          />
+        </ItemGroup>
+      </Show>
+      <Show when={props.preferencesAvailable}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            class="settings-modal-row"
+            checked={preferences()}
+            disabled={props.importing}
+            onChange={setPreferences}
+            label={t("settings.transfer.import.preferences")}
+            description={t("settings.transfer.import.preferencesDescription")}
           />
         </ItemGroup>
       </Show>
       <div class="agent-import-actions instance-transfer-start">
         <Button
           type="button"
-          disabled={selected().length === 0 && !settings()}
+          disabled={selected().length === 0 && !settings() && !(props.preferencesAvailable && preferences())}
           loading={props.importing}
           loadingLabel={t("settings.transfer.import.importing")}
           onClick={() =>
             props.onImport(
               selected().map((agent) => agent.key),
               settings(),
+              props.preferencesAvailable && preferences(),
             )
           }
         >

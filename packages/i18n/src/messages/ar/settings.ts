@@ -752,12 +752,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "لا إعدادات للخادم",
   "settings.transfer.includeAgent": "تضمين {name}",
   "settings.transfer.export.title": "تصدير هذا الخادم",
-  "settings.transfer.export.files": "تضمين ملفات مساحة العمل",
-  "settings.transfer.export.filesDescription":
-    "الملفات التي أنشأها وكلاؤك، والمجلد المشترك. أوقفه للحصول على ملف صغير.",
-  "settings.transfer.export.settings": "تضمين إعدادات الخادم",
+  "settings.transfer.preset.label": "ما يدخل في الملف",
+  "settings.transfer.preset.templates": "القوالب",
+  "settings.transfer.preset.everything": "كل شيء",
+  "settings.transfer.meter.files": "من {total} في ملفات مساحة العمل",
+  "settings.transfer.part.agents": "الوكلاء وإعدادهم",
+  "settings.transfer.part.agentsDescription": "{contents}. موجودة دائمًا في الملف.",
+  "settings.transfer.part.settings": "إعدادات الخادم",
+  "settings.transfer.part.chats": "سجل الدردشات",
+  "settings.transfer.part.chatsDescription":
+    "الدردشات والسلاسل الجانبية مع ملفاتها، وسجل تشغيل المهام الدورية. يتابع الوكلاء هذه الدردشات بسياقها.",
+  "settings.transfer.part.channels": "رسائل القنوات",
+  "settings.transfer.part.channelsDescription":
+    "رسائل القنوات التي يشارك فيها الوكلاء المُصدَّرون، مع ملفاتها وسجل تشغيل المهام الدورية للقنوات.",
+  "settings.transfer.part.files": "ملفات مساحة العمل",
+  "settings.transfer.part.filesDescription": "الملفات التي أنشأها وكلاؤك، والمجلد المشترك.",
+  "settings.transfer.part.preferences": "تفضيلات الخادم",
+  "settings.transfer.part.preferencesDescription":
+    "الاسم والشعار والمنطقة الزمنية والشخصية والإعدادات الافتراضية للوكلاء واختيارات النماذج وإعدادات الذاكرة والمهارات، ومستويات الإشعارات والعناصر المثبّتة لكل شخص.",
   "settings.transfer.export.settingsDescription":
-    "خوادم MCP ومزوّدو النماذج المخصصون وأقسام الشريط الجانبي وتدفقات المهام الدورية.",
+    "خوادم MCP ومزوّدو النماذج المخصصون وأقسام الشريط الجانبي وتدفقات المهام الدورية والمهارات المشتركة.",
   "settings.transfer.export.chooseAgents": "اختيار الوكلاء ({selected} من {total})",
   "settings.transfer.export.hideAgents": "إخفاء الوكلاء",
   "settings.transfer.export.agentsLabel": "الوكلاء المراد تصديرهم",
@@ -783,8 +797,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "الوكلاء في الملف",
   "settings.transfer.import.nameExists": "الاسم مستخدم بالفعل",
   "settings.transfer.import.settings": "استيراد إعدادات الخادم",
-  "settings.transfer.import.settingsDescription":
-    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.settingsAndPreferences":
+    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي والمهارات المشتركة غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.preferences": "استيراد تفضيلات الخادم",
+  "settings.transfer.import.preferencesDescription":
+    "يستبدل اسم هذا الخادم وشعاره وتفضيلاته، ومستويات الإشعارات والعناصر المثبّتة لكل شخص، بتلك الموجودة في الملف.",
   "settings.transfer.import.submit": {
     zero: "لا وكلاء للاستيراد",
     one: "استيراد وكيل واحد",

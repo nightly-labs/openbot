@@ -150,7 +150,7 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       );
   }
 
-  function importFile(keys: string[], includeSettings: boolean): void {
+  function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {
     const token = state.preview?.token;
     if (!token) return;
     setState((draft) => {
@@ -158,7 +158,10 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       draft.importError = null;
     });
     void calls
-      .apply({ token, keys, includeSettings }, serverId)
+      .apply(
+        { token, keys, includeSettings, ...(includeServerPreferences ? { includeServerPreferences } : {}) },
+        serverId,
+      )
       .then((result) => {
         desktopAnalytics.track("server_transfer_action", { action: "import", result: "succeeded" });
         setState((draft) => {
