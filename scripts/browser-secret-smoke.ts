@@ -145,19 +145,22 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
             tabId: tab.id,
             method: "password",
             ...(saved ? { loginId: "combined-login" } : {}),
-            targets: [{ kind: "css", selector: "#password" }],
-            codeTargets: [{ kind: "css", selector: codeSelector }],
+            targets: [
+              { kind: "css", selector: "#password" },
+              { kind: "css", selector: codeSelector },
+            ],
             digits: 6,
             submission: "click",
             submitTarget: { kind: "css", selector: "#combined-submit" },
           },
         });
-        // Code fields need a saved login, and a field that does not ask for a code is not one.
+        // A password target with code fields needs a saved login, and a field that does not ask for a
+        // code is not a code field.
         const refused = await runCauseEffect(browser.prepareSecret(params({ saved: false }))).then(
           () => false,
           () => true,
         );
-        if (!refused) throw new Error("Code targets were accepted without a saved login.");
+        if (!refused) throw new Error("Password and code targets were accepted without a saved login.");
         const wrongField = await runCauseEffect(browser.prepareSecret(params({ codeSelector: "#code" })));
         wrongField.cancel();
         if (wrongField.vaultFillable || !wrongField.withCode)

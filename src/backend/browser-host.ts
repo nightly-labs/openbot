@@ -1603,18 +1603,21 @@ export class BrowserHost {
       return yield* browserFailure(new Error(sourceText("error.backend.authHttpsRequired")));
     yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
     // A form that takes the password and an authenticator code in one submit gets both from one saved
-    // login, so no field is filled while the other waits for a second call.
-    const codeTargets = args.codeTargets ?? [];
-    const withCode = codeTargets.length > 0;
-    if (withCode && (args.method !== "password" || !args.loginId))
+    // login, so no field is filled while the other waits for a second call. Its targets are the
+    // password field, then the code field or the digit fields.
+    const withCode = args.method === "password" && args.targets.length > 1;
+    const fieldTargets = withCode ? args.targets.slice(0, 1) : args.targets;
+    const codeTargets = withCode ? args.targets.slice(1) : [];
+    if (withCode && !args.loginId)
       return yield* browserFailure(
-        new Error("Invalid authentication targets: codeTargets is only for method=password with loginId."),
+        new Error(
+          "Invalid authentication targets: method=password needs exactly one field target, or a loginId when the form also asks for the authenticator code.",
+        ),
       );
     if ((args.method !== "password" || withCode) && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
-      (args.method === "password" && args.targets.length !== 1) ||
-      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (fieldTargets.length !== 1 && fieldTargets.length !== args.digits) ||
       (withCode && codeTargets.length !== 1 && codeTargets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
@@ -1624,9 +1627,9 @@ export class BrowserHost {
             ? "Invalid authentication targets: submission=click needs submitTarget."
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
-              : args.method === "password" && args.targets.length !== 1
-                ? "Invalid authentication targets: method=password needs exactly one field target."
-                : `Invalid authentication targets: use one ${withCode ? "code target" : "field target"} for the whole code, or ${args.digits} digit ${withCode ? "code targets" : "field targets"}.`,
+              : withCode
+                ? `Invalid authentication targets: after the password field, use one target for the whole code, or ${args.digits} digit field targets.`
+                : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
@@ -1643,7 +1646,7 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget, codeTargets),
+              tab.engine.prepareSecret(fieldTargets, url.origin, args.submission, args.submitTarget, codeTargets),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1656,7 +1659,7 @@ export class BrowserHost {
         request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
         agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
         vaultFillable: entry.kinds.every((kind, index) =>
-          args.method === "password" && index < args.targets.length
+          args.method === "password" && index < fieldTargets.length
             ? kind.password
             : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
         ),
@@ -1684,7 +1687,7 @@ export class BrowserHost {
             // After the check above, a request with code fields always has its code.
             const filledCode = withCode ? code : undefined;
             const values = [
-              ...spread(secret, args.targets.length),
+              ...spread(secret, fieldTargets.length),
               ...(filledCode === undefined ? [] : spread(filledCode, codeTargets.length)),
             ];
             const secrets = filledCode === undefined ? [secret] : [secret, filledCode];

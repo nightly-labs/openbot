@@ -154,8 +154,8 @@ const answer = (message) => {
       const browserCall = (tool, args) => ({ tool: "tool_call", arguments: { name: "openbot_browser." + tool, arguments: args } });
       const secret = (method, withCode = false) => browserCall("submit_secret", {
         tabId: "routine-tab", loginId: ${JSON.stringify(VAULT_LOGIN)}, method, digits: 6,
-        targets: [{ kind: "css", selector: "#secret" }], submission: "click",
-        ...(withCode ? { codeTargets: [{ kind: "css", selector: "#code" }] } : {}),
+        targets: [{ kind: "css", selector: "#secret" }, ...(withCode ? [{ kind: "css", selector: "#code" }] : [])],
+        submission: "click",
         submitTarget: { kind: "css", selector: "#submit" },
       });
       let held = false;
@@ -273,7 +273,8 @@ const browser: AgentBrowserHost = {
       const args = getRecord(params, "arguments");
       const method = getString(args, "method");
       assert.ok(method === "password" || method === "authenticator");
-      const withCode = Array.isArray(args?.codeTargets);
+      const targets = args?.targets;
+      const withCode = method === "password" && Array.isArray(targets) && targets.length > 1;
       return {
         request: { method, origin: VAULT_ORIGIN, digits: 6 },
         agentScriptedOrigin: false,
