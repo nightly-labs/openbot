@@ -61,6 +61,8 @@ export function ShareScreen() {
   const received = useRef<IncomingShare | null>(null);
   const sendingRef = useRef(false);
   const mounted = useRef(true);
+  // True while Send reads the copies of the share. A new sheet deletes them, so it waits.
+  const reading = useRef(false);
   // A new share that came while a send read the files. The sheet takes it after the send.
   const nextShareWaits = useRef(false);
   // The host of the selected agent decides which files it takes. The read of the files asks it.
@@ -103,7 +105,8 @@ export function ShareScreen() {
       mounted.current = false;
       stopTaking();
       // A send in progress still reads the copies. It deletes them when the read ends.
-      if (received.current && !sendingRef.current) discardIncomingShare(received.current);
+      if (reading.current) return;
+      if (received.current) discardIncomingShare(received.current);
       // The chat took the place of the sheet. A share that came during the send gets a new sheet.
       if (nextShareWaits.current) openShareSheet();
     };
@@ -151,13 +154,16 @@ export function ShareScreen() {
     // alert names each file that the host does not take or that is too large.
     attachments.clear();
     let sharedText = "";
+    reading.current = true;
     const { items, refused } = await attachments.addShared(share.text, share.files, (text) => {
       sharedText = text;
     });
+    reading.current = false;
     attachments.clear();
     // The user closed the sheet during the read: nothing is sent.
     if (!mounted.current) {
       discardIncomingShare(share);
+      if (nextShareWaits.current) openShareSheet();
       return;
     }
     if (refused) {
