@@ -7,7 +7,7 @@ import {
   isNoUpdateToolCall,
   isTextAnswer,
   keptQuietAnswer,
-  quietTeammateDelivery,
+  quietTeammateTurnDelivery,
 } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
@@ -80,6 +80,11 @@ export interface ProviderHistoryImportInput {
    * not count: the tool refused its answer, so the answer showed. Left out, no answer counts.
    */
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
+  /**
+   * Whether the agent answered a teammate's request with its own `send_message` reply, so its turn can
+   * have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   */
+  hasOwnReplyFrom?(agentId: string, messageId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -306,7 +311,7 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a quiet routine run or a teammate update (`quietTeammateDelivery`) started answered: `quiet` when each answer is only the
+ * How a turn that a quiet routine run, a teammate update or an answered request (`quietTeammateTurnDelivery`) started answered: `quiet` when each answer is only the
  * no-update marker, or the agent called the no-update tool and generated no image, so the turn
  * completion kept only its quiet answers; `image` when the agent called the tool
  * and generated an image, so the completion dropped only the text answers; `answered` for any
@@ -347,7 +352,11 @@ function routineTurnAnswers(
           if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
-            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
+            ((input.quietTeammateThread === true &&
+              quietTeammateTurnDelivery(
+                delivery,
+                (agentId, messageId) => input.hasOwnReplyFrom?.(agentId, messageId) === true,
+              )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.

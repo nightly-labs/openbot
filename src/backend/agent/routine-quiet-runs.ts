@@ -89,6 +89,34 @@ export function answeredRequestId(delivery: QueueDelivery): string | null {
     : null;
 }
 
+/**
+ * A teammate's request that does not reply to a message of this agent. Its result goes to the
+ * teammate with `send_message`, so after that reply nobody waits for the turn's written answer.
+ */
+export function teammateRequest(delivery: QueueDelivery): boolean {
+  return (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply !== false &&
+    !delivery.replyToMessageId
+  );
+}
+
+/**
+ * Whether a teammate's message may end its turn quiet: an update (`quietTeammateDelivery`), or a
+ * request that the agent already answered with its own `send_message` reply (`answered`). Without
+ * this, a provider such as Claude Code made the model write the result again in the user's chat (#7465).
+ */
+export function quietTeammateTurnDelivery(
+  delivery: QueueDelivery,
+  answered: (agentId: string, messageId: string) => boolean,
+): boolean {
+  return (
+    quietTeammateDelivery(delivery) ||
+    (teammateRequest(delivery) && answered(delivery.recipientAgentId, delivery.messageId))
+  );
+}
+
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
   const answer = text.trim();
@@ -97,7 +125,7 @@ export function isNoUpdateAnswer(text: string): boolean {
 
 /**
  * Settles the answers of a completed turn that ran only quiet routine runs and teammate updates
- * (`quietTeammateDelivery`). Each answer that is only
+ * or answered requests (`quietTeammateTurnDelivery`). Each answer that is only
  * the marker goes: the user never needs to see it. After a call to the no-update tool, each text answer
  * is a quiet answer. When nothing else in the turn tells the user anything, the turn is quiet: its
  * thinking and plan go, and each quiet answer stays as a `ROUTINE_QUIET_ANSWER_ITEM_TYPE` message that

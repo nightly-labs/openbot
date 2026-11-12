@@ -83,6 +83,15 @@ for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only af
 `routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
 request always shows.
 
+A teammate's request that does not reply to a message of the agent ends quiet in the same way after
+the agent sent its result to that teammate with `send_message` (`quietTeammateTurnDelivery`, #7465).
+Its prompt names `routine_no_update` for after that reply. Before the reply, the tool answers that the
+agent must send the result first. Only the agent's own reply counts (`MailboxStore.hasOwnReplyFrom`):
+the result that OpenBot relays when the turn ends and the note for a failed request come after the
+turn completion, so they do not count, and the history import decides the same. The tool call counts
+also when it came before the reply, at the turn completion and in the history import. A reply to a
+message of the agent can hold the result that the user asked for, so it is never quiet.
+
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
 desktop, the web client and the phone show no notification for it and play no completion sound
