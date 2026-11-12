@@ -22,6 +22,8 @@ interface CaseResult {
   afterFirstKey: string;
   duringComposition: string;
   afterComposition: string;
+  /** A picker that was open before the composition must not change while the IME owns the text. */
+  pickerStayedOpen: boolean;
   passed: boolean;
 }
 
@@ -38,7 +40,9 @@ const report: { cases: CaseResult[]; regressions: RegressionResult[]; passed: bo
 };
 
 async function openComposer(page: Page): Promise<Locator> {
-  await page.goto(`${storybook}/iframe.html?id=conversation-composereditor--mention-picker&viewMode=story`);
+  await page.goto(`${storybook}/iframe.html?id=conversation-composereditor--mention-picker&viewMode=story`, {
+    timeout: 120_000,
+  });
   const editor = page.getByRole("textbox", { name: "Message Chief" });
   await editor.waitFor({ timeout: 60_000 });
   await editor.click();
@@ -78,7 +82,9 @@ async function runCase(
   const firstKeyPrevented = await typeCompositionFirstKey(editor);
   const afterFirstKey = await editor.innerText();
   await session.send("Input.imeSetComposition", { text: "に", selectionStart: 1, selectionEnd: 1 });
+  await page.waitForTimeout(200);
   const duringComposition = await editor.innerText();
+  const pickerStayedOpen = !pickerOpen || (await page.locator(".mention-picker").isVisible());
   await session.send("Input.insertText", { text: "に" });
   await page.waitForTimeout(200);
   const afterComposition = await editor.innerText();
@@ -89,7 +95,9 @@ async function runCase(
     afterFirstKey,
     duringComposition,
     afterComposition,
-    passed: afterFirstKey === prefix && duringComposition === expected && afterComposition === expected,
+    pickerStayedOpen,
+    passed:
+      afterFirstKey === prefix && duringComposition === expected && afterComposition === expected && pickerStayedOpen,
   };
 }
 
@@ -148,6 +156,24 @@ async function runRegressions(page: Page): Promise<RegressionResult[]> {
     name: "mention picker",
     text: mentioned,
     passed: !pickerOpen && mentioned.trim().length > 0 && !mentioned.includes("@ch"),
+  });
+
+  // Backspace still removes the automatic space and then the mention.
+  editor = await openComposer(page);
+  await page.keyboard.type("@ch");
+  await page.locator(".mention-picker").waitFor({ state: "visible", timeout: 10_000 });
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(200);
+  const afterSpace = await editor.innerText();
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(200);
+  const afterMention = await editor.innerText();
+  results.push({
+    name: "backspace mention",
+    text: `${afterSpace}|${afterMention}`,
+    passed: afterSpace.length > 0 && !afterSpace.endsWith(" ") && afterMention === "",
   });
 
   return results;

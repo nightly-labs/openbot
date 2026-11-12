@@ -408,7 +408,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   /*
    * The key that starts a composition comes before `compositionstart`, without `isComposing`,
    * and Chromium marks it with keyCode 229 ("Process"). The `insertText` that follows carries
-   * the raw key; the input method types the composed text itself, so the composer keeps it out.
+   * the raw key; the input method types the composed text itself, so the composer does not type it.
    */
   let imeKeyDown = false;
   const [compositionRevision, setCompositionRevision] = createSignal(0);
@@ -644,6 +644,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const view = document.defaultView;
     const selectionChanged = () => {
       if (editor && document.activeElement === editor) savedCaret = readEditorSelection(editor)?.focus ?? savedCaret;
+      // The composition moves the selection itself; the picker syncs on `compositionend`.
+      if (isComposing) return;
       // A dismissed picker stays closed until the user types or clicks again.
       if (mention()) updateMention();
     };
@@ -696,9 +698,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
     imeKeyDown = false;
     const lineBreak = event.inputType === "insertLineBreak" || event.inputType === "insertParagraph";
     if (!lineBreak && (event.inputType !== "insertText" || !event.data)) return;
-    event.preventDefault();
-    // The composition types the kana; this first `insertText` carries only the raw key.
+    // The composition types the kana; this first `insertText` carries only the raw key, so leave it
+    // to the browser instead of typing it here.
     if (imeInsert) return;
+    event.preventDefault();
     if (lineBreak) insertLineBreak(editor);
     else if (event.data) insertPlainText(editor, event.data);
     emitValue();
@@ -1105,7 +1108,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
         spellcheck="true"
         data-cuelume-type=""
         onFocus={ensureEditorSelection}
-        onInput={() => {
+        onInput={(event) => {
+          // The composition owns the text until `compositionend`, which syncs the value.
+          if (isComposing || event.isComposing) return;
           emitValue();
           updateMention();
         }}
@@ -1119,6 +1124,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onCompositionEnd={() => {
           isComposing = false;
           imeKeyDown = false;
+          emitValue();
+          updateMention();
           setCompositionRevision((revision) => revision + 1);
         }}
         onPaste={handlePaste}
