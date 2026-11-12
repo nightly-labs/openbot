@@ -304,6 +304,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "גבוה מאוד",
   "mobile.agent.runtime.effort.max": "מרבי",
   "mobile.agent.runtime.effort.ultra": "אולטרה",
+  "mobile.agent.runtime.fast": "מהיר",
   "mobile.agent.runtime.retryModels": "ניסיון חוזר לטעינת מודלים",
   "mobile.agent.runtime.loadingModels": "טוען מודלים…",
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
