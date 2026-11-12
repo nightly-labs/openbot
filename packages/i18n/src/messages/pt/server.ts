@@ -337,6 +337,17 @@ export const messages = {
     "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
+  "server.settings.turnLimit": "Tópicos ao mesmo tempo",
+  "server.settings.turnLimitDescription":
+    "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",
+  "server.settings.turnLimitAutomatic": "Automático ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automático (sem limite)",
+  "server.settings.turnLimitUnlimited": "Sem limite",
+  "server.settings.turnLimitsLoadFailed": "Não foi possível carregar os limites de tópicos deste servidor.",
+  "server.settings.agentTaskLimit": "Tópicos em paralelo por agente",
+  "server.settings.agentTaskLimitDescription":
+    "Quantos tópicos cada agente sem limite próprio pode executar ao mesmo tempo.",
+  "server.settings.agentTaskLimitDefault": "Padrão ({count})",
   "server.settings.memoryLimit": "Memórias por agente",
   "server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",

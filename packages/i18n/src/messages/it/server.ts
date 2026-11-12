@@ -333,6 +333,17 @@ export const messages = {
     "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente.",
   "server.settings.timezoneAutomatic": "Automatico ({zone})",
   "server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
+  "server.settings.turnLimit": "Thread contemporanei",
+  "server.settings.turnLimitDescription":
+    "Quanti thread degli agenti possono essere eseguiti contemporaneamente su questo server. Più thread usano più memoria.",
+  "server.settings.turnLimitAutomatic": "Automatico ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatico (nessun limite)",
+  "server.settings.turnLimitUnlimited": "Nessun limite",
+  "server.settings.turnLimitsLoadFailed": "Impossibile caricare i limiti dei thread di questo server.",
+  "server.settings.agentTaskLimit": "Thread in parallelo per agente",
+  "server.settings.agentTaskLimitDescription":
+    "Quanti thread può eseguire contemporaneamente ogni agente senza un limite proprio.",
+  "server.settings.agentTaskLimitDefault": "Predefinito ({count})",
   "server.settings.memoryLimit": "Memorie per agente",
   "server.settings.memoryLimitDescription": "Quante memorie può conservare ogni agente su questo server.",
   "server.settings.memoryLimitLoadFailed": "Impossibile caricare il limite di memorie di questo server.",

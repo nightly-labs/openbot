@@ -730,6 +730,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
@@ -801,6 +802,13 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+
+`host-turn-limits-v1` reads and sets the turn limits of the host (`openbot-host-turn-limits-v1.json`).
+`turnLimit` is the most turns that run at the same time on the host; `null` is automatic: 2, 8 or 16 by
+the memory of a server, no limit on a desktop computer. `automaticTurnLimit` gives that value. A chosen
+value can be above it; low memory still holds a new turn. `agentTaskLimit` is the task limit of an
+agent with no limit of its own; `null` is `defaultAgentTaskLimit` (4). A save starts the turns that a
+higher limit lets start. `openbot status` shows the limit that runs.
 
 `host-personality-v1` reads and sets how the agents of a server talk while they work
 (`openbot-server-personality-v1.json`, Server settings → Personality). `natural`, the default, tells

@@ -163,8 +163,9 @@ socket.
 A self-hosted server uses the memory guards of a hosted server (see
 [Memory](hosted-servers.md#memory)). When free memory is low, new turns wait in the queue and start
 again when memory is available. A message from a person starts first. The browser opens no new tab
-and unloads idle pages sooner. A fixed number of turns run at the same time: 2 up to 5 GiB of memory,
-8 up to 10 GiB, and 16 above.
+and unloads idle pages sooner. By default, a fixed number of turns run at the same time: 2 up to
+5 GiB of memory, 8 up to 10 GiB, and 16 above. An owner or admin can choose another number, 1 to 128, or
+Unlimited, in Server Settings > General > Threads at the same time. Low memory still holds a new turn.
 
 The memory ceiling is the smaller of the machine memory and the limit of `openbot.service`
 (`MemoryMax=90%`). To give OpenBot less memory, lower the limit with

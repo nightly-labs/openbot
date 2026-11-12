@@ -74,6 +74,7 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "当前连接无法保存只运行一次的自动化任务。",
   "error.team.routineRunCommandUnsupported": "当前连接无法提供自动化任务的运行命令。",
   "error.team.threadQueueUnsupported": "当前连接无法显示支线对话的队列。",
+  "error.team.hostTurnLimitsUnsupported": "此连接无法显示或更改服务器的话题数限制。",
   "error.team.usageLimitUnsupported": "当前连接无法显示或更改助手的用量限制。",
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
