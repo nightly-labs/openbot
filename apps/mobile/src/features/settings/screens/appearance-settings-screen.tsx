@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { AppIconSection } from "@/features/settings/components/app-icon-row";
 import { MessageColorPicker } from "@/features/settings/components/message-color-picker";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
@@ -84,6 +85,7 @@ export function AppearanceSettingsScreen() {
           <Typography.Paragraph>{t("mobile.settings.appearance.theme")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
+      <AppIconSection />
       <TextSizeSection />
       <SettingsSection footer={messageColorError ?? t("mobile.settings.appearance.messageColorFooter")}>
         <SettingsRow
