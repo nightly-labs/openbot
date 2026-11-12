@@ -1,3 +1,3 @@
 ### Fixed
 
-- When an agent tries to post to a WhatsApp chat that you did not allow, it now tells you to add the contact or the group in Marketplace, Apps, WhatsApp, in place of an unclear "no_answer" error.
+- When an agent lists the chats of a WhatsApp number, it now knows that the list has only the chats you allowed. When a chat is missing, it tells you to add the contact or the group in Marketplace, Apps, WhatsApp. Before, a personal number showed only "Message yourself", and the agent could not say why the other chats were missing.
