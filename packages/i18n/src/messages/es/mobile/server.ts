@@ -326,6 +326,7 @@ export const messages = {
   "mobile.server.route.member": "Miembro",
   "mobile.server.route.timezone": "Zona horaria",
   "mobile.server.route.personality": "Personalidad del agente",
+  "mobile.server.route.agents": "Agentes",
   "mobile.server.settings.storage": "Almacenamiento",
   "mobile.server.route.storage": "Almacenamiento",
   "mobile.server.route.storageFiles": "Todos los archivos",
@@ -449,6 +450,25 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "No se pudo guardar el límite de recuerdos. Inténtalo de nuevo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su límite de recuerdos.",
+  "mobile.server.settings.memoryReview": "Revisión de recuerdos",
+  "mobile.server.settings.memoryReviewDescription":
+    "Con qué frecuencia los agentes de este servidor guardan en segundo plano datos duraderos de sus chats.",
+  "mobile.server.settings.memoryReviewOff": "Desactivada",
+  "mobile.server.settings.memoryReviewTurns": { one: "Cada {count} turno", other: "Cada {count} turnos" },
+  "mobile.server.settings.memoryReviewLoadFailed": "No se pudo cargar el ajuste de revisión de recuerdos.",
+  "mobile.server.settings.skillLearning": "Aprendizaje de habilidades",
+  "mobile.server.settings.skillLearningDescription":
+    "Si los agentes de este servidor guardan lo que aprenden como habilidades.",
+  "mobile.server.settings.skillLearningAutomatic": "Automático",
+  "mobile.server.settings.skillLearningAsk": "Preguntar antes",
+  "mobile.server.settings.skillLearningOff": "Desactivado",
+  "mobile.server.settings.skillLearningLoadFailed": "No se pudo cargar el ajuste de aprendizaje de habilidades.",
+  "mobile.server.settings.browsingMemory": "Aprender de mi navegación",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Cuando controlas el navegador de un agente, el agente aprende cómo funcionan los sitios a partir de las páginas y los botones que usas. El texto que escribes no se guarda.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "No se pudo cargar el ajuste de navegación.",
+  "mobile.server.settings.learningSaveFailed": "No se pudo guardar este ajuste. Inténtalo de nuevo.",
+  "mobile.server.settings.learningUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí este ajuste.",
   "mobile.server.settings.responseStyleDescription":
     "Natural: los agentes envían actualizaciones breves mientras trabajan y el chat las muestra. Clásico: los agentes responden una vez, al terminar.",
   "mobile.server.settings.responseStyleNatural": "Natural",
@@ -457,8 +477,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "No se pudo guardar el estilo de respuesta. Inténtalo de nuevo.",
   "mobile.server.settings.personalityUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su estilo de respuesta.",
-  "mobile.server.settings.personalityUnavailable":
-    "Conéctate a este servidor como propietario o administrador para cambiar la personalidad del agente.",
+  "mobile.server.settings.agentsUnavailable":
+    "Conéctate a este servidor como propietario o administrador para cambiar los ajustes de los agentes.",
   "mobile.server.route.browserProfiles": "Perfiles del navegador",
   "mobile.server.browserProfiles.unavailable":
     "Solo el propietario o un administrador de un servidor en línea puede gestionar sus perfiles del navegador.",

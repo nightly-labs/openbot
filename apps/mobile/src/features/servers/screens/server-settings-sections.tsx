@@ -7,11 +7,11 @@ import type { LucideIcon } from "lucide-react-native";
 import AppWindow from "lucide-react-native/icons/app-window";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import Blocks from "lucide-react-native/icons/blocks";
+import Bot from "lucide-react-native/icons/bot";
 import Brain from "lucide-react-native/icons/brain";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
 import Earth from "lucide-react-native/icons/earth";
-import Smile from "lucide-react-native/icons/face-slightly-smiling";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
@@ -30,6 +30,12 @@ import { useUniwind } from "uniwind";
 import { confirmOwner } from "@/features/app-lock/model/app-lock";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import {
+  ServerBrowsingMemoryRow,
+  ServerMemoryReviewRow,
+  ServerPersonalityRow,
+  ServerSkillLearningRow,
+} from "@/features/servers/components/server-learning-rows";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer } from "@/features/servers/model/server-settings-access";
@@ -37,7 +43,7 @@ import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
-import { RESPONSE_STYLE_LABEL_KEYS, useServerPersonality } from "@/features/servers/model/use-server-personality";
+import { useServerPersonality } from "@/features/servers/model/use-server-personality";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
@@ -290,21 +296,84 @@ export function ServerConnectionSection({
   );
 }
 
+/** True when this user can change at least one of the settings of the Agents page of the server. */
+export function useAgentSettingsAvailable(serverId: string): boolean {
+  const { canManageAgentMemoryLimit, canManageMemoryReview, canManageSkillLearning, canManageBrowsingMemory } =
+    useMobileWorkspace();
+  const personality = useServerPersonality(serverId);
+  return (
+    personality.canManage ||
+    canManageAgentMemoryLimit(serverId) ||
+    canManageMemoryReview(serverId) ||
+    canManageSkillLearning(serverId) ||
+    canManageBrowsingMemory(serverId)
+  );
+}
+
 /**
- * The OpenBot update of the host, and the server timezone and the memories per agent, for an owner or
- * admin of a host that serves them. The host checks the role and the value again.
+ * The OpenBot update of the host, the server timezone and the Agents page, for an owner or admin of a
+ * host that serves them. The host checks the role and the value again.
  */
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
+  const { t, errorMessage } = useText();
+  const timezone = useServerTimezone(serverId);
+  const update = useServerUpdate(serverId, { poll: false });
+  const updateShown = Boolean(update.access || update.query.data);
+  const agentsShown = useAgentSettingsAvailable(serverId);
+  if (!updateShown && !timezone.available && !agentsShown) return null;
+  const zone = timezone.query.data;
+  return (
+    <SettingsSection
+      title={t("mobile.server.settings.serverSection")}
+      footer={
+        timezone.query.isError
+          ? errorMessage(timezone.query.error, t("mobile.server.settings.timezoneLoadFailed"))
+          : undefined
+      }
+    >
+      {updateShown ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
+      {timezone.available ? (
+        <SettingsRow
+          leading={<RowIcon icon={Clock} />}
+          trailing={
+            zone ? (
+              <TrailingValue
+                value={zone.timezone ? timeZoneLabel(zone.timezone) : t("mobile.server.settings.timezoneAutomatic")}
+              />
+            ) : undefined
+          }
+          disabled={!zone}
+          onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {agentsShown ? (
+        <SettingsRow
+          leading={<RowIcon icon={Bot} />}
+          onPress={() => router.push({ pathname: "/server-settings/agents", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.route.agents")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+/**
+ * The groups of the Agents page, one setting each with its description under it: the personality of the agents, the memories per agent and how the
+ * agents learn, for an owner or admin of a host that serves them. The host checks the role and the
+ * value again.
+ */
+export function ServerAgentsSection({ serverId }: { serverId: string }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const { canManageAgentMemoryLimit } = useMobileWorkspace();
+  const { canManageAgentMemoryLimit, canManageMemoryReview, canManageSkillLearning, canManageBrowsingMemory } =
+    useMobileWorkspace();
   const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
-  const timezone = useServerTimezone(serverId);
   const personality = useServerPersonality(serverId);
-  const update = useServerUpdate(serverId, { poll: false });
-  const updateShown = Boolean(update.access || update.query.data);
   const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
   const memoryLimitAvailable = canManageAgentMemoryLimit(serverId);
   const memoryLimit = useQuery({
@@ -317,9 +386,17 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!updateShown && !timezone.available && !personality.canManage && !memoryLimitAvailable) return null;
-  const responseStyle = personality.query.data?.responseStyle;
-  const zone = timezone.query.data;
+  const memoryReviewAvailable = canManageMemoryReview(serverId);
+  const skillLearningAvailable = canManageSkillLearning(serverId);
+  const browsingMemoryAvailable = canManageBrowsingMemory(serverId);
+  if (
+    !personality.canManage &&
+    !memoryLimitAvailable &&
+    !memoryReviewAvailable &&
+    !skillLearningAvailable &&
+    !browsingMemoryAvailable
+  )
+    return null;
   const limit = memoryLimit.data;
 
   function chooseLimit(next: number) {
@@ -341,69 +418,44 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   }
 
   return (
-    <SettingsSection
-      title={t("mobile.server.settings.serverSection")}
-      footer={
-        error ??
-        (memoryLimit.isError
-          ? errorMessage(memoryLimit.error, t("mobile.server.settings.memoryLimitLoadFailed"))
-          : timezone.query.isError
-            ? errorMessage(timezone.query.error, t("mobile.server.settings.timezoneLoadFailed"))
-            : memoryLimitAvailable
-              ? t("mobile.server.settings.memoryLimitDescription")
-              : undefined)
-      }
-    >
-      {updateShown ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
-      {timezone.available ? (
-        <SettingsRow
-          leading={<RowIcon icon={Clock} />}
-          trailing={
-            zone ? (
-              <TrailingValue
-                value={zone.timezone ? timeZoneLabel(zone.timezone) : t("mobile.server.settings.timezoneAutomatic")}
-              />
-            ) : undefined
-          }
-          disabled={!zone}
-          onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
-        >
-          <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
-        </SettingsRow>
-      ) : null}
-      {personality.canManage ? (
-        <SettingsRow
-          leading={<RowIcon icon={Smile} />}
-          trailing={responseStyle ? <TrailingValue value={t(RESPONSE_STYLE_LABEL_KEYS[responseStyle])} /> : undefined}
-          onPress={() => router.push({ pathname: "/server-settings/personality", params: { serverId } })}
-        >
-          <Typography.Paragraph>{t("mobile.server.route.personality")}</Typography.Paragraph>
-        </SettingsRow>
-      ) : null}
+    <>
+      {personality.canManage ? <ServerPersonalityRow serverId={serverId} /> : null}
       {memoryLimitAvailable ? (
-        <SettingsRow
-          leading={<RowIcon icon={Brain} />}
-          disclosure={false}
-          trailing={
-            limit ? (
-              <SettingsPicker
-                value={limit.limit}
-                // A host that no longer permits its saved value still shows it.
-                options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
-                  (choice) => ({ value: choice, label: String(choice) }),
-                )}
-                enabled={!saving}
-                dark={theme === "dark"}
-                label={t("mobile.server.settings.memoryLimit")}
-                onChange={chooseLimit}
-              />
-            ) : null
+        <SettingsSection
+          footer={
+            error ??
+            (memoryLimit.isError
+              ? errorMessage(memoryLimit.error, t("mobile.server.settings.memoryLimitLoadFailed"))
+              : t("mobile.server.settings.memoryLimitDescription"))
           }
         >
-          <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
-        </SettingsRow>
+          <SettingsRow
+            leading={<RowIcon icon={Brain} />}
+            disclosure={false}
+            trailing={
+              limit ? (
+                <SettingsPicker
+                  value={limit.limit}
+                  // A host that no longer permits its saved value still shows it.
+                  options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
+                    (choice) => ({ value: choice, label: String(choice) }),
+                  )}
+                  enabled={!saving}
+                  dark={theme === "dark"}
+                  label={t("mobile.server.settings.memoryLimit")}
+                  onChange={chooseLimit}
+                />
+              ) : null
+            }
+          >
+            <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
+          </SettingsRow>
+        </SettingsSection>
       ) : null}
-    </SettingsSection>
+      {memoryReviewAvailable ? <ServerMemoryReviewRow serverId={serverId} /> : null}
+      {skillLearningAvailable ? <ServerSkillLearningRow serverId={serverId} /> : null}
+      {browsingMemoryAvailable ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+    </>
   );
 }
 
