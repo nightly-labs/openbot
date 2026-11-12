@@ -18,7 +18,12 @@ export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  const { agentId, messageId } = useLocalSearchParams<{ agentId: string; messageId?: string }>();
+  // `focusAt` changes when a pinned message opens again, so the chat goes to it again.
+  const { agentId, messageId, focusAt } = useLocalSearchParams<{
+    agentId: string;
+    messageId?: string;
+    focusAt?: string;
+  }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
@@ -39,7 +44,7 @@ export function AgentChatScreen() {
     return (
       <MobileChatView
         // A new message, such as the source of a branch, opens the chat again at that message.
-        key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}`}
+        key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}:${focusAt ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}
         onLeave={leaveChat}

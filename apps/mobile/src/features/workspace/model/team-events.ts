@@ -130,6 +130,10 @@ export function syncEventQueries(
     ])
       void queryClient.invalidateQueries({ queryKey });
   }
+  if (event.type === "message-pins-changed") {
+    // A pin of the agent changed on another device, by the agent, or by a deleted message: read the list again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.messagePins(scope, serverId, event.agentId) });
+  }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });

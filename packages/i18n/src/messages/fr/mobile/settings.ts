@@ -186,6 +186,9 @@ export const messages = {
   "mobile.settings.privacy.retry": "Réessayer d’enregistrer le réglage de confidentialité",
   "mobile.settings.conversations.title": "Conversations",
   "mobile.settings.conversations.hiddenChats": "Discussions masquées",
+  "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
+  "mobile.settings.conversations.largeFilesFooter":
+    "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
   "mobile.settings.profile.nameUnsafe": "Retirez les sauts de ligne et les caractères de contrôle de votre nom.",
   "mobile.settings.profile.nameLength": "Utilisez 3 à 20 caractères pour votre nom affiché.",
   "mobile.settings.profile.saveFailed": "Impossible d’enregistrer les modifications. Réessayez.",

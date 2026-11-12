@@ -12,6 +12,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
+import { playbackTime } from "../model/playback-time";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 import { VideoViewer } from "./video-viewer";
@@ -95,17 +96,6 @@ function useVideoPoster(key: string, uri: string | null) {
   return { poster, missing };
 }
 
-/** A length such as 0:42 or 1:02:05, as a player shows it. */
-export function playbackTime(seconds: number, format: MobileText["format"]) {
-  const total = Math.max(0, Math.round(seconds));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const rest = format.number(total % 60, { minimumIntegerDigits: 2 });
-  return hours > 0
-    ? `${format.number(hours)}:${format.number(minutes, { minimumIntegerDigits: 2 })}:${rest}`
-    : `${format.number(minutes)}:${rest}`;
-}
-
 export async function runFileAction(action: () => Promise<void>, title: string, text: MobileText): Promise<boolean> {
   try {
     await action();
@@ -130,10 +120,13 @@ export function ChatVideoAttachment({
   attachment,
   serverId,
   alignment = "left",
+  unknownRatio = UNKNOWN_RATIO,
 }: {
   attachment: AttachmentSummary;
   serverId: string;
   alignment?: "left" | "right";
+  /** The width over height of the frame until the video gives its first frame. */
+  unknownRatio?: number;
 }) {
   const text = useText();
   const { t, format, sourceText } = text;
@@ -147,7 +140,7 @@ export function ChatVideoAttachment({
   const [viewing, setViewing] = useState(false);
   const [busy, setBusy] = useState(false);
   const maxWidth = Math.min(MAX_FRAME_WIDTH, width - 80);
-  const frame = attachmentFrame(poster?.thumbnail ?? null, maxWidth, UNKNOWN_RATIO);
+  const frame = attachmentFrame(poster?.thumbnail ?? null, maxWidth, unknownRatio);
   const failed = Boolean(query.error);
 
   async function share() {

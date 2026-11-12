@@ -60,6 +60,7 @@ import {
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
@@ -73,6 +74,7 @@ import {
   type RoutineRunPlace,
   remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
+  type SetMessagePinnedInput,
   type StartAgentTaskInput,
   type SteerQueuedMessageInput,
   type UpdateQueuedMessageInput,
@@ -122,7 +124,7 @@ import {
   type LiveVoiceSessionResponse,
   type LiveVoiceStartRequest,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
-import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { decodeMessagePinsResponse, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutineRunPlace,
@@ -299,6 +301,32 @@ export const readAgentThreadAround = Effect.fn("TeamClient.readAgentThreadAround
 ): Effect.fn.Return<AgentTaskWindow, TeamRequestError> {
   return yield* teamCall(() =>
     request("POST", MESSAGE_PINS_ROUTES.readThread, decodeTaskWindow, { agentId, taskId, messageId, limit }),
+  );
+});
+
+/** The pinned messages of all chats of an agent, the newest pin first. Send it only to a host with `message-pins-v1`. */
+export const listMessagePins = Effect.fn("TeamClient.listMessagePins")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", MESSAGE_PINS_ROUTES.list, decodeMessagePinsResponse, { agentId }));
+});
+
+/**
+ * Pins or unpins one message of the agent's own chat or, with `taskId`, of one of its side threads.
+ * Answers the new list. Send it only to a host with `message-pins-v1`.
+ */
+export const setMessagePinned = Effect.fn("TeamClient.setMessagePinned")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, pinned }: SetMessagePinnedInput,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", MESSAGE_PINS_ROUTES.set, decodeMessagePinsResponse, {
+      agentId,
+      taskId: taskId ?? null,
+      messageId,
+      pinned,
+    }),
   );
 });
 

@@ -10,12 +10,14 @@ import {
 import { Button, Typography } from "heroui-native";
 import { useMemo, useRef, useState } from "react";
 import { type GestureResponderEvent, Pressable, ScrollView, type ScrollViewInstance, View } from "react-native";
+import Animated, { cubicBezier, Easing, FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { AgentProviderAvatar } from "@/features/agents/components/agent-provider-avatar";
-import { UsageBar, UsageValue } from "@/features/agents/components/usage-motion";
+import { UsageBar, UsageLoading, UsageValue } from "@/features/agents/components/usage-motion";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import type { ProfileActivity as ProfileActivityState } from "@/features/settings/model/use-profile-activity";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
 const CELL = 11;
@@ -24,6 +26,49 @@ const STEP = CELL + GAP;
 const AVATAR_SIZE = 32;
 /** The opacity of each heatmap level; level 0 is the border colour, the others the accent. */
 const LEVEL_ALPHA = [1, 0.32, 0.55, 0.78, 1] as const;
+const EASING = cubicBezier(0.23, 1, 0.32, 1);
+const CELL_MS = 320;
+const SECTION_EASING = Easing.bezier(0.23, 1, 0.32, 1);
+const SECTION_IN = FadeIn.duration(220).easing(SECTION_EASING);
+const SECTION_OUT = FadeOut.duration(160).easing(SECTION_EASING);
+/** The value of a tile or a row before the report arrives. */
+const NO_VALUE = "–";
+/** Keeps the line of a tile detail while the report loads, so the tile does not grow when it arrives. */
+const BLANK_LINE = "\u00a0";
+
+/** The days of the range with no activity: the grid that shows while the report loads. */
+function emptyDays(range: { startDate: string; endDate: string }): ProfileDay[] {
+  const days: ProfileDay[] = [];
+  const end = Date.parse(`${range.endDate}T00:00:00Z`);
+  for (let time = Date.parse(`${range.startDate}T00:00:00Z`); time <= end; time += 86_400_000)
+    days.push({
+      date: new Date(time).toISOString().slice(0, 10),
+      weekday: new Date(time).getUTCDay(),
+      tokens: 0,
+      messages: 0,
+    });
+  return days;
+}
+
+/** A report with no activity. The screen keeps its layout and the real values move into it. */
+function placeholderStats(range: { startDate: string; endDate: string }): ProfileStats<MobileAgent> {
+  return {
+    days: emptyDays(range),
+    tokens: 0,
+    messages: 0,
+    cost: null,
+    activeDays: 0,
+    peak: null,
+    currentStreak: 0,
+    currentStreakStart: null,
+    longestStreak: 0,
+    longestStreakDates: null,
+    busiestWeekday: null,
+    providers: [],
+    models: [],
+    teammates: [],
+  };
+}
 
 const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
 
@@ -53,15 +98,20 @@ function useProfileDates() {
   };
 }
 
+/** A day of the grid. When the report arrives, the day fades to its level. */
 function HeatCell({ level, color, empty }: { level: HeatLevel; color: string; empty: string }) {
+  const reducedMotion = useReducedMotion();
   return (
-    <View
+    <Animated.View
       style={{
         width: CELL,
         height: CELL,
         borderRadius: 3,
         backgroundColor: level === 0 ? empty : color,
         opacity: LEVEL_ALPHA[level],
+        transitionProperty: ["backgroundColor", "opacity"],
+        transitionDuration: reducedMotion ? 0 : CELL_MS,
+        transitionTimingFunction: EASING,
       }}
     />
   );
@@ -71,7 +121,17 @@ function HeatCell({ level, color, empty }: { level: HeatLevel; color: string; em
  * A year of days: one column for each week, Sunday at the top. The grid scrolls sideways and opens
  * on the current week. A tap on a day shows its date and tokens under the grid.
  */
-function ProfileHeatmap({ days, label, summary }: { days: ProfileDay[]; label: string; summary: string }) {
+function ProfileHeatmap({
+  days,
+  label,
+  summary,
+  loading,
+}: {
+  days: ProfileDay[];
+  label: string;
+  summary: string;
+  loading: boolean;
+}) {
   const { t, format } = useText();
   const dates = useProfileDates();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -125,7 +185,7 @@ function ProfileHeatmap({ days, label, summary }: { days: ProfileDay[]; label: s
               </Typography>
             ))}
           </View>
-          <Pressable accessibilityRole="image" accessibilityLabel={label} onPress={selectDay}>
+          <Pressable accessibilityRole="image" accessibilityLabel={label} disabled={loading} onPress={selectDay}>
             <View className="flex-row" style={{ gap: GAP }} pointerEvents="none">
               {model.columns.map((column) => (
                 <View key={column.key} style={{ gap: GAP }}>
@@ -153,7 +213,7 @@ function ProfileHeatmap({ days, label, summary }: { days: ProfileDay[]; label: s
       </ScrollView>
       <View className="flex-row items-center justify-between gap-3">
         <Typography type="body-xs" className="min-w-0 shrink text-grouped-secondary" numberOfLines={1}>
-          {selected
+          {selected && !loading
             ? `${dates.long(selected.date)} · ${t("mobile.settings.profile.activity.dayTokens", { tokens: format.compact(selected.tokens) })}`
             : summary}
         </Typography>
@@ -177,12 +237,12 @@ function ProfileHeatmap({ days, label, summary }: { days: ProfileDay[]; label: s
   );
 }
 
-function ProfileTiles({ stats }: { stats: ProfileStats<MobileAgent> }) {
+function ProfileTiles({ stats, loading }: { stats: ProfileStats<MobileAgent>; loading: boolean }) {
   const { t, format } = useText();
   const dates = useProfileDates();
   const none = t("mobile.settings.profile.tile.none");
   const days = (count: number) => t("mobile.settings.profile.tile.days", { count });
-  const tiles = [
+  const loaded = [
     {
       label: t("mobile.settings.profile.tile.tokens"),
       value: format.compact(stats.tokens),
@@ -213,6 +273,7 @@ function ProfileTiles({ stats }: { stats: ProfileStats<MobileAgent> }) {
         : none,
     },
   ];
+  const tiles = loading ? loaded.map((tile) => ({ label: tile.label, value: NO_VALUE, detail: BLANK_LINE })) : loaded;
   return (
     <View className="flex-row flex-wrap gap-3">
       {tiles.map((tile) => (
@@ -230,9 +291,11 @@ function ProfileTiles({ stats }: { stats: ProfileStats<MobileAgent> }) {
               {tile.value}
             </Typography>
           </UsageValue>
-          <Typography type="body-xs" className="text-grouped-secondary" numberOfLines={1}>
-            {tile.detail}
-          </Typography>
+          <UsageValue value={tile.detail}>
+            <Typography type="body-xs" className="text-grouped-secondary" numberOfLines={1}>
+              {tile.detail}
+            </Typography>
+          </UsageValue>
         </View>
       ))}
     </View>
@@ -242,39 +305,23 @@ function ProfileTiles({ stats }: { stats: ProfileStats<MobileAgent> }) {
 /**
  * The year of the user's work on the paired desktop, under the profile header, as the desktop
  * Profile tab shows it: five tiles, the year of days, the insights, the teammates and the models.
+ * While the report loads, the same layout shows with no values, and the values then move into it.
  * Nothing shows without a paired desktop or when its host has no analytics.
  */
 export function ProfileActivity({ activity }: { activity: ProfileActivityState }) {
   const { t, format } = useText();
   const dates = useProfileDates();
-  const { server, online, report, stats } = activity;
+  const reducedMotion = useReducedMotion();
+  const { server, online, report, stats, range } = activity;
+  const placeholder = useMemo(() => placeholderStats(range), [range]);
   if (!server) return null;
   const title = t("mobile.settings.profile.activity.title", { server: server.name });
   const percent = (value: number) => format.percent(value, { maximumFractionDigits: 0 });
+  const connecting = server.state === "connecting" || server.state === "unknown";
+  const loading = !stats && (online ? report.isPending : connecting);
 
-  if (!online && !stats) {
-    if (server.state === "connecting" || server.state === "unknown")
-      return (
-        <SettingsSection title={title}>
-          <SettingsRow>
-            <Typography.Paragraph className="text-grouped-secondary">
-              {t("mobile.settings.profile.activity.loading")}
-            </Typography.Paragraph>
-          </SettingsRow>
-        </SettingsSection>
-      );
+  if (!online && !stats && !connecting)
     return <SettingsNote>{t("mobile.settings.profile.activity.offline", { server: server.name })}</SettingsNote>;
-  }
-  if (report.isPending)
-    return (
-      <SettingsSection title={title}>
-        <SettingsRow>
-          <Typography.Paragraph className="text-grouped-secondary">
-            {t("mobile.settings.profile.activity.loading")}
-          </Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
-    );
   if (report.isError && !stats)
     return (
       <SettingsSection title={title}>
@@ -288,98 +335,127 @@ export function ProfileActivity({ activity }: { activity: ProfileActivityState }
         </View>
       </SettingsSection>
     );
-  if (!stats) return null;
+  if (!stats && !loading) return null;
 
-  const topProvider = stats.providers[0];
-  const topModel = stats.models[0];
-  const insights = [
-    topProvider
-      ? {
-          label: t("mobile.settings.profile.insights.provider"),
-          value: `${providerName(topProvider.provider)} · ${percent(topProvider.share)}`,
-        }
-      : null,
-    topModel ? { label: t("mobile.settings.profile.insights.model"), value: topModel.model } : null,
-    stats.busiestWeekday === null
-      ? null
-      : { label: t("mobile.settings.profile.insights.weekday"), value: dates.weekday(stats.busiestWeekday) },
-    stats.cost === null
-      ? null
-      : { label: t("mobile.settings.profile.insights.cost"), value: format.currencyUsd(stats.cost) },
-  ].filter((row) => row !== null);
+  const shown = stats ?? placeholder;
+  const topProvider = shown.providers[0];
+  const topModel = shown.models[0];
+  const insights = loading
+    ? [
+        t("mobile.settings.profile.insights.provider"),
+        t("mobile.settings.profile.insights.model"),
+        t("mobile.settings.profile.insights.weekday"),
+      ].map((label) => ({ label, value: NO_VALUE }))
+    : [
+        topProvider
+          ? {
+              label: t("mobile.settings.profile.insights.provider"),
+              value: `${providerName(topProvider.provider)} · ${percent(topProvider.share)}`,
+            }
+          : null,
+        topModel ? { label: t("mobile.settings.profile.insights.model"), value: topModel.model } : null,
+        shown.busiestWeekday === null
+          ? null
+          : { label: t("mobile.settings.profile.insights.weekday"), value: dates.weekday(shown.busiestWeekday) },
+        shown.cost === null
+          ? null
+          : { label: t("mobile.settings.profile.insights.cost"), value: format.currencyUsd(shown.cost) },
+      ].filter((row) => row !== null);
+  const sectionIn = reducedMotion ? undefined : SECTION_IN;
+  const sectionOut = reducedMotion ? undefined : SECTION_OUT;
 
   return (
-    <>
-      <ProfileTiles stats={stats} />
-      <SettingsSection title={title}>
-        <ProfileHeatmap
-          days={stats.days}
-          label={t("mobile.settings.profile.activity.heatmapLabel", {
-            tokens: format.compact(stats.tokens),
-            count: stats.activeDays,
-          })}
-          summary={
-            stats.activeDays > 0
-              ? t("mobile.settings.profile.activity.activeDays", { count: stats.activeDays })
-              : t("mobile.settings.profile.activity.empty")
-          }
-        />
-      </SettingsSection>
-      {stats.tokens > 0 ? (
-        <>
-          <SettingsSection title={t("mobile.settings.profile.insights.title")}>
-            {insights.map((row) => (
-              <SettingsRow
-                key={row.label}
-                trailing={
-                  <Typography className="text-grouped-secondary" numberOfLines={1}>
-                    {row.value}
-                  </Typography>
-                }
-              >
-                <Typography>{row.label}</Typography>
-              </SettingsRow>
-            ))}
+    // A section that shows with the screen does not fade in; one that the report adds later does.
+    <LayoutAnimationConfig skipEntering>
+      <UsageLoading loading={loading}>
+        <View className="gap-7">
+          <ProfileTiles stats={shown} loading={loading} />
+          <SettingsSection title={title}>
+            <ProfileHeatmap
+              days={shown.days}
+              loading={loading}
+              label={
+                loading
+                  ? t("mobile.settings.profile.activity.loading")
+                  : t("mobile.settings.profile.activity.heatmapLabel", {
+                      tokens: format.compact(shown.tokens),
+                      count: shown.activeDays,
+                    })
+              }
+              summary={
+                loading
+                  ? t("mobile.settings.profile.activity.loading")
+                  : shown.activeDays > 0
+                    ? t("mobile.settings.profile.activity.activeDays", { count: shown.activeDays })
+                    : t("mobile.settings.profile.activity.empty")
+              }
+            />
           </SettingsSection>
-          {stats.teammates.length > 0 ? (
-            <SettingsSection title={t("mobile.settings.profile.teammates.title")}>
-              {stats.teammates.slice(0, 4).map((row) => (
-                <SettingsRow
-                  key={row.agent.id}
-                  leading={<AgentProviderAvatar agent={row.agent} size={AVATAR_SIZE} />}
-                  trailing={
-                    <UsageValue value={format.compact(row.tokens)}>
-                      <Typography className="font-semibold">{format.compact(row.tokens)}</Typography>
-                    </UsageValue>
-                  }
-                >
-                  <Typography numberOfLines={1}>{row.agent.name}</Typography>
-                </SettingsRow>
-              ))}
-            </SettingsSection>
+          {loading || shown.tokens > 0 ? (
+            <Animated.View entering={sectionIn} exiting={sectionOut}>
+              <SettingsSection title={t("mobile.settings.profile.insights.title")}>
+                {insights.map((row) => (
+                  <SettingsRow
+                    key={row.label}
+                    trailing={
+                      <UsageValue value={row.value}>
+                        <Typography className="text-grouped-secondary" numberOfLines={1}>
+                          {row.value}
+                        </Typography>
+                      </UsageValue>
+                    }
+                  >
+                    <Typography>{row.label}</Typography>
+                  </SettingsRow>
+                ))}
+              </SettingsSection>
+            </Animated.View>
           ) : null}
-          <SettingsSection title={t("mobile.settings.profile.models.title")}>
-            {stats.models.map((model) => (
-              <View key={`${model.provider}/${model.model}`} className="gap-2 px-4 py-3">
-                <View className="flex-row items-center gap-3">
-                  <Typography className="min-w-0 flex-1" numberOfLines={1}>
-                    {model.model}
-                  </Typography>
-                  <Typography type="body-xs" className="text-grouped-secondary">
-                    {percent(model.share)}
-                  </Typography>
-                </View>
-                <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
-                  <UsageBar
-                    className="h-full bg-accent"
-                    style={{ width: `${Math.min(100, Math.max(0, model.share * 100))}%` }}
-                  />
-                </View>
-              </View>
-            ))}
-          </SettingsSection>
-        </>
-      ) : null}
-    </>
+          {shown.teammates.length > 0 ? (
+            <Animated.View entering={sectionIn} exiting={sectionOut}>
+              <SettingsSection title={t("mobile.settings.profile.teammates.title")}>
+                {shown.teammates.slice(0, 4).map((row) => (
+                  <SettingsRow
+                    key={row.agent.id}
+                    leading={<AgentProviderAvatar agent={row.agent} size={AVATAR_SIZE} />}
+                    trailing={
+                      <UsageValue value={format.compact(row.tokens)}>
+                        <Typography className="font-semibold">{format.compact(row.tokens)}</Typography>
+                      </UsageValue>
+                    }
+                  >
+                    <Typography numberOfLines={1}>{row.agent.name}</Typography>
+                  </SettingsRow>
+                ))}
+              </SettingsSection>
+            </Animated.View>
+          ) : null}
+          {shown.models.length > 0 && shown.tokens > 0 ? (
+            <Animated.View entering={sectionIn} exiting={sectionOut}>
+              <SettingsSection title={t("mobile.settings.profile.models.title")}>
+                {shown.models.map((model) => (
+                  <View key={`${model.provider}/${model.model}`} className="gap-2 px-4 py-3">
+                    <View className="flex-row items-center gap-3">
+                      <Typography className="min-w-0 flex-1" numberOfLines={1}>
+                        {model.model}
+                      </Typography>
+                      <Typography type="body-xs" className="text-grouped-secondary">
+                        {percent(model.share)}
+                      </Typography>
+                    </View>
+                    <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
+                      <UsageBar
+                        className="h-full bg-accent"
+                        style={{ width: `${Math.min(100, Math.max(0, model.share * 100))}%` }}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </SettingsSection>
+            </Animated.View>
+          ) : null}
+        </View>
+      </UsageLoading>
+    </LayoutAnimationConfig>
   );
 }

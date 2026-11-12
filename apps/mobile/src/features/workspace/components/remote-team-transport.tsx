@@ -13,6 +13,7 @@ import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
@@ -63,6 +64,8 @@ export interface RemoteTeamTransportRef {
     upload?: RemoteFileUpload,
     /** Hears the fraction of the uploaded file sent so far, from 0 to 1. */
     onUploadProgress?: (fraction: number) => void,
+    /** Lets one file larger than the attachment limit answer this request. */
+    largeDownload?: RemoteLargeDownload,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
@@ -109,7 +112,14 @@ interface RemoteTeamTransportProps {
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
-  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+  | {
+      type: "request";
+      method: string;
+      path: string;
+      body: TeamProtocolV2Json;
+      upload?: RemoteFileUpload;
+      largeDownload?: RemoteLargeDownload;
+    };
 
 /**
  * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
@@ -213,10 +223,12 @@ export const RemoteTeamTransport = memo(
                   // As on desktop and web: a read that makes the server usable fails in seconds, so a
                   // dead path does not keep the connection attempt running for the 10 min request limit.
                   timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
-                  // The transfer file is the one answer larger than an attachment.
+                  // The transfer file, and a large file that the user asked for, can be larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
-                    : {}),
+                    : next.largeDownload
+                      ? { largeDownload: next.largeDownload }
+                      : {}),
                 }
               : { id, type: "disconnect" };
         if (!onUploadProgress) return mailbox.send(command);
@@ -259,9 +271,10 @@ export const RemoteTeamTransport = memo(
           body: TeamProtocolV2Json = {},
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
+          largeDownload?: RemoteLargeDownload,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
+          const send = () => enqueue({ type: "request", method, path, body, upload, largeDownload }, onUploadProgress);
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;

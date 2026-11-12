@@ -67,14 +67,17 @@ import type {
   HostAgentMemoryLimit,
   HostAnalytics,
   HostAnalyticsInput,
+  HostBrowsingMemory,
   HostedSiteList,
   HostGitHubConnectorStatus,
+  HostMemoryReview,
   HostMessagingConnectInput,
   HostMessagingWorkspaceInput,
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
+  HostSkillLearning,
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
@@ -86,6 +89,7 @@ import type {
   InstanceTransferSummary,
   MachineMetrics,
   MarkAgentTaskReadInput,
+  McpAccessSnapshot,
   McpServerConfig,
   McpSignInState,
   McpTestResult,
@@ -95,6 +99,7 @@ import type {
   PasswordManagerConnectInput,
   PasswordManagerId,
   PasswordManagerStatus,
+  PinnedMessagesSnapshot,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
@@ -123,6 +128,8 @@ import type {
   SetAgentSessionSettingInput,
   SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
+  SetMcpAccessInput,
+  SetMessagePinnedInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
@@ -183,7 +190,7 @@ import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/c
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -412,6 +419,12 @@ export interface MobileWorkspaceContextValue {
   refreshServer: (serverId: string) => Promise<void>;
   /** The account server says that a hosted server starts, for example after a restart. The app connects again soon. */
   hostedServerStarting: (serverId: string) => void;
+  /**
+   * The checks with the capabilities of the last connection of a server, as if the host were online.
+   * Null when the phone does not know them. A screen shows the rows that they permit, disabled, while
+   * the server is not connected.
+   */
+  knownServerChecks: (serverId: string) => ServerChecks | null;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
   canEditServerIdentity: (serverId: string) => boolean;
   /**
@@ -487,6 +500,21 @@ export interface MobileWorkspaceContextValue {
   /** How many memories each agent of the server can keep, and the values that the host permits. */
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  /** An owner or admin of an online host that serves `memory-review-v1`. The host checks the role again. */
+  canManageMemoryReview: (serverId: string) => boolean;
+  /** How many completed turns pass between two background memory reviews, and the values that the host permits. */
+  loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
+  setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
+  /** An owner or admin of an online host that serves `skill-learning-v1`. The host checks the role again. */
+  canManageSkillLearning: (serverId: string) => boolean;
+  /** What the memory reviews do when a chat teaches a skill, and the values that the host permits. */
+  loadSkillLearning: (serverId: string) => Promise<HostSkillLearning>;
+  setSkillLearning: (mode: string, serverId: string) => Promise<HostSkillLearning>;
+  /** An owner or admin of an online host that serves `browsing-memory-v1`. The host checks the role again. */
+  canManageBrowsingMemory: (serverId: string) => boolean;
+  /** "Learn from my browsing". Off deletes what the host recorded. */
+  loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
+  setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
   /** An owner or admin of an online host that serves `host-personality-v1`. The host checks the role again. */
   canManageServerPersonality: (serverId: string) => boolean;
   /** An online host that serves `host-personality-v1`. Any member reads its personality. */
@@ -724,6 +752,12 @@ export interface MobileWorkspaceContextValue {
   /** The http servers that the host holds a sign-in for. Empty for a host without `mcp-sign-in-v1`. */
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
   signOutMcpServer: (mcpServerId: string, serverId: string) => Promise<McpSignInState[]>;
+  /** An owner or admin of an online host that serves `mcp-access-v1`. The host checks the role again. */
+  canManageMcpAccess: (serverId: string) => boolean;
+  /** Who gets each MCP server of the host: the agents and the level of each role. */
+  loadMcpAccess: (serverId: string) => Promise<McpAccessSnapshot>;
+  /** Replaces the access of one MCP server. The host refuses a change made from an earlier revision. */
+  setMcpAccess: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /**
    * Creates an agent on the active server and returns its id. A host with `agent-welcome-v1` gets a
@@ -982,6 +1016,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `message-pins-v1`: a member who can message an agent can pin its messages. */
+  canPinMessages: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
   canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
@@ -1054,6 +1090,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
   markAgentThreadRead: (input: MarkAgentTaskReadInput, serverId: string) => Promise<AgentTaskReadState>;
+  /** The pinned messages of all chats of the agent, the newest pin first. */
+  loadMessagePins: (agentId: string, serverId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Pins or unpins one message of the agent's chat or of one of its threads. Answers the new list. */
+  setMessagePinned: (input: SetMessagePinnedInput, serverId: string) => Promise<PinnedMessagesSnapshot>;
   /** Answers a question of a task turn. The host finds the question by its request, on any thread. */
   respondToTaskPrompt: (input: RespondToPromptInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
@@ -1082,7 +1122,12 @@ export interface MobileWorkspaceContextValue {
     /** Hears the fraction of the file sent so far, from 0 to 1. */
     onProgress?: (fraction: number) => void,
   ) => Promise<DraftAttachment>;
-  downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
+  /** `largeDownload` lets a file larger than the attachment limit answer, for a file the user asked for. */
+  downloadAttachment: (
+    serverId: string,
+    attachmentId: string,
+    largeDownload?: RemoteLargeDownload,
+  ) => Promise<RemoteFileUpload>;
   /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member
    * reads it; the host keeps the path inside the folder.
@@ -1148,6 +1193,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canPinMessages"
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
@@ -1156,32 +1202,18 @@ export type MobileWorkspaceCapabilityCheck =
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
-type MobileWorkspaceStateKey =
-  | MobileWorkspaceCapabilityCheck
-  | "sidebarByServer"
-  | "servers"
-  | "memberCountByServer"
-  | "serverDirectoryState"
-  | "serverDirectoryError"
-  | "agents"
-  | "activeServer"
-  | "activeAgents"
-  | "hiddenAgents"
-  | "pinnedAgentIds"
-  | "pinnedChannelIds"
-  | "pinnedWorkflowIds"
-  | "collapsedSectionIds"
-  | "hiddenChannelIds"
-  | "hidesAgentsOnServer"
-  | "hiddenAgentsWorkOnServer"
-  | "canUnhideAgent"
+/** The checks of the role of this member and the capabilities of one server. */
+type ServerCheckKey =
+  | Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
   | "canEditServerIdentity"
   | "canRotateServerKey"
   | "canCreateLocalServers"
-  | "localServerKind"
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMemoryReview"
+  | "canManageSkillLearning"
+  | "canManageBrowsingMemory"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"
@@ -1206,13 +1238,16 @@ type MobileWorkspaceStateKey =
   | "canManageProviders"
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
+  | "canManageMcpAccess"
   | "canAddMarketplaceAgents"
   | "canUpdateMarketplaceAgents"
-  | "canSendNotifications"
   | "canManageEvents"
   | "canManageMissedRuns"
   | "canManageRoutineResults"
   | "canManageAgentSkills"
+  | "canManageSharedTables"
+  | "canManageAgentFolders"
+  | "canNestSidebarFolders"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
   | "canManageAgentBackupModels"
@@ -1220,11 +1255,34 @@ type MobileWorkspaceStateKey =
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
   | "canManageAgentInstructions"
-  | "canManageProviderAccounts"
-  | "canManageSharedTables"
-  | "canManageAgentFolders"
-  | "canNestSidebarFolders"
-  | "canPublishAgent";
+  | "canPublishAgent"
+  | "canManageProviderAccounts";
+
+export type ServerChecks = Pick<MobileWorkspaceContextValue, ServerCheckKey>;
+
+type MobileWorkspaceStateKey =
+  | MobileWorkspaceCapabilityCheck
+  | ServerCheckKey
+  | "knownServerChecks"
+  | "sidebarByServer"
+  | "servers"
+  | "memberCountByServer"
+  | "serverDirectoryState"
+  | "serverDirectoryError"
+  | "agents"
+  | "activeServer"
+  | "activeAgents"
+  | "hiddenAgents"
+  | "pinnedAgentIds"
+  | "pinnedChannelIds"
+  | "pinnedWorkflowIds"
+  | "collapsedSectionIds"
+  | "hiddenChannelIds"
+  | "hidesAgentsOnServer"
+  | "hiddenAgentsWorkOnServer"
+  | "canUnhideAgent"
+  | "localServerKind"
+  | "canSendNotifications";
 
 /**
  * The workspace data, and the checks that a component calls while it renders. A change renders

@@ -76,11 +76,19 @@ export interface AppServerRequest {
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 /**
- * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
- * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ * The account of a Codex whose selected model provider does not use an OpenAI login
+ * (`requires_openai_auth` is false, the default of a custom provider). Codex then reports no account
+ * and skips its own login screen: the provider's key or gateway authenticates the turns.
+ */
+export const CODEX_MODEL_PROVIDER_ACCOUNT_TYPE = "codex-model-provider";
+
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`), or a model provider that needs no OpenAI
+ * login. Turns on a key use API credits.
  */
 export function isCodexLoginType(type: string | undefined): boolean {
-  return type === "chatgpt" || type === "apiKey";
+  return type === "chatgpt" || type === "apiKey" || type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE;
 }
 
 export interface AccountReadResult {
@@ -294,6 +302,16 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
+}
+
+/**
+ * The Codex `account/read`. Only an explicit `requiresOpenaiAuth: false` means that the model
+ * provider needs no OpenAI login; a response without the field stays signed out.
+ */
+export function decodeCodexAccountReadResult(value: unknown): AccountReadResult {
+  const result = decodeAccountReadResult(value);
+  if (result.account || decodeRecord(value, "account response").requiresOpenaiAuth !== false) return result;
+  return { account: { type: CODEX_MODEL_PROVIDER_ACCOUNT_TYPE, email: null }, requiresOpenaiAuth: false };
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {

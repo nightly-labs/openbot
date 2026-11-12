@@ -1547,6 +1547,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(INSTANCE_TRANSFER_CAPABILITY) &&
     canAdministerServer(workspace.state.host?.role);
   // A named function, not a ternary in the prop: the settings read the prop in a tracked effect.
+  // No copy to another server: the browser client connects to one host, and only the desktop app
+  // holds the connections of two servers at the same time.
   const instanceTransferSettings = () =>
     instanceTransferEnabled()
       ? {
@@ -2689,11 +2691,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     showAgents();
     setCreating(true);
   }
-  /** The rail button of the page. The server settings open from the server menu, so no button is current. */
+  /**
+   * The rail button of the page. The server settings and the pricing page open from the server menu, so no button is
+   * current.
+   */
   const railPage = (): PageRailPage | null => {
     const current = page();
     if (current === "agents") return layout.sidebarView();
-    return current === "server-settings" ? null : current;
+    return current === "server-settings" || current === "pricing" ? null : current;
   };
   /** The settings page on screen, if any. */
   const settingsKind = (): SettingsKind | null =>
@@ -3252,6 +3257,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRefreshServers={workspace.retryHosts}
                     resume={hostedServers.addServer()?.resume}
                     license={licenseCalls}
+                    onOpenUrl={(url) => window.open(url, "_blank", "noopener")}
                     onClose={hostedServers.closeAddServer}
                     onOpenServer={(serverId) => {
                       hostedServers.closeAddServer();

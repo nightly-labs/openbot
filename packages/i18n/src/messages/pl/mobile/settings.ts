@@ -189,6 +189,9 @@ export const messages = {
   "mobile.settings.privacy.retry": "Ponów zapis ustawienia prywatności",
   "mobile.settings.conversations.title": "Rozmowy",
   "mobile.settings.conversations.hiddenChats": "Ukryte czaty",
+  "mobile.settings.conversations.largeFiles": "Automatycznie pobieraj duże pliki",
+  "mobile.settings.conversations.largeFilesFooter":
+    "Obrazy, filmy i dźwięki większe niż {small} pobierają się dopiero po stuknięciu. Włącz, aby pobierać je od razu, do {large}. Może to zużyć dużo danych komórkowych.",
   "mobile.settings.profile.nameUnsafe": "Usuń z imienia podziały wierszy i znaki sterujące.",
   "mobile.settings.profile.nameLength": "Wyświetlana nazwa musi mieć 3–20 znaków.",
   "mobile.settings.profile.saveFailed": "Nie udało się zapisać zmian. Spróbuj ponownie.",
