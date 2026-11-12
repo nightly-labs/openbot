@@ -255,6 +255,7 @@ export const messages = {
     "サーバーを停止してから再び起動します。約 1 分かかります。実行中のエージェントのターンは停止し、サーバーが戻るまでメンバーの接続は切れます。ファイルとチャットは保持されます。",
   "mobile.server.settings.restartConfirm": "再起動",
   "mobile.server.settings.restarted": "{name} を再起動しています",
+  "mobile.server.settings.restartUnsupported": "ここから再起動するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.settings.leaveTitle": "{name} から退出しますか？",
   "mobile.server.settings.leaveBody": "再度参加するには新しい招待が必要です。",
   "mobile.server.settings.leave": "サーバーから退出",

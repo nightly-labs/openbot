@@ -3253,6 +3253,20 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      // A self-hosted server only: systemd (or the Docker restart policy) starts it again after the quit.
+      // A desktop app has nothing that starts it again, and a hosted server restarts through the account
+      // service. `app.relaunch` is not used: it would start the app outside the virtual display.
+      ...(serverModeEnvironment
+        ? {
+            restart: {
+              request: () => {
+                logger.info("An owner or admin asked this server to restart.");
+                // The answer leaves before the quit closes the connections.
+                setImmediate(() => app.quit());
+              },
+            },
+          }
+        : {}),
       personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,

@@ -6,6 +6,7 @@ import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { useSettings } from "../settings/settings-context";
+import { serverSupportsCapability } from "./server-capabilities";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";
@@ -141,7 +142,14 @@ export function useServerActions() {
       onThisComputer(serverId) ? requestLeaveServer(serverId, trigger) : openHostedServerDelete(serverId, trigger),
     canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
-    canRestart: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
+    // A self-hosted server restarts itself when its host has `host-restart-v1`; an older host does not.
+    canRestart: (serverId) =>
+      hostedServerIds().has(serverId) ||
+      onThisComputer(serverId) ||
+      serverSupportsCapability(
+        servers().find((server) => server.id === serverId),
+        "host-restart-v1",
+      ),
     onHide: (serverId) => void hideLocal(serverId),
     // Only beside another server: the list is never empty.
     canHide: () => remoteServers().length > 0,

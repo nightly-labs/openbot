@@ -299,6 +299,7 @@ export const messages = {
     "Сервер остановится и запустится снова. Это займёт около минуты. Текущие ходы агентов остановятся, а участники потеряют соединение, пока сервер не вернётся. Файлы и чаты сохранятся.",
   "mobile.server.settings.restartConfirm": "Перезапустить",
   "mobile.server.settings.restarted": "{name} перезапускается",
+  "mobile.server.settings.restartUnsupported": "Обновите OpenBot на этом сервере, чтобы перезапускать его отсюда.",
   "mobile.server.settings.leaveTitle": "Покинуть «{name}»?",
   "mobile.server.settings.leaveBody": "Чтобы присоединиться снова, понадобится новое приглашение.",
   "mobile.server.settings.leave": "Покинуть сервер",

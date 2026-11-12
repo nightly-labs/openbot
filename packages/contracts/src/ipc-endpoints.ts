@@ -1368,6 +1368,11 @@ export const IPC_ENDPOINTS = {
      * Paired devices follow the handover that both keys sign.
      */
     rotateHostKey: scopedQuery<void, "required">()("host-admin:rotate-host-key"),
+    /**
+     * Restarts a self-hosted server now, through `host-restart-v1`. Running agent turns stop. A hosted
+     * server and a server on this computer restart through `hostedServers` and `localServers`.
+     */
+    restartHost: scopedQuery<void, "required">()("host-admin:restart-host"),
     getReleaseStatus: scopedQuery<HostReleaseStatus | null, "required">()("host-admin:get-release-status"),
     checkRelease: scopedQuery<HostReleaseStatus, "required">()("host-admin:check-release"),
     getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),

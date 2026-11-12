@@ -82,6 +82,7 @@ import {
   HOST_PERSONALITY_CAPABILITY,
   HOST_PERSONALITY_ROUTES,
 } from "@openbot/contracts/team-protocol/host-personality-v1";
+import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
@@ -301,6 +302,20 @@ export function hostAdminIpcHandlers({
           );
           // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
+        },
+      }),
+      // Local: this app has nothing that starts it again after a quit. The renderer shows the action only
+      // for a joined server whose host has `host-restart-v1`.
+      restartHost: scopedQueryHandler({
+        local: () => {
+          throw new Error(sourceText("error.team.hostRestartUnsupported"));
+        },
+        remote: async (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_RESTART_CAPABILITY))
+            throw new Error(sourceText("error.team.hostRestartUnsupported"));
+          await runCauseEffect(
+            remoteServers.request(serverId, HOST_RESTART_ROUTES.restart, acceptEmpty, { method: "POST", body: {} }),
+          );
         },
       }),
       rotateHostKey: scopedQueryHandler({

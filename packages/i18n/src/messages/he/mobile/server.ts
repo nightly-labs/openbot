@@ -379,6 +379,7 @@ export const messages = {
     "השרת נעצר ומתחיל שוב. זה אורך כדקה. תורות של סוכנים שרצים נעצרים, וחברים מאבדים את החיבור עד שהשרת חוזר. הקבצים והצ'אטים נשמרים.",
   "mobile.server.settings.restartConfirm": "הפעלה מחדש",
   "mobile.server.settings.restarted": "{name} מופעל מחדש",
+  "mobile.server.settings.restartUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי להפעיל אותו מחדש מכאן.",
   "mobile.server.settings.leaveTitle": "לעזוב את {name}?",
   "mobile.server.settings.leaveBody": "כדי להצטרף שוב יהיה צורך בהזמנה אחרת.",
   "mobile.server.settings.leave": "עזיבת השרת",

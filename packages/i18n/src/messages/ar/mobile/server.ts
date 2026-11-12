@@ -326,6 +326,7 @@ export const messages = {
     "يتوقف الخادم ثم يعمل من جديد. يستغرق ذلك نحو دقيقة. تتوقف أدوار الوكلاء الجارية، ويفقد الأعضاء الاتصال حتى يعود الخادم. تبقى الملفات والدردشات.",
   "mobile.server.settings.restartConfirm": "إعادة التشغيل",
   "mobile.server.settings.restarted": "تجري إعادة تشغيل {name}",
+  "mobile.server.settings.restartUnsupported": "حدّث OpenBot على هذا الخادم لإعادة تشغيله من هنا.",
   "mobile.server.settings.leaveTitle": "هل تريد مغادرة {name}؟",
   "mobile.server.settings.leaveBody": "ستحتاج إلى دعوة أخرى للانضمام مجددًا.",
   "mobile.server.settings.leave": "مغادرة الخادم",

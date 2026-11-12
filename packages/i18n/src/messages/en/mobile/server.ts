@@ -362,6 +362,7 @@ export const messages = defineMessages("mobile.server", {
     "The server stops and starts again. This takes about a minute. Running agent turns stop, and members lose the connection until the server is back. Files and chats stay.",
   "mobile.server.settings.restartConfirm": "Restart",
   "mobile.server.settings.restarted": "{name} is restarting",
+  "mobile.server.settings.restartUnsupported": "Update OpenBot on this server to restart it here.",
   "mobile.server.settings.leaveTitle": "Leave {name}?",
   "mobile.server.settings.leaveBody": "You will need another invitation to join again.",
   "mobile.server.settings.leave": "Leave server",

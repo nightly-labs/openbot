@@ -96,6 +96,7 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
@@ -335,6 +336,7 @@ import { routeHermesImport } from "./team-api/route-hermes-import";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
+import { routeHostRestart } from "./team-api/route-host-restart";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
@@ -1244,6 +1246,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
@@ -2613,6 +2616,7 @@ export class TeamApiServer {
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+          if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
           if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;

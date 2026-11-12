@@ -257,6 +257,7 @@ export const messages = {
     "Il server si arresta e si avvia di nuovo. Ci vuole circa un minuto. I turni degli agenti in corso si interrompono e i membri perdono la connessione finché il server non torna disponibile. File e chat restano.",
   "mobile.server.settings.restartConfirm": "Riavvia",
   "mobile.server.settings.restarted": "{name} si sta riavviando",
+  "mobile.server.settings.restartUnsupported": "Aggiorna OpenBot su questo server per riavviarlo da qui.",
   "mobile.server.settings.leaveTitle": "Uscire da {name}?",
   "mobile.server.settings.leaveBody": "Ti servirà un altro invito per unirti di nuovo.",
   "mobile.server.settings.leave": "Esci dal server",

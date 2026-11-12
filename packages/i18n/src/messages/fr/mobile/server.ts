@@ -260,6 +260,7 @@ export const messages = {
     "Le serveur s’arrête puis redémarre. Cela prend environ une minute. Les tours d’agent en cours s’arrêtent et les membres perdent la connexion jusqu’au retour du serveur. Les fichiers et les discussions sont conservés.",
   "mobile.server.settings.restartConfirm": "Redémarrer",
   "mobile.server.settings.restarted": "{name} redémarre",
+  "mobile.server.settings.restartUnsupported": "Mettez à jour OpenBot sur ce serveur pour le redémarrer ici.",
   "mobile.server.settings.leaveTitle": "Quitter {name} ?",
   "mobile.server.settings.leaveBody": "Il vous faudra une nouvelle invitation pour revenir.",
   "mobile.server.settings.leave": "Quitter le serveur",

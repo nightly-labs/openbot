@@ -121,6 +121,7 @@ import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -230,6 +231,7 @@ import {
   readAgentSessionSettings,
   removeAgentFolder,
   removeMcpServer,
+  requestHostRestart,
   resetAgentSessionSetting,
   rotateEventRoutineSecret,
   saveEventRoutine,
@@ -430,6 +432,7 @@ type HostRequestActions = Pick<
   | "excludeAgentFolder"
   | "includeAgentFolder"
   | "browseAgentFolders"
+  | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
   | "loadAgentMemoryLimit"
@@ -718,6 +721,9 @@ export function createHostRequestActions({
   /** The branches of a chat are an optional route set beside the tasks. */
   const threadBranchesApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_BRANCHES_CAPABILITY, "mobile.chat.threads.unsupported");
+  /** A self-hosted server restarts itself through an optional admin route. */
+  const restartAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   /** The server timezone and the agent memory limit are optional admin route sets. */
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
@@ -790,6 +796,7 @@ export function createHostRequestActions({
   const checks = createHostRequestChecks(capabilities);
   const actions: HostRequestActions = {
     // Async, so a host without the capability rejects the promise and does not throw at the call.
+    restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),

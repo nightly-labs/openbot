@@ -300,6 +300,7 @@ export const messages = {
     "Serwer zatrzyma się i uruchomi ponownie. Trwa to około minuty. Trwające tury agentów zostaną przerwane, a członkowie stracą połączenie do powrotu serwera. Pliki i czaty zostaną zachowane.",
   "mobile.server.settings.restartConfirm": "Uruchom ponownie",
   "mobile.server.settings.restarted": "{name} uruchamia się ponownie",
+  "mobile.server.settings.restartUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby uruchomić go ponownie stąd.",
   "mobile.server.settings.leaveTitle": "Opuścić serwer {name}?",
   "mobile.server.settings.leaveBody": "Aby dołączyć ponownie, potrzebne będzie nowe zaproszenie.",
   "mobile.server.settings.leave": "Opuść serwer",

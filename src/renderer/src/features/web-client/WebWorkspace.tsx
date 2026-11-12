@@ -68,6 +68,7 @@ import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/disc
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
@@ -117,6 +118,7 @@ import {
   getStorageUsage,
   listHostBackgroundProcesses,
   listHostedSites,
+  requestHostRestart,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowsingMemory,
@@ -1443,9 +1445,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (gone) setRestartRequest(null);
     },
   );
+  /**
+   * A self-hosted server restarts itself (`host-restart-v1`); only the open one, because the web client
+   * reaches no other host. The account service restarts a hosted server.
+   */
+  function restartsItself(serverId: string): boolean {
+    return (
+      !hostedServers.isHosted(serverId) &&
+      server()?.id === serverId &&
+      workspace.runtime.admin !== undefined &&
+      workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
+    );
+  }
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
-    if (hostId) await hostedServers.calls.restart(hostId);
+    if (!hostId) return;
+    if (restartsItself(hostId))
+      await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
+    else await hostedServers.calls.restart(hostId);
   }
   createEffect(
     () => props.billingReturn,
@@ -1758,7 +1775,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     onDelete: deleteHostedServer,
     canDelete: hostedServers.isHosted,
     onRestart: (hostId, trigger) => setRestartRequest({ hostId, trigger }),
-    canRestart: hostedServers.isHosted,
+    canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
   } satisfies ServerActionCallbacks;
   // Each time the user enters a host that has a new version, the update dialog opens. A reconnect does not offer again.
   let entry: { id: string; offered: boolean } | null = null;

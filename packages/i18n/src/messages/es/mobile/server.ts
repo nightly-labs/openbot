@@ -258,6 +258,7 @@ export const messages = {
     "El servidor se detiene y se vuelve a iniciar. Tarda alrededor de un minuto. Los turnos de agentes en curso se detienen y los miembros pierden la conexión hasta que el servidor vuelva. Los archivos y chats se conservan.",
   "mobile.server.settings.restartConfirm": "Reiniciar",
   "mobile.server.settings.restarted": "{name} se está reiniciando",
+  "mobile.server.settings.restartUnsupported": "Actualiza OpenBot en este servidor para reiniciarlo desde aquí.",
   "mobile.server.settings.leaveTitle": "¿Salir de {name}?",
   "mobile.server.settings.leaveBody": "Necesitarás otra invitación para volver a unirte.",
   "mobile.server.settings.leave": "Salir del servidor",

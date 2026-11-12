@@ -262,6 +262,7 @@ export const messages = {
     "Sunucu durur ve yeniden başlar. Bu yaklaşık bir dakika sürer. Çalışan ajan turları durur ve üyeler sunucu geri gelene kadar bağlantıyı kaybeder. Dosyalar ve sohbetler korunur.",
   "mobile.server.settings.restartConfirm": "Yeniden başlat",
   "mobile.server.settings.restarted": "{name} yeniden başlatılıyor",
+  "mobile.server.settings.restartUnsupported": "Buradan yeniden başlatmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.leaveTitle": "{name} sunucusundan ayrılmak istiyor musunuz?",
   "mobile.server.settings.leaveBody": "Tekrar katılmak için başka bir davete ihtiyacınız olacak.",
   "mobile.server.settings.leave": "Sunucudan ayrıl",

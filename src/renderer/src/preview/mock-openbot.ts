@@ -3632,6 +3632,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       rotateHostKey: async () => {
         await mockTeam.host.rotateIdentityKey();
       },
+      // Preview has no self-hosted server to restart.
+      restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
       ...createMockHostPersonality(),

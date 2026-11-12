@@ -226,6 +226,7 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -2136,6 +2137,9 @@ try {
                 return { publicKey: ROTATED_HOST_KEY };
               }),
       },
+      // A stand-in for the server-mode restart, which closes the app under its service manager. This
+      // checks the gate and that a refused request never reaches the host.
+      restart: { request: () => record("restartHost") },
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
       localServers: {
@@ -10723,6 +10727,67 @@ try {
         newLines.every((line) => !line.includes(FAKE_SECRET)) &&
         newLines.some((line) => line.includes("[redacted]")),
       { lines: newLines.length },
+    );
+  }
+
+  // ---- Server restart (host-restart-v1) ----
+  {
+    const capabilities = [HOST_RESTART_CAPABILITY];
+    const restarts = () => callsOf("restartHost").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-restart-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_RESTART_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The channel host has no restart: a desktop app is not in server mode.
+    assert.ok(channelHost?.port, "The channel host of the server restart check does not run.");
+    const without = { base: `http://127.0.0.1:${channelHost.port}` };
+    const withoutCompatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      ...without,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const withoutRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      ...without,
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const unsupported = await call("POST", HOST_RESTART_ROUTES.restart, { token: owner.sessionToken, json: {} });
+    check(
+      "a host that is not in server mode does not advertise host-restart-v1, and it and a client without the capability get 400 hostRestartUnsupported",
+      withoutCompatibility.status === 200 &&
+        !list(field(withoutCompatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        errorIs(withoutRestart, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        errorIs(unsupported, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        restarts() === 0,
+      [summary(withoutCompatibility), summary(withoutRestart), summary(unsupported)],
+    );
+    const memberRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: bobToken, json: {}, capabilities });
+    const wrongMethod = await call("GET", HOST_RESTART_ROUTES.restart, { token: adaToken, capabilities });
+    check(
+      "a member cannot restart the server, only POST restarts it, and the host does not restart",
+      errorIs(memberRestart, 403, sourceText("error.team.adminRequired")) &&
+        wrongMethod.status === 404 &&
+        restarts() === 0,
+      [summary(memberRestart), summary(wrongMethod)],
+    );
+    const adminRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: adaToken, json: {}, capabilities });
+    const ownerRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin and the owner each restart the server once, and the reply is empty",
+      adminRestart.status === 200 &&
+        isDeepStrictEqual(adminRestart.body, {}) &&
+        ownerRestart.status === 200 &&
+        isDeepStrictEqual(ownerRestart.body, {}) &&
+        restarts() === 2,
+      [summary(adminRestart), summary(ownerRestart), restarts()],
     );
   }
 
