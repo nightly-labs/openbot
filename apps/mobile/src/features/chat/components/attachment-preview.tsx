@@ -1,7 +1,7 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
-import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
@@ -17,6 +17,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import { attachmentDownload, largeDownloadOf } from "../model/large-files";
 import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile } from "./use-media-file";
 
@@ -143,10 +144,11 @@ function attachmentFileQuery(
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
     queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
-      if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(tooLarge);
+      // A large file downloads only after the user asks for it, or with the setting on.
+      if (attachmentDownload(serverId, attachment) !== "download") throw new Error(tooLarge);
       const kept = keptImageFile(serverId, attachment);
       if (kept) return kept;
-      const data = await downloadAttachment(serverId, attachment.id);
+      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       return {
         ...data,
         fileUri: data.mimeType.startsWith("image/") ? keepImageFile(serverId, attachment, data) : undefined,

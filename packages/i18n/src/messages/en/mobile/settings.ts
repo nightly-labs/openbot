@@ -180,6 +180,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.privacy.retry": "Retry saving privacy setting",
   "mobile.settings.conversations.title": "Conversations",
   "mobile.settings.conversations.hiddenChats": "Hidden chats",
+  "mobile.settings.conversations.largeFiles": "Download large files automatically",
+  "mobile.settings.conversations.largeFilesFooter":
+    "Files larger than {small} download only when you tap them. Turn this on to download files up to {large} at once. This can use a lot of mobile data.",
   "mobile.settings.profile.nameUnsafe": "Remove line breaks and control characters from your name.",
   "mobile.settings.profile.nameLength": "Use 3–20 characters for your display name.",
   "mobile.settings.profile.saveFailed": "Could not save changes. Try again.",

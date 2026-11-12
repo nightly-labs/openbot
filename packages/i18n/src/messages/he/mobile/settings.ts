@@ -179,6 +179,9 @@ export const messages = {
   "mobile.settings.privacy.retry": "ניסיון חוזר לשמירת הגדרת הפרטיות",
   "mobile.settings.conversations.title": "שיחות",
   "mobile.settings.conversations.hiddenChats": "צ'אטים מוסתרים",
+  "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
+  "mobile.settings.conversations.largeFilesFooter":
+    "קבצים גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד מיד קבצים עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
   "mobile.settings.profile.nameUnsafe": "יש להסיר מהשם מעברי שורה ותווי בקרה.",
   "mobile.settings.profile.nameLength": "שם התצוגה חייב להכיל 3–20 תווים.",
   "mobile.settings.profile.saveFailed": "לא ניתן לשמור את השינויים. אפשר לנסות שוב.",

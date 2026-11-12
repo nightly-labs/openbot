@@ -181,6 +181,9 @@ export const messages = {
   "mobile.settings.privacy.retry": "Opslaan van privacyinstelling opnieuw proberen",
   "mobile.settings.conversations.title": "Gesprekken",
   "mobile.settings.conversations.hiddenChats": "Verborgen chats",
+  "mobile.settings.conversations.largeFiles": "Grote bestanden automatisch downloaden",
+  "mobile.settings.conversations.largeFilesFooter":
+    "Bestanden groter dan {small} worden pas gedownload als je erop tikt. Zet dit aan om bestanden tot {large} meteen te downloaden. Dit kan veel mobiele data gebruiken.",
   "mobile.settings.profile.nameUnsafe": "Verwijder regeleinden en stuurtekens uit je naam.",
   "mobile.settings.profile.nameLength": "Gebruik 3–20 tekens voor je weergavenaam.",
   "mobile.settings.profile.saveFailed": "Kan de wijzigingen niet opslaan. Probeer het opnieuw.",

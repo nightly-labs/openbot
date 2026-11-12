@@ -181,6 +181,9 @@ export const messages = {
   "mobile.settings.privacy.retry": "개인정보 설정 다시 저장",
   "mobile.settings.conversations.title": "대화",
   "mobile.settings.conversations.hiddenChats": "숨긴 채팅",
+  "mobile.settings.conversations.largeFiles": "큰 파일 자동 다운로드",
+  "mobile.settings.conversations.largeFilesFooter":
+    "{small}보다 큰 파일은 탭할 때만 다운로드돼요. 켜면 {large}까지의 파일을 바로 다운로드해요. 모바일 데이터를 많이 쓸 수 있어요.",
   "mobile.settings.profile.nameUnsafe": "이름에서 줄바꿈과 제어 문자를 제거해 주세요.",
   "mobile.settings.profile.nameLength": "표시 이름은 3~20자로 입력해 주세요.",
   "mobile.settings.profile.saveFailed": "변경 사항을 저장할 수 없었어요. 다시 시도해 주세요.",
