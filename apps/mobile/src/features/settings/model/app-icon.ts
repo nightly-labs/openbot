@@ -61,8 +61,6 @@ export const useAppIcon = create<{ value: AppLogoColor | null; ready: boolean; s
 }));
 
 let loading: Promise<void> | null = null;
-/** Counts the selections, so a read that started before one does not overwrite it. */
-let selections = 0;
 
 /** Reads the icon once. The Appearance row and the picker share the read. */
 export function loadAppIcon(): Promise<void> {
@@ -78,11 +76,10 @@ async function readAppIcon(): Promise<void> {
     useAppIcon.setState({ ready: true });
     return;
   }
-  const before = selections;
   try {
     const id = await native.getIcon();
     const value = id === MAIN_ICON ? DEFAULT_APP_LOGO_COLOR : isAppLogoColor(id) ? id : null;
-    if (selections === before) useAppIcon.setState({ value });
+    useAppIcon.setState({ value });
   } finally {
     useAppIcon.setState({ ready: true });
   }
@@ -91,7 +88,6 @@ async function readAppIcon(): Promise<void> {
 export async function saveAppIcon(color: AppLogoColor): Promise<void> {
   const { value, saving } = useAppIcon.getState();
   if (!native || saving || value === color) return;
-  selections += 1;
   useAppIcon.setState({ value: color, saving: true });
   try {
     await native.setIcon(color === DEFAULT_APP_LOGO_COLOR ? MAIN_ICON : color);
