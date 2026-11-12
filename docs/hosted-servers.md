@@ -1135,7 +1135,7 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
 
    The move does not copy systemd units or their settings in `/etc`. When the sandbox has a unit of
    the customer (a unit file in `/etc/systemd/system` of no package, or an enabled template instance
-   such as `wg-quick@wg0`), `packages` names it and the move stops before the downtime. The server
+   such as `syncthing@user`), `packages` names it and the move stops before the downtime. The server
    stays on boat. On 2026-11-12 an export failed because such a service wrote to the home during the
    archive.
 
