@@ -1425,6 +1425,7 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    agentChat: (threadId) => store.ownsThread(threadId),
     profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
     onProxyStatusChanged: () => browserProxyStatusChanged(),
     computerExit: (memberId) => browserEgress.exit(memberId),

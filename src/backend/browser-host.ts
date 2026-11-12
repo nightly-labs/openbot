@@ -592,6 +592,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #agentChat: (threadId: string) => boolean;
   readonly #profileProxy: (profileId: string) => BrowserProxyConnection | null;
   readonly #onProxyStatusChanged: () => void;
   readonly #computerExit: (memberId: string) => RelayExit;
@@ -688,6 +689,11 @@ export class BrowserHost {
       /** Whether a named profile still exists. A tab never opens in a deleted profile. */
       profileExists?: (profileId: string) => boolean;
       /**
+       * Whether a thread is the own chat of an agent, not a side thread, a routine run or a channel.
+       * A tab that a person opened before the agent's first message has no thread, and it belongs there.
+       */
+      agentChat?: (threadId: string) => boolean;
+      /**
        * The proxy of a named profile, with its password, or null for the proxy settings of the
        * computer. It throws when the password cannot be read: the tab then does not open.
        */
@@ -729,6 +735,7 @@ export class BrowserHost {
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#agentChat = options.agentChat ?? (() => false);
     this.#profileProxy = options.profileProxy ?? (() => null);
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
@@ -2728,7 +2735,12 @@ export class BrowserHost {
     };
   }).bind(this);
 
-  #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
+  #toolTabs(params: DynamicToolCallParams): {
+    tabs: BrowserTab[];
+    activeTabId: string | null;
+    otherChatTabs?: number;
+    note?: string;
+  } {
     // A page can put a typed card value in its title or address, so they go through the tab's scrub.
     const tabs = this.listTabs()
       .filter((tab) => this.#canUseToolTab(params, tab))
@@ -2739,7 +2751,20 @@ export class BrowserHost {
     const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
       ? this.#activeTabId
       : (tabs.at(-1)?.id ?? null);
-    return { tabs, activeTabId };
+    // The browser panel shows all tabs of the agent, so the agent learns why it cannot see some of them.
+    const ownerAgentId = params.ownerAgentId ?? null;
+    const otherChatTabs =
+      ownerAgentId === null
+        ? 0
+        : this.listTabs().filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab))
+            .length;
+    if (otherChatTabs === 0) return { tabs, activeTabId };
+    return {
+      tabs,
+      activeTabId,
+      otherChatTabs,
+      note: `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+    };
   }
 
   /**
@@ -4294,12 +4319,14 @@ export class BrowserHost {
 
   /**
    * The owner thread can use its tab. Another thread of the same agent can use it after a person shared
-   * it with that thread. A tab with no owner agent is never shared.
+   * it with that thread. A tab with no owner agent is never shared. A tab of the agent with no owner
+   * thread opened before the agent's first message, from its browser panel, so its own chat can use it.
    */
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
+    if (tab.ownerThreadId === null && this.#agentChat(params.threadId)) return true;
     return this.#tabs.get(tab.id)?.sharedThreadIds?.has(params.threadId) ?? false;
   }
 
