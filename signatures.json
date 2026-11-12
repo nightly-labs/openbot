@@ -749,6 +749,16 @@
       "method": "checkbox",
       "url": "https://github.com/nightly-labs/openbot/pull/4838",
       "text": "- [x] I have read the [OpenBot Contributor Assignment Agreement](https://github.com/nightly-labs/openbot/blob/main/CLA.md) 1.0 and I agree to it."
+    },
+    {
+      "login": "sumingwang233",
+      "userId": 131336715,
+      "version": "2.0",
+      "signedAt": "2026-11-12T12:20:42.779Z",
+      "pullRequest": 5344,
+      "method": "email",
+      "url": "https://github.com/nightly-labs/openbot/pull/5344",
+      "text": "Signed PDF of the OpenBot Contributor License Agreement 2.0, sent to licenses@openbot.run."
     }
   ]
 }
