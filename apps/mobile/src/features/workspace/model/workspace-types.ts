@@ -86,6 +86,7 @@ import type {
   InstanceTransferSummary,
   MachineMetrics,
   MarkAgentTaskReadInput,
+  McpAccessSnapshot,
   McpServerConfig,
   McpSignInState,
   McpTestResult,
@@ -123,6 +124,7 @@ import type {
   SetAgentSessionSettingInput,
   SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
+  SetMcpAccessInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
@@ -724,6 +726,12 @@ export interface MobileWorkspaceContextValue {
   /** The http servers that the host holds a sign-in for. Empty for a host without `mcp-sign-in-v1`. */
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
   signOutMcpServer: (mcpServerId: string, serverId: string) => Promise<McpSignInState[]>;
+  /** An owner or admin of an online host that serves `mcp-access-v1`. The host checks the role again. */
+  canManageMcpAccess: (serverId: string) => boolean;
+  /** Who gets each MCP server of the host: the agents and the level of each role. */
+  loadMcpAccess: (serverId: string) => Promise<McpAccessSnapshot>;
+  /** Replaces the access of one MCP server. The host refuses a change made from an earlier revision. */
+  setMcpAccess: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /**
    * Creates an agent on the active server and returns its id. A host with `agent-welcome-v1` gets a
@@ -1211,6 +1219,7 @@ type MobileWorkspaceStateKey =
   | "canManageProviders"
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
+  | "canManageMcpAccess"
   | "canAddMarketplaceAgents"
   | "canUpdateMarketplaceAgents"
   | "canSendNotifications"

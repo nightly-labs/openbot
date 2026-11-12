@@ -1226,6 +1226,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego serwerami MCP.",
   "mobile.server.mcp.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego serwerami MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby wybrać, kto dostaje jego serwery MCP.",
   "mobile.server.mcp.description":
     "Serwery MCP dają agentom tego serwera więcej narzędzi. Agenci Claude i Codex dostają tylko serwery z tej listy.",
   "mobile.server.mcp.loading": "Wczytywanie serwerów MCP…",
@@ -1303,6 +1305,20 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Agenci tego serwera przestają dostawać jego narzędzia. Ustawienia nie są zachowywane.",
   "mobile.server.mcp.remove": "Usuń serwer MCP",
+  "mobile.server.mcp.access.title": "Dostęp",
+  "mobile.server.mcp.access.agents": "Agenci",
+  "mobile.server.mcp.access.agentsOf": "Agenci, którzy mogą używać {name}",
+  "mobile.server.mcp.access.allAgents": "Wszyscy agenci",
+  "mobile.server.mcp.access.allAgentsHint": "Wszyscy agenci obejmuje też każdego agenta dodanego później.",
+  "mobile.server.mcp.access.noAgents": "Brak agentów",
+  "mobile.server.mcp.access.someAgents": "{count} z {total}",
+  "mobile.server.mcp.access.use": "Może używać",
+  "mobile.server.mcp.access.level": "Dostęp {role} do {name}",
+  "mobile.server.mcp.access.hint":
+    "Członek dostaje najwyższy poziom z Wszyscy i swoich ról. Właściciele, administratorzy i osoba, która dodała serwer, zawsze mogą nim zarządzać.",
+  "mobile.server.mcp.access.loadFailed": "Nie udało się wczytać, kto dostaje ten serwer MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Tylko właściciel lub administrator serwera online może wybrać, kto dostaje ten serwer MCP.",
   "mobile.server.usage.agents": "Agenci",
   "mobile.server.usage.agentLine": "Tokeny: {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Brak zarejestrowanego użycia agentów w tym okresie.",

@@ -1222,6 +1222,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Обновите OpenBot на этом сервере, чтобы управлять его серверами MCP здесь.",
   "mobile.server.mcp.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы управлять его серверами MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы выбирать, кто получает его серверы MCP.",
   "mobile.server.mcp.description":
     "Серверы MCP дают агентам этого сервера больше инструментов. Агенты Claude и Codex получают только серверы из этого списка.",
   "mobile.server.mcp.loading": "Загрузка серверов MCP…",
@@ -1298,6 +1300,20 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "Удалить {name}?",
   "mobile.server.mcp.removeBody": "Агенты этого сервера перестают получать его инструменты. Настройки не сохраняются.",
   "mobile.server.mcp.remove": "Удалить сервер MCP",
+  "mobile.server.mcp.access.title": "Доступ",
+  "mobile.server.mcp.access.agents": "Агенты",
+  "mobile.server.mcp.access.agentsOf": "Агенты, которые могут использовать «{name}»",
+  "mobile.server.mcp.access.allAgents": "Все агенты",
+  "mobile.server.mcp.access.allAgentsHint": "«Все агенты» также включает каждого агента, добавленного позже.",
+  "mobile.server.mcp.access.noAgents": "Нет агентов",
+  "mobile.server.mcp.access.someAgents": "{count} из {total}",
+  "mobile.server.mcp.access.use": "Использование",
+  "mobile.server.mcp.access.level": "Доступ роли «{role}» к «{name}»",
+  "mobile.server.mcp.access.hint":
+    "Участник получает самый высокий уровень из «Все» и своих ролей. Владельцы, администраторы и тот, кто добавил сервер, всегда могут им управлять.",
+  "mobile.server.mcp.access.loadFailed": "Не удалось загрузить, кто получает этот сервер MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Выбрать, кто получает этот сервер MCP, может только владелец или администратор сервера в сети.",
   "mobile.server.usage.agents": "Агенты",
   "mobile.server.usage.agentLine": "{tokens} токенов · {cost} · {percent}",
   "mobile.server.usage.noAgents": "За этот период использования агентами нет.",

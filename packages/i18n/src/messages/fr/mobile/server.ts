@@ -1124,6 +1124,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses serveurs MCP ici.",
   "mobile.server.mcp.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour gérer ses serveurs MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour choisir qui reçoit ses serveurs MCP.",
   "mobile.server.mcp.description":
     "Les serveurs MCP donnent plus d’outils aux agents de ce serveur. Les agents Claude et Codex reçoivent uniquement les serveurs de cette liste.",
   "mobile.server.mcp.loading": "Chargement des serveurs MCP…",
@@ -1197,6 +1199,20 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Les agents de ce serveur ne reçoivent plus ses outils. Les réglages ne sont pas conservés.",
   "mobile.server.mcp.remove": "Retirer le serveur MCP",
+  "mobile.server.mcp.access.title": "Accès",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents qui peuvent utiliser {name}",
+  "mobile.server.mcp.access.allAgents": "Tous les agents",
+  "mobile.server.mcp.access.allAgentsHint": "Tous les agents inclut aussi chaque agent ajouté plus tard.",
+  "mobile.server.mcp.access.noAgents": "Aucun agent",
+  "mobile.server.mcp.access.someAgents": "{count} sur {total}",
+  "mobile.server.mcp.access.use": "Peut utiliser",
+  "mobile.server.mcp.access.level": "Accès de {role} à {name}",
+  "mobile.server.mcp.access.hint":
+    "Un membre reçoit le niveau le plus élevé de Tout le monde et de ses rôles. Les propriétaires, les admins et la personne qui a ajouté le serveur peuvent toujours le gérer.",
+  "mobile.server.mcp.access.loadFailed": "Impossible de charger qui reçoit ce serveur MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Seul un propriétaire ou un admin d’un serveur en ligne peut choisir qui reçoit ce serveur MCP.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "Jetons : {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Aucune utilisation d’agent enregistrée sur cette période.",

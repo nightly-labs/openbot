@@ -194,6 +194,8 @@ export const queryKeys = {
   customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
+  /** Who gets each MCP server of a host. A change answers with the whole snapshot. */
+  mcpAccess: (scope: QueryScope, serverId: string) => ["mcp-access", ...scope, serverId],
   serverLogo: (scope: QueryScope, serverId: string, ...logo: [] | [logoKey: string | null]) => [
     "server-logo",
     ...scope,

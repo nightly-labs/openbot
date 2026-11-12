@@ -1084,6 +1084,7 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",
   "mobile.server.mcp.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de MCP-servers te beheren.",
+  "mobile.server.mcp.accessUnsupported": "Werk OpenBot bij op deze server om te kiezen wie de MCP-servers krijgt.",
   "mobile.server.mcp.description":
     "MCP-servers geven de agents van deze server meer tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst.",
   "mobile.server.mcp.loading": "MCP-servers laden…",
@@ -1156,6 +1157,20 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "De agents van deze server krijgen de tools ervan niet meer. De instellingen worden niet bewaard.",
   "mobile.server.mcp.remove": "MCP-server verwijderen",
+  "mobile.server.mcp.access.title": "Toegang",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents die {name} mogen gebruiken",
+  "mobile.server.mcp.access.allAgents": "Alle agents",
+  "mobile.server.mcp.access.allAgentsHint": "Alle agents omvat ook elke agent die later wordt toegevoegd.",
+  "mobile.server.mcp.access.noAgents": "Geen agents",
+  "mobile.server.mcp.access.someAgents": "{count} van {total}",
+  "mobile.server.mcp.access.use": "Mag gebruiken",
+  "mobile.server.mcp.access.level": "Toegang van {role} tot {name}",
+  "mobile.server.mcp.access.hint":
+    "Een lid krijgt het hoogste niveau van Iedereen en van de eigen rollen. Eigenaren, beheerders en wie de server heeft toegevoegd, kunnen hem altijd beheren.",
+  "mobile.server.mcp.access.loadFailed": "Kan niet laden wie deze MCP-server krijgt.",
+  "mobile.server.mcp.access.unavailable":
+    "Alleen een eigenaar of beheerder van een online server kan kiezen wie deze MCP-server krijgt.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Geen agentgebruik vastgelegd in deze periode.",
