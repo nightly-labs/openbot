@@ -122,11 +122,9 @@ try {
 
   const pid = Number(await readFile(pidFile, "utf8"));
   assert.ok(alive(pid), "The stdio server runs while the session is open.");
+  // A stop waits for the relays, so that an app quit leaves no server running.
   await stopClients(clients);
   clients.length = 0;
-  // The relay ends the server with stdin closed and SIGTERM, then SIGKILL after 2 s.
-  const deadline = Date.now() + 10_000;
-  while (alive(pid) && Date.now() < deadline) await new Promise((done) => setTimeout(done, 100));
   report.serverStoppedWithSession = !alive(pid);
   assert.ok(report.serverStoppedWithSession, "The stdio server ends with the session.");
 

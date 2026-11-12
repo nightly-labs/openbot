@@ -67,7 +67,7 @@ import {
   type DiagnosticOrigin,
   ProviderTurnActiveError,
 } from "./agent-client";
-import type { AgentCliInfo } from "./cli";
+import { type AgentCliInfo, cliPathEnvironment } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
@@ -300,6 +300,8 @@ interface AcpThread {
   configOptions: SessionConfigOption[];
   currentModelId: string | null;
   mcp: LocalMcpSession;
+  /** Ends the session's stdio relays (`relayStdioMcpServers`) and their servers. */
+  relays: Effect.Effect<void>;
   activeTurn: AcpTurn | null;
   /** Antigravity cancel can leave its stream open. Reload this same session before new input. */
   needsResume: boolean;
@@ -884,6 +886,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.#historyReplays.clear();
           const threads = this.#threads.clear();
           for (const thread of threads) thread.mcp.close();
+          yield* Effect.forEach(threads, (thread) => thread.relays, { concurrency: "unbounded", discard: true });
           yield* Effect.forEach(
             threads,
             (thread) => (thread.transport ? thread.transport.stop(Effect.void).pipe(Effect.ignore) : Effect.void),
@@ -993,6 +996,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.detach(thread);
     this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
+    Effect.runFork(thread.relays);
     if (thread.transport) Effect.runFork(thread.transport.stop(Effect.void).pipe(Effect.ignore));
   }
 
@@ -1002,6 +1006,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
+    yield* thread.relays;
     if (thread.transport) return yield* thread.transport.stop(Effect.void);
     yield* providerCall(() =>
       this.#transport.connection?.closeSession({ sessionId: thread.id }).catch(() => undefined),
@@ -1649,7 +1654,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const exit = yield* Effect.exit(this.#openThread(params, true));
     // session/resume closes the old Antigravity harness and restores its saved trajectory.
     // Keep its bridge until the replacement succeeds, so a failure can be retried in this session.
-    if (recovering && Exit.isSuccess(exit)) held.mcp.close();
+    if (recovering && Exit.isSuccess(exit)) {
+      held.mcp.close();
+      yield* held.relays;
+    }
     yield* Deferred.done(completion, exit);
     if (this.#startingThreads.get(requestedThreadId) === completion) this.#startingThreads.delete(requestedThreadId);
     return yield* exit;
@@ -1784,7 +1792,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               promptsSinceInstructions: kept?.promptsSinceInstructions ?? 0,
               configOptions,
               currentModelId,
-              mcp: closeRelays ? withRelays(mcp, closeRelays) : mcp,
+              mcp,
+              relays: closeRelays ?? Effect.void,
               activeTurn: null,
               needsResume: false,
               transport: sessionTransport,
@@ -1845,8 +1854,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /**
    * The session's stdio servers as http entries of relays in OpenBot, for an agent that drops stdio
-   * (`relayStdioMcpServers`). A server starts with the environment of the agent's process, in the
-   * session's folder, as the agent would start it. `close` ends the relays and their servers.
+   * (`relayStdioMcpServers`). A server starts with the environment of the agent's process, without
+   * its private temporary folder, in the session's folder, as the agent would start it. It runs
+   * outside a Workspace only sandbox: the Access setting does not limit MCP servers, as for Claude,
+   * Codex and Pi (#6191). `close` ends the relays and their servers.
    */
   readonly #relayStdioMcpServers = Effect.fn("AcpAgentClient.relayStdioMcpServers")(function* (
     this: AcpAgentClient,
@@ -1859,7 +1870,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     ).pipe(Effect.ignore);
     const environment: Record<string, string> = {};
     for (const [key, value] of Object.entries(process.env)) if (value !== undefined) environment[key] = value;
-    Object.assign(environment, this.options.extraEnv?.());
+    Object.assign(environment, cliPathEnvironment(this.#cli), this.options.env, this.options.extraEnv?.());
     const relayed = yield* Effect.forEach(servers, (server) =>
       Effect.gen(function* () {
         if ("type" in server) return server;
@@ -4008,20 +4019,4 @@ function isAuthenticationError(error: unknown): boolean {
   if (error instanceof RequestError && error.code === -32000) return true;
   const text = failureText(error);
   return classifyUserError(text) === "auth" || /\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text);
-}
-
-/**
- * The session's OpenBot servers, whose `close` also ends its stdio relays. Each place that ends a
- * session closes its MCP session, and none of them waits for it, so neither does this.
- */
-function withRelays(mcp: LocalMcpSession, closeRelays: Effect.Effect<void>): LocalMcpSession {
-  return {
-    servers: mcp.servers,
-    setThreadId: (threadId) => mcp.setThreadId(threadId),
-    reached: () => mcp.reached(),
-    close: () => {
-      mcp.close();
-      Effect.runFork(closeRelays);
-    },
-  };
 }
