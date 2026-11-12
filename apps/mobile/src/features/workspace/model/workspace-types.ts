@@ -87,6 +87,8 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  LibraryFolderAction,
+  LibraryFoldersSnapshot,
   MachineMetrics,
   MarkAgentTaskReadInput,
   McpAccessSnapshot,
@@ -859,6 +861,16 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `library-folders-v1` and `storage-v1`. Every member reads the
+   * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
+   */
+  canOrganizeLibrary: (serverId: string) => boolean;
+  /**
+   * True when the host also advertises `library-folders-events-v1`: it sends `library-folders-changed`
+   * after each change, so the Library follows a change on another device at once.
+   */
+  followsLibraryFolders: (serverId: string) => boolean;
   /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
   canReadMachineMetrics: (serverId: string) => boolean;
   /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
@@ -869,6 +881,10 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /** The Library folders of the host that this member can see (`library-folders-v1`). */
+  loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /** Applies one folder change. The host answers with all folders that this member can see. */
+  changeLibraryFolders: (action: LibraryFolderAction, serverId: string) => Promise<LibraryFoldersSnapshot>;
   /** Owners and admins only; the host refuses a member. */
   clearServerStorage: (category: ClearableStorageCategory, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
@@ -1213,6 +1229,8 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canOrganizeLibrary"
+  | "followsLibraryFolders"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 

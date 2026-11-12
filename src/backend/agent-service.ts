@@ -2623,6 +2623,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "browser-profiles-changed" });
   }
 
+  /**
+   * A Library folder, or the folder of a file, changed. The Library of this window and of each joined
+   * client reads the folders again (`library-folders-events-v1`).
+   */
+  notifyLibraryFoldersChanged(): void {
+    this.#emit({ type: "library-folders-changed" });
+  }
+
   notifyWorkflowRunEnded(end: WorkflowRunEnd): void {
     this.emit("workflowRun", end);
   }

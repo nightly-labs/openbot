@@ -3727,7 +3727,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
-    storage: createMockStorage(),
+    storage: createMockStorage(() => emitAgentEvent({ type: "library-folders-changed" })),
     agentImport: {
       choose: async () => clone(AGENT_IMPORT_PREVIEW),
       apply: async ({ token, keys, channelKeys }) => {
