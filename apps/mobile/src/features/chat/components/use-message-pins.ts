@@ -13,7 +13,7 @@ import { useText } from "@/shared/lib/text";
 const NO_PINS: readonly PinnedMessage[] = [];
 
 /** The key of one pin: its chat (the side thread, or the agent's own chat) and its message. */
-export function pinKey(taskId: string | null, messageId: string): string {
+function pinKey(taskId: string | null, messageId: string): string {
   return `${taskId ?? ""}:${messageId}`;
 }
 
