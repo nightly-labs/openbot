@@ -19,10 +19,12 @@ import type {
   HostedServerSetupStatus,
 } from "@openbot/ui/features/servers/AddServerDialog";
 import {
+  guessHostedCurrency,
   HOSTED_BILLING_CURRENCY,
   HOSTED_CURRENCIES,
   type HostedCurrency,
   type HostedServerPlan,
+  hostedCurrencies,
   hostedServerPlansFromCatalog,
 } from "@openbot/ui/features/servers/HostedServerPricing";
 import { currentText, useText } from "@openbot/ui/text";
@@ -417,6 +419,8 @@ function AddServerSession(
           : t("settings.hostedServers.checkoutFailed");
         draft.orderError = errorDetails(error, title);
         draft.orderErrorTitle = title;
+        // No server was made, so the page stays open, and a new window page closes the flow.
+        draft.orderedFromPage = false;
       });
     } finally {
       setState((draft) => {
@@ -510,7 +514,7 @@ function AddServerSession(
                 overlay={props.pricingPage === undefined}
                 headerFrame={props.pricingPage ? headerFrame() : undefined}
                 plans={state.catalog}
-                currency={state.currency ? HOSTED_BILLING_CURRENCY[state.currency] : undefined}
+                currency={HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans()))]}
                 currencyLocked={state.currency !== null}
                 used={state.licenseOffer?.used}
                 licenseTrialEnd={state.licenseOffer?.trialEnd}
