@@ -139,6 +139,8 @@ export interface MarketplaceControllerProps {
   macOS?: boolean | undefined;
   /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
   onAddServer?: (() => void) | undefined;
+  /** Opens the form that edits the custom MCP server with this ID. Absent when the user cannot edit one. */
+  onEditServer?: ((id: string) => void) | undefined;
 }
 
 /** The connect step of one app. `settle(null)` is a closed dialog. */
@@ -1730,6 +1732,9 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     },
     get addServer() {
       return props.onAddServer;
+    },
+    get editServer() {
+      return props.onEditServer;
     },
     get runPrompt() {
       const run = props.onRunPluginPrompt;

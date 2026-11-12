@@ -45,6 +45,7 @@ import { AppMark, TryCard } from "./MarketplaceParts";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import {
   appSetup,
+  customServerStatus,
   type MarketplaceApp,
   type MarketplaceAppAccount,
   type MarketplaceAppConnection,
@@ -672,14 +673,26 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         props.scope.nav.back();
       });
   };
+  /* OpenBot connects to a custom server only for a test, so the header says what the user set, as in
+     Server settings › MCP, and not that the server answers. */
   return (
     <IntegrationPage
       class="marketplace-custom-page"
       logo={<Plug aria-hidden="true" />}
       name={props.app.name}
-      status={props.app.status}
-      statusLabel={t(STATUS_LABEL[props.app.status])}
+      status="idle"
+      statusLabel={t(customServerStatus(props.app))}
       subtitle={t("marketplace.app.custom")}
+      actions={
+        <Show when={model().canConnectApps() ? model().editServer : undefined}>
+          {(edit) => (
+            <Button type="button" variant="outline" size="sm" onClick={() => edit()(props.app.server.id)}>
+              <Pencil aria-hidden="true" />
+              {t("common.edit")}
+            </Button>
+          )}
+        </Show>
+      }
       danger={
         <Show when={model().canConnectApps()}>
           <DangerZone
