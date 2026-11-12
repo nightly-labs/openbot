@@ -39,6 +39,7 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
         <ChannelAvatar
           channel={transition.avatar.channel}
           agents={transition.avatar.agents}
+          serverId={transition.avatar.serverId}
           disconnected={transition.avatar.disconnected}
           size={transition.from.width}
         />
@@ -46,6 +47,7 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
         <BloubAvatar
           agentId={transition.chatId}
           hue={transition.avatar.hue}
+          color={transition.avatar.color}
           seed={transition.avatar.seed}
           size={transition.from.width}
           animateIdle={false}

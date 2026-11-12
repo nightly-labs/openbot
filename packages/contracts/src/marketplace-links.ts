@@ -15,9 +15,9 @@
  * is refused, so the shape cannot grow an `?install=1`. A link opens the listing's page in the app;
  * adding the agent or skill is still a press of Add there.
  *
- * An agent has only its id, a UUID the Worker makes. A skill has a unique slug, made from its name.
- * Both forms are built from that value and never read from catalog data, so a listing cannot put a
- * foreign address behind the button that copies its own link.
+ * An agent has only its id: a UUID the Worker makes, or the id of a curated agent. A skill has a
+ * unique slug, made from its name. Both forms are built from that value and never read from catalog
+ * data, so a listing cannot put a foreign address behind the button that copies its own link.
  */
 
 export const OPENBOT_MARKETPLACE_ORIGIN = "https://openbot.run";
@@ -37,8 +37,12 @@ export interface MarketplaceListingLink {
 const LISTING_SEGMENTS: Record<MarketplaceListingKind, string> = { agent: "agents", skill: "skills" };
 const LISTING_KINDS: readonly MarketplaceListingKind[] = ["agent", "skill"];
 
-/** `crypto.randomUUID()` in the Worker: lower-case hex in the 8-4-4-4-12 form. */
-const MARKETPLACE_AGENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+/**
+ * A submitted agent has a `crypto.randomUUID()` id; a curated agent has `openbot-curated-agent-<slug>`.
+ * Lower-case letters, digits and hyphens, at most 128. No dot and no slash, so an id cannot reach
+ * another path. The Worker decides if the agent exists.
+ */
+const MARKETPLACE_AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,127}$/u;
 
 /**
  * The Worker's `slugify`: lower-case letters, digits and hyphens, at most 64. No dot and no slash, so

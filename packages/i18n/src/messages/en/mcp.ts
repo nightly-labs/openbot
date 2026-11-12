@@ -6,6 +6,8 @@ export const messages = defineMessages("mcp", {
   "mcp.connect.notConnected": "Not connected",
   "mcp.connect.close": "Close connect {name}",
   "mcp.connect.getKey": "Get a key",
+  "mcp.connect.useKey": "Use an API key instead",
+  "mcp.connect.useSignIn": "Sign in instead",
   "mcp.connect.keyDescription":
     "Paste a credential from your {name} account. OpenBot connects with it and keeps it on {host}.",
   "mcp.connect.thisComputer": "this computer",
@@ -141,11 +143,11 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.appSaved": "App saved. Sign in to use it.",
   "mcp.panel.appRemoved": "App removed.",
   "mcp.signIn.relayDescription":
-    "Check that the sign-in page is on {page}, then open it in your browser. When you finish, OpenBot sends the sign-in to {host}.",
+    "Sign in on {page} in your browser. When you finish, OpenBot sends the sign-in to {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Open the sign-in page of {page} in your browser. When you finish, paste the address that the browser shows here. OpenBot then sends the sign-in to {host}.",
+    "Sign in on {page} in your browser. When you finish, paste the address that the browser shows here. OpenBot then sends the sign-in to {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Check that the sign-in page is on {page}, then open it in your browser and finish there. {host} sees the sign-in by itself.",
+    "Sign in on {page} in your browser and finish there. {host} sees the sign-in by itself.",
   "mcp.signIn.relayOpen": "Open sign-in page",
   "mcp.signIn.relayPasteHint":
     "If the browser does not come back to OpenBot, copy the address that it shows and paste it here.",

@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "./input-limits";
+import type { AvatarImageInput } from "./ipc-agents";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
 import { optionalHistoryExtent } from "./ipc-decoding";
@@ -19,10 +20,55 @@ export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
 export const SIGNED_OUT_CHANNEL_MEMBER_ID = "local";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
+/**
+ * The reason a run stops at `CHANNEL_ASSIGNMENT_LIMIT`. Saved tasks and every host version carry this
+ * exact English, so a screen compares it to show its own text. Do not change it.
+ */
+export const CHANNEL_ASSIGNMENT_LIMIT_ERROR =
+  "The automatic assignment limit was reached. Continue or reassign this task.";
 
 export interface ChannelMember {
   agentId: string;
 }
+
+/**
+ * The icon a reader chose for a channel, in place of its member faces. `name` is a key of the icon
+ * set in the app. A name this version does not know shows the faces, so a later version can add
+ * icons without making a channel unreadable after a downgrade.
+ */
+export interface ChannelIcon {
+  name: string;
+  hue: number;
+}
+
+/**
+ * The icons that this version draws, in the order of the editor grid. The names are saved in the
+ * channel, so a name never changes its meaning; add new names at the end.
+ */
+export const CHANNEL_ICON_NAMES = [
+  "megaphone",
+  "chart",
+  "lifebuoy",
+  "search",
+  "briefcase",
+  "code",
+  "globe",
+  "mail",
+  "calendar",
+  "gift",
+  "palette",
+  "brain",
+  "book",
+  "sparkles",
+  "star",
+  "zap",
+  "shield",
+  "store",
+  "workflow",
+  "card",
+] as const;
+
+export type ChannelIconName = (typeof CHANNEL_ICON_NAMES)[number];
 
 export interface ChannelDraft {
   name: string;
@@ -30,6 +76,58 @@ export interface ChannelDraft {
   instructions: string;
   members: ChannelMember[];
   leadAgentId: string | null;
+  /**
+   * An isolated channel keeps what its members learn in it: `openbot.remember` saves a channel
+   * memory there, not a memory of the agent (#4332). Absent is off. A save without it keeps the
+   * stored value, so a client from before it does not turn it off.
+   */
+  isolated?: boolean;
+  /**
+   * Which members can use the browser in this channel (#4135). Absent is every member. A save without
+   * it keeps the stored value. The Team API channel codecs carry it only between peers with
+   * `channel-browser-v1`.
+   */
+  browser?: ChannelBrowser;
+  /**
+   * Absent keeps the stored icon, and null removes it. The Team API channel codecs carry it only
+   * between peers with `channel-picture-v1`; other peers show the member faces.
+   */
+  icon?: ChannelIcon | null;
+}
+
+/**
+ * `members`: every member can use the browser. `member`: only `agentId`, which is a member of the
+ * channel; the others pass a browser step to it. `none`: no member can use it.
+ */
+export type ChannelBrowser = { kind: "members" } | { kind: "none" } | { kind: "member"; agentId: string };
+
+export const CHANNEL_BROWSER_MEMBERS: ChannelBrowser = { kind: "members" };
+
+export function isChannelBrowser(value: unknown): value is ChannelBrowser {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "members" || value.kind === "none") return Object.keys(value).length === 1;
+  return value.kind === "member" && isIdentifier(value.agentId) && Object.keys(value).length === 2;
+}
+
+/** The member that can use the browser of `channel`: `true` for every member, `false` for none. */
+export function channelBrowserAgent(channel: Pick<ChannelDraft, "browser">): string | boolean {
+  const browser = channel.browser ?? CHANNEL_BROWSER_MEMBERS;
+  if (browser.kind === "member") return browser.agentId;
+  return browser.kind === "members";
+}
+
+/** True when `agentId` can use the browser in `channel`. */
+export function channelAllowsBrowser(channel: Pick<ChannelDraft, "browser">, agentId: string): boolean {
+  const agent = channelBrowserAgent(channel);
+  return typeof agent === "string" ? agent === agentId : agent;
+}
+
+/** `channel`, with the browser setting `none` when its browser member is not a member any more. */
+export function withBrowserMember<T extends ChannelDraft>(channel: T): T {
+  const browser = channel.browser;
+  if (browser?.kind !== "member" || channel.members.some((member) => member.agentId === browser.agentId))
+    return channel;
+  return { ...channel, browser: { kind: "none" } };
 }
 
 export interface Channel extends ChannelDraft {
@@ -37,6 +135,17 @@ export interface Channel extends ChannelDraft {
   archived: boolean;
   revision: number;
   createdAt: string;
+  /**
+   * An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. A
+   * joined server sends the host's URL with `channel-picture-v1`; the desktop changes it to an
+   * `openbot-remote-avatar://<server>/channel/` URL, and the web client to a data URL.
+   */
+  imageUrl?: string | null;
+}
+
+export interface SetChannelImageInput {
+  channelId: string;
+  image: AvatarImageInput | null;
 }
 
 export type ChannelTaskState = "queued" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
@@ -58,6 +167,11 @@ export interface ChannelTask {
   revision: number;
   assignmentCount: number;
   error: string | null;
+  /**
+   * On a page only, for a `waiting` task: the dependencies whose results one of its earlier turns
+   * already had. Never stored. Absent from a host without channel-seen-subtasks-v1.
+   */
+  seenDependencies?: string[];
 }
 
 export interface ChannelMessage {
@@ -68,6 +182,12 @@ export interface ChannelMessage {
   taskId: string | null;
   superseded: boolean;
   message: ConversationMessage;
+}
+
+/** Deletes one message of a channel from its history and view. Agents can still remember it. */
+export interface DeleteChannelMessageInput {
+  channelId: string;
+  messageId: string;
 }
 
 /** One ellipsised sidebar line: enough to preview a channel, never a whole message body. */
@@ -178,20 +298,94 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
   return { title: "", instructions: isString(purpose) ? purpose : "", ...rest };
 }
 
-export function isChannelDraft(value: unknown): value is ChannelDraft {
+/**
+ * A saved channel, read back. An icon this version cannot read is left out, so a channel that a later
+ * version saved shows its member faces after a downgrade and does not become unreadable. A command
+ * with such an icon is still refused.
+ */
+function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
+  const channel = readableBrowser(normalizeChannelDraft(value));
+  if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
+  const { icon: _unreadable, ...rest } = channel;
+  return rest;
+}
+
+/**
+ * A browser setting that this version cannot read, or that names an agent that is not a member, reads
+ * as `none`. The setting limits access, so a value that cannot be read must not give every member the
+ * browser.
+ */
+function readableBrowser(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || channel.browser === undefined) return channel;
+  const members = Array.isArray(channel.members) ? channel.members.filter(isChannelMember) : [];
+  if (isChannelBrowser(channel.browser) && browserIsMember(channel.browser, members)) return channel;
+  return { ...channel, browser: { kind: "none" } };
+}
+
+/**
+ * `instructionsLimit` is `storedChannelInstructions` where the instructions can be the stored ones
+ * unchanged: a read, and a save, which sends the whole draft. The backend refuses a save that
+ * changes them to more than `agentDescription`.
+ */
+export function isChannelDraft(
+  value: unknown,
+  instructionsLimit: number = INPUT_LIMITS.agentDescription,
+): value is ChannelDraft {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     value.name.trim().length > 0 &&
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
-    isBoundedString(value.instructions, INPUT_LIMITS.agentDescription) &&
+    isBoundedString(value.instructions, instructionsLimit) &&
+    (value.isolated === undefined || typeof value.isolated === "boolean") &&
+    (value.browser === undefined || isChannelBrowser(value.browser)) &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
     value.members.every(isChannelMember) &&
     new Set(value.members.map((member) => member.agentId)).size === value.members.length &&
     (value.leadAgentId === null ||
-      (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId)))
+      (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId))) &&
+    (value.icon === undefined || value.icon === null || isChannelIcon(value.icon)) &&
+    browserIsMember(value.browser, value.members)
   );
+}
+
+/** The browser member of a draft, like its lead, is one of its members. */
+function browserIsMember(browser: unknown, members: readonly ChannelMember[]): boolean {
+  return (
+    !isChannelBrowser(browser) ||
+    browser.kind !== "member" ||
+    members.some((member) => member.agentId === browser.agentId)
+  );
+}
+
+const CHANNEL_ICON_NAME = /^[a-z][a-z0-9-]{0,39}$/;
+
+export function isChannelIcon(value: unknown): value is ChannelIcon {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.name) &&
+    CHANNEL_ICON_NAME.test(value.name) &&
+    typeof value.hue === "number" &&
+    Number.isInteger(value.hue) &&
+    value.hue >= 0 &&
+    value.hue < 360
+  );
+}
+
+/** Only the fields of a draft, so a save cannot carry a host-owned field such as `imageUrl`. */
+function draftFields(draft: ChannelDraft): ChannelDraft {
+  const { name, title, instructions, members, leadAgentId, isolated, browser, icon } = draft;
+  return {
+    name,
+    title,
+    instructions,
+    members,
+    leadAgentId,
+    ...(isolated === undefined ? {} : { isolated }),
+    ...(browser === undefined ? {} : { browser }),
+    ...(icon === undefined ? {} : { icon }),
+  };
 }
 
 function isChannelMember(value: unknown): value is ChannelMember {
@@ -214,11 +408,12 @@ function sequence(value: unknown): value is number {
 export function isChannel(value: unknown): value is Channel {
   return (
     isDynamicRecord(value) &&
-    isChannelDraft(value) &&
+    isChannelDraft(value, INPUT_LIMITS.storedChannelInstructions) &&
     isIdentifier(value.id) &&
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
-    isBoundedString(value.createdAt, 80)
+    isBoundedString(value.createdAt, 80) &&
+    (value.imageUrl === undefined || value.imageUrl === null || isBoundedString(value.imageUrl, 2048))
   );
 }
 
@@ -242,7 +437,8 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
-    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
+    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
+    (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
 }
 
@@ -265,13 +461,13 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
 }
 
 export function decodeChannel(value: unknown): Channel {
-  const channel = normalizeChannelDraft(value);
+  const channel = normalizeSavedChannel(value);
   if (!isChannel(channel)) throw new Error("Invalid channel response.");
   return channel;
 }
 
 export function decodeChannelPage(value: unknown): ChannelPage {
-  const channel = isDynamicRecord(value) ? normalizeChannelDraft(value.channel) : undefined;
+  const channel = isDynamicRecord(value) ? normalizeSavedChannel(value.channel) : undefined;
   if (
     !isDynamicRecord(value) ||
     !isChannel(channel) ||
@@ -296,7 +492,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
 
 export function decodeChannelSummaries(value: unknown): ChannelSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid channel list response.");
-  const summaries: unknown[] = value.map(normalizeChannelDraft);
+  const summaries: unknown[] = value.map(normalizeSavedChannel);
   if (!summaries.every(isChannelSummary)) throw new Error("Invalid channel list response.");
   return summaries;
 }
@@ -354,8 +550,13 @@ export function parseChannelCommand(value: unknown): ChannelCommand {
     throw new Error("Provide a valid channel command.");
   const common = { operationId: value.operationId, channelId: value.channelId };
   const draft = normalizeChannelDraft(value.draft);
-  if (value.type === "save" && isChannelDraft(draft))
-    return { ...common, type: value.type, draft, ...(value.update === true ? { update: true } : {}) };
+  if (value.type === "save" && isChannelDraft(draft, INPUT_LIMITS.storedChannelInstructions))
+    return {
+      ...common,
+      type: value.type,
+      draft: draftFields(draft),
+      ...(value.update === true ? { update: true } : {}),
+    };
   if (value.type === "archive" || value.type === "restore") return { ...common, type: value.type };
   if (value.type === "read" && sequence(value.throughSequence))
     return { ...common, type: value.type, throughSequence: value.throughSequence };

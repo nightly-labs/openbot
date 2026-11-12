@@ -96,6 +96,20 @@ export class MobileConversationStore {
     for (const listener of this.#listeners.get(agentId) ?? []) listener();
   }
 
+  /**
+   * Takes a message that a member deleted out of the loaded window and the replies' references. A
+   * latest page keeps the older loaded messages, so the host's change event alone leaves it shown.
+   */
+  removeMessage(agentId: string, messageId: string) {
+    this.flush();
+    const current = this.get(agentId);
+    if (!current) return;
+    const messages = current.messages.filter((message) => message.id !== messageId);
+    if (messages.length === current.messages.length && !(messageId in current.references)) return;
+    const { [messageId]: _removed, ...references } = current.references;
+    this.#publish(agentId, { ...current, messages, references });
+  }
+
   cancelRequests() {
     this.markStale();
     this.#loads.clear();
@@ -164,7 +178,7 @@ export class MobileConversationStore {
 
   /** `attach` lets a latest page replace a window around a searched message. */
   applyPage(page: ConversationPage, cursor?: string, attach = false) {
-    this.flush();
+    if (cursor) this.flush();
     const current = this.get(page.agentId);
     if (cursor && (!current || current.threadId !== page.threadId || current.pageInfo.olderCursor !== cursor)) return;
     if (!cursor && current && page.revision < current.revision && !this.#cached.has(page.agentId)) return;
@@ -272,7 +286,11 @@ export class MobileConversationStore {
           return page;
         })
         .finally(() => {
-          if (this.#loads.get(agentId) === load) this.#loads.delete(agentId);
+          if (this.#loads.get(agentId) === load) {
+            this.#loads.delete(agentId);
+            // The held deltas apply after the page, also when the page is older than the window and changes nothing.
+            if (this.#deltas.has(agentId)) this.flush();
+          }
         }),
     };
     this.#loads.set(agentId, load);
@@ -306,6 +324,10 @@ export class MobileConversationStore {
 
   enqueue(delta: Delta) {
     if (!this.get(delta.agentId)) return;
+    // A closed chat that missed changes reads its latest page when it opens. A delta would add the end
+    // of a message to its old window, and the phone's copy would keep that part message.
+    if (!this.isObserved(delta.agentId) && !this.#upToDate.has(delta.agentId) && !this.#loads.has(delta.agentId))
+      return;
     const pending = this.#deltas.get(delta.agentId) ?? [];
     pending.push(delta);
     this.#deltas.set(delta.agentId, pending);
@@ -318,6 +340,13 @@ export class MobileConversationStore {
     const pending = this.#deltas;
     this.#deltas = new Map();
     for (const [agentId, deltas] of pending) {
+      // A delta that arrives during a latest-page read waits for the page: the page gives a new
+      // message its itemType (such as commentary), and its revision tells which deltas are newer.
+      if (this.#loads.has(agentId)) {
+        const later = this.#deltas.get(agentId);
+        this.#deltas.set(agentId, later ? [...deltas, ...later] : deltas);
+        continue;
+      }
       const current = this.get(agentId);
       const indices = this.#indices.get(agentId);
       if (!current || !indices) continue;

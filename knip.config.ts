@@ -23,6 +23,9 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Opens the interactive provider sign-in CLI on Linux.
     "xterm",
+    // Read and forget the SSH host keys of a reinstalled pool machine in `leaseweb-pool.ts`.
+    "ssh-keygen",
+    "ssh-keyscan",
     // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.
@@ -38,6 +41,8 @@ const config: KnipConfig = {
     "cloudflared",
     // Copies a profile database read-only for the agent threads upgrade E2E script.
     "sqlite3",
+    // Extracts the signed `.app` from a release ZIP, with its links and signature, in the release upgrade E2E script.
+    "ditto",
     // Speaks the English samples of the macOS dictation smoke test.
     "say",
     // Finds the child processes of the dev app in the channel E2E scripts.
@@ -52,6 +57,22 @@ const config: KnipConfig = {
     "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
+    // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
+    "dbus-run-session",
+    // Find Icon Composer, and make the macOS `.icns` and Dock image in `compile-macos-icon.ts`.
+    "xcode-select",
+    "sips",
+    "iconutil",
+    // Run the X11 desktop, the window manager, the compositor, the screen recording and the screenshots
+    // of the Linux agent dock and Dynamic Island E2E scripts in Docker.
+    "Xvfb",
+    "xdpyinfo",
+    "openbox",
+    "wmctrl",
+    "picom",
+    "ffmpeg",
+    "gdbus",
+    "import",
   ],
   workspaces: {
     ".": {
@@ -79,14 +100,27 @@ const config: KnipConfig = {
         // `@openbot/team-client` imports it, and the main bundle keeps it external through this
         // entry. Bundled, a JSDoc `import` line in it takes the `__dirname` shim of electron-vite.
         "@noble/hashes",
+        // The vendored Baileys in `@openbot/whatsapp` imports these at runtime. The main bundle keeps
+        // them external, so electron-builder packs them only from these root entries.
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "@noble/curves",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
       ],
       // Scripts start other scripts by path (`bun scripts/<name>.ts`), relative to the repository
       // root. Every file in scripts/ is already an entry.
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
     "apps/auth-api": {
-      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc.
-      entry: ["*.ts"],
+      // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc only. The
+      // email relay Worker's `main` is in wrangler.email-relay.jsonc.
+      entry: ["*.ts", "src/email-relay-entry.ts"],
       project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "*.ts"],
       // `cloudflare:workers` is a runtime module of the Workers platform, not an npm package.
       ignoreDependencies: ["cloudflare"],
@@ -95,12 +129,17 @@ const config: KnipConfig = {
     "apps/site-router": {
       project: ["src/**/*.ts"],
     },
+    "apps/mobile-updates": {
+      entry: ["scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/**/*.ts"],
+    },
     "apps/mobile": {
       entry: [
         "src/app/**/*.{ts,tsx}",
         "plugins/**/*.{js,ts}",
-        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path.
-        "src/shims/*.ts",
+        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path, and gives the
+        // Uniwind component wrappers `uniwind-react-native.js` as `react-native`.
+        "src/shims/*.{ts,js}",
         // metro.config.js loads this stylesheet by path (`cssEntryFile`).
         "global.css",
         // scripts/mobile-share-sender.ts builds the share extension page from this file by path.
@@ -108,6 +147,8 @@ const config: KnipConfig = {
       ],
       project: ["src/**/*.{ts,tsx}", "plugins/**/*.{js,ts}"],
       ignoreDependencies: [
+        // Not a package: metro.config.js resolves this name to the real `react-native` for the shims.
+        "openbot-original-react-native",
         // `expo` installs it; Expo config plugins import it by this name.
         "@expo/config-plugins",
         // Expo CLI loads it as a dev tools plugin (the simulators in a browser tab); no code imports it.
@@ -130,6 +171,26 @@ const config: KnipConfig = {
       // Metro resolves mobile-catalogs.native.ts in place of mobile-catalogs.ts.
       entry: ["src/lazy-catalogs.ts", "src/mobile-catalogs.native.ts"],
       project: ["src/**/*.{ts,tsx,css}"],
+    },
+    "packages/whatsapp": {
+      entry: ["src/*.ts", "scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/*.ts"],
+      // The vendored Baileys imports these. Knip does not read the vendor, which keeps upstream's code
+      // as it is (vendor/baileys/OPENBOT-PATCHES.md).
+      ignoreDependencies: [
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
+        "ws",
+        // The vendor's own type check reads these types.
+        "@types/ws",
+      ],
     },
     "packages/*": {
       project: ["src/**/*.{ts,tsx,css}"],

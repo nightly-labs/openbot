@@ -3,10 +3,13 @@ import {
   decodeAgentBrowserProfile,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
+  decodeBrowserProxyList,
+  decodeBrowserProxySummary,
   decodeHostBrowserTabProfiles,
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 
@@ -15,10 +18,12 @@ const ignoreResponse = (): void => {};
 /**
  * The `browser-profiles-v1` routes of the connected host. Only the tab route answers a member. A host
  * with `browser-profiles-events-v1` reports each change with an event, which `onChanged` passes on.
+ * The proxy routes are asked only while `proxies` says the host has `browser-proxies-v1`.
  */
 export function webBrowserProfileCalls(
   request: () => TeamApiRequest,
   onHostEvent?: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,
+  proxies: () => boolean = () => false,
 ): BrowserProfileCalls {
   const post = <T>(path: string, decode: (value: unknown) => T, body: Parameters<TeamApiRequest>[3] = {}) =>
     request()("POST", path, decode, body);
@@ -35,6 +40,16 @@ export function webBrowserProfileCalls(
         profile: { ...input.profile },
       }),
     tabProfiles: () => post(BROWSER_PROFILES_ROUTES.tabs, decodeHostBrowserTabProfiles),
+    proxies: {
+      list: async () => (proxies() ? post(BROWSER_PROXIES_ROUTES.list, decodeBrowserProxyList) : null),
+      save: (input) => post(BROWSER_PROXIES_ROUTES.save, decodeBrowserProxySummary, { ...input }),
+      remove: (input) =>
+        post(BROWSER_PROXIES_ROUTES.delete, ignoreResponse, {
+          proxyId: input.proxyId,
+          profileIds: [...input.profileIds],
+        }),
+      setProfileProxy: (input) => post(BROWSER_PROXIES_ROUTES.profile, ignoreResponse, { ...input }),
+    },
     ...(onHostEvent
       ? {
           onChanged: (listener: () => void) =>

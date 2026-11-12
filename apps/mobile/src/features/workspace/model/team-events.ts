@@ -109,12 +109,30 @@ export function syncEventQueries(
     });
   }
   if (event.type === "browser-profiles-changed") {
-    // A change on the desktop or another phone: the profile list and each agent's choice read again.
+    // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProxies(scope, serverId) });
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId),
       predicate: (query) => query.queryKey.at(-1) === "browser-profile",
     });
+  }
+  if (event.type === "status") {
+    // The host sends a status event after a change to its providers, the models that its picker
+    // shows, the prompt cache time or the Claude compaction size, such as one on the desktop app.
+    // Open provider pages read again.
+    for (const queryKey of [
+      queryKeys.providerStatus(scope, serverId),
+      queryKeys.providerModels(scope, serverId),
+      queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCompactWindow(scope, serverId),
+      queryKeys.agentModels(scope, serverId),
+    ])
+      void queryClient.invalidateQueries({ queryKey });
+  }
+  if (event.type === "message-pins-changed") {
+    // A pin of the agent changed on another device, by the agent, or by a deleted message: read the list again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.messagePins(scope, serverId, event.agentId) });
   }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });

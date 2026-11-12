@@ -1,7 +1,7 @@
 import { Alert } from "react-native";
 import { create } from "zustand";
 import { currentText } from "@/shared/lib/text";
-import { REPLY_VOICE_FAILURE_TEXT, type ReplyReading, readReply } from "./reply-voice";
+import { type ReplyReading, readReply, replyVoiceFailureText } from "./reply-voice";
 import { speechNative } from "./speech-native";
 
 /** The message that Read aloud reads now. One message reads at a time. */
@@ -33,10 +33,9 @@ export function toggleReadAloud(messageId: string, markdown: string): void {
   const own = readReply(markdown, {
     onPart: () => undefined,
     onDone: finish,
-    onError: (failure) => {
+    onError: (failure, reason) => {
       finish();
-      const { t } = currentText();
-      Alert.alert(t("mobile.chat.message.readAloudFailed"), t(REPLY_VOICE_FAILURE_TEXT[failure]));
+      Alert.alert(currentText().t("mobile.chat.message.readAloudFailed"), replyVoiceFailureText(failure, reason));
     },
   });
   reading = own;

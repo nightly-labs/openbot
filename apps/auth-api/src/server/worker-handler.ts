@@ -1,14 +1,17 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
+import { createAccountAnalytics } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
+import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
+import { observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
   deliverPendingRemoteAuthEvents,
@@ -35,12 +38,13 @@ export function createWorkerHandler(
   return {
     async fetch(
       request: Request,
-      bindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
+      workerBindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER"> &
         Partial<
           Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN" | "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">
         >,
       context?: WorkerExecutionContext,
     ) {
+      const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
       const hostRedirect = canonicalHostRedirect(request);
       if (hostRedirect) return hostRedirect;
       if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
@@ -91,9 +95,10 @@ export function createWorkerHandler(
     },
     async scheduled(
       controller: Pick<ScheduledController, "scheduledTime"> & Partial<Pick<ScheduledController, "cron">>,
-      bindings: RemoteAuthEventBindings &
+      workerBindings: RemoteAuthEventBindings &
         Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey> & SignalEntryBindings>,
     ) {
+      const bindings = { ...workerBindings, DB: observedD1(workerBindings.DB) };
       if (controller.cron === SIGNAL_ENTRY_CRON) {
         await runSignalEntryCheck(bindings);
         return;
@@ -118,11 +123,12 @@ export function createWorkerHandler(
               bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
             ),
             Effect.exit(tickSalesAnalytics(bindings, now)),
+            Effect.exit(tickHostedPool(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit]),
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]),
           ),
         ),
       );
@@ -163,6 +169,28 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
   console.info("Sales analytics delivery completed.", result);
   yield* payments;
   yield* snapshot;
+});
+
+/**
+ * Each hour, the machines of the operator by location, product and state, for the "Server pool" dashboard
+ * (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the run waits
+ * for each send.
+ */
+const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
+  if (new Date(now).getUTCMinutes() !== 0) return;
+  if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
+  const groups = yield* readHostedPool(bindings.DB, now);
+  if (groups.length === 0) return;
+  const sends: Effect.Effect<void>[] = [];
+  const analytics = createAccountAnalytics({
+    clientId: bindings.OPENPANEL_CLIENT_ID,
+    clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
+    fetch: (input, init) => fetch(input, init),
+    schedule: (send) => sends.push(send),
+    database: bindings.DB,
+  });
+  for (const group of groups) analytics.track(null, { name: "hosted_pool_snapshot", group });
+  yield* Effect.all(sends, { concurrency: "unbounded", discard: true });
 });
 
 const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function* (

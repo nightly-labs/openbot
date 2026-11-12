@@ -50,7 +50,7 @@ export function ElevenLabsKeyScreen() {
     try {
       const voices = await testElevenLabsKey(trimmed);
       await saveElevenLabsKey(trimmed);
-      useElevenLabsVoices.setState({ phase: "ready", voices, failure: null });
+      useElevenLabsVoices.setState({ phase: "ready", voices, failure: null, reason: null });
       const chosen = useVoiceSettings.getState().elevenLabsVoice;
       const kept = chosen && voices.some((voice) => voice.id === chosen.id) ? chosen : (voices[0] ?? null);
       await saveVoiceSettings(
@@ -65,7 +65,11 @@ export function ElevenLabsKeyScreen() {
       void haptics.notification("error");
       setState({
         phase: "idle",
-        error: t(error instanceof ElevenLabsError ? FAILURES[error.code] : "mobile.settings.saveFailed"),
+        error: !(error instanceof ElevenLabsError)
+          ? t("mobile.settings.saveFailed")
+          : error.reason
+            ? t("mobile.settings.voice.elevenLabs.refused", { reason: error.reason })
+            : t(FAILURES[error.code]),
       });
     }
   };

@@ -44,6 +44,9 @@ const markdown = new Marked({
         // The phone cannot open the quoted passage, so a quote reads as its text in quotation marks.
         if (reference?.start === 0 && reference.kind === "quote")
           return { type: "text", raw: source.slice(0, reference.end), text: `“${reference.name}”` };
+        // A thread of the agent reads as its name.
+        if (reference?.start === 0 && reference.kind === "thread")
+          return { type: "text", raw: source.slice(0, reference.end), text: reference.name };
       },
     },
     {
@@ -55,6 +58,17 @@ const markdown = new Marked({
         // A skill or an app that a message names, such as a Try from the Marketplace, draws as a chip.
         if (reference?.start === 0 && (reference.kind === "skill" || reference.kind === "mcp"))
           return { type: "skillMention", raw: source.slice(0, reference.end) };
+      },
+    },
+    {
+      name: "tabReference",
+      level: "inline",
+      start: (source) => source.indexOf("@["),
+      tokenizer(source) {
+        const reference = chatTagReferences(source)[0];
+        // A browser tab of the agent draws as a chip, and a tap opens the tab, as the desktop chip does.
+        if (reference?.start === 0 && reference.kind === "tab")
+          return { type: "tabMention", raw: source.slice(0, reference.end) };
       },
     },
   ],
@@ -160,4 +174,13 @@ export function parseFinishedChatMarkdown(body: string) {
   if (parsedBodies.size >= MAX_CACHED_BODIES && oldest !== undefined) parsedBodies.delete(oldest);
   parsedBodies.set(body, tokens);
   return tokens;
+}
+
+/**
+ * Markdown as one paragraph of inline tokens, such as the question of an agent: links, emphasis and
+ * code, but no list or heading. `1. Which branch?` stays a sentence, as on desktop.
+ */
+export function parseInlineChatMarkdown(body: string): Token[] {
+  const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
+  return [{ type: "paragraph", raw: body, text: body, tokens }];
 }

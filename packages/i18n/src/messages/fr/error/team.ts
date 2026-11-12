@@ -60,30 +60,58 @@ export const messages = {
   "error.team.providersUnsupported": "Les réglages des fournisseurs ne sont pas pris en charge par cette connexion.",
   "error.team.providerNotManaged": "OpenBot ne gère pas la CLI de ce fournisseur.",
   "error.team.channelsUnsupported": "Les discussions de canal ne sont pas prises en charge par cette connexion.",
+  "error.team.channelContextUnsupported":
+    "Cette connexion ne prend pas en charge une nouvelle conversation ni la compaction dans un canal.",
+  "error.team.channelPictureUnsupported": "Les images de canal ne sont pas prises en charge par cette connexion.",
   "error.team.channelDeleteUnsupported": "La suppression de canaux n’est pas prise en charge par cette connexion.",
+  "error.team.historyDeleteUnsupported":
+    "La suppression de l’historique n’est pas prise en charge par cette connexion.",
   "error.team.channelTaskCancelUnsupported":
     "L’annulation des tâches de canal n’est pas prise en charge par cette connexion.",
   "error.team.membersCannotDeleteChannels": "Les membres ne peuvent pas supprimer de canaux.",
+  "error.team.membersCannotDeleteChannelHistory": "Les membres ne peuvent pas supprimer l’historique du canal.",
   "error.team.membersCannotArchiveChannels": "Les membres ne peuvent pas archiver de canaux.",
   "error.team.membersCannotRestoreChannels": "Les membres ne peuvent pas restaurer de canaux.",
   "error.team.sharedDataUnsupported": "Les données partagées ne sont pas prises en charge par cette connexion.",
   "error.team.agentInstallUnsupported": "L’ajout d’agents n’est pas pris en charge par cette connexion.",
   "error.team.agentHideUnsupported": "Le masquage d’agents n’est pas pris en charge par cette connexion.",
+  "error.team.agentColorsUnsupported": "Les couleurs d’agents ne sont pas prises en charge par cette connexion.",
+  "error.team.chatColorsUnsupported": "Les couleurs de discussion ne sont pas prises en charge par cette connexion.",
+  "error.team.routineRunPlaceUnsupported": "Cette connexion ne peut pas changer l’endroit où une routine s’exécute.",
+  "error.team.routinesOnceUnsupported":
+    "Cette connexion ne peut pas enregistrer les routines qui s’exécutent une fois.",
+  "error.team.routineRunCommandUnsupported":
+    "Cette connexion ne peut pas fournir la commande d’exécution d’une routine.",
+  "error.team.threadQueueUnsupported": "Cette connexion ne peut pas afficher la file d’attente d’un fil annexe.",
+  "error.team.usageLimitUnsupported":
+    "Cette connexion ne peut pas afficher ni modifier les limites d’utilisation des agents.",
+  "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",
+  "error.team.providerDetectionUnsupported":
+    "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
+  "error.team.libraryFoldersUnsupported":
+    "Les dossiers de la Bibliothèque ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour chaque agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.sidebarPinsUnsupported":
     "Ce serveur ne peut pas garder vos discussions épinglées pour tous vos appareils. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
+  "error.team.agentInstructionsUnsupported":
+    "La modification des instructions d’agent n’est pas prise en charge par cette connexion.",
   "error.team.agentPublishUnsupported": "La publication d’agents n’est pas prise en charge par cette connexion.",
   "error.team.agentUpdateUnsupported": "La mise à jour des agents n’est pas prise en charge par cette connexion.",
   "error.team.contextResetUnsupported":
     "Commencer une nouvelle discussion n’est pas pris en charge par cette connexion.",
   "error.team.contextCompactUnsupported": "Cette connexion ne prend pas en charge la compaction du contexte.",
+  "error.team.messageDeleteUnsupported": "Cette connexion ne permet pas de supprimer des messages.",
   "error.team.workspaceDirectoryUnsupported": "L’affichage des dossiers n’est pas pris en charge par cette connexion.",
   "error.team.conversationFileSearchUnsupported":
     "La recherche de fichiers n’est pas prise en charge par cette connexion.",
+  "error.team.threadMessageSearchUnsupported":
+    "La recherche dans les fils annexes n’est pas prise en charge par cette connexion.",
   "error.team.sideQuestionUnsupported": "Les questions annexes ne sont pas prises en charge par cette connexion.",
+  "error.team.liveVoiceUnsupported":
+    "Ce serveur ne prend pas en charge la voix en direct Codex. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.routineFlowsUnsupported":
     "Ce serveur ne prend pas en charge les flux de routines. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.routineCanvasTooLarge":
@@ -102,12 +130,22 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
+  "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",
   "error.team.agentMemoryLimitUnsupported": "Cette connexion ne prend pas en charge la limite de souvenirs des agents.",
   "error.team.agentFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers des agents.",
   "error.team.folderUnavailable": "Ce dossier n’est pas disponible sur l’ordinateur hôte.",
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
+  "error.team.skillLearningUnsupported":
+    "L’apprentissage des compétences n’est pas pris en charge par cette connexion.",
+  "error.team.browsingMemoryUnsupported":
+    "Cette connexion ne prend pas en charge l'apprentissage à partir de la navigation.",
   "error.team.promptCacheTtlUnsupported": "Cette connexion ne prend pas en charge la durée du cache de prompt.",
+  "error.team.claudeUserSetupUnsupported":
+    "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",
+  "error.team.claudeCompactWindowUnsupported":
+    "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
+  "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
   "error.team.attachmentNameRequired": "Un nom de pièce jointe sûr est requis.",
   "error.team.attachmentNotFound": "Pièce jointe introuvable.",
@@ -116,6 +154,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "La vue du navigateur en direct n’est pas disponible.",
   "error.team.browserSessionNotFound": "Session de vue du navigateur introuvable.",
   "error.team.mcpUnsupported": "Les serveurs MCP ne sont pas pris en charge par cette connexion.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Mettez à jour OpenBot sur cet appareil pour utiliser plus de {limit} serveurs MCP sur ce serveur.",
   "error.team.storageUnsupported": "Le stockage n’est pas pris en charge par cette connexion.",
   "error.team.machineResourcesUnsupported":
     "L’utilisation de la machine n’est pas prise en charge par cette connexion.",
@@ -142,6 +182,9 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L’authentification sécurisée n’est pas prise en charge par ce client.",
   "error.team.agentSettingsUnsupported": "Les réglages des agents ne sont pas pris en charge par cette connexion.",
   "error.team.adminRequired": "Un accès administrateur est requis.",
+  "error.team.mcpAccessStale": "Quelqu’un a modifié l’accès à ce serveur MCP. Refaites votre modification.",
+  "error.team.mcpServerNotYours":
+    "Seule la personne qui a ajouté ce serveur MCP, ou un administrateur, peut le modifier.",
   "error.team.ownerRequired": "Seul le propriétaire de ce serveur peut faire cela.",
   "error.team.requestTooLarge": "Le corps de la requête est trop volumineux.",
   "error.team.signInRelayUnsupported":
@@ -155,4 +198,13 @@ export const messages = {
   "error.team.signInRelayUsed": "Cette connexion a déjà été envoyée.",
   "error.team.signInRelayMismatch": "Cette adresse ne vient pas de cette connexion.",
   "error.team.signInRelayLinkUnknown": "Aucun agent de ce serveur n’a affiché ce lien de connexion.",
+  "error.team.hostPersonalityUnsupported": "Cette connexion ne prend pas en charge la personnalité du serveur.",
+  "error.team.agentWaitsUnsupported": "Cette connexion ne prend pas en charge les attentes ouvertes.",
+  "error.team.messagePinsUnsupported": "Cette connexion ne prend pas en charge les messages épinglés.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Cette connexion ne prend pas en charge l’exécution d’un message en file d’attente dans un nouveau fil.",
+  "error.team.backgroundProcessesUnsupported": "Cette connexion ne prend pas en charge les processus en arrière-plan.",
+  "error.team.providerUseUnsupported":
+    "Cette connexion ne prend pas en charge l’activation et la désactivation des fournisseurs.",
+  "error.team.providerUseInvalid": "Ce fournisseur n’a pas d’interrupteur d’activation.",
 } as const satisfies PartialTranslation<typeof source>;

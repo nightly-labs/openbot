@@ -1,6 +1,7 @@
 import {
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
+  parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
@@ -11,6 +12,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_FAST_MODE_CAPABILITY,
+  AGENT_FAST_MODE_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
@@ -30,7 +35,7 @@ import { AgentNotFoundError } from "../agent-admin-settings";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin, requireVisibleBodyAgent, stringField } from "./request-helpers";
+import { readJson, requireAdmin, requireAgentLevel, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
 /**
  * Access and auto-approve of one agent, changed from a joined server. Together they are the agent's
@@ -245,6 +250,46 @@ export async function routeAgentPlanCard(
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid plan card setting.");
     }
     return json(200, await runCauseEffect(settings.updatePlanCard(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Whether one agent asks for the fast service tier, and the models of this computer that have one.
+ * A member reads it with view access to the agent and changes it with manage access, as the member
+ * changes its model and reasoning effort on the released agent route. Frozen by `agent-fast-mode-v1`.
+ */
+export async function routeAgentFastMode(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  const models = method === "POST" && url.pathname === AGENT_FAST_MODE_ROUTES.models;
+  const read = method === "POST" && url.pathname === AGENT_FAST_MODE_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_FAST_MODE_ROUTES.update;
+  if (!models && !read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_FAST_MODE_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  // `readJson` has already run the body through the agent-fast-mode wire codec.
+  const body = await readJson(request);
+  if (models) return json(200, { models: settings.listFastModels() });
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  const agentId = stringField(body, "agentId");
+  // The level of the released agent route: reading needs view, a change needs manage.
+  requireAgentLevel(context, agentId, read ? "view" : "manage");
+  try {
+    if (read) return json(200, settings.readFastMode(agentId));
+    let input: ReturnType<typeof parseUpdateAgentFastModeInput>;
+    try {
+      input = parseUpdateAgentFastModeInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid fast mode setting.");
+    }
+    return json(200, await runCauseEffect(settings.updateFastMode(input)));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

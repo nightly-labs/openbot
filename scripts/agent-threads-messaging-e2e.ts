@@ -26,8 +26,11 @@
 // 11. B's answer waits in A's running side thread, and A stops the thread. The Stop does not cancel
 //    the answer: it runs next in the side thread, and A's own chat does not get it.
 // 12. The same, but A archives the side thread. The answer goes to A's own chat.
-// 13. B steers busy messages and runs a turn in a new own chat when A asks it. The request goes into
-//    that running turn, not into a new one. It needs a provider that steers natively.
+// 13. B steers busy messages and runs a turn in a new own chat. A notice from A (expectsReply false)
+//    goes into that running turn. A request from A waits and runs in a turn of its own. It needs a
+//    provider that steers natively.
+// 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
+//    come to the side thread, not to A's own chat.
 // At the end it stops and deletes each thread that it started.
 // Writes .openbot-build/agent-threads-messaging-e2e/report.json.
 import assert from "node:assert/strict";
@@ -656,14 +659,16 @@ try {
     assert.equal(details.threadHasAnswer, false, "The archived side thread also shows the answer.");
   });
 
-  // 13. A request steers the running turn of a recipient that steers busy messages.
-  await step("request steers the recipient's running turn", async (details) => {
+  // 13. A notice joins the running turn of a recipient that steers busy messages. A request does not:
+  //     it asks for a result, so it waits for a turn of its own.
+  await step("notice steers the recipient's running turn, request waits", async (details) => {
     const provider = toAgentInfo.provider;
     if (!isAgentProvider(provider) || agentProviderDescriptor(provider).steer !== "native") {
       details.skipped = `${provider} cannot steer a running turn.`;
       return;
     }
     const word = `M13${run}`;
+    const notice = `N13${run}`;
     const slept = `SLEPT13${run}`;
     const settings = await page.evaluate((agentId) => window.openbot.agent.getAgentHostSettings(agentId), to);
     const mode = (busyMessageMode: "steer" | "queue" | null) =>
@@ -671,12 +676,16 @@ try {
         agentId: to,
         busyMessageMode,
       });
+    const fromA = async (text: string) => {
+      const queue = await page.evaluate((agentId) => window.openbot.agent.listQueue(agentId), to);
+      return queue.deliveries.find((entry) => entry.sender.kind === "agent" && entry.text.includes(text)) ?? null;
+    };
     // A new chat, so a wait that B refused earlier in its own chat does not make it refuse this one.
     await waitFor(page, "B's own chat is idle", () => bridge.main(to), idle, TURN_MS);
     await page.evaluate((agentId) => window.openbot.agent.clearContext(agentId), to);
     await mode("steer");
     try {
-      await bridge.send(to, `First ${busyFor(60)}, then reply with the single word ${slept}.`);
+      await bridge.send(to, `First ${busyFor(120)}, then reply with the single word ${slept}.`);
       const busy = await waitFor(
         page,
         "B's own chat runs",
@@ -685,27 +694,106 @@ try {
         TURN_MS,
       );
       const turnId = busy.activeTurnId;
-      await bridge.send(from, ask(word, "What is 7+7?", toAgentInfo.name));
-      const delivery = await waitFor(
+      await bridge.send(
+        from,
+        [
+          `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply false:`,
+          `"${notice}: For your information, the build number is 14. No answer is necessary."`,
+          "Then end your turn and reply with the single word SENT.",
+        ].join("\n"),
+      );
+      const joined = await waitFor(
         page,
-        "the request leaves B's queue",
-        async () => {
-          const queue = await page.evaluate((agentId) => window.openbot.agent.listQueue(agentId), to);
-          return queue.deliveries.find((entry) => entry.sender.kind === "agent" && entry.text.includes(word)) ?? null;
-        },
+        "the notice leaves B's queue",
+        () => fromA(notice),
         (entry) => entry !== null && entry.status !== "queued",
         TURN_MS,
       );
-      details.deliveryStatus = delivery?.status;
-      details.steerFallback = delivery?.steerFallback ?? null;
-      details.steeredIntoRunningTurn = delivery?.turnId === turnId;
-      const main = await bridge.main(to);
-      details.turnStillRan = main.activeTurnId === turnId;
-      assert.equal(details.steeredIntoRunningTurn, true, "The request waited for a new turn of B.");
+      details.noticeStatus = joined?.status;
+      details.noticeSteerFallback = joined?.steerFallback ?? null;
+      details.noticeJoinedRunningTurn = joined?.turnId === turnId;
+      assert.equal(details.noticeJoinedRunningTurn, true, "The notice waited for a new turn of B.");
+      await waitFor(page, "A's own chat is idle", () => bridge.main(from), idle, TURN_MS);
+      await bridge.send(from, ask(word, "What is 7+7?", toAgentInfo.name));
+      const waiting = await waitFor(
+        page,
+        "B gets the request",
+        () => fromA(word),
+        (entry) => entry !== null,
+        TURN_MS,
+      );
+      details.requestStatusOnArrival = waiting?.status;
+      details.turnRanOnArrival = (await bridge.main(to)).activeTurnId === turnId;
+      assert.equal(details.turnRanOnArrival, true, "B finished before the request; the step proves nothing.");
+      assert.equal(waiting?.status, "queued", "The request did not wait in B's queue.");
+      const ran = await waitFor(
+        page,
+        "the request gets a turn",
+        () => fromA(word),
+        // A delivery that starts has no turn ID until the provider gives one.
+        (entry) => Boolean(entry?.turnId),
+        TURN_MS,
+      );
+      details.requestStatus = ran?.status;
+      details.requestRanInOwnTurn = ran?.turnId !== turnId;
+      assert.equal(details.requestRanInOwnTurn, true, "The request went into B's running turn.");
       await waitFor(page, "B's turn ends", () => bridge.main(to), idle, TURN_MS);
     } finally {
       await mode(settings.busyMessageMode);
     }
+  });
+  // 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
+  //    after it come to the side thread, not to A's own chat (#5093).
+  await step("question back without replyToMessageId", async (details) => {
+    const word = `M14${run}`;
+    const question = (m: ConversationMessage) => m.senderAgentId === to && m.text.includes(`Q14${run}`);
+    // The run id can hold "11", so the answer is a message from B without the question's marker.
+    const answer = (m: ConversationMessage) =>
+      m.senderAgentId === to && !question(m) && m.text.replaceAll(run, "").includes("11");
+    const questionsBefore = count(await bridge.main(from), question);
+    const answersBefore = count(await bridge.main(from), answer);
+    // A's numbers reply to B's question, so OpenBot sends no automatic result: B must send the sum.
+    const side = await bridge.startTask(
+      from,
+      [
+        `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply true:`,
+        `"${word}: Before you answer, ask me which two numbers to add. Ask with openbot.send_message as a new message:`,
+        `recipientAgentIds ["${from}"], no replyToMessageId, expectsReply true, and text that starts with Q14${run}.`,
+        'Then end your turn. When I give you the numbers, send me only their sum with openbot.send_message."',
+        `When ${toAgentInfo.name} asks which numbers, answer "5 and 6" with openbot.send_message and replyToMessageId.`,
+        "Then end your turn and reply with the single word SENT. Do not wait for the answer.",
+      ].join("\n"),
+    );
+    details.taskId = side.id;
+    const asked = await waitFor(
+      page,
+      "the question comes to the side thread",
+      () => bridge.side(from, side.id),
+      (s) => has(s, question),
+      TURN_MS,
+    );
+    // With a reply id, the old path routes the question, and the step would not check the fix.
+    details.questionReplyTo = asked.messages.find(question)?.replyToMessageId ?? null;
+    assert.equal(details.questionReplyTo, null, "B sent the question with replyToMessageId.");
+    await waitFor(
+      page,
+      "the answer comes to the side thread",
+      () => bridge.side(from, side.id),
+      (s) => has(s, answer),
+      TURN_MS,
+    );
+    await waitFor(
+      page,
+      "the side thread reads it",
+      () => task(from, side.id),
+      (e) => e?.state === "idle",
+      TURN_MS,
+    );
+    const ownChat = await bridge.main(from);
+    details.questionInSenderChat = count(ownChat, question) > questionsBefore;
+    details.answerInSenderChat = count(ownChat, answer) > answersBefore;
+    assert.equal(details.questionInSenderChat, false, "A's own chat got the question to its side thread.");
+    assert.equal(details.answerInSenderChat, false, "A's own chat got the answer to its side thread.");
   });
   report.passed = report.steps.every((entry) => entry.passed);
 } finally {

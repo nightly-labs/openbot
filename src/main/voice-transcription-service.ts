@@ -5,12 +5,20 @@ import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AUTOMATIC_VOICE_LANGUAGE,
+  type CloudVoiceModelId,
+  type CloudVoiceModelInfo,
+  type DictationKeyProvider,
   ELEVENLABS_VOICE_MODEL_ID,
+  type GroqVoiceModelId,
+  isGroqVoiceModelId,
   isLocalVoiceModelId,
   LOCAL_VOICE_MODEL_IDS,
   type LocalVoiceModelId,
+  modelLanguage,
   VOICE_AUDIO_LIMITS,
+  VOICE_KEY_PROVIDER_NAMES,
   VOICE_MODEL_IDS,
+  VOICE_MODELS,
   type VoiceModelId,
   type VoiceModelStatus,
   type VoiceSettings,
@@ -21,16 +29,23 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, Scope } from "effect";
-import type { VoiceApiKeyStore } from "./voice-api-key-store";
+import { Effect, Exit, Fiber, Scope, Semaphore } from "effect";
+import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
 import {
   type OpenVoiceStreamSocket,
   ScribeRealtimeSession,
   scribeRealtimeUrl,
   VoiceStreamFailure,
 } from "./voice-cloud-stream";
-import { VOICE_RUNTIME_ADDON, VoiceModelService, VoiceOperationError } from "./voice-model-service";
+import {
+  TRANSCRIPTION_SESSION_CONFIGS,
+  transcriptionHostThreads,
+  VOICE_RUNTIME_ADDON,
+  VoiceModelService,
+  VoiceOperationError,
+} from "./voice-model-service";
 import type { VoicePreferenceStore } from "./voice-preference-store";
+import { transcribeRecording } from "./voice-server-service";
 import type {
   VoiceTranscriptionEngine,
   VoiceTranscriptionFailure,
@@ -41,23 +56,49 @@ import type {
 const logger = createOpenBotLogger("voice-transcription-service");
 
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
-const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
+/** Groq's OpenAI-compatible API. Only the recording, the model and the language go there. */
+const GROQ_API_ADDRESS = "https://api.groq.com/openai/v1";
+/** The model name that Groq takes for each Groq dictation model. */
+const GROQ_MODELS: Record<GroqVoiceModelId, string> = {
+  "groq-whisper-large-v3-turbo": "whisper-large-v3-turbo",
+  "groq-whisper-large-v3": "whisper-large-v3",
+};
+const CLOUD_MODELS = VOICE_MODELS.filter((model): model is CloudVoiceModelInfo => model.kind === "cloud");
+/** The sherpa-onnx engine of each local model. The bench and smoke scripts use it too. */
+export const MODEL_ENGINES: Record<LocalVoiceModelId, VoiceTranscriptionEngine> = {
   "parakeet-tdt-0.6b-v3": "nemo-transducer",
+  "parakeet-unified-en-0.6b": "nemo-transducer",
   "bark-3.0-plus": "nemo-transducer",
   "whisper-turbo": "whisper",
+  "cohere-transcribe-03-2026": "cohere-transcribe",
 };
 /** Bark was evaluated with 0.25 s of silence before the speech; without it, it can lose the first word. */
 const LEADING_SILENCE_SAMPLES: Record<LocalVoiceModelId, number> = {
   "parakeet-tdt-0.6b-v3": 0,
+  "parakeet-unified-en-0.6b": 0,
   "bark-3.0-plus": 4_000,
   "whisper-turbo": 0,
+  "cohere-transcribe-03-2026": 0,
 };
+
+/**
+ * The language the host gets: a code, or empty to let Whisper find it. Parakeet and Bark take none,
+ * and Cohere Transcribe takes only its own languages.
+ */
+function hostLanguage(modelId: LocalVoiceModelId, language: VoiceSettings["language"]): string {
+  if (MODEL_ENGINES[modelId] === "nemo-transducer") return "";
+  const model = VOICE_MODELS.find((candidate) => candidate.id === modelId);
+  const used = model ? modelLanguage(model, language) : language;
+  return used === AUTOMATIC_VOICE_LANGUAGE ? "" : used;
+}
 
 /**
  * The loaded model holds about 2 GB, so the host ends after this long without a request. While
  * the user speaks, the renderer asks about once per second, so the host stays loaded until then.
  */
 const HOST_IDLE_MS = 60_000;
+/** A loaded model keeps its thread count, so the count is read once. */
+const HOST_THREADS = transcriptionHostThreads();
 /** `parseVoiceTranscription` accepts only the canonical 44-byte header before the PCM data. */
 const WAV_HEADER_BYTES = 44;
 const BYTES_PER_SECOND = 32_000;
@@ -85,10 +126,11 @@ interface VoiceTranscriptionServiceOptions {
   resourcesRoot: string;
   modelDirectories: Record<LocalVoiceModelId, string>;
   preferences: VoicePreferenceStore;
-  apiKeys: VoiceApiKeyStore;
+  /** The key of each dictation provider. The ElevenLabs key also reads replies aloud. */
+  apiKeys: Record<DictationKeyProvider, VoiceApiKeyStore>;
   spawnHost: () => VoiceTranscriptionHostProcess;
   openStreamSocket: OpenVoiceStreamSocket;
-  fetch?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+  fetch?: typeof fetch;
 }
 
 /** A failure the host reported. Only its category is known; the addon's own message stays there. */
@@ -108,7 +150,8 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   readonly #addonPath: string;
   readonly #models: Record<LocalVoiceModelId, VoiceModelService<LocalVoiceModelId>>;
   readonly #preferences: VoicePreferenceStore;
-  readonly #apiKeys: VoiceApiKeyStore;
+  readonly #apiKeys: Record<DictationKeyProvider, VoiceApiKeyStore>;
+  readonly #fetch: typeof fetch;
   readonly #spawnHost: () => VoiceTranscriptionHostProcess;
   readonly #openStreamSocket: OpenVoiceStreamSocket;
   #host: VoiceTranscriptionHostProcess | null = null;
@@ -120,6 +163,8 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   #nextRequestId = 1;
   #idleTimer: NodeJS.Timeout | null = null;
   #busy = false;
+  /** Transcriptions run one at a time: dictation and the parts of a video wait in one queue. */
+  readonly #queue = Semaphore.makeUnsafe(1);
 
   constructor(options: VoiceTranscriptionServiceOptions) {
     super();
@@ -128,6 +173,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.#openStreamSocket = options.openStreamSocket;
     this.#preferences = options.preferences;
     this.#apiKeys = options.apiKeys;
+    this.#fetch = options.fetch ?? fetch;
     const model = (modelId: LocalVoiceModelId) => {
       const service = new VoiceModelService<LocalVoiceModelId>({
         modelId,
@@ -139,8 +185,10 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     };
     this.#models = {
       "parakeet-tdt-0.6b-v3": model("parakeet-tdt-0.6b-v3"),
+      "parakeet-unified-en-0.6b": model("parakeet-unified-en-0.6b"),
       "bark-3.0-plus": model("bark-3.0-plus"),
       "whisper-turbo": model("whisper-turbo"),
+      "cohere-transcribe-03-2026": model("cohere-transcribe-03-2026"),
     };
   }
 
@@ -167,7 +215,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     modelId: VoiceModelId,
   ) {
     // A cloud model has nothing to download: it is ready when its key is saved.
-    if (!isLocalVoiceModelId(modelId)) return this.#cloudStatus();
+    if (!isLocalVoiceModelId(modelId)) return this.#cloudStatus(modelId);
     return this.#runtimeMissing(modelId) ?? (yield* this.#models[modelId].prepare());
   }).bind(this);
 
@@ -175,7 +223,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this: VoiceTranscriptionService,
     modelId: VoiceModelId,
   ) {
-    if (!isLocalVoiceModelId(modelId)) return this.#cloudStatus();
+    if (!isLocalVoiceModelId(modelId)) return this.#cloudStatus(modelId);
     return this.#runtimeMissing(modelId) ?? (yield* this.#models[modelId].cancel());
   }).bind(this);
 
@@ -210,66 +258,79 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   readonly transcribe = Effect.fn("VoiceTranscription.transcribe")(
     (audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> =>
       Effect.gen({ self: this }, function* () {
-        if (this.#busy) return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.busy")) });
-        return yield* Effect.acquireUseRelease(
-          Effect.sync(() => {
-            this.#busy = true;
-          }),
-          () =>
-            Effect.gen({ self: this }, function* () {
-              const settings = this.#preferences.get();
-              const { modelId } = settings;
-              // A cloud model takes a stream, not a recording.
-              if (!isLocalVoiceModelId(modelId))
-                return yield* new VoiceOperationError({
-                  cause: new Error(sourceText("error.voice.transcriptionFailed")),
-                });
-              // After the first full check in this process, this is a `stat` of each model file.
-              const modelStatus = yield* this.downloadModel(modelId);
-              if (modelStatus.phase !== "ready")
-                return yield* new VoiceOperationError({
-                  cause: new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable")),
-                });
-              const startedAt = Date.now();
-              const pcm = audio.slice(WAV_HEADER_BYTES);
-              const audioSeconds = (pcm.byteLength / BYTES_PER_SECOND).toFixed(1);
-              return yield* Effect.gen({ self: this }, function* () {
-                const text = yield* this.#request(pcm, modelId, settings.language);
-                if (text.length > INPUT_LIMITS.messageText)
-                  return yield* new VoiceOperationError({ cause: new Error("The voice transcript is too long.") });
-                logger.info(`Voice transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`);
-                return { text };
-              }).pipe(
-                Effect.mapError((error) => {
-                  logger.error(
-                    `Voice transcription of ${audioSeconds}s failed after ${Date.now() - startedAt}ms.`,
-                    errorCategory(error.cause),
-                  );
-                  return new VoiceOperationError({ cause: userFacingError(error.cause) });
-                }),
-              );
-            }),
-          () =>
+        return yield* this.#queue.withPermit(
+          Effect.acquireUseRelease(
             Effect.sync(() => {
-              this.#busy = false;
+              this.#busy = true;
             }),
+            () =>
+              Effect.gen({ self: this }, function* () {
+                const settings = this.#preferences.get();
+                const { modelId } = settings;
+                if (isGroqVoiceModelId(modelId))
+                  return yield* this.#transcribeAtGroq(audio, modelId, settings.language);
+                // ElevenLabs takes a stream, not a recording.
+                if (!isLocalVoiceModelId(modelId))
+                  return yield* new VoiceOperationError({
+                    cause: new Error(sourceText("error.voice.transcriptionFailed")),
+                  });
+                // After the first full check in this process, this is a `stat` of each model file.
+                const modelStatus = yield* this.downloadModel(modelId);
+                if (modelStatus.phase !== "ready")
+                  return yield* new VoiceOperationError({
+                    cause: new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable")),
+                  });
+                const startedAt = Date.now();
+                const pcm = audio.slice(WAV_HEADER_BYTES);
+                const audioSeconds = (pcm.byteLength / BYTES_PER_SECOND).toFixed(1);
+                return yield* Effect.gen({ self: this }, function* () {
+                  const text = yield* this.#request(pcm, modelId, settings.language);
+                  if (text.length > INPUT_LIMITS.messageText)
+                    return yield* new VoiceOperationError({ cause: new Error("The voice transcript is too long.") });
+                  logger.info(`Voice transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`);
+                  return { text };
+                }).pipe(
+                  Effect.mapError((error) => {
+                    logger.error(
+                      `Voice transcription of ${audioSeconds}s failed after ${Date.now() - startedAt}ms.`,
+                      errorCategory(error.cause),
+                    );
+                    return new VoiceOperationError({ cause: userFacingError(error.cause) });
+                  }),
+                );
+              }),
+            () =>
+              Effect.sync(() => {
+                this.#busy = false;
+              }),
+          ),
         );
       }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }), Effect.flatMap(Fiber.join)),
   );
 
-  /** Saves or removes the ElevenLabs key, and answers the status of its model. */
+  /**
+   * Saves or removes the key of a dictation provider, and announces the status of each of its
+   * models. Answers the status of its model in use, or of its first model.
+   */
   readonly setApiKey = Effect.fn("VoiceTranscription.setApiKey")(function* (
     this: VoiceTranscriptionService,
+    provider: DictationKeyProvider,
     key: string | null,
   ) {
-    yield* this.#apiKeys
+    yield* this.#apiKeys[provider]
       .set(key)
-      .pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause: savedKeyError(cause) })));
+      .pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause: savedKeyError(cause, provider) })));
     // A stream holds the key it opened with; a removed key ends it.
-    if (key === null) this.#endStream();
-    const status = this.#cloudStatus();
-    this.emit("modelStatus", status);
-    return status;
+    if (key === null && provider === "elevenlabs") this.#endStream();
+    const statuses = CLOUD_MODELS.filter((model) => model.provider === provider).map((model) =>
+      this.#cloudStatus(model.id),
+    );
+    for (const status of statuses) this.emit("modelStatus", status);
+    const inUse = this.#preferences.get().modelId;
+    // Each provider has at least one model, so the last fallback does not run.
+    return (
+      statuses.find((status) => status.modelId === inUse) ?? statuses[0] ?? this.#cloudStatus(ELEVENLABS_VOICE_MODEL_ID)
+    );
   }).bind(this);
 
   /**
@@ -279,9 +340,13 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   readonly startStream = Effect.fn("VoiceTranscription.startStream")(function* (this: VoiceTranscriptionService) {
     this.#endStream();
     const { modelId, language } = this.#preferences.get();
-    const apiKey = this.#apiKeys.get();
+    const apiKey = this.#apiKeys.elevenlabs.get();
     if (modelId !== ELEVENLABS_VOICE_MODEL_ID || !apiKey)
-      return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.cloud.keyRequired")) });
+      return yield* new VoiceOperationError({
+        cause: new Error(
+          sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES.elevenlabs }),
+        ),
+      });
     const id = randomUUID();
     const session = new ScribeRealtimeSession({
       url: scribeRealtimeUrl(language),
@@ -339,21 +404,58 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   }, Effect.uninterruptible).bind(this);
 
   #status(modelId: VoiceModelId): Effect.Effect<VoiceModelStatus, VoiceOperationError> {
-    if (!isLocalVoiceModelId(modelId)) return Effect.succeed(this.#cloudStatus());
+    if (!isLocalVoiceModelId(modelId)) return Effect.succeed(this.#cloudStatus(modelId));
     const missing = this.#runtimeMissing(modelId);
     return missing ? Effect.succeed(missing) : this.#models[modelId].getStatus();
   }
 
-  /** The ElevenLabs model is ready when its key is saved. */
-  #cloudStatus(): VoiceModelStatus {
-    return this.#apiKeys.get()
-      ? { modelId: ELEVENLABS_VOICE_MODEL_ID, phase: "ready", progress: null, message: null }
+  /** A cloud model is ready when the key of its provider is saved. */
+  #cloudStatus(modelId: CloudVoiceModelId): VoiceModelStatus {
+    const provider = cloudProvider(modelId);
+    return this.#apiKeys[provider].get()
+      ? { modelId, phase: "ready", progress: null, message: null }
       : {
-          modelId: ELEVENLABS_VOICE_MODEL_ID,
+          modelId,
           phase: "missing",
           progress: null,
-          message: sourceText("error.voice.cloud.keyRequired"),
+          message: sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES[provider] }),
         };
+  }
+
+  /** Sends the whole recording to Groq after Stop. Groq has no stream for Whisper. */
+  #transcribeAtGroq(
+    audio: Uint8Array,
+    modelId: GroqVoiceModelId,
+    language: VoiceSettings["language"],
+  ): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> {
+    const apiKey = this.#apiKeys.groq.get();
+    if (!apiKey)
+      return Effect.fail(
+        new VoiceOperationError({
+          cause: new Error(sourceText("error.voice.cloud.keyRequired", { provider: VOICE_KEY_PROVIDER_NAMES.groq })),
+        }),
+      );
+    const startedAt = Date.now();
+    const audioSeconds = (Math.max(0, audio.byteLength - WAV_HEADER_BYTES) / BYTES_PER_SECOND).toFixed(1);
+    return transcribeRecording(
+      this.#fetch,
+      { address: GROQ_API_ADDRESS, apiKey },
+      GROQ_MODELS[modelId],
+      audio,
+      language,
+      { label: "Groq", refused: groqRefusal },
+    ).pipe(
+      Effect.flatMap((result) =>
+        result.text.length > INPUT_LIMITS.messageText
+          ? Effect.fail(new VoiceOperationError({ cause: new Error("The voice transcript is too long.") }))
+          : Effect.succeed(result),
+      ),
+      Effect.tap(() =>
+        Effect.sync(() =>
+          logger.info(`Groq transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`),
+        ),
+      ),
+    );
   }
 
   #activeStream(streamId: string): Effect.Effect<ActiveStream, VoiceOperationError> {
@@ -404,8 +506,10 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
         addonPath: this.#addonPath,
         modelDirectory: this.#models[modelId].directory,
         engine,
-        language: engine === "whisper" && language !== AUTOMATIC_VOICE_LANGUAGE ? language : "",
+        language: hostLanguage(modelId, language),
         leadingSilenceSamples: LEADING_SILENCE_SAMPLES[modelId],
+        numThreads: HOST_THREADS,
+        sessionConfig: TRANSCRIPTION_SESSION_CONFIGS[modelId],
         pcm,
       });
       return Effect.sync(() => {
@@ -482,6 +586,18 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   }
 }
 
+/** The text for a Groq answer that is not about the recording: a refused key or a rate limit. */
+function groqRefusal(status: number): string | null {
+  const provider = VOICE_KEY_PROVIDER_NAMES.groq;
+  if (status === 401 || status === 403) return sourceText("error.voice.cloud.keyRejected", { provider });
+  if (status === 429) return sourceText("error.voice.cloud.rateLimited", { provider });
+  return null;
+}
+
+function cloudProvider(modelId: CloudVoiceModelId): DictationKeyProvider {
+  return CLOUD_MODELS.find((model) => model.id === modelId)?.provider ?? "elevenlabs";
+}
+
 function responseResult(response: VoiceTranscriptionResponse): Effect.Effect<string, VoiceOperationError> {
   if ("text" in response) return Effect.succeed(response.text);
   return Effect.fail(new VoiceOperationError({ cause: new HostFailure(response.error) }));
@@ -498,15 +614,6 @@ function streamError(cause: unknown): VoiceOperationError {
 }
 
 /** The cipher's message for a computer with no secret storage; any other failure is generic. */
-function savedKeyError(cause: unknown): Error {
-  const unavailable = sourceText("error.app.secretStorageUnavailable");
-  return new Error(
-    cause instanceof Error && cause.message === unavailable
-      ? unavailable
-      : sourceText("error.voice.cloud.keySaveFailed"),
-  );
-}
-
 function errorCategory(
   error: unknown,
 ): "unknown" | "timeout" | "runtime-unavailable" | "model-load-failed" | "inference-failed" | "host-exited" {

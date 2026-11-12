@@ -22,13 +22,51 @@ const nativeModuleShims = new Map([
   ["solid-js", path.resolve(__dirname, "src/shims/solid-js.ts")],
 ]);
 
+// The plush avatar pictures ship in the bloub package, which does not export its asset folder.
+// `@norbert_bodziony/bloub/assets/<file>` names a file in that folder.
+const BLOUB_ASSETS = "@norbert_bodziony/bloub/assets/";
+const bloubAssetFolder = path.join(path.dirname(require.resolve("@norbert_bodziony/bloub")), "assets");
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const shim = nativeModuleShims.get(moduleName);
   if (shim) return { filePath: shim, type: "sourceFile" };
+  if (moduleName.startsWith(BLOUB_ASSETS)) {
+    return context.resolveRequest(
+      context,
+      path.join(bloubAssetFolder, path.basename(moduleName.slice(BLOUB_ASSETS.length))),
+      platform,
+    );
+  }
   return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = withUniwindConfig(config, {
+const uniwindConfig = withUniwindConfig(config, {
   cssEntryFile: "./global.css",
   dtsFile: "./src/uniwind-types.d.ts",
 });
+
+// The Uniwind component wrappers get `react-native` from `src/shims/uniwind-react-native.js`, so
+// `Text` and `TextInput` take the text size of the app. Metro caches a resolution from
+// `node_modules` per folder, not per file, so the whole wrapper folder gets the shim. The shims read
+// the real `react-native` through a name that only they use. This wraps the Uniwind resolver, which
+// sends each `react-native` import outside Uniwind to the wrappers.
+const SHIMS = path.resolve(__dirname, "src/shims");
+const UNIWIND_REACT_NATIVE = path.join(SHIMS, "uniwind-react-native.js");
+const ORIGINAL_REACT_NATIVE = "openbot-original-react-native";
+const UNIWIND_WRAPPERS = path.join("node_modules", "uniwind", "src", "components", "native");
+const uniwindResolveRequest = uniwindConfig.resolver.resolveRequest;
+uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === ORIGINAL_REACT_NATIVE && path.dirname(context.originModulePath) === SHIMS) {
+    return context.resolveRequest(context, "react-native", platform);
+  }
+  if (
+    moduleName === "react-native" &&
+    platform !== "web" &&
+    path.dirname(context.originModulePath).endsWith(UNIWIND_WRAPPERS)
+  ) {
+    return { filePath: UNIWIND_REACT_NATIVE, type: "sourceFile" };
+  }
+  return uniwindResolveRequest(context, moduleName, platform);
+};
+
+module.exports = uniwindConfig;

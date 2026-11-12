@@ -171,8 +171,27 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    machine in memory and continue it at a resume with no boot: the resume answers `"status":
    "running"`, and the file stays. Then the Worker runs a command on the machine that removes the
    file and starts `openbot.service` (`HELD_RESUME_START_COMMAND`). With no file the command does
-   nothing. If boat does not complete the stop after the hook, OpenBot stays stopped until the next
-   stop and resume. A hook that OpenBot did not write stays, and a self-hosted server gets no hook.
+   nothing. boat can also cancel the stop after the hook, for example when it cannot pause a Docker
+   container that restarts ("Final snapshot failed; stop aborted"). The machine then runs with the
+   file, and OpenBot stays stopped. Two paths start it again, both only for a file older than 5
+   minutes: boat runs the hook again before each new try of the stop, so a newer file can belong to a
+   save that still runs. The hook sets a transient systemd timer (`openbot-pre-stop-restart`) that
+   fires 15 minutes after the last hook. A client wake or a connector event for a server that boat
+   reports as running makes the Worker run `FAILED_STOP_START_COMMAND` after the reply. boat tries
+   the stop again every 4 to 10 minutes (seen on 2026-11-05), and each try stops OpenBot again. Thus
+   the timer fires only after boat stops its tries, and a wake keeps OpenBot running only until the
+   next try. boat reports these tries as `stop.status: "failing"` and keeps the sandbox state
+   `idle`. On 2026-11-05 a save failed this way for 18 hours, while the restore of the disk stalled,
+   and the start command failed with `sandbox_restoring`. Thus the Worker reads a failing stop as
+   `stopping`, not `running`, and logs `Hosted server stop is failing.` at each check. A `sandbox.ready`
+   webhook for a stopping server makes the Worker read the sandbox again, so the webhook does not hide
+   the failing stop. Each client wake and connector event still sends `FAILED_STOP_START_COMMAND`. The Worker does not end the stop. Only a resume ends it
+   (`superseded`), but boat does not say if that resume keeps the disk or restores the last saved
+   disk. A forced stop keeps only the last saved disk and loses what was written after it. An
+   operator decides: compare `snapshotCompletedAt` with the last writes of OpenBot before a force,
+   then wake the server. A machine that stopped
+   runs no timer. A hook that OpenBot did not write stays, and a self-hosted server gets
+   no hook.
 
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes
@@ -630,9 +649,10 @@ again with backoff (30 s to 10 min) and then publishes the host.
 ## Memory
 
 One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
-each thread, and one set of MCP servers for each ACP session. A Starter server has 4 GB. The guards
-are on a hosted server, a [self-hosted server](self-hosted-server.md#memory) and a
-[container](docker.md#memory); the desktop app does not change.
+each thread, one set of MCP servers for each ACP session, and one set for each loaded Codex thread.
+A Starter server has 4 GB. The guards are on a hosted server, a
+[self-hosted server](self-hosted-server.md#memory) and a [container](docker.md#memory); the desktop
+app does not change.
 
 The unit (`openbot.service`):
 
@@ -662,7 +682,7 @@ do not all pass the check before their processes grow. A start that fails counts
 | Level | When | What happens |
 | --- | --- | --- |
 | `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. |
+| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
 | `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
@@ -720,7 +740,8 @@ comes for a route (a Slack workspace, a Discord guild or a Telegram chat) and no
 holds it:
 
 1. Signal asks the Worker, signed, `POST /v2/remote/route-wake` with the route and `wake`. The Worker
-   finds the host in `slack_workspace_routes`, `discord_guild_routes` or `telegram_chat_routes`, and
+   finds the host in `slack_workspace_routes`, `discord_guild_routes`, `telegram_chat_routes` or
+   `webhook_routes` (a route that is not revoked), and
    answers `not_hosted`, `ended`, `sleeping` or `starting` before it starts anything, because Slack
    waits at most 3 seconds. With `wake`, the server then starts in the background (`waitUntil`) as for
    a client (`last_wake_reason = 'message'`). A plan that ended starts nothing. Signal asks at most
@@ -753,8 +774,21 @@ removes the key that Signal had. A kept delivery that arrives before its connect
 up to 60 seconds for it, only while the connection can still start. When the account service does
 not answer, Signal keeps nothing and does not remember the failure. Signal says `ingress-queue` only
 when the account service had `/v2/remote/route-wake` when Signal started, so deploy the account
-service first. Generic webhooks do not
-start a server: their sender sends again after a 503.
+service first.
+
+A generic webhook for a route that no socket holds also starts a hosted server that sleeps, but
+Signal keeps nothing: only the host can check the webhook's signature, so Signal answers 503 at once
+and the sender sends again (`docs/webhooks.md`). Because Signal cannot check the sender, two limits
+apply. A webhook starts a host at most once in 30 minutes, so requests to a known route URL keep a
+server awake for at most about half of the time (the idle stop is after 15 minutes). And a route that
+Signal has no recent answer for asks the account service at most 60 times a minute from one address
+(1/10 of `REMOTE_MAX_MESSAGES_PER_MINUTE`), and 600 times a minute from all addresses together (the
+full limit), so unknown route IDs cannot flood D1. Each wake request also counts against these lookup limits. A start that fails does not count against the 30
+minutes. A server that stays `starting` (a resume failed and its row stays `running`) is asked to
+start again, also at most once in 30 minutes. A route of a host ID that another owner registered again does not start it. A server that
+went back to sleep less than 30 minutes after a webhook started it waits for the end of the 30
+minutes; senders that retry for hours, such as Shopify and Stripe, still deliver. An account service
+without the `webhook` route answers 400, and Signal then starts nothing, as before.
 
 ## Tested on boat
 
@@ -843,6 +877,471 @@ as `user` with mode 0755. It did not change a current hook, kept a hook that Ope
 (a file, a link or a FIFO, with no wait), and replaced a changed OpenBot hook. At a stop of the real OpenBot, the hook
 stopped `openbot.service` in 0.3 seconds and ended with 0. After the resume (a new boot ID), the
 flag was gone, OpenBot ran, and `openbot.db` passed `quick_check`.
+
+## Leaseweb VPS
+
+The Worker makes no Leaseweb server: boat is the provider of each new hosted server. A Leaseweb VPS
+runs all the time, so it has no stop and no resume. An operator can move one hosted server at a time
+from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the record and the steps.
+For a server that never was on boat, the VPS is a [self-hosted server](self-hosted-server.md) that
+an operator sets up for the customer:
+
+1. Order a VPS with Ubuntu 24.04 or 26.04. The order takes no SSH key and no user data. The root password
+   comes from `GET /publicCloud/v1/vps/{id}/credentials`.
+2. Install OpenBot with `install-server.sh` and a [server claim](self-hosted-server.md#sign-in-with-a-server-claim)
+   for the customer's email.
+3. Run `scripts/hosting/leaseweb-bootstrap.sh` as root, with the public keys of the operators. Each
+   release also has it in `/opt/OpenBot/app/resources/hosting`.
+
+   ```sh
+   ssh root@<address> bash -s "$(ssh <core server> cat /root/.ssh/authorized_keys | base64 | tr -d '\n')" \
+     <scripts/hosting/leaseweb-bootstrap.sh
+   ```
+
+4. Restart the server one time before a customer uses it. The bootstrap writes GRUB to the disk
+   again, and a boot fault must show now. `leaseweb-bootstrap-e2e.ts --restart=yes` does this and
+   checks the result.
+
+The bootstrap does not restart OpenBot, and a second run gives the same state:
+
+| Part | Result | Files |
+| --- | --- | --- |
+| SSH | Keys only, no forwarding. The operator keys sign in as root, and as no other user. | `/etc/ssh/sshd_config.d/00-openbot-hardening.conf`, `/etc/ssh/openbot-operator-keys/root` |
+| Egress rules | The service user cannot connect to the CloudStack router (the DHCP server, which gives metadata and a reset root password to each process that asks), nor to private, link-local and multicast addresses. No user can connect to TCP port 25. | `/usr/local/sbin/openbot-egress-firewall`, `/etc/openbot/egress-router`, `openbot-egress-firewall.service`, `openbot.service.d/10-egress-firewall.conf` |
+| Updates | Security updates each day. They restart neither the server nor OpenBot. Ubuntu (`needrestart`) restarts each other service that uses an updated library. | `/etc/apt/apt.conf.d/20auto-upgrades`, `52openbot-unattended`, `/etc/needrestart/conf.d/50-openbot.conf` |
+| Kernel | A new kernel gets a boot entry: the bootstrap installs `grub-pc` when the image has no `update-grub`. The boot arguments of the image stay. | `/etc/default/grub.d/50-openbot.cfg` |
+
+The rules load before the network starts, with the router of the last run, and again before each
+start of OpenBot, with the router of the current DHCP lease. `openbot.service` requires the rules
+unit, so OpenBot does not run without them. The rules also refuse the service user a container
+network in 172.16.0.0/12 and a VPN in 100.64.0.0/10; change `PRIVATE4` in the helper for a server
+that needs one. They do not filter incoming connections: a port that an agent opens on all
+addresses is open to the internet.
+
+OpenBot thus keeps its old libraries until the operator restarts the service, and the server runs
+its old kernel until the operator restarts the server. Plan those restarts.
+
+A server has three names, and each one can change later:
+
+| Name | Command | Notes |
+| --- | --- | --- |
+| Leaseweb reference | `PUT /publicCloud/v1/vps/{id}` with `{"reference": "<name>"}` | At most 255 characters; `@`, `+`, a space and letters outside ASCII are kept. `GET /publicCloud/v1/vps?reference=<text>` finds each server that has the text in its reference, with no difference between capital and small letters. |
+| OpenBot server name | `openbot name <name>` as the service user | 6 to 32 characters. No restart. The customer sees this name. |
+| Linux hostname | `hostnamectl set-hostname <name>` | Set it before OpenBot starts, or restart OpenBot after it. |
+
+The X authorization of the virtual display has the hostname in it. After a hostname change, a new
+program of a running OpenBot cannot open the display ("Authorization required") until OpenBot
+restarts.
+
+The names of a pool server follow one scheme:
+
+| Name | Value | Example |
+| --- | --- | --- |
+| Leaseweb reference, free server | `pool-free` | `pool-free` |
+| Leaseweb reference, assigned server | `<owner email> <first 8 characters of the OpenBot server ID>` | `jane@example.com 1a2b3c4d` |
+| Linux hostname | `lsw-<Leaseweb VPS ID>`; it never changes | `lsw-12728110` |
+| OpenBot server name | The customer's choice | |
+
+The reference is a label for the operator. The record of the account service, not the reference,
+decides which server is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must
+name that before a customer server gets one.
+
+The operator keys are a file with one public key for each operator, in the format of
+`authorized_keys`, with no options. The fixed place of the list is `/root/.ssh/authorized_keys` of
+the core server of the operators: read it at each run, as the command above does, so that the same
+persons have access to each server. The list is not in this repository, which is public, and not in
+the bootstrap, which each release has. Only public keys go on a server: each operator keeps the
+private key.
+
+- The list replaces the list of the last run. To remove an operator, run the bootstrap with the
+  shorter list on each server. A run with no list keeps the keys.
+- A list with a line that is not a public key stops the run before a change.
+- The keys are in a file of root, not in `/root/.ssh/authorized_keys`, so the service user and the
+  agents cannot read a path that they can change. A key that an operator adds to
+  `/root/.ssh/authorized_keys` by hand still works.
+- An operator has root access to the files, chats and provider sessions of the customer.
+- Without a list, the password session of the operator is the last SSH session.
+
+The second way in is the Leaseweb API, which works below the operating system: `reboot`, `console`,
+`resetPassword`, and `attachIso` with the `GRML` image. So the Leaseweb API key gives full access
+to each server and its disk. Keep it only where the operator runs. The key of the account that
+has the customer servers (Netherlands) is `LEASEWEB_API_KEY_NL` in the encrypted
+`apps/auth-api/.env.production`. The deploy script does not send it to the Worker. Send it in the
+`X-LSW-Auth` header:
+
+```sh
+bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
+  sh -c 'curl -sS -H "X-LSW-Auth: $LEASEWEB_API_KEY_NL" "https://api.leaseweb.com/publicCloud/v1/vps?limit=50"'
+```
+
+One Leaseweb account is for one sales organization, and an API key sees only the servers of its
+account: the key of the German account does not list a server in Amsterdam. The key of the German
+account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
+the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEWEB_API_KEY_AU`.
+
+### Move a server from boat
+
+A move is a manual operator action on one row. The setup of a VPS can take hours, so the Worker
+never waits for one. Move only Standard and Pro servers: Starter servers stay on boat for now
+(developer decision, 2026-11-11). Two columns of `hosted_servers` (migration 0052) hold the record:
+
+| Column | Value |
+| --- | --- |
+| `operator_host` | The machine that an operator runs for the server, such as `leaseweb:12728110`. `NULL` on each server that boat runs. A row has a machine or a sandbox, never the two, and one machine has one server. |
+| `retired_sandbox_id` | The boat sandbox from before the move. The rollback and the delete use it. |
+
+The machines of the pool are in `operator_hosts` (migration 0053). A machine of the pool that no row
+of `hosted_servers` names is free. See [Reuse a pool machine](#reuse-a-pool-machine).
+
+For a row with `operator_host`, the Worker sends no call to boat, with one exception (the delete).
+It writes what it wants in `desired_state`; the operator starts and stops OpenBot on the machine and
+writes `observed_state`:
+
+| Event | The Worker | The operator |
+| --- | --- | --- |
+| No use for 15 minutes | Nothing. The server runs all the time. | Nothing. |
+| A client or a connector event asks for a start | Nothing. | Nothing. |
+| The server reports its use | Stores `last_active_at` and `next_run_at`. | Nothing. |
+| The plan changes | Sets `size` at once. | Nothing: each pool server has the same size. |
+| The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
+| The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
+| 30 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
+| The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
+| The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool-free`, then set `operator_host = NULL`. |
+| boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
+
+The Worker sends no message to the operator. Run `leaseweb-pool.ts sync` each day: it does the
+operator column of the table. See [Reuse a pool machine](#reuse-a-pool-machine).
+
+Never write `desired_state = 'idle'` on such a row: the next client request changes it to `running`,
+and the cron query for a server with a routine does not look at the machine.
+
+The server on the VPS stays a hosted server (no `/opt/OpenBot/hosted/mode` file), so OpenBot signs
+in, reports its use and installs updates as it did on boat. `provision.sh` installs it and does not
+start it, so the data is in place before the first start. `scripts/hosting/move-from-boat.sh` does
+the parts of a move that run on the two machines, as root. The steps:
+
+1. Deploy the Worker with migration 0052 before the first move. An older Worker does not know the
+   two columns, and it can make a new sandbox for a row that has none.
+2. On the VPS, while the customer still uses the sandbox: copy `scripts/hosting` to the VPS and run
+   `move-from-boat.sh prepare lsw-<VPS ID> <uid> <gid> <appimage-url> <appimage-sha256> <auth-api-url>`.
+   The IDs are those of `id user` in the sandbox. The release is the one that the sandbox has, or a
+   newer one. The command sets the hostname, makes the user `user` with the home `/home/user`, runs
+   `provision.sh`, and disables `openbot.service`, so a restart does not start OpenBot with no data.
+3. Run `leaseweb-bootstrap.sh` with the operator keys. Restart the VPS one time.
+4. Write the row, in one statement, before the export:
+
+   ```sql
+   UPDATE hosted_servers SET operator_host = 'leaseweb:<VPS ID>', retired_sandbox_id = provider_sandbox_id,
+     provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
+     updated_at = <now in ms>
+   WHERE server_id = '<server ID>' AND provider_sandbox_id IS NOT NULL AND operator_host IS NULL
+     AND plan IN ('standard', 'pro') AND desired_state IN ('running', 'idle');
+   ```
+
+   The statement changes no row of a server whose plan ended (`stopped`) or whose delete is in
+   progress (`deleted`): do not move such a server.
+
+   From this statement, the Worker sends no call to boat for the server, and the customer still uses
+   the sandbox. The order is necessary: while the row has the sandbox and `desired_state = 'running'`,
+   the Worker resumes a stopped sandbox in some seconds, and a resume starts OpenBot there again. The
+   Worker can also stop the sandbox for no use during the export, and the next client request then
+   starts it. In each case the sandbox gets data that the archive does not have. When the sandbox is
+   stopped at this step, start it at boat.
+
+   From this statement, the Worker also does not extend the boat lease of the sandbox, and boat stops
+   the sandbox at the end of the lease. Read `lease_until` of the row before the statement. A server
+   in use has 1 to 2 hours. When less time is left than steps 5 to 7 need, extend the lease at boat
+   first (`PATCH /sandboxes/<sandbox ID>` with `ttlSeconds`). When boat stops the sandbox during the
+   export or the copy, start it at boat, delete the archive, and do step 5 again. Not confirmed: the
+   lease that a start at boat by hand gives.
+5. On the sandbox: `move-from-boat.sh export <archive>`. The downtime of the customer starts here.
+   The command sets `/run/openbot-pre-stop`, stops `openbot.service`, and archives, with numeric
+   owners, the home of `user` and `/srv/openbot-hosted`. The archive has the SHA-256 of `openbot.db`,
+   `agent-data.db`, `login.keyring` and `keyring-password`, and the names of the npm commands and
+   groups of the sandbox. It does not have `/opt/OpenBot`, `~/.boat`, `~/.boatignore`,
+   `~/.Xauthority*` and `~/.npm/_cacache`. The archive holds the account session and each provider
+   sign-in of the customer: copy it only over SSH.
+6. On the VPS: `move-from-boat.sh import <archive>`. The command refuses an OpenBot that is older
+   than that of the sandbox, restores the archive, and compares the four SHA-256 values. An agent
+   of the customer can get root in the sandbox, and the service user has no root on the VPS. So the
+   service user restores the files, and only `/home/user` and `/srv/openbot-hosted`: the archive
+   cannot write a file of root, a setuid file of root or a device. A file that root or another user
+   owned in the sandbox gets the service user as its owner. When the archive has a member that the
+   service user cannot restore, the import fails. Delete each copy of the archive. When the import fails, run `move-from-boat.sh discard lsw-<VPS ID>` and then
+   the import again: `discard` removes the restored data, and it refuses a machine on which OpenBot
+   started.
+7. Stop the sandbox at boat. Do not start it again while the VPS runs: two hosts would have one ID.
+8. On the VPS: `move-from-boat.sh start`. It refuses when the import is not complete or when
+   `openbot.db` changed after the import, then enables and starts `openbot.service`. Without the boat
+   desktop, each start waits 120 seconds for display `:0` before OpenBot uses two virtual displays.
+   Confirm in the web client that the server is online and that an agent answers. Set the Leaseweb
+   reference.
+9. Keep the stopped sandbox for the rollback. A delete of the server by its owner also deletes it.
+
+The VPS is not the same machine as the sandbox:
+
+- The boat image has commands that npm installed for all users (`claude`, `codex` and `pnpm` on
+  2026-11-11). The VPS has none, and `import` names each one that is missing. The provider sign-in
+  moves with the home. A provider that used such a command shows that its CLI is not downloaded, and
+  the user downloads it in OpenBot. Not confirmed on a provider that is signed in: the test server
+  had none.
+- `prepare` makes only the primary group of `user`, and the VPS has no Docker. `import` names each
+  group that `user` had in the sandbox (`docker` and `ascii-streaming-audio` on 2026-11-11). An
+  agent of the customer that used Docker does not have it after the move.
+- `provision.sh` also writes `~/.boat/pre-stop` and `~/.boatignore` on the VPS, as each update does
+  on a hosted server. Nothing on the VPS reads them.
+- The clients show no restart action for a moved server: the server list of the account service has
+  `restartAvailable: false` for it. A client from before this field shows the action and gets the
+  refusal of the Worker.
+- A moved server has more storage: 25, 75 and 150 GB for Starter, Standard and Pro
+  (`OPERATOR_HOST_STORAGE_GB`), not the 12, 50 and 100 GB of the plan table. The account service
+  sends the number in the server list, the hosting list and the billing state from the moment of the
+  row `UPDATE`, so the storage meter, the storage alerts, Billing and the plan change offer show it.
+  The host reads it at its start, for the instructions of its agents. The pricing page and the order
+  form keep the plan table, because a new server starts in a boat sandbox. A client or a host from
+  before this number shows the plan table. A rollback gives the server the plan table again, so a
+  server that used more on the VPS shows a full disk.
+- The number is not a limit that the machine enforces. The clients count
+  `HOSTED_SERVER_BASE_IMAGE_GB` (22 GB) for the system, so the disk has much more than the user sees:
+
+  | Plan | Machine | Disk | User sees | Disk above that |
+  | --- | --- | --- | --- | --- |
+  | Starter (only after a change down from Standard or Pro) | Leaseweb VPS 2 | 200 GB | 25 GB | about 153 GB |
+  | Standard | Leaseweb VPS 2 | 200 GB | 75 GB | about 103 GB |
+  | Pro | Leaseweb VPS 3 | 300 GB | 150 GB | about 128 GB |
+
+  The 200 GB is from the Leaseweb API (`rootDiskSize`, 2026-11-11). The VPS 3 (8 vCPU, 24 GB,
+  300 GB) is from the Leaseweb product page; no VPS 3 was bought on 2026-11-11, so its disk is not
+  measured. The system part of a VPS was not measured; the 22 GB is from the boat servers.
+- Move a Pro server to a VPS 3. A plan change does not change the machine of a moved server. After a
+  change to Pro, a server on a VPS 2 shows 150 GB at once and has about 28 GB of disk above that,
+  until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
+  `plan = 'pro'` rows whose machine is a VPS 2.
+- The clients show the vCPU and the memory of the boat size of the plan (2 and 4 GB, 4 and 8 GB, 8
+  and 16 GB) also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
+- After the owner deletes the server, OpenBot still runs on the VPS with a session that is ended. It
+  cannot connect, and it has the data until the operator reinstalls the machine.
+
+Rollback, while the sandbox exists: run `systemctl disable --now openbot.service` on the VPS, so that
+no restart of the VPS starts a second host. Make sure that the sandbox is stopped at boat. Then give
+the row back to boat. The next client request resumes the sandbox, and the resume starts OpenBot
+there. The work that the server did on the VPS is not in the sandbox.
+
+```sql
+UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
+  operator_host = NULL, desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
+  observed_state = 'stopped', updated_at = <now in ms>
+WHERE server_id = '<server ID>' AND operator_host IS NOT NULL AND retired_sandbox_id IS NOT NULL
+  AND desired_state != 'deleted';
+```
+
+A server whose plan ended on the VPS keeps `stopped`, so the rollback does not start it. When the
+plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan and
+the row has the `size` of the new plan. In that case also write `pending_size = size` in the
+statement, so that the resume changes the machine, as it does after a plan change on boat. Not
+tested: a rollback after a plan change.
+
+A moved server that lost its session cannot get a new claim from a client request. The operator
+makes a claim of 16 to 128 characters from `A-Z a-z 0-9 _ -`, writes its SHA-256 as base64url with no
+padding to `claim_token_hash` and a time at most one hour ahead to `claim_expires_at`, writes
+the claim to `OPENBOT_HOSTED_CLAIM` in `/home/user/.config/openbot-hosted/env`, and restarts
+`openbot.service`. The redeem ends the old session.
+
+`bun run test:hosted-operator-host` drives the real service with a fake boat and checks each line of
+the table, the claim recovery, the storage of a moved server in each list, and that the servers of
+boat still stop and start. The migration has
+its data fixture in `apps/auth-api/test/hosted-server-operator-host-migration.test.ts`.
+
+Tested on 2026-11-11 with one test server, two times (test Worker, boat sandbox with 4 vCPU and
+8 GB, VPS in AMS-01 with Ubuntu 26.04, OpenBot 0.68.0, web client):
+
+- `user` in the sandbox had the UID 1000 and the GID 1000. ID 1000 is free on the Leaseweb image.
+- `prepare` took 83 seconds. For a home of 1.1 GB, the export took 8 seconds and made an archive of
+  974 MB, the copy from the sandbox to the VPS took 10 seconds, and the import took 2 seconds.
+- With the row written first, the sandbox kept its state during the export, and the stopped sandbox
+  stayed stopped for 3.5 minutes with no change of the row. In the old order (stop, then the row),
+  the Worker resumed the sandbox in 6 seconds.
+- After `start`, the host registered from the VPS in 129 seconds, with the same host key and no new
+  sign-in. The data of the sandbox was there. A restart of the VPS gave the same result.
+- An import of a cut archive failed and named `discard`. A second import and `start` refused.
+  `discard` removed the data, and the full import then passed. `discard` and a second `start`
+  refused after the start.
+- A hosted server ran under the rules of `leaseweb-bootstrap.sh`.
+- The web client showed no restart action for the moved server, and showed it again after the
+  rollback. With a Worker from before `restartAvailable`, it showed the message of the Worker.
+- A plan end set `desired_state = 'stopped'`, and a renewal set `running` again.
+- Rollback: the client request resumed the sandbox in 15 seconds, and the host registered from the
+  sandbox. A restart of the VPS started no OpenBot.
+- A delete of the moved server through the Worker deleted the retired sandbox at boat.
+
+Not confirmed:
+
+- a move of a server that has a signed-in provider, agents and chats of a real customer. The test
+  server had one file and no provider;
+- an update request of a hosted server under the rules of `leaseweb-bootstrap.sh`;
+- the behavior of Signal while the sandbox and the VPS both have the host ID. The test never ran both;
+- the restart action in the desktop and mobile clients. They read the same field through the same
+  gate, and only the web client was checked;
+- the cause of five `turn.openbot.run` resolve errors on the first start on the VPS in the first
+  test. The second test did not look for them.
+
+Tested on 2026-11-11 on one VPS (FRA-01, 6 vCPU, 16 GiB, Ubuntu 24.04, OpenBot 0.67.1):
+
+- `bun scripts/hosting/leaseweb-bootstrap-e2e.ts --host=root@<address> --restart=yes` passed its 75
+  checks. It runs the bootstrap two times, connects as the service user and as root, stops the rules,
+  and restarts the server. The report is in `.openbot-build/leaseweb-bootstrap/`.
+- Rescue: `attachIso` with `GRML` and then `reboot` started the GRML system. Its console gave a root
+  shell with no password, and `mount -o ro,noload /dev/sda2` showed the files of the server. After
+  `detachIso` and `reboot`, Ubuntu started 173 seconds after the call, and OpenBot was online 55
+  seconds later.
+
+An order test through the Leaseweb API on 2026-11-11, with an API key of an account of the German
+sales organization (locations FRA-01, FRA-10 and FRA-14), did not order a server:
+
+- `GET /ordering/v1/products/vps?location=FRA-01` answers `404 Product configurator not found`, and
+  `GET` and `POST /ordering/v1/products/vps/VPS02_2` (the order with `dryRun: true`) answer
+  `404 Product not found`. Another location answers `403`. The same key reads
+  `/ordering/v2/products/dedicatedServers?location=FRA-01`, `/publicCloud/v1/vps`,
+  `/account/v1/orders` and `/services/v1/services`. Thus the key and the account are accepted, and
+  the VPS order is not available to this account. The cause is not confirmed: Leaseweb documents
+  that the order API needs a verified customer who pays by invoice with no prepayment, and the first
+  order of this account was paid in advance.
+- `/services/v1/services` shows the VPS as `cancellable`, with a 1-month term that starts on the
+  first day of the next month: a server from 2026-11-11 has `contractTermEndDate` 2026-12-31.
+  `POST /services/v1/services/{id}/cancel` exists and was not called.
+- `PUT /publicCloud/v1/vps/{id}/reinstall` with `{"imageId": "UBUNTU_26_04_64BIT"}` answers `202`
+  and deletes the disk. The test VPS had Ubuntu 26.04.1 (kernel 7.0) and an open SSH port 37 seconds
+  later, with a new root password in `/credentials`. `install-server.sh` then took 98 seconds, and
+  `leaseweb-bootstrap-e2e.ts --restart=yes` passed its 75 checks. Ubuntu 26.04 has the `install`
+  command of uutils, which refuses `/dev/stdin` as the source when the target exists; the bootstrap
+  thus writes its files with `cat`. The bootstrap with this change was not run again on Ubuntu 24.04.
+- On Ubuntu 26.04, the server signed in with `openbot login`, and the web client connected to it. An
+  agent with a free OpenCode model ran a shell command as the service user and read a web page. After
+  a restart, the server was online again with no new sign-in, and the agent had its chat. The log
+  has `Failed to resolve address for turn.openbot.run` lines when a client connects, although the
+  service user resolves that name; the cause is not known, and the connection was made.
+- The configurator of the Leaseweb shop, on the same day, marks Frankfurt (FRA-01) as out of stock
+  for each VPS package (`VPS02_1` to `VPS02_6`), and Montreal and Tokyo too. Amsterdam, London,
+  Washington, San Francisco, Los Angeles, Singapore and Sydney are in stock. This is the probable
+  cause of the `404` for FRA-01. A pool of ready servers must thus not depend on one location.
+- A second account, of the Netherlands sales organization, got 10 servers on 2026-11-11 (VPS 2,
+  AMS-01, Ubuntu 26.04) from one shop order: the order was at 17:22 UTC and the servers started
+  from 17:44 to 17:45 UTC. Each has a 1-year term to 2027-11-30 with a bill each month (EUR 8.09),
+  and `cancellable: true`. With the key of this account, `GET /ordering/v1/products/vps?location=AMS-01`
+  answers `200` with the packages `VPS02_1` to `VPS02_6`. No order was sent through the API.
+- The first daily update on Ubuntu 26.04 restarted `openbot.service`: `needrestart` restarts each
+  service that uses an updated library. The bootstrap now writes
+  `/etc/needrestart/conf.d/50-openbot.conf`. After that, a reinstall of `libpcre2-8-0` restarted
+  `cron.service`, `ssh.service` and six other services, and listed `openbot.service` as deferred; its
+  start time did not change. The E2E reads the value that `needrestart` uses for the unit.
+- Operator keys: the E2E adds a temporary key to the list. That key signed in as root and not as the
+  service user, a key outside the list did not sign in, a list with a bad line changed nothing, and a
+  run with the first list removed the key. With `--restart=yes` on Ubuntu 26.04 it passed its 91
+  checks. The test VPS then had the two keys of another server of the operators and no
+  `/root/.ssh/authorized_keys`, and an operator signed in.
+- The Ubuntu 26.04 image of Leaseweb has GRUB 2.14 on the disk (GPT with a BIOS boot partition) and
+  no GRUB package, so it has no `update-grub`. The daily update installed kernel 7.0.0-43, and
+  `/boot/grub/grub.cfg` got no entry for it: after two restarts the server still ran 7.0.0-38.
+  Without a fix, a kernel security update has no effect on this image. The bootstrap now installs
+  `grub-pc`, which writes GRUB to the disk and adds `update-grub` to the kernel hooks. With the
+  package removed again, the E2E ran the bootstrap and restarted the server: it ran 7.0.0-43 with
+  the arguments `ro net.ifnames=0 quiet splash`, SSH answered 23 seconds after the restart command,
+  and OpenBot was online 5 seconds later.
+- The three names of the test VPS changed: the reference through the API, the server name with
+  `openbot name`, and the hostname, which stayed after a restart of the server.
+
+Not confirmed for Leaseweb:
+
+- `needrestart` on Ubuntu 24.04, and the bootstrap of this version on Ubuntu 24.04;
+- if the Ubuntu 24.04 image of Leaseweb has `update-grub`, and the kernel fix on a server that
+  starts with UEFI (the bootstrap prints a warning there and changes nothing);
+- a kernel update that comes after the fix. The boot entry of the kernel that was there is confirmed,
+  and `zz-update-grub` is in the kernel hooks;
+- another distribution than Ubuntu 24.04 and 26.04, and a network that does not use `systemd-networkd` (the
+  helper reads the DHCP server from its lease files);
+- a router address that changes while the server runs. The rules change at the next start of
+  OpenBot;
+- `resetPassword`, which needs the guest agent, and a custom image for a VPS;
+- why the start after `detachIso` took 173 seconds;
+- WebRTC with a rule set that also filters incoming connections.
+
+### Reuse a pool machine
+
+A pool machine has one server at a time. When the server ends, the machine gets a new operating
+system and goes back to the pool for the next move. The Worker and the operator share the work:
+
+1. The plan ends. The Worker sets `desired_state = 'stopped'` and `plan_ended_at`. `sync` stops
+   OpenBot on the machine. The data stays, so the owner can renew.
+2. 30 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
+   subscription is not open and Stripe reports it `canceled`. The delete is the one of the owner: the
+   old sandbox, the Remote host and the session go, and `observed_state = 'deleted'`. A subscription
+   that Stripe still retries (`past_due`, `unpaid`, `paused`) keeps the server, with no limit: the
+   operator decides. A renewal before the 30 days keeps the server. The 30 days are
+   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`.
+3. `sync` reinstalls the machine with `UBUNTU_26_04_64BIT`, which erases the disk, sets its reference
+   to `pool-free`, and sets `operator_host = NULL` on the deleted row. The machine is free.
+   Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
+   host keys.
+
+A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
+so its 30 days start then.
+
+Tested on 2026-11-12 with the test Worker, its D1 and one VPS in `AMS-01`: `add`, `status`, `sync`
+stop and start, the cron delete of a server whose plan ended 31 days before with a `canceled` Stripe
+test subscription, then `sync`. The reinstall took 51 seconds: the machine started 26 seconds after
+the request, and `sync` returned 25 seconds later. A file in `/root` and `/opt/OpenBot` were gone.
+Then `remove` and `add`.
+
+`operator_hosts` has one row for each machine that was in the pool:
+
+| Column | Value |
+| --- | --- |
+| `host_id` | `leaseweb:<VPS ID>`, as in `hosted_servers.operator_host`. |
+| `location` | The Leaseweb data center, such as `AMS-01`. |
+| `product` | `VPS02` or `VPS03`, from the Leaseweb pack. |
+| `added_at` | When the operator added the machine. |
+| `removed_at` | When the machine left the pool. `NULL` while it is in the pool. |
+
+`scripts/hosting/leaseweb-pool.ts` does the operator work. It shows what it would do and changes
+nothing without `--apply`. It reads the Leaseweb keys and the Cloudflare token from the environment,
+so it runs on each computer that has the key file, and it can run on a server of the operator later:
+
+```bash
+bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
+  bun scripts/hosting/leaseweb-pool.ts <command> [--apply] [--env=test]
+```
+
+| Command | Work |
+| --- | --- |
+| `status` | Read only. Free machines of each location and product, and the work of `sync`. |
+| `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool-free` when the machine has none. It refuses a machine with another reference. |
+| `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
+| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. |
+
+`sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
+operator. A move still uses [Move a server from boat](#move-a-server-from-boat) on a free machine,
+from step 2.
+
+The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each hour, at minute 0, the
+production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
+`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. The
+snapshot counts each machine in one state:
+
+| State | Machine |
+| --- | --- |
+| `free` | No server. Ready for a move. |
+| `to_reinstall` | Its server is deleted. Free after the next `sync`. |
+| `plan_ended` | Its plan ended. Free 30 days after `plan_ended_at`, unless the owner renews. |
+| `cancel_scheduled` | The owner cancelled the plan at the period end, or scheduled a delete. |
+| `in_use` | Each other server. |
+
+`free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews.
+A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
+subscription that Stripe still retries, or with no subscription, has no date: the cron does not delete
+that server. A server that names a machine that is not in the
+pool is in the group `unknown`: add the machine. `bun run test:hosted-operator-pool` checks the
+delete, the snapshot and its event on the real service with a fake Stripe and a fake boat.
 
 ## Not confirmed
 

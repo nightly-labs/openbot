@@ -17,6 +17,8 @@ interface TeamWebRtcBridgeEvents {
   signalReady: [peerId: string];
   /** The Signal socket of a peer opened. Only the connection trace reads it. */
   signalOpen: [peerId: string];
+  /** Signal holds a client attempt with `waitForHost` until the offline host connects. */
+  hostWaiting: [peerId: string];
   /** A host's own Signal socket closed. `terminal`: the peer does not connect it again. */
   signalClosed: [peerId: string, code: string, terminal: boolean];
   incoming: [
@@ -40,6 +42,12 @@ interface TeamWebRtcBridgeEvents {
   pathLost: [peerId: string];
   pathRestored: [peerId: string];
   data: [peerId: string, channel: TeamWebRtcChannel, data: string | ArrayBuffer];
+  /** The optional `browser-egress-v1` channel of a peer opened. It is not part of `connected`. */
+  egressOpen: [peerId: string];
+  /** The egress channel of a peer closed. The connection can still be up. */
+  egressClosed: [peerId: string];
+  /** A frame on the egress channel: control as a string, data as binary. */
+  egressData: [peerId: string, data: string | ArrayBuffer];
   path: [peerId: string, path: "p2p" | "relay"];
   error: [peerId: string, code: string, message: string, terminal?: boolean];
   iceServers: [peerId: string, servers: RemoteDesktopIceServer[]];
@@ -103,10 +111,22 @@ type BridgeCommand =
       peer: "host" | "client";
       iceTransportPolicy: "all" | "relay";
       privateNetwork?: boolean;
+      waitForHost?: boolean;
     }
   | { type: "prepare-signal"; peerId: string; signalUrl: string }
   | { type: "set-private-network"; peerId: string; privateNetwork: boolean }
-  | { type: "disconnect" | "disconnect-peer" | "restart-ice" | "renew-host-signal" | "close"; peerId: string }
+  | {
+      type:
+        | "disconnect"
+        | "disconnect-peer"
+        | "restart-ice"
+        | "renew-host-signal"
+        | "close"
+        | "open-egress"
+        | "close-egress";
+      peerId: string;
+    }
+  | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
   | { type: "send"; peerId: string; channel: TeamWebRtcChannel; data: string | ArrayBuffer };
 
 const COMMAND_TIMEOUT_MS = 15_000;
@@ -143,7 +163,14 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
 
   readonly connect = Effect.fn("TeamWebRtcBridge.connect")(function* (
     this: TeamWebRtcBridge,
-    input: { peerId: string; signalUrl: string; token: string; peer: "host" | "client"; privateNetwork?: boolean },
+    input: {
+      peerId: string;
+      signalUrl: string;
+      token: string;
+      peer: "host" | "client";
+      privateNetwork?: boolean;
+      waitForHost?: boolean;
+    },
   ) {
     yield* this.start();
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
@@ -194,6 +221,25 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   ) {
     yield* this.start();
     yield* this.#command({ type: "send", peerId, channel, data });
+  }).bind(this);
+
+  /** A client opens the egress channel on its connection to a host. */
+  readonly openEgress = Effect.fn("TeamWebRtcBridge.openEgress")(function* (this: TeamWebRtcBridge, peerId: string) {
+    yield* this.#command({ type: "open-egress", peerId });
+  }).bind(this);
+
+  /** Closes the egress channel of a peer. The connection stays up. */
+  readonly closeEgress = Effect.fn("TeamWebRtcBridge.closeEgress")(function* (this: TeamWebRtcBridge, peerId: string) {
+    if (this.#port) yield* this.#command({ type: "close-egress", peerId });
+  }).bind(this);
+
+  /** Sends one egress frame. Frames go out in the order of the calls. */
+  readonly sendEgress = Effect.fn("TeamWebRtcBridge.sendEgress")(function* (
+    this: TeamWebRtcBridge,
+    peerId: string,
+    data: string | ArrayBuffer,
+  ) {
+    yield* this.#command({ type: "send-egress", peerId, data });
   }).bind(this);
 
   readonly restartIce = Effect.fn("TeamWebRtcBridge.restartIce")(function* (this: TeamWebRtcBridge, peerId: string) {
@@ -309,7 +355,10 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
           yield* remoteDecode(() => port.postMessage({ ...command, commandId }));
           yield* Deferred.await(pending).pipe(
             Effect.timeoutOrElse({
-              duration: command.type === "send" ? SEND_COMMAND_TIMEOUT_MS : COMMAND_TIMEOUT_MS,
+              duration:
+                command.type === "send" || command.type === "send-egress"
+                  ? SEND_COMMAND_TIMEOUT_MS
+                  : COMMAND_TIMEOUT_MS,
               orElse: () =>
                 Effect.fail(
                   new RemoteWorkflowError({
@@ -367,6 +416,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "account-servers-changed") this.emit("accountServersChanged", message.peerId);
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
     else if (message.type === "signal-open") this.emit("signalOpen", message.peerId);
+    else if (message.type === "host-waiting") this.emit("hostWaiting", message.peerId);
     else if (message.type === "signal-closed" && message.code)
       this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
@@ -383,6 +433,10 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       this.emit("iceServers", message.peerId, structuredClone(message.iceServers));
     } else if (message.type === "data" && message.channel && message.data !== undefined)
       this.emit("data", message.peerId, message.channel, message.data);
+    else if (message.type === "egress-open") this.emit("egressOpen", message.peerId);
+    else if (message.type === "egress-closed") this.emit("egressClosed", message.peerId);
+    else if (message.type === "egress-data" && message.data !== undefined)
+      this.emit("egressData", message.peerId, message.data);
     else if (message.type === "peer-error")
       this.emit(
         "error",

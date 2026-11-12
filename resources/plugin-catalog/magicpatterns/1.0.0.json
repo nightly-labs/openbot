@@ -1,0 +1,33 @@
+{
+  "slug": "magicpatterns",
+  "name": "Magic Patterns",
+  "tagline": "AI UI prototypes",
+  "description": "Magic Patterns lets agents create and read UI designs and prototypes in the signed-in Magic Patterns account. Each user signs in to their own Magic Patterns account through the browser.",
+  "category": "design",
+  "creatorName": "Magic Patterns",
+  "iconUrl": "https://www.magicpatterns.com/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-dashboard", "text": "Design a settings page for a project management app." },
+    { "id": "prompt-iterate", "text": "Make the onboarding design simpler and use fewer steps." },
+    { "id": "prompt-code", "text": "Get the code of my latest design so I can add it to the app." }
+  ],
+  "apps": [
+    {
+      "id": "app-magicpatterns-mcp",
+      "name": "Magic Patterns",
+      "description": "UI design and prototype generation, over Magic Patterns' MCP server with browser sign-in.",
+      "iconUrl": "https://www.magicpatterns.com/apple-icon.png",
+      "server": {
+        "name": "magicpatterns",
+        "transport": "http",
+        "url": "https://mcp.magicpatterns.com/mcp",
+        "auth": [{ "id": "magicpatterns-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.magicpatterns.com",
+  "privacyPolicyUrl": "https://www.magicpatterns.com/docs/documentation/legal/privacy",
+  "termsUrl": "https://www.magicpatterns.com/docs/documentation/legal/terms",
+  "skills": []
+}

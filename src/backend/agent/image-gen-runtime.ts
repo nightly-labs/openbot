@@ -1,5 +1,6 @@
-import type { AttachmentSummary, ImageGenerationInfo } from "@openbot/contracts/ipc";
-import { isString } from "@openbot/contracts/runtime-values";
+import type { AttachmentSummary, ImageGenerationInfo, VideoGenerationInfo } from "@openbot/contracts/ipc";
+import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
@@ -9,10 +10,14 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { lastUserPrompt } from "./delivery-content";
 import {
   decodeGeneratedImage,
+  type GeneratedMediaKind,
   generatedImageName,
+  generatedMediaInfo,
+  generatedMediaKind,
+  generatedVideoName,
+  generationInterruptedText,
   imageGenerationAspectRatio,
   imageGenerationFailure,
-  isImageGenerationItem,
 } from "./image-generation";
 
 interface ImageGenerationOperation {
@@ -32,7 +37,7 @@ export interface ImageGenRuntimeOptions {
 }
 
 /**
- * Streaming image-generation items, and the interrupt flag that races them.
+ * Streaming image-generation and video-generation items, and the interrupt flag that races them.
  *
  * Owns the `threadId:turnId:itemId` operation map plus the `threadId:turnId`
  * interrupted set. Everything else (snapshots, attachments, events) goes
@@ -55,7 +60,7 @@ export class ImageGenRuntime {
   }
 
   /**
-   * Handles one streaming item when it is an image-generation item.
+   * Handles one streaming item when it is an image-generation or a video-generation item.
    * Returns true when handled, so the caller can fall through for the rest.
    */
   readonly handleItem = Effect.fn("ImageGenRuntime.handleItem")(function* (
@@ -66,7 +71,8 @@ export class ImageGenRuntime {
     item: ThreadItem,
     completed: boolean,
   ) {
-    if (!isImageGenerationItem(item)) return false;
+    const kind = generatedMediaKind(item);
+    if (!kind) return false;
     const operationKey = `${threadId}:${turnId}:${item.id}`;
     const state = this.#operations.get(operationKey) ?? {
       interrupted: this.#interruptedTurns.has(`${threadId}:${turnId}`),
@@ -74,7 +80,7 @@ export class ImageGenRuntime {
     };
     state.interrupted ||= this.#interruptedTurns.has(`${threadId}:${turnId}`);
     this.#operations.set(operationKey, state);
-    state.fiber = yield* this.#applyItem(agentId, threadId, turnId, item, completed, state).pipe(
+    state.fiber = yield* this.#applyItem(agentId, threadId, turnId, kind, item, completed, state).pipe(
       Effect.forkIn(this.#scope, { startImmediately: true }),
     );
     return true;
@@ -89,9 +95,10 @@ export class ImageGenRuntime {
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     let changed = false;
     for (const message of snapshot.messages) {
+      const media = generatedMediaInfo(message);
       if (
         message.turnId !== turnId ||
-        message.itemType !== "image_generation" ||
+        !media ||
         message.status === "completed" ||
         message.status === "failed" ||
         message.status === "interrupted"
@@ -99,7 +106,7 @@ export class ImageGenRuntime {
         continue;
       }
       message.status = "interrupted";
-      if (message.imageGeneration) message.imageGeneration.error ??= "Image generation was interrupted.";
+      media.info.error ??= generationInterruptedText(media.kind);
       changed = true;
     }
     if (changed) this.#conversation.emitConversation(snapshot, "image-generation.interrupted", { turnId });
@@ -142,6 +149,7 @@ export class ImageGenRuntime {
     agentId: string,
     threadId: string,
     turnId: string,
+    kind: GeneratedMediaKind,
     item: ThreadItem,
     completed: boolean,
     operation: ImageGenerationOperation,
@@ -154,29 +162,58 @@ export class ImageGenRuntime {
       snapshot.messages.push(message);
     }
 
-    const previous = message.imageGeneration;
+    const previous =
+      generatedMediaInfo(message)?.kind === kind ? (message.imageGeneration ?? message.videoGeneration) : undefined;
     const prompt =
       getString(item, "revised_prompt") ??
       getString(item, "prompt") ??
       previous?.prompt ??
       lastUserPrompt(snapshot) ??
       undefined;
-    const resolution =
-      getString(item, "resolution") ?? getString(item, "size") ?? previous?.resolution ?? "1024 × 1024";
-    const aspectRatio = imageGenerationAspectRatio(item) ?? previous?.aspectRatio ?? "square";
+    // A video model makes a wide clip unless the call asks for another frame.
+    const aspectRatio =
+      imageGenerationAspectRatio(item) ?? previous?.aspectRatio ?? (kind === "video" ? "landscape" : "square");
     const providerStatus = getString(item, "status");
     const failure = imageGenerationFailure(item);
 
-    message.itemType = "image_generation";
     message.text = "";
-    message.imageGeneration = {
-      ...(prompt === undefined ? {} : { prompt }),
-      resolution,
-      aspectRatio,
-      ...(failure ? { error: failure } : {}),
-    } satisfies ImageGenerationInfo;
+    let info: { error?: string | undefined };
+    if (kind === "video") {
+      const resolution = getString(item, "resolution") ?? message.videoGeneration?.resolution;
+      const duration =
+        isNumber(item.duration) && item.duration > 0 ? item.duration : message.videoGeneration?.durationSeconds;
+      message.itemType = "video_generation";
+      delete message.imageGeneration;
+      const video: VideoGenerationInfo = {
+        ...(prompt === undefined ? {} : { prompt }),
+        aspectRatio,
+        ...(duration === undefined ? {} : { durationSeconds: duration }),
+        ...(resolution === undefined ? {} : { resolution }),
+        ...(failure ? { error: failure } : {}),
+      };
+      message.videoGeneration = video;
+      info = video;
+    } else {
+      const resolution =
+        getString(item, "resolution") ??
+        getString(item, "size") ??
+        message.imageGeneration?.resolution ??
+        "1024 × 1024";
+      message.itemType = "image_generation";
+      delete message.videoGeneration;
+      const image: ImageGenerationInfo = {
+        ...(prompt === undefined ? {} : { prompt }),
+        resolution,
+        aspectRatio,
+        ...(failure ? { error: failure } : {}),
+      };
+      message.imageGeneration = image;
+      info = image;
+    }
+    const failedText =
+      kind === "video" ? sourceText("error.backend.videoGenerationFailed") : "Image generation failed.";
     message.status = operation.interrupted ? "interrupted" : completed ? "completed" : "streaming";
-    if (operation.interrupted) message.imageGeneration.error ??= "Image generation was interrupted.";
+    if (operation.interrupted) info.error ??= generationInterruptedText(kind);
     this.#hooks.trackItem(item.id, turnId);
     this.#conversation.emitConversation(snapshot);
 
@@ -185,18 +222,25 @@ export class ImageGenRuntime {
     }
     if (providerStatus === "failed" || failure) {
       message.status = "failed";
-      message.imageGeneration.error = failure ?? "Image generation failed.";
+      info.error = failure ?? failedText;
       this.#conversation.emitConversation(snapshot);
       return;
     }
 
     const savedPath = getString(item, "saved_path");
-    const result = getString(item, "result");
+    // Only an image comes as data. A video always comes as a file.
+    const result = kind === "image" ? getString(item, "result") : null;
     yield* Effect.gen({ self: this }, function* () {
       let attachment: AttachmentSummary;
       const storeBytes = Effect.gen({ self: this }, function* () {
         if (!result)
-          return yield* new GeneratedImageFailed({ cause: new Error("Image generation did not return an image.") });
+          return yield* new GeneratedImageFailed({
+            cause: new Error(
+              kind === "video"
+                ? sourceText("error.backend.videoGenerationNoVideo")
+                : "Image generation did not return an image.",
+            ),
+          });
         const bytes = yield* imageStep(() => decodeGeneratedImage(result));
         return yield* this.#mailbox
           .storeGeneratedAttachment({
@@ -213,7 +257,8 @@ export class ImageGenRuntime {
           this.#mailbox
             .storeGeneratedAttachment({
               sourcePath: savedPath,
-              name: generatedImageName(savedPath),
+              kind,
+              name: kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
               ownerAgentId: agentId,
               ownerThreadId: threadId,
             })
@@ -229,19 +274,21 @@ export class ImageGenRuntime {
         if (operation.interrupted) {
           const interruptedSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
           const interruptedMessage = interruptedSnapshot.messages.find((candidate) => candidate.id === item.id);
-          if (interruptedMessage?.imageGeneration) {
+          const interruptedMedia = interruptedMessage ? generatedMediaInfo(interruptedMessage) : null;
+          if (interruptedMessage && interruptedMedia) {
             interruptedMessage.status = "interrupted";
-            interruptedMessage.imageGeneration.error ??= "Image generation was interrupted.";
+            interruptedMedia.info.error ??= generationInterruptedText(kind);
             this.#conversation.emitConversation(interruptedSnapshot);
           }
           return;
         }
         const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
         const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
-        if (!latestMessage?.imageGeneration) return;
+        const latestMedia = latestMessage ? generatedMediaInfo(latestMessage) : null;
+        if (!latestMessage || !latestMedia) return;
         latestMessage.attachments = [attachment];
         latestMessage.status = "completed";
-        delete latestMessage.imageGeneration.error;
+        delete latestMedia.info.error;
         this.#conversation.emitConversation(latestSnapshot);
         return;
       });
@@ -251,9 +298,10 @@ export class ImageGenRuntime {
           const error = failure.cause;
           const latestSnapshot = this.#conversation.ensureSnapshot(agentId, threadId);
           const latestMessage = latestSnapshot.messages.find((candidate) => candidate.id === item.id);
-          if (!latestMessage?.imageGeneration) return;
+          const latestMedia = latestMessage ? generatedMediaInfo(latestMessage) : null;
+          if (!latestMessage || !latestMedia) return;
           latestMessage.status = "failed";
-          latestMessage.imageGeneration.error = error instanceof Error ? error.message : String(error);
+          latestMedia.info.error = error instanceof Error ? error.message : String(error);
           this.#conversation.emitConversation(latestSnapshot);
         }),
       ),

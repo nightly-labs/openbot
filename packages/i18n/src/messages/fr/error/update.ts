@@ -27,6 +27,8 @@ export const messages = {
     "Un autre processus OpenBot est toujours en cours d’exécution dans ce compte utilisateur. Quittez-le, puis installez à nouveau la mise à jour.",
   "error.update.siblingCheckFailed":
     "Impossible de vérifier les autres sessions OpenBot. Réessayez avant l’installation.",
+  "error.update.readOnlyLocation":
+    "OpenBot ne peut pas installer de mises à jour depuis cet emplacement. Quittez OpenBot. Dans le Finder, faites glisser OpenBot dans le dossier Applications (s’il y est déjà, sortez-le puis remettez-le). Ouvrez ensuite OpenBot et installez de nouveau la mise à jour.",
   "error.update.remoteDisabled": "Les mises à jour des administrateurs du serveur sont désactivées sur cet ordinateur.",
   "error.update.restartStarted": "OpenBot redémarre déjà pour installer la mise à jour.",
   "error.update.alreadyRestarting": "OpenBot redémarre déjà.",

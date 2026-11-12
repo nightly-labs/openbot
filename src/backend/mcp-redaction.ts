@@ -23,9 +23,10 @@ export function redactMcpSecrets(text: string, config: McpServerConfig): string 
  * A provider process keeps the credentials it was given until it stops, and the user can edit or
  * disable a server while that process still runs. Its stderr then quotes the old value, which the
  * new configuration no longer names. The caller retains what it handed over and passes it here.
+ * `rules` is `redactSecrets` for text that the agent reads back.
  */
-export function redactMcpValues(text: string, values: Iterable<string>): string {
-  return redactText(maskValues(text, values));
+export function redactMcpValues(text: string, values: Iterable<string>, rules = redactText): string {
+  return rules(maskValues(text, values));
 }
 
 /**
@@ -86,12 +87,46 @@ export function registerMcpSecretValues(config: McpServerConfig): void {
 export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   const values = new Set<string>();
   for (const config of configs) {
-    for (const value of Object.values(mcpEnvironment(config))) values.add(value);
+    for (const [name, value] of Object.entries(mcpEnvironment(config))) {
+      if (!isInheritedProfileValue(name, value)) values.add(value);
+    }
     for (const pair of config.headers) values.add(pair.value);
     for (const value of urlQueryValues(config.url)) values.add(value);
   }
   // A short value is left alone - masking a two-character value would hide ordinary words.
   return [...values].filter((value) => value.length >= 4);
+}
+
+/**
+ * The variables that name this computer's user, its folders, and its search path. The Computer Use
+ * server inherits `HOME`, `USER` and `TMPDIR` (#4863). This computer's own value of one of them is
+ * not a credential, and masking `HOME` changes each path an agent writes, so a Shared file link no
+ * longer opens. A value that the user typed under one of these names stays masked.
+ */
+const USER_PROFILE_VARIABLES = new Set([
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "PATH",
+  "SHELL",
+  "USERNAME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "TEMP",
+  "TMP",
+  "SYSTEMROOT",
+  "WINDIR",
+]);
+
+/**
+ * Whether an MCP environment entry holds this computer's own value of a profile variable. The name
+ * is upper-cased for Windows; `process.env` is case-sensitive on macOS and Linux, so `user` there is
+ * a different variable and stays masked.
+ */
+export function isInheritedProfileValue(name: string, value: string): boolean {
+  return USER_PROFILE_VARIABLES.has(name.toUpperCase()) && process.env[name] === value;
 }
 
 /**

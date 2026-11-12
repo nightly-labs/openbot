@@ -1,27 +1,60 @@
 import {
   type AgentProviderId,
+  type AgentProviderStatus,
+  claudeCompactWindowSizes,
   isAgentProvider,
+  isInstallerProvider,
   isKeyOnlyProvider,
+  PROMPT_CACHE_TTLS,
+  type PromptCacheTtl,
+  type ProviderAccountPool,
   type ProviderAccountStatus,
-  relayCallbackQuery,
+  type ProviderApiKeyStatus,
 } from "@openbot/contracts/ipc";
+import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { Spinner, Typography } from "heroui-native";
-import { useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { Chip, Typography } from "heroui-native";
+import type { LucideIcon } from "lucide-react-native";
+import CircleArrowUp from "lucide-react-native/icons/circle-arrow-up";
+import Clock from "lucide-react-native/icons/clock";
+import Download from "lucide-react-native/icons/download";
+import Globe from "lucide-react-native/icons/globe";
+import KeyRound from "lucide-react-native/icons/key-round";
+import Layers from "lucide-react-native/icons/layers";
+import LogIn from "lucide-react-native/icons/log-in";
+import LogOut from "lucide-react-native/icons/log-out";
+import Minimize2 from "lucide-react-native/icons/minimize-2";
+import Package from "lucide-react-native/icons/package";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Star from "lucide-react-native/icons/star";
+import UserPlus from "lucide-react-native/icons/user-plus";
+import UserRound from "lucide-react-native/icons/user-round";
+import Users from "lucide-react-native/icons/users";
+import X from "lucide-react-native/icons/x";
+import { useRef, useState } from "react";
+import { Alert, View } from "react-native";
+import { useUniwind } from "uniwind";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import {
   type ProviderAdmin,
+  type ProviderRow,
   providerAccountStateKey,
   providerRuntimeBusy,
-  relayPage,
+  providerSignOutOffered,
 } from "@/features/servers/model/provider-admin";
-import { useServerProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
+import { useOpenSignIn } from "@/features/servers/model/use-open-sign-in";
+import { useProviderModels } from "@/features/servers/model/use-provider-models";
+import {
+  useHostProviderDefault,
+  useProviderKeyState,
+  useServerProviderAccounts,
+  useServerProviders,
+} from "@/features/servers/model/use-server-providers";
 import { providerStatusLabel } from "@/features/servers/screens/server-providers-screen";
 import {
   SettingsContent,
@@ -29,51 +62,80 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { IDENTITY_PICTURE_SIZE, SettingsIdentityHeader } from "@/features/settings/components/settings-identity-header";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { SheetFormField } from "@/shared/components/sheet-form-field";
-import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { currentText, type MobileText, useText } from "@/shared/lib/text";
 
-/** How often the host is asked how a relayed sign-in is, as on the web. */
-const RELAY_POLL_MS = 1000;
+type RuntimeAction = "cancel" | "update" | "retry" | "download" | "check";
 
-/** A sign-in that runs on the host while this page shows it. */
-type SignIn =
-  | { kind: "starting" }
-  /** A device code that the user types on the provider's page. */
-  | { kind: "code"; userCode: string; url: string }
-  /** The provider's page shows a code that the user pastes back here. */
-  | { kind: "paste"; url: string }
-  /** The provider sees the sign-in on the page by itself. */
-  | { kind: "link"; url: string }
-  /** `sign-in-relay-v1`: the host waits for its page; `paste` pages return to the host's loopback address. */
-  | { kind: "relay"; flowId: string; page: { url: string; state: string | null; paste: boolean } | null };
+const RUNTIME_ACTION_ICONS = {
+  cancel: X,
+  update: CircleArrowUp,
+  retry: RotateCcw,
+  download: Download,
+  check: RefreshCw,
+} as const satisfies Record<RuntimeAction, LucideIcon>;
+
+/** The Version line names the CLI that runs: the one the user installed, or OpenBot's download. */
+const VERSION_SOURCE_KEYS = {
+  system: "mobile.server.providers.versionInstalledByUser",
+  managed: "mobile.server.providers.versionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, string>;
+
+/** The colour of the status in the page header, in the order of the desktop header: a problem first. */
+function providerStatusColor(row: ProviderRow): "success" | "warning" | "danger" | "accent" | "default" {
+  const state = row.status?.state;
+  if (row.status?.off) return "default";
+  if (providerRuntimeBusy(row) || (row.status?.connectionState === "connecting" && state !== "available"))
+    return "accent";
+  if (row.runtime?.phase === "download-error" || state === "error") return "danger";
+  if (row.updatable || state === "outdated") return "warning";
+  return state === "available" ? "success" : "default";
+}
+
+/** What the API key does for the provider, as the API key card of the desktop page says it. */
+function keyDescription(row: ProviderRow, key: ProviderApiKeyStatus | undefined, { t }: Pick<MobileText, "t">) {
+  const saved = key === "saved";
+  if (row.id === "opencode") return t("mobile.server.providers.keyOptional");
+  if (row.id === "antigravity" && saved) return t("mobile.server.providers.geminiKeyInUse");
+  if (row.id === "claude" && saved) return t("mobile.server.providers.claudeKeyInUse");
+  if (row.id === "codex")
+    return t(saved ? "mobile.server.providers.codexKeyInUse" : "mobile.server.providers.codexKeyAlternative");
+  if (isKeyOnlyProvider(row.id)) return t("mobile.server.providers.keyHint");
+  return undefined;
+}
 
 /**
- * Server settings > Providers > one provider of the host: its status, its sign-in, the download or
- * update of its CLI, and its API key. The host checks the role on every request. A code or key goes
- * to the host only, and the phone does not keep it.
+ * Server settings > Providers > one provider of the host: its status, its sign-in, its API key, the
+ * download or update of its CLI, and how the host's agents use it. The host checks the role on every
+ * request. A code or key goes to the host only, and the phone does not keep it.
  */
 export function ServerProviderScreen() {
   const text = useText();
   const { t, sourceText, errorMessage } = text;
-  const params = useLocalSearchParams<{ serverId: string; provider: string; signInAccount?: string }>();
+  const { theme } = useUniwind();
+  const params = useLocalSearchParams<{ serverId: string; provider: string }>();
   const serverId = params.serverId;
   const provider = isAgentProvider(params.provider) ? params.provider : null;
-  const [signIn, setSignIn] = useState<SignIn | null>(null);
-  const providers = useServerProviders(serverId, { watchStatus: signIn !== null && signIn.kind !== "relay" });
-  const { available, admin, status, rows, applyStatus, applyRuntimes, refreshStatus } = providers;
+  const providers = useServerProviders(serverId);
+  const { available, admin, status, rows, applyRuntimes, refreshStatus } = providers;
   const accounts = useServerProviderAccounts(serverId, admin);
-  const refreshAccounts = accounts.refresh;
   const row = rows.find((candidate) => candidate.id === provider);
+  // A provider that is off has no Models row, so the page does not read its list.
+  const models = useProviderModels(serverId, row?.status?.off ? null : provider, admin);
+  const keyState = useProviderKeyState(serverId, row?.apiKey ? admin : null, provider);
+  const defaultProvider = useHostProviderDefault(serverId, admin?.defaultProvider ?? null);
+  const { agents } = useMobileWorkspace();
   const locked = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [address, setAddress] = useState("");
   /** The last check found no update, so the page says the provider is up to date. */
   const [checked, setChecked] = useState(false);
+  const openSignInPage = useOpenSignIn();
 
   async function run(key: string, operation: () => Promise<void>) {
     if (locked.current) return;
@@ -92,97 +154,6 @@ export function ServerProviderScreen() {
     }
   }
 
-  // A sign-in ends on the provider's page. The host then reports the provider connected. A Reconnect
-  // starts while the provider is connected, so it ends only after the host reported the sign-in as
-  // running: the host marks the provider `connecting` until the sign-in ends.
-  const state = row?.status?.state;
-  const connecting = row?.status?.connectionState === "connecting";
-  const [reconnecting, setReconnecting] = useState(false);
-  const [sawConnecting, setSawConnecting] = useState(false);
-  useEffect(() => {
-    if (signIn !== null && connecting) setSawConnecting(true);
-  }, [signIn, connecting]);
-  useEffect(() => {
-    if (state !== "available" || signIn === null || signIn.kind === "relay" || signIn.kind === "starting") return;
-    if (reconnecting && (connecting || !sawConnecting)) return;
-    setSignIn(null);
-    setCode("");
-    void haptics.notification("success");
-  }, [state, connecting, signIn, reconnecting, sawConnecting]);
-
-  // The host keeps a sign-in open until it ends or is cancelled, so leaving the page cancels it.
-  const active = useRef<{ admin: ProviderAdmin; signIn: SignIn; provider: AgentProviderId } | null>(null);
-  useEffect(() => {
-    active.current = admin && provider && signIn && signIn.kind !== "starting" ? { admin, signIn, provider } : null;
-  }, [admin, provider, signIn]);
-  // A start that answers after the page closed is cancelled where it resolves, in `startSignIn`.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      const current = active.current;
-      if (current) void cancelSignIn(current.admin, current.provider, current.signIn).catch(() => undefined);
-    };
-  }, []);
-
-  const relayFlow = signIn?.kind === "relay" ? signIn.flowId : null;
-  const relayReady = signIn?.kind === "relay" && signIn.page !== null;
-  useEffect(() => {
-    if (!admin || !relayFlow) return;
-    let current = true;
-    const timer = setInterval(() => {
-      admin.relayStatus(relayFlow).then(
-        (relay) => {
-          if (!current) return;
-          if (relay.result) {
-            setSignIn(null);
-            setAddress("");
-            if (relay.result.error) {
-              setError(sourceText(relay.result.error));
-              void haptics.notification("error");
-            } else void haptics.notification("success");
-            void refreshStatus();
-            void refreshAccounts();
-            return;
-          }
-          if (!relay.authorizeUrl || relayReady) return;
-          const page = relayPage(relay.authorizeUrl);
-          if ("error" in page) {
-            setSignIn(null);
-            setError(currentText().t(page.error));
-            void admin.cancelRelay(relayFlow).then(applyStatus, () => undefined);
-            return;
-          }
-          setSignIn({ kind: "relay", flowId: relayFlow, page });
-          // The user asked for the sign-in with Connect, so the page opens without a second tap.
-          void Linking.openURL(page.url).catch(() => setError(currentText().t("mobile.server.providers.openFailed")));
-        },
-        // The host forgets a flow that expired or that a restart ended, and refuses its status.
-        (cause: unknown) => {
-          if (!current) return;
-          setSignIn(null);
-          setAddress("");
-          setError(currentText().errorMessage(cause, currentText().t("mobile.server.providers.actionFailed")));
-          void haptics.notification("error");
-        },
-      );
-    }, RELAY_POLL_MS);
-    return () => {
-      current = false;
-      clearInterval(timer);
-    };
-  }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, refreshAccounts]);
-
-  // The account page asks for a sign-in of one account, which runs here. The request runs once.
-  const requestedAccount = params.signInAccount;
-  const startAccountSignIn = useRef<(account: string) => boolean>(() => false);
-  useEffect(() => {
-    // A sign-in or another action that runs keeps the request until it ends.
-    if (!requestedAccount || !row || pending !== null) return;
-    if (startAccountSignIn.current(requestedAccount)) router.setParams({ signInAccount: undefined });
-  }, [requestedAccount, row, pending]);
-
   if (!available || !admin || !provider || !row)
     return (
       <SettingsContent>
@@ -196,67 +167,18 @@ export function ServerProviderScreen() {
       </SettingsContent>
     );
 
-  /** `account` relays the sign-in of an account after the first: a string signs it in again, null adds one. */
-  function startSignIn(method: "code" | "relay", account?: string | null) {
-    if (!admin || !provider || locked.current) return;
-    setReconnecting(state === "available");
-    setSawConnecting(false);
-    setSignIn({ kind: "starting" });
-    void run("sign-in", async () => {
-      try {
-        if (method === "relay") {
-          const flowId =
-            account !== undefined && admin.accounts
-              ? await admin.accounts.startRelay(provider, account)
-              : await admin.startRelay(provider);
-          if (!mounted.current) {
-            void admin.cancelRelay(flowId).catch(() => undefined);
-            return;
-          }
-          setSignIn({ kind: "relay", flowId, page: null });
-          return;
-        }
-        const started = await admin.startCodeSignIn(provider);
-        if (!mounted.current) {
-          if (started.kind !== "connected") void admin.cancelCodeSignIn(provider).catch(() => undefined);
-          return;
-        }
-        if (started.kind === "connected") {
-          setSignIn(null);
-          await applyStatus(await admin.readStatus());
-          return;
-        }
-        if (started.kind === "code") {
-          setSignIn({
-            kind: "code",
-            userCode: started.userCode,
-            url: started.verificationUrlComplete ?? started.verificationUrl,
-          });
-          return;
-        }
-        setSignIn({ kind: started.kind, url: started.verificationUrl });
-      } catch (cause) {
-        setSignIn(null);
-        throw cause;
-      }
-    });
-  }
-
-  startAccountSignIn.current = (account) => {
-    if (signIn !== null || locked.current) return false;
-    startSignIn("relay", account);
-    return true;
-  };
-
-  function openPage(url: string) {
-    void Linking.openURL(url).catch(() => setError(t("mobile.server.providers.openFailed")));
+  const state = row.status?.state;
+  /** The sign-in runs on its own page, which closes when the sign-in ends. */
+  function openSignIn(method: "code" | "relay", extra: { add?: "1" } = {}) {
+    if (provider) openSignInPage({ serverId, provider, method, ...extra });
   }
 
   const busy = pending !== null;
   const runtime = row.runtime;
   // A download can be cancelled; the setup step after it cannot. An update downloads the newer version.
-  // An installed runtime with no update offers a check, as the row menu of the desktop tab does.
-  const runtimeAction =
+  // An installed runtime with no update offers a check, as the row menu of the desktop tab does. An
+  // installer provider has no update.
+  const runtimeAction: RuntimeAction | null =
     runtime?.phase === "downloading"
       ? "cancel"
       : !runtime || providerRuntimeBusy(row)
@@ -267,187 +189,516 @@ export function ServerProviderScreen() {
             ? "retry"
             : runtime.phase === "not-downloaded"
               ? "download"
-              : "check";
+              : isInstallerProvider(runtime.provider)
+                ? null
+                : "check";
   // A provider whose CLI is not on the host yet downloads before it signs in.
   // As on desktop, a connected provider offers Reconnect: the same sign-in, for another account or
   // a sign-in that the provider no longer accepts.
-  const connectable = (!runtime || runtime.phase === "ready") && signIn === null;
+  const connectable = !runtime || runtime.phase === "ready";
   const connect = row.signIn;
+  const alternative = connectable ? row.alternativeSignIn : null;
   const version = runtime?.version ?? row.status?.version ?? null;
+  const cliSource = row.status?.cliSource;
   // The host lists only a provider that can hold more than one account.
   const providerAccounts = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts;
+  const hasAccounts = Boolean(providerAccounts && providerAccounts.length > 0);
+  // The pool shows only where the host has it (`provider-account-pool-v1`). The host lists a pool only while it is on.
+  const setPool = admin.accounts?.setPool ?? null;
+  const pool = setPool ? accounts.list.data?.pools?.find((entry) => entry.provider === provider)?.pool : undefined;
   const message = row.status?.message ?? row.status?.checkError ?? null;
+  const signOut = admin.signOut;
+  // As on desktop, a saved key keeps the provider connected, and with an accounts list the provider's
+  // own account offers Disconnect on its page.
+  const keySaved = row.apiKey && keyState.data === "saved";
+  const disconnectable = signOut !== null && providerSignOutOffered(row) && !keySaved && !hasAccounts;
+  const off = row.status?.off === true;
+  const modelList = models.list.data;
+  // As on desktop, a provider that lists no model has no Models row.
+  const modelsShown = !off && models.available && ((modelList?.models.length ?? 0) > 0 || models.list.isError);
+  const users = agents.filter((agent) => agent.serverId === serverId && agent.provider === provider);
+  const isDefault = defaultProvider.current.data?.provider === provider;
+  const connectOnComputer =
+    connectable && !connect && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider));
+  const signInShown =
+    !hasAccounts && (Boolean(row.status?.email) || (connectable && Boolean(connect)) || disconnectable);
+
+  const providerName = row.name;
+  const signedInAs = row.status?.email ?? row.name;
+  function disconnect() {
+    if (!signOut || !provider) return;
+    const target = provider;
+    const blocked =
+      users.length > 0
+        ? currentText().t("mobile.server.providers.disconnectBlocked", {
+            agents: currentText().format.list(users.map((agent) => agent.name)),
+          })
+        : null;
+    Alert.alert(
+      currentText().t("mobile.server.providers.disconnectTitle", { name: signedInAs }),
+      [currentText().t("mobile.server.providers.disconnectBody", { provider: providerName }), blocked]
+        .filter(Boolean)
+        .join(" "),
+      [
+        { text: currentText().t("common.cancel"), style: "cancel" },
+        {
+          text: currentText().t("mobile.server.providers.disconnect"),
+          style: "destructive",
+          onPress: () =>
+            void run("sign-out", async () => {
+              await signOut(target);
+              await Promise.all([refreshStatus(), accounts.refresh()]);
+            }),
+        },
+      ],
+    );
+  }
 
   return (
     <SettingsContent>
       <Stack.Screen options={{ title: row.name }} />
+      <SettingsIdentityHeader
+        picture={
+          <View
+            className="items-center justify-center rounded-grouped bg-grouped"
+            style={{ width: IDENTITY_PICTURE_SIZE, height: IDENTITY_PICTURE_SIZE }}
+          >
+            <ProviderMark provider={provider} size={IDENTITY_PICTURE_SIZE / 2} />
+          </View>
+        }
+        name={row.name}
+        nameLabel={row.name}
+        subtitle={
+          <View className="items-start gap-1.5">
+            <Chip size="sm" variant="soft" color={providerStatusColor(row)} accessibilityRole="text">
+              <Chip.Label>{providerStatusLabel(row, text)}</Chip.Label>
+            </Chip>
+            <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
+              {users.length > 0
+                ? t("mobile.server.providers.usedByCount", { count: users.length })
+                : t("mobile.server.providers.unused")}
+            </Typography.Paragraph>
+          </View>
+        }
+      />
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="px-4 text-danger-text">
           {error}
         </Typography.Paragraph>
       ) : null}
-      <SettingsSection footer={message ? sourceText(message) : t("mobile.server.providers.onHost")}>
-        <SettingsRow
-          disclosure={false}
-          trailing={
-            <Typography.Paragraph className="text-grouped-secondary">
-              {providerStatusLabel(row, text)}
-            </Typography.Paragraph>
-          }
-        >
-          <Typography.Paragraph>{t("mobile.server.providers.statusLabel")}</Typography.Paragraph>
-        </SettingsRow>
-        {row.status?.email ? (
-          <SettingsRow
-            disclosure={false}
-            trailing={
-              <Typography.Paragraph numberOfLines={1} className="shrink text-grouped-secondary">
-                {row.status.email}
-              </Typography.Paragraph>
-            }
-          >
-            <Typography.Paragraph>{t("mobile.server.providers.account")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {version ? (
-          <SettingsRow
-            disclosure={false}
-            trailing={<Typography.Paragraph className="text-grouped-secondary">{version}</Typography.Paragraph>}
-          >
-            <Typography.Paragraph>{t("mobile.server.providers.version")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-      </SettingsSection>
-      {connectable && connect ? (
+      {message && !signInShown ? <SettingsNote>{sourceText(message)}</SettingsNote> : null}
+      {signInShown ? (
         <SettingsSection
+          title={t("mobile.server.providers.sectionSignIn")}
           footer={
-            connect === "relay" ? t("mobile.server.providers.relayHint") : t("mobile.server.providers.connectHint")
+            message
+              ? sourceText(message)
+              : connectable && connect
+                ? t(connect === "relay" ? "mobile.server.providers.relayHint" : "mobile.server.providers.connectHint")
+                : connectOnComputer
+                  ? t("mobile.server.providers.connectOnComputer")
+                  : undefined
           }
         >
-          <SettingsRow disclosure={false} disabled={busy} onPress={() => startSignIn(connect)}>
-            <Typography.Paragraph className="text-accent">
-              {t(state === "available" ? "mobile.server.providers.reconnect" : "mobile.server.providers.connect")}
-            </Typography.Paragraph>
-          </SettingsRow>
+          {row.status?.email ? (
+            <SettingsRow
+              disclosure={false}
+              leading={<RowIcon icon={UserRound} />}
+              supportingText={t("mobile.server.providers.account")}
+            >
+              <Typography.Paragraph numberOfLines={1}>{row.status.email}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {connectable && connect ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={busy}
+              leading={<RowIcon icon={state === "available" ? RefreshCw : LogIn} tone="accent" />}
+              onPress={() => openSignIn(connect)}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t(state === "available" ? "mobile.server.providers.reconnect" : "mobile.server.providers.connect")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {alternative ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={busy}
+              leading={<RowIcon icon={Globe} tone="accent" />}
+              onPress={() => openSignIn(alternative)}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.signInBrowser")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {disconnectable ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={busy}
+              leading={<RowIcon icon={LogOut} tone="danger" />}
+              onPress={disconnect}
+            >
+              <Typography.Paragraph className="text-danger-text">
+                {t("mobile.server.providers.disconnect")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
         </SettingsSection>
-      ) : connectable && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider)) ? (
+      ) : null}
+      {!hasAccounts && connectOnComputer && !signInShown ? (
         <SettingsNote>{t("mobile.server.providers.connectOnComputer")}</SettingsNote>
       ) : null}
-      {signIn ? (
-        <SignInSection
-          signIn={signIn}
-          busy={busy}
-          code={code}
-          address={address}
-          onCode={setCode}
-          onAddress={setAddress}
-          onOpen={openPage}
-          onCopy={(value) =>
-            void Clipboard.setStringAsync(value).then(
-              () => haptics.notification("success"),
-              () => setError(t("mobile.server.providers.copyFailed")),
-            )
-          }
-          onSubmitCode={() =>
-            void run("submit", async () => {
-              // The host only gives the code to the CLI. The sign-in stays open, so the status is
-              // read until the host reports the provider connected.
-              await applyStatus(await admin.submitCode(provider, code.trim()));
-              setCode("");
-            })
-          }
-          onSubmitAddress={() =>
-            void run("submit", async () => {
-              if (signIn.kind !== "relay" || !signIn.page) return;
-              const query = relayCallbackQuery(address, signIn.page.state);
-              if (query === null) throw new Error(currentText().t("mobile.server.providers.relayAddressInvalid"));
-              const relay = await admin.completeRelay(signIn.flowId, query);
-              if (relay.result?.error) throw new Error(sourceText(relay.result.error));
-              if (relay.result) {
-                setSignIn(null);
-                setAddress("");
-                await refreshStatus();
-                void refreshAccounts();
-              }
-            })
-          }
-          onCancel={() =>
-            void run("cancel", async () => {
-              const current = signIn;
-              setSignIn(null);
-              setCode("");
-              setAddress("");
-              await applyStatus(await cancelSignIn(admin, provider, current));
-              void refreshAccounts();
-            })
-          }
-        />
-      ) : null}
-      {providerAccounts && providerAccounts.length > 0 ? (
+      {hasAccounts && providerAccounts ? (
         <ProviderAccountsSection
           serverId={serverId}
           provider={provider}
           accounts={providerAccounts}
-          canAdd={signIn === null && connectable && admin.accounts?.canSignIn(provider) === true}
+          canAdd={connectable && admin.accounts?.canSignIn(provider) === true}
           busy={busy}
-          onAdd={() => startSignIn("relay", null)}
+          onAdd={() => openSignIn("relay", { add: "1" })}
+          pool={pool}
+          onPoolChange={
+            setPool
+              ? (enabled) =>
+                  void run("pool", async () => {
+                    // The host forgets the accounts left out when the pool is off, as on desktop.
+                    await setPool(provider, enabled, pool?.leftOut ?? []);
+                    await accounts.refresh();
+                  })
+              : null
+          }
         />
       ) : null}
-      {runtime && runtimeAction ? (
+      {!off && (modelsShown || admin.defaultProvider) ? (
         <SettingsSection
+          title={t("mobile.server.providers.sectionUse")}
           footer={
-            runtime.phase === "download-error" && runtime.message
-              ? sourceText(runtime.message)
-              : row.updatable && runtime.availableVersion
-                ? t("mobile.server.providers.updateHint", { version: runtime.availableVersion })
-                : checked
-                  ? t("mobile.server.providers.upToDate", { name: row.name })
-                  : undefined
+            defaultProvider.error ??
+            (defaultProvider.current.isError
+              ? errorMessage(defaultProvider.current.error, t("mobile.server.providers.loadFailed"))
+              : models.list.isError
+                ? errorMessage(models.list.error, t("mobile.server.providers.modelsLoadFailed"))
+                : !admin.defaultProvider
+                  ? undefined
+                  : isDefault
+                    ? t("mobile.server.providers.startsWith", { name: row.name })
+                    : state !== "available"
+                      ? t("mobile.server.providers.connectFirst", { name: row.name })
+                      : undefined)
+          }
+        >
+          {modelsShown ? (
+            <SettingsRow
+              disabled={!modelList}
+              leading={<RowIcon icon={Layers} />}
+              trailing={
+                modelList ? (
+                  <TrailingValue
+                    value={t("mobile.server.providers.modelsCount", {
+                      shown: modelList.shown.length,
+                      total: modelList.models.length,
+                    })}
+                  />
+                ) : undefined
+              }
+              onPress={() =>
+                router.push({ pathname: "/server-settings/provider-models", params: { serverId, provider } })
+              }
+            >
+              <Typography.Paragraph>{t("mobile.server.providers.models")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {admin.defaultProvider ? (
+            <SettingsRow leading={<RowIcon icon={Star} />}>
+              <SettingsSwitch
+                value={isDefault}
+                // The host has no "none": another provider becomes the default on its own page.
+                disabled={
+                  isDefault || !defaultProvider.current.isSuccess || defaultProvider.saving || state !== "available"
+                }
+                label={t("mobile.server.providers.defaultForNew")}
+                dark={theme === "dark"}
+                onValueChange={(on) => {
+                  if (on) defaultProvider.choose(provider);
+                }}
+              />
+            </SettingsRow>
+          ) : null}
+        </SettingsSection>
+      ) : null}
+      {provider === "claude" && !off && admin.promptCache ? (
+        <PromptCacheSection serverId={serverId} setting={admin.promptCache} />
+      ) : null}
+      {provider === "claude" && !off && admin.compactWindow ? (
+        <CompactWindowSection serverId={serverId} setting={admin.compactWindow} />
+      ) : null}
+      {row.apiKey ? (
+        <SettingsSection
+          title={t("mobile.server.providers.apiKey")}
+          footer={
+            keyState.isError
+              ? errorMessage(keyState.error, t("mobile.server.providers.keyLoadFailed"))
+              : keyDescription(row, keyState.data, text)
           }
         >
           <SettingsRow
-            disclosure={false}
-            disabled={busy}
-            onPress={() =>
-              void run("runtime", async () => {
-                await applyRuntimes(
-                  await (runtimeAction === "cancel"
-                    ? admin.cancelDownload(runtime.provider)
-                    : runtimeAction === "check"
-                      ? admin.checkUpdates()
-                      : admin.download(runtime.provider)),
-                );
-                setChecked(runtimeAction === "check");
-              })
+            leading={<RowIcon icon={KeyRound} />}
+            trailing={
+              keyState.data ? (
+                <TrailingValue
+                  value={t(
+                    keyState.data === "saved" || keyState.data === "unreadable"
+                      ? "mobile.server.providers.keySaved"
+                      : "mobile.server.providers.keyMissing",
+                  )}
+                />
+              ) : undefined
             }
+            onPress={() => router.push({ pathname: "/server-settings/provider-key", params: { serverId, provider } })}
           >
-            <Typography.Paragraph className={runtimeAction === "cancel" ? "text-danger-text" : "text-accent"}>
-              {t(
-                runtimeAction === "cancel"
-                  ? "mobile.server.providers.cancelDownload"
-                  : runtimeAction === "check"
-                    ? pending === "runtime"
-                      ? "mobile.server.providers.checking"
-                      : "mobile.server.providers.checkUpdates"
-                    : runtimeAction === "update"
-                      ? "mobile.server.providers.update"
-                      : runtimeAction === "retry"
-                        ? "mobile.server.providers.retry"
-                        : "mobile.server.providers.download",
-              )}
-            </Typography.Paragraph>
+            <View className="flex-row items-center gap-2">
+              <Typography.Paragraph>{t("mobile.server.providers.apiKey")}</Typography.Paragraph>
+              {row.id === "opencode" && keyState.data === "missing" ? (
+                <Chip size="sm" variant="soft" color="success" className="self-center" accessibilityRole="text">
+                  <Chip.Label>{t("mobile.server.providers.keyFree")}</Chip.Label>
+                </Chip>
+              ) : null}
+            </View>
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {/* One save action at a time in the header: the sign-in's pasted value, or the key. */}
-      {row.apiKey && signIn === null ? (
-        <ProviderKeySection serverId={serverId} admin={admin} provider={provider} onStatus={applyStatus} />
+      {version || (runtime && runtimeAction) ? (
+        <SettingsSection
+          title={t("mobile.server.providers.sectionRuntime")}
+          footer={
+            runtime?.phase === "download-error" && runtime.message
+              ? sourceText(runtime.message)
+              : checked && !row.updatable
+                ? t("mobile.server.providers.upToDate", { name: row.name })
+                : undefined
+          }
+        >
+          {version ? (
+            <SettingsRow
+              disclosure={false}
+              leading={<RowIcon icon={Package} />}
+              trailing={
+                <Typography.Paragraph numberOfLines={1} className="shrink text-grouped-secondary">
+                  {cliSource ? t(VERSION_SOURCE_KEYS[cliSource], { version }) : version}
+                </Typography.Paragraph>
+              }
+            >
+              <Typography.Paragraph>{t("mobile.server.providers.version")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {runtime && runtimeAction ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={busy}
+              leading={
+                <RowIcon
+                  icon={RUNTIME_ACTION_ICONS[runtimeAction]}
+                  tone={runtimeAction === "cancel" ? "danger" : "accent"}
+                />
+              }
+              onPress={() =>
+                void run("runtime", async () => {
+                  await applyRuntimes(
+                    await (runtimeAction === "cancel"
+                      ? admin.cancelDownload(runtime.provider)
+                      : runtimeAction === "check"
+                        ? admin.checkUpdates()
+                        : admin.download(runtime.provider)),
+                  );
+                  setChecked(runtimeAction === "check");
+                })
+              }
+            >
+              <Typography.Paragraph className={runtimeAction === "cancel" ? "text-danger-text" : "text-accent"}>
+                {runtimeAction === "update" && runtime.availableVersion
+                  ? t("mobile.server.providers.updateTo", { version: runtime.availableVersion })
+                  : t(
+                      runtimeAction === "cancel"
+                        ? "mobile.server.providers.cancelDownload"
+                        : runtimeAction === "check"
+                          ? pending === "runtime"
+                            ? "mobile.server.providers.checking"
+                            : "mobile.server.providers.checkUpdates"
+                          : runtimeAction === "update"
+                            ? "mobile.server.providers.update"
+                            : runtimeAction === "retry"
+                              ? "mobile.server.providers.retry"
+                              : "mobile.server.providers.download",
+                    )}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+        </SettingsSection>
       ) : null}
     </SettingsContent>
   );
 }
 
-/** The accounts of the provider on the host. Each agent uses one; its settings choose which. */
+const PROMPT_CACHE_TTL_KEYS = {
+  "5m": "mobile.server.providers.promptCacheDefault",
+  "1h": "mobile.server.providers.promptCacheHour",
+} as const;
+
+/**
+ * How long Claude keeps the prompt cache of the host's agents (`prompt-cache-ttl-v1`), as the Cache
+ * section of the desktop Claude page. A change applies to the next Claude process on the host.
+ */
+function PromptCacheSection({
+  serverId,
+  setting,
+}: {
+  serverId: string;
+  setting: NonNullable<ProviderAdmin["promptCache"]>;
+}) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.providerPromptCache(queryScope, serverId);
+  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = t("mobile.server.providers.promptCache");
+  return (
+    <SettingsSection
+      footer={
+        error ??
+        (current.isError
+          ? errorMessage(current.error, t("mobile.server.providers.promptCacheLoadFailed"))
+          : t("mobile.server.providers.promptCacheHint"))
+      }
+    >
+      <SettingsRow
+        disclosure={false}
+        leading={<RowIcon icon={Clock} />}
+        trailing={
+          current.data ? (
+            <SettingsPicker<PromptCacheTtl>
+              value={current.data.ttl}
+              options={PROMPT_CACHE_TTLS.map((ttl) => ({ value: ttl, label: t(PROMPT_CACHE_TTL_KEYS[ttl]) }))}
+              enabled={!saving}
+              dark={theme === "dark"}
+              label={label}
+              onChange={(ttl) => {
+                if (ttl === current.data?.ttl) return;
+                setSaving(true);
+                setError(null);
+                setting
+                  .set(ttl)
+                  .then(async (saved) => {
+                    await queryClient.cancelQueries({ queryKey, exact: true });
+                    queryClient.setQueryData(queryKey, saved);
+                    void haptics.notification("success");
+                  })
+                  .catch((cause: unknown) => {
+                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
+                    void haptics.notification("error");
+                  })
+                  .finally(() => setSaving(false));
+              }}
+            />
+          ) : null
+        }
+      >
+        <Typography.Paragraph>{label}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** A picker value: `default` for Claude Code's own size, or a number of tokens as text. */
+type CompactWindowChoice = "default" | `${number}`;
+
+function compactWindowChoice(tokens: number | null): CompactWindowChoice {
+  return tokens === null ? "default" : `${tokens}`;
+}
+
+/**
+ * The size at which Claude Code compacts the chats of the host's agents (`claude-compact-window-v1`),
+ * as the Context section of the desktop Claude page. A change applies to the next Claude process on
+ * the host. A size that another client saved and that is not a choice here still shows.
+ */
+function CompactWindowSection({
+  serverId,
+  setting,
+}: {
+  serverId: string;
+  setting: NonNullable<ProviderAdmin["compactWindow"]>;
+}) {
+  const { t, format, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.providerCompactWindow(queryScope, serverId);
+  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = t("mobile.server.providers.compactWindow");
+  const options = claudeCompactWindowSizes(current.data?.tokens ?? null).map((size) => ({
+    value: compactWindowChoice(size),
+    label:
+      size === null
+        ? t("mobile.server.providers.compactWindowDefault")
+        : t("mobile.server.providers.compactWindowTokens", { size: format.compact(size) }),
+  }));
+  return (
+    <SettingsSection
+      footer={
+        error ??
+        (current.isError
+          ? errorMessage(current.error, t("mobile.server.providers.compactWindowLoadFailed"))
+          : t("mobile.server.providers.compactWindowHint"))
+      }
+    >
+      <SettingsRow
+        disclosure={false}
+        leading={<RowIcon icon={Minimize2} />}
+        trailing={
+          current.data ? (
+            <SettingsPicker<CompactWindowChoice>
+              value={compactWindowChoice(current.data.tokens)}
+              options={options}
+              enabled={!saving}
+              dark={theme === "dark"}
+              label={label}
+              onChange={(choice) => {
+                if (choice === compactWindowChoice(current.data?.tokens ?? null)) return;
+                setSaving(true);
+                setError(null);
+                setting
+                  .set(choice === "default" ? null : Number(choice))
+                  .then(async (next) => {
+                    await queryClient.cancelQueries({ queryKey, exact: true });
+                    queryClient.setQueryData(queryKey, next);
+                    void haptics.notification("success");
+                  })
+                  .catch((cause: unknown) => {
+                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
+                    void haptics.notification("error");
+                  })
+                  .finally(() => setSaving(false));
+              }}
+            />
+          ) : null
+        }
+      >
+        <Typography.Paragraph>{label}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/**
+ * The accounts of the provider on the host. Each agent uses one; its settings choose which. With the
+ * pool on, the agents share the accounts that are in the pool.
+ */
 function ProviderAccountsSection({
   serverId,
   provider,
@@ -455,6 +706,8 @@ function ProviderAccountsSection({
   canAdd,
   busy,
   onAdd,
+  pool,
+  onPoolChange,
 }: {
   serverId: string;
   provider: AgentProviderId;
@@ -462,19 +715,50 @@ function ProviderAccountsSection({
   canAdd: boolean;
   busy: boolean;
   onAdd: () => void;
+  /** The pool of the accounts, while it is on. */
+  pool: ProviderAccountPool | undefined;
+  /** Null when the host does not have the pool. */
+  onPoolChange: ((enabled: boolean) => void) | null;
 }) {
   const { t } = useText();
+  const { theme } = useUniwind();
   const accountName = useProviderAccountName();
+  // As on desktop: a saved key has no plan limit, so it is not a pool member. The switch shows when
+  // the provider has a second plan account to use, or the pool is on.
+  const planAccounts = accounts.filter((account) => account.id !== CLAUDE_API_KEY_ACCOUNT_ID);
+  const poolOffered = onPoolChange !== null && (planAccounts.length > 1 || Boolean(pool));
   return (
     <SettingsSection
       title={t("mobile.server.providers.accounts")}
-      footer={t(canAdd ? "mobile.server.providers.accountsHint" : "mobile.server.providers.accountsOnComputer")}
+      footer={t(
+        pool
+          ? canAdd
+            ? "mobile.server.providers.accountsPooledHint"
+            : "mobile.server.providers.accountsPooledOnComputer"
+          : canAdd
+            ? "mobile.server.providers.accountsHint"
+            : "mobile.server.providers.accountsOnComputer",
+      )}
     >
+      {poolOffered ? (
+        <SettingsRow leading={<RowIcon icon={Users} />} supportingText={t("mobile.server.providers.poolHint")}>
+          <SettingsSwitch
+            value={Boolean(pool)}
+            disabled={busy}
+            label={t("mobile.server.providers.pool")}
+            dark={theme === "dark"}
+            onValueChange={(enabled) => onPoolChange?.(enabled)}
+          />
+        </SettingsRow>
+      ) : null}
       {accounts.map((account, index) => {
         const name = accountName(account, index);
+        const leftOut = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && pool?.leftOut.includes(account.id) === true;
+        const inUse = !leftOut && pool?.inUse === account.id;
         return (
           <SettingsRow
             key={account.id}
+            leading={<RowIcon icon={UserRound} />}
             supportingText={account.email && account.email !== name ? account.email : undefined}
             trailing={<TrailingValue value={t(providerAccountStateKey(account.state))} />}
             onPress={() =>
@@ -484,285 +768,37 @@ function ProviderAccountsSection({
               })
             }
           >
-            <Typography.Paragraph numberOfLines={1}>{name}</Typography.Paragraph>
+            <View className="shrink flex-row items-center gap-2">
+              <Typography.Paragraph numberOfLines={1} className="shrink">
+                {name}
+              </Typography.Paragraph>
+              {leftOut || inUse ? (
+                <Chip
+                  size="sm"
+                  variant="soft"
+                  color={inUse ? "success" : "default"}
+                  className="self-center"
+                  accessibilityRole="text"
+                >
+                  <Chip.Label>
+                    {t(inUse ? "mobile.server.providers.inUse" : "mobile.server.providers.notInPool")}
+                  </Chip.Label>
+                </Chip>
+              ) : null}
+            </View>
           </SettingsRow>
         );
       })}
       {canAdd ? (
-        <SettingsRow disclosure={false} disabled={busy} onPress={onAdd}>
+        <SettingsRow
+          disclosure={false}
+          disabled={busy}
+          leading={<RowIcon icon={UserPlus} tone="accent" />}
+          onPress={onAdd}
+        >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.addAccount")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
     </SettingsSection>
-  );
-}
-
-/** Asks the host to end a sign-in. It answers with its status after it. */
-function cancelSignIn(admin: ProviderAdmin, provider: AgentProviderId, signIn: SignIn) {
-  if (signIn.kind === "relay") return admin.cancelRelay(signIn.flowId);
-  return admin.cancelCodeSignIn(provider);
-}
-
-function SignInSection({
-  signIn,
-  busy,
-  code,
-  address,
-  onCode,
-  onAddress,
-  onOpen,
-  onCopy,
-  onSubmitCode,
-  onSubmitAddress,
-  onCancel,
-}: {
-  signIn: SignIn;
-  busy: boolean;
-  code: string;
-  address: string;
-  onCode: (value: string) => void;
-  onAddress: (value: string) => void;
-  onOpen: (url: string) => void;
-  onCopy: (value: string) => void;
-  onSubmitCode: () => void;
-  onSubmitAddress: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useText();
-  const accent = String(useCSSVariable("--openbot-accent"));
-  // The host needs a moment to start the sign-in and to get the page. The row says what it waits for.
-  const waiting =
-    signIn.kind === "starting"
-      ? t("mobile.server.providers.starting")
-      : signIn.kind === "relay" && !signIn.page
-        ? t("mobile.server.providers.relayWaiting")
-        : null;
-  const url = signIn.kind === "starting" ? null : signIn.kind === "relay" ? (signIn.page?.url ?? null) : signIn.url;
-  const footer =
-    signIn.kind === "starting"
-      ? undefined
-      : signIn.kind === "code"
-        ? t("mobile.server.providers.codeHint")
-        : signIn.kind === "paste"
-          ? t("mobile.server.providers.pasteHint")
-          : signIn.kind === "link"
-            ? t("mobile.server.providers.linkHint")
-            : !signIn.page
-              ? undefined
-              : signIn.page.paste
-                ? t("mobile.server.providers.relayPasteHint")
-                : t("mobile.server.providers.linkHint");
-  return (
-    <>
-      <SettingsSection title={t("mobile.server.providers.signIn")} footer={footer}>
-        {waiting ? (
-          <SettingsRow disclosure={false} trailing={<Spinner size="sm" color={accent} />}>
-            <Typography.Paragraph className="text-grouped-secondary">{waiting}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {signIn.kind === "code" ? (
-          <SettingsRow
-            disclosure={false}
-            accessibilityLabel={t("mobile.server.providers.copyCode")}
-            trailing={
-              <Typography.Paragraph className="text-accent">{t("mobile.server.providers.copy")}</Typography.Paragraph>
-            }
-            onPress={() => onCopy(signIn.userCode)}
-          >
-            <Typography.Heading type="h4" selectable>
-              {signIn.userCode}
-            </Typography.Heading>
-          </SettingsRow>
-        ) : null}
-        {url ? (
-          <SettingsRow disclosure={false} onPress={() => onOpen(url)}>
-            <Typography.Paragraph className="text-accent">{t("mobile.server.providers.openPage")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {signIn.kind === "starting" ? null : (
-          <SettingsRow disclosure={false} disabled={busy} onPress={onCancel}>
-            <Typography.Paragraph className="text-danger-text">{t("common.cancel")}</Typography.Paragraph>
-          </SettingsRow>
-        )}
-      </SettingsSection>
-      {signIn.kind === "paste" ? (
-        <PastedValue
-          label={t("mobile.server.providers.code")}
-          value={code}
-          busy={busy}
-          onChange={onCode}
-          onSubmit={onSubmitCode}
-        />
-      ) : null}
-      {signIn.kind === "relay" && signIn.page?.paste ? (
-        <PastedValue
-          label={t("mobile.server.providers.address")}
-          value={address}
-          busy={busy}
-          onChange={onAddress}
-          onSubmit={onSubmitAddress}
-        />
-      ) : null}
-    </>
-  );
-}
-
-/** A code or an address that the user pastes back from the provider's page. */
-function PastedValue({
-  label,
-  value,
-  busy,
-  onChange,
-  onSubmit,
-}: {
-  label: string;
-  value: string;
-  busy: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  const { t } = useText();
-  return (
-    <>
-      <SheetFormField
-        label={label}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!busy}
-        value={value}
-        returnKeyType="done"
-        onChangeText={onChange}
-        onSubmitEditing={() => {
-          if (value.trim()) onSubmit();
-        }}
-      />
-      <SheetSaveAction
-        dirty={value.trim().length > 0}
-        canSave
-        pending={busy}
-        label={t("mobile.server.providers.finish")}
-        pendingLabel={t("mobile.server.providers.finishing")}
-        onSave={onSubmit}
-      />
-    </>
-  );
-}
-
-/** The provider's API key on the host. Only its state comes back; the input is cleared after a save. */
-function ProviderKeySection({
-  serverId,
-  admin,
-  provider,
-  onStatus,
-}: {
-  serverId: string;
-  admin: ProviderAdmin;
-  provider: AgentProviderId;
-  onStatus: (status: Awaited<ReturnType<ProviderAdmin["setKey"]>>) => Promise<void>;
-}) {
-  const { t, errorMessage } = useText();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerKey(queryScope, serverId, provider);
-  const keyState = useQuery({
-    queryKey,
-    retry: false,
-    staleTime: 0,
-    gcTime: 0,
-    queryFn: () => admin.keyState(provider),
-  });
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const locked = useRef(false);
-
-  async function change(operation: () => Promise<Awaited<ReturnType<ProviderAdmin["setKey"]>>>) {
-    if (locked.current) return;
-    locked.current = true;
-    setSaving(true);
-    setError(null);
-    try {
-      await onStatus(await operation());
-      setDraft("");
-      await queryClient.invalidateQueries({ queryKey, exact: true });
-      void haptics.notification("success");
-    } catch (cause) {
-      setError(errorMessage(cause, t("mobile.server.providers.keyFailed")));
-      void haptics.notification("error");
-    } finally {
-      locked.current = false;
-      setSaving(false);
-    }
-  }
-
-  const saved = keyState.data === "saved";
-  return (
-    <>
-      <SettingsSection
-        title={t("mobile.server.providers.apiKey")}
-        footer={
-          error ??
-          (keyState.isError
-            ? errorMessage(keyState.error, t("mobile.server.providers.keyLoadFailed"))
-            : keyState.data === "unreadable"
-              ? t("mobile.server.providers.keyUnreadable")
-              : t("mobile.server.providers.keyHint"))
-        }
-      >
-        <SettingsRow
-          disclosure={false}
-          trailing={
-            keyState.data ? (
-              <Typography.Paragraph className="text-grouped-secondary">
-                {t(saved ? "mobile.server.providers.keySaved" : "mobile.server.providers.keyMissing")}
-              </Typography.Paragraph>
-            ) : null
-          }
-        >
-          <Typography.Paragraph>{t("mobile.server.providers.keyState")}</Typography.Paragraph>
-        </SettingsRow>
-        {saved ? (
-          <SettingsRow
-            disclosure={false}
-            disabled={saving}
-            onPress={() =>
-              Alert.alert(currentText().t("mobile.server.providers.removeKeyTitle"), undefined, [
-                { text: currentText().t("common.cancel"), style: "cancel" },
-                {
-                  text: currentText().t("mobile.server.providers.removeKey"),
-                  style: "destructive",
-                  onPress: () => void change(() => admin.clearKey(provider)),
-                },
-              ])
-            }
-          >
-            <Typography.Paragraph className="text-danger-text">
-              {t("mobile.server.providers.removeKey")}
-            </Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-      </SettingsSection>
-      <SheetFormField
-        label={t(saved ? "mobile.server.providers.replaceKey" : "mobile.server.providers.newKey")}
-        placeholder={t("mobile.server.providers.keyPlaceholder")}
-        autoCapitalize="none"
-        autoCorrect={false}
-        secureTextEntry
-        editable={!saving}
-        maxLength={512}
-        value={draft}
-        onChangeText={(value) => {
-          setDraft(value);
-          setError(null);
-        }}
-      />
-      <SheetSaveAction
-        dirty={draft.trim().length > 0}
-        canSave
-        pending={saving}
-        label={t("mobile.server.providers.saveKey")}
-        onSave={() => void change(() => admin.setKey(provider, draft.trim()))}
-      />
-    </>
   );
 }

@@ -1,9 +1,12 @@
 import {
   type AgentProviderId,
   agentProviderName,
+  INSTALLER_PROVIDERS,
+  isInstallerProvider,
   isManagedRuntimeProvider,
   MANAGED_RUNTIME_PROVIDERS,
   type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
   type ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
@@ -25,6 +28,12 @@ import {
 } from "./provider-update-toast";
 
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
+/** Each provider that can have a download notification. */
+const DOWNLOADABLE_PROVIDERS = [...MANAGED_RUNTIME_PROVIDERS, ...INSTALLER_PROVIDERS];
+
+function downloadRuns(status: ProviderRuntimeStatus | undefined): boolean {
+  return status?.phase === "downloading" || status?.phase === "finishing";
+}
 
 /**
  * The runtime calls a joined server's host serves too. Removing a download is this computer's only,
@@ -44,6 +53,7 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.runtimeChecksum": "checksum_failed",
   "error.provider.installRecordMismatch": "checksum_failed",
   "error.provider.unexpectedVersion": "version_mismatch",
+  "error.provider.cpuUnsupported": "cpu_unsupported",
   "error.provider.cliUpdateFailed": "cli_update_failed",
   // The text of hosts before #4375, which named the copy's start failure this way.
   "error.provider.cliActivateFailed": "cli_activate_failed",
@@ -52,6 +62,8 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.cliSigningIn": "cli_signing_in",
   "error.provider.off": "provider_off",
   "status.provider.downloadStopped": "download_stopped",
+  "error.provider.hermesInstallFailed": "hermes_install_failed",
+  "error.provider.hermesNeedsGitCurl": "hermes_prerequisites",
 };
 
 /** The status message holds catalog text only, so its key names the reason without a path or a secret. */
@@ -101,6 +113,11 @@ export function createProviderRuntimeStore(
    * shows the runtime current: a sibling instance installed it, or a Retry elsewhere did.
    */
   const failed = new Set<AgentProviderId>();
+  /**
+   * Providers whose notification is for a first download. It has no offer before it and no version
+   * to come from, so the notification says "download" where an update says "update".
+   */
+  const installing = new Set<AgentProviderId>();
   /** What the user was last told about, so one offer is not announced twice. */
   let announced: ProviderUpdate[] = [];
   let disposed = false;
@@ -119,7 +136,28 @@ export function createProviderRuntimeStore(
           ? { ...runtime, version: runtime.version ?? systemVersion }
           : runtime,
       availableVersion,
+      ...(installing.has(provider) ? { install: true } : {}),
     };
+  }
+
+  function runtimeStatus(
+    provider: AgentProviderId,
+    snapshot: ProviderRuntimeSnapshot,
+  ): ProviderRuntimeStatus | undefined {
+    if (isManagedRuntimeProvider(provider)) return snapshot.providers[provider];
+    return isInstallerProvider(provider) ? snapshot.providers[provider] : undefined;
+  }
+
+  /**
+   * What the notification of a download says: a managed runtime, or an installer provider while
+   * the host offers its install. An installer provider has no version, so its download is always
+   * a first download.
+   */
+  function downloadUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate | null {
+    if (isManagedRuntimeProvider(provider)) return providerUpdate(provider, snapshot);
+    const runtime = runtimeStatus(provider, snapshot);
+    if (!runtime) return null;
+    return { provider, name: agentProviderName(provider), runtime, availableVersion: null, install: true };
   }
 
   /**
@@ -212,6 +250,23 @@ export function createProviderRuntimeStore(
         });
       }
     }
+    // An installer provider's install ends in "ready" when the agent status finds the CLI, or in an
+    // error that stays on its row.
+    for (const provider of INSTALLER_PROVIDERS) {
+      const previousPhase = current.providers[provider]?.phase;
+      if (previousPhase !== "downloading" && previousPhase !== "finishing") continue;
+      const next = snapshot.providers[provider];
+      // No status: the host no longer offers the install, which is not its end.
+      if (!next || next.phase === "downloading" || next.phase === "finishing" || next.phase === "not-downloaded")
+        continue;
+      desktopAnalytics.scope().track("provider_action", {
+        provider,
+        action: "download_completed",
+        ...(next.phase === "download-error"
+          ? { result: "failed", failure_code: downloadFailureCode(next.message) }
+          : { result: "succeeded" }),
+      });
+    }
     setProviderRuntimeSnapshot(snapshot);
     // Main updates the managed CLIs on its own after an app upgrade, with no notification. Only
     // its failure is shown, with a Retry. A first install has no version and shows its own failure.
@@ -222,30 +277,72 @@ export function createProviderRuntimeStore(
       const next = snapshot.providers[provider];
       if (next.phase !== "download-error" || next.version === null) continue;
       if (current.providers[provider].phase === "download-error") continue;
-      showProviderUpdateToast(providerUpdate(provider, snapshot), () => void downloadProviderRuntime(provider));
+      showProviderUpdateToast(providerUpdate(provider, snapshot), () => retryDownload(provider));
       failed.add(provider);
     }
-    for (const provider of updating) {
+    // A first download that the host started itself: a saved key of a provider that runs on Pi, or
+    // a custom endpoint. The user did not press Download, so the notification is the only sign.
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
+      if (updating.has(provider)) continue;
+      if (downloadRuns(current.providers[provider]) || !downloadRuns(snapshot.providers[provider])) continue;
       const update = providerUpdate(provider, snapshot);
+      if (update.runtime.version !== null) continue;
+      installing.add(provider);
+      updating.add(provider);
+      failed.delete(provider);
+      showProviderUpdateToast({ ...update, install: true }, () => retryDownload(provider));
+    }
+    for (const provider of updating) {
+      const update = downloadUpdate(provider, snapshot);
+      // The host stopped a first download, or offers the install no more: nothing is left to report.
+      const stopped =
+        installing.has(provider) &&
+        update?.runtime.phase === "not-downloaded" &&
+        downloadRuns(runtimeStatus(provider, current));
+      if (!update || stopped) {
+        updating.delete(provider);
+        installing.delete(provider);
+        dismissProviderUpdateToast(provider);
+        continue;
+      }
       if (update.runtime.phase === "not-downloaded" || (update.runtime.phase === "ready" && update.availableVersion))
         continue;
-      reportProviderUpdateToast(update, () => void downloadProviderRuntime(provider));
+      reportProviderUpdateToast(update, () => retryDownload(provider));
       // The report replaced whatever the notification said before, a failure included.
       if (update.runtime.phase === "download-error") failed.add(provider);
       else failed.delete(provider);
-      if (update.runtime.phase !== "downloading" && update.runtime.phase !== "finishing") updating.delete(provider);
+      if (update.runtime.phase !== "downloading" && update.runtime.phase !== "finishing") {
+        updating.delete(provider);
+        // A failure keeps its words for the Retry, which starts the same first download again.
+        if (update.runtime.phase !== "download-error") installing.delete(provider);
+      }
     }
     for (const provider of failed) {
-      if (updating.has(provider) || !isManagedRuntimeProvider(provider)) continue;
-      const previous = current.providers[provider];
-      const next = snapshot.providers[provider];
+      if (updating.has(provider)) continue;
+      const previous = runtimeStatus(provider, current);
+      const next = runtimeStatus(provider, snapshot);
       // Only the crossing into a current runtime: a failed check leaves a runtime that was ready
       // ready, and the next unrelated snapshot must not take that failure away.
-      if (next.phase !== "ready" || next.availableVersion) continue;
-      if (previous.phase === "ready" && previous.version === next.version) continue;
+      if (next?.phase !== "ready" || next.availableVersion) continue;
+      if (previous?.phase === "ready" && previous.version === next.version) continue;
       failed.delete(provider);
+      // The CLI is there now, so a later download of this provider is an update.
+      installing.delete(provider);
       hideProviderUpdateToast(provider);
     }
+  }
+
+  /**
+   * Reads the runtimes again after a change that can start a download on the host, such as a saved
+   * key of a provider that runs on Pi. A joined server's host sends no event for it.
+   */
+  function refreshProviderRuntimes(): void {
+    const source = api();
+    if (!source) return;
+    source
+      .getStatus()
+      .then((snapshot) => applyFrom(source, snapshot))
+      .catch(() => undefined);
   }
 
   /** Drops an answer that arrives after `api` moved to another computer. */
@@ -253,19 +350,29 @@ export function createProviderRuntimeStore(
     if (source === api()) applyProviderRuntimeSnapshot(snapshot);
   }
 
+  /** The notification's Retry. A first download also rejects, for the row; the notification shows it. */
+  function retryDownload(provider: AgentProviderId): void {
+    void downloadProviderRuntime(provider).catch(() => undefined);
+  }
+
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
     // A custom agent is the user's own command: OpenBot downloads nothing for it.
-    if (!isManagedRuntimeProvider(provider)) return;
+    if (!isManagedRuntimeProvider(provider) && !isInstallerProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
-    const update = providerUpdate(provider);
-    const isUpdate = update.availableVersion !== null;
-    if (isUpdate) {
+    // A first download has no installed version. The user started it, on this computer or on a joined
+    // server's host, and can leave the row that shows its progress: the notification stays. A provider
+    // that its own installer installs has no version and no update, so its download is always a first one.
+    if (downloadUpdate(provider)?.runtime.version === null) installing.add(provider);
+    else installing.delete(provider);
+    const update = downloadUpdate(provider);
+    const isUpdate = update !== null && (update.availableVersion !== null || update.install === true);
+    if (update && isUpdate) {
       updating.add(provider);
       failed.delete(provider);
       showProviderUpdateToast(
         { ...update, runtime: { ...update.runtime, phase: "downloading", progress: 0, message: null } },
-        () => void downloadProviderRuntime(provider),
+        () => retryDownload(provider),
       );
     }
     const analytics = desktopAnalytics.scope();
@@ -279,7 +386,7 @@ export function createProviderRuntimeStore(
         result: "failed",
         failure_code: "download_failed",
       });
-      if (isUpdate) {
+      if (update && isUpdate) {
         updating.delete(provider);
         if (!disposed)
           reportProviderUpdateToast(
@@ -288,12 +395,17 @@ export function createProviderRuntimeStore(
               runtime: {
                 ...update.runtime,
                 phase: "download-error",
-                message: currentText().t("update.provider.startFailed"),
+                // A first download is not an update, so its notification gives the reason itself.
+                message: update.install
+                  ? currentText().errorMessage(error, currentText().t("update.provider.downloadFailedRetry"))
+                  : currentText().t("update.provider.startFailed"),
               },
             },
-            () => void downloadProviderRuntime(provider),
+            () => retryDownload(provider),
           );
         failed.add(provider);
+        // The caller of a first download shows the failure on its row too, as it did before.
+        if (update.install) throw error;
         return;
       }
       throw error;
@@ -302,11 +414,12 @@ export function createProviderRuntimeStore(
 
   async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
     // A custom agent is the user's own command: OpenBot downloads nothing for it.
-    if (!isManagedRuntimeProvider(provider)) return;
+    if (!isManagedRuntimeProvider(provider) && !isInstallerProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const snapshot = await source.cancel(provider);
     updating.delete(provider);
+    installing.delete(provider);
     dismissProviderUpdateToast(provider);
     applyFrom(source, snapshot);
     desktopAnalytics.scope().track("provider_action", {
@@ -357,7 +470,8 @@ export function createProviderRuntimeStore(
       // Another computer: its revisions count from its own start, and nothing shown so far is its.
       updating.clear();
       failed.clear();
-      for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
+      installing.clear();
+      for (const provider of DOWNLOADABLE_PROVIDERS) hideProviderUpdateToast(provider);
       setProviderRuntimeSnapshot(FALLBACK_PROVIDER_RUNTIMES);
     }
     if (!source) return;
@@ -374,7 +488,7 @@ export function createProviderRuntimeStore(
       disposed = true;
       updating.clear();
       // Hidden, not dismissed: the offer outlives the workspace this store was built for.
-      for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
+      for (const provider of DOWNLOADABLE_PROVIDERS) hideProviderUpdateToast(provider);
     };
   });
   return {
@@ -390,6 +504,7 @@ export function createProviderRuntimeStore(
       Object.fromEntries(PROVIDERS.map((provider) => [provider, providerUpdate(provider).availableVersion])),
     providerRuntimeDownloadsAvailable: () => Boolean(api()),
     applyProviderRuntimeSnapshot,
+    refreshProviderRuntimes,
     startProviderUpdate,
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,

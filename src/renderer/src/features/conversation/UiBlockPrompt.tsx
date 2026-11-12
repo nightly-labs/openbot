@@ -1,6 +1,7 @@
 import { type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  UI_API_KEY_SCOPE_FIELD_ID,
   UI_BLOCK_SUBMIT_ACTION_ID,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -181,10 +182,17 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     </Show>
   );
 
+  /** The `request_api_key` form shows its choice of who can use the key small, next to the submit button. */
+  function footerFieldId() {
+    if (props.block.apiKey) return UI_API_KEY_SCOPE_FIELD_ID;
+    return undefined;
+  }
+
   function uiBlockCard() {
     return (
       <UiBlockingBlock
         spec={props.block.spec}
+        footerFieldId={footerFieldId()}
         state={state()}
         busy={busy()}
         error={error()}

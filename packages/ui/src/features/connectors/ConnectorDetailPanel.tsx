@@ -18,6 +18,11 @@ import {
   type OnePasswordConnectorPanelProps,
 } from "../settings/OnePasswordConnectorPanel";
 import {
+  ProtonPassConnectorPanel,
+  type ProtonPassConnectorPanelProps,
+  protonPassStatus,
+} from "../settings/ProtonPassConnectorPanel";
+import {
   messagingPlatformText,
   messagingStateUnknown,
   SlackIntegrationPanel,
@@ -31,6 +36,12 @@ import {
   telegramIntegrationState,
   telegramOrchestrator,
 } from "../settings/TelegramIntegrationPanel";
+import {
+  WhatsAppIntegrationPanel,
+  type WhatsAppIntegrationPanelProps,
+  whatsappIntegrationState,
+  whatsappOrchestrator,
+} from "../settings/WhatsAppIntegrationPanel";
 
 /**
  * The page of one connector, with its live state and actions, as Marketplace › Apps shows it. Read the props through getters, so the page follows them.
@@ -39,8 +50,10 @@ export type ConnectorDetail =
   | { id: "github"; props: GitHubConnectorPanelProps }
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
   | { id: "bitwarden"; props: BitwardenConnectorPanelProps }
+  | { id: "protonpass"; props: ProtonPassConnectorPanelProps }
   | { id: "slack" | "discord"; props: SlackIntegrationPanelProps }
-  | { id: "telegram"; props: TelegramIntegrationPanelProps };
+  | { id: "telegram"; props: TelegramIntegrationPanelProps }
+  | { id: "whatsapp"; props: WhatsAppIntegrationPanelProps };
 
 /** What a list of connectors shows for one connector: its status and one line about it. */
 export interface ConnectorSummary {
@@ -101,6 +114,24 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         summary: host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description"),
       };
     }
+    case "protonpass": {
+      if (detail.props.statusError) return unknownSummary(t);
+      const status = detail.props.status;
+      const header = protonPassStatus(detail.props);
+      const host = detail.props.hostName;
+      return {
+        status: header.status,
+        statusLabel: t(header.label),
+        summary:
+          header.status === "attention"
+            ? t("connector.protonPass.expiredTitle")
+            : status.state === "connected" && status.loginCount !== null
+              ? t("connector.protonPass.loginCount", { count: status.loginCount })
+              : host
+                ? t("connector.protonPass.descriptionHost", { host })
+                : t("connector.protonPass.description"),
+      };
+    }
     case "slack":
     case "discord": {
       if (messagingStateUnknown(detail.props)) return unknownSummary(t);
@@ -158,6 +189,26 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         agents: orchestrator ? [orchestrator] : [],
       };
     }
+    case "whatsapp": {
+      if (messagingStateUnknown(detail.props)) return unknownSummary(t);
+      const { connections, agents } = detail.props;
+      const state = whatsappIntegrationState(connections, agents);
+      const orchestrator = whatsappOrchestrator(connections, agents);
+      const count = connections.length;
+      return {
+        status: state.status,
+        statusLabel: t(state.label),
+        summary:
+          state.attention > 0
+            ? t("connector.whatsapp.attentionTitle", { count: state.attention })
+            : count === 0
+              ? t("connector.whatsapp.description")
+              : orchestrator
+                ? t("connector.whatsapp.summaryConnected", { count })
+                : t("connector.whatsapp.summaryNoAgent", { count }),
+        agents: orchestrator ? [orchestrator] : [],
+      };
+    }
   }
 }
 
@@ -176,11 +227,17 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
       const host = detail.props.hostName;
       return host ? t("connector.bitwarden.descriptionHost", { host }) : t("connector.bitwarden.description");
     }
+    case "protonpass": {
+      const host = detail.props.hostName;
+      return host ? t("connector.protonPass.descriptionHost", { host }) : t("connector.protonPass.description");
+    }
     case "slack":
     case "discord":
       return t(messagingPlatformText(detail.id).description);
     case "telegram":
       return t("connector.telegram.description");
+    case "whatsapp":
+      return t("connector.whatsapp.description");
   }
 }
 
@@ -192,8 +249,10 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
   const github = () => (props.detail.id === "github" ? props.detail : undefined);
   const onePassword = () => (props.detail.id === "onepassword" ? props.detail : undefined);
   const bitwarden = () => (props.detail.id === "bitwarden" ? props.detail : undefined);
+  const protonPass = () => (props.detail.id === "protonpass" ? props.detail : undefined);
   const workspace = () => (props.detail.id === "slack" || props.detail.id === "discord" ? props.detail : undefined);
   const telegram = () => (props.detail.id === "telegram" ? props.detail : undefined);
+  const whatsapp = () => (props.detail.id === "whatsapp" ? props.detail : undefined);
   return (
     <Switch>
       <Match when={github()}>
@@ -226,6 +285,16 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
           />
         )}
       </Match>
+      <Match when={protonPass()}>
+        {(detail) => (
+          <ProtonPassConnectorPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
       <Match when={workspace()}>
         {(detail) => (
           <SlackIntegrationPanel
@@ -240,6 +309,16 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
       <Match when={telegram()}>
         {(detail) => (
           <TelegramIntegrationPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={whatsapp()}>
+        {(detail) => (
+          <WhatsAppIntegrationPanel
             {...detail().props}
             tagline={props.tagline}
             intro={props.intro}

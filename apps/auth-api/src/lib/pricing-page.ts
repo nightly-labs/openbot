@@ -6,6 +6,9 @@ import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers"
 
 export const PRICING_ROUTE = "/pricing";
 
+/** The social image. Its alt text is the `sitePage.pricing.imageAlt` key. */
+export const PRICING_SOCIAL_IMAGE_PATH = "/social/pricing.jpg";
+
 /** The plans that no new server can take. Servers that have one keep it. */
 export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set(["starter"]);
 

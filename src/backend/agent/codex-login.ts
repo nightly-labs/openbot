@@ -8,12 +8,14 @@ import { causeHelpers } from "../effect-boundary";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
+  CODEX_MODEL_PROVIDER_ACCOUNT_TYPE,
   decodeAccountDeviceCodeLoginStartResult,
   decodeAccountLoginStartResult,
-  decodeAccountReadResult,
+  decodeCodexAccountReadResult,
   decodeRecordResponse,
   isCodexLoginType,
 } from "./../protocol";
+import { ProviderSignInError, signInReason } from "../provider-client-effects";
 import { recordRestartActivity } from "../restart-activity";
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -150,11 +152,15 @@ export class CodexLoginFlow {
             .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
             .pipe(toCodexLoginFailed);
           const { account } = yield* client
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+            .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
             .pipe(toCodexLoginFailed);
           if (account?.type !== "apiKey") {
             return yield* new CodexLoginFailed({
-              cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
+              cause: new Error(
+                account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE
+                  ? sourceText("error.provider.codexModelProvider")
+                  : sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" }),
+              ),
             });
           }
         }),
@@ -175,14 +181,27 @@ export class CodexLoginFlow {
     clearTimeout(pending.timer);
 
     if (!completion.success) {
-      yield* this.#fail(pending, "ChatGPT connection was not completed. Try again.");
+      const reason = signInReason(completion.error);
+      yield* this.#fail(
+        pending,
+        reason
+          ? new ProviderSignInError({ message: sourceText("error.provider.acpSignInFailedReason", { reason }) })
+          : "ChatGPT connection was not completed. Try again.",
+      );
       return;
     }
 
     yield* Effect.gen({ self: this }, function* () {
       const account = yield* pending.client
-        .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+        .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
         .pipe(toCodexLoginFailed);
+      // Codex kept the login, but its model provider does not use it.
+      if (account.account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) {
+        return yield* this.#fail(
+          pending,
+          new ProviderSignInError({ message: sourceText("error.provider.codexModelProvider") }),
+        );
+      }
       if (account.account?.type !== "chatgpt") {
         return yield* new CodexLoginFailed({
           cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
@@ -248,7 +267,7 @@ export class CodexLoginFlow {
     const activated = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         const result = yield* pending.client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+          .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
           .pipe(toCodexLoginFailed);
         const account = result.account;
         if (account?.type !== "chatgpt") return false;
@@ -292,7 +311,7 @@ export class CodexLoginFlow {
             yield* initializeLoginClient(client);
             if (!this.#host.hasActiveClient()) {
               const existing = yield* client
-                .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+                .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
                 .pipe(
                   toCodexLoginFailed,
                   // An expired sign-in fails this check too, such as "workspace routing discovery
@@ -350,14 +369,14 @@ export class CodexLoginFlow {
   readonly #fail = Effect.fn("CodexLogin.fail")(function* (
     this: CodexLoginFlow,
     pending: PendingCodexLogin,
-    message: string,
+    failure: string | ProviderSignInError,
   ) {
     if (this.#pending !== pending) return;
     clearTimeout(pending.timer);
     this.#pending = null;
     end(pending, false);
     yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
-    this.#host.setFailure(new Error(message), pending.cli.version);
+    this.#host.setFailure(typeof failure === "string" ? new Error(failure) : failure, pending.cli.version);
   }, Effect.uninterruptible);
 }
 

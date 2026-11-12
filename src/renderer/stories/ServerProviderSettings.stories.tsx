@@ -5,7 +5,9 @@ import {
   type CustomProviderRestart,
   type CustomProviderSummary,
   isManagedRuntimeProvider,
+  type ProviderAccountPool,
   type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
   type ServerSummary,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
@@ -13,11 +15,13 @@ import { Toaster, toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { ServerSettingsModal } from "../src/features/servers/ServerSettingsModal";
+import type { HostProviderSettings } from "../src/features/settings/ProviderSettingsSection";
 import { STORY_HOST_STATUS, STORY_INVITES, STORY_PRESENCE, STORY_SERVERS } from "../src/preview/fixtures";
 import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { createMockOpenBot } from "./mock-openbot";
@@ -25,6 +29,7 @@ import { createFakeConnection } from "./provider-connection-fixture";
 import { SettingsPageStory } from "./settings-page-story";
 
 const localServer = localStoryServer();
+const teamServer = STORY_SERVERS.find((candidate) => candidate.kind === "remote") ?? localServer;
 
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
@@ -51,6 +56,9 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "not-downloaded", progress: null, message: null, version: null },
   pi: { phase: "not-downloaded", progress: null, message: null, version: null },
   muse: { phase: "not-downloaded", progress: null, message: null, version: null },
+  devin: { phase: "not-downloaded", progress: null, message: null, version: null },
+  copilot: { phase: "not-downloaded", progress: null, message: null, version: null },
+  mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -63,6 +71,13 @@ const providerUpdateAgentStatus: AgentStatus = {
     version: id === "claude" ? "2.1.246" : "1.0.0",
     message: null,
   })),
+};
+/** The same, before Codex has a CLI. */
+const firstDownloadAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "not-installed", version: null } : provider,
+  ),
 };
 /** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
 const openCodeInstalledAgentStatus: AgentStatus = {
@@ -110,6 +125,33 @@ function createUsageResetAccounts(): ProviderAccountActions {
   };
 }
 
+/**
+ * Codex accounts that the pool can share. The switch turns the pool on, and the ⋯ menu of an account
+ * leaves it out or puts it back. The first account in the pool is in use.
+ */
+function createPoolAccounts() {
+  const [pool, setPool] = createSignal<ProviderAccountPool | undefined>(undefined);
+  const accounts = usageResetAgentStatus.providers?.find((provider) => provider.id === "codex")?.accounts ?? [];
+  const actions: ProviderAccountActions = {
+    connect: fn(async () => undefined),
+    cancel: fn(async () => undefined),
+    rename: fn(async () => undefined),
+    remove: fn(async () => undefined),
+    setPool: fn(async (_provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => {
+      const inUse = accounts.find((account) => !leftOut.includes(account.id))?.id ?? null;
+      setPool(enabled ? { leftOut: [...leftOut], inUse } : undefined);
+    }),
+  };
+  const agentStatus = (): AgentStatus => ({
+    ...usageResetAgentStatus,
+    providers: (usageResetAgentStatus.providers ?? []).map((provider) => {
+      const current = pool();
+      return provider.id === "codex" && current ? { ...provider, accountPool: current } : provider;
+    }),
+  });
+  return { actions, agentStatus };
+}
+
 /** ChatGPT installed and signed out, so its row offers both ways in. The rest are connected. */
 const codeSignInAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -119,6 +161,27 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
+/**
+ * Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. The host status
+ * does not carry the key, so only the key route says it is saved.
+ */
+const hostCodexKeyAgentStatus: AgentStatus = {
+  ...codeSignInAgentStatus,
+  providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex" ? { ...provider, state: "available", message: null } : provider,
+  ),
+};
+/** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
+function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
+  return {
+    readsCodexKey: true,
+    onHost: true,
+    getProviderApiKeyState: async (provider) => ({ provider, status: provider === "codex" ? codex : "missing" }),
+    setProviderApiKey: fn(async () => undefined),
+    clearProviderApiKey: fn(async () => undefined),
+    openExternal: fn(async () => undefined),
+  };
+}
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -136,6 +199,24 @@ const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
     models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
   },
 ];
+/**
+ * The endpoints of a joined server's host, as `custom-provider-edit-v1` lists them: each one names its
+ * harness and its header names. The model limits stay on the host.
+ */
+const STORY_HOST_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
+  {
+    id: "aperture",
+    name: "Aperture",
+    baseUrl: "https://aperture.example.com/v1",
+    hasApiKey: true,
+    headerNames: ["X-Tenant"],
+    models: [
+      { id: "qwen3-coder", name: "Qwen3 Coder" },
+      { id: "glm-4.6", name: "GLM 4.6" },
+    ],
+    harness: "pi",
+  },
+];
 const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
@@ -147,6 +228,9 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   kimi: { phase: "ready", progress: 100, message: null, version: "1.52.0" },
   pi: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
   muse: { phase: "ready", progress: 100, message: null, version: "3.0.68" },
+  devin: { phase: "ready", progress: 100, message: null, version: "3000.11.234" },
+  copilot: { phase: "ready", progress: 100, message: null, version: "1.0.105" },
+  mistral: { phase: "ready", progress: 100, message: null, version: "3.1.0" },
 };
 
 /** The Providers section of Server settings, with the providers of this computer. */
@@ -154,6 +238,8 @@ function ServerProvidersStory(props: {
   providerDownloads?: boolean;
   providerUpdate?: boolean;
   providerUpdateFailure?: boolean;
+  /** Codex has no CLI yet. Needs `providerUpdate`, which gives the real runtime store. */
+  providerFirstDownload?: boolean;
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   codeSignIn?: boolean;
@@ -170,15 +256,53 @@ function ServerProvidersStory(props: {
   providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
   /** Codex accounts with usage reset credits: the account ⋯ menu offers Reset usage. */
   usageReset?: boolean;
+  /** Codex accounts that the pool can share. */
+  accountPool?: boolean;
+  /**
+   * The Hermes row: `null` is a host that sends no installer status, so the row opens the install
+   * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
+   */
+  hermes?: ProviderRuntimeStatus | null;
+  /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
+  hostCodexKey?: "missing" | "saved";
+  /**
+   * A joined server with saved endpoints: `edit` is a host with `custom-provider-edit-v1`, and
+   * `remove-only` is an older host, which offers Remove only.
+   */
+  hostCustomProviders?: "edit" | "remove-only";
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
+  const poolAccounts = props.accountPool ? createPoolAccounts() : undefined;
+  const hermes = props.hermes;
+  const hermesAgentStatus: AgentStatus | undefined =
+    hermes === undefined
+      ? undefined
+      : {
+          ...providerAgentStatus,
+          providers: [
+            ...(providerAgentStatus.providers ?? []),
+            {
+              id: "hermes",
+              state: hermes?.phase === "ready" ? "sign-in-required" : "not-installed",
+              version: hermes?.phase === "ready" ? hermes.version : null,
+              message: null,
+            },
+          ],
+        };
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
     ...(props.providerUpdate
       ? {
           providerRuntimeSnapshot: {
             revision: 0,
-            providers: providerUpdateRuntimeStatuses,
+            providers: props.providerFirstDownload
+              ? {
+                  ...providerUpdateRuntimeStatuses,
+                  codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+                  // No update offer here: its notification would cover the one for the download.
+                  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
+                }
+              : providerUpdateRuntimeStatuses,
             toolRuntimes: { bun: { phase: "ready", progress: 100, message: null, version: "1.4.2" } },
           },
         }
@@ -201,7 +325,11 @@ function ServerProvidersStory(props: {
   const codeConnection = createFakeConnection({ browser: fn(), finishAfterMs: 0 });
   const browserConnection = createFakeConnection({ browser: fn(), alternative: [] });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
-    props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
+    props.hostCustomProviders
+      ? [...STORY_HOST_CUSTOM_PROVIDERS]
+      : props.customProviderList
+        ? [...STORY_CUSTOM_PROVIDERS]
+        : [],
   );
   const [detectionSettings, setDetectionSettings] = createSignal(props.detectionSettings);
   const [offProviders, setOffProviders] = createSignal(props.offProviders);
@@ -248,6 +376,118 @@ function ServerProvidersStory(props: {
     return "restarted";
   }
 
+  // Named values, not ternary props: the modal reads its props in effect callbacks, where a
+  // compiled ternary prop cannot create its memo.
+  const switchToManageProviders = props.inactive ? fn() : undefined;
+  function storyServer(): ServerSummary {
+    if (props.hostCodexKey || props.hostCustomProviders) return { ...teamServer, active: true };
+    return props.inactive ? { ...localServer, active: false } : localServer;
+  }
+
+  function providerOptions(): HostProviderSettings | undefined {
+    if (props.inactive) return undefined;
+    return {
+      get defaultProvider() {
+        return {
+          ...preference(),
+          save: async (provider: AgentProviderId, model?: string | null) => {
+            setPreference((current) => ({
+              completed: true,
+              preferredProvider: provider,
+              preferredModel:
+                model === undefined && current.preferredProvider === provider
+                  ? current.preferredModel
+                  : (model ?? null),
+            }));
+          },
+        };
+      },
+      get agentStatus() {
+        if (hermesAgentStatus) return hermesAgentStatus;
+        if (poolAccounts) return poolAccounts.agentStatus();
+        if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
+        return props.usageReset
+          ? usageResetAgentStatus
+          : props.codeSignIn
+            ? codeSignInAgentStatus
+            : props.providerFirstDownload
+              ? firstDownloadAgentStatus
+              : props.providerUpdate
+                ? providerUpdateAgentStatus
+                : props.openCodeInstalled
+                  ? openCodeInstalledAgentStatus
+                  : providerAgentStatus;
+      },
+      connection:
+        props.codeSignIn || hermes !== undefined
+          ? codeConnection
+          : props.providerDownloads || props.providerUpdate
+            ? browserConnection
+            : undefined,
+      get providerRuntimeStatuses() {
+        if (hermes !== undefined) return hermes ? { ...providerRuntimeStatuses, hermes } : providerRuntimeStatuses;
+        return props.providerUpdate
+          ? runtimes.providerRuntimeStatuses()
+          : props.providerDownloads
+            ? providerRuntimeStatuses
+            : undefined;
+      },
+      get providerAvailableVersions() {
+        return props.providerUpdate ? runtimes.providerAvailableVersions() : undefined;
+      },
+      onUpdateProvider: props.providerUpdate ? runtimes.downloadProviderRuntime : undefined,
+      onDownloadProvider: props.providerUpdate
+        ? runtimes.downloadProviderRuntime
+        : props.providerDownloads || hermes !== undefined
+          ? fn()
+          : undefined,
+      onCancelProviderDownload: props.providerUpdate
+        ? runtimes.cancelProviderRuntimeDownload
+        : props.providerDownloads || hermes !== undefined
+          ? fn()
+          : undefined,
+      accountActions: poolAccounts?.actions ?? usageResetAccounts,
+      providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
+      onAddCustomProvider: addCustomProvider,
+      onDeleteCustomProvider: deleteCustomProvider,
+      onUpdateCustomProvider: props.hostCustomProviders === "remove-only" ? undefined : updateCustomProvider,
+      get customProviders() {
+        return customProviders();
+      },
+      get providerDetection() {
+        return detection?.detection();
+      },
+      detectedProviderApi: detection?.api,
+      get detectionSettings() {
+        return detectionSettings();
+      },
+      onDetectionSettingsChange: setDetectionSettings,
+      get offProviders() {
+        return offProviders();
+      },
+      providerUsers: props.providerUsers,
+      onSetProviderOn: props.offProviders
+        ? (provider: AgentProviderId, on: boolean) => {
+            setOffProviders((current = []) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
+          }
+        : undefined,
+      onMeasureProviderDownload:
+        props.offProviders && props.providerUpdate
+          ? async (provider: AgentProviderId) =>
+              isManagedRuntimeProvider(provider)
+                ? await mock.api.providerRuntimes.measureDownload(provider)
+                : { bytes: 0, versions: 0 }
+          : undefined,
+      onRemoveProviderDownload:
+        props.offProviders && props.providerUpdate
+          ? async (provider: AgentProviderId) => {
+              if (!isManagedRuntimeProvider(provider)) return;
+              runtimes.applyProviderRuntimeSnapshot(await mock.api.providerRuntimes.removeDownload(provider));
+            }
+          : undefined,
+    };
+  }
+
   return (
     <>
       <SettingsPageStory title="Server settings" onEscape={() => setOpen(false)}>
@@ -256,7 +496,7 @@ function ServerProvidersStory(props: {
             page={page()}
             open={open()}
             platform="darwin"
-            server={props.inactive ? { ...localServer, active: false } : localServer}
+            server={storyServer()}
             hostStatus={STORY_HOST_STATUS}
             members={STORY_PRESENCE.members}
             invites={STORY_INVITES}
@@ -273,107 +513,11 @@ function ServerProvidersStory(props: {
             onRecheckScreenRecording={fn(async () => undefined)}
             initialSection="providers"
             hostPromptCacheTtl={{}}
-            onSwitchToManageProviders={props.inactive ? fn() : undefined}
-            providers={
-              props.inactive
-                ? undefined
-                : {
-                    get defaultProvider() {
-                      return {
-                        ...preference(),
-                        save: async (provider: AgentProviderId, model?: string | null) => {
-                          setPreference((current) => ({
-                            completed: true,
-                            preferredProvider: provider,
-                            preferredModel:
-                              model === undefined && current.preferredProvider === provider
-                                ? current.preferredModel
-                                : (model ?? null),
-                          }));
-                        },
-                      };
-                    },
-                    get agentStatus() {
-                      return props.usageReset
-                        ? usageResetAgentStatus
-                        : props.codeSignIn
-                          ? codeSignInAgentStatus
-                          : props.providerUpdate
-                            ? providerUpdateAgentStatus
-                            : props.openCodeInstalled
-                              ? openCodeInstalledAgentStatus
-                              : providerAgentStatus;
-                    },
-                    connection: props.codeSignIn
-                      ? codeConnection
-                      : props.providerDownloads || props.providerUpdate
-                        ? browserConnection
-                        : undefined,
-                    get providerRuntimeStatuses() {
-                      return props.providerUpdate
-                        ? runtimes.providerRuntimeStatuses()
-                        : props.providerDownloads
-                          ? providerRuntimeStatuses
-                          : undefined;
-                    },
-                    get providerAvailableVersions() {
-                      return props.providerUpdate ? runtimes.providerAvailableVersions() : undefined;
-                    },
-                    onUpdateProvider: props.providerUpdate ? runtimes.downloadProviderRuntime : undefined,
-                    onDownloadProvider: props.providerUpdate
-                      ? runtimes.downloadProviderRuntime
-                      : props.providerDownloads
-                        ? fn()
-                        : undefined,
-                    onCancelProviderDownload: props.providerUpdate
-                      ? runtimes.cancelProviderRuntimeDownload
-                      : props.providerDownloads
-                        ? fn()
-                        : undefined,
-                    accountActions: usageResetAccounts,
-                    onAddCustomProvider: addCustomProvider,
-                    onDeleteCustomProvider: deleteCustomProvider,
-                    onUpdateCustomProvider: updateCustomProvider,
-                    get customProviders() {
-                      return customProviders();
-                    },
-                    get providerDetection() {
-                      return detection?.detection();
-                    },
-                    detectedProviderApi: detection?.api,
-                    get detectionSettings() {
-                      return detectionSettings();
-                    },
-                    onDetectionSettingsChange: setDetectionSettings,
-                    get offProviders() {
-                      return offProviders();
-                    },
-                    providerUsers: props.providerUsers,
-                    onSetProviderOn: props.offProviders
-                      ? (provider: AgentProviderId, on: boolean) => {
-                          setOffProviders((current = []) =>
-                            on ? current.filter((id) => id !== provider) : [...current, provider],
-                          );
-                        }
-                      : undefined,
-                    onMeasureProviderDownload:
-                      props.offProviders && props.providerUpdate
-                        ? async (provider: AgentProviderId) =>
-                            isManagedRuntimeProvider(provider)
-                              ? await mock.api.providerRuntimes.measureDownload(provider)
-                              : { bytes: 0, versions: 0 }
-                        : undefined,
-                    onRemoveProviderDownload:
-                      props.offProviders && props.providerUpdate
-                        ? async (provider: AgentProviderId) => {
-                            if (!isManagedRuntimeProvider(provider)) return;
-                            runtimes.applyProviderRuntimeSnapshot(
-                              await mock.api.providerRuntimes.removeDownload(provider),
-                            );
-                          }
-                        : undefined,
-                  }
-            }
+            claudeUserSetup={{}}
+            claudeCompactWindow={{}}
+            hostModelVisibility={{}}
+            onSwitchToManageProviders={switchToManageProviders}
+            providers={providerOptions()}
           />
         )}
       </SettingsPageStory>
@@ -486,6 +630,30 @@ export const CodeSignIn: Story = {
   render: () => <ServerProvidersStory codeSignIn />,
 };
 
+/** A joined server with `codex-api-key-v1`: the signed-out Codex row offers API key next to Connect. */
+export const HostCodexKey: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="missing" />,
+};
+
+/** The same server after the key: Codex on the host uses the OpenAI API key. */
+export const HostCodexKeySaved: Story = {
+  render: () => <ServerProvidersStory hostCodexKey="saved" />,
+};
+
+/**
+ * A joined server whose host has `custom-provider-edit-v1`. Open the endpoint list: each endpoint
+ * offers Edit. The form changes the name, address, models, key and headers; the host keeps the
+ * harness and the model limits.
+ */
+export const HostCustomProviderEdit: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="edit" />,
+};
+
+/** The same server on an older host: the endpoint list offers Remove only. */
+export const HostCustomProviderRemoveOnly: Story = {
+  render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="remove-only" />,
+};
+
 export const ProviderDownloads: Story = {
   render: () => <ServerProvidersStory providerDownloads />,
   parameters: { viewport: { defaultViewport: "serverPhone" } },
@@ -501,9 +669,17 @@ export const ProviderUpdateRetry: Story = {
 };
 
 /**
+ * Open ChatGPT: the page shows only the download. Press Download: the notification and the card show
+ * the progress, and the other sections come when the download ends.
+ */
+export const ProviderFirstDownload: Story = {
+  render: () => <ServerProvidersStory providerUpdate providerFirstDownload />,
+};
+
+/**
  * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on. Open Cursor: its Download section offers Remove download,
- * and after it the list reads "Off · Not downloaded".
+ * Codex and Claude, so those switches stay on. Open Cursor: its Danger zone offers Delete, and after
+ * it the list reads "Off · Not downloaded".
  */
 export const ProvidersOff: Story = {
   render: () => (
@@ -521,6 +697,36 @@ export const ProvidersOff: Story = {
  */
 export const CodexUsageReset: Story = {
   render: () => <ServerProvidersStory usageReset />,
+};
+
+/**
+ * Open Codex: two accounts show the Pool accounts switch, off at first. On, agents use one account
+ * until it nears a usage limit. The ⋯ menu of an account leaves it out of the pool or puts it back.
+ */
+export const AccountPool: Story = {
+  render: () => <ServerProvidersStory accountPool />,
+};
+
+/** A host that sends no Hermes installer status, such as a Windows host: the row opens the install guide. */
+export const HermesInstallGuide: Story = {
+  render: () => <ServerProvidersStory hermes={null} />,
+};
+
+/** The host can run the Hermes installer: the row offers Download. */
+export const HermesDownload: Story = {
+  render: () => (
+    <ServerProvidersStory hermes={{ phase: "not-downloaded", progress: null, message: null, version: null }} />
+  ),
+};
+
+/** The installer runs one stage at a time, and each stage moves the bar. Cancel stops it. */
+export const HermesInstalling: Story = {
+  render: () => <ServerProvidersStory hermes={{ phase: "downloading", progress: 25, message: null, version: null }} />,
+};
+
+/** Hermes is installed: the row offers Connect, which signs in with the Nous Portal code. */
+export const HermesConnect: Story = {
+  render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */

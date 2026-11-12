@@ -15,6 +15,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { AgentLiveActivityProps } from "@openbot/team-client/live-activity-props";
+import { FilterMode, ImageFormat, MipmapMode, Skia } from "@shopify/react-native-skia";
 import { Directory, File, Paths } from "expo-file-system";
 import {
   LiveActivity,
@@ -24,8 +25,9 @@ import {
   widgetsDirectory,
 } from "expo-widgets";
 import ExpoWidgetsModule from "expo-widgets/build/ExpoWidgets";
+import type { ReactElement } from "react";
+import { PLUSH_STYLE, renderPlushPicture } from "@/features/agents/model/plush/plush-picture";
 import type { AgentLiveActivityLoader, AgentLiveActivityNative } from "./agent-live-activity.types";
-import { renderBloubAvatar } from "./model/live-activity-bloub";
 import { openSealedLiveActivity } from "./model/live-activity-open";
 import type { LiveActivityInstance } from "./model/live-activity-sync";
 
@@ -56,13 +58,18 @@ function agentLiveActivityLayout(
   const rows = stale ? [] : props.rows;
   // Old answers can target a request that is gone. The app checks again, but the view offers none.
   const buttons = stale ? [] : props.buttons;
-  // The props name a picture file, and the App Group folder is the same for all of them.
+  // The props name a picture file, and the App Group folder is the same for all of them. A photo is
+  // round. A drawn plush keeps its own felt shape, as in the app.
   const photo = (file: string, size: number, key?: string) =>
     file ? (
       <Image
         key={key}
         uiImage={props.dir + file}
-        modifiers={[resizable(), frame({ width: size, height: size }), clipShape("circle")]}
+        modifiers={
+          file.indexOf("avatar-bloub-") === 0
+            ? [resizable(), frame({ width: size, height: size })]
+            : [resizable(), frame({ width: size, height: size }), clipShape("circle")]
+        }
       />
     ) : (
       <Image key={key} systemName={props.symbol} color={tint} size={size * 0.7} />
@@ -219,6 +226,14 @@ function agentLiveActivityLayout(
         })}
       </HStack>
     ) : null;
+  // In the expanded island, iOS does not apply the `widgetURL` of a region to a tap: the app opened
+  // on the screen it had, and not on the chat. A link opens its destination, as each row of the
+  // agent list does. The plain style keeps the colors of the content.
+  const tapLink = (key: string, content: ReactElement) => (
+    <Link key={key} destination={props.tapUrl} modifiers={[buttonStyle("plain")]}>
+      {content}
+    </Link>
+  );
   return {
     // Lock Screen: the state heads the view, and below it the photo and text read as a message from
     // the agent. The photo lines up with the name, not with the state line.
@@ -309,24 +324,29 @@ function agentLiveActivityLayout(
     // Expanded island: the state and its count sit beside the camera. Below, the photo and text read
     // as a notification from the agent, and the answers use the full width.
     expandedLeading: (
-      <HStack modifiers={[padding({ leading: 8, top: 6 })]}>{status(waitSymbol ? tint : islandTint)}</HStack>
+      <HStack modifiers={[padding({ leading: 8, top: 6 })]}>
+        {tapLink("state", status(waitSymbol ? tint : islandTint))}
+      </HStack>
     ),
-    expandedTrailing: <HStack modifiers={[padding({ trailing: 8, top: 6 })]}>{footer}</HStack>,
+    expandedTrailing: (
+      <HStack modifiers={[padding({ trailing: 8, top: 6 })]}>{footer ? tapLink("count", footer) : null}</HStack>
+    ),
     expandedBottom: (
       <VStack
         alignment="leading"
         spacing={12}
         modifiers={[padding({ horizontal: 8, top: 6, bottom: 8 }), widgetURL(props.tapUrl)]}
       >
-        {agents.length > 0 ? (
-          agentList(3, 22)
-        ) : (
-          <HStack alignment="top" spacing={12}>
-            {avatar(44)}
-            {text}
-            <Spacer />
-          </HStack>
-        )}
+        {agents.length > 0
+          ? agentList(3, 22)
+          : tapLink(
+              "content",
+              <HStack alignment="top" spacing={12}>
+                {avatar(44)}
+                {text}
+                <Spacer />
+              </HStack>,
+            )}
         {actions(true)}
       </VStack>
     ),
@@ -335,9 +355,60 @@ function agentLiveActivityLayout(
 
 const ACTIVITY_NAME = "AgentActivity";
 const AVATAR_PREFIX = "avatar-";
-/** Three pixels for each point of the largest view, the 44-point expanded island. */
-const BLOUB_PIXELS = 132;
+/**
+ * Three pixels for each point of the largest view, the 44-point expanded island. ActivityKit does not
+ * show a picture that is larger than its presentation: the island shows an empty grey shape. So a
+ * photo is reduced to this size too.
+ */
+const AVATAR_PIXELS = 132;
 const AVATAR_EXTENSIONS: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+/** The App Group file that names the style of the saved pictures. It is not an avatar file. */
+const STYLE_FILE = "plush-style.txt";
+
+/**
+ * The picture of a data URL, square and at most `AVATAR_PIXELS` wide, as base64 data. A photo fills
+ * the square, as the round frame of the activity shows it. `null` when it cannot be read.
+ */
+function fittedAvatar(data: string, extension: string): { data: string; extension: string } | null {
+  const image = Skia.Image.MakeImageFromEncoded(Skia.Data.fromBase64(data));
+  if (!image) return null;
+  const side = Math.min(image.width(), image.height());
+  if (image.width() === image.height() && side <= AVATAR_PIXELS) return { data, extension };
+  const pixels = Math.min(side, AVATAR_PIXELS);
+  const surface = Skia.Surface.Make(pixels, pixels);
+  if (!surface) return null;
+  const paint = Skia.Paint();
+  paint.setAntiAlias(true);
+  surface
+    .getCanvas()
+    .drawImageRectOptions(
+      image,
+      Skia.XYWHRect((image.width() - side) / 2, (image.height() - side) / 2, side, side),
+      Skia.XYWHRect(0, 0, pixels, pixels),
+      FilterMode.Linear,
+      MipmapMode.Linear,
+      paint,
+    );
+  surface.flush();
+  return { data: surface.makeImageSnapshot().encodeToBase64(ImageFormat.PNG), extension: "png" };
+}
+
+/**
+ * The pictures of an older version have the flat bloub, and its photos can be too large for the
+ * island. The host names the same files, so the app deletes them once and draws them again.
+ */
+function removeOldAvatars(directory: string): void {
+  try {
+    const style = new File(directory, STYLE_FILE);
+    if (style.exists && style.textSync() === PLUSH_STYLE) return;
+    for (const entry of new Directory(directory).list()) {
+      if (entry instanceof File && entry.name.startsWith(AVATAR_PREFIX)) entry.delete();
+    }
+    style.writeSync(PLUSH_STYLE);
+  } catch {
+    // The pictures are drawn again at the next launch.
+  }
+}
 
 /**
  * The layout the widget extension runs. A host update comes as `{ sealed }`, which only the keys in
@@ -429,6 +500,7 @@ let native: AgentLiveActivityNative | undefined;
 export const agentLiveActivity: AgentLiveActivityLoader = () => {
   if (native) return native;
   const dir = widgetsDirectory ?? "";
+  if (widgetsDirectory) removeOldAvatars(widgetsDirectory);
   let factory = new ExpoWidgetsModule.LiveActivityFactory(
     ACTIVITY_NAME,
     composeLayout({ dir, seal: "", tag: "", fallback: null }),
@@ -470,13 +542,17 @@ export const agentLiveActivity: AgentLiveActivityLoader = () => {
       const extension = match?.[1] ? AVATAR_EXTENSIONS[match[1]] : undefined;
       // The App Group is missing when the widget extension was not built into the app.
       if (!widgetsDirectory || !match?.[2] || !extension) return null;
-      const fileName = `${AVATAR_PREFIX}${name}.${extension}`;
+      const picture = fittedAvatar(match[2], extension);
+      if (!picture) return null;
+      const fileName = `${AVATAR_PREFIX}${name}.${picture.extension}`;
       const file = new File(widgetsDirectory, fileName);
-      if (!file.exists) file.writeSync(match[2], { encoding: "base64" });
+      if (!file.exists) file.writeSync(picture.data, { encoding: "base64" });
       return fileName;
     },
     hasAvatar: (fileName) => Boolean(widgetsDirectory) && new File(widgetsDirectory, fileName).exists,
-    renderBloub: (seed, hue, mood) => renderBloubAvatar(seed, hue, mood, BLOUB_PIXELS),
+    // The host names these pictures from the seed and the hue only, so they show the hue, not `avatarColor`.
+    renderBloub: async (seed, hue, mood) =>
+      `data:image/png;base64,${await renderPlushPicture({ seed, hue, color: null, mood, pixels: AVATAR_PIXELS, saturation: 1 })}`,
     removeAvatars(keep) {
       if (!widgetsDirectory) return;
       for (const entry of new Directory(widgetsDirectory).list()) {

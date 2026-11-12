@@ -1,0 +1,33 @@
+{
+  "slug": "digitalocean",
+  "name": "DigitalOcean",
+  "tagline": "Cloud resources and apps",
+  "description": "DigitalOcean lets agents find and run tools for App Platform, Droplets, databases, Kubernetes, Spaces and networking through one router address. Each user signs in to their own DigitalOcean account through the browser.",
+  "category": "coding",
+  "creatorName": "DigitalOcean",
+  "iconUrl": "https://assets.digitalocean.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-droplets", "text": "List my Droplets and their regions and sizes." },
+    { "id": "prompt-deploy", "text": "Why did the last deployment of my App Platform app fail?" },
+    { "id": "prompt-databases", "text": "Which managed databases do I have, and what plan does each use?" }
+  ],
+  "apps": [
+    {
+      "id": "app-digitalocean-mcp",
+      "name": "DigitalOcean",
+      "description": "Apps, Droplets, databases, and other cloud resources, over DigitalOcean's MCP server with browser sign-in.",
+      "iconUrl": "https://assets.digitalocean.com/favicon.ico",
+      "server": {
+        "name": "digitalocean",
+        "transport": "http",
+        "url": "https://mcp.digitalocean.com/mcp",
+        "auth": [{ "id": "digitalocean-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.digitalocean.com",
+  "privacyPolicyUrl": "https://www.digitalocean.com/legal/privacy-policy",
+  "termsUrl": "https://www.digitalocean.com/legal/terms-of-service-agreement"
+}

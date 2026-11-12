@@ -4,7 +4,7 @@
  * Its last few hundred lines are a theme layer, not app-shell content: fourteen
  * grouped rules assign the palette to selectors from every domain at once, and
  * some of those selectors - .message-action-button,
- * .composer-button, .choice-card - are not even declared in this file. Splitting
+ * .composer-button - are not even declared in this file. Splitting
  * the sidebar or remote-desktop rules out means either duplicating those
  * declarations into a second file, which is the one thing the shared palette
  * exists to prevent, or leaving them here while their domain's own rules move
@@ -139,7 +139,8 @@
   align-items: center;
   gap: var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-4);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-4) var(--openbot-space-2);
   color: var(--openbot-text-muted);
 }
 
@@ -437,11 +438,28 @@
 .global-search-empty,
 .global-search-results:not(:has(.global-search-result)) .global-search-status {
   /* With no rows, "Searching…" and "No results" have one height, so the dialog does not jump. */
-  min-height: 96px;
+  min-height: 148px;
 }
 
+/* "No results" is under the plush. */
 .global-search-empty {
+  flex-direction: column;
+  padding-block: var(--openbot-space-3);
   animation: global-search-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+/* The plush tilts on its bottom edge. Its eyes follow the caret, -1 to 1 on each axis. */
+.global-search-plush {
+  --ui-plush-size: 56px;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+.global-search-plush[data-gaze="follow"] .ui-plush-eyes {
+  animation: none;
+  translate: calc(var(--global-search-gaze-x) * var(--ui-plush-size) * 0.07)
+    calc(var(--global-search-gaze-y) * var(--ui-plush-size) * 0.05);
+  transition: translate var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 @keyframes global-search-fade-in {
@@ -492,7 +510,7 @@
 }
 
 .global-search-hint .ui-kbd + .ui-kbd {
-  margin-left: calc(var(--openbot-space-0-5) * -1);
+  margin-inline-start: calc(var(--openbot-space-0-5) * -1);
 }
 
 @media (max-width: 640px) {
@@ -572,7 +590,7 @@
 .server-rail::after {
   position: absolute;
   top: var(--left-header-height);
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   width: clamp(0.5px, 0.05123cqw, 1px);
   background: var(--openbot-border);
@@ -709,10 +727,13 @@
 .server-rail-mark {
   position: absolute;
   top: 50%;
-  left: -7px;
+  inset-inline-start: -7px;
   width: 3px;
   height: 0;
-  border-radius: 0 var(--openbot-radius-xs) var(--openbot-radius-xs) 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: var(--openbot-radius-xs);
+  border-end-end-radius: var(--openbot-radius-xs);
+  border-end-start-radius: 0;
   background: var(--openbot-text-primary);
   opacity: 0;
   transform: translateY(-50%);
@@ -744,7 +765,7 @@
   height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .server-rail-tooltip {
@@ -841,7 +862,7 @@ html.panel-resizing {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   height: auto;
 }
 
@@ -850,7 +871,7 @@ html.panel-resizing {
 }
 
 .panel-edge {
-  border-right: clamp(0.5px, 0.05123cqw, 1px) solid var(--openbot-border);
+  border-inline-end: clamp(0.5px, 0.05123cqw, 1px) solid var(--openbot-border);
 }
 
 .window-drag {
@@ -883,7 +904,8 @@ textarea {
   gap: var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
   /* The logo of the page rail (`page-rail.css`) has the same top padding, to stay on this center line. */
-  padding: 2px 3px 0 10px;
+  padding-block: 2px 0;
+  padding-inline: 10px 3px;
 }
 
 /* The frame edge. The top row of the sidebar, the chat and the side panel has no line of its own: the
@@ -903,7 +925,7 @@ textarea {
   .app-frame-edge > .sidebar {
     position: relative;
     isolation: isolate;
-    border-right: 0;
+    border-inline-end: 0;
   }
 
   .app-frame-edge > .sidebar::before {
@@ -999,8 +1021,7 @@ textarea {
   /* A side panel's header continues the top row at the chat header's height, so the lines meet. The
    * window card draws the line. */
   .app-frame-edge .settings-panel-header,
-  .app-frame-edge .file-preview-header,
-  .app-frame-edge .browser-preview-header {
+  .app-frame-edge .file-preview-header {
     height: var(--left-header-height);
     border-bottom: 0;
     background: transparent;
@@ -1015,16 +1036,17 @@ textarea {
   flex: 0 1 auto;
   justify-content: flex-start;
   gap: var(--openbot-space-1-5);
-  margin-right: auto;
+  margin-inline-end: auto;
   border-radius: var(--openbot-radius-pill);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1) var(--openbot-space-2);
   color: var(--openbot-text-primary);
   cursor: pointer;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-semibold);
   line-height: var(--openbot-leading-md);
   opacity: 1;
-  text-align: left;
+  text-align: start;
   transition:
     background-color var(--openbot-duration-hover) ease,
     border-color var(--openbot-duration-hover) ease,
@@ -1094,10 +1116,10 @@ textarea {
   }
 }
 
-/* The server menu view has no rail, so the server name moves right of the macOS traffic lights. The web
+/* The server menu view has no rail, so the server name moves past the macOS traffic lights. The web
  * frame uses the macOS geometry but has no traffic lights, so these rules skip it. */
 .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-topbar {
-  padding-left: 78px;
+  padding-inline-start: 78px;
 }
 
 /* A compact sidebar is too narrow for the traffic lights and the expand button in one row, and the
@@ -1160,6 +1182,16 @@ textarea {
   height: 100%;
 }
 
+/* The plush keeps its own squircle: a circle clip and ring cut its fur. */
+.server-menu-mark:has(> .ui-server-plush-logo) {
+  overflow: visible;
+  border-radius: 0;
+}
+
+.server-menu-mark:has(> .ui-server-plush-logo)::after {
+  content: none;
+}
+
 .server-menu-name {
   min-width: 0;
   flex: 1 1 auto;
@@ -1187,7 +1219,7 @@ textarea {
 }
 
 .server-menu .server-menu-layout-chevron {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 /* The add item: a dashed circle that fills in on the highlighted row, with the plus cut out of it. */
@@ -1318,7 +1350,7 @@ textarea {
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .sidebar-history-button > svg {
@@ -1344,17 +1376,22 @@ textarea {
 .sidebar-update-button > svg {
   width: 18px;
   height: 18px;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
+/* The search field, then the New button. */
 .sidebar-search-wrap {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
   padding: 8px 12px 6px;
 }
 
 /* The field opens the global search, so it is a button drawn as the search field. */
 .sidebar-search-trigger {
-  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
   justify-content: flex-start;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
@@ -1671,6 +1708,11 @@ textarea {
   transform: rotate(-90deg);
 }
 
+/* A closed section points to the reading direction. */
+.sidebar-section-chevron-collapsed:dir(rtl) {
+  transform: rotate(90deg);
+}
+
 .sidebar-section-collapse {
   display: grid;
   opacity: 1;
@@ -1728,6 +1770,12 @@ textarea {
   font-weight: 650;
 }
 
+/* "Unread" uses the "Needs you" heading with a neutral count: the warning colour belongs to waits. */
+.sidebar-unread-group .sidebar-waiting-group-count {
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-readable);
+}
+
 .sidebar-hidden-group-count {
   margin-inline-start: var(--openbot-space-1);
   font-variant-numeric: tabular-nums;
@@ -1742,7 +1790,8 @@ textarea {
   height: 36px;
   border-color: var(--openbot-border-focus);
   border-radius: var(--openbot-radius-md);
-  padding: 0 32px 0 8px;
+  padding-block: 0;
+  padding-inline: 8px 32px;
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
@@ -1755,7 +1804,7 @@ textarea {
 .sidebar-section-editor-chevron {
   position: absolute;
   top: 50%;
-  right: 9px;
+  inset-inline-end: 9px;
   color: var(--openbot-text-muted);
   pointer-events: none;
   transform: translateY(-50%);
@@ -1790,24 +1839,48 @@ textarea {
   z-index: 4;
 }
 
-/* The sticky header covers the top of the list, so the list keeps only its bottom fade. The top
-   fade would make the header partly transparent. */
-.agent-list.scroll-fade-top:has(.sidebar-folder):not(.scroll-fade-bottom) {
-  -webkit-mask-image: none;
-  mask-image: none;
+/* The rows fade in under the folder headers that stay at the top, so no row is cut at a header's
+   edge. `--agent-list-stuck-height` is the bottom of those headers, or 0 when none is at the top.
+   These properties do not inherit: the list sets them while it scrolls, and an inherited change
+   restyles every row under it (issue 6019). */
+@property --agent-list-stuck-height {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
 }
 
-.agent-list.scroll-fade-top.scroll-fade-bottom:has(.sidebar-folder) {
-  -webkit-mask-image: linear-gradient(
+@property --agent-list-fade-top {
+  syntax: "*";
+  inherits: false;
+}
+
+@property --agent-list-fade-bottom {
+  syntax: "*";
+  inherits: false;
+}
+
+.sidebar .agent-list:is(.scroll-fade-top, .scroll-fade-bottom) {
+  --agent-list-fade-top: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
+  --agent-list-fade-bottom: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
+  -webkit-mask-image: var(--agent-list-fade-top), var(--agent-list-fade-bottom);
+  mask-image: var(--agent-list-fade-top), var(--agent-list-fade-bottom);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.sidebar .agent-list.scroll-fade-top {
+  --agent-list-fade-top: linear-gradient(
     to bottom,
-    var(--openbot-text-primary) 0,
-    var(--openbot-text-primary) calc(100% - 18px),
-    transparent 100%
+    var(--openbot-text-primary) var(--agent-list-stuck-height),
+    transparent var(--agent-list-stuck-height),
+    var(--openbot-text-primary) calc(var(--agent-list-stuck-height) + var(--agent-list-fade-size, 18px))
   );
-  mask-image: linear-gradient(
+}
+
+.sidebar .agent-list.scroll-fade-bottom {
+  --agent-list-fade-bottom: linear-gradient(
     to bottom,
-    var(--openbot-text-primary) 0,
-    var(--openbot-text-primary) calc(100% - 18px),
+    var(--openbot-text-primary) calc(100% - var(--agent-list-fade-size, 18px)),
     transparent 100%
   );
 }
@@ -2228,24 +2301,6 @@ textarea {
   height: 34px;
 }
 
-.person-unread-badge {
-  position: absolute;
-  z-index: 2;
-  right: -4px;
-  bottom: -3px;
-  display: grid;
-  min-width: 17px;
-  height: 17px;
-  place-items: center;
-  border: 2px solid var(--openbot-bg-sidebar);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 680;
-}
-
 .agent-row {
   --agent-row-avatar-size: 46px;
 
@@ -2260,7 +2315,7 @@ textarea {
   background: transparent;
   padding: 8px;
   color: inherit;
-  text-align: left;
+  text-align: start;
   transition:
     background-color var(--openbot-duration-hover) ease,
     border-color var(--openbot-duration-hover) ease,
@@ -2305,7 +2360,7 @@ textarea {
 .agent-row-agent-status {
   position: absolute;
   z-index: 1;
-  right: -5px;
+  inset-inline-end: -5px;
   bottom: -3px;
   display: inline-flex;
   align-items: center;
@@ -2319,13 +2374,28 @@ textarea {
   border-color: var(--openbot-bg-control);
 }
 
-.agent-row-agent-status-working {
-  width: 24px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface);
-  color: var(--openbot-text-secondary);
+/* In the light theme, a surface card on the light sidebar is hard to see (issue 4715), so the selected
+   row has an ink fill, and keeps it on hover. The dark theme keeps the card, and so does the first
+   agent button, which is the only row and needs its hover fill. The sidebar holds the colour,
+   because the ring filter of the channel faces reads it there (`SidebarFrame`). */
+:root[data-openbot-color-scheme="light"] .sidebar {
+  --sidebar-row-selected: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-sidebar));
 }
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row.agent-row-active:not(.sidebar-first-agent-action) {
+  --agent-avatar-outline: var(--sidebar-row-selected);
+
+  background: var(--sidebar-row-selected);
+}
+
+:root[data-openbot-color-scheme="light"] .sidebar .agent-row-active .agent-row-agent-status {
+  border-color: var(--sidebar-row-selected);
+}
+
+/* The working badge, with its felt balls, is in `@openbot/ui/features/sidebar/sidebar-working-badge.css`. */
+
+/* The unread count, the failed routine mark and the badge of an agent that waits for the user are
+   felt too, with their transitions, in `@openbot/ui/features/sidebar/sidebar-felt-badges.css`. */
 
 .agent-row-thinking-dots {
   display: inline-flex;
@@ -2368,18 +2438,6 @@ textarea {
   stroke-linejoin: round;
 }
 
-.agent-row-agent-status-unread {
-  min-width: 16px;
-  height: 16px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  padding: 0 3px;
-  color: var(--openbot-bg-sidebar);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  line-height: 12px;
-}
-
 .agent-row-agent-status-routine,
 .agent-row-agent-status-limited {
   width: 16px;
@@ -2395,25 +2453,6 @@ textarea {
   height: 10px;
 }
 
-.agent-row-agent-status-routine-failed {
-  color: var(--openbot-danger);
-}
-
-/* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
-   the first badge the eye finds in a busy list. */
-.agent-row-agent-status-waiting {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-warning);
-  color: var(--openbot-bg-sidebar);
-}
-
-.agent-row-agent-status-waiting svg {
-  width: 11px;
-  height: 11px;
-}
-
 /* The action chip takes the time slot: the time does not matter while the agent waits. */
 .agent-row-wait-chip {
   display: inline-flex;
@@ -2422,7 +2461,8 @@ textarea {
   gap: 3px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-warning-soft);
-  padding: 1px 7px 1px 5px;
+  padding-block: 1px;
+  padding-inline: 5px 7px;
   color: var(--openbot-warning-text);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
@@ -2508,7 +2548,7 @@ textarea {
 }
 
 .agent-context-submenu-chevron {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--openbot-text-muted);
 }
 
@@ -2559,8 +2599,9 @@ textarea {
 }
 
 /* The plush body is a picture, not a path, so the same ring follows its edge as four offset shadows
-   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke. */
-.bloub-avatar-svg:has(> g > image) {
+   in the surface colour. They sit on the whole drawing, in pixels, so the width matches the stroke.
+   Bloub nests the body in groups whose depth changes between versions, so any image selects it. */
+.bloub-avatar-svg:has(image) {
   --agent-avatar-ring-color: var(--agent-avatar-outline, transparent);
   --agent-avatar-ring-width: var(--agent-avatar-outline-width, 1.5px);
 
@@ -2668,7 +2709,8 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 7px 10px 3px 13px;
+  padding-block: 7px 3px;
+  padding-inline: 13px 10px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   font-weight: 590;
@@ -2678,6 +2720,18 @@ textarea {
 
 .avatar-editor-heading > span {
   white-space: nowrap;
+}
+
+.avatar-editor-heading-end {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The heading is upper case. The style tabs keep the case of other tabs. */
+.avatar-style-tabs {
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .avatar-editor-actions {
@@ -2731,7 +2785,7 @@ textarea {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 11px;
   color: var(--openbot-text-primary);
-  text-align: left;
+  text-align: start;
   transition:
     border-color var(--openbot-duration-hover) ease,
     background-color var(--openbot-duration-hover) ease,
@@ -2769,7 +2823,7 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .avatar-image-upload-preview .agent-avatar {
@@ -2880,10 +2934,12 @@ textarea {
   padding: 4px 10px 12px;
 }
 
-/* Automatic and the eight colours fit one row. */
+/* Automatic and the 17 colours fill two rows of nine. A column is narrower than the button
+   padding, so the tile has none; with it, each tile overflowed onto the next one's ring. */
 .avatar-color-choice {
   width: 100%;
   height: 32px;
+  padding: 0;
 }
 
 .avatar-color-swatch {
@@ -3018,10 +3074,18 @@ textarea {
 }
 
 /* At the default width and below, the wait chip keeps only its icon so that a long name keeps its
-   space. The row's label and tooltip still name the action. */
+   space. The row's label and tooltip still name the action. The chip is then an 18px circle. */
 @container (max-width: 300px) {
   .agent-row-wait-chip:has(.agent-row-wait-chip-label) {
-    padding: 1px 5px;
+    width: 18px;
+    height: 18px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .agent-row-wait-chip:has(.agent-row-wait-chip-label) svg {
+    width: 12px;
+    height: 12px;
   }
 
   .agent-row-wait-chip-label {
@@ -3099,7 +3163,7 @@ textarea {
   position: relative;
   z-index: var(--openbot-layer-tooltip);
   display: grid;
-  width: min(300px, calc(100vw - var(--openbot-space-4)));
+  width: min(340px, calc(100vw - var(--openbot-space-4)));
   max-height: min(60vh, 420px);
   overflow: auto;
   padding: var(--openbot-space-2);
@@ -3151,12 +3215,13 @@ textarea {
 }
 
 /* Columns: logo, window label, bar, percent left, reset countdown. Each provider row and each
-   window row is a subgrid, so the bars line up across providers. */
+   window row is a subgrid, so the bars line up across providers. A long window label is cut
+   before the bar gets narrower than its minimum. */
 .account-usage-providers {
   display: grid;
   margin: 0;
   padding: 0;
-  grid-template-columns: auto max-content minmax(0, 1fr) max-content max-content;
+  grid-template-columns: auto minmax(0, max-content) minmax(var(--openbot-space-8), 1fr) max-content max-content;
   column-gap: var(--openbot-space-2);
   row-gap: var(--openbot-space-1);
   list-style: none;
@@ -3256,8 +3321,13 @@ textarea {
   white-space: nowrap;
 }
 
+.account-usage-window-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .account-usage-window-reset {
-  text-align: right;
+  text-align: end;
 }
 
 .account-usage-window-bar {
@@ -3279,7 +3349,7 @@ textarea {
   color: var(--openbot-text-primary);
   font-variant-numeric: tabular-nums;
   font-weight: var(--openbot-weight-semibold);
-  text-align: right;
+  text-align: end;
 }
 
 .account-usage-window:not([data-usage-tone="neutral"]) .account-usage-window-remaining {
@@ -3334,6 +3404,11 @@ textarea {
   padding-inline: 12px;
 }
 
+/* The compact top row has room for the toggle only. A window with the page rail shows them (`window.css`). */
+.sidebar-compact :is(.sidebar-history-button, .sidebar-update-button) {
+  display: none;
+}
+
 .sidebar-compact .sidebar-server-name {
   opacity: 0;
   pointer-events: none;
@@ -3371,6 +3446,9 @@ textarea {
 }
 
 .sidebar-compact .agent-list {
+  /* An 18px fade is too short for a 64px row: a cut avatar looks like a hard edge. Half a row fades. */
+  --agent-list-fade-size: 32px;
+
   padding-inline: 12px;
 }
 
@@ -3426,6 +3504,32 @@ textarea {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-8px);
+}
+
+/* Right to left, the compact offsets above go the other way. `:dir()` keeps the specificity under the
+ * macOS rules for the compact top row. */
+.sidebar-compact .sidebar-new-button:dir(rtl) {
+  transform: translateX(-6px) scale(0.92);
+}
+
+.sidebar-compact .sidebar-toggle-button:dir(rtl) {
+  transform: translateX(-13px);
+}
+
+.sidebar-compact .sidebar-toggle-button:dir(rtl):active {
+  transform: translateX(-13px) scale(0.96);
+}
+
+.sidebar-compact .search-field:dir(rtl) {
+  transform: translateX(8px);
+}
+
+.sidebar-compact .agent-row-avatar:dir(rtl) {
+  transform: translateX(-4px);
+}
+
+.sidebar-compact .agent-row-copy:dir(rtl) {
+  transform: translateX(8px);
 }
 
 .icon-spinning {
@@ -3503,6 +3607,7 @@ textarea {
 .reaction-picker-row button:focus-visible,
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
+.composer-button[aria-expanded="true"],
 .composer-attachment > button:hover,
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {
@@ -3523,6 +3628,14 @@ textarea {
   --agent-avatar-outline: var(--openbot-bg-control);
 
   background: var(--openbot-bg-control);
+}
+
+/* A row is a ghost button. With a fine pointer, the ghost hover fill wins over the row fill
+   (`primitives.css`), so the avatar ring takes that fill too. */
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .agent-row:hover {
+    --agent-avatar-outline: var(--openbot-bg-control-hover);
+  }
 }
 
 .agent-list[data-sidebar-dragging] .agent-row:hover {
@@ -3551,7 +3664,6 @@ textarea {
   color: var(--openbot-text-primary);
 }
 
-.choice-key,
 .composer-mention-token,
 .remote-desktop-empty-mark {
   background: var(--openbot-bg-control-hover);
@@ -3559,7 +3671,7 @@ textarea {
 }
 .server-rail-muted {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   color: var(--openbot-text-secondary);
   background: var(--openbot-bg-sidebar);

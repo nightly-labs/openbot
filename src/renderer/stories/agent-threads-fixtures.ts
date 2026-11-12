@@ -1,4 +1,4 @@
-import type { AgentTask, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentTask, ConversationMessage, ConversationSnapshot, QueueDelivery } from "@openbot/contracts/ipc";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 
 /** Side threads of Chief for the desktop and web thread stories. */
@@ -172,4 +172,97 @@ export const THREAD_OPTIONS: MockOpenBotOptions = {
       ),
     ]),
   },
+};
+
+const COMPETITORS = requireThread("competitors");
+
+function requireThread(id: string): AgentTask {
+  const task = THREADS.find((candidate) => candidate.id === id);
+  if (!task) throw new Error(`No thread fixture: ${id}`);
+  return task;
+}
+
+function queued(id: string, position: number, text: string): QueueDelivery {
+  return {
+    id,
+    messageId: `message-${id}`,
+    recipientAgentId: AGENT_ID,
+    sender: { kind: "user" },
+    text,
+    attachments: [],
+    replyToMessageId: null,
+    status: "queued",
+    position,
+    turnId: null,
+    error: null,
+    createdAt: "2026-08-19T10:01:00.000Z",
+    expectsReply: false,
+  };
+}
+
+/**
+ * "Competitor scan" works, and two messages wait in its queue. Reply to a message of the thread to see
+ * the reply card under the queue.
+ */
+export const THREAD_QUEUE_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: {
+    [AGENT_ID]: THREADS.map((task) =>
+      task.id === COMPETITORS.id
+        ? {
+            ...task,
+            queue: [
+              queued("competitors-queue-1", 1, "Also add the two newest competitors."),
+              queued("competitors-queue-2", 2, "Keep the summary under one page."),
+            ],
+          }
+        : task,
+    ),
+  },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS, [
+      message(
+        "competitors-queue-message-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-queue-message-2",
+        "assistant",
+        "I have the first two pages. The third one loads its prices late, so I read it again.",
+        "2026-08-19T09:56:00.000Z",
+      ),
+    ]),
+  },
+};
+
+const COMPETITORS_DONE = thread("competitors", "Competitor scan", "2026-08-19T10:07:00.000Z");
+
+/**
+ * Chief has unread agent messages in three side threads. "Competitor scan" has finished, so Chief does
+ * not work and the sidebar shows the unread count. "Pricing FAQ" has no tab: only the menu shows its dot.
+ */
+export const UNREAD_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: { [AGENT_ID]: THREADS.map((task) => (task.id === COMPETITORS_DONE.id ? COMPETITORS_DONE : task)) },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS_DONE, [
+      message(
+        "competitors-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-2",
+        "assistant",
+        "All three charge per seat. Only one has a free plan, and none keeps data on the computer. The table is in `competitors.md`.",
+        "2026-08-19T10:07:00.000Z",
+      ),
+    ]),
+  },
+  taskUnread: { pricing: 1, competitors: 1, "pricing-orphan": 2 },
 };

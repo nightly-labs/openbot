@@ -1,4 +1,4 @@
-import { BookOpen, CircleQuestionMark, DropdownMenu, Gift, Megaphone, MotionTooltip } from "@openbot/ui";
+import { BookOpen, Bug, CircleQuestionMark, DropdownMenu, Gift, Megaphone, MotionTooltip } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { DiscordMark } from "../settings/brand-marks";
@@ -21,6 +21,7 @@ export interface HelpMenuProps {
   onOpenChangelog: () => void;
   onOpenGuides: () => void;
   onOpenDiscord: () => void;
+  onReportProblem: () => void;
   onSendFeedback: () => void;
 }
 
@@ -30,7 +31,7 @@ function releaseDate(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
-/** The Help menu: the newest release notes, the changelog, the guides, the Discord community and feedback. */
+/** The Help menu: the newest release notes, the changelog, the guides, the Discord community, bug reports and feedback. */
 export function HelpMenu(props: HelpMenuProps) {
   const { t, format } = useText();
   const [open, setOpen] = createSignal(false);
@@ -79,6 +80,10 @@ export function HelpMenu(props: HelpMenuProps) {
           <DropdownMenu.Item onSelect={() => props.onOpenDiscord()}>
             <DiscordMark class="agent-context-icon size-4" />
             <span>{t("app.help.discord")}</span>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item onSelect={() => props.onReportProblem()}>
+            <Bug class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("app.help.reportProblem")}</span>
           </DropdownMenu.Item>
           <DropdownMenu.Item onSelect={() => props.onSendFeedback()}>
             <Megaphone class="agent-context-icon size-4" aria-hidden="true" />

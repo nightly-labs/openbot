@@ -6,6 +6,8 @@
 
 .otp-input-fieldset {
   position: relative;
+  /* A code reads left to right in every language; the focus ring moves by slot index from the left. */
+  direction: ltr;
   width: max-content;
   max-width: 100%;
   margin: 0;

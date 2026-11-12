@@ -37,14 +37,19 @@ import {
   savedAcpAgentDraft,
 } from "./custom-acp-agent-form";
 
-/** What the host does with the user's own ACP agents. This computer only: each is a command here. */
+/**
+ * What the host does with the user's own ACP agents. Each is a command on the computer that runs the
+ * agents: this computer, or the host of a joined server.
+ */
 export interface CustomAgentSettingsApi {
   agents: readonly CustomAgentSummary[];
+  /** True when the agents run on the host of a joined server, not on this computer. */
+  host?: boolean | undefined;
   /** Rejects with the reason, so the form stays open with what the user typed. */
   save: (input: SaveCustomAgentInput) => Promise<CustomProviderRestart>;
   remove: (id: string) => Promise<CustomProviderRestart>;
-  /** One trial start. Rejects with the reason the agent did not answer. */
-  check: (input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>;
+  /** One trial start. Rejects with the reason the agent did not answer. Without it the form has no Check. */
+  check?: ((input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>) | undefined;
   /**
    * Restarts the process group of the custom agents after their tasks stop. Without it the section
    * offers no restart.
@@ -127,10 +132,11 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     }
   }
 
-  async function runCheck(draft: CustomAcpAgentDraft): Promise<void> {
+  async function runCheck(check: CustomAgentSettingsApi["check"], draft: CustomAcpAgentDraft): Promise<void> {
+    if (!check) return;
     setCheck({ status: "checking" });
     try {
-      setCheck(checkResult(await props.api.check(customAgentCheckInput(draft, form()?.saved?.id))));
+      setCheck(checkResult(await check(customAgentCheckInput(draft, form()?.saved?.id))));
     } catch (error) {
       setCheck({ status: "failed", message: errorMessage(error, t("customProvider.acp.checkFailed")) });
     }
@@ -154,6 +160,13 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     if (agent) void remove(agent);
   }
 
+  /** A named function, not a ternary in the prop: the dialog reads it in a tracked scope. */
+  function checkHandler(): ((draft: CustomAcpAgentDraft) => void) | undefined {
+    const check = props.api.check;
+    if (!check) return undefined;
+    return (draft) => void runCheck(check, draft);
+  }
+
   const detail = (agent: CustomAgentSummary) => {
     const command = [agent.resolvedCommand ?? agent.command, ...agent.args].join(" ");
     const parts = [agent.resolvedCommand ? command : t("customProvider.agents.commandMissing", { command })];
@@ -161,10 +174,13 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     return parts.join(" · ");
   };
 
+  const description = () =>
+    t(props.api.host ? "customProvider.agents.hostDescription" : "customProvider.agents.description");
+
   return (
     <SettingsSection
       title={t("customProvider.agents.title")}
-      description={t("customProvider.agents.description")}
+      description={description()}
       actions={
         <>
           <Show when={props.api.restart && (props.api.agents.length > 0 || props.api.restartPending)}>
@@ -281,8 +297,9 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
         draft={form()?.draft}
         editing={Boolean(form()?.saved)}
         presets={ACP_AGENT_PRESETS}
+        host={props.api.host}
         check={check()}
-        onCheck={(draft) => void runCheck(draft)}
+        onCheck={checkHandler()}
         busy={saving()}
         submitError={submitError()}
         takenAgentIds={props.api.agents.map((agent) => agent.id).filter((id) => id !== form()?.saved?.id)}

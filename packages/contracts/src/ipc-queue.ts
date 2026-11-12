@@ -18,10 +18,13 @@ export type QueueDeliveryStatus = (typeof QUEUE_DELIVERY_STATUSES)[number];
 /**
  * What a message sent to a busy agent does. `queue` waits behind the running turn; `steer` joins
  * that turn at the provider's next step. Idle agents start every message the same way.
+ *
+ * `steer` is the default. A stored `queue`, for the app or for one agent, stays `queue`, and a
+ * provider that cannot steer queues the message in either mode.
  */
 export const BUSY_MESSAGE_MODES = ["queue", "steer"] as const;
 export type BusyMessageMode = (typeof BUSY_MESSAGE_MODES)[number];
-export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "queue";
+export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "steer";
 
 export function isBusyMessageMode(value: unknown): value is BusyMessageMode {
   return isOneOf(BUSY_MESSAGE_MODES, value);
@@ -164,6 +167,11 @@ export interface QueueSnapshot {
    * key list, so a remote server drops this field instead of reporting it.
    */
   hold?: QueueHold | null;
+  /**
+   * The setup message of a new agent (`agent-welcome-v1`) waits or runs. No delivery shows it, so a
+   * client shows that the agent prepares its welcome. Absent on every other queue.
+   */
+  welcome?: true;
 }
 
 export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
@@ -172,7 +180,8 @@ export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
     isIdentifier(value.agentId) &&
     Array.isArray(value.deliveries) &&
     value.deliveries.every(isQueueDelivery) &&
-    (value.hold === undefined || value.hold === null || isQueueHold(value.hold))
+    (value.hold === undefined || value.hold === null || isQueueHold(value.hold)) &&
+    (value.welcome === undefined || value.welcome === true)
   );
 }
 
@@ -230,6 +239,8 @@ export interface UpdateQueuedMessageInput {
 export interface ReorderQueueInput {
   agentId: string;
   deliveryIds: string[];
+  /** The side thread whose queued messages `deliveryIds` orders. Absent for the agent's own chat. */
+  taskId?: string;
 }
 
 export interface InterruptTurnInput {

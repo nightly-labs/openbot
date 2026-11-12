@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
-import { type ReactNode, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { type ReactNode, useRef, useState } from "react";
+import { Pressable, ScrollView, View, type ViewInstance } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SettingsNote, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { GLASS_CAPSULE_HEIGHT } from "@/shared/components/glass-capsule";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
@@ -24,7 +25,12 @@ import {
   matchesFilter,
   NO_MARKETPLACE_FILTER,
 } from "../model/marketplace-listings";
-import { type MarketplaceInstalled, useMarketplaceCatalog, useMarketplaceInstalled } from "../model/use-marketplace";
+import {
+  type MarketplaceCatalog,
+  type MarketplaceInstalled,
+  useMarketplaceCatalog,
+  useMarketplaceInstalled,
+} from "../model/use-marketplace";
 
 /** The agents of the shelf and the skills of the list on the overview. */
 const OVERVIEW_ROWS = 8;
@@ -41,14 +47,24 @@ export function MarketplaceScreen() {
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const server = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId));
   const scroll = useLargeTitleScroll();
+  const blurTarget = useRef<ViewInstance>(null);
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<MarketplaceFilter>(NO_MARKETPLACE_FILTER);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
-  const catalog = useMarketplaceCatalog({ query, filter });
+  const catalog = useMarketplaceCatalog({ serverId, query, filter });
   const installed = useMarketplaceInstalled(serverId);
   const title = t("mobile.app.route.marketplace");
   const listing = (item: MarketplaceListing) => {
+    // A connector and an MCP server that the user added open their own pages, as on the desktop.
+    if (item.kind === "app" && item.source === "connector") {
+      router.push({ pathname: "/server-settings/connector", params: { serverId, id: item.connector } });
+      return;
+    }
+    if (item.kind === "app" && item.source === "custom") {
+      router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId: item.server.id } });
+      return;
+    }
     // The name goes along, so the sheet has its title before the listing loads.
     router.push({
       pathname: "/marketplace-listing",
@@ -81,6 +97,7 @@ export function MarketplaceScreen() {
         listings={catalog.listings.filter((item) => matchesFilter(item, filter, installed.installed))}
         filter={filter}
         pending={catalog.pending}
+        more={catalog}
         installed={installed}
         onOpen={listing}
         onClear={() => {
@@ -103,30 +120,32 @@ export function MarketplaceScreen() {
 
   return (
     <View className="flex-1 bg-sheet">
-      <Animated.ScrollView
-        className="flex-1"
-        // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
-        style={{ marginLeft: insets.left, marginRight: insets.right }}
-        contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-        // Android has no content inset, so the content starts below the transparent header. The bottom
-        // keeps the last row above the field.
-        contentContainerStyle={{
-          paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
-          paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
-        }}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        onScroll={scroll.onScroll}
-      >
-        <LargeTitle scroll={scroll} title={title} caption={server?.name} />
-        <View className="gap-7 pt-3">
-          {loadFailed}
-          {content}
-        </View>
-      </Animated.ScrollView>
-      <LargeTitleBar scroll={scroll} title={title} surface="sheet" />
+      <AndroidBlurTarget target={blurTarget} surface="sheet">
+        <Animated.ScrollView
+          className="flex-1"
+          // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
+          style={{ marginLeft: insets.left, marginRight: insets.right }}
+          contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
+          // Android has no content inset, so the content starts below the transparent header. The bottom
+          // keeps the last row above the field.
+          contentContainerStyle={{
+            paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
+            paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
+          }}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          onScroll={scroll.onScroll}
+        >
+          <LargeTitle scroll={scroll} title={title} caption={server?.name} />
+          <View className="gap-7 pt-3">
+            {loadFailed}
+            {content}
+          </View>
+        </Animated.ScrollView>
+      </AndroidBlurTarget>
+      <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
       {server ? (
         <MarketplaceSearchBar
           query={query}
@@ -253,6 +272,7 @@ function FilteredList({
   listings,
   filter,
   pending,
+  more,
   installed,
   onOpen,
   onClear,
@@ -260,6 +280,8 @@ function FilteredList({
   listings: MarketplaceListing[];
   filter: MarketplaceFilter;
   pending: boolean;
+  /** The next catalog page, as the desktop "Load more". */
+  more: Pick<MarketplaceCatalog, "hasMore" | "loadingMore" | "loadMoreFailed" | "loadMore">;
   installed: MarketplaceInstalled;
   onOpen: (listing: MarketplaceListing) => void;
   onClear: () => void;
@@ -305,6 +327,17 @@ function FilteredList({
       ) : (
         <SettingsNote>{t("mobile.marketplace.empty")}</SettingsNote>
       )}
+      {more.loadMoreFailed ? <SettingsNote>{t("mobile.marketplace.loadFailed")}</SettingsNote> : null}
+      {more.hasMore ? (
+        <Button
+          variant="secondary"
+          className="self-center"
+          isDisabled={more.loadingMore}
+          onPress={() => void more.loadMore()}
+        >
+          <Button.Label>{t("mobile.marketplace.loadMore")}</Button.Label>
+        </Button>
+      ) : null}
     </View>
   );
 }

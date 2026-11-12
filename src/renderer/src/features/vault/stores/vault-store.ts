@@ -37,7 +37,7 @@ export function createVaultStore(calls: VaultCalls) {
     remove: async (id: string) => show(await calls.remove(id)),
     reveal: (request: VaultSecretRequest) => calls.reveal(request),
     copy: (request: VaultSecretRequest) => calls.copy(request),
-    /** Absent for a joined server. */
+    /** Absent for a joined server without `vault-import-v1`. */
     importCsv: calls.importCsv
       ? async () => {
           const result = await calls.importCsv?.();
@@ -46,6 +46,7 @@ export function createVaultStore(calls: VaultCalls) {
         }
       : undefined,
     reset: async () => show(await calls.reset()),
+    codes: () => calls.codes(),
   };
 }
 

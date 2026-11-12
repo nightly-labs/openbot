@@ -96,7 +96,7 @@ async function run() {
     assert.equal(isOpenableAttachmentName("chart.svg"), false);
     assert.doesNotThrow(() => assertSupportedAttachmentName("chart.svg"));
     // A remote host without svg-attachments does not get SVG files.
-    const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: false };
+    const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: false, anyFile: false };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("svg"), false);
     assert.equal(supportedAttachmentExtensions(oldHost).includes("png"), true);
     assert.equal(isSupportedAttachmentNameFor("logo.svg", oldHost), false);

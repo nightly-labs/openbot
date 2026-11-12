@@ -8,8 +8,10 @@ import type {
   ConversationPageAnchor,
   ConversationSearchPage,
   ConversationSnapshot,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -101,18 +103,22 @@ export class ConversationQueries {
 
   /**
    * The assistant messages of one turn, in order. A routine flow reads only the answer of a turn,
-   * so it does not load and parse the whole history of the thread for it.
+   * so it does not load and parse the whole history of the thread for it. The turn row names the
+   * thread that ran the turn: the agent's chat or a side thread, such as a routine thread. A branch
+   * keeps the turn ids of the rows it copied, but the turn row stays with the source thread.
    */
-  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
+  readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     const rows = databaseRows(
       this.#core.connection
         .prepare(
-          `SELECT message.message_json FROM projection_thread_messages AS message
-           JOIN projection_threads AS thread ON thread.thread_id = message.thread_id
-           WHERE message.thread_id = ? AND thread.agent_id = ? AND message.turn_id = ? AND message.author = 'assistant'
+          `SELECT message.message_json FROM projection_turns AS turn
+           JOIN projection_threads AS thread ON thread.thread_id = turn.thread_id
+           JOIN projection_thread_messages AS message
+             ON message.thread_id = turn.thread_id AND message.turn_id = turn.turn_id
+           WHERE turn.turn_id = ? AND thread.agent_id = ? AND message.author = 'assistant'
            ORDER BY message.created_at, message.ordinal, message.message_id`,
         )
-        .all(threadId, agentId, turnId),
+        .all(turnId, agentId),
     );
     return rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
   }
@@ -149,6 +155,26 @@ export class ConversationQueries {
       turns.set(threadId, [...(turns.get(threadId) ?? []), requiredStringColumn(row, "turn_id")]);
     }
     return turns;
+  }
+
+  /**
+   * The first time and the number of the messages that a person wrote to an agent on this computer.
+   * A routine run is also a `user` message, with the `routine` item type; it does not count.
+   * One scan of the table: the columns come before the message JSON, so it reads no overflow page.
+   */
+  readSentMessageStats(): SentMessageStats {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          "SELECT MIN(created_at) AS first_sent_at, COUNT(*) AS sent_count FROM projection_thread_messages WHERE author = 'user' AND item_type IS NOT 'routine'",
+        )
+        .get(),
+    );
+    if (!row) return { firstSentAt: null, sentCount: 0 };
+    return {
+      firstSentAt: optionalStringColumn(row, "first_sent_at"),
+      sentCount: requiredNumberColumn(row, "sent_count"),
+    };
   }
 
   readConversationRevision(agentId: string, threadId: string | null): number {
@@ -324,6 +350,47 @@ export class ConversationQueries {
     };
   }
 
+  /** The cursor of the page before a message of the thread, or null when the thread does not hold it. */
+  conversationCursorAt(threadId: string, messageId: string): string | null {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? encodePageCursor(conversationRowCursor(row)) : null;
+  }
+
+  /** How many messages the reader can see before a message of the thread. 0 when the thread does not hold it. */
+  conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
+    const row = this.#messageOrderRow(threadId, messageId);
+    return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
+  }
+
+  /** Whether the reader can see a message after a message of the thread. False when the thread does not hold it. */
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    const row = this.#messageOrderRow(threadId, messageId);
+    if (!row) return false;
+    const next = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT 1 AS found FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
+           ${conversationMarkerSqlFilter(options)}
+           LIMIT 1`,
+        )
+        .get(threadId, ...pageKeyValues(conversationRowCursor(row))),
+    );
+    return next !== null;
+  }
+
+  #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
+    return databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT ${ORDER_KEY_COLUMNS} FROM ordered WHERE message_id = ?`,
+        )
+        .get(threadId, messageId),
+    );
+  }
+
   supportedConversationCursor(
     threadId: string,
     throughMessageId: string | null,
@@ -391,7 +458,7 @@ export class ConversationQueries {
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
              WHERE ${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
-               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}')
+               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -726,8 +793,10 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
   ];
 }
 
+/** A new agent's setup message (`agent-welcome-v1`) is for the agent only, so no page or read state has it. */
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
+    `AND COALESCE(item_type, '') != '${AGENT_WELCOME_ITEM_TYPE}'`,
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`
       : "",

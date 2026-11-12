@@ -8,6 +8,18 @@
 // that a prompt on a channel thread names the channel and a prompt on the agent's own thread does
 // not, and that only the peer with the capability gets `threads`, the preview author and status and
 // the UI blocks, while the released peer reads its wire with the frozen channels-v1 codec.
+// It also checks channel-isolation-v1 (#5380): only a protocol 9 peer with the capability reads and
+// saves "Keep memories in this channel", a save without the field keeps the stored value, and the host
+// ignores the field from a peer without the capability.
+// It also checks channel-browser-v1 (#4135) in the same way for the Browser setting, and that a browser
+// member who is not in the channel turns the setting to no member. It checks the channel files route of
+// storage-channel-v1: a peer without the capability gets 400, a peer with it reads the channel's files
+// from a real storage service, and an unknown channel gets 404.
+// It also checks the channel routes of chat-history-v1: an owner starts a new conversation, a compaction
+// with no member session is refused with 409, a member who is not an admin gets 403 for a history
+// delete, an owner deletes the history, and an archived channel is refused with 409.
+// It also checks channel-seen-subtasks-v1 (#7505): a lead that waits for a second round of sub-tasks
+// names the first round as seen, from the host and on this computer, and a peer without it gets no field.
 // Run: `bun scripts/channel-notifications-e2e.ts`.
 // Writes .openbot-build/channel-notifications-e2e/report.json.
 
@@ -19,8 +31,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentEvent,
+  type ChannelBrowser,
   type ChannelMessage,
   type ChannelTask,
+  decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
   IPC_ENDPOINTS,
@@ -32,22 +46,35 @@ import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_V8,
+  TEAM_PROTOCOL_V9,
   TEAM_PROTOCOL_VERSION_HEADER,
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES, channelResponse } from "@openbot/contracts/team-protocol/channels-v1";
-import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
+import {
+  CHANNEL_BROWSER_CAPABILITY,
+  CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  TEAM_CHANNEL_ATTENTION_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  STORAGE_CHANNEL_CAPABILITY,
+  STORAGE_CHANNEL_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { createFormat, translateFor } from "@openbot/i18n";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
+import type { ChannelAssignment } from "../src/backend/channel-store";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import { StorageUsageScanner, StorageUsageService } from "../src/backend/storage-usage";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/channel-notifications-e2e");
@@ -174,6 +201,8 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   unverified: [
     "A remote host's channel list. This check reads the local host; the forwarder reads a remote list through the same decoder that the Team API steps use.",
     "Phone push. A channel reply sends no phone notification, as before channels were deprecated.",
+    "A channel file row. The fixture channel has no file; the scanner reads channel files as it reads chat files.",
+    "The channel files of a member who cannot see the channel. The owner sees every channel here.",
   ],
   steps: [],
 };
@@ -238,6 +267,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],
@@ -248,6 +280,8 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
   close: unused,
@@ -278,6 +312,30 @@ const manager = new RemoteServerManager(join(userData, "remote-servers.json"), c
 });
 let agents: AgentService | undefined;
 let server: InstanceType<typeof TeamApiServer> | undefined;
+/** The storage service of the host, on the temporary profile. The channel files come as the app reads them. */
+const storageSources = {
+  roots: {
+    database: join(userData, "openbot.db"),
+    downloads: join(root, "downloads"),
+    caches: [join(userData, "remote-attachments")],
+    logs: [join(userData, "logs")],
+    runtimes: join(root, "runtimes"),
+    data: userData,
+  },
+  database: () => database.connection,
+  mailbox,
+  agents: () => agents?.listAgents() ?? [],
+  channelFiles: (channelId: string) => {
+    const store = agents?.channels.store;
+    if (!store?.exists(channelId)) return null;
+    return store
+      .messages(channelId)
+      .flatMap((entry) =>
+        (entry.message.attachments ?? []).map((attachment) => ({ attachmentId: attachment.id, messageId: entry.id })),
+      );
+  },
+};
+const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
 
 /** An agent message in the channel, as a finished channel turn stores it. */
 function agentMessage(
@@ -309,14 +367,24 @@ function agentMessage(
 /** The capabilities that a protocol 8 peer sends. */
 const V8_PEER_CAPABILITIES = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V8);
 
-/** One HTTP request of a v8 peer that advertises `capabilities`. */
+/** The capabilities that a protocol 9 peer sends. channel-isolation-v1 is one of them. */
+const V9_PEER_CAPABILITIES = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+
+/** One HTTP request of a peer of `protocol` (v8 when absent) that advertises `capabilities`. */
 async function wire(
   port: number,
-  input: { method: string; path: string; capabilities: readonly string[]; body?: unknown; token?: string },
+  input: {
+    method: string;
+    path: string;
+    capabilities: readonly string[];
+    body?: unknown;
+    token?: string;
+    protocol?: number;
+  },
 ): Promise<{ status: number; body: unknown }> {
   const headers = new Headers({
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V8),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(input.protocol ?? TEAM_PROTOCOL_V8),
     [TEAM_APP_VERSION_HEADER]: APP_VERSION,
     [TEAM_CAPABILITIES_HEADER]: input.capabilities.join(","),
   });
@@ -585,6 +653,7 @@ try {
       sidebarLayout: sidebar,
       appVersion: APP_VERSION,
       channels,
+      storage,
     });
     return Effect.runPromise(server.start());
   });
@@ -652,9 +721,473 @@ try {
     },
   );
 
+  const codec = teamSideRouteCodec(CHANNEL_ROUTES.command);
+  assert.ok(codec);
+  const withoutIsolation = V9_PEER_CAPABILITIES.filter((capability) => capability !== CHANNEL_ISOLATION_CAPABILITY);
+  assert.ok(
+    V9_PEER_CAPABILITIES.includes(CHANNEL_ISOLATION_CAPABILITY),
+    "A protocol 9 peer does not send the capability.",
+  );
+  const stored = () => channels.store.get(channel.id).isolated;
+  /** A settings save of the channel, as the editor sends it, with `isolated` only when it is given. */
+  const save = (isolated?: boolean) => {
+    const current = channels.store.get(channel.id);
+    return {
+      type: "save",
+      operationId: randomUUID(),
+      channelId: channel.id,
+      update: true,
+      draft: {
+        name: current.name,
+        title: current.title,
+        instructions: current.instructions,
+        members: current.members,
+        leadAgentId: current.leadAgentId,
+        ...(isolated === undefined ? {} : { isolated }),
+      },
+    };
+  };
+  /** A request of a protocol 9 peer; `isolation` says whether it advertises channel-isolation-v1. */
+  const v9 = (isolation: boolean, method: string, path: string, body?: unknown) =>
+    wire(port, {
+      method,
+      path,
+      capabilities: isolation ? V9_PEER_CAPABILITIES : withoutIsolation,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      ...(body === undefined ? {} : { body }),
+    });
+  /** What a client with channel-isolation-v1 reads as `isolated` in the list, the page and `response`. */
+  const readIsolated = async (response: { status: number; body: unknown }) => {
+    assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+    const options = { channelAttention: true, channelIsolation: true };
+    const list = await v9(true, "GET", CHANNEL_ROUTES.list);
+    const page = await v9(true, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    const summary = decodeChannelSummaries(codec.response(CHANNEL_ROUTES.list, 200, list.body, options)).find(
+      (candidate) => candidate.id === channel.id,
+    );
+    return {
+      list: summary?.isolated,
+      page: decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, page.body, options)).channel.isolated,
+      command: decodeChannel(codec.response(CHANNEL_ROUTES.command, 200, response.body, options)).isolated,
+      stored: stored(),
+    };
+  };
+
+  await step("A peer without channel-isolation-v1 cannot turn the setting on, and gets no isolated field", async () => {
+    assert.notEqual(stored(), true, "The channel starts with the setting on.");
+    // The raw body carries the field: the host must ignore it because the peer did not advertise it.
+    const response = await v9(false, "POST", CHANNEL_ROUTES.command, save(true));
+    assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+    assert.notEqual(stored(), true, "The host stored isolated from a peer without the capability.");
+    const list = await v9(false, "GET", CHANNEL_ROUTES.list);
+    const page = await v9(false, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    const sent = {
+      list:
+        Array.isArray(list.body) && list.body.some((item) => isDynamicRecord(item) && Object.hasOwn(item, "isolated")),
+      page:
+        isDynamicRecord(page.body) &&
+        isDynamicRecord(page.body.channel) &&
+        Object.hasOwn(page.body.channel, "isolated"),
+      command: isDynamicRecord(response.body) && Object.hasOwn(response.body, "isolated"),
+    };
+    assert.deepEqual(sent, { list: false, page: false, command: false });
+    channelResponse(CHANNEL_ROUTES.list, 200, list.body);
+    channelResponse(CHANNEL_ROUTES.read, 200, page.body);
+    return { sent, stored: stored() ?? null };
+  });
+
+  await step(
+    "A peer with channel-isolation-v1 turns the setting on and reads it in the list, the page and the answer",
+    async () => {
+      const body = codec.request(CHANNEL_ROUTES.command, save(true), { channelIsolation: true });
+      const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+      assert.deepEqual(read, { list: true, page: true, command: true, stored: true });
+      return read;
+    },
+  );
+
+  await step(
+    "A save of a peer without channel-isolation-v1 keeps the setting on, even with isolated false",
+    async () => {
+      // An older desktop client, the phone, or a client of an older host: the raw body may carry the field.
+      const response = await v9(false, "POST", CHANNEL_ROUTES.command, save(false));
+      assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+      assert.equal(stored(), true, "A save of a peer without the capability turned the setting off.");
+      return { stored: stored() ?? null };
+    },
+  );
+
+  await step("A save without isolated keeps the setting on, as the editor sends a rename", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, save(), { channelIsolation: true });
+    const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, { list: true, page: true, command: true, stored: true });
+    return read;
+  });
+
+  await step("A peer with channel-isolation-v1 turns the setting off again", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, save(false), { channelIsolation: true });
+    const read = await readIsolated(await v9(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, { list: false, page: false, command: false, stored: false });
+    return read;
+  });
+
+  const withoutBrowser = V9_PEER_CAPABILITIES.filter((capability) => capability !== CHANNEL_BROWSER_CAPABILITY);
+  assert.ok(
+    V9_PEER_CAPABILITIES.includes(CHANNEL_BROWSER_CAPABILITY),
+    "A protocol 9 peer does not send the capability.",
+  );
+  const storedBrowser = () => channels.store.get(channel.id).browser ?? null;
+  /**
+   * A settings save of the channel, as the editor sends it, with `browser` only when it is given, and
+   * with `members` in place of the stored members when they are given.
+   */
+  const browserSave = (browser?: ChannelBrowser, members?: readonly { agentId: string }[]) => {
+    const saved = save();
+    return {
+      ...saved,
+      draft: {
+        ...saved.draft,
+        ...(members === undefined ? {} : { members }),
+        ...(browser === undefined ? {} : { browser }),
+      },
+    };
+  };
+  /** A request of a protocol 9 peer; `browser` says whether it advertises channel-browser-v1. */
+  const withBrowser = (browser: boolean, method: string, path: string, body?: unknown) =>
+    wire(port, {
+      method,
+      path,
+      capabilities: browser ? V9_PEER_CAPABILITIES : withoutBrowser,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      ...(body === undefined ? {} : { body }),
+    });
+  /** What a client with channel-browser-v1 reads as `browser` in the list, the page and `response`. */
+  const readBrowser = async (response: { status: number; body: unknown }) => {
+    assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+    const options = { channelAttention: true, channelBrowser: true };
+    const list = await withBrowser(true, "GET", CHANNEL_ROUTES.list);
+    const page = await withBrowser(true, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    const summary = decodeChannelSummaries(codec.response(CHANNEL_ROUTES.list, 200, list.body, options)).find(
+      (candidate) => candidate.id === channel.id,
+    );
+    return {
+      list: summary?.browser ?? null,
+      page: decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, page.body, options)).channel.browser ?? null,
+      command: decodeChannel(codec.response(CHANNEL_ROUTES.command, 200, response.body, options)).browser ?? null,
+      stored: storedBrowser(),
+    };
+  };
+  /** The same value in the list, the page, the answer and the store. */
+  const everywhere = (browser: ChannelBrowser) => ({ list: browser, page: browser, command: browser, stored: browser });
+  const onlyAgent: ChannelBrowser = { kind: "member", agentId: agent.id };
+
+  await step(
+    "A peer without channel-browser-v1 cannot change the Browser setting, and gets no browser field",
+    async () => {
+      assert.equal(storedBrowser(), null, "The channel starts with a Browser setting.");
+      // The raw body carries the field: the host must ignore it because the peer did not advertise it.
+      const response = await withBrowser(false, "POST", CHANNEL_ROUTES.command, browserSave({ kind: "none" }));
+      assert.equal(response.status, 200, `The save failed: ${JSON.stringify(response.body)}`);
+      assert.equal(storedBrowser(), null, "The host stored browser from a peer without the capability.");
+      const list = await withBrowser(false, "GET", CHANNEL_ROUTES.list);
+      const page = await withBrowser(false, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+      const sent = {
+        list:
+          Array.isArray(list.body) && list.body.some((item) => isDynamicRecord(item) && Object.hasOwn(item, "browser")),
+        page:
+          isDynamicRecord(page.body) &&
+          isDynamicRecord(page.body.channel) &&
+          Object.hasOwn(page.body.channel, "browser"),
+        command: isDynamicRecord(response.body) && Object.hasOwn(response.body, "browser"),
+      };
+      assert.deepEqual(sent, { list: false, page: false, command: false });
+      return { sent, stored: storedBrowser() };
+    },
+  );
+
+  await step(
+    "A peer with channel-browser-v1 gives the browser to one member and reads it in the list, the page and the answer",
+    async () => {
+      const body = codec.request(CHANNEL_ROUTES.command, browserSave(onlyAgent), { channelBrowser: true });
+      const read = await readBrowser(await withBrowser(true, "POST", CHANNEL_ROUTES.command, body));
+      assert.deepEqual(read, everywhere(onlyAgent));
+      return read;
+    },
+  );
+
+  await step("A save without browser keeps the browser member, as the editor sends a rename", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, browserSave(), { channelBrowser: true });
+    const read = await readBrowser(await withBrowser(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, everywhere(onlyAgent));
+    return read;
+  });
+
+  await step("A save that gives the browser to an agent who is not a member is refused", async () => {
+    const stranger: ChannelBrowser = { kind: "member", agentId: randomUUID() };
+    const body = codec.request(CHANNEL_ROUTES.command, browserSave(stranger), { channelBrowser: true });
+    const response = await withBrowser(true, "POST", CHANNEL_ROUTES.command, body);
+    assert.notEqual(response.status, 200, `The host saved a browser member who is not a member.`);
+    assert.deepEqual(storedBrowser(), onlyAgent, "A refused save changed the setting.");
+    return { status: response.status, stored: storedBrowser() };
+  });
+
+  await step("Removing the browser member from the channel turns the setting to no member", async () => {
+    const helper = await runCauseEffect(
+      agentStore.createAgent({
+        name: "Browser fixture",
+        description: "Synthetic second member for the channel browser check",
+        avatarSeed: "channel-browser",
+        avatarHue: null,
+      }),
+    );
+    const both = [{ agentId: agent.id }, { agentId: helper.id }];
+    const helperOnly: ChannelBrowser = { kind: "member", agentId: helper.id };
+    const add = codec.request(CHANNEL_ROUTES.command, browserSave(helperOnly, both), { channelBrowser: true });
+    assert.deepEqual(
+      await readBrowser(await withBrowser(true, "POST", CHANNEL_ROUTES.command, add)),
+      everywhere(helperOnly),
+    );
+    // The editor sends no `browser` when it removes a member, so the host must not keep a non-member.
+    const remove = codec.request(CHANNEL_ROUTES.command, browserSave(undefined, [{ agentId: agent.id }]), {
+      channelBrowser: true,
+    });
+    const read = await readBrowser(await withBrowser(true, "POST", CHANNEL_ROUTES.command, remove));
+    assert.deepEqual(read, everywhere({ kind: "none" }));
+    return read;
+  });
+
+  await step("A peer with channel-browser-v1 gives the browser to every member again", async () => {
+    const body = codec.request(CHANNEL_ROUTES.command, browserSave({ kind: "members" }), { channelBrowser: true });
+    const read = await readBrowser(await withBrowser(true, "POST", CHANNEL_ROUTES.command, body));
+    assert.deepEqual(read, everywhere({ kind: "members" }));
+    return read;
+  });
+
+  await step(
+    "A lead that waits for a second round names the first round as seen, only to a peer with channel-seen-subtasks-v1",
+    async () => {
+      assert.ok(V9_PEER_CAPABILITIES.includes(CHANNEL_SEEN_SUBTASKS_CAPABILITY), "A protocol 9 peer lacks it.");
+      const task = (id: string, parentTaskId: string | null, rootTaskId: string, state: ChannelTask["state"]) => ({
+        id,
+        channelId: channel.id,
+        parentTaskId,
+        rootTaskId,
+        ownerAgentId: agent.id,
+        requestMessageId: randomUUID(),
+        instruction: `Task ${id}`,
+        attachmentDraftIds: [],
+        expectedResult: "",
+        sourceMessageIds: [],
+        dependencies: [],
+        resources: [],
+        state,
+        revision: 1,
+        assignmentCount: 1,
+        error: null,
+      });
+      const leadId = randomUUID();
+      // The first round finished and the lead's second turn read it; that turn then assigned the second round.
+      const firstRound = task(randomUUID(), leadId, leadId, "completed");
+      const secondRound = task(randomUUID(), leadId, leadId, "running");
+      const lead: ChannelTask = {
+        ...task(leadId, null, leadId, "waiting"),
+        dependencies: [firstRound.id, secondRound.id],
+      };
+      const secondTurn: ChannelAssignment = {
+        id: randomUUID(),
+        channelId: channel.id,
+        taskId: lead.id,
+        agentId: agent.id,
+        taskRevision: 2,
+        requestMessageId: lead.requestMessageId,
+        resources: [],
+        deliveryId: null,
+        turnId: null,
+        state: "completed",
+        throughSequence: 0,
+        summaryVersion: 0,
+        awaitedTaskIds: [firstRound.id],
+        pendingRevision: null,
+        pendingOutcome: null,
+      };
+      channels.store.update(channels.store.get(channel.id), {
+        tasks: [lead, firstRound, secondRound],
+        assignments: [secondTurn],
+      });
+      const read = (capabilities: readonly string[]) =>
+        wire(port, {
+          method: "POST",
+          path: CHANNEL_ROUTES.read,
+          capabilities,
+          token,
+          protocol: TEAM_PROTOCOL_V9,
+          body: { channelId: channel.id },
+        });
+      const released = await read(V9_PEER_CAPABILITIES.filter((item) => item !== CHANNEL_SEEN_SUBTASKS_CAPABILITY));
+      const current = await read(V9_PEER_CAPABILITIES);
+      assert.equal(released.status, 200, `The page failed: ${JSON.stringify(released.body)}`);
+      assert.equal(current.status, 200, `The page failed: ${JSON.stringify(current.body)}`);
+      const options = { channelAttention: true, channelSeenSubtasks: true };
+      const releasedPage = decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, released.body, options));
+      const currentPage = decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, current.body, options));
+      const leadOf = (tasks: readonly ChannelTask[]) => tasks.find((item) => item.id === lead.id);
+      // The released wire still reads with the frozen channels-v1 codec.
+      channelResponse(CHANNEL_ROUTES.read, 200, released.body);
+      const local = channels.store.withSeenDependencies(channel.id, channels.store.tasks(channel.id));
+      // This checks the data. The list above the composer (`channelAwaitingReplies`) reads it, and a
+      // script cannot load that renderer module, so the smoke test of the PR checks the list itself.
+      // A first-round sub-task that runs again after the lead read it, as after Reassign, is not seen.
+      channels.store.update(channels.store.get(channel.id), {
+        assignments: [{ ...secondTurn, id: randomUUID(), taskId: firstRound.id, awaitedTaskIds: [] }],
+      });
+      const reassigned = await read(V9_PEER_CAPABILITIES);
+      const result = {
+        released: leadOf(releasedPage.tasks)?.seenDependencies ?? null,
+        current: leadOf(currentPage.tasks)?.seenDependencies ?? null,
+        local: leadOf(local)?.seenDependencies ?? null,
+        // Only a waiting task names what it has seen: the sub-tasks have nothing.
+        subtasks: currentPage.tasks.filter((item) => item.parentTaskId === lead.id && item.seenDependencies).length,
+        reassigned:
+          leadOf(decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, reassigned.body, options)).tasks)
+            ?.seenDependencies ?? null,
+      };
+      assert.deepEqual(result, {
+        released: null,
+        current: [firstRound.id],
+        local: [firstRound.id],
+        subtasks: 0,
+        reassigned: null,
+      });
+      channels.store.update(channels.store.get(channel.id), {
+        tasks: [lead, firstRound, secondRound].map((item) => ({ ...item, state: "completed" as const })),
+      });
+      return result;
+    },
+  );
+
+  const withoutChannelFiles = V9_PEER_CAPABILITIES.filter((capability) => capability !== STORAGE_CHANNEL_CAPABILITY);
+  const channelFiles = (channelId: string, capabilities: readonly string[] = V9_PEER_CAPABILITIES) =>
+    wire(port, {
+      method: "POST",
+      path: STORAGE_CHANNEL_ROUTES.files,
+      capabilities,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      body: { channelId, force: true },
+    });
+
+  await step("A peer without storage-channel-v1 gets 400 for the files of a channel", async () => {
+    const response = await channelFiles(channel.id, withoutChannelFiles);
+    assert.equal(response.status, 400, `The host answered: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
+  });
+
+  await step("A peer with storage-channel-v1 reads the files of the channel from the host's storage", async () => {
+    const response = await channelFiles(channel.id);
+    assert.equal(response.status, 200, `The files failed: ${JSON.stringify(response.body)}`);
+    assert.ok(isDynamicRecord(response.body), "The answer is not an object.");
+    assert.equal(response.body.channelId, channel.id);
+    assert.ok(Array.isArray(response.body.files), "The answer has no file list.");
+    assert.equal(response.body.truncated, false);
+    // The fixture channel has no file, and a file of another chat must not show in it.
+    assert.deepEqual(response.body.files, []);
+    return { status: response.status, files: response.body.files.length };
+  });
+
+  await step("The files of an unknown channel get 404", async () => {
+    const response = await channelFiles(randomUUID());
+    assert.equal(response.status, 404, `The host answered: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
+  });
+
+  const withoutHistory = V9_PEER_CAPABILITIES.filter((capability) => capability !== CHAT_HISTORY_CAPABILITY);
+  const historyRequest = (path: string, capabilities: readonly string[] = V9_PEER_CAPABILITIES) =>
+    wire(port, {
+      method: "POST",
+      path,
+      capabilities,
+      token,
+      protocol: TEAM_PROTOCOL_V9,
+      body: { channelId: channel.id },
+    });
+  const readPage = async () => {
+    const page = await v9(true, "POST", CHANNEL_ROUTES.read, { channelId: channel.id });
+    assert.equal(page.status, 200, `The page failed: ${JSON.stringify(page.body)}`);
+    return decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, page.body, { channelAttention: true }));
+  };
+
+  await step("A peer without chat-history-v1 cannot start a new conversation in the channel", async () => {
+    const before = (await readPage()).messages.length;
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear, withoutHistory);
+    assert.equal(response.status, 400, `The host accepted the request: ${JSON.stringify(response.body)}`);
+    assert.equal((await readPage()).messages.length, before, "The host changed the channel.");
+    return { status: response.status, body: response.body };
+  });
+
+  await step("An owner starts a new conversation in the channel over the Team API", async () => {
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear);
+    assert.equal(response.status, 200, `The new conversation failed: ${JSON.stringify(response.body)}`);
+    const last = (await readPage()).messages.at(-1);
+    assert.equal(last?.message.itemType, "context-reset", "The channel has no new conversation marker.");
+    return { status: response.status, marker: last?.message.itemType ?? null };
+  });
+
+  await step("A compaction with no member session gets 409 with a sentence", async () => {
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelCompact);
+    assert.equal(response.status, 409, `The host did not refuse: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
+  });
+
+  await step("A member who is not an admin gets 403 for a channel history delete, and the messages stay", async () => {
+    const invite = await runCauseEffect(team.createInvite("member"));
+    const memberCredentials = { username: "member-user", password: "member-password-123" };
+    await runCauseEffect(team.acceptInvite(invite.token, memberCredentials.username, memberCredentials.password));
+    const memberLogin = await wire(port, {
+      method: "POST",
+      path: "/v1/auth/login",
+      capabilities: V8_PEER_CAPABILITIES,
+      body: memberCredentials,
+    });
+    assert.ok(isDynamicRecord(memberLogin.body) && typeof memberLogin.body.sessionToken === "string");
+    const before = (await readPage()).messages.length;
+    const response = await wire(port, {
+      method: "POST",
+      path: CHAT_HISTORY_ROUTES.channelDelete,
+      capabilities: V9_PEER_CAPABILITIES,
+      token: memberLogin.body.sessionToken,
+      protocol: TEAM_PROTOCOL_V9,
+      body: { channelId: channel.id },
+    });
+    assert.equal(response.status, 403, `The host did not refuse the member: ${JSON.stringify(response.body)}`);
+    assert.equal((await readPage()).messages.length, before, "The host changed the channel.");
+    return { status: response.status, body: response.body };
+  });
+
+  await step("An owner deletes the channel history over the Team API", async () => {
+    assert.ok((await readPage()).messages.length > 0, "The channel starts without messages.");
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelDelete);
+    assert.equal(response.status, 200, `The delete failed: ${JSON.stringify(response.body)}`);
+    const shown = (await readPage()).messages.filter((message) => message.message.text !== "");
+    assert.equal(shown.length, 0, `The channel still shows messages: ${JSON.stringify(shown)}`);
+    return { status: response.status, shown: shown.length };
+  });
+
+  await step("A new conversation in an archived channel gets 409 with a sentence", async () => {
+    const command = (type: "archive" | "restore") =>
+      v9(true, "POST", CHANNEL_ROUTES.command, { type, operationId: randomUUID(), channelId: channel.id });
+    assert.equal((await command("archive")).status, 200, "The archive failed.");
+    const response = await historyRequest(CHAT_HISTORY_ROUTES.channelClear);
+    assert.equal((await command("restore")).status, 200, "The restore failed.");
+    assert.equal(response.status, 409, `The host did not refuse: ${JSON.stringify(response.body)}`);
+    return { status: response.status, body: response.body };
+  });
+
   report.passed = true;
 } finally {
   if (server) await Effect.runPromise(server.stop()).catch(() => undefined);
+  await Effect.runPromise(storage.dispose()).catch(() => undefined);
   await runCauseEffect(manager.stop()).catch(() => undefined);
   if (agents) await runCauseEffect(agents.stop()).catch(() => undefined);
   database.close();

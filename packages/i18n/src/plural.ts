@@ -15,6 +15,19 @@ const english: PluralRule = (count) => (count === 1 ? "one" : "other");
 
 const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   en: english,
+  // CLDR Arabic: zero for 0; one for 1; two for 2; few for n % 100 in 3–10; many for n % 100 in
+  // 11–99; other for 100–102, 200–202… and for fractions.
+  ar: (count) => {
+    const absolute = Math.abs(count);
+    if (!Number.isInteger(absolute)) return "other";
+    if (absolute === 0) return "zero";
+    if (absolute === 1) return "one";
+    if (absolute === 2) return "two";
+    const lastTwo = absolute % 100;
+    if (lastTwo >= 3 && lastTwo <= 10) return "few";
+    if (lastTwo >= 11) return "many";
+    return "other";
+  },
   de: (count) => (Math.abs(count) === 1 ? "one" : "other"),
   // CLDR Spanish: one for 1; many for nonzero integer multiples of one million.
   es: (count) => {
@@ -24,6 +37,12 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
+  // CLDR Hebrew: one for 1 and for fractions below 1; two for 2; other for every other number.
+  he: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute === 1 || (absolute > 0 && absolute < 1)) return "one";
+    return absolute === 2 ? "two" : "other";
+  },
   // CLDR Italian: one for 1; many for nonzero integer multiples of one million.
   it: (count) => {
     const absolute = Math.abs(count);

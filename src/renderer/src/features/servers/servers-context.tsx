@@ -69,6 +69,8 @@ const Servers = createSimpleContext({
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
     /** The dialog that creates a server on this computer. */
     const [createLocalServerOpen, setCreateLocalServerOpen] = createSignal(false);
+    /** The dialog with the command that installs a server on another computer. */
+    const [installServerOpen, setInstallServerOpen] = createSignal(false);
     /** Where the user opened the hosted server plans, or null while they are closed. */
     const [addServerEntryPoint, setAddServerEntryPoint] = createSignal<HostedServerEntryPoint | null>(null);
     const addServerOpen = () => addServerEntryPoint() !== null;
@@ -377,7 +379,9 @@ const Servers = createSimpleContext({
     );
 
     async function retryServerConnection(serverId: string): Promise<void> {
-      pendingCompatibilityRetryServerId = serverId;
+      // A server that stays online needs no new load. A replaced connection loads as a reconnection.
+      if (servers().find((server) => server.id === serverId)?.state !== "online")
+        pendingCompatibilityRetryServerId = serverId;
       try {
         await serversPort().servers.retryConnection(serverId);
       } catch (error) {
@@ -456,6 +460,8 @@ const Servers = createSimpleContext({
       setJoinServerOpen,
       createLocalServerOpen,
       setCreateLocalServerOpen,
+      installServerOpen,
+      setInstallServerOpen,
       addServerOpen,
       addServerEntryPoint,
       setAddServerOpen,

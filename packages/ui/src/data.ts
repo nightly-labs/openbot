@@ -5,8 +5,11 @@ import type {
   AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
+  AgentTask,
   AttachmentSummary,
+  AvatarColor,
   AvatarHue,
+  BrowserTab,
   ChannelRoutingConversationEvent,
   ClientAgentSummary,
   ConversationMemoryChange,
@@ -26,6 +29,8 @@ import type {
   RoutineConversationEvent,
   RoutineRunConversationEvent,
   SkillConversationEvent,
+  SkillSuggestionEvent,
+  VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
@@ -78,6 +83,8 @@ export interface AgentMessageMarkerModel {
   replyToMessageId: string | null;
   /** The sender asked for no answer, so the marker names it as information rather than a request. */
   expectsReply: boolean;
+  /** The sender's side thread that sent an incoming message. The sender link opens it. */
+  senderTaskId?: string;
   /** Set when the chat has the text of the message: whether the text shows under the marker. */
   expanded?: boolean;
 }
@@ -96,7 +103,16 @@ export interface RoutineRunMarkerModel {
 }
 
 export type ChatActionMarkerModel =
-  | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
+  | (SkillConversationEvent & {
+      kind: "skill-lifecycle";
+      timestamp: string;
+      /**
+       * Set when this row stands for consecutive installs of one skill revision, one for each agent:
+       * the ids of their messages, oldest first. Only the timeline joins them, and `timestamp` is the
+       * time of the newest one.
+       */
+      installMessageIds?: readonly string[];
+    })
   | AgentMessageMarkerModel
   /**
    * Consecutive agent messages, oldest first, drawn as one row. Only the timeline joins them: each
@@ -143,11 +159,30 @@ export type ChatActionMarkerModel =
       url: string | null;
       timestamp: string;
     }
-  | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /**
+   * Where a channel request went. Consecutive receipts of one action, such as the lead giving parts
+   * of one request to three members, are one row: "Assigned to Chief, Builder and Launch". Only the
+   * timeline joins them: each stored receipt names one member. `timestamp` is the newest receipt.
+   */
+  | {
+      kind: "channel-routing";
+      action: ChannelRoutingConversationEvent["action"];
+      agentIds: string[];
+      timestamp: string;
+    }
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** A memory review asks to save a skill from the chat. The chat shows a card to save it. */
+  | (SkillSuggestionEvent & { kind: "skill-suggestion"; timestamp: string })
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
   | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
+  /**
+   * The agent got a one-time command that installs a server. The chat shows a card that waits for the
+   * server. `name` is the name that the command gives it; `expiresAt` is in milliseconds since the epoch.
+   */
+  | { kind: "server-install"; name: string | null; expiresAt: number; timestamp: string }
+  /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
+  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */
@@ -206,6 +241,7 @@ export interface AgentMessage {
   /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  videoGeneration?: VideoGenerationInfo | undefined;
   questionPrompt?: ConversationQuestionPrompt | undefined;
   /** The interactive block an agent drew. A blocking block sits beside `questionPrompt`. */
   uiBlock?: ConversationUiBlock;
@@ -227,6 +263,8 @@ export interface AgentMessage {
   itemIds?: string[];
   /** When the host wrote each of `items`, to place them between a turn's progress lines. */
   itemCreatedAt?: string[];
+  /** Whether the host still writes each of `items`. */
+  itemStreaming?: boolean[];
   plan?: AgentMessagePlan | undefined;
   /** The subagents that the agent started in this turn, on a `subagents` message. */
   subagents?: ConversationSubagent[] | undefined;
@@ -269,6 +307,8 @@ export interface AgentProfile {
   browserProfileId?: string | undefined;
   /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
   fastMode?: boolean | undefined;
+  /** With `fastMode`, the Ultrafast tier in place of Fast. Absent for an agent on a remote host. */
+  ultrafast?: boolean | undefined;
   /** Absent means the app default. Absent for an agent on a remote host too, which does not share it. */
   busyMessageMode?: ClientAgentSummary["busyMessageMode"];
   /** Absent means the default task limit. Absent for an agent on a remote host too, which runs no tasks. */
@@ -288,6 +328,10 @@ export interface AgentProfile {
   workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour, which wins over `avatarHue`. Absent on a host without `agent-colors-v1`. */
+  avatarColor?: AvatarColor | null;
+  /** The tint of the agent's chat bubbles. Absent for no tint, and on a host without `chat-colors-v1`. */
+  chatColor?: AvatarColor | undefined;
   avatarUrl: string | null;
   marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;
@@ -298,7 +342,7 @@ export interface AgentProfile {
 /** The agent fields that the composer, the queue, rich text and the browser dock read. */
 export type ComposerAgent = Pick<
   AgentProfile,
-  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
 >;
 
 /** The skill fields that the composer, the queue and rich text read. */
@@ -312,3 +356,9 @@ export type ComposerMcpServer = Pick<
   McpServerConfig,
   "id" | "name" | "enabled" | "transport" | "command" | "args" | "url"
 >;
+
+/** A browser tab of the agent that the composer can tag. */
+export type ComposerBrowserTab = Pick<BrowserTab, "id" | "title" | "url">;
+
+/** A side thread of the agent that the composer can tag. Its id is the task id. */
+export type ComposerThread = Pick<AgentTask, "id" | "title" | "state" | "outcome" | "progress" | "error">;

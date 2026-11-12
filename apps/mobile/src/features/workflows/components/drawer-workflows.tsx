@@ -3,13 +3,14 @@ import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import Play from "lucide-react-native/icons/play";
 import UserRoundCheck from "lucide-react-native/icons/user-round-check";
-import { memo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
 import { useWorkflowList } from "@/features/workflows/model/use-workflows";
 import { RUN_STATUS_LABEL } from "@/features/workflows/model/workflow-steps";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { rememberDrawerValues, useDrawerSnapshot } from "@/features/workspace/model/drawer-snapshot";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -27,14 +28,36 @@ export interface DrawerWorkflows {
   pinned: WorkflowSummary[];
 }
 
-/** The value of the Workflows row and the pinned workflows, from the list that the host keeps current. */
+/**
+ * The value of the Workflows row and the pinned workflows, from the list that the host keeps current.
+ * Until the host is online and sends the list, they are the ones of the last start. A failed read
+ * shows none, as it did before the phone kept them.
+ */
 export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkflows {
   const { t } = useText();
-  const { list, supported } = useWorkflowList(serverId, open);
+  const { list, online, supported: liveSupported } = useWorkflowList(serverId, open);
   const pinnedIds = useMobileWorkspaceSelector((current) => current.pinnedWorkflowIds[serverId] ?? NO_IDS);
-  const workflows = list.data ?? [];
-  const needsYou = workflows.filter((workflow) => workflow.lastRun?.status === "approval").length;
-  const running = workflows.filter((workflow) => workflow.lastRun?.status === "running").length;
+  const cached = useDrawerSnapshot(serverId).workflows;
+  // An online host has sent its capabilities.
+  const known = online && (!liveSupported || list.data !== undefined || list.isError);
+  const data = list.data;
+  const live = useMemo(() => {
+    const workflows = data ?? [];
+    return {
+      needsYou: workflows.filter((workflow) => workflow.lastRun?.status === "approval").length,
+      running: workflows.filter((workflow) => workflow.lastRun?.status === "running").length,
+      pinned: pinnedIds.flatMap((id) => workflows.find((workflow) => workflow.id === id) ?? []),
+    };
+  }, [data, pinnedIds]);
+  // With no kept values, the row shows from the capabilities, as before.
+  const fromHost = known || cached === undefined;
+  const shown = fromHost ? (liveSupported ? live : null) : cached;
+  const supported = fromHost ? liveSupported : Boolean(cached);
+  useEffect(() => {
+    if (known && !list.isError) rememberDrawerValues(serverId, { workflows: liveSupported ? live : null });
+  }, [serverId, known, list.isError, liveSupported, live]);
+  const needsYou = shown?.needsYou ?? 0;
+  const running = shown?.running ?? 0;
   return {
     supported,
     value: needsYou
@@ -43,7 +66,8 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
         ? t("mobile.workflow.drawer.running", { count: running })
         : null,
     needsYou: needsYou > 0,
-    pinned: pinnedIds.flatMap((id) => workflows.find((workflow) => workflow.id === id) ?? []),
+    // A workflow unpinned since the last start does not show.
+    pinned: pinnedIds.flatMap((id) => shown?.pinned.find((workflow) => workflow.id === id) ?? []),
   };
 }
 

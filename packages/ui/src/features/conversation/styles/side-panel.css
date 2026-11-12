@@ -6,7 +6,7 @@
   position: absolute;
   z-index: 16;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   display: flex;
   align-items: center;
   gap: var(--openbot-space-1);
@@ -21,7 +21,7 @@
 .side-panel-header::before {
   position: absolute;
   top: 50%;
-  left: 0;
+  inset-inline-start: 0;
   width: 1px;
   height: var(--openbot-icon-lg);
   translate: 0 -50%;
@@ -36,6 +36,9 @@
   align-items: center;
   gap: var(--openbot-space-1);
   min-width: 0;
+  /* A tab drag measures `offsetLeft` from the left edge (`SidePanel.tsx`, `BrowserTabStrip.tsx`), so
+     the tabs keep the left-to-right order in every language. */
+  direction: ltr;
 }
 
 .side-panel-actions {
@@ -60,7 +63,8 @@
   gap: var(--openbot-space-1-5);
   min-width: 0;
   height: var(--openbot-control-sm);
-  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-secondary);
 }
@@ -79,7 +83,7 @@
 .side-panel-tab + .side-panel-tab::before {
   position: absolute;
   top: 50%;
-  left: calc(var(--openbot-space-1) / -2 - 0.5px);
+  inset-inline-start: calc(var(--openbot-space-1) / -2 - 0.5px);
   width: 1px;
   height: var(--openbot-icon-lg);
   translate: 0 -50%;
@@ -130,6 +134,12 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+/* A file-type badge of three or four letters is wider than a tab icon, so the slot grows to hold it. */
+.side-panel-file-tab .side-panel-tab-close {
+  width: auto;
+  min-width: var(--openbot-icon-md);
 }
 
 .side-panel-tab-icon,
@@ -286,6 +296,40 @@
   color: var(--openbot-text-muted);
 }
 
+/* A file tab shows the file-type badge of a file link at its size in the chat. A file name is longer
+ * than a pane name, so it shrinks and ends in an ellipsis. A file tab slides when it drags, as a thread
+ * tab does. */
+.side-panel-file-tab {
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.side-panel-file-badge {
+  display: inline-flex;
+}
+
+.side-panel-file-badge > .attachment-reference-visual > svg {
+  width: 12px;
+  height: 12px;
+}
+
+.side-panel-file-tab .side-panel-tab-select {
+  flex: 0 1 auto;
+}
+
+/* In the dock, the file tab names the file. The title keeps its place, so the file actions stay at
+ * the end of the toolbar. The file comes in with its tab, as the other panes do, without a slide. */
+.side-panel-docked .file-preview-header > .file-preview-file-icon {
+  display: none;
+}
+
+.side-panel-docked .file-preview-header > h2 {
+  visibility: hidden;
+}
+
+.side-panel-docked > .file-preview-panel.t-panel-slide {
+  transition: none;
+}
+
 /* A thread tab: the state badge of the thread takes the icon slot at its own size, and the X shows
  * over it on hover. A thread that needs the user wears the tint of its badge, as in the chat header. */
 .side-panel-tab-close:has(.agent-threads-state) {
@@ -318,7 +362,7 @@
   text-align: start;
 }
 
-/* A thread tab that the pointer moves follows the pointer and wears the selection fill, so it covers
+/* A thread or file tab that the pointer moves follows the pointer and wears the selection fill, so it covers
  * the tabs that it passes. The dividers and the X hide until the drop. Over the chat, the tab goes
  * back to its place, faded, and a copy follows the pointer. */
 .side-panel-tabs[data-dragging],
@@ -327,7 +371,7 @@
   user-select: none;
 }
 
-.side-panel-tabs[data-dragging] > .side-panel-thread-tab[data-dragged=""] {
+.side-panel-tabs[data-dragging] > :is(.side-panel-thread-tab, .side-panel-file-tab)[data-dragged=""] {
   z-index: 2;
   background-color: var(--openbot-bg-control-active);
   color: var(--openbot-text-primary);
@@ -379,7 +423,7 @@
   position: absolute;
   z-index: 17;
   top: calc(var(--left-header-height, 38px) + var(--openbot-space-2));
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   bottom: var(--openbot-space-2);
   display: grid;
   width: calc(var(--side-panel-width, 380px) - 2 * var(--openbot-space-2));
@@ -394,7 +438,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .side-panel-thread-tab {
+  .side-panel-thread-tab,
+  .side-panel-file-tab {
     transition: none;
   }
 }

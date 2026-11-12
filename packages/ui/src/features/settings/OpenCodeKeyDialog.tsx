@@ -100,6 +100,13 @@ export interface ProviderKeyApi {
    * with `claude-api-key-v1`. An older host stores the key and never reads it.
    */
   readsClaudeKey?: boolean | undefined;
+  /**
+   * Whether the host logs Codex in with a pasted OpenAI key: this computer, or a joined server with
+   * `codex-api-key-v1`. An older host stores the key and never reads it.
+   */
+  readsCodexKey?: boolean | undefined;
+  /** Whether the key goes to the host of a joined server, not to this computer. */
+  onHost?: boolean | undefined;
   getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
   setProviderApiKey: (input: { provider: AgentProviderId; key: string }) => Promise<unknown>;
   clearProviderApiKey: (provider: AgentProviderId) => Promise<unknown>;
@@ -124,6 +131,9 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   const { t, errorMessage } = useText();
   const provider = () => props.provider ?? "opencode";
   const text = () => KEY_TEXT[provider()];
+  // Codex saves the key where it runs, which for a joined server is the host.
+  const description = () =>
+    provider() === "codex" && props.api.onHost ? "provider.codexKey.descriptionHost" : text().description;
   const [key, setKey] = createSignal("");
   const [stored, setStored] = createSignal<ProviderApiKeyStatus>("missing");
   const [phase, setPhase] = createSignal<DialogPhase>("loading");
@@ -207,7 +217,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 <Show
                   when={stored() === "saved"}
                   fallback={
-                    <Show when={stored() === "unreadable"} fallback={t(text().description)}>
+                    <Show when={stored() === "unreadable"} fallback={t(description())}>
                       {t("provider.openCodeKey.unreadable")}
                     </Show>
                   }

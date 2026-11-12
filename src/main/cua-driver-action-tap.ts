@@ -17,7 +17,17 @@
 // It changes one thing on the way back. The answer to a tool call gets one more text item, a JSON
 // copy of its `structuredContent`, because some providers show the model only the text and the
 // driver's text is a summary with nothing in it to act on. `cua-driver-structured-text.ts` says
-// what the copy holds. Every other answer, and every other byte of a changed one, passes unchanged.
+// what the copy holds. A refused call also gets its reason in `structuredContent`, because Codex
+// shows the model only that. Every other answer, and every other byte of a changed one, passes
+// unchanged.
+//
+// The tool list also loses the tools of the driver's own cursor overlay. OpenBot starts the daemon
+// with `--no-overlay` and draws the agent cursor itself, so those tools can change nothing that the
+// user sees: on macOS they refuse with a reason about the driver's own host, and on Linux they
+// report a change that nothing draws. An agent that a user asked to show its cursor called one,
+// read the refusal, and told the user that they could not watch it work (#6478). The driver's
+// proxy reads the list once, and a provider offers the model only the tools that it lists. A call
+// to a hidden tool still passes, because the tap refuses nothing.
 //
 // It also times each tool call, from the request line to the end of its answer line, and logs the
 // tool name and the milliseconds. That is the driver's share of a slow Computer Use step; the rest
@@ -30,7 +40,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { CuaDriverFailure, cuaIO } from "./cua-driver-effects";
-import { rewriteCallAnswer } from "./cua-driver-structured-text";
+import { parseAnswerLine, rewriteCallAnswer } from "./cua-driver-structured-text";
 
 /**
  * A line longer than this is not a request the tap understands, so it stops reading that line.
@@ -101,11 +111,26 @@ interface ObservedRequest {
    * copy of its structured result, and the tap logs how long that answer took.
    */
   tool: string | null;
+  /** Whether the line asks for the tool list, whose answer loses the driver's cursor tools. */
+  list: boolean;
   action: ObservedAction | null;
   pointer: ObservedPointer | null;
 }
 
-const NOTHING: ObservedRequest = { tool: null, action: null, pointer: null };
+const NOTHING: ObservedRequest = { tool: null, list: false, action: null, pointer: null };
+const TOOL_LIST: ObservedRequest = { ...NOTHING, list: true };
+
+/**
+ * The tools of the driver's own cursor overlay, which `--no-overlay` turns off on every platform.
+ * `move_cursor` is not one of them: it also moves the real pointer, and OpenBot draws its own
+ * cursor at the point that the call names.
+ */
+const DRIVER_CURSOR_TOOLS = new Set([
+  "set_agent_cursor_enabled",
+  "set_agent_cursor_motion",
+  "set_agent_cursor_theme",
+  "get_agent_cursor_state",
+]);
 
 /**
  * The tools that aim the pointer at a point on the desktop.
@@ -121,8 +146,8 @@ const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
  * The protocol is one JSON object per line. A tool call is
  * `{"method":"call","name":"click","args":{…}}`; the target sits in the arguments either directly
  * as `pid` and `window_id` or inside a `target` object, and the point sits beside it as `x` and
- * `y`. Anything else - a `list`, a `session_begin`, a call with neither - reports nothing rather
- * than a guess.
+ * `y`. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
+ * reports nothing rather than a guess.
  */
 function readRequest(line: string, at: number): ObservedRequest {
   let parsed: unknown;
@@ -131,11 +156,12 @@ function readRequest(line: string, at: number): ObservedRequest {
   } catch {
     return NOTHING;
   }
+  if (isDynamicRecord(parsed) && parsed.method === "list") return TOOL_LIST;
   if (!isDynamicRecord(parsed) || parsed.method !== "call") return NOTHING;
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { tool, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  return { tool, list: false, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -173,22 +199,26 @@ interface PendingCall {
   at: number;
 }
 
+/** A request whose answer the tap changes: a tool call, or `"list"` for the tool list. */
+type ExpectedAnswer = PendingCall | "list";
+
 /**
- * The daemon's answers, one line at a time, with the text copy added to each tool call's answer.
+ * The daemon's answers, one line at a time, with the text copy added to each tool call's answer
+ * and the driver's cursor tools taken out of the tool list.
  *
  * The protocol carries no request id: the daemon answers in the order it was asked, so the answer
  * lines are matched to the request lines in order. `expect` is told about each request before the
- * daemon can answer it. A line that is not a tool call's answer is passed on as it arrives; a tool
- * call's answer is held to its newline, because a text item can only be added to a whole answer.
+ * daemon can answer it. A line that answers no tool call and no list is passed on as it arrives;
+ * the others are held to their newline, because only a whole answer can be changed.
  * The stream's own back pressure holds the daemon while the agent reads slower than it writes.
  */
 class CallAnswerLines extends Transform {
-  /** One entry per request not yet answered: its tool call, or `null` when it is no call. */
-  readonly #expected: Array<PendingCall | null> = [];
+  /** One entry per request not yet answered: its tool call or the list, or `null` for any other request. */
+  readonly #expected: Array<ExpectedAnswer | null> = [];
   /** How the current line is handled, or `null` before its first byte. */
   #line: "pass" | "hold" | null = null;
-  /** The request the current line answers, or `null` when it answers no tool call. */
-  #answering: PendingCall | null = null;
+  /** The request the current line answers, or `null` when it answers no request that the tap changes. */
+  #answering: ExpectedAnswer | null = null;
   #held: Buffer[] = [];
   #heldBytes = 0;
   readonly #answered: (tool: string, ms: number) => void;
@@ -200,13 +230,15 @@ class CallAnswerLines extends Transform {
     this.#now = now;
   }
 
-  expect(request: PendingCall | null): void {
+  expect(request: ExpectedAnswer | null): void {
     this.#expected.push(request);
   }
 
   /** The tool calls still waiting for their answer, oldest first. Each is returned only once. */
   takeUnanswered(): PendingCall[] {
-    const calls = [this.#answering, ...this.#expected].filter((call): call is PendingCall => call !== null);
+    const calls = [this.#answering, ...this.#expected].filter(
+      (call): call is PendingCall => call !== null && call !== "list",
+    );
     this.#answering = null;
     this.#expected.length = 0;
     return calls;
@@ -238,7 +270,7 @@ class CallAnswerLines extends Transform {
       if (newline >= 0) {
         if (this.#line === "hold") this.#release(true);
         const answering = this.#answering;
-        if (answering) this.#answered(answering.tool, this.#now() - answering.at);
+        if (answering && answering !== "list") this.#answered(answering.tool, this.#now() - answering.at);
         this.#answering = null;
         this.#line = null;
       }
@@ -257,14 +289,29 @@ class CallAnswerLines extends Transform {
     const line = Buffer.concat(this.#held, this.#heldBytes);
     this.#held = [];
     this.#heldBytes = 0;
-    this.push(whole ? withCopy(line) : line);
+    if (!whole) this.push(line);
+    else this.push(this.#answering === "list" ? withoutDriverCursorTools(line) : withCopy(line));
   }
+}
+
+/** One whole tool list answer line, ending in its newline, less the tools in `DRIVER_CURSOR_TOOLS`. */
+function withoutDriverCursorTools(line: Buffer): Buffer {
+  if (!line.includes("agent_cursor")) return line;
+  const parsed = parseAnswerLine(line.toString("utf8", 0, line.length - 1));
+  const result = parsed?.ok === true ? parsed.result : null;
+  if (!parsed || !isDynamicRecord(result) || !Array.isArray(result.tools)) return line;
+  const tools = result.tools.filter(
+    (tool) => !(isDynamicRecord(tool) && typeof tool.name === "string" && DRIVER_CURSOR_TOOLS.has(tool.name)),
+  );
+  if (tools.length === result.tools.length) return line;
+  return Buffer.from(`${JSON.stringify({ ...parsed, result: { ...result, tools } })}\n`, "utf8");
 }
 
 /** One whole answer line, ending in its newline, with the copy added when there is one to add. */
 function withCopy(line: Buffer): Buffer {
-  // Most answers have no structured result, and this search costs far less than the parse.
-  if (!line.includes('"structuredContent"')) return line;
+  // Most answers have no structured result and are no refusal or error, and this search costs far less than the parse.
+  if (!line.includes('"structuredContent"') && !line.includes('"ok":false') && !line.includes('"isError":true'))
+    return line;
   const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
   return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
 }
@@ -399,8 +446,8 @@ export class CuaDriverActionTap {
           answers.expect(null);
         } else {
           const at = this.#now();
-          const { tool, action, pointer } = readRequest(line, at);
-          answers.expect(tool === null ? null : { tool, at });
+          const { tool, list, action, pointer } = readRequest(line, at);
+          answers.expect(list ? "list" : tool === null ? null : { tool, at });
           if (action) this.#action = action;
           if (pointer) this.#pointer = pointer;
         }

@@ -1,32 +1,78 @@
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import { File, Paths } from "expo-file-system";
+import * as Updates from "expo-updates";
 import { AppState } from "react-native";
 import {
   formatSupportLogEntry,
   parseSupportLog,
+  parseSupportLogCache,
+  SUPPORT_LOG_CACHE_LINES,
   type SupportLogLevel,
   supportLog,
+  supportLogCacheLines,
+  supportLogCacheText,
   supportLogValue,
   withRequestLog,
 } from "./support-log";
 
-const CACHE_FILE = "support-log-v1.json";
-// A write converts the whole log to JSON on the JavaScript thread. A move to the background and a
-// fatal error write at once, so a longer wait loses only the entries of a native crash.
+const CACHE_FILE = "support-log-v2.jsonl";
+/** The cache file of earlier versions: the whole log as one JSON array. It is read once, then deleted. */
+const LEGACY_CACHE_FILE = "support-log-v1.json";
+// A write blocks the JavaScript thread. A move to the background and a fatal error write at once, so
+// a longer wait loses only the entries of a native crash.
 const PERSIST_DELAY_MS = 10_000;
 let installed = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 // The file holds the earlier launch until its entries are in the log, so no write may replace it first.
 let restored = false;
+/** The next write replaces the file: there is none, its key is old, or its last line can be damaged. */
+let rewrite = true;
+/** The entry lines in the cache file. */
+let cacheLines = 0;
+
+/**
+ * The key of the redaction that this JavaScript bundle runs. An app build and an over-the-air update
+ * can both change the rules, so the key names both. A development bundle changes without either, so
+ * it has no key and always redacts restored entries again.
+ */
+function redactionKey(): string | null {
+  if (__DEV__) return null;
+  return `${appVersion()} ${Updates.updateId ?? "embedded"}`;
+}
+
+function cacheFile(): File {
+  return new File(Paths.cache, CACHE_FILE);
+}
+
+function legacyCacheFile(): File {
+  return new File(Paths.cache, LEGACY_CACHE_FILE);
+}
+
+/** Puts the earlier launch in the log. With no version 2 file, the version 1 file is read once. */
+function restoreText(cache: string | null, legacy: string | null): void {
+  if (cache !== null) {
+    const parsed = parseSupportLogCache(cache, redactionKey());
+    cacheLines = parsed.lines;
+    rewrite = parsed.rewrite;
+    supportLog.restore(parsed.entries);
+  } else if (legacy !== null) {
+    // The next write makes the version 2 file and deletes this one.
+    supportLog.restore(parseSupportLog(legacy));
+  }
+}
 
 /** Reads the earlier launch at once. A move to the background or an error can come before the idle read. */
 function restoreNow(): void {
   if (restored) return;
   restored = true;
   try {
-    const file = new File(Paths.cache, CACHE_FILE);
-    if (file.exists) supportLog.restore(parseSupportLog(file.textSync()));
+    const file = cacheFile();
+    if (file.exists) restoreText(file.textSync(), null);
+    else {
+      const legacy = legacyCacheFile();
+      if (legacy.exists) restoreText(null, legacy.textSync());
+    }
   } catch {
     // A cache file that cannot be read starts a new log.
   }
@@ -36,19 +82,24 @@ function restoreNow(): void {
 function restoreWhenIdle(): void {
   requestIdleCallback(() => {
     if (restored) return;
-    const file = new File(Paths.cache, CACHE_FILE);
-    let text: Promise<string>;
+    let text: Promise<[string | null, string | null]>;
     try {
-      text = file.exists ? file.text() : Promise.resolve("");
+      const file = cacheFile();
+      const legacy = legacyCacheFile();
+      text = file.exists
+        ? file.text().then((value): [string, null] => [value, null])
+        : legacy.exists
+          ? legacy.text().then((value): [null, string] => [null, value])
+          : Promise.resolve<[null, null]>([null, null]);
     } catch {
       restored = true;
       return;
     }
     void text.then(
-      (value) => {
+      ([cache, legacy]) => {
         if (restored) return;
         restored = true;
-        if (value) supportLog.restore(parseSupportLog(value));
+        restoreText(cache, legacy);
       },
       () => {
         restored = true;
@@ -57,14 +108,33 @@ function restoreWhenIdle(): void {
   });
 }
 
+/**
+ * Appends the entries that are not in the file yet. The file is written again with only the kept
+ * entries when `rewrite` is set, or when it has more lines than the log keeps by half.
+ */
 function persist(): void {
   if (persistTimer !== null) clearTimeout(persistTimer);
   persistTimer = null;
   restoreNow();
   try {
-    new File(Paths.cache, CACHE_FILE).writeSync(JSON.stringify(supportLog.entries()));
+    const file = cacheFile();
+    const unsaved = supportLog.unsaved();
+    if (rewrite || !file.exists || cacheLines + unsaved.length > SUPPORT_LOG_CACHE_LINES) {
+      const entries = supportLog.entries();
+      file.writeSync(supportLogCacheText(redactionKey(), entries));
+      cacheLines = entries.length;
+      rewrite = false;
+      const legacy = legacyCacheFile();
+      if (legacy.exists) legacy.delete();
+    } else if (unsaved.length > 0) {
+      file.writeSync(supportLogCacheLines(unsaved), { append: true });
+      cacheLines += unsaved.length;
+    }
+    supportLog.markSaved();
   } catch {
-    // The log on the screen and the saved file still work without the cache copy.
+    // The log on the screen and the saved file still work without the cache copy. A failed write
+    // can leave part of a line, so the next write replaces the file.
+    rewrite = true;
   }
 }
 
@@ -75,6 +145,17 @@ function schedulePersist(): void {
 function appVersion(): string {
   const version = Application.nativeApplicationVersion ?? "development";
   return Application.nativeBuildVersion ? `${version} (${Application.nativeBuildVersion})` : version;
+}
+
+/**
+ * The JavaScript bundle that runs, such as `embedded, channel production, runtime 5d8a2bf4...`. An
+ * over-the-air update shows its ID in place of `embedded`. Support needs it: two phones with the same
+ * app version and build can run different bundles.
+ */
+function bundleName(): string {
+  if (!Updates.isEnabled) return "no update server";
+  const bundle = Updates.isEmbeddedLaunch ? "embedded" : (Updates.updateId ?? "unknown");
+  return `${bundle}, channel ${Updates.channel ?? "none"}, runtime ${Updates.runtimeVersion ?? "none"}`;
 }
 
 /** Such as `iOS 27.0, iPhone 16 Plus (iPhone17,4)`. The identifier names the exact hardware. */
@@ -92,6 +173,7 @@ export function supportLogFileText(): string {
     "OpenBot support log",
     `Saved: ${new Date().toISOString()}`,
     `App: ${appVersion()}`,
+    `Bundle: ${bundleName()}`,
     `System: ${systemName()}`,
     `Entries: ${entries.length}`,
     "",
@@ -104,6 +186,7 @@ export function clearSupportLog(): void {
   // The cleared entries of the earlier launch must not come back with a later read.
   restored = true;
   supportLog.clear();
+  rewrite = true;
   persist();
 }
 
@@ -158,7 +241,7 @@ export function installSupportLog(): void {
   installed = true;
   restoreWhenIdle();
   supportLog.subscribe(schedulePersist);
-  supportLog.add("info", "app", `Started OpenBot ${appVersion()} on ${systemName()}`);
+  supportLog.add("info", "app", `Started OpenBot ${appVersion()} on ${systemName()}, bundle ${bundleName()}`);
   captureConsole();
   captureErrors();
   captureFetch();

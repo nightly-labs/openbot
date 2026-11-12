@@ -1,6 +1,7 @@
 import {
   BROWSER_DOCK_LIMITS,
   type BrowserDockAction,
+  type BrowserDockFrame,
   type BrowserDockGlass,
   type BrowserDockPresentation,
   LOCAL_SERVER_ID,
@@ -65,7 +66,7 @@ export function BrowserDockSurface() {
     );
   }
 
-  function measure(): { height: number; glass: BrowserDockGlass[] } {
+  function measure(): Omit<BrowserDockFrame, "seq"> {
     const dock = surface?.firstElementChild;
     if (!(dock instanceof HTMLElement)) return { height: 0, glass: [] };
     const viewport = window.innerHeight;
@@ -79,8 +80,21 @@ export function BrowserDockSurface() {
       }
     }
     // A menu needs room above the dock, so the overlay takes the whole page while one is open.
-    const needed = open.length > 0 ? BROWSER_DOCK_LIMITS.frameSize : viewport - dock.getBoundingClientRect().top;
-    return { height: clamp(Math.ceil(needed + SHADOW_ROOM), 0, BROWSER_DOCK_LIMITS.frameSize), glass };
+    // The dock is in a bottom corner, so the overlay needs only the space from that side: of the box, or of
+    // its tab when the user hid the box. A menu needs the whole page.
+    const tab = dock.hasAttribute("data-tucked") ? dock.querySelector(".browser-dock-tab") : null;
+    const box = (tab ?? dock).getBoundingClientRect();
+    const limit = BROWSER_DOCK_LIMITS.frameSize;
+    const needed = open.length > 0 ? limit : viewport - box.top;
+    const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, limit);
+    const side = getComputedStyle(dock).direction === "rtl" ? "left" : "right";
+    const reach = side === "left" ? box.right : window.innerWidth - box.left;
+    const width = open.length > 0 ? limit : clamp(Math.ceil(reach + SHADOW_ROOM), 0, limit);
+    // Main places the glass in an overlay of the new width before this view has that width. The dock stays
+    // at the right edge, so a glass shape keeps its distance from that edge.
+    const shift = side === "right" ? width - window.innerWidth : 0;
+    for (const shape of glass) shape.left = clamp(shape.left + shift, -limit, limit);
+    return { height, glass, anchor: { side, width } };
   }
 
   function report() {

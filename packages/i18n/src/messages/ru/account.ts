@@ -43,7 +43,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} мин",
   "account.usage.window.cursorModels": "Модели Cursor",
   "account.usage.window.otherModels": "Другие модели",
+  "account.usage.window.total": "Всего",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "осталось {percent}",
   "account.update.failedRetry": "Не удалось обновить. Повторите попытку.",
   "account.update.managedByHost": "Управляется хостом",
   "account.update.restart": "Перезапустить",
@@ -69,6 +71,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot сейчас не может связаться с сервисом аккаунтов.",
   "account.login.signInDescription":
     "Войдите или создайте аккаунт по электронной почте. Мы отправим вам одноразовый код.",
+  "account.login.keyringChangedDescription":
+    "Связка ключей системы потеряла ваш последний вход. Теперь OpenBot хранит входы в собственном файле на этом компьютере. Войдите ещё раз.",
   "account.login.codeAccepted": "Код принят.",
   "account.login.codeSent": "Мы отправили код на {email}.",
   "account.login.connectingSecurely": "Устанавливаем защищённое соединение…",

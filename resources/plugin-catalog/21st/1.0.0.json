@@ -1,0 +1,33 @@
+{
+  "slug": "21st",
+  "name": "21st",
+  "tagline": "React UI component catalog",
+  "description": "21st lets agents search a catalog of React UI components and add the chosen components to the project. Each user signs in to their own 21st account through the browser.",
+  "category": "coding",
+  "creatorName": "21st",
+  "iconUrl": "https://21st.dev/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-pricing-table", "text": "Find a pricing table component that fits this landing page." },
+    { "id": "prompt-navbar", "text": "Add a responsive navigation bar component to the header." },
+    { "id": "prompt-compare", "text": "Show three date picker components and compare their props." }
+  ],
+  "apps": [
+    {
+      "id": "app-21st-mcp",
+      "name": "21st",
+      "description": "UI component search and install, over 21st's MCP server with browser sign-in.",
+      "iconUrl": "https://21st.dev/apple-touch-icon.png",
+      "server": {
+        "name": "21st",
+        "transport": "http",
+        "url": "https://21st.dev/api/mcp",
+        "auth": [{ "id": "21st-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://21st.dev",
+  "privacyPolicyUrl": "https://21st.dev/privacy",
+  "termsUrl": "https://21st.dev/terms",
+  "skills": []
+}

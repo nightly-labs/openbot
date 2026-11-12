@@ -10,18 +10,16 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { hasVisibleToasts } from "@openbot/ui";
-import {
-  type BackupModelSource,
-  rememberedBackupModels,
-  type UsageLimitAskCardProps,
-  usageLimitAskOptions,
-} from "@openbot/ui/features/conversation/BackupModels";
+import type { AgentMessage } from "@openbot/ui/data";
+import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { sidebarAgentWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
+import { createMemo } from "solid-js";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -41,13 +39,17 @@ import { agentsPort } from "../agents/agents-port";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { useBrowserTabs } from "../browser/browser-context";
+import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
+import { useServerActions } from "../servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
+import { serversPort } from "../servers/servers-port";
 import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -55,8 +57,15 @@ import { useUsage } from "../usage/usage-context";
 import { useWindowPage } from "../window/window-page-context";
 import { Conversation } from "./Conversation";
 import { useConversation } from "./conversation-context";
+import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import {
+  createAgentMessageDeleteAccess,
+  desktopAgentMessageDeleteAccess,
+  readerCanDeleteMessage,
+} from "./message-delete-access";
+import { trackUsageLimitShown, usageLimitAskFrom } from "./usage-limit-ask";
 
 /**
  * The transcript of the active Agent, with everything the composer needs to send
@@ -76,7 +85,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const serverScope = useServerScope();
   const platform = usePlatform();
   const connectors = useConnectors();
-  const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { select: selectServer } = useServerActions();
   const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
     useServerSettings();
   const {
@@ -110,6 +120,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
+  const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -117,7 +128,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     agentList,
     agentListConnecting,
     activeAgent,
-    userHiddenAgentIds,
+    userPausedAgentIds,
     modelOptions,
     settingsRequest,
     updateAgent,
@@ -143,6 +154,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelQueuedMessage,
     cancelWait,
     steerQueuedMessage,
+    sendQueuedMessageNow,
     updateQueuedMessage,
     reorderQueue,
     stopActiveTurn,
@@ -150,6 +162,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     usageLimitedModels,
     waitedUsageLimits,
     setWaitedUsageLimits,
+    failedModels,
     queues,
   } = useTurns();
   const {
@@ -158,6 +171,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     sendMessage,
     markAgentMessagesRead,
     markAgentMessagesUnread,
+    deleteAgentMessage,
+    messagePins,
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
@@ -176,6 +191,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   /** A joined host's workspace or open conversation is still loading, so the composer says "Connecting…". */
   const remoteLoading = () =>
     activeServer()?.kind === "remote" && (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded);
+  /**
+   * A named function, not a ternary in the prop: a ternary prop makes a memo on each read, and the Effort select
+   * of a model picker reads this status in an effect callback, where a new memo halts the renderer.
+   */
+  const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
   // The composer never asks for usage itself. It reads the dock's reading, which is scoped to the
@@ -184,6 +204,21 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const auth = useAuth();
   const { teamPresence, currentTeamMember } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
+  const channels = useChannels();
+  const conversationController = useConversationController();
+  /** The open channels, for "Send to channel" on a message. The text waits in the channel's composer. */
+  const sendToChannel = () => {
+    if (!channels.supported()) return;
+    const open = channels.state.channels.filter((channel) => !channel.archived);
+    if (open.length === 0) return;
+    return {
+      channels: open.map((channel) => ({ id: channel.id, name: channel.name })),
+      onSend: (channelId: string, text: string) => {
+        conversationController.appendChannelText({ serverId: activeServer()?.id ?? "local", channelId }, text);
+        void channels.open(channelId);
+      },
+    };
+  };
 
   // The waits of the agents that this agent asked, by the same rules as the sidebar's "Needs you".
   const agentWaits = createMemo(() =>
@@ -218,11 +253,31 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
-  /** Local only: the Team API has no route to compact a joined server's agent. */
+  /** This computer, an owner or admin, or a member with manage access to the agent. */
+  const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
+
+  /**
+   * "Delete history" of the active agent's own chat: on this computer, or on a host that serves
+   * `chat-history-v1`, for a reader who can delete any message of the chat.
+   */
+  const deleteActiveAgentHistory = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || !server || !serverSupportsCapability(server, "chat-history-v1")) return undefined;
+    if (!deletesAnyAgentMessage(agent.id)) return undefined;
+    return async () => {
+      await turnsPort().agent.deleteHistory(agent.id, server.id);
+      // A window around a search result keeps the messages that an empty snapshot does not name, so
+      // the chat reads its latest page again.
+      await loadLatestAgentMessages(agent.id);
+    };
+  });
+
+  /** "Compact now", on this computer or on a host that serves `context-compact-v1`. */
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return () => turnsPort().agent.compactContext(agent.id, server.id);
   });
 
@@ -230,7 +285,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const compactTaskContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
-    if (!agent || server?.kind !== "local") return undefined;
+    if (!agent || !server || !serverSupportsCapability(server, "context-compact-v1")) return undefined;
     return (taskId: string) => turnsPort().agent.compactTaskContext({ agentId: agent.id, taskId }, server.id);
   });
 
@@ -244,6 +299,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const fastMode = remoteAgentAdmin.fastMode();
+    const computerUse = remoteAgentAdmin.computerUse();
+    const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
       ? {
           ...agent,
@@ -254,6 +312,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
+          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
+          ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
         }
       : agent;
   });
@@ -345,7 +406,35 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   /** Whether a usage limit holds this model and account now. */
   const usageLimited = (choice: AgentModelChoice) =>
     usageLimitedModels().some((limited) => sameAgentModelChoice(limited, choice));
+  /** Whether a provider error holds this model and account now, so that a switch passes over it. */
+  const providerFailed = (choice: AgentModelChoice) =>
+    failedModels().some((failed) => sameAgentModelChoice(failed, choice));
 
+  /** Whether the reader is the sender `senderId`: a member on a joined server, or anyone on this computer. */
+  const isOwnSender = (senderId: string) => {
+    const state = auth.centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+  /** The host deletes messages only with `message-delete-v1`. This computer always can. */
+  const messageDeleteSupported = () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY);
+  /** Whether the reader may delete `message` in the active agent's chat or side threads. */
+  const canDeleteAgentMessage = (message: AgentMessage) =>
+    readerCanDeleteMessage(message, {
+      deleteAny: deletesAnyAgentMessage(activeAgent()?.id),
+      isOwnSender,
+    });
+  const deleteActiveAgentMessage = (messageId: string) => {
+    const agentId = activeAgent()?.id;
+    return agentId ? deleteAgentMessage(agentId, messageId) : Promise.resolve();
+  };
+  /** The Delete action of the active agent's chat. A host without `message-delete-v1` has none. */
+  const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
+  /** Pin and Unpin of the active server. A host without `message-pins-v1` has none; this computer always has. */
+  const messagePinsAction = () => (activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY) ? messagePins : undefined);
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -367,7 +456,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
       contextStates: threadContextStates,
       onCompactContext: compactTaskContext(),
-      onOpenMainMessage: (messageId) => void openAgentMessage(agent.id, messageId),
+      onOpenMainMessage: (messageId) => openAgentMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
@@ -403,82 +492,37 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return (messages ?? []).findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;
   });
   /**
-   * A usage limit holds the active agent's queued message on this computer. The chat asks where to
-   * send it, unless the agent switches by itself to a saved backup model that is ready.
+   * A usage limit holds the active agent's queued message. The chat asks where to send it, unless the
+   * agent switches by itself to a saved backup model that is ready. The usage limits of a joined
+   * server's agents come from its host (`agent-usage-limit-v1`).
    */
-  const usageLimitAsk = createMemo((): UsageLimitAskCardProps | undefined => {
-    const agent = activeAgent();
-    // Only this computer holds a message at a usage limit, and its agents use the providers it knows.
-    if (!agent || activeServer()?.kind !== "local" || !isKnownAgentProvider(agent.provider)) return undefined;
-    const provider = agent.provider;
-    const limits = usageLimits();
-    if (!(agent.id in limits)) return undefined;
-    const resetsAt = limits[agent.id] ?? null;
-    if (waitedUsageLimits()[agent.id] === resetsAt && agent.id in waitedUsageLimits()) return undefined;
-    if (!queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
-    const source: BackupModelSource = {
-      modelOptions: modelOptions(),
-      providers: agentStatus().providers,
-      limited: usageLimited,
-    };
-    const options = usageLimitAskOptions({ ...agent, provider }, agent.backupModels, source);
-    if (options.length === 0) return undefined;
-    const backupModels = agent.backupModels;
-    if (
-      backupModels?.automatic &&
-      backupModels.order.some((choice) => options.some((option) => sameAgentModelChoice(option.choice, choice)))
-    )
-      return undefined;
-    const agentId = agent.id;
-    const reasoningEffort = agent.reasoningEffort;
-    const fromProvider = agent.provider;
-    return {
-      provider,
-      resetsAt,
-      options,
-      onSend: async (option, remember) => {
-        // The agent keeps its reasoning effort where the other model has it.
-        const model = modelOptions().find(
-          (candidate) => candidate.provider === option.choice.provider && candidate.id === option.choice.model,
-        );
-        await updateAgent(agentId, {
-          provider: option.choice.provider,
-          model: option.choice.model,
-          providerAccountId: option.choice.providerAccountId ?? null,
-          reasoningEffort:
-            model && !model.supportedReasoningEfforts.includes(reasoningEffort)
-              ? model.defaultReasoningEffort
-              : reasoningEffort,
-          leaveUsageLimit: true,
-          ...(remember ? { backupModels: rememberedBackupModels(option.choice, backupModels) } : {}),
-        });
-        desktopAnalytics.track("usage_limit_action", {
-          action: "model_switched",
-          from_provider: fromProvider,
-          to_provider: option.choice.provider,
-          to_model: option.choice.model,
-        });
-      },
-      onWait: () => {
-        desktopAnalytics.track("usage_limit_action", { action: "waited", from_provider: fromProvider });
-        setWaitedUsageLimits((current) => ({ ...current, [agentId]: resetsAt }));
-      },
-    };
+  const usageLimitsShown = () => serverSupportsCapability(activeServer(), "agent-usage-limit-v1");
+  const usageLimitAskFor = usageLimitAskFrom({
+    // On a joined server, the same levels decide Delete of any message: an owner or admin, or a member
+    // with manage access to the agent.
+    available: (agentId) =>
+      usageLimitsShown() && (activeServer()?.kind !== "remote" || deletesAnyAgentMessage(agentId)),
+    // On a joined server, only an owner or admin saves the backup models of an agent.
+    rememberable: () => serverCanAdminister(activeServer(), "agent-backup-models-v1"),
+    usageLimits,
+    waited: waitedUsageLimits,
+    wait: (agentId, resetsAt) => setWaitedUsageLimits((current) => ({ ...current, [agentId]: resetsAt })),
+    modelOptions,
+    providers: () => agentStatus().providers,
+    limited: usageLimited,
+    update: updateConversationAgent,
   });
-  // One "shown" for each limit that asks, also when the user opens the agent again; a new reset time is a
-  // new limit.
-  const shownUsageLimits = new Set<string>();
-  createEffect(
-    () => {
-      const ask = usageLimitAsk();
-      return ask ? { key: `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}`, provider: ask.provider } : null;
-    },
-    (shown) => {
-      if (!shown || shownUsageLimits.has(shown.key)) return;
-      shownUsageLimits.add(shown.key);
-      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: shown.provider });
-    },
-  );
+  const usageLimitAsk = createMemo((): UsageLimitAskCardProps | undefined => {
+    // A joined server's agent has its backup models from the host, when the reader can read them.
+    const agent = conversationAgent();
+    if (!agent || !queues()[agent.id]?.deliveries.some((delivery) => delivery.status === "queued")) return undefined;
+    return usageLimitAskFor(agent);
+  });
+  trackUsageLimitShown(() => {
+    const ask = usageLimitAsk();
+    const agent = activeAgent();
+    return ask && agent ? { agentId: agent.id, ask } : undefined;
+  });
 
   return (
     <>
@@ -502,8 +546,18 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         mcpSignedIn={(mcpServerId) =>
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
+        serverInstall={{
+          get servers() {
+            return servers();
+          },
+          get loaded() {
+            return serversLoaded();
+          },
+          retryConnection: (serverId) => serversPort().servers.retryConnection(serverId),
+          onOpenServer: selectServer,
+        }}
         onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
-        agentStatus={remoteLoading() ? { ...agentStatus(), phase: "starting" } : agentStatus()}
+        agentStatus={panelAgentStatus()}
         agentsConnecting={agentListConnecting() || (remoteLoading() && activeServer()?.state === "online")}
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
@@ -521,7 +575,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onOpenNotificationSettings={openNotificationLevels}
         agent={conversationAgent()}
         agents={agentList()}
-        mentionAgents={agentList().filter((agent) => !userHiddenAgentIds().has(agent.id))}
+        mentionAgents={agentList().filter((agent) => !userPausedAgentIds().has(agent.id))}
         availableRoutineIds={activeRoutineIds()}
         routines={activeRoutines()}
         modelOptions={modelOptions()}
@@ -549,16 +603,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         workspaceCovered={windowPage.conversationCovered()}
         browserControlState={browserControlState()}
         server={activeServer()}
+        responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
-        isOwnSender={(senderId) => {
-          const state = auth.centralAuth();
-          return isReaderAuthor(senderId, {
-            memberId: currentTeamMember()?.id ?? null,
-            accountUserId: state.status === "signed_in" ? state.user.id : null,
-            onOwnComputer: activeServer()?.kind === "local",
-          });
-        }}
+        isOwnSender={isOwnSender}
         // The browser and the remote desktop show in the main window only.
         browserEnabled={
           !platform.landingPreview && !platform.chatWindow && activeServerSupportsCapability("browser-control")
@@ -573,10 +621,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         promptUiBlock={activePromptUiBlock()}
         approval={activeApproval()}
         usageLimitAsk={usageLimitAsk()}
-        usageLimited={activeServer()?.kind === "local" ? usageLimited : undefined}
+        usageLimited={usageLimitsShown() ? usageLimited : undefined}
+        providerFailed={usageLimitsShown() ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}
         activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
         activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
+        activityRunning={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.running : undefined}
+        activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
         mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
@@ -597,15 +648,19 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}
         onMarkRead={() => markAgentMessagesRead()}
-        // The Team API unread route marks a whole chat, so only an agent on this computer has the item.
+        // A joined server marks one message unread only through `conversation-unread-from-v1`.
         onMarkUnread={
-          activeServer()?.kind === "local"
+          activeServerSupportsCapability(CONVERSATION_UNREAD_FROM_CAPABILITY)
             ? (messageId) => {
                 const agentId = activeAgent()?.id;
                 return agentId ? markAgentMessagesUnread(agentId, messageId) : Promise.resolve();
               }
             : undefined
         }
+        onDeleteMessage={deleteMessageAction()}
+        canDeleteMessage={canDeleteAgentMessage}
+        messagePins={messagePinsAction()}
+        sendToChannel={sendToChannel()}
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
         onSearchMessages={(query) =>
@@ -613,9 +668,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
             ? searchAgentMessages(activeAgent()?.id ?? "", query)
             : Promise.resolve({ messageIds: [], total: 0 })
         }
-        onOpenSearchMessage={(messageId) =>
-          activeAgent() ? openAgentMessage(activeAgent()?.id ?? "", messageId) : Promise.resolve()
-        }
+        onOpenSearchMessage={async (messageId) => {
+          const agentId = activeAgent()?.id;
+          if (agentId) await openAgentMessage(agentId, messageId);
+        }}
         onTypingChange={setTeamTyping}
         onAnswerPrompt={(answers, options) => answerPrompt(answers, options, openThreadId())}
         onPromptResolutionPresented={presentPromptResolution}
@@ -625,6 +681,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+        remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
+        remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
         remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
         onUpdateAgentPermissions={permissionsEditable() ? writeAgentPermissions : undefined}
         defaultBusyMessageMode={
@@ -635,6 +693,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
+        onDeleteAgentHistory={deleteActiveAgentHistory()}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}
@@ -642,6 +701,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         threads={threads()}
         onCancelWait={cancelWait}
         onSteerQueuedMessage={steerQueuedMessage}
+        onSendQueuedMessageNow={sendQueuedMessageNow}
         onUpdateQueuedMessage={updateQueuedMessage}
         onReorderQueue={reorderQueue}
         onActivateBrowserTab={activateBrowserTab}

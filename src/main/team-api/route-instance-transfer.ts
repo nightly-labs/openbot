@@ -43,7 +43,7 @@ export async function routeInstanceTransfer(
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Invalid export.");
       }
-      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input)), 400);
+      const path = await answer(() => runCauseEffect(instanceTransfer.exportForMember(input, member.id)), 400);
       try {
         return await sendFile(response, path, null, (size) => ({
           "Content-Type": "application/zip",
@@ -79,7 +79,16 @@ export async function routeInstanceTransfer(
       }
       // The service checks the zone and uses the host's own when it is not valid.
       const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
-      const result = await answer(() => runCauseEffect(instanceTransfer.apply(input, member.id, timezone)), 409);
+      const result = await answer(
+        () =>
+          runCauseEffect(
+            instanceTransfer.apply(input, member.id, timezone, {
+              id: member.id,
+              name: member.name ?? "Team member",
+            }),
+          ),
+        409,
+      );
       return json(200, {
         ...result,
         agents: result.agents.map((agent) => ({ agentId: agent.id, name: agent.name })),

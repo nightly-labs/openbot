@@ -1,10 +1,11 @@
 import { agentProviderDescriptor, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { DEFAULT_AGENT_ACCESS } from "@openbot/contracts/ipc";
+import { ConfirmDialog } from "@openbot/ui";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
 import { useText } from "@openbot/ui/text";
 import { createEffect, Show } from "solid-js";
-import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { agentFolderCalls } from "./agent-folders-port";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHeader } from "./ConversationHeader";
@@ -28,7 +29,6 @@ export function ConversationView(props: ConversationProps) {
     browserSidebarOpen,
     dropActive,
     filePreviewOpen,
-    filesOpen,
     activeRightPanel,
     settingsOpen,
     sidePanel,
@@ -41,8 +41,18 @@ export function ConversationView(props: ConversationProps) {
     settingsPanelWidth,
     submitting,
     sideThreadOpen,
+    fastModeConfirmationOpen,
+    confirmFastMode,
+    cancelFastModeConfirmation,
   } = scope;
   const { t } = useText();
+  /** Each view of the side panel has the width of the browser panel, except Agent settings, which has its own. */
+  const sidePanelUsesBrowserWidth = () => {
+    const mode = activeRightPanel();
+    if (mode === "browser") return browserSidebarOpen();
+    if (mode === "file-preview") return filePreviewOpen();
+    return sidePanelOpen() && mode !== "settings";
+  };
   const folderCalls = agentFolderCalls();
   /**
    * A local agent in Workspace only mode can get a folder from a drop on the chat. With wider access a
@@ -80,15 +90,7 @@ export function ConversationView(props: ConversationProps) {
           "conversation-panel",
           {
             "conversation-drop-active": dropActive(),
-            "browser-panel-active":
-              browserSidebarOpen() ||
-              filePreviewOpen() ||
-              filesOpen() ||
-              activeRightPanel() === "question" ||
-              activeRightPanel() === "voice" ||
-              activeRightPanel() === "subagent" ||
-              activeRightPanel() === "thread" ||
-              activeRightPanel() === "side-panel",
+            "browser-panel-active": sidePanelUsesBrowserWidth(),
             "side-panel-docked": sidePanelOpen(),
             "side-panel-maximized": sidePanelOpen() && sidePanel().maximized,
           },
@@ -114,7 +116,7 @@ export function ConversationView(props: ConversationProps) {
           disabled={!conversationOwnerId(props) || props.channel?.readOnly() === true || !agentReady() || submitting()}
           onSend={sendSelectionInstruction}
           onQuote={quoteSelection}
-          quoteShortcut={(props.platform ?? currentDevicePlatform()) === "darwin" ? "meta" : "ctrl"}
+          quoteShortcut={deviceQuoteShortcut(props.platform)}
         />
         <Show when={dropActive()}>
           <Show
@@ -141,6 +143,15 @@ export function ConversationView(props: ConversationProps) {
         </Show>
 
         <ConversationPanels onOpenUsage={props.onOpenUsage} />
+        <ConfirmDialog
+          open={fastModeConfirmationOpen()}
+          tone="default"
+          title={t("composer.fastMode.confirmTitle")}
+          description={t("composer.fastMode.confirmDescription")}
+          confirmLabel={t("composer.fastMode.confirm")}
+          onConfirm={confirmFastMode}
+          onCancel={cancelFastModeConfirmation}
+        />
       </main>
     </ConversationViewScopeContext>
   );

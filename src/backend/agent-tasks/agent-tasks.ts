@@ -35,8 +35,17 @@ import { storedSync } from "../stored-state-effects";
 
 const logger = createOpenBotLogger("agent-tasks");
 
-/** The most open tasks that an agent can have when it starts one more itself. The user can have up to `INPUT_LIMITS.agentTasks`. */
-const AGENT_STARTED_OPEN_TASKS = 8;
+/**
+ * The most unfinished tasks that an agent can have when it starts one more itself. A finished task does
+ * not count. The user can have up to `INPUT_LIMITS.agentTasks` open tasks.
+ */
+const AGENT_STARTED_UNFINISHED_TASKS = 8;
+
+/**
+ * The finished tasks that the agent started and that stay open when it starts one more. The older ones
+ * are archived, so a routine that starts a task each run does not fill the task list.
+ */
+const AGENT_STARTED_FINISHED_KEPT = 8;
 
 export const START_TASK_TOOL = "start_task";
 
@@ -53,6 +62,10 @@ export interface AgentTasksHooks {
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
   queued(agentId: string): void;
+  /** The stored active turn of a thread, also when its conversation is not loaded. */
+  turnActive(agentId: string, threadId: string): boolean;
+  /** OpenBot archived finished tasks of one agent: their memory reviews start, and a waiting task lane can start. */
+  archived(agentId: string, tasks: readonly AgentThreadRecord[]): Effect.Effect<void>;
 }
 
 /** Where `start_task` was called, as the tool router knows it. */
@@ -101,6 +114,8 @@ export class AgentTasks implements TaskLanes {
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
   readonly #branches = Semaphore.makeUnsafe(1);
+  /** One `start_task` call runs at a time, so parallel calls in one turn cannot pass the task limits. */
+  readonly #starts = Semaphore.makeUnsafe(1);
 
   constructor(options: AgentTasksOptions) {
     this.#store = options.store;
@@ -162,6 +177,16 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
+  /** The side threads of this agent, open and archived, with activity at or after `after`. The latest first. */
+  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+    return this.#store.recent(agentId, after, limit);
+  }
+
+  /** Whether this agent has the task, open or closed. */
+  has(agentId: string, taskId: string): boolean {
+    return this.#store.task(taskId)?.agentId === agentId;
+  }
+
   /** A task of this agent, open or closed. */
   require(agentId: string, taskId: string): AgentThreadRecord {
     const task = this.#store.task(taskId);
@@ -177,6 +202,48 @@ export class AgentTasks implements TaskLanes {
     const task = this.#store.create({ agentId, origin, title, titleSource: origin === "agent" ? "agent" : "auto" });
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return task;
+  }
+
+  /**
+   * The open thread that takes the runs of this routine. It is made at the first run and restored when
+   * it was archived. Null when the task list has no room: the run then goes to the agent's own chat.
+   */
+  routineThread(agentId: string, routineId: string, routineName: string): AgentThreadRecord | null {
+    const existing = this.#store.threadForRoutine(agentId, routineId);
+    const title = taskTitle(routineName);
+    if (existing?.closedAt === null) {
+      this.#conversation.registerTaskThread(agentId, existing.threadId);
+      return this.#followRoutineName(existing, title);
+    }
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
+    if (existing) {
+      this.reopen(existing);
+      const reopened = this.#store.task(existing.taskId);
+      return reopened ? this.#followRoutineName(reopened, title) : null;
+    }
+    if (!title) return null;
+    const task = this.#store.create({ agentId, origin: "agent", title, titleSource: "agent", routineId });
+    this.#conversation.registerTaskThread(agentId, task.threadId);
+    this.changed(agentId);
+    return task;
+  }
+
+  /** A routine thread takes the routine's new name, unless a person renamed the thread. */
+  #followRoutineName(thread: AgentThreadRecord, title: string | null): AgentThreadRecord {
+    if (!title || thread.title === title || thread.titleSource === "user") return thread;
+    this.#store.retitle(thread.threadId, title);
+    this.changed(thread.agentId);
+    return this.#store.task(thread.taskId) ?? thread;
+  }
+
+  /** The thread belongs to a routine: each run of the routine starts a new session in it. */
+  isRoutineThread(taskId: string): boolean {
+    return (this.#store.task(taskId)?.routineId ?? null) !== null;
+  }
+
+  /** The thread of this routine, open or archived, or null before its first run. */
+  threadOfRoutine(agentId: string, routineId: string): AgentThreadRecord | null {
+    return this.#store.threadForRoutine(agentId, routineId);
   }
 
   /**
@@ -320,10 +387,15 @@ export class AgentTasks implements TaskLanes {
   }
 
   close(task: AgentThreadRecord): void {
+    this.#closeQuietly(task);
+    this.changed(task.agentId);
+  }
+
+  /** Closes the task and sends no event, so a caller that closes many sends one. */
+  #closeQuietly(task: AgentThreadRecord): void {
     this.#store.close(task.taskId);
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
-    this.changed(task.agentId);
   }
 
   reopen(task: AgentThreadRecord): void {
@@ -404,8 +476,22 @@ export class AgentTasks implements TaskLanes {
     return [...agentIds];
   });
 
+  /**
+   * A side thread of this agent that the person opened or branched. A routine thread and a thread
+   * that the agent started with `start_task` are not.
+   */
+  isPersonThread(agentId: string, threadId: string): boolean {
+    const thread = this.#store.taskForThread(threadId);
+    return thread?.agentId === agentId && thread.origin === "user" && thread.routineId === null;
+  }
+
   isBranchThread(threadId: string): boolean {
     return Boolean(this.#store.taskForThread(threadId)?.branch);
+  }
+
+  /** Whether the thread takes the runs of a routine. One read, by thread id. */
+  isRoutineThreadId(threadId: string): boolean {
+    return (this.#store.taskForThread(threadId)?.routineId ?? null) !== null;
   }
 
   taskForThread(threadId: string): string | null {
@@ -439,6 +525,19 @@ export class AgentTasks implements TaskLanes {
     const parsed = startTaskToolSchema.safeParse(params.arguments);
     if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskToolInvalid"));
     if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
+    return yield* this.#starts.withPermit(this.#start(params, caller, parsed.data));
+  });
+
+  /**
+   * Starts the task of one `start_task` call. Calls run one at a time, so the count of unfinished
+   * tasks includes the task of an earlier call, and a retry finds the task that the first call started.
+   */
+  readonly #start = Effect.fn("AgentTasks.start")(function* (
+    this: AgentTasks,
+    params: DynamicToolCallParams,
+    caller: AgentTaskCaller,
+    input: z.infer<typeof startTaskToolSchema>,
+  ): Effect.fn.Return<OpenBotToolResponse> {
     const idempotencyKey = `start-task:${createHash("sha256")
       .update(JSON.stringify([caller.agentId, params.turnId, params.callId]))
       .digest("hex")}`;
@@ -446,16 +545,34 @@ export class AgentTasks implements TaskLanes {
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
     if (startedTask) return startedTaskResult(startedTask);
-    const open = this.#store.openTaskIds(caller.agentId).length;
-    if (open >= AGENT_STARTED_OPEN_TASKS)
-      return openBotToolFailure(sourceText("error.backend.taskOpenLimit", { count: AGENT_STARTED_OPEN_TASKS }));
-    const task = this.create(caller.agentId, parsed.data.title, "agent");
+    const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
+    const finished = open.filter((task) => this.#finished(task));
+    // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
+    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
+    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
+      return openBotToolFailure(
+        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
+      );
+    // The newest finished tasks that the agent started stay open, when the task list has a place for them
+    // and for the new task. The person's own tasks, branches and routine threads stay open.
+    const finishedByAgent = finished
+      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const others = open.length - finishedByAgent.length;
+    const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
+    const archived = finishedByAgent.slice(kept);
+    if (open.length - archived.length >= INPUT_LIMITS.agentTasks)
+      return openBotToolFailure(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+    // All of them close before the first yield, so no turn starts between the check and the close.
+    for (const task of archived) this.#closeQuietly(task);
+    const task = this.create(caller.agentId, input.title, "agent");
+    if (archived.length > 0) yield* this.#hooks.archived(caller.agentId, archived);
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
         taskId: task.taskId,
         recipientAgentIds: [caller.agentId],
-        text: parsed.data.brief,
+        text: input.brief,
         replyToMessageId: null,
         idempotencyKey,
       })
@@ -470,6 +587,7 @@ export class AgentTasks implements TaskLanes {
       );
     if (!queued) {
       this.discard(task);
+      if (archived.length > 0) this.changed(caller.agentId);
       return openBotToolFailure(sourceText("error.backend.taskStartFailed"));
     }
     this.changed(caller.agentId);
@@ -529,6 +647,16 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
+        // A turn in the agent's chat notifies. In a side thread it notifies through its own event, so
+        // the agent's chat keeps its turn state. A routine run in its own thread notifies as it did in
+        // the agent's chat; the listeners read `routine` to keep that apart from the other threads.
+        if (!event.quiet && !event.continues)
+          this.#hooks.emit({
+            type: "thread-turn-completed",
+            taskId: task.taskId,
+            routine: task.routineId !== null,
+            turn: event,
+          });
         return true;
       }
       case "queue-changed":
@@ -538,6 +666,15 @@ export class AgentTasks implements TaskLanes {
       default:
         return false;
     }
+  }
+
+  /** No turn runs in the task, and no message is queued for it. */
+  #finished(task: AgentThreadRecord): boolean {
+    return (
+      !this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId &&
+      !this.#hooks.turnActive(task.agentId, task.threadId) &&
+      !this.#mailbox.taskBusy(task.agentId, task.taskId)
+    );
   }
 
   #taskOf(threadId: string | null): AgentThreadRecord | null {
@@ -573,10 +710,12 @@ export class AgentTasks implements TaskLanes {
       progress: activeTurnId ? (this.#progress.get(task.taskId) ?? null) : null,
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
+      queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
       branch: this.#publicBranch(task),
+      routineId: task.routineId,
     };
   }
 

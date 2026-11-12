@@ -16,7 +16,10 @@ const VAULT_FOLDER = ".vault";
 export interface SavedApiKey {
   name: string;
   path: string;
-  /** Present for a key from the Vault, which every agent can read and only the user changes. */
+  /**
+   * Present for a key from the Vault, which every agent can read. The user changes it, or an agent with
+   * `save_api_key` when a person asked in the OpenBot chat.
+   */
   source?: "vault";
 }
 
@@ -84,21 +87,24 @@ export class AgentApiKeys {
 
   /**
    * Brings the Vault key files that `list` wrote in line with the Vault: a changed key is written
-   * again, and a key that is gone, or a Vault that cannot be read, removes its file.
+   * again, and a key that is gone, or a Vault that cannot be read, removes its file. Only files that
+   * OpenBot writes are removed: an agent can put other files here, such as a key that cannot be
+   * downloaded again.
    */
   readonly syncVault = Effect.fn("AgentApiKeys.syncVault")(function* (this: AgentApiKeys) {
     yield* this.#vaultFiles.withPermit(
       Effect.gen({ self: this }, function* () {
         const folder = join(this.#root, VAULT_FOLDER);
-        const names = yield* Effect.tryPromise({ try: () => folderNames(folder), catch: failed });
+        const names = yield* Effect.tryPromise({ try: () => folderFiles(folder), catch: failed });
         const keys = new Map(this.#vaultKeys().map(({ name, value }) => [name, value]));
         for (const name of names) {
-          // Another name is a temporary file that a stopped write left: no write runs now.
-          const value = API_KEY_NAME_PATTERN.test(name) ? keys.get(name) : undefined;
           const path = join(folder, name);
-          if (value === undefined)
-            yield* Effect.tryPromise({ try: () => rm(path, { force: true, recursive: true }), catch: failed });
-          else yield* writeIfChanged(path, value);
+          const value = API_KEY_NAME_PATTERN.test(name) ? keys.get(name) : undefined;
+          if (value !== undefined) yield* writeIfChanged(path, value);
+          // A key that the Vault no longer has, or the temporary file of a stopped write: no write
+          // runs now. Every other file stays.
+          else if (API_KEY_NAME_PATTERN.test(name) || isStoppedWrite(name))
+            yield* Effect.tryPromise({ try: () => rm(path, { force: true }), catch: failed });
         }
       }),
     );
@@ -170,6 +176,22 @@ function writeIfChanged(path: string, value: string): Effect.Effect<void, AgentA
         : writeFileAtomically(path, value, { createDirectory: true }).pipe(Effect.mapError(failed)),
     ),
   );
+}
+
+/** The temporary file that `writeFileAtomically` makes for a key: `<NAME>.<uuid>.tmp`. */
+function isStoppedWrite(name: string): boolean {
+  const match = /^([^.]+)\.[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.tmp$/u.exec(name);
+  return match?.[1] !== undefined && API_KEY_NAME_PATTERN.test(match[1]);
+}
+
+/** The names of the files in a folder, not of its folders; none when the folder is missing. */
+async function folderFiles(folder: string): Promise<string[]> {
+  try {
+    return (await readdir(folder, { withFileTypes: true })).filter((entry) => entry.isFile()).map(({ name }) => name);
+  } catch (error) {
+    if (isMissingFileError(error)) return [];
+    throw error;
+  }
 }
 
 /** The names in a folder; none when the folder is missing. */

@@ -25,6 +25,7 @@ import {
   type AgentProviderRef,
   agentProviderDescriptor,
   type CustomProviderHarness,
+  type InstallerProviderId,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -32,6 +33,7 @@ import {
   MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
   type ManagedRuntimeId,
+  type McpServerConfig,
   type ProviderRuntimeDownload,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
@@ -43,6 +45,7 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { PROCESSOR_FEATURE_MISSING } from "../backend/agent-client";
 import {
   type BundledProviderExecutables,
   compareReleases,
@@ -56,6 +59,7 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { measureTree } from "../backend/storage-usage";
+import type { HermesInstaller } from "./hermes-installer";
 import { isSafeLinkTarget } from "./provider-runtime-archive";
 import {
   type ArchiveDigest,
@@ -187,6 +191,11 @@ export interface ProviderRuntimeManagerOptions {
   availableDiskBytes?: () => Promise<number>;
   /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
   heldStageWaitMs?: number;
+  /**
+   * Installs Hermes, which has no release archive, with its own installer. Its status joins the
+   * snapshot, and `download` and `cancel` of `hermes` go to it. Without it, Hermes has no status.
+   */
+  hermesInstaller?: HermesInstaller;
   /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
   heldSourceWaitsMs?: readonly number[];
   /**
@@ -225,11 +234,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #root: string;
   readonly #downloads: string;
   readonly #target: RuntimeTarget | null;
+  #isCatalogNpxApp: (config: McpServerConfig) => boolean = () => false;
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
   readonly #heldStageWaitMs: number;
   readonly #heldSourceWaitsMs: readonly number[];
+  readonly #hermesInstaller: HermesInstaller | null;
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Fiber.Fiber<void, ProviderRuntimeFailure>>();
@@ -289,6 +300,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       });
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
     this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
+    this.#hermesInstaller = options.hermesInstaller ?? null;
+    this.#hermesInstaller?.on("status", () => {
+      this.#revision += 1;
+      this.emit("status", this.getStatus());
+    });
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -301,6 +317,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       kimi: emptyStatus(unsupportedMessage),
       pi: emptyStatus(unsupportedMessage),
       muse: emptyStatus(unsupportedMessage),
+      devin: emptyStatus(unsupportedMessage),
+      copilot: emptyStatus(unsupportedMessage),
+      mistral: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -312,7 +331,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         concurrency: "unbounded",
         discard: true,
       });
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, VERSION_RETENTION_MS);
+      if (this.#target) {
+        const stale = Date.now() - VERSION_RETENTION_MS;
+        const paths = yield* this.#oldVersionPathsEffect(this.#target, stale, true);
+        // Forked, as in the update check: the removal can take gigabytes off a slow disk, and the
+        // window waits for this start. The stamps above are done, so a sibling keeps these versions.
+        yield* Effect.forkIn(this.#removeOldVersionPathsEffect(paths, stale), this.#scope);
+      }
       return this.getStatus();
     });
   }
@@ -335,7 +360,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           offer && !configuredCliPath(provider) && !automatic && this.#isProviderOn(provider) ? version : null;
       }
     }
-    return { revision: this.#revision, providers, toolRuntimes: { bun } };
+    const hermes = this.#hermesInstaller?.status();
+    return {
+      revision: this.#revision,
+      providers: hermes ? { ...providers, hermes } : providers,
+      toolRuntimes: { bun },
+    };
   }
   checkForUpdates(): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
@@ -701,13 +731,40 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * nothing rewrites a stored command, the catalog, or the wire.
    */
   mcpToolRuntimes(): McpToolRuntimes {
-    const executable = this.#target && this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
-    if (!(executable && this.#target)) return NO_MCP_TOOL_RUNTIMES;
-    const bin = dirname(executable);
-    return { binDirectories: [bin], commandAliases: { npx: join(bin, bunxExecutableName(this.#target)) } };
+    const target = this.#target;
+    // No managed Bun exists for this machine, so a Marketplace app starts as the machine can start it.
+    if (!target) return NO_MCP_TOOL_RUNTIMES;
+    const executable = this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
+    const bunx = executable ? join(dirname(executable), bunxExecutableName(target)) : null;
+    const isCatalogNpxApp = this.#isCatalogNpxApp;
+    const catalogCommand: McpToolRuntimes["catalogCommand"] = (config) => {
+      if (!isCatalogNpxApp(config)) return null;
+      // `--bun`, because `bunx` alone starts the package with a `node` it finds on the `PATH`.
+      return bunx ? { command: bunx, args: ["--bun"] } : "pending";
+    };
+    if (!(executable && bunx)) return { ...NO_MCP_TOOL_RUNTIMES, catalogCommand };
+    return { binDirectories: [dirname(executable)], commandAliases: { npx: bunx }, catalogCommand };
   }
-  download(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+
+  /**
+   * Names the Marketplace apps that `npx` starts. The catalog is read after this manager is made,
+   * so it arrives here. Until then no server is a Marketplace app.
+   */
+  setCatalogNpxApps(isCatalogNpxApp: (config: McpServerConfig) => boolean): void {
+    this.#isCatalogNpxApp = isCatalogNpxApp;
+  }
+  download(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (!this.#hermesInstaller)
+          return yield* new ProviderRuntimeFailure({
+            cause: new Error(sourceText("error.provider.runtimesUnsupported")),
+          });
+        yield* this.#hermesInstaller.install();
+        return this.getStatus();
+      }
       if (!this.#target)
         return yield* new ProviderRuntimeFailure({
           cause: new Error(sourceText("error.provider.runtimesUnsupported")),
@@ -872,8 +929,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       ),
     );
   }
-  cancel(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+  cancel(
+    runtime: ManagedRuntimeId | InstallerProviderId,
+  ): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
+      if (runtime === "hermes") {
+        if (this.#hermesInstaller) yield* this.#hermesInstaller.cancel();
+        return this.getStatus();
+      }
       if (this.#statuses[runtime].phase !== "downloading") return this.getStatus();
       const task = this.#tasks.get(runtime);
       const spec = this.#transfers.get(runtime);
@@ -892,6 +955,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#checkTimer) clearInterval(this.#checkTimer);
       this.#checkTimer = null;
       for (const controller of this.#controllers.values()) controller.abort();
+      if (this.#hermesInstaller) yield* this.#hermesInstaller.stop();
       yield* Effect.forEach(this.#tasks.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Effect.forEach(this.#removals.values(), Fiber.await, { concurrency: "unbounded", discard: true });
       yield* Scope.close(this.#scope, Exit.void);
@@ -984,7 +1048,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  /** The newest version older than `version` whose executable is still there. */
+  /**
+   * The newest version older than `version` whose executable is still there. An install with a
+   * legacy executable name counts, so the update after an app upgrade replaces it, but it cannot run:
+   * `executablePath` names the current program in it, which is missing.
+   */
 
   #workingBackupEffect(
     targetRoot: string,
@@ -997,11 +1065,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         .filter((entry) => entry.isDirectory() && olderVersion(entry.name, version))
         .map((entry) => entry.name)
         .sort((a, b) => compareReleases(b, a));
+      const names = [spec.executableName, ...(providerRuntimeDescriptor(spec.runtime).legacyExecutableNames ?? [])];
       for (const candidate of versions) {
-        const executable = yield* runtimeIO(
-          async () => await stat(join(targetRoot, candidate, "bin", spec.executableName)).catch(() => null),
-        );
-        if (executable?.isFile()) return candidate;
+        for (const name of names) {
+          const executable = yield* runtimeIO(
+            async () => await stat(join(targetRoot, candidate, "bin", name)).catch(() => null),
+          );
+          if (executable?.isFile()) return candidate;
+        }
       }
       return null;
     });
@@ -1526,23 +1597,24 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #collectVersionsEffect(target: RuntimeTarget, retentionMs: number): Effect.Effect<void> {
     const stale = Date.now() - retentionMs;
     return this.#oldVersionPathsEffect(target, stale, true).pipe(
-      Effect.flatMap((paths) =>
-        Effect.forEach(
-          paths,
-          (path) =>
-            removeStaleRuntimeDirectory(path, stale).pipe(
-              Effect.andThen(pathExists(path)),
-              Effect.flatMap((kept) =>
-                kept
-                  ? Effect.void
-                  : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
-              ),
-            ),
-          { concurrency: "unbounded", discard: true },
-        ),
-      ),
-      Effect.catch(() => Effect.void),
+      Effect.flatMap((paths) => this.#removeOldVersionPathsEffect(paths, stale)),
     );
+  }
+
+  /** Removes each of `paths` that is still not stamped after `stale`, with its verification record. */
+
+  #removeOldVersionPathsEffect(paths: readonly string[], stale: number): Effect.Effect<void> {
+    return Effect.forEach(
+      paths,
+      (path) =>
+        removeStaleRuntimeDirectory(path, stale).pipe(
+          Effect.andThen(pathExists(path)),
+          Effect.flatMap((kept) =>
+            kept ? Effect.void : runtimeIO(() => rm(verificationRecordPath(path), { force: true })).pipe(Effect.ignore),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    ).pipe(Effect.catch(() => Effect.void));
   }
 
   /**
@@ -1732,12 +1804,38 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })))
-        .stdout;
+    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
+        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
+      )).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
 });
+
+/**
+ * A CLI built for a processor feature that this computer does not have names the feature and stops
+ * with SIGILL before it answers, such as Antigravity on a processor without AES or PCLMUL (#7111).
+ * Another try of the same copy stops in the same way, so the row names the cause instead of "Try
+ * again". Only provider runtimes get this text, because it names a provider. The log keeps the
+ * original failure.
+ */
+function unsupportedProcessorFailure(
+  runtime: ManagedRuntimeId,
+  failure: ProviderRuntimeFailure,
+): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    !("signal" in cause) ||
+    cause.signal !== "SIGILL" ||
+    !("stderr" in cause) ||
+    typeof cause.stderr !== "string" ||
+    !PROCESSOR_FEATURE_MISSING.test(cause.stderr)
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */
 const VERIFICATION_RECORD_LAYOUT = 1;

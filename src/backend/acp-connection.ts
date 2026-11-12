@@ -1,6 +1,7 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
 import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
+import { promisify } from "node:util";
 import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
@@ -26,6 +27,7 @@ const EXIT_REPORT_WAIT_MS = 2_000;
  */
 const CRASH_LINE = /^(?:F\d{4} \d\d:\d\d:\d\d|FATAL ERROR:|Fatal Python error:|\*\*\* SIG[A-Z]+ .*received)/u;
 const logger = createOpenBotLogger("acp-connection");
+const execFileAsync = promisify(execFile);
 interface ProcessEnd {
   ending: string;
   detail: string | null;
@@ -43,8 +45,6 @@ export interface AcpConnectionOptions {
   label(): string;
   redact(text: string): string;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
-  /** A stderr line that must not become the exit detail, such as a sign-in prompt with OAuth state. */
-  privateDiagnostic?: RegExp | undefined;
   exit(error: Error): void;
   client(): Client;
 }
@@ -129,10 +129,8 @@ export class AcpConnection {
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
-        if (!this.options.privateDiagnostic?.test(message)) {
-          lastDiagnostic = message;
-          if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        }
+        lastDiagnostic = message;
+        if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
         this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
       },
     });
@@ -164,6 +162,34 @@ export class AcpConnection {
       this.#fail(new Error(`ACP process exited with ${suffix}.`), child);
     });
   }
+
+  /** Runs the agent's command once with other arguments, in the environment and confinement of its process. */
+  readonly run = Effect.fn("AcpConnection.run")(function* (
+    this: AcpConnection,
+    argv: readonly string[],
+    timeoutMs: number,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    yield* Effect.tryPromise({
+      try: (signal) => {
+        const direct = cliSpawnTarget(this.options.cli.executable, argv);
+        const target = this.options.confine ? this.options.confine(direct) : direct;
+        return execFileAsync(target.command, target.args, {
+          signal,
+          timeout: timeoutMs,
+          maxBuffer: 64 * 1024,
+          env: {
+            ...process.env,
+            ...cliPathEnvironment(this.options.cli),
+            ...this.options.env,
+            ...this.options.extraEnv?.(),
+          },
+          windowsVerbatimArguments: target.windowsVerbatimArguments,
+          windowsHide: true,
+        });
+      },
+      catch: providerFailure,
+    });
+  });
 
   readonly stop = Effect.fn("AcpConnection.stop")(function* (
     this: AcpConnection,
@@ -212,8 +238,12 @@ export class AcpConnection {
   }
 }
 
-/** Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. */
+/**
+ * Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. Its
+ * input stays open there: the end of input can end the wrapper first, and `taskkill /T` then finds
+ * no children (#6470). Node closes the input when the process exits.
+ */
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {
-  child.stdin.end();
+  if (process.platform !== "win32") child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));
 });

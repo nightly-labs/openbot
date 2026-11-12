@@ -33,18 +33,29 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} existiert bereits. Diese Kopie wird daher als {saved} gespeichert.",
   "error.import.fileSkipped": "{name}: Die Datei {file} wird ausgelassen. {reason}",
   "error.import.chooseZip": "Wähle eine .zip-Datei.",
-  "error.import.zipTooLarge": "Der Export muss eine .zip-Datei unter 500 MB sein.",
   "error.import.unsafeFile": "Der Export enthält eine unsichere Datei: {name}",
-  "error.import.expandedTooLarge":
+  "error.import.tooManyFiles": "Der Export darf höchstens {limit} Dateien enthalten.",
+  "error.import.diskSpace":
+    "{name}: Die Dateien benötigen {size} GB freien Speicherplatz, frei sind {free} GB. Gib Speicherplatz frei und importiere den Agenten erneut.",
+  "error.import.remoteExpandedTooLarge":
     "Der entpackte Export muss unter 500 MB groß sein und weniger als {limit} Dateien enthalten.",
   "error.import.zipInvalid":
     "Die gewählte Datei ist keine gültige .zip-Datei. Falls Grok Bot sie noch speichert, warte und wähle sie erneut.",
+  "error.import.entryDamaged": "Die Datei ist im Export beschädigt.",
+  "error.import.foldersSkipped":
+    "{number} Dateien in .git- und node_modules-Ordnern werden ausgelassen. Ein Tool kann sie neu erstellen.",
   "error.import.empty": "Der Export ist leer.",
   "error.import.remoteZipTooLarge":
     "Für den Import auf einen Server, dem du beigetreten bist, muss der Export eine .zip-Datei unter 100 MB sein.",
   "error.import.hostBusy": "Der Server liest andere Exporte. Versuche es in einigen Minuten erneut.",
+  "error.import.uploadDiskSpace":
+    "Der Export braucht {size} GB freien Speicher auf dem Server, und {free} GB sind frei. Gib auf dem Server Speicher frei und wähle den Export dann erneut.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Dieser Server nimmt Exporte bis 100 MB an. Aktualisiere OpenBot auf dem Server, um einen größeren Export zu importieren.",
   "error.import.skillKept":
     "{name}: Der Server hat die Fähigkeit „{skill}“ bereits. Der Agent verwendet daher diese Fähigkeit. Bitte einen Administrator, sie zu aktualisieren.",
+  "error.import.skillRenamed":
+    "{name}: Der Name der Fähigkeit „{skill}“ ist dem Namen einer anderen Fähigkeit zu ähnlich. Daher wird sie als „{renamed}“ gespeichert.",
   "error.import.transferRemoteTooLarge":
     "Eine Übertragungsdatei für einen beigetretenen Server muss kleiner als 100 MB sein. Deaktiviere die Dateien der Arbeitsbereiche oder exportiere weniger Agenten.",
   "error.import.transferNotFile": "Diese Datei ist keine OpenBot-Übertragungsdatei.",

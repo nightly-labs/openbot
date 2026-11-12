@@ -74,4 +74,14 @@ export const messages = {
   "remoteDesktop.setup.seeDesktop": "デスクトップが見えます",
   "remoteDesktop.setup.seeTestPanel": "テストパネルが見えます",
   "remoteDesktop.setup.finishTest": "テストを終了",
+  "remoteDesktop.host.questionTitle": "{name} がこのコンピューターを操作しようとしています",
+  "remoteDesktop.host.questionDetail":
+    "{name} はあなたの画面を見て、マウスとキーボードを使えるようになります。30 秒以内に応答しないと、OpenBot はリクエストを拒否します。",
+  "remoteDesktop.host.allow": "許可",
+  "remoteDesktop.host.deny": "拒否",
+  "remoteDesktop.host.startedTitle": "リモート操作が開始されました",
+  "remoteDesktop.host.startedBody": "{name} がこのコンピューターを操作しています。",
+  "remoteDesktop.host.trayTooltip": "OpenBot: リモート操作中",
+  "remoteDesktop.host.trayControlledBy": "{name} がこのコンピューターを操作中",
+  "remoteDesktop.host.stopAll": "すべてのリモート操作を停止",
 } as const satisfies PartialTranslation<typeof source>;

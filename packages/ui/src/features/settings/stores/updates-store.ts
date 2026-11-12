@@ -76,7 +76,9 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
       case "installing":
         return t("settings.updates.status.installing", { target: targetUpdate() });
       case "up-to-date":
-        return t("settings.updates.status.upToDate");
+        return props.updateStatus.stagedVersion
+          ? t("settings.updates.status.staged", { target: `OpenBot v${props.updateStatus.stagedVersion}` })
+          : t("settings.updates.status.upToDate");
       case "error":
         return errorMessage(props.updateStatus.message, t("settings.updates.status.checkFailed"));
       case "unsupported":

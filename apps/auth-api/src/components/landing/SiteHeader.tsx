@@ -1,8 +1,10 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { SiteLogoLink } from "../brand/SiteLogoLink";
 import { Button, ButtonLink } from "../ui/button";
+import { SiteLanguageMenu } from "./SiteLanguageMenu";
 import { SiteMobileMenu } from "./SiteMobileMenu";
 import { SiteNavigationMenu } from "./SiteNavigationMenu";
+import { useSiteChrome } from "./SiteText";
 
 export interface SiteHeaderProps {
   /**
@@ -18,16 +20,18 @@ export interface SiteHeaderProps {
 // The one header of the public site. It keeps the `landing-header` class because
 // analytics reads it to report a click as coming from the header.
 export function SiteHeader(props: SiteHeaderProps) {
+  const chrome = useSiteChrome();
+  const text = () => chrome().text;
   // The mobile sheet repeats these actions. Only the header's own copy is the beam's source.
   const actions = (downloadRef?: (element: HTMLElement) => void) => (
     <>
       {props.page === "landing" ? (
         <Button ref={downloadRef} href={OPENBOT_LINKS.download} variant="primary" size="sm" icon="download">
-          Download
+          {text().download}
         </Button>
       ) : (
         <ButtonLink to="/download" variant="primary" size="sm" icon="download">
-          Download
+          {text().download}
         </ButtonLink>
       )}
       {/* A full page load: the /app route brings the desktop document styles, which stop the site page from
@@ -40,16 +44,17 @@ export function SiteHeader(props: SiteHeaderProps) {
         icon="arrow-right"
         class="landing-button-glass site-header-secondary"
       >
-        App
+        {text().app}
       </ButtonLink>
     </>
   );
 
   return (
-    <header class="landing-header" data-enter="header">
+    <header class="landing-header" data-enter="header" lang={chrome().lang}>
       <SiteLogoLink />
       <SiteNavigationMenu />
       <div class="site-header-actions">
+        <SiteLanguageMenu />
         {actions(props.downloadRef)}
         <SiteMobileMenu actions={() => actions()} />
       </div>

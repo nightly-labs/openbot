@@ -1,22 +1,23 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Input, Search, Server } from "@openbot/ui";
-import { createSignal, For, flush, Show } from "solid-js";
+import { Button, Server } from "@openbot/ui";
+import { createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
+import { useAuth } from "../account/account-context";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
+import { navItem, navItems, type SettingsTab, settingsRowShown, settingsTabShown } from "../settings/settings-tabs";
 import {
-  dynamicIslandSettingsShown,
-  navItem,
-  navItems,
-  type SettingsTab,
-  settingsRowShown,
-  settingsTabShown,
-} from "../settings/settings-tabs";
-import { ServerSettingsPageTitle, SettingsPageFrame } from "./SettingsPageFrame";
+  openFirstSettingsSection,
+  PersonalSettingsLink,
+  ServerSettingsLink,
+  ServerSettingsPageTitle,
+  SettingsPageFrame,
+  SettingsSearchField,
+} from "./SettingsPageFrame";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
 /** A personal search entry: a tab, or a row of a tab. A row has an anchor; a tab has none and opens at the top. */
@@ -74,7 +75,9 @@ function rankRows(query: string, rows: ReadonlyArray<SearchRow>, text: (key: App
 /**
  * A settings page of the window: the user settings or the settings of the active server. The settings
  * panel shows its nav and content in the mounts of this page. On the user settings page, the search
- * above the nav replaces the nav with matching rows. A result opens its tab and moves to its row.
+ * above the nav replaces the nav with matching rows. A result opens its tab and moves to its row. On a
+ * server settings page, the search filters the sections of the nav. Below the nav, each page has a row
+ * that opens the other page.
  */
 export function SettingsPage(props: { kind: SettingsKind }) {
   const i18n = useI18n();
@@ -83,9 +86,15 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   const serverSettings = useServerSettings();
   const platform = usePlatform();
   const { activeServer } = useServers();
-  const [query, setQuery] = createSignal("");
+  const { signedInAccount } = useAuth();
+  const [personalQuery, setPersonalQuery] = createSignal("");
+  /** The search of this page. The server settings read the server search to filter their section list. */
+  const query = () => (props.kind === "personal" ? personalQuery() : windowPage.serverSettingsQuery());
+  const setQuery = (value: string) =>
+    props.kind === "personal" ? setPersonalQuery(value) : windowPage.setServerSettingsQuery(value);
+  onCleanup(() => windowPage.setServerSettingsQuery(""));
   const tabShown = (tab: SettingsTab) =>
-    settingsTabShown(tab, dynamicIslandSettingsShown(platform.appInfo()?.platform, platform.chatWindow !== null));
+    settingsTabShown(tab, { platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null });
   /** The rows of the tabs shown on this computer, then the sections that the active server's settings show. */
   const searchRows = (): SearchRow[] => {
     const server = activeServer();
@@ -99,7 +108,8 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       ...(serverSupportsCapability(server, "agent-import-v1") ? [IMPORT_ROW] : []),
     ];
   };
-  const results = () => (query().trim() ? rankRows(query().trim(), searchRows(), (key) => i18n.t(key)) : null);
+  const results = () =>
+    props.kind === "personal" && query().trim() ? rankRows(query().trim(), searchRows(), (key) => i18n.t(key)) : null;
   /** What a screen reader hears while the user types a query. */
   const resultStatus = () => {
     const rows = results();
@@ -109,6 +119,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       : i18n.t("app.settingsPage.noResults");
   };
   let content: HTMLElement | undefined;
+  let nav: HTMLElement | undefined;
 
   /**
    * Opens the tab of the result. For a row, it then scrolls to the row, marks it and puts the focus on its
@@ -158,8 +169,30 @@ export function SettingsPage(props: { kind: SettingsKind }) {
         </Show>
       }
       sectionsHidden={results() !== null}
+      footer={
+        <Show
+          when={props.kind === "personal"}
+          fallback={
+            <PersonalSettingsLink
+              account={signedInAccount()}
+              // The footer row closes with this page, so the focus goes back to what opened the first page.
+              onOpen={() => settings.openAppSettings(serverSettings.serverSettingsRestoreTarget())}
+            />
+          }
+        >
+          <Show when={activeServer()}>
+            {(server) => (
+              <ServerSettingsLink
+                server={server()}
+                onOpen={() => serverSettings.openServerSettings(server().id, settings.appSettingsRestoreTarget())}
+              />
+            )}
+          </Show>
+        </Show>
+      }
       onMounts={(mounts) => {
         content = mounts?.content;
+        nav = mounts?.nav;
         windowPage.setSettingsMounts(mounts);
       }}
       // Escape clears the search, or else closes the page.
@@ -167,26 +200,21 @@ export function SettingsPage(props: { kind: SettingsKind }) {
         if (query()) setQuery("");
         else windowPage.showAgents();
       }}
+      onClose={windowPage.showAgents}
     >
+      <SettingsSearchField
+        value={query()}
+        onInput={setQuery}
+        onEnter={() => {
+          if (props.kind === "server") {
+            openFirstSettingsSection(nav, windowPage.openFirstServerSection, query);
+            return;
+          }
+          const top = results()?.[0];
+          if (top) openResult(top);
+        }}
+      />
       <Show when={props.kind === "personal"}>
-        <label class="search-field settings-page-search">
-          <Search aria-hidden="true" />
-          <Input
-            type="search"
-            aria-label={i18n.t("app.settingsPage.search")}
-            placeholder={i18n.t("app.settingsPage.searchPlaceholder")}
-            spellcheck={false}
-            value={query()}
-            onInput={(event) => setQuery(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              const top = results()?.[0];
-              if (event.key === "Enter" && top) {
-                event.preventDefault();
-                openResult(top);
-              }
-            }}
-          />
-        </label>
         {/* Always in the page, so a screen reader announces each change of the count. */}
         <span class="sr-only" role="status">
           {resultStatus()}

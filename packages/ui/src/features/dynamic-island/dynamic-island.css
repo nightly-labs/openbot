@@ -136,6 +136,9 @@
   font: inherit;
   outline: none;
   transform: translateX(-50%);
+  /* The compact ears and shoulders are placed by physical side and measured by the motion script, so
+     the compact bar keeps one layout in every language. The expanded panel mirrors. */
+  direction: ltr;
 }
 
 .dynamic-island[data-pointer-toggle="false"] .dynamic-island-toggle {

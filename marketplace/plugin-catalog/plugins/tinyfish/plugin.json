@@ -1,0 +1,36 @@
+{
+  "slug": "tinyfish",
+  "name": "TinyFish",
+  "tagline": "Web search and browsing",
+  "description": "TinyFish lets agents search the web, fetch pages, and run browser agents that navigate sites and extract data. Each user signs in to their own TinyFish account through the browser, and browser and agent runs use that account's credits.",
+  "category": "automation",
+  "creatorName": "TinyFish",
+  "iconUrl": "https://www.tinyfish.ai/favicon-for-app/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-compare-prices", "text": "Compare the listed prices for this laptop model on three retail sites." },
+    {
+      "id": "prompt-extract-list",
+      "text": "Collect the names and dates of upcoming events from this conference site."
+    },
+    { "id": "prompt-search", "text": "Search for recent reviews of standing desks and summarize them." }
+  ],
+  "apps": [
+    {
+      "id": "app-tinyfish-mcp",
+      "name": "TinyFish",
+      "description": "Web search, page fetch, and browser agents, over TinyFish's MCP server with browser sign-in.",
+      "iconUrl": "https://www.tinyfish.ai/favicon-for-app/apple-icon.png",
+      "server": {
+        "name": "tinyfish",
+        "transport": "http",
+        "url": "https://agent.tinyfish.ai/mcp",
+        "auth": [{ "id": "tinyfish-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.tinyfish.ai",
+  "privacyPolicyUrl": "https://www.tinyfish.ai/privacy-policy",
+  "termsUrl": "https://www.tinyfish.ai/terms"
+}

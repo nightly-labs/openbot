@@ -1,0 +1,29 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/uiBlock";
+
+export const messages = {
+  "uiBlock.status.answered": "تمت الإجابة",
+  "uiBlock.status.waiting": "في انتظارك",
+  "uiBlock.outcome.expired": "لم تُقدَّم إجابة في الوقت المحدد",
+  "uiBlock.outcome.closed": "أُغلق دون إجابة",
+  "uiBlock.outcome.autoAnswered": "{outcome} (لم يُجب أحد في الوقت المحدد)",
+  "uiBlock.confirm.holdHint": "اضغط مطوّلًا على الزر للتأكيد، أو اضغطه للتأكيد في خطوة ثانية",
+  "uiBlock.confirm.prompt": "تأكيد: {action}؟",
+  "uiBlock.confirm.accept": "تأكيد",
+  "uiBlock.confirm.autoActionLabel": "{action} · {seconds} ث",
+  "uiBlock.confirm.autoActionClock": "{action} · {time}",
+  "uiBlock.confirm.previewLabel": "معاينة",
+  "uiBlock.confirm.showFullPreview": "عرض الكل",
+  "uiBlock.confirm.hideFullPreview": "عرض أقل",
+  "uiBlock.choice.submit": "إرسال",
+  "uiBlock.choice.shortcutHint": "اضغط من {first} إلى {last} للاختيار",
+  "uiBlock.quick.label": "ردود سريعة",
+  "uiBlock.form.submit": "إرسال",
+  "uiBlock.form.required": "هذا الحقل مطلوب",
+  "uiBlock.form.choose": "اختر خيارًا",
+  "uiBlock.form.notSet": "غير محدد",
+  "uiBlock.form.invalid": "بعض الإجابات غير صحيحة. تحقّق منها وأعد المحاولة.",
+  "uiBlock.form.hiddenValue": "مخفي",
+  "uiBlock.skip": "تخطٍّ",
+  "uiBlock.error.answerFailed": "تعذّر إرسال إجابتك. أعد المحاولة.",
+} as const satisfies PartialTranslation<typeof source>;

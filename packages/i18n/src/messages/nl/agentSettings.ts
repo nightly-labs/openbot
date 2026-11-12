@@ -49,6 +49,18 @@ export const messages = {
     one: "Je kunt maximaal {count} map toevoegen",
     other: "Je kunt maximaal {count} mappen toevoegen",
   },
+  "agentSettings.folders.browse.places": "Ga naar",
+  "agentSettings.folders.browse.home": "Thuismap",
+  "agentSettings.folders.browse.parent": "Omhoog naar {folder}",
+  "agentSettings.folders.browse.failed": "Kan deze map niet openen.",
+  "agentSettings.folders.browse.empty": "Deze map bevat geen mappen.",
+  "agentSettings.folders.browse.truncated": {
+    one: "Alleen de eerste map wordt getoond.",
+    other: "Alleen de eerste {count} mappen worden getoond.",
+  },
+  "agentSettings.folders.browse.add": "Toevoegen",
+  "agentSettings.folders.browse.exclude": "Uitsluiten",
+  "agentSettings.folders.browse.locate": "Gebruiken",
   "agentSettings.folders.failed": "Kan de mappen niet wijzigen",
   "agentSettings.folders.excluded": "Uitgesloten",
   "agentSettings.folders.exclude": "Map uitsluiten…",
@@ -72,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
   "agentSettings.backupModels.introAutomatic":
-    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+    "Als {model} de gebruikslimiet bereikt, schakelt {name} over op het eerste beschikbare model in de volgorde. {name} schakelt ook over als {model} een fout van de aanbieder geeft voordat {name} begint te schrijven.",
   "agentSettings.backupModels.ask": "Vragen voor overschakelen",
   "agentSettings.backupModels.order": "Volgorde",
   "agentSettings.backupModels.listLabel": "Reservemodellen, op volgorde",
@@ -85,7 +97,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} schakelt nooit over nadat het begint te schrijven. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
+    "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "agentSettings.groups.brain": "Brein",
   "agentSettings.groups.knows": "Weet",
   "agentSettings.groups.does": "Doet",
@@ -116,6 +128,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Terug naar ID",
   "agentSettings.avatar.shape": "Vorm",
   "agentSettings.avatar.shuffle": "Willekeurig gezicht",
+  "agentSettings.avatar.style": "Avatarstijl",
+  "agentSettings.avatar.stylePlush": "Pluche",
+  "agentSettings.avatar.styleFlat": "Plat",
   "agentSettings.avatar.shapes": "Avatarvormen",
   "agentSettings.avatar.shapeOption": "Vorm {number}",
   "agentSettings.avatar.eyes": "Ogen",
@@ -130,10 +145,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Kan de avatar van de agent niet verwerken.",
   "agentSettings.runtime.model": "Agentmodel",
   "agentSettings.runtime.modelUnavailable": "Modellen zijn beschikbaar nadat een agent-CLI verbinding maakt.",
-  "agentSettings.runtime.reasoning": "Redeneren",
-  "agentSettings.runtime.reasoningLabel": "Redeneerniveau van de agent",
-  "agentSettings.runtime.selectReasoning": "Kies redeneerniveau",
-  "agentSettings.runtime.reasoningSetByProvider": "Ingesteld door {provider}",
   "agentSettings.runtime.access": "Toegang",
   "agentSettings.runtime.accessLabel": "Toegang van agent",
   "agentSettings.runtime.busyMessage": "Tijdens werk",
@@ -173,6 +184,15 @@ export const messages = {
     "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.deleteHistory.title": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.description":
+    "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",
+  "agentSettings.deleteHistory.button": "Wissen",
+  "agentSettings.deleteHistory.confirmTitle": "Chatgeschiedenis met {name} wissen?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Alle berichten en bestanden van deze chat worden uit OpenBot gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
+  "agentSettings.deleteHistory.confirm": "Geschiedenis wissen",
+  "agentSettings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
   "agentSettings.fullAccess.title": "Deze agent volledige toegang geven?",
   "agentSettings.fullAccess.askTitle": "Deze agent buiten zijn werkruimte laten werken?",
   "agentSettings.fullAccess.description":
@@ -207,8 +227,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
-  "agentSettings.quickAcknowledgement.description":
-    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",

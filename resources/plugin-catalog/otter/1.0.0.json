@@ -1,0 +1,33 @@
+{
+  "slug": "otter",
+  "name": "Otter.ai",
+  "tagline": "Meeting transcripts and notes",
+  "description": "Otter.ai lets agents search and read meeting transcripts and summaries in the user's Otter account. Access is read-only.",
+  "category": "productivity",
+  "creatorName": "Otter.ai",
+  "iconUrl": "https://cdn.prod.website-files.com/618e9316785b3582a5178502/618e943a80919a98b5e9bf69_apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-last-meeting", "text": "Summarize my last meeting and list the action items." },
+    { "id": "prompt-search", "text": "Find meetings this month where pricing was discussed." },
+    { "id": "prompt-follow-up", "text": "Draft a follow-up email from yesterday's customer call." }
+  ],
+  "apps": [
+    {
+      "id": "app-otter-mcp",
+      "name": "Otter.ai",
+      "description": "Meeting search and transcript reading, over Otter.ai's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/618e9316785b3582a5178502/618e943a80919a98b5e9bf69_apple-icon.png",
+      "server": {
+        "name": "otter",
+        "transport": "http",
+        "url": "https://mcp.otter.ai/mcp",
+        "auth": [{ "id": "otter-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://otter.ai",
+  "privacyPolicyUrl": "https://otter.ai/privacy-policy",
+  "termsUrl": "https://otter.ai/terms-of-service",
+  "skills": []
+}

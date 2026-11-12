@@ -12,6 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { withoutQueuePositions } from "../database/conversation-writer";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -189,6 +190,11 @@ export class ConversationRuntime {
   readonly #evictedSnapshots = new Map<string, EvictedSnapshot>();
   #evictionTimer: NodeJS.Timeout | null = null;
   readonly #conversationSignatures = new Map<string, string>();
+  /**
+   * The messages that a person deleted, by thread, read from SQLite at the first publish of the
+   * thread. A provider read or a sync can bring such a message back into a snapshot; it never shows.
+   */
+  readonly #deletedMessageIds = new Map<string, Set<string>>();
   readonly #unstoredSends = new Map<string, { since: number; sends: number }>();
   readonly #threadToAgent = new Map<string, string>();
   readonly #loadedThreads = new Map<string, AgentClient>();
@@ -204,6 +210,11 @@ export class ConversationRuntime {
   readonly #forgottenExecutionThreads = new Set<string>();
   /** The execution threads that are tasks: they run beside the agent's own chat, not after it. */
   readonly #taskThreads = new Set<string>();
+  /**
+   * The execution threads of channels, with their channel. A channel turn runs beside the agent's
+   * own chat and its tasks, as a task does, unless the provider runs one turn at a time.
+   */
+  readonly #channelThreads = new Map<string, string>();
   /**
    * The open provider sessions of routine runs, with their agent. A routine run has its own session,
    * which closes when the run ends, so the agent's long chat session does not grow with it.
@@ -361,23 +372,23 @@ export class ConversationRuntime {
         if (other !== cached && other.snapshot.messages === cached.snapshot.messages) committed.delete(other);
       }
     };
+    // The least recently used first. The sort is stable, so of two chats used at the same time, an
+    // agent chat goes before a thread, and each in map order, as before.
+    let byAge: Array<{ kind: "agent" | "execution"; id: string; cached: CachedSnapshot }> | undefined;
     while (this.#cachedSnapshotBytes > CONVERSATION_CACHE_TOTAL_BYTES_LIMIT) {
-      let oldest:
-        | { kind: "agent"; id: string; usedAt: number }
-        | { kind: "execution"; id: string; usedAt: number }
-        | undefined;
-      for (const [id, cached] of this.#cachedSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
+      byAge ??= [
+        ...[...this.#cachedSnapshots].map(([id, cached]) => ({ kind: "agent" as const, id, cached })),
+        ...[...this.#cachedExecutionSnapshots].map(([id, cached]) => ({ kind: "execution" as const, id, cached })),
+      ].sort((left, right) => left.cached.usedAt - right.cached.usedAt);
+      // A full signature is computed only for a chat that is the oldest one left, not for each
+      // cached chat. Each call on a full cache otherwise serialized the whole budget again (#7250).
+      const oldest = byAge.find(({ kind, id, cached }) => {
+        const current = kind === "agent" ? this.#cachedSnapshots.get(id) : this.#cachedExecutionSnapshots.get(id);
+        if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "agent", id, usedAt: cached.usedAt };
-      }
-      for (const [id, cached] of this.#cachedExecutionSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
-        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "execution", id, usedAt: cached.usedAt };
-      }
+          return false;
+        return isCommitted(cached);
+      });
       if (!oldest) return;
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
@@ -501,12 +512,17 @@ export class ConversationRuntime {
   }
 
   /**
-   * The running turn of the agent's own chat, or of a channel or messaging thread it serves. A task
-   * runs beside these, so its turns are not here: see `anyWorkingSnapshot` and `workingTaskSnapshots`.
+   * The running turn of the agent's own chat, or of a messaging thread it serves. A task and a
+   * channel run beside these, so their turns are not here: see `anyWorkingSnapshot`,
+   * `workingTaskSnapshots` and `workingChannelSnapshots`.
    */
   workingSnapshot(agentId: string): ConversationSnapshot | undefined {
     return [...this.activeSnapshots()].find(
-      ([id, snapshot]) => id === agentId && snapshot.activeTurnId && !this.isTaskThread(snapshot.threadId),
+      ([id, snapshot]) =>
+        id === agentId &&
+        snapshot.activeTurnId &&
+        !this.isTaskThread(snapshot.threadId) &&
+        this.channelForThread(snapshot.threadId) === null,
     )?.[1];
   }
 
@@ -527,6 +543,31 @@ export class ConversationRuntime {
     return [...this.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];
+  }
+
+  /** The channel threads of this agent that run a turn now. */
+  workingChannelSnapshots(agentId: string): ConversationSnapshot[] {
+    return [...this.#executionSnapshots.values()].filter(
+      (snapshot) =>
+        snapshot.agentId === agentId && snapshot.activeTurnId && this.channelForThread(snapshot.threadId) !== null,
+    );
+  }
+
+  /** Records the execution thread of one channel, so its turns run in the channel's own lane. */
+  registerChannelThread(agentId: string, threadId: string, channelId: string): void {
+    if (this.#forgottenExecutionThreads.has(threadId) || this.#store.ownsThread(threadId)) return;
+    this.#channelThreads.set(threadId, channelId);
+    this.registerExecutionThread(agentId, threadId);
+  }
+
+  /** The channel whose execution thread this is, or null. */
+  channelForThread(threadId: string | null): string | null {
+    return threadId === null ? null : (this.#channelThreads.get(threadId) ?? null);
+  }
+
+  /** Whether this thread runs beside the agent's own chat: a task or a channel thread. */
+  isSideThread(threadId: string | null): boolean {
+    return this.isTaskThread(threadId) || this.channelForThread(threadId) !== null;
   }
 
   registerTaskThread(agentId: string, threadId: string): void {
@@ -648,6 +689,7 @@ export class ConversationRuntime {
     replacedMessageId?: string,
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
     if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
@@ -756,8 +798,10 @@ export class ConversationRuntime {
     );
   }
 
-  publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
+  publishConversation(snapshot: ConversationSnapshot, signature?: string): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    if (this.#dropDeletedMessages(snapshot) || signature === undefined)
+      signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
   }
@@ -771,11 +815,15 @@ export class ConversationRuntime {
     return this.#threadToAgent.get(externalThreadId);
   }
 
-  /** Model retrieval must never fall back to the agent's personal conversation. */
+  /**
+   * Model retrieval must never fall back to the agent's personal conversation. The scope lasts as long
+   * as the client runs the session: `unloadAgentThreads` only reloads the instructions before the next
+   * turn, and the running turn must keep its history tools (#6584).
+   */
   historyScope(externalThreadId: string, client: AgentClient) {
     const agentId = this.#threadToAgent.get(externalThreadId);
     const threadId = this.#publicThreads.get(externalThreadId);
-    return agentId && threadId && this.#loadedThreads.get(externalThreadId) === client ? { agentId, threadId } : null;
+    return agentId && threadId && this.openClientFor(externalThreadId) === client ? { agentId, threadId } : null;
   }
 
   bindThread(externalThreadId: string, agentId: string, publicThreadId?: string): void {
@@ -844,7 +892,10 @@ export class ConversationRuntime {
     return open;
   }
 
-  /** Marks this provider session as the one routine run of the agent. Its items show in the agent's own chat. */
+  /**
+   * Marks this provider session as the session of one routine run of the agent. Its items show in the
+   * thread that it is bound to: the routine's own side thread, or the agent's own chat.
+   */
   registerRoutineSession(agentId: string, externalThreadId: string): void {
     this.#routineSessions.set(externalThreadId, agentId);
   }
@@ -853,11 +904,21 @@ export class ConversationRuntime {
     this.#routineSessions.delete(externalThreadId);
   }
 
-  /** The newest open routine session of this agent. Its chat runs one turn at a time. */
-  routineSession(agentId: string): string | undefined {
+  /**
+   * The newest open routine session of this agent in one thread: the agent's own chat or a routine's
+   * side thread. Each thread runs one turn at a time.
+   */
+  routineSession(agentId: string, publicThreadId: string): string | undefined {
     let newest: string | undefined;
-    for (const [externalThreadId, owner] of this.#routineSessions) if (owner === agentId) newest = externalThreadId;
+    for (const [externalThreadId, owner] of this.#routineSessions)
+      if (owner === agentId && this.#publicThreads.get(externalThreadId) === publicThreadId) newest = externalThreadId;
     return newest;
+  }
+
+  /** Whether any routine run of this agent has an open session, in any thread. */
+  hasRoutineSession(agentId: string): boolean {
+    for (const owner of this.#routineSessions.values()) if (owner === agentId) return true;
+    return false;
   }
 
   isRoutineSession(externalThreadId: string): boolean {
@@ -867,10 +928,74 @@ export class ConversationRuntime {
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#taskThreads.delete(threadId);
+    this.#channelThreads.delete(threadId);
     this.#executionSnapshots.delete(threadId);
     this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
     this.#unstoredSends.delete(threadId);
+    this.#deletedMessageIds.delete(threadId);
+  }
+
+  /** Removes from the snapshot each message that a person deleted. True when one was there. */
+  #dropDeletedMessages(snapshot: ConversationSnapshot): boolean {
+    if (!snapshot.threadId) return false;
+    let deleted = this.#deletedMessageIds.get(snapshot.threadId);
+    if (!deleted) {
+      deleted = this.#store.database.deletedConversationMessageIds(snapshot.threadId);
+      this.#deletedMessageIds.set(snapshot.threadId, deleted);
+    }
+    if (deleted.size === 0) return false;
+    const before = snapshot.messages.length;
+    for (let index = before - 1; index >= 0; index--) {
+      const message = snapshot.messages[index];
+      if (message && deleted.has(message.id)) snapshot.messages.splice(index, 1);
+    }
+    return snapshot.messages.length !== before;
+  }
+
+  /**
+   * Removes a message that a person deleted from each chat in memory that holds it, after the delete
+   * is stored. The cache of each such chat is built again, so no later write sees the message as
+   * removed again or as trimmed. Returns the chat to publish, with the stored revision, or undefined
+   * when main holds no chat of the thread.
+   */
+  forgetDeletedMessage(
+    agentId: string,
+    threadId: string,
+    messageId: string,
+    revision: number,
+  ): ConversationSnapshot | undefined {
+    const remove = (snapshot: ConversationSnapshot): void => {
+      const index = snapshot.messages.findIndex((message) => message.id === messageId);
+      if (index !== -1) snapshot.messages.splice(index, 1);
+      snapshot.revision = Math.max(snapshot.revision, revision);
+    };
+    const deleted = this.#deletedMessageIds.get(threadId);
+    if (deleted) deleted.add(messageId);
+    else this.#deletedMessageIds.set(threadId, this.#store.database.deletedConversationMessageIds(threadId));
+    const execution = this.#executionSnapshots.get(threadId);
+    if (execution) {
+      remove(execution);
+      this.#setExecutionSnapshot(threadId, execution);
+      return this.#executionSnapshots.get(threadId);
+    }
+    // A caller can still hold an idle snapshot across an `await`, so it loses the message too.
+    const evicted = this.#evictedSnapshots.get(agentId);
+    const retained = evicted?.threadId === threadId ? evicted.snapshot.deref() : undefined;
+    if (retained) remove(retained);
+    const live = this.#snapshots.get(agentId);
+    if (live?.threadId !== threadId) return undefined;
+    remove(live);
+    this.#keepSnapshot(agentId, live);
+    return this.#snapshots.get(agentId);
+  }
+
+  /**
+   * After "Delete history" of the agent's own chat: the next read of the deleted ids comes from the
+   * database, which now holds every message of the thread. The caller replaces the snapshot.
+   */
+  forgetDeletedHistory(threadId: string): void {
+    this.#deletedMessageIds.delete(threadId);
   }
 
   clearLoadedThreads(): void {
@@ -882,15 +1007,18 @@ export class ConversationRuntime {
     for (const [id, snapshot] of this.#executionSnapshots) {
       if (snapshot.agentId !== agentId) continue;
       this.#taskThreads.delete(id);
+      this.#channelThreads.delete(id);
       this.#executionSnapshots.delete(id);
       this.#dropCachedExecutionSnapshot(id);
       this.#conversationSignatures.delete(id);
       this.#unstoredSends.delete(id);
+      this.#deletedMessageIds.delete(id);
     }
     const threadId = (this.#snapshots.get(agentId) ?? this.#evictedSnapshots.get(agentId))?.threadId;
     if (threadId) {
       this.#conversationSignatures.delete(threadId);
       this.#unstoredSends.delete(threadId);
+      this.#deletedMessageIds.delete(threadId);
     }
     this.#snapshots.delete(agentId);
     for (const [externalThreadId, owner] of this.#routineSessions)
@@ -1151,6 +1279,9 @@ function oldestMessagesToRemove(
   return removed;
 }
 
+/** What a write must store of a message: it with no queue position (`withoutQueuePositions`). */
 function messageSignature(message: ConversationMessage): string {
-  return createHash("sha256").update(JSON.stringify(message)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(withoutQueuePositions(message)))
+    .digest("hex");
 }

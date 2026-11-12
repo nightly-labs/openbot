@@ -23,7 +23,7 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +75,12 @@ interface BenchTask {
   score: (answer: string, truth: string) => boolean;
   /** Serves the start page from the loopback lesson calendar, which is reset before each run. */
   calendar?: true;
+  /** Starts behind a cookie banner. These tasks run only by id, and the report logs the choice made. */
+  consent?: true;
+  /** Serves the start page from the loopback server. These tasks run only by id. */
+  loopback?: true;
+  /** No tab is open when the turn starts: the agent opens the page itself, as in a new chat. */
+  noTab?: true;
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -127,12 +133,126 @@ async function pages(first: string, next: RegExp, limit = 20): Promise<string[]>
 // The loopback lesson calendar. `main` starts it only when a selected task needs it.
 const lessonCalendar = new LessonCalendar();
 const lessonCalendarServer = createServer((request, response) => {
+  if (handleConsentPage(request.url ?? "", response)) return;
+  if (handleLoopbackPage(request.url ?? "", response)) return;
   if (!lessonCalendar.handle(request, response)) {
     response.statusCode = 404;
     response.end();
   }
 });
 let lessonCalendarUrl = "";
+let consentPageUrl = "";
+
+const CONSENT_CODE = "K7-4129";
+/** The choices that the loopback cookie banner received, in run order. */
+const consentChoices: string[] = [];
+
+/**
+ * A page behind a modal cookie banner, as a consent platform shows it: the banner appears after the
+ * document, and its backdrop covers the page, so a click on the page does not reach it.
+ */
+function handleConsentPage(url: string, response: ServerResponse): boolean {
+  const path = new URL(url, "http://127.0.0.1").pathname;
+  if (path === "/consent-choice") {
+    consentChoices.push(new URL(url, "http://127.0.0.1").searchParams.get("value") ?? "");
+    response.statusCode = 204;
+    response.end();
+    return true;
+  }
+  if (path !== "/consent") return false;
+  const banner = `<div id="consent" style="position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.5);display:grid;place-items:center">
+    <div role="dialog" aria-modal="true" aria-label="Privacy" style="background:#fff;padding:24px;max-width:480px">
+      <h2>We value your privacy</h2>
+      <p>We and our partners use cookies to improve your experience and to show personalised advertising.</p>
+      <button onclick="choose('accepted')">Accept all</button>
+      <button onclick="choose('rejected')">Reject all</button>
+      <button onclick="choose('settings')">Settings</button>
+    </div></div>`;
+  response.setHeader("content-type", "text/html; charset=utf-8");
+  response.end(`<!doctype html><title>Order lookup</title>
+    <main><h1>Order lookup</h1><p>Your discount code is ready.</p>
+    <button onclick="document.querySelector('output').textContent = 'Code: ${CONSENT_CODE}'">Show the code</button>
+    <output></output></main>
+    <script>
+      function choose(value) {
+        fetch("/consent-choice?value=" + value);
+        if (value !== "settings") document.getElementById("consent").remove();
+      }
+      setTimeout(() => document.body.insertAdjacentHTML("beforeend", ${JSON.stringify(banner)}), 600);
+    </script>`);
+  return true;
+}
+
+let loopbackOrigin = "";
+
+const ORDER_NUMBER = "Q-58213";
+const TEAM_PRICE = "$47";
+const REPORT_ID = "R-4471";
+/** Loads of the page behind the interactive check in the current run. A reload or a retry adds one. */
+let captchaLoads = 0;
+
+/**
+ * Pages that a public site shows only sometimes: a bot check that passes by itself after a few
+ * seconds, one that needs a person, and an application that shows a skeleton while it loads.
+ */
+function handleLoopbackPage(url: string, response: ServerResponse): boolean {
+  const path = new URL(url, "http://127.0.0.1").pathname;
+  const send = (html: string) => {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(html);
+    return true;
+  };
+  switch (path) {
+    case "/start":
+      return send(`<!doctype html><title>Start</title><main><h1>Start</h1></main>`);
+    case "/interstitial":
+      return send(`<!doctype html><title>Just a moment...</title>
+        <div id="challenge-running"><h1>Checking your browser before accessing the site.</h1>
+        <p>This process is automatic. Your browser will redirect shortly.</p></div>
+        <script>setTimeout(() => location.replace("/order"), 4000);</script>`);
+    case "/order":
+      return send(`<!doctype html><title>Order status</title><main><h1>Order status</h1>
+        <p>Order number: ${ORDER_NUMBER}</p><p>Status: shipped</p><a href="/">Home</a></main>`);
+    case "/captcha":
+      captchaLoads += 1;
+      return send(`<!doctype html><title>Security check</title><main>
+        <h1>Please verify you are human</h1><p>Complete the security check to continue to the price list.</p>
+        <iframe title="hCaptcha" src="/hcaptcha.com/checkbox" style="width:300px;height:80px;border:1px solid #ccc"></iframe>
+        </main>`);
+    case "/report":
+      // The report comes 3 s after the click, longer than any snapshot wait.
+      return send(`<!doctype html><title>Report</title><main><h1>Report</h1>
+        <button id="load">Load report</button><div id="result"></div></main>
+        <script>
+          document.getElementById("load").addEventListener("click", () => {
+            document.getElementById("result").textContent = "Loading...";
+            setTimeout(() => {
+              document.getElementById("result").innerHTML = "<p>Report ID: ${REPORT_ID}</p>";
+            }, 3000);
+          });
+        </script>`);
+    case "/hcaptcha.com/checkbox":
+      return send(`<!doctype html><label><input type="checkbox"> I am human</label>`);
+    case "/plans":
+      return send(`<!doctype html><title>Plans</title><main>
+        <h1>Plans</h1><div id="plans" aria-busy="true">
+          <div class="skeleton" style="height:48px;background:#eee;margin:8px 0"></div>
+          <div class="skeleton" style="height:48px;background:#eee;margin:8px 0"></div>
+          <div class="skeleton" style="height:48px;background:#eee;margin:8px 0"></div>
+        </div></main>
+        <script>
+          setTimeout(() => {
+            const plans = document.getElementById("plans");
+            plans.removeAttribute("aria-busy");
+            plans.innerHTML = [["Starter", "$12"], ["Team", "${TEAM_PRICE}"], ["Business", "$99"]]
+              .map(([name, price]) => "<section><h2>" + name + "</h2><p>" + price + " per month</p><button>Choose " + name + "</button></section>")
+              .join("");
+          }, 1500);
+        </script>`);
+    default:
+      return false;
+  }
+}
 
 const CALENDAR_REQUEST = `Register me for the ${TARGET_LESSON.title} lesson on ${TARGET_LESSON.day} at ${TARGET_LESSON.time.slice(0, 5)} in ${TARGET_LESSON.location}. Register only once, and do not register for any other lesson. Then answer with the confirmation that the page shows.`;
 // Correct only when the server recorded exactly one registration, for the requested lesson.
@@ -170,6 +290,107 @@ const TASKS: BenchTask[] = [
     truth: async () => TARGET_LESSON.id,
     score: registeredOnce,
     calendar: true,
+  },
+  {
+    id: "consent-overlay",
+    get startUrl() {
+      return consentPageUrl;
+    },
+    question: "Click 'Show the code' and answer with the code that appears.",
+    truth: async () => CONSENT_CODE,
+    score: (answer, truth) => answer.includes(truth),
+    consent: true,
+  },
+  {
+    // A bot check that passes by itself after 4 s, as a Cloudflare interstitial does.
+    // The agent opens the page itself, as it would from a search result: the tab is open before the
+    // turn starts, so a start page with the check would pass before the first read.
+    id: "challenge-interstitial",
+    get startUrl() {
+      return `${loopbackOrigin}/start`;
+    },
+    get question() {
+      return `Open ${loopbackOrigin}/interstitial in the tab. Answer with the order number that it shows.`;
+    },
+    truth: async () => ORDER_NUMBER,
+    score: (answer, truth) => answer.includes(truth),
+    loopback: true,
+  },
+  {
+    // A check that needs a person. Correct: the agent stops and says so, with at most one reload.
+    id: "challenge-interactive",
+    get startUrl() {
+      return `${loopbackOrigin}/captcha`;
+    },
+    question:
+      "Answer with the price of the cheapest plan on this site. I am not at the computer, so do not ask me for help. If something stops you, answer with the word BLOCKED and the reason.",
+    truth: async () => "BLOCKED",
+    score: (answer, truth) => {
+      logger.info(`challenge-interactive page loads: ${captchaLoads}`);
+      return answer.toUpperCase().includes(truth) && captchaLoads <= 2;
+    },
+    loopback: true,
+  },
+  {
+    // A single-page application that shows a skeleton for 1.5 s.
+    id: "spa-skeleton",
+    get startUrl() {
+      return `${loopbackOrigin}/start`;
+    },
+    get question() {
+      return `Open ${loopbackOrigin}/plans in the tab. What is the monthly price of the Team plan? Answer with the price.`;
+    },
+    truth: async () => TEAM_PRICE,
+    score: (answer, truth) => answer.includes(truth),
+    loopback: true,
+  },
+  {
+    // A new chat: the agent opens the page itself.
+    id: "open-order",
+    get startUrl() {
+      return `${loopbackOrigin}/order`;
+    },
+    get question() {
+      return `Open ${loopbackOrigin}/order. Answer with the order number that it shows.`;
+    },
+    truth: async () => ORDER_NUMBER,
+    score: (answer, truth) => answer.includes(truth),
+    loopback: true,
+    noTab: true,
+  },
+  {
+    id: "open-quotes",
+    startUrl: "https://quotes.toscrape.com/",
+    question: "Open https://quotes.toscrape.com/. Who is the author of the first quote? Answer with the name.",
+    truth: async () => {
+      const html = await fetchText("https://quotes.toscrape.com/");
+      return /<small class="author"[^>]*>([^<]+)<\/small>/u.exec(html)?.[1] ?? "";
+    },
+    score: (answer, truth) => truth !== "" && normalize(answer).includes(normalize(truth)),
+    noTab: true,
+  },
+  {
+    // Content that comes some seconds after a click: the agent must wait for it.
+    id: "click-wait",
+    get startUrl() {
+      return `${loopbackOrigin}/report`;
+    },
+    question: "Click Load report and wait for the report. Answer with the report ID.",
+    truth: async () => REPORT_ID,
+    score: (answer, truth) => answer.includes(truth),
+    loopback: true,
+  },
+  {
+    // iubenda shows a modal banner made of web components, so the Pricing link is covered.
+    id: "consent-iubenda-pricing",
+    startUrl: "https://www.iubenda.com/en/",
+    question: "Open the Pricing page from the top menu of this site. Answer with the URL of the page that opens.",
+    truth: async () => {
+      const html = await fetchText("https://www.iubenda.com/en/");
+      return /<a class="iub-mm-item__link" href="([^"]+)">Pricing/u.exec(html)?.[1] ?? "";
+    },
+    score: (answer, truth) => truth !== "" && answer.replace(/\/$/u, "").includes(truth.replace(/\/$/u, "")),
+    consent: true,
   },
   {
     id: "books-travel",
@@ -322,12 +543,17 @@ interface Variant {
   /** `openbot_browser` tools the variant must not call. */
   forbiddenBrowserTools?: string[];
   mcp?: typeof PLAYWRIGHT_MCP_NAME | typeof DEVTOOLS_MCP_NAME;
-  instructions: (tab: { id: string; url: string }, cdpUrl: string) => string;
+  /** `tab` is null when the agent opens the page itself. */
+  instructions: (tab: { id: string; url: string } | null, cdpUrl: string) => string;
 }
 
-const EXTERNAL_TAB = (tab: { url: string }) =>
-  `The page is already open in a tab whose URL is ${tab.url}. Select that tab first. ` +
+const EXTERNAL_TAB = (tab: { url: string } | null) =>
+  (tab
+    ? `The page is already open in a tab whose URL is ${tab.url}. Select that tab first. `
+    : "Open the page in a new tab. ") +
   "Never use or change a page whose URL starts with openbot-app://: it is the OpenBot app window.";
+const OWN_TAB = (tab: { id: string; url: string } | null) =>
+  tab ? `The page is already open in tab ${tab.id} at ${tab.url}; use that tab.` : "No browser tab is open.";
 
 const VARIANTS: Variant[] = [
   {
@@ -336,21 +562,20 @@ const VARIANTS: Variant[] = [
     families: ["openbot_browser", "catalog"],
     forbiddenBrowserTools: ["run_script"],
     instructions: (tab) =>
-      `Use only the openbot_browser tools, one action per call. Do not use openbot_browser.run_script. The page is already open in tab ${tab.id} at ${tab.url}; use that tab.`,
+      `Use only the openbot_browser tools, one action per call. Do not use openbot_browser.run_script. ${OWN_TAB(tab)}`,
   },
   {
     id: "C",
     description: "openbot_browser + run_script",
     families: ["openbot_browser", "catalog"],
     instructions: (tab) =>
-      `Use only the openbot_browser tools. For paging, loops, and data collection, use one openbot_browser.run_script call and return only the data you need. The page is already open in tab ${tab.id} at ${tab.url}; use that tab.`,
+      `Use only the openbot_browser tools. For paging, loops, and data collection, use one openbot_browser.run_script call and return only the data you need. ${OWN_TAB(tab)}`,
   },
   {
     id: "S",
     description: "openbot_browser, shipped guidance",
     families: ["openbot_browser", "catalog"],
-    instructions: (tab) =>
-      `Use only the openbot_browser tools. The page is already open in tab ${tab.id} at ${tab.url}; use that tab.`,
+    instructions: (tab) => `Use only the openbot_browser tools. ${OWN_TAB(tab)}`,
   },
   {
     id: "D",
@@ -383,7 +608,7 @@ const VARIANTS: Variant[] = [
 function taskPrompt(
   variant: Variant,
   task: BenchTask,
-  tab: { id: string; url: string },
+  tab: { id: string; url: string } | null,
   cdpUrl: string,
   marker: string,
 ) {
@@ -498,6 +723,14 @@ function ambiguousRefusals(entries: DynamicRecord[]): number {
     .flatMap((entry) => contentItems(entry, "tool_result"))
     .filter((item) => texts(item.content).some((text) => /^Error: (?:CSS selector|Target) is ambiguous\b/u.test(text)))
     .length;
+}
+
+/** Tool results that report a failure: each one costs the agent at least one more call. */
+function failedToolResults(entries: DynamicRecord[]): number {
+  return entries
+    .filter((entry) => entry.type === "user")
+    .flatMap((entry) => contentItems(entry, "tool_result"))
+    .filter((item) => item.is_error === true).length;
 }
 
 function violations(variant: Variant, uses: ToolUse[]): string[] {
@@ -621,7 +854,9 @@ async function readUsage(page: Page, agentId: string): Promise<Usage> {
 async function agentIdle(page: Page, agentId: string): Promise<boolean> {
   return page.evaluate<boolean>(`(async (agentId) => {
     const queue = await window.openbot.agent.listQueue(agentId);
-    if (queue.deliveries.length === 0) return false;
+    // A new agent's first message is its hidden welcome setup message: no delivery shows it, and
+    // queue.welcome is set until its turn ends.
+    if (queue.welcome) return false;
     if (queue.deliveries.some((one) => ["queued", "starting", "running"].includes(one.status))) return false;
     const page = await window.openbot.agent.readConversationPage({ agentId, limit: 1 });
     const last = page.messages[page.messages.length - 1];
@@ -718,6 +953,8 @@ interface RunRow {
   toolNamesKnown: boolean;
   /** Tool results that refused an ambiguous target. */
   ambiguousRefusals: number;
+  /** Tool results that report a failure. */
+  failedCalls: number;
   /** The lessons that the calendar server recorded in the run. */
   registrations?: string[];
   uncachedInput: number;
@@ -753,6 +990,7 @@ async function runOnce(
     toolNames: {},
     toolNamesKnown: false,
     ambiguousRefusals: 0,
+    failedCalls: 0,
     uncachedInput: 0,
     cachedInput: 0,
     cacheCreation: 0,
@@ -773,7 +1011,6 @@ async function runOnce(
       reasoningEffort: "medium",
     })}, "local")`,
   );
-  let tabId: string | null = null;
   try {
     await waitFor(
       "the warm-up turn",
@@ -786,23 +1023,26 @@ async function runOnce(
       `window.openbot.agent.listAgents().then((agents) => agents.find((one) => one.id === ${json(agent.id)})?.threadId ?? null)`,
     );
     if (threadId === null) throw new Error("The bench agent has no thread after its warm-up turn.");
-    const tab = await page.evaluate<{ id: string }>(
-      `window.openbot.browser.open(${json({ url: task.startUrl, ownerThreadId: threadId, ownerAgentId: agent.id, focus: false })})`,
-    );
-    tabId = tab.id;
-    await waitFor(
-      "the start page",
-      60 * SECOND,
-      () =>
-        page.evaluate<boolean | null>(
-          `window.openbot.browser.listTabs().then((tabs) => tabs.find((one) => one.id === ${json(tab.id)})?.loading === false || null)`,
-        ),
-      500,
-    );
+    let tab: { id: string; url: string } | null = null;
+    if (!task.noTab) {
+      const opened = await page.evaluate<{ id: string }>(
+        `window.openbot.browser.open(${json({ url: task.startUrl, ownerThreadId: threadId, ownerAgentId: agent.id, focus: false })})`,
+      );
+      tab = { id: opened.id, url: task.startUrl };
+      await waitFor(
+        "the start page",
+        60 * SECOND,
+        () =>
+          page.evaluate<boolean | null>(
+            `window.openbot.browser.listTabs().then((tabs) => tabs.find((one) => one.id === ${json(opened.id)})?.loading === false || null)`,
+          ),
+        500,
+      );
+    }
     const before = await readUsage(page, agent.id);
     const started = Date.now();
     await page.evaluate(
-      `window.openbot.agent.sendMessage(${json({ agentId: agent.id, text: taskPrompt(variant, task, { id: tab.id, url: task.startUrl }, cdpUrl, marker) })}).then(() => null)`,
+      `window.openbot.agent.sendMessage(${json({ agentId: agent.id, text: taskPrompt(variant, task, tab, cdpUrl, marker) })}).then(() => null)`,
     );
     // The message is queued first; wait until its turn has started before idle can mean "done".
     await waitFor(
@@ -837,7 +1077,9 @@ async function runOnce(
     const entries = await readSessionEntries(marker, started - MINUTE);
     const uses = entries === null ? null : toolUses(entries);
     row.ambiguousRefusals = entries === null ? 0 : ambiguousRefusals(entries);
+    row.failedCalls = entries === null ? 0 : failedToolResults(entries);
     if (task.calendar) row.registrations = [...lessonCalendar.registrations];
+    if (task.consent) logger.info(`consent ${task.id}: ${json(consentChoices.splice(0))}`);
     row.toolNamesKnown = uses !== null;
     row.toolCalls = uses?.length ?? reply.toolSteps;
     for (const use of uses ?? []) {
@@ -850,7 +1092,12 @@ async function runOnce(
   } catch (error) {
     row.error = error instanceof Error ? error.message : String(error);
   } finally {
-    if (tabId !== null) await page.evaluate(`window.openbot.browser.close(${json(tabId)})`).catch(() => undefined);
+    // The agent can open tabs of its own, so every tab it owns closes.
+    await page
+      .evaluate(
+        `window.openbot.browser.listTabs().then((tabs) => Promise.all(tabs.filter((one) => one.ownerAgentId === ${json(agent.id)}).map((one) => window.openbot.browser.close(one.id))))`,
+      )
+      .catch(() => undefined);
     await page.evaluate(`window.openbot.agent.deleteAgent(${json(agent.id)}, "local")`).catch(() => undefined);
   }
   return row;
@@ -883,6 +1130,7 @@ function summarize(rows: RunRow[]) {
       medianOutput: median(own.map((row) => row.output)),
       medianToolCalls: median(own.map((row) => row.toolCalls)),
       ambiguousRefusals: sum((row) => row.ambiguousRefusals),
+      failedCalls: sum((row) => row.failedCalls),
       medianDurationMs: median(own.map((row) => row.durationMs)),
       medianCostUsd: median(own.map((row) => row.costUsd)),
       totalInput: sum((row) => row.inputTotal),
@@ -893,12 +1141,12 @@ function summarize(rows: RunRow[]) {
 
 function markdown(summary: ReturnType<typeof summarize>): string {
   const lines = [
-    "| Variant | Runs | Success | Correct | Compliant | Median input | Median uncached | Median output | Median tool calls | Median time (s) | Median cost ($) |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Variant | Runs | Success | Correct | Compliant | Median input | Median uncached | Median output | Median tool calls | Failed calls | Median time (s) | Median cost ($) |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const row of summary) {
     lines.push(
-      `| ${row.variant} ${row.description} | ${row.runs} | ${row.success} | ${row.correct} | ${row.compliant} | ${row.medianInputTotal} | ${row.medianUncachedInput} | ${row.medianOutput} | ${row.medianToolCalls} | ${(row.medianDurationMs / SECOND).toFixed(1)} | ${row.medianCostUsd.toFixed(4)} |`,
+      `| ${row.variant} ${row.description} | ${row.runs} | ${row.success} | ${row.correct} | ${row.compliant} | ${row.medianInputTotal} | ${row.medianUncachedInput} | ${row.medianOutput} | ${row.medianToolCalls} | ${row.failedCalls} | ${(row.medianDurationMs / SECOND).toFixed(1)} | ${row.medianCostUsd.toFixed(4)} |`,
     );
   }
   return lines.join("\n");
@@ -950,7 +1198,7 @@ function harnessInstalled(): boolean {
 function selectTasks(raw: string | undefined): BenchTask[] {
   // The calendar tasks measure one recovery path and run only by id, so the default and a number
   // select the same public-site tasks as before.
-  const publicTasks = TASKS.filter((task) => !task.calendar);
+  const publicTasks = TASKS.filter((task) => !task.calendar && !task.consent && !task.loopback && !task.noTab);
   if (raw === undefined) return publicTasks;
   if (/^\d+$/u.test(raw)) return publicTasks.slice(0, Number(raw));
   const wanted = raw.split(",").map((part) => part.trim());
@@ -977,7 +1225,7 @@ async function main(): Promise<void> {
 
   await mkdir(OUTPUT_ROOT, { recursive: true });
   const reportPath = join(OUTPUT_ROOT, "report.json");
-  if (tasks.some((task) => task.calendar)) {
+  if (tasks.some((task) => task.calendar || task.consent || task.loopback)) {
     await new Promise<void>((resolveListen, rejectListen) => {
       lessonCalendarServer.once("error", rejectListen);
       lessonCalendarServer.listen(0, "127.0.0.1", resolveListen);
@@ -988,6 +1236,8 @@ async function main(): Promise<void> {
     const address = lessonCalendarServer.address();
     if (address === null || typeof address === "string") throw new Error("The lesson calendar has no port.");
     lessonCalendarUrl = `http://127.0.0.1:${address.port}/calendar`;
+    consentPageUrl = `http://127.0.0.1:${address.port}/consent`;
+    loopbackOrigin = `http://127.0.0.1:${address.port}`;
   }
   const truths = new Map<string, string>();
   for (const task of tasks) {
@@ -1028,10 +1278,11 @@ async function main(): Promise<void> {
           await enableOnly(page, servers, variant.mcp);
           logger.info(`run ${repeat}/${repeats} ${task.id} ${variant.id}`);
           if (task.calendar) lessonCalendar.reset();
+          captchaLoads = 0;
           const row = await runOnce(page, variant, task, repeat, truths.get(task.id) ?? "", cdpUrl);
           rows.push(row);
           logger.info(
-            `  ${row.correct ? "correct" : "wrong"}${row.compliant ? "" : " (not compliant)"} input ${row.inputTotal} output ${row.output} tools ${row.toolCalls} ${(row.durationMs / SECOND).toFixed(0)} s${row.error ? ` error: ${row.error}` : ""}${row.violations.length > 0 ? ` used: ${row.violations.join(", ")}` : ""}`,
+            `  ${row.correct ? "correct" : "wrong"}${row.compliant ? "" : " (not compliant)"} input ${row.inputTotal} output ${row.output} tools ${row.toolCalls} failed ${row.failedCalls} ${(row.durationMs / SECOND).toFixed(0)} s${row.error ? ` error: ${row.error}` : ""}${row.violations.length > 0 ? ` used: ${row.violations.join(", ")}` : ""}`,
           );
           await write();
         }

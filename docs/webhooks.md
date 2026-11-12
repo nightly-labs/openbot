@@ -29,7 +29,8 @@ and the secret stay the same. Only a person's message can start these tools: a r
 another agent's message cannot make or change a webhook routine.
 
 To replace the secret, make a new one in the routine editor and update the sender. The old secret
-stops working immediately. A secret has the format `whsec_<43 base64url characters>`.
+stops working immediately. A secret has the format `whsec_<44 base64 characters>`, as the
+[Standard Webhooks](https://www.standardwebhooks.com/) specification says.
 
 When you change the routine to **Schedule**, or delete the routine, its URL stops working. If you
 change it back to **Webhook**, the routine gets a new URL and a new secret.
@@ -131,7 +132,8 @@ if (response.status !== 200 && response.status !== 202) {
 
 A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event
-is lost.
+is lost. When the host is a hosted server that sleeps, the `503` also starts it, so retry: a hosted
+server is usually online again within a few minutes.
 
 ### Retries and duplicates
 
@@ -146,6 +148,41 @@ The run instruction is the routine instruction, followed by the event. The event
 external data, not as instructions. It contains the delivery ID, the routine ID, `type`,
 `occurredAt`, the receipt time, and `data`. Event data can go to the model provider of the routine,
 like all routine input. The data cannot give tools to the agent or skip approvals.
+
+## Standard Webhooks senders
+
+The URL also accepts requests in the [Standard Webhooks](https://www.standardwebhooks.com/) format.
+Composio, Svix, Clerk, and Resend send this format. These senders make their own signing secret, so
+you cannot give them the OpenBot secret:
+
+1. Copy the URL of the routine into the sender.
+2. Copy the signing secret that the sender shows.
+3. In the routine editor or on the chat card, select **Use the sender's secret** (the key button
+   next to the regenerate button), paste the secret, and select **Use secret**. The previous secret
+   stops working immediately.
+
+| Header | Value |
+| --- | --- |
+| `webhook-id` | A unique ID for this event, with the same rules as `X-OpenBot-Delivery-Id`. |
+| `webhook-timestamp` | The current Unix time in seconds. It must be within 5 minutes of the host clock. |
+| `webhook-signature` | One to eight space-separated `v1,<base64 HMAC-SHA256>` values. One value must match. |
+
+Svix also sends these headers with the `svix-` prefix. OpenBot accepts both names. The signed bytes
+are `<webhook-id>.<webhook-timestamp>.<body>`. The HMAC key is the base64 data after `whsec_` in the
+secret, as the specification says, or the complete secret as UTF-8 text, as Composio uses it.
+A secret that an older OpenBot version made is base64url (`-` and `_`, no `=`). Standard Webhooks
+senders need base64, so make a new secret in the routine editor and copy it into the sender.
+
+The body must be a JSON object with a `type` string. OpenBot reads the request as follows:
+
+| Event field | Value |
+| --- | --- |
+| `type` | The `type` field of the body. |
+| `occurredAt` | The `timestamp` field of the body when it is a date string, otherwise the receipt time. |
+| `data` | The complete body. A filter reads it from the root, for example `/metadata/trigger_slug` for a Composio trigger. |
+
+The responses and the retry rules are the same as for the OpenBot format. A host that has an older
+OpenBot version cannot check this format, and the relay answers `401`.
 
 ## History
 

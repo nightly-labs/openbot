@@ -13,7 +13,12 @@
 // patch release keeps the Chromium major version, so it does not make a failing computer stop again.
 // `OPENBOT_DISABLE_GPU=1` always uses software rendering. `OPENBOT_DISABLE_GPU=0` always uses the GPU.
 // A server (`OPENBOT_SERVER=1` or a hosted server) runs under a virtual display with no GPU, so it
-// always uses software rendering. The renderer sandbox stays on in all cases.
+// always composites on the CPU. It keeps hardware acceleration for WebGL on SwiftShader (#6404): the
+// browser of its agents opens sites such as the Figma editor, which stop without WebGL. A server
+// records a GPU process crash and then turns off hardware acceleration, as a desktop does. It writes
+// no start file: a server is often stopped soon after a start. `OPENBOT_DISABLE_GPU=1` turns off
+// hardware acceleration on a server; `OPENBOT_DISABLE_GPU=0` does not change a server.
+// The renderer sandbox stays on in all cases.
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -70,12 +75,12 @@ interface LinuxGpuModeInput {
 /** Decides if this start uses hardware acceleration. It reads no files and changes nothing. */
 function resolveLinuxGpuMode(input: LinuxGpuModeInput): LinuxGpuMode {
   if (input.platform !== "linux") return { hardwareAcceleration: true, reason: "not-linux" };
-  if (input.server) return { hardwareAcceleration: false, reason: "server" };
   if (input.disableGpu === "1") return { hardwareAcceleration: false, reason: "environment-off" };
-  if (input.disableGpu === "0") return { hardwareAcceleration: true, reason: "environment-on" };
+  if (!input.server && input.disableGpu === "0") return { hardwareAcceleration: true, reason: "environment-on" };
   if (input.crash?.chromium === input.chromiumMajor) {
     return { hardwareAcceleration: false, reason: "gpu-process-crash" };
   }
+  if (input.server) return { hardwareAcceleration: true, reason: "server" };
   if (input.unfinishedStart?.chromium === input.chromiumMajor) {
     return { hardwareAcceleration: false, reason: "unfinished-start" };
   }
@@ -117,18 +122,27 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     if (options.ownsInstance && (mode.reason === "gpu-process-crash" || mode.reason === "unfinished-start")) {
       logger.warn(
         `Software rendering is on because the GPU failed before (${mode.reason}). ` +
-          `Remove ${mode.reason === "gpu-process-crash" ? crashPath : startPath} or set OPENBOT_DISABLE_GPU=0 to try the GPU again.`,
+          `Remove ${mode.reason === "gpu-process-crash" ? crashPath : startPath}` +
+          `${options.server ? "" : " or set OPENBOT_DISABLE_GPU=0"} to try the GPU again.`,
       );
     }
     return mode;
   }
+  if (mode.reason === "server") {
+    // `disableHardwareAcceleration()` also turns off WebGL, and Chromium has no automatic SwiftShader
+    // WebGL fallback. Compositing, raster, 2D canvas and video stay on the CPU, as with that call.
+    app.commandLine.appendSwitch("disable-gpu-compositing");
+    app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+  }
   if (!options.ownsInstance) return mode;
-  writeGpuFailure(startPath, chromiumMajor);
-  const confirmStart = () => removeFile(startPath);
-  void app.whenReady().then(() => setTimeout(confirmStart, options.startConfirmMs ?? DEFAULT_START_CONFIRM_MS));
-  // Not `will-quit`: it fires only after the teardown, which can take longer than a stop allows
-  // (the shutdown deadline ends with `app.exit`, and `dev:stop` sends SIGKILL after a few seconds).
-  app.once("before-quit", confirmStart);
+  if (mode.reason !== "server") {
+    writeGpuFailure(startPath, chromiumMajor);
+    const confirmStart = () => removeFile(startPath);
+    void app.whenReady().then(() => setTimeout(confirmStart, options.startConfirmMs ?? DEFAULT_START_CONFIRM_MS));
+    // Not `will-quit`: it fires only after the teardown, which can take longer than a stop allows
+    // (the shutdown deadline ends with `app.exit`, and `dev:stop` sends SIGKILL after a few seconds).
+    app.once("before-quit", confirmStart);
+  }
   app.on("child-process-gone", (_event, details) => {
     if (details.type !== "GPU" || !GPU_FAILURE_REASONS.has(details.reason)) return;
     if (details.reason === "abnormal-exit" && details.exitCode === GPU_EXIT_ON_CONTEXT_LOST) return;

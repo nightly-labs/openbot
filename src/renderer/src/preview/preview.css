@@ -38,7 +38,7 @@
     grid-column: 1;
     grid-row: 1;
     flex-direction: row;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
   }
 
