@@ -7,7 +7,7 @@ import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
-import { textDirection } from "../../content-direction";
+import { blockDirectionOverride, textDirection } from "../../content-direction";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
@@ -417,7 +417,12 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "heading")) return token.raw;
       const level = headingLevel(token.depth);
       return (
-        <Dynamic component={`h${level}`} class="message-markdown-heading" data-level={level} dir="auto">
+        <Dynamic
+          component={`h${level}`}
+          class="message-markdown-heading"
+          data-level={level}
+          dir={proseDirection(token.tokens)}
+        >
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -430,7 +435,7 @@ function MarkdownBlock(props: {
     case "paragraph": {
       if (!tokenIs(token, "paragraph")) return token.raw;
       return (
-        <p dir="auto">
+        <p dir={proseDirection(token.tokens)}>
           <MarkdownInline
             tokens={token.tokens}
             content={props.content}
@@ -553,7 +558,10 @@ function MarkdownList(props: {
   const list = () => (
     <For each={renderedItems()}>
       {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
+        <li
+          class={renderedItem.item.task ? "message-markdown-task" : undefined}
+          dir={proseDirection(renderedItem.item.tokens.filter((child) => child.type === "text"))}
+        >
           <Show when={renderedItem.item.task}>
             <Checkbox
               class="message-markdown-checkbox"
@@ -873,6 +881,21 @@ function tokensDirection(tokens: readonly Token[]): "ltr" | "rtl" | undefined {
 }
 
 function tokenDirection(token: Token): "ltr" | "rtl" | undefined {
+  if (!isProseToken(token)) return undefined;
+  // A block that reads right to left from its words, though it opens with a Latin word.
+  if ((tokenIs(token, "paragraph") || tokenIs(token, "heading") || tokenIs(token, "text")) && token.tokens) {
+    const override = blockDirectionOverride(proseText(token.tokens));
+    if (override) return override;
+  }
+  if (tokenIs(token, "list")) return tokensDirection(token.items);
+  if (tokenIs(token, "table"))
+    return tokensDirection([...token.header, ...token.rows.flat()].flatMap((cell) => cell.tokens));
+  if ("tokens" in token && token.tokens) return tokensDirection(token.tokens);
+  return "text" in token && typeof token.text === "string" ? textDirection(token.text) : undefined;
+}
+
+/** False for code, math, raw HTML, images, checkboxes and bare URLs: they are isolated left to right. */
+function isProseToken(token: Token): boolean {
   switch (token.type) {
     case "code":
     case "codespan":
@@ -881,14 +904,30 @@ function tokenDirection(token: Token): "ltr" | "rtl" | undefined {
     case "html":
     case "image":
     case "checkbox":
-      return undefined;
+      return false;
   }
-  if (tokenIs(token, "list")) return tokensDirection(token.items);
-  if (tokenIs(token, "table"))
-    return tokensDirection([...token.header, ...token.rows.flat()].flatMap((cell) => cell.tokens));
-  if (tokenIs(token, "link") && linkTitle(token.text, token.href) === undefined) return undefined;
-  if ("tokens" in token && token.tokens) return tokensDirection(token.tokens);
-  return "text" in token && typeof token.text === "string" ? textDirection(token.text) : undefined;
+  return !(tokenIs(token, "link") && linkTitle(token.text, token.href) === undefined);
+}
+
+/** The prose of tokens, with a line break as a new line, to find its direction. */
+function proseText(tokens: readonly Token[]): string {
+  return tokens
+    .map((token) => {
+      if (token.type === "br") return "\n";
+      if (!isProseToken(token)) return " ";
+      if ("tokens" in token && token.tokens) return proseText(token.tokens);
+      return "text" in token && typeof token.text === "string" ? token.text : "";
+    })
+    .join("");
+}
+
+/**
+ * The `dir` of a paragraph, a heading or a list item. Its lines take the direction of their first
+ * letter (`dir="auto"` and `unicode-bidi: plaintext`), except a block that opens with a Latin word
+ * but reads right to left: see `blockDirectionOverride`.
+ */
+function proseDirection(tokens: readonly Token[]): "ltr" | "rtl" | "auto" {
+  return blockDirectionOverride(proseText(tokens)) ?? "auto";
 }
 
 function textTokenEndsWithTagMarker(token: Token | undefined): boolean {

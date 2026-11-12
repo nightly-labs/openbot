@@ -27,6 +27,12 @@
   unicode-bidi: plaintext;
 }
 
+/* A block that opens with a Latin word but reads right to left gets its `dir` from its words, and
+   its lines follow that `dir`, not their first letter. */
+.message-markdown :is(p, li, h1, h2, h3, h4, h5, h6):not([dir="auto"]) {
+  unicode-bidi: isolate;
+}
+
 .message-markdown > *,
 .message-markdown :is(p, ul, ol, blockquote) {
   margin: 0;
