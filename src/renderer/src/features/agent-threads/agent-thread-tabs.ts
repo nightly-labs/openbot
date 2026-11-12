@@ -372,9 +372,15 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   );
 
   /** Sends a message to a side thread. An archived thread is restored first. */
-  async function send(agentId: string, id: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
+  async function send(
+    agentId: string,
+    id: string,
+    text: string,
+    attachmentDraftIds: string[],
+    replyToMessageId: string | null = null,
+  ): Promise<boolean> {
     if (task(agentId, id)?.state === "closed" && !(await tasks.reopenTask(agentId, id))) return false;
-    return tasks.sendToTask(agentId, id, text, attachmentDraftIds);
+    return tasks.sendToTask(agentId, id, text, attachmentDraftIds, replyToMessageId);
   }
 
   /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
@@ -417,11 +423,13 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
 
   /**
    * Opens a side thread at one of its messages. An archived thread is restored, as from the menu. The list
-   * has every open thread, so a thread that the list does not have is archived.
+   * has every open thread, so a thread that the list does not have is archived. A thread in the side
+   * panel stays there and scrolls to the message beside the chat.
    */
   async function openAt(agentId: string, id: string, messageId: string): Promise<void> {
     setMessageFocus({ taskId: id, messageId, nonce: (messageFocus()?.nonce ?? 0) + 1 });
     if (!task(agentId, id) && !(await tasks.reopenTask(agentId, id))) return;
+    if (!scopeIsCurrent() || sideIds(agentId).includes(id)) return;
     await restore(agentId, id);
   }
 
@@ -431,6 +439,16 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     setDraft(agentId, false);
     writeTabs(agentId, null);
   }
+
+  // The open thread and the threads in the side panel keep their conversations. The conversations of
+  // the other threads go when there are too many, and the thread reads it again when its tab opens.
+  createEffect(
+    () => {
+      const agentId = activeAgentId();
+      return agentId ? [activeId(agentId), ...sideIds(agentId)].join("\n") : "";
+    },
+    (key) => tasks.showConversations(key ? key.split("\n") : []),
+  );
 
   // The open thread and the threads in the side panel read their conversations once, also when their
   // tabs are open after a restart. Events then keep them current. A thread that waits for its read is

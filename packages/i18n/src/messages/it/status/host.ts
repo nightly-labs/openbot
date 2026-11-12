@@ -7,6 +7,8 @@ export const messages = {
   "status.host.identityUpdated": "Identità del server aggiornata.",
   "status.host.starting": "Avvio dell'host WebRTC…",
   "status.host.ready": "Questo OpenBot è pronto per le connessioni WebRTC.",
+  "status.host.signalLost": "Gli altri dispositivi non possono raggiungere questo OpenBot ora. Si ricollega.",
   "status.host.stopping": "Questo OpenBot sta diventando privato…",
   "status.host.private": "Questo OpenBot è privato.",
+  "status.host.removed": "Questo OpenBot è stato rimosso dal tuo account. Pubblicalo di nuovo per condividerlo.",
 } as const satisfies PartialTranslation<typeof source>;

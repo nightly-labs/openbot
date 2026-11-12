@@ -26,6 +26,18 @@ library, so the phone composes its layout with the two widget keys and the App G
 state carry an HMAC signature, which the app checks with the key of the host that the action goes
 to, so one host cannot sign an action for another.
 
+A question, an approval or a browser step can be of a side thread of an agent or of a channel thread.
+The tap link and the button links of such a view name the thread of the request in a `thread`
+parameter (`DynamicIslandCoordinator.requestThreadId`). The runtime work of an agent has the work of
+its side threads too, so a view that shows work names the side thread that runs the turn
+(`DynamicIslandCoordinator.workingTurn`; the host reads the thread from `AgentService.listTasks`, the
+phone from the thread lists that it has read). The parameter only says which conversation
+the app opens, so it is outside the signed action, and an app from before it reads the same links
+and opens the agent's chat. The app opens the thread as it opens the thread of a notification (see
+[Side thread notifications](#side-thread-notifications)). A link that starts the app gives the
+route of the agent's chat, and the thread opens when the app can navigate
+(`live-activity-link.ts`).
+
 ## iPhone notifications
 
 A host sends an iOS notification when an agent finishes a turn, stops with an error, cannot start a
@@ -83,8 +95,12 @@ computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), a
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
 the owner (`desktopShowsAgentEvent`: desktop notifications on, and the mute and the level of this
 computer's server let the event through); or the member sent, answered, or typed from another session in the last 30
-seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
-can end at any time after the member leaves the computer. While the phone shows a Live Activity of
+seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory); or the computer of the member's
+desktop app had input, in any app, in the last 30 seconds (`computer-activity-v1`, see
+[servers](servers.md#computer-activity)). The time is short because a task can end at any time after
+the member leaves the computer. An unpackaged app reads another time in whole seconds from
+`OPENBOT_DEV_AWAY_SECONDS`, for the host and for the desktop that reports its input, so a check
+need not wait 30 seconds. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
 restarted does not know it), and the next view of the activity shows the event, the host sends no
 notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while
@@ -106,7 +122,35 @@ The Notification Service Extension of the app (`apps/mobile/plugins/with-notific
 `NotificationService.swift`) opens the seal with the keys that the app writes into the App Group
 file `push-notifications.json`, and shows the agent name and the text. It refuses content that names
 another server than the one whose keys open it. A notification that it cannot open keeps the app
-name only. A tap opens the chat of the agent.
+name only. A tap opens the conversation of the thread that the notification names: the channel of a
+channel thread, a side thread of the agent, or else the chat of the agent.
+
+### Side thread notifications
+
+A turn in a side thread sends no `turn-completed` outside `AgentTasks`. When the turn is not quiet,
+`AgentTasks` sends the local `thread-turn-completed` event, with `routine: true` for the thread of a
+routine. `PushNotificationService` sends a routine thread turn to each phone, as it did when a
+routine ran in the agent's chat. It sends the turn of another side thread only to a phone that
+advertises `push-notification-threads-v1`, because an app from before it opens the agent's chat, and
+only while that phone did not turn these notifications off (`POST /v1/push-notifications/threads`
+with `replies`; Settings > Notifications > Thread replies). The host keeps the choice with the
+registration of the session in `openbot-push-notifications-v1.json` (`threadReplies`), also when the
+phone registers again. A request for input, an approval or a browser step of a side thread does not
+read the choice. The level, the mute, the preview and the Live Activity check apply as for the
+agent's chat, but the Live Activity shows the replies and the failed turn of the agent's own chat
+only, so it never replaces the notification of a side thread turn. The desktop notification and the
+completion sound still use routine thread turns only. So for the turn of another side thread, the
+phone stays quiet only while the member uses OpenBot: the window of the host's desktop app has focus,
+or the member sent, answered, or typed from another session in the last 30 seconds. Input in another
+app on a computer does not count for it, because no desktop then tells about that turn. A host does
+not keep such a turn for a phone that does not take it.
+
+The notification data has the thread of the event, not a task id, and the phone does not know the
+thread of an agent's own chat. So the app (`outside-target.ts`, used by `(app)/_layout.tsx`) opens
+the channel whose thread it is, or the side thread when the phone has read the agent's thread list.
+Else it opens the agent's chat at once and reads the thread list from the host
+(`agent-tasks-v1`); when the thread is a side thread, it opens on top of that chat. While the app is
+on screen, a notification of the chat or the side thread that shows is not shown again.
 
 ## Android notifications
 
@@ -153,6 +197,17 @@ changing existing agent data. Channel commands use the orchestration log and com
 Messages have stable IDs and per-channel sequences. A channel projection can be rebuilt from its events.
 Archiving stops channel work and retains its records. Restore makes the chat available for new messages again. Neither action removes agents or linked conversations. The sidebar calls archiving "Delete". On desktop and web, the row menu in Deleted channels restores a channel; it shows to the people who can delete one.
 
+A channel can have a picture. `channel_json` keeps an optional icon (`{ name, hue }`) and an
+optional `imageUrl`. A channel save keeps both when its draft has no `icon` key. The image is a file
+for each version under `userData/avatars/channels/<sha256(channel id)>/`, served as
+`openbot-avatar://channel/<id>?v=<version>&type=<mime>`. `ChannelService.setImage` writes the new file,
+commits the URL, and then removes the old file. Archiving keeps the file; only the permanent
+delete of the channel records removes the folder. An icon or
+color choice removes the image. A name or hue that this version does not know shows the member
+faces or the default color. The channels-v1 Team API codec keeps only its released fields, so a
+client without `channel-picture-v1` shows member faces. A client with it reads and edits the picture
+through the host (see below).
+
 Each channel-agent pair has a separate execution thread in `projection_threads`. The normal agent
 thread is never replaced. Provider sessions, turns, questions, approvals, attachments, compaction,
 and restart recovery use the explicit execution thread. These internal execution records do not
@@ -165,8 +220,9 @@ available member. These selections use no model. Other requests use
 the lead's provider, model, and reasoning setting in a separate session with no work tools. The
 request supplies the accepted result schema and the channel summary in place of the transcript.
 Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
-request in the area of one member, or in the area of no member, goes to the one member best able to
-answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
+request in the area of one member goes to that member. A greeting, a question about the channel, an
+unclear request, or a request in the area of no member goes to the lead only (the prompt names the
+lead), and the lead can ask the person in its own reply. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
 gets the request's attachments; its packet names the other members that answer, but does not carry
 their replies to that request, so each member gives its own view. This stays true after a typed
@@ -174,21 +230,26 @@ their replies to that request, so each member gives its own view. This stays tru
 the member wrote its own complete reply or result (not commentary), a follow-up gets the other replies, so it can ask about them. The packet cursor stops before the
 first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
-request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
+request. Routing can select an existing task or indicate that a message needs no answer. It cannot
+ask a question: the routing model used that outcome to answer the person as Coordinator (#4401). A
+model that still returns the old `question` outcome routes to the lead, so the coordinator posts only
+routing failures. A message that mentions a member that can take work is never idle: routing that
+returns idle gives it to the mentioned members, as a person who is named in a group chat answers.
 An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
 visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
-only itself adds none: its reply shows who answers. A routing answer that does not decode pauses the
-task with `channelRoutingUnreadable` and offers Reassign. The log gets the answer length and its
-field names only, not its text.
+only itself adds none: its reply shows who answers. A routing answer that does not decode goes to the
+lead, as an unclear request does. The log gets the answer length and its field names only, not its
+text.
 
 A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
-that can take work, with no routing turn. A message that opens with `@everyone` goes to each member
+that can take work, with no routing turn. A quote tag before or between the mentions does not end
+the address, because the composer puts a quote where the caret is. A message that opens with `@everyone` goes to each member
 that can take work. `@everyone` is plain text, not a tag; the channel composer's mention picker
 offers it. The host reads the address from the text (`leadingAddress`), so a client that sends only
 the first mention in `recipientAgentId` reaches all of them, and the Team API wire does not change.
-A message that opens with a typed "@Name" and no tag goes to the member with that exact name
-(case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
+A message that opens with typed "@Name"s and no tag ("@Ana @Ben, ideas?") goes to each member with
+that exact name (case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
 parser does not change. A routine run reads its text in the same way. A request to more than one
 member does not continue the task of the message it replies to. "continue" (or "resume", "go on",
 "keep going") continues each stopped root task of the newest request that has one. A failed root
@@ -207,12 +268,37 @@ Only assignments and awaited results start turns. Completed child results are co
 owner returns. The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
+An agent can also give work to a channel from another conversation, such as its direct chat with
+the user. `list_channels` lists the open channels with their lead and members.
+`send_to_channel` posts one request (`ChannelService.handoff`): a complete brief, optional
+recipient agents, and optional file paths that the channel copies as attachments. The message has
+the sending agent as a member author with the id `agent:<agentId>`. The assignment of a root task
+from it starts with "Request from OpenBot teammate <name> (<agentId>)" (`assignmentText`), so the
+member does not read the agent's words as the user's. A follow-up under that line names its
+sender, such as "Follow-up from the user". Routing is the same as for a person's request: each named recipient and each opening @mention gets a root task, and with none the
+lead routes it. A channel without a lead refuses a request that names nobody
+(`channelLeadRequired`). The command does not go through `parseChannelCommand`, so no client can
+post as an agent. The tool call id gives the operation id, so a retried call posts no second
+message. Inside a channel task, `send_to_channel` is refused; use `channel_assign` or
+`channel_transfer`. It is also refused in an external chat thread and in a turn that answers a
+teammate request from one (`answersMessagingRequest`): no channel result comes back, so the person
+would get no answer (#6160). The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
+an agent chat opens the channel with the message text in its composer. Attachments stay behind.
+
+A workflow output with the target `chat-channel` posts its result as a note (`ChannelService.postNote`).
+The note has the author kind `coordinator`, the id `workflow:<workflowId>`, the workflow title as its
+name, and no task. It starts no task and no member answers it; the members read it later as channel
+history. The released channel codecs already accept that author kind, so a joined client and a phone
+decode the note. The step id gives the operation id, so a step that a restart resumes posts no second
+note. A missing or an archived channel fails the step. Only this computer offers the target, and over
+the Team API only an owner or admin can add or change one (`adminNodes` in `route-workflows.ts`).
+
 A member can also change its channel when a person asks: `channel_add_member`,
 `channel_remove_member`, `channel_set_instructions`, and `channel_list_routines`,
 `channel_create_routine`, `channel_update_routine`, `channel_delete_routine` for the schedule
 routines. They act only on the channel of the running task (`channel-management.ts`). The request
-message of the root task must have a person as author. A routine run (author id `routine:<id>`)
-and a request that only an agent wrote are refused, so untrusted run input cannot change the
+message of the root task must have a person as author. A routine run (author id `routine:<id>`),
+an agent handoff (author id `agent:<agentId>`) and a request that only an agent wrote are refused, so untrusted run input cannot change the
 channel. A member change is a `save` through the command queue, with the draft read from the stored
 channel when its turn comes. The caller cannot remove itself or an owner of a task above its own,
 and removing the lead clears the lead. An agent that a person adds must be one that person can chat
@@ -225,12 +311,80 @@ writes a `channel-change` note in the same commit, with the agent as author and 
 names the agent, the change and the person. Clients show it as an activity row, and it is not
 unread and not in the model packet.
 
-Channel work holds only the agent that does it. An agent runs one main-lane turn at a time: its chat,
-a channel delivery or a messaging delivery. While the agent has an active assignment,
-`ChannelService.mayDrain` holds its other main-lane requests. The work of other agents does not hold
-it. The tasks of the agent run beside the channel turn within the agent task limit, and a channel
-turn takes no task slot. When the provider of the agent runs one turn at a time (`concurrentTurns:
-false`), its task turns count as busy. Only declared `browser` and `workspace:<path>` resources are
+`channel_cancel` lets a member cancel a run that it owns when a person asks, for example when a
+newer request replaces it (`ChannelService.cancelOwnRun`). The `taskId` names the root task or one
+of its subtasks, and the whole run ends: each task of the run that has not ended becomes
+`cancelled`, running turns stop and queued deliveries are cancelled. Other runs, messages and files
+stay. It has the same person-request rule as the tools above (`PERSON_CANCEL_REQUIRED`). It refuses,
+with `accepted: false`, a run of another owner, the run of the caller's own task, a run that ended,
+and a run that a task of another open run depends on, which would then wait for ever. A person can
+stop those runs with the channel controls. The cancel goes through the command queue, keeps a
+receipt for a retried call and writes one `channel-change` note. The `cancel` command of the
+channel controls still accepts only a stopped or failed run. On desktop, each row of the
+waiting-for-subtasks list above the composer has Stop, which sends the `stop` command for that
+subtask. Its stopped-task card then offers Continue, Reassign and Cancel.
+
+Members can reply to each other (#4847). `channel_reply` takes the id of a message of another member
+and a short text (`CHANNEL_REPLY_CHARACTERS`). It posts the text in the shared chat as a reply to
+that message (`replyToMessageId`), and gives the author of that message one turn to answer: a child
+task of the caller's task, with the reply as its request and instruction. The caller waits for it
+as for `channel_assign`: the child is in `dependencies`, so the caller's turn ends `waiting` and the
+caller continues with the answer. Without the wait, a member that had to agree on something answered
+the person before the other member answered it. The answer of that turn shows as a reply to the
+reply message (`capture`, and `channel_result`). Text that the caller writes after its reply in the
+same turn folds into the steps of that turn, as text after `channel_result` does: models wrote "I
+will report back" there, and the note showed after the answer. `channel-replies.ts`
+finds a reply task by its request id prefix (`channel-reply-`), so the change adds no stored field,
+no migration and no Team API field. A person's message that resumes a reply task gives it a new
+request, so it becomes an ordinary task with the default expected result and answers that person. A
+request allows `CHANNEL_REPLY_LIMIT` (2) member replies, counted from the reply tasks of each root
+task of that request, whoever writes them: one message to two members shares one limit. A reply
+task that fails lets the caller continue without the answer (`settled`), because a short question
+must not hold the request until a person acts. `channel_result` is refused while a reply of the
+task waits for its answer. `channel_reply` refuses, with
+`accepted: false`, a reply after the caller's `channel_result`, in a run that ended, to a message of
+a person or of the caller, to a streaming message, to a member that takes no work, and over the
+limit. Each refusal tells the model not to mention it, because a model wrote one in the chat. Claude
+gets a refusal of `channel_result` or `channel_reply` as a failed tool call, so Claude Code asks for
+an answer when the turn then ends empty (see [Providers](providers.md)). The
+reply text is agent text that reaches another agent, so its assignment starts with a line that
+names the sender and says it is not the user, and a reply turn only answers: it cannot use
+`channel_reply`, `channel_assign`, `channel_transfer`, `channel_cancel`, the channel memory tools or
+the channel management tools. The commentary of a turn that posted a reply is left out of the
+transcript that models read, as for a turn that posted a result or wrote a completed answer.
+
+The channel controls stop and cancel a run with no message that a model reads, and a change note is
+not in the packet. So each packet has `stoppedTasks`: the `paused` and `cancelled` tasks of the
+recent messages that the member owns, or that run under work it owns (`channelWorkOwners`). Without
+it, a lead said that it still waited for a subtask that a person had cancelled.
+
+From its own chats, an agent can make and change channels: `create_channel` and `update_channel`
+(`agent/channel-agent-tools.ts`). They set the name, title, instructions, members, lead, isolated
+memory and picture (an icon on a hue, or an image file that `loadAvatarFile` reads before any
+write), and archive or restore. `list_channels` with `archived: true` lists the archived channels.
+The change is a `save` through the command queue (`ChannelService.agentSave`), with the draft read
+from the stored channel when its turn comes, and the actor id `agent:<agentId>`. A new channel's id
+comes from the tool call id, so a retried call makes no second channel. Members must exist and not
+be hidden, and the lead must be a member; an icon removes an image, as in the channel settings.
+These changes write no `channel-change` note. Outside a channel, they need a turn of only this
+computer's user's messages, in the agent's own chat or in a side thread that the person opened or
+branched (no routine or messaging link): an external chat, a routine run or an agent message can
+carry text from outside, and the Team API checks a team member's agent access. Inside a channel task,
+they need a task whose request this computer's user wrote (`ChannelService.requestedByLocalPerson`):
+the same `channelRequester` check as the channel tools, which refuses a routine run, an agent's
+request and a member reply, and also a team member. There, `update_channel` does not change the
+task's own channel: the channel tools change it, write the note, and keep the caller's work from
+stopping. Webhook routines still need the agent's own chat.
+
+Channel work holds only the agent that does it. Each channel has its own mailbox lane
+(`channelLane(channelId)`, from `StoredMessage.channelId`), and its execution thread is a side thread
+in `ConversationRuntime`. So a channel turn runs beside the agent's own chat and its messaging
+deliveries, as a task turn does (#4761). It gets the side-thread guidance and no Computer Use. An
+agent runs one channel turn at a time over all channels: the scheduler holds the other channel lanes
+(`channel-turn`), and the channel `busy` hook starts no second assignment while one is active. The
+work of other agents does not hold it. A channel turn takes no task slot. When the provider of the
+agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
+turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,
 `none`, and `host` (from an earlier version) reserve nothing. An assignment keeps the resources it
 started with until it ends, and a task with an active assignment starts no second owner. An update
@@ -260,7 +414,91 @@ The provider acceptance cursor records context delivery. Context packets remain 
 provider replacement or compaction does not remove shared decisions. Unrelated server conversations
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
 their existing meaning. A packet leaves out a member's thinking, and the commentary of a turn that
-posted a `channel_result`: the result is the answer of that turn.
+wrote a completed answer or posted a `channel_result` or a reply: the answer is what the turn says,
+and the reader sees that commentary only as folded steps above it (#5296). A turn with no completed
+answer keeps its commentary, because a turn that answers and then calls a tool has its answer there.
+The member packet and the `channel_assign` tool say to do the assignment alone, and to assign only when
+the person asks for another member or for help, or when a part clearly needs another member's role.
+
+### How a channel keeps context
+
+`ChannelHistory.prepare` (`src/backend/channel-history.ts`) makes the packet of each turn.
+
+| Step | Value | Where |
+| --- | --- | --- |
+| Packet budget | 120,000 characters (`CONTEXT_CHARACTERS`) | `channel-history.ts` |
+| Transcript part | budget / 4 (`TRANSCRIPT_SHARE`), newest first | `newest()` |
+| Summary in `prepare` | when the recent messages are more than the transcript part; it keeps the newest half of that part | `summarize` |
+| Summary after a turn | at 0.75 of that threshold (`AHEAD_SHARE`), in the background | `ChannelService.#summarizeAhead` |
+| Assignment again at the end | when 2,000 characters or less | `REPEATED_ASSIGNMENT_CHARACTERS` |
+| Provider compaction | at 80% of the context window, or before a turn whose input would fill it over 80% | `ContextCompaction` |
+| `channel_history` page | 24,000 characters (`HISTORY_PAGE_CHARACTERS`); a longer message is cut at 16,000 | `boundedHistoryPage` |
+| Handoff of an agent in the packet | 24,000 characters (`HANDOFF_INSTRUCTION_CHARACTERS`): 18,000 first and 6,000 last | `cutInstruction` |
+| Instruction of a task this task waits for | 500 characters (`DEPENDENCY_INSTRUCTION_CHARACTERS`) | `channel-history.ts` |
+| Compaction stops | after 2 compactions in a row that leave 70% or more; a `context_compaction_ineffective` notice. A session under 70% starts the count again | `ContextCompaction` |
+| Compaction stops after failures | after 2 compactions in a row that fail or time out; a `context_compaction_stopped` notice. A completed compaction or a session under 80% starts the count again | `ContextCompaction` |
+| Retry notice | at the 3rd provider retry; at 50% or more, a compaction before the next turn | `TurnLifecycle` |
+
+- The packet starts with the current assignment. A short assignment comes again at the end, because
+  a provider can cut a long message (#3630).
+- The summary keeps the recent messages under the transcript part, so a message is in the summary
+  or in the transcript. Only when the oldest recent message still streams does the summary wait,
+  and the transcript then leaves out older messages with a line that tells how to read them.
+- The task facts in the packet have no instruction or expected result: the assignment block gives
+  them.
+- The summary block is reference only. The request messages of the task are always in "Referenced
+  messages", not only in the summary (#3557).
+- A delta has no replies of the member that gets it: its session already has them (#3905). It has no
+  fixed rules, and it has the channel facts only when they changed since the packet before it (#3380).
+- A request that is the assignment is in the packet once: its transcript row refers to "Current
+  assignment". A handoff of an agent over 24,000 characters is cut, with a line that gives the
+  `channel_history` `messageId` and `offset` of the rest.
+- `channel_history` gives a page of about 24,000 characters at most. A message over 16,000 characters
+  is cut in the page and named in `cutMessages`; a read with its `messageId` and `offset` gives the
+  next part.
+- Before a turn, the drain gives `ContextCompaction.expectInput` the size of the message text (4
+  characters a token). Attachments and images are not in this estimate. When the last usage and that
+  text are over 80% of the window, the session compacts first.
+- A channel with no lead summarizes with the model of the member that gets the packet.
+- A change to `supersededAt` only does not reset the summary or the contexts. A text edit resets them
+  (#3761).
+- The summary uses the lead's provider. `backgroundModel` (`src/backend/agent/background-model.ts`)
+  selects the provider's default model when its price is lower than the lead's model, as a memory
+  review does. When the lead's provider or model is not available, the summary uses the model of
+  another visible member (#3957).
+- An isolated channel (`Channel.isolated`, off by default, in `channel_json`, so no migration) keeps
+  what its members learn there (#4332). `OpenBotToolRouter` saves `openbot.remember` of a channel turn
+  as a channel memory (`channel_remember`), and refuses a `memoryId`, so a channel cannot change an
+  agent memory. Agent memories still reach the channel. The packet gives `isolated: true` in the
+  channel facts with a rule line, and a line when a person turns it off. A save without the field
+  keeps the stored value, so a client from before it does not turn it off. The agent import archive
+  (`src/main/agent-import-manifest.ts`) has no field for it, so an imported channel starts with it off.
+- The Browser setting of a channel (`Channel.browser`, in `channel_json`, so no migration) says which
+  members can use the browser there (#4135): every member (absent, or `{ kind: "members" }`), one
+  member (`{ kind: "member", agentId }`), or no member (`{ kind: "none" }`). `OpenBotToolRouter`
+  refuses an `openbot_browser` call of a channel thread that the setting forbids, and the answer tells
+  the agent to give the browser step to the browser member with `channel_assign`. The packet gives
+  `browser` in the channel facts with a rule line for each member, and a line when a person gives the
+  browser to every member again. A save without the field keeps the stored value. A value that this
+  version cannot read, or that names an agent that is not a member, reads as no member: the setting
+  limits access, so it fails closed. A save that removes the browser member also sets no member
+  (`withBrowserMember`), and no other member gets the browser in its place.
+- The channel side panel has the Settings, Browser and Files panes. The Browser pane shows the tabs
+  that the members' channel threads own (`ChannelSummary.threads`). A new tab opens for the browser
+  member's channel thread (else the lead's, else the first member's), so that member can use it under
+  the host's thread rule for tabs. When no member can use the browser, or the member has no channel
+  thread yet, the pane shows only the tabs that exist. The Files pane reads the `channel` storage
+  scope: the files of the channel's messages, as the chat Files pane reads one conversation. Voice and
+  the side question stay in agent chats.
+- After a turn, a channel starts one background summary. `prepare` waits for it only when its own
+  budget needs a summary (`ChannelHistory.needsSummary`), so a turn does not summarize the same
+  messages again. A deleted channel stops the summary. It does not start when it would take the
+  last generation slot of `ProfileClients`: the next packet makes the summary. It uses the member's
+  reasoning effort only on the member's own model.
+- The log line "A channel packet was prepared." gives the size of each part (`packetParts`,
+  `deltaParts`): assignment, memories, summary, referenced messages, transcript, and the count of
+  kept and left-out messages. `otherCharacters` is the rest: the rules and the JSON facts. It never
+  contains message text.
 
 The channel copies the assistant rows of a member's execution thread. The first rows of a turn go
 to the running assignment before it knows the turn id; a row of another turn does not. A new row
@@ -288,12 +526,18 @@ effects do not have an exactly-once guarantee.
 Desktop IPC and remote desktop transports expose `channel-chats-v1` as an optional capability with
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
 the capability only when its channel service is connected. When a host does not advertise
-`channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. The account API and Signal service add no channel storage or routing.
+`channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. On desktop and in the web
+client, a `channels-changed` event of the open channel reads the list and the page; an event of
+another channel reads only the list. The six channels the reader left last keep their page, so a
+visit shows it at once while the read brings it up to date; a change in such a channel drops its page.
+A stopped-task card names the owner and the start of the request, so several cards differ (#5413). For a run that the assignment limit stopped, the card compares the reason with `CHANNEL_ASSIGNMENT_LIMIT_ERROR` and names the members that passed the work between them. Saved tasks and every host version keep that exact English. The mobile app still shows the English reason. The account API and Signal service add no channel storage or routing.
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
 with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
-channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
-in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
+channel settings, members, messages, memories, routines, and read positions. Mobile keeps the channel
+list and the latest 50 messages of each opened channel in its encrypted workspace copy
+(`workspace-cache.ts`) and shows them after a start, before the host answers. The host list then
+replaces them. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.
 Closing a channel retains a short message window (up to 50 messages), as single chats do,
 and releases larger windows. Only open channels refresh their history. Server removal discards its cached channels and late
@@ -314,6 +558,27 @@ operation: the host stores a repeated operation once. The send then reads the hi
 channel, so the host's row replaces the phone's own; a failed read is not a failed send, and a closed
 channel reads its history when it opens. A channel message that an app before channels came back
 kept aside in `messages.unreadable-<time>.json` stays there.
+
+On a host with `channel-isolation-v1`, each channel record and the draft of a `save` carry `isolated`,
+the "Keep memories in this channel" setting. The channels-v1 codec drops the field, so a joined
+server or the browser client shows the switch only when the host advertises the capability (#5380).
+A save without the field keeps the stored value, so a phone or an older client does not turn it off.
+
+On a host with `channel-browser-v1`, each channel record and the draft of a `save` carry `browser`, in
+the same way. A joined server or the browser client shows the Browser select only when the host
+advertises the capability. The phone does not show the setting, and its saves do not change it. On a
+host with `storage-channel-v1`, `POST /v1/storage/channel-files` answers the file rows of one channel
+for the Files pane. Every member who sees the channel can read them; a hidden channel gets 404, as
+`POST /v1/channels/read` does.
+
+On a host with `channel-picture-v1`, each channel record carries its picture: `icon` and the
+`openbot-avatar://channel/` `imageUrl`, which names only the image version. A `save` draft can carry
+`icon`; absent keeps the stored icon, and null removes it. `/v1/channels/image?channelId=` reads the
+image bytes by version (`GET`), sets them (`PUT`) and removes them (`DELETE`). The phone keeps the
+images beside the agent photos in its cache and edits the picture in Channel info, as the desktop
+channel settings do. The browser client cannot open the host URL, so it reads the bytes of each
+version into a data URL. A joined desktop changes the URL to `openbot-remote-avatar://<server>/channel/<id>`,
+which reads the same route. Both clients set the icon and the image as the phone does.
 
 On a host with `channel-attention-v1`, each channel summary names the threads of its members. The
 channel then shows the approvals and browser steps of those threads, and the agent's own chat does
@@ -338,7 +603,7 @@ No account API, Signal, IPC contract, or database migration changes are required
 ## Messaging connections
 
 The agents of a computer can answer in an external chat platform: Slack, Discord (see **Discord**
-below) and Telegram. [messaging.md](../messaging.md) has the setup, the limits and how to add a
+below), Telegram and WhatsApp (see **WhatsApp** below). [messaging.md](../messaging.md) has the setup, the limits and how to add a
 platform. Every workspace
 installs the one OpenBot Slack app (`apps/slack-app`), and the workspace is linked to the host that
 connected it. People mention @OpenBot or send it a direct message. The workspace's Slack Orchestrator,
@@ -398,7 +663,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   is one, and a basic group finds the chain in an in-memory reply map, which a restart forgets. A
   mention starts or continues a conversation; a reply without a mention continues only a linked one.
   Telegram has no history API, so `TelegramChatState` keeps the names and last messages it saw, in
-  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat.
+  memory. One Telegram Orchestrator (`telegram-orchestrator.ts`) answers every chat. A new
+  conversation in a group goes first to the workflows' Telegram triggers; a message that starts a run
+  does not go to the orchestrator ([events.md](events.md#workflow-telegram-triggers)).
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`
 beside `ChannelService` and knows no platform. `MessagingService` is built in the main process and
@@ -430,6 +697,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
   and turn events, so the public chat, the renderer and Team peers never see them. Approvals still
   reach the host.
+- **Workflows.** Before a channel mention that is not in a linked thread goes to the orchestrator,
+  `MessagingService` gives it to `Workflows.receiveSlack`. A matched Slack trigger takes the mention,
+  and no agent conversation starts. A Slack output replies, posts or reacts through
+  `MessagingThreads.slackSend`. See [Workflow Slack triggers](events.md#workflow-slack-triggers).
 - **Deliveries.** An external message is a mailbox message from `user` with a `messaging` origin
   (link, author, platform message). No new sender kind, so the frozen Team protocol codecs are
   unchanged. The queue and the public chat hide it like channel work. A request the agent sends from
@@ -448,6 +719,23 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
+  A `messaging_history` call that names a connection and a place goes the same way
+  (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
+  `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
+  turn with a delivery that has a `messaging` origin or a `messagingReturn`, or that an agent sent
+  from such a turn (`MailboxStore.turnServesExternalChat` follows the chain of requests), so a
+  person in an external chat cannot make an agent or a teammate in the chain read a different place.
+  A Slack post with live user mentions (`slackPingedUsers`) stores one `projection_messaging_pings`
+  row for each person, with the calling agent and the redacted post, unless a person's mention opened
+  the thread. In a thread with pings, a reply without a mention counts only from a pinged person,
+  also after the link exists: the first one skips the workflows and goes to the orchestrator with the
+  post as its `replyTo`. An answer in such a thread that pings people records them too
+  (`MessagingThreads.recordPings`). Deleting an agent deletes the pings of its threads and its pings of threads
+  that no reply opened. A thread `message` event that mentions OpenBot is
+  left to its `app_mention` event, so the order of the two events does not decide the route.
+- **Quiet answer.** In Slack threads the guidance lets the agent answer only `NO_REPLY` when a
+  message needs no answer. `finalPost` then keeps the reaction and posts nothing, and the adapter's
+  `remove` deletes the status post. An adapter without `remove` edits it to the no-answer text.
 - **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
   work and behind channel work that holds the host. The Slack thread shows a waiting post.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status
@@ -512,11 +800,57 @@ the token and does the platform work for the hosts:
   (`discord-driver.ts`) sends typed operations (`DiscordApiRequest`: post, edit, delete, react, list
   messages, names, a private reply to a button press, upload) to `POST /v1/discord/api` with that
   bearer. Signal accepts an operation only for a guild routed to that socket, and only for a channel
-  of that guild, and makes the call with `@discordjs/rest`. Every post has no allowed mention, so it
-  pings nobody. Attachments are signed CDN addresses, which the host downloads directly.
+  of that guild, and makes the call with `@discordjs/rest`. A new text post allows only user mentions,
+  so it pings each user that it mentions, never a role or `@everyone`. Other posts and edits ping
+  nobody. Attachments are signed CDN addresses, which the host downloads directly.
 - **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
   replies to that message, so a reply to an OpenBot post names the conversation through the replied
   post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.
+
+**WhatsApp.** A WhatsApp number links as a device of the host, so the host holds its own session and
+no OpenBot service takes part: no Signal route, no account service row, no route ticket. A connection
+is one linked number (`workspace_id` is the number in digits).
+
+- **Client.** `packages/whatsapp` vendors Baileys v7.0.0-rc14 (MIT) without its copyleft parts
+  (`libsignal`, `whatsapp-rust-bridge`); `src/signal/` is OpenBot's clean-room Signal code, and
+  `signal-repository.ts` gives it to Baileys as its `SignalRepository`. See
+  [packages/whatsapp/README.md](../../packages/whatsapp/README.md). The main bundle includes the
+  vendor; type checks read it only through its generated declarations.
+- **Store.** `WhatsAppAuthStore` keeps one SQLite file per number in `<userData>/whatsapp/`: the
+  device's creds and Signal keys, the posts of the last day (for WhatsApp's retry receipts), a journal
+  of received messages (30 minutes), the reply chains (7 days) and the WhatsApp Web version. Each value
+  is AES-256-GCM sealed under a random key that `MessagingCredentialStore` keeps
+  (`whatsappStoreKey`), with its table and row as additional data. The file is held in SQLite's
+  exclusive locking mode while it is open, so a second process cannot take the same session.
+  `openbot.db` stays the source of truth for the connection, its conversations and its memories.
+- **Runtime.** `WhatsAppRuntime` keeps the open store, the `WhatsAppSession` and the in-memory chat
+  state of each number. The driver's adapter and transport share them. A store stays open across a
+  restart of its connection and closes when the messaging service stops.
+- **Session.** `WhatsAppSession` owns the Baileys socket: no history sync, not online on connect,
+  own posts not read back. A closed socket follows `closeDecision`: 401, 403 and 411 stop with
+  `invalid_token` (the user links again); 440 stops with `error` (another client has the session;
+  Reconnect takes it back); 515 restarts at once; others retry with backoff from 2 to 30 seconds with
+  jitter. A watchdog reconnects a socket that is silent for 90 seconds. Posts wait up to 5 minutes
+  for the socket, keep at least a second between posts to one chat, and get their message id before
+  the send, so an echo in the owner's own chat is never read as a request.
+- **Link.** `WhatsAppConnect` pairs a new device in a new store (QR code, or a pairing code for a
+  phone number); the page reads the link state about every second. When the device opens, the store
+  becomes the connection's store, the store of an earlier device of the number is deleted, and the
+  connection starts.
+- **Senders.** `whatsapp-senders.ts` applies the rules before anything shows that a message was seen.
+  The owner's own chat always counts. On the owner's personal number (the default) nobody else counts
+  unless the owner allowed them, and OpenBot never writes to anyone first. On a number used only by
+  OpenBot, an unknown direct sender gets one pairing code; at most three requests wait, for an hour,
+  in memory. Groups count only when allowed (migration 51, `projection_messaging_allowed_senders`).
+- **Messages.** `whatsapp-events.ts` turns a message into an `InboundMessage`: a direct chat is
+  keyed by the phone number (LID forms are mapped through `remoteJidAlt`, `participantAlt` and the
+  LID mapping), is one conversation (`dm`), and in a group a mention starts a conversation keyed by
+  its message id and a reply continues it. The transport reads messages one at a time, journals each
+  before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
+  the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
+  the quoted menu or the newest one of the conversation.
+- **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
+  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 
 ## Mobile chat queue
 

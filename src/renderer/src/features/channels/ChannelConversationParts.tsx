@@ -25,12 +25,15 @@ import { useChannels } from "./channels-context";
 export interface ChannelRoutineHost {
   /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
   localHost: () => boolean;
+  /** The host saves the routines that run once: this computer, or a joined host with `routines-once-v1`. */
+  onceSchedule: () => boolean;
   /** The desktop server whose event API this window may manage: owner, admin or this computer. */
   eventsServerId: () => string | undefined;
   /** Whether the `eventsServerId` host has `routine-recovery-v1`. */
   routineRecovery: () => boolean;
   /** Whether the `eventsServerId` host sends a test event to a webhook routine. */
   webhookTests: () => boolean;
+  webhookSenderSecret: () => boolean;
 }
 
 function useOpenChannel(channelId: string) {
@@ -75,7 +78,12 @@ export function ChannelHeaderTitle(props: { channelId: string; onOpenSettings: (
           onClick={props.onOpenSettings}
           disabled={current().channel.archived}
         >
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <span class="channel-header-copy">
             <h1>{current().channel.name}</h1>
             <Show when={current().channel.title.trim()}>
@@ -95,7 +103,12 @@ export function ChannelEmptyState(props: { channelId: string }) {
     <Show when={page()}>
       {(current) => (
         <div class="channel-empty">
-          <ChannelAvatar members={current().channel.members} agents={channels.agents()} />
+          <ChannelAvatar
+            members={current().channel.members}
+            agents={channels.agents()}
+            icon={current().channel.icon}
+            imageUrl={current().channel.imageUrl}
+          />
           <h2>{current().channel.name}</h2>
           <Show when={current().channel.title}>
             <p class="channel-empty-title">{current().channel.title}</p>
@@ -184,12 +197,22 @@ export function ChannelSettingsPane(
   // subscription each time a message arrives.
   const memoriesPort = createMemo(() => channelMemoriesPort(props.channelId, channelName(), runtime().agent));
   const routinesPort = createMemo(() => {
-    const legacy = channelRoutinesPort(props.channelId, runtime().agent, props.routines.localHost());
+    const legacy = channelRoutinesPort(
+      props.channelId,
+      runtime().agent,
+      props.routines.localHost(),
+      props.routines.onceSchedule(),
+    );
     const serverId = props.routines.eventsServerId();
     const eventApi =
       runtime().eventRoutines ??
       (serverId
-        ? desktopEventRoutinesApi(serverId, props.routines.routineRecovery(), props.routines.webhookTests())
+        ? desktopEventRoutinesApi(
+            serverId,
+            props.routines.routineRecovery(),
+            props.routines.webhookTests(),
+            props.routines.webhookSenderSecret(),
+          )
         : undefined);
     return eventApi ? eventRoutinesPort({ kind: "channel", id: props.channelId }, eventApi, legacy) : legacy;
   });

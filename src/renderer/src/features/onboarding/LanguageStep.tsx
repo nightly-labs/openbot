@@ -36,7 +36,10 @@ export function LanguageStep(props: {
   }
 
   return (
-    <TextProvider locale={language()} formatLocale={formatLocale(formatLanguage(), navigator.language)}>
+    <TextProvider
+      locale={language()}
+      formatLocale={formatLocale(formatLanguage(), navigator.language, i18n.hourCycle())}
+    >
       <LanguageWheel
         variant={props.variant}
         systemLocale={navigator.language}

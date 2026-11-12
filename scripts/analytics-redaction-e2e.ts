@@ -9,7 +9,8 @@
 // agent reports token usage for each answered turn, and the script checks that the turn event carries
 // those counts, the same counts as the Usage report, that the model's own token event carries them,
 // that the turn says how it is paid for,
-// that a turn with no usage reports unknown, and that the failed turn's failure report arrives.
+// that a turn with no usage reports unknown, that the failed turn's failure report arrives, and that
+// the failed turn's own event names the failure and cause codes of that report.
 //
 // Start the dev app with the capture server's address first, then run the script:
 //   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47321 bun run dev
@@ -267,18 +268,26 @@ try {
   );
 
   await page.evaluate(
-    ({ id, command, marker }) =>
-      window.openbot.customAgents.save({
-        id,
-        name: `Agent ${marker}`,
-        command,
-        args: [`--token=${marker}arg`],
-        env: [{ name: "FAKE_TOKEN", value: `${marker}token` }],
-        usagePrompt: null,
-      }),
-    { id: customAgentId, command: fakeAgentPath, marker: MARKER },
+    ({ id, command, marker, server }) =>
+      window.openbot.customAgents.save(
+        {
+          id,
+          name: `Agent ${marker}`,
+          command,
+          args: [`--token=${marker}arg`],
+          env: [{ name: "FAKE_TOKEN", value: `${marker}token` }],
+          usagePrompt: null,
+        },
+        server,
+      ),
+    { id: customAgentId, command: fakeAgentPath, marker: MARKER, server: LOCAL_SERVER_ID },
   );
-  cleanup.push(() => page.evaluate((id) => window.openbot.customAgents.delete({ id }), customAgentId));
+  cleanup.push(() =>
+    page.evaluate(({ id, server }) => window.openbot.customAgents.delete({ id }, server), {
+      id: customAgentId,
+      server: LOCAL_SERVER_ID,
+    }),
+  );
 
   // A saved custom agent restarts the provider. Until the restarted process has listed its models,
   // the host refuses the model with "listed no models"; that refusal is the state to wait out.
@@ -377,6 +386,14 @@ try {
     () => null,
   );
   check("the failed turn's failure report arrives", report !== null, report?.properties);
+  // The fake agent refuses the prompt with ACP's internal error and "Authentication failed" text.
+  check(
+    "the failed turn names the error that ended it",
+    failure.properties.failure_code === "agent_event_failed" &&
+      failure.properties.cause_code === "authentication" &&
+      report?.properties.cause_code === failure.properties.cause_code,
+    failure.properties,
+  );
   check(
     "a turn with no provider usage reports unknown, not 0",
     failure.properties.token_usage === "unknown" &&

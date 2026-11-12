@@ -89,8 +89,12 @@ export function pendingSignInLinkId(): string | undefined {
   return [...requests].reverse().find(([, link]) => link.kind === "invite" || link.kind === "template")?.[0];
 }
 
-export function redirectIncomingLink(path: string): string {
-  if (path === "openbot://" || path === "openbot:///" || path === "openbot:") return "/";
+/**
+ * Other apps open a bare `openbot://` only to bring OpenBot back. In a running app, the route `/` resets
+ * the navigation and mounts the server connections again, so the running app stays where it is.
+ */
+export function redirectIncomingLink(path: string, initial: boolean): string | null {
+  if (path === "openbot://" || path === "openbot:///" || path === "openbot:") return initial ? "/" : null;
   // Expo Go and ordinary internal routes retain Expo Router's normal behavior.
   if (/^exps?:\/\//u.test(path)) return path;
   if (path.startsWith("/") && !path.startsWith("//")) {

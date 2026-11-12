@@ -7,7 +7,573 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
-## [1.4.5] - 2026-11-01 (iOS)
+## [1.4.9] - 2026-11-12
+
+### Added
+
+- **Photos** in the attachment menu now also shows videos. Select a MOV or MP4 video to attach it to
+  a chat, as on the desktop. A video must be 10 MB or smaller.
+- **Search models** in agent settings and in Create agent. The Model row now opens a list of the
+  provider's models with a search bar. Type a name or a model id to find a model without a scroll
+  through the full list, such as the OpenRouter list (#6503).
+- OpenBot can now get fixes between store versions. When a fix is ready, the home screen shows
+  **A new OpenBot is ready**. Tap **Update** and the app restarts with the fix, with no visit to the
+  App Store or Google Play. This works from this version on.
+- **Settings → About** shows a short update ID after the version when the app runs such a fix.
+- **API key for ChatGPT and Claude** in Server settings > Providers. When the server can read the
+  key, the provider page has an API key row, as on the desktop. The key goes to the server only.
+- **Default for new agents** on each provider page. Turn it on to make new agents of the server
+  start with this provider. The page also shows how many agents use the provider.
+- **Sign in in the browser** on a provider page when the server signs the provider in with a code.
+  Use it when the code sign-in does not work.
+- Give a channel its own picture in Channel info: upload a photo, or choose an icon and a color, as
+  on the desktop. The channel list, the chat header and search show it in place of the member
+  faces. A channel picture that you set on the desktop now shows on the phone too. The server must
+  run this OpenBot version.
+- Connect Postiz from the Apps marketplace with browser sign-in or your Postiz API key, so agents can list your social media channels, and draft, schedule and publish posts.
+- Get a notification when an agent finishes or stops with an error in a thread. Settings >
+  Notifications > Thread replies turns these notifications off on this phone. The server must run
+  the next OpenBot version.
+
+### Changed
+
+- **Open the export agent** in the Grok Bot import guide now opens the new Migrator by OpenBot page
+  in Grok Bot.
+- The app now also looks for a fix when you come back to it, not only when it starts. It asks
+  OpenBot's own update server, and it accepts only updates that OpenBot signed.
+- The provider page has a new layout: a header with the provider logo, its status and its agents,
+  then the Sign-in, Use, API key and Runtime sections. Each action, such as Reconnect, Update and
+  Disconnect, has an icon, as in Settings. The API key opens on its own page.
+- The sign-in page and the custom provider, custom agent and MCP server pages also have an icon
+  on each action, such as Open sign-in page, Cancel, Add and Remove.
+- The Models page of a provider shows the selected models in their own section, above the other
+  models. Select all, Deselect all and Reset to default are in the menu at the top right.
+- The provider page shows if the server runs the CLI that you installed or the one that OpenBot
+  downloaded. The Disconnect question names the agents that stop until you sign in again.
+- Channel info is shorter. The Agents row opens a list of the server's agents with a search and a
+  menu to select or deselect all. The Lead agent row has a menu to choose the lead.
+- An owner or admin can delete an agent from the end of Agent info.
+- Consecutive routine markers in a chat, such as updated, completed or failed routines, now show as
+  one closed row with a count. Tap the row to show or hide each marker. A routine that is running or
+  needs attention keeps a row of its own. To show the markers open, turn off **Collapse routine
+  activity** in Settings > Appearance.
+
+### Fixed
+
+- The number on an agent in the chat list now counts only the unread messages of its chat. Before,
+  it also counted the messages of its threads, such as a routine's thread, so it grew with each
+  routine run and opening the chat did not clear it. Unread messages in threads now show as a badge
+  with no number.
+- A turn that ends without an answer, for example one that you stop or that a restart interrupts,
+  now shows its steps in a row of its own in an agent chat, a thread and a channel. In an agent
+  chat and a thread, tap the row to open the steps. Before, its thinking was not shown after the
+  turn ended, and a chat whose newest messages were only that thinking showed no rows, also after
+  Load older messages.
+- On Android, you can now share an audio file, a video, an email or a file of another type, such as
+  a Garmin `.fit` activity, from another app to an agent. Before, the OpenBot share target showed
+  only for text, images and documents when you shared one file (#6583).
+- With large text, a settings row with a menu value, such as Reasoning on an agent's Model page, no longer flickers after you change its value.
+- You can now import a Grok Bot export of more than 100 MB into a server from your phone. The app
+  sends the export in parts. The server must be on the new OpenBot version.
+- Messages no longer move while you scroll up through older messages of the same day.
+- A tap on a notification of a thread opens that thread, and so does a tap on the Live Activity
+  while it shows the work, a question or an approval of a thread. Before, both opened the main chat
+  of the agent.
+- A tap on the expanded Live Activity in the Dynamic Island that shows one agent opens the chat of
+  that agent. Before, the app opened on the screen that it had.
+- When OpenBot takes a fix back, the Android app now shows **A new OpenBot is ready**, as the iPhone
+  app does. Before, it went back to the earlier version at its next start with no message.
+
+## [1.4.8] - 2026-11-10
+
+### Added
+
+- Type `@` in an agent's chat or side thread to tag one of the agent's browser tabs or side threads,
+  as on the desktop. The agent gets the tab and can use it, and it can read the tagged thread. A tagged
+  browser tab shows as a badge in the message. Tap it to open that tab. The host computer must have
+  OpenBot 0.62.0 or later.
+- A tap on a file name in a chat message now opens the file from the agent's workspace or the shared
+  folder. Text, Markdown, code, PDF and spreadsheet files open in the preview, and images open in a
+  sheet. Other files open in the share sheet, where you can save them to Files or open them in
+  another app (#5227).
+- Manage the proxies of browser profiles in the mobile app. In Server settings > Browser profiles,
+  an owner or admin can add, change and delete a proxy, such as `socks5://user:password@host:1080`,
+  and choose the proxy of each named profile, or Automatic. A saved password shows only as a mask.
+  The list also shows the computers that members share from the desktop app, and shows when a proxy
+  does not answer, refuses the sign-in, or when a computer is offline. Before a change closes open
+  tabs, the app asks. The phone cannot share its own internet connection.
+- You can change the order of the tools in the server drawer, such as Threads, Schedule and
+  Workflows. Hold a tool and select **Edit sidebar**, then drag the handles. The order is saved on
+  this device.
+- You can unpin a tool to hide it from the server drawer. Hold the tool and select **Unpin**. In
+  edit mode, the pin button shows or hides each tool.
+- Control a computer from the phone. Open the server menu and tap **Control computer** to see the
+  computer's screen and use it like a trackpad. Pinch to zoom, type with the phone keyboard and the
+  keys above it (Esc, Tab, Ctrl, Option or Alt, Cmd, arrows), and paste text from the phone. The
+  ••• menu has Trackpad mode, Fit to screen, the computer's displays, the quality (Fast at 120 fps,
+  Smooth at 60 fps or Data saver) and connection stats, and the help button shows each gesture.
+  The phone asks for Face ID, Touch ID or the phone unlock first, and stops the stream when you
+  leave the app. The computer must run OpenBot with remote desktop set up.
+- On iPhone, the OpenBot share sheet has a message field. Type a message to send with the link,
+  text or file that you share. The message goes before the shared content. If the share sheet
+  cannot send and you open the app, the message is in the chat's message field.
+- A server admin can select which models of a provider the model picker shows. Open **Server
+  settings › Providers**, select a provider, then select **Models**. The page has a search, **Show
+  all**, **Hide all** and **Reset to default**. Agents can still use every model.
+- On the Claude page, a server admin can set how long Claude keeps the prompt cache.
+- A server admin can disconnect the server's own sign-in of a provider, such as Claude or Codex.
+- A server admin can reset the usage of a Codex account that has usage reset credits.
+- The provider pages update when a change comes from the desktop app or another admin, such as
+  the models of the model picker, the prompt cache time or a sign-in. You do not have to open the
+  page again.
+- Connect GitLab.com from the Apps marketplace with browser sign-in, so agents can work with projects, issues, merge requests, repositories and CI pipelines. For a self-hosted GitLab, add its MCP server address in the MCP servers settings.
+- Connect Omnisend from the Apps marketplace with browser sign-in, so agents can read campaign reports and work with contacts, segments, campaigns and automations. Select read-only access on the Omnisend consent screen when agents only need reports.
+- Connect ElevenLabs from the Apps marketplace with browser sign-in to turn text into speech, work with voices, and manage ElevenLabs voice agents. Each generation uses ElevenLabs credits.
+- Use OpenBot in Hebrew. The layout mirrors from right to left when Hebrew is the language.
+- A workflow output that posts into an OpenBot channel shows as "OpenBot channel". Choose the channel in OpenBot on the computer.
+- **Settings > Profile** now shows your activity on your paired desktop, as the desktop Profile tab
+  does: tokens, peak day, messages, streaks, a year of days, insights, your most active teammates
+  and model usage.
+- A menu at the top right of **Settings > Profile** has **Share** and **Sign out**. **Share** makes
+  the same activity image as the desktop app and opens the share sheet.
+- Settings › Appearance has a Message color setting: no color, the agent color, or a custom color that you select from presets or a color picker. A custom color also shows on your messages in channels.
+- Settings › Appearance has a Text size slider, from 67% to 200%, as on desktop. It adds to the text size in your phone settings.
+- Choose the ElevenLabs model that reads replies aloud, as on desktop: Flash v2.5 (the fastest, and
+  the default), Multilingual v2 or Eleven v3. Open **Settings > Voice > Speaking**, check
+  ElevenLabs, and select a model in **Model**.
+- A Library in the server drawer shows every picture and file from the chats of a server, newest
+  first, in a bento grid where pictures get the large tiles. You can filter them by type. A picture
+  opens in the image viewer, and you can swipe through the pictures. A file opens in its preview,
+  or in the share sheet. Hold a picture or a file to show it in its chat, share it, or delete it.
+  Pull down to measure again.
+- Talk with an agent by GPT live voice, as with Codex live voice on the desktop. Turn on GPT live voice
+  in Settings > Voice and choose its voice. A voice conversation in an agent chat then uses OpenAI's
+  live voice with the Codex (ChatGPT) sign-in of the computer that runs the server. Your voice goes
+  between the phone and OpenAI, and the chat shows your requests and the agent's answers as usual. The
+  computer that runs the server must have a version of OpenBot that supports GPT live voice; other
+  servers keep the voice of the phone. Settings > Voice lists each server as ready, offline, in need
+  of a newer OpenBot, or in need of a Codex sign-in, and an owner or admin can open the server's Codex
+  page from there. When a start fails, the call bar shows the reason that the server gives. It needs
+  this new version of the app from the App Store or Google Play: an update over the air does not add
+  it.
+- Use your own OpenAI-compatible voice server, as on the desktop: Speaches, Kokoro-FastAPI or another
+  server with `/v1/audio`. Set it up in Settings > Voice > Voice server, then choose it for dictation,
+  for spoken replies, or for both. The phone sends your recordings and the reply text only to that
+  address, so the phone must be able to reach it.
+- Dictate in English with Parakeet Unified, the English model of the desktop. It runs on the phone, adds
+  punctuation and makes fewer errors than Parakeet v3. Choose it in Settings > Voice > Listening. It
+  needs a phone with 6 GB of memory or more. Whisper turbo and Cohere Transcribe stay on the desktop
+  only: they are too large for a phone.
+- The Usage screen of a server shows the CPU, memory and disk use of its machine to owners and
+  admins, in one row at the top. The values update every few seconds while the screen is open.
+  Select the disk to open Storage.
+- You can sign in with your company account, such as Microsoft Entra ID, Okta or Google Workspace.
+  Enter your work email: when your company uses company sign-in, its sign-in page opens in place of
+  an email code.
+- Dictate with Qwen3-ASR, which runs on the phone. It finds the language you speak, in 30 languages and
+  22 Chinese dialects, also when you mix Chinese and English in one sentence. Choose it in Settings >
+  Voice > Listening and download the model (about 1 GB). Your speech stays on the phone. It needs a
+  phone with 6 GB of memory or more, and this new version of the app from the App Store or Google
+  Play: an update over the air does not add it. (#5713)
+- Read replies aloud with Eleven v4 or Eleven v4 Turbo, the ElevenLabs models that speak more than
+  90 languages. Open **Settings > Voice > Speaking**, check ElevenLabs, and select a model in
+  **Model**. Flash v2.5 stays the default.
+
+### Changed
+
+- The ChatGPT code sign-in of a server now tells you to turn on device code sign-in for Codex in the
+  ChatGPT security settings first. For a work account, the workspace admin turns it on.
+- When a plan card waits a minute or more before it starts the work, its Start button counts down in minutes, such as "Start · 4:59", not in seconds.
+- The Instructions file page of an agent now shows about 14 lines of the file instead of 4.
+- On Android 12 and later, the bar at the top of sheets and pages now blurs the content that scrolls
+  under it, and the blur fades out smoothly below the bar. Before, the bar was a solid color. This applies to
+  home, Marketplace, Routines, Usage, Tasks, Workflows, Settings, Create agent and the other sheets.
+- The icons for Threads, Schedule, Workflows, Usage and Marketplace in the server drawer and in
+  search are now the same as in the desktop app.
+- The Routines page of a server is now called **Schedule**, as in the desktop app. It shows the
+  calendar of routine runs. You still manage routines in the info of each agent and channel.
+- Server settings is now one page. The sections are Server (updates, timezone and memories per
+  agent), People (your role, members, roles and audit log), AI and tools, Data, and Import and
+  transfer. Refresh, Restart and Leave, Delete or Remove come next, and Server key is at the
+  bottom. General and Maintenance are not separate pages any more. A row that is not available for your role does not
+  show.
+- The top of Server settings shows the server logo beside its name, with the connection status and
+  the OpenBot version under the name. Owners and admins tap the logo to change it, and tap the name
+  to edit it in place.
+- The rows of Server settings and Settings have icons. Where the desktop app has a tab for the same
+  setting, the row uses its icon.
+- Profile has the same layout as Server settings: your photo beside your name, with your email
+  under it. Tap the photo to change it, and tap the name to edit it in place.
+- Consecutive completed runs of one routine now show as one row in the chat, as in the desktop app.
+  The row shows the routine and the number of runs. Tap the number to show or hide each run. Runs
+  on different days also join, so a daily routine no longer adds a row each day.
+- You can now attach a file of any type to a chat on a server that supports it, for example a VPN
+  profile (`.ovpn`) or a certificate (`.pem`). Before, the app refused a file whose extension was not
+  in its list. The agent gets the file and reads it with its own tools.
+- A voice conversation reads the agent's progress updates aloud while it works, and then the answer.
+- A new agent now opens with its own short welcome, in your language, as a question with three first
+  tasks that you can choose or answer in your own words. The setup message that OpenBot sends to the agent no longer shows in the chat.
+  The first task that you write during setup still goes to the agent after its welcome.
+- Connect Composio with a sign-in when your server can relay sign-ins. Otherwise, type only your
+  Composio API key. You no longer type an MCP URL.
+- The chat list keeps the sections and folders that you close. When you open the app again, they
+  stay closed. Each server keeps its own sections on this device.
+- **Sign out** moved from the bottom of **Settings > Profile** to the new menu.
+- On iPhone, the value and the arrows of a selection row in settings are now gray, as on Android.
+- The rows in the info of an agent now have icons, the same as in the desktop agent settings.
+- In the info of an agent, **Routines** shows each routine as a card, as in the desktop app. The card
+  shows the trigger icon, the name, when the routine runs, and a switch at the end. The switch
+  pauses or resumes the routine. Tap the card to open the routine.
+- A member of a joined server can see and add its MCP servers, and connect Marketplace apps, when the server allows it. A member changes or removes only the MCP servers that the member added.
+- The Roles page of server settings is now named **Permissions**.
+- When you come back to the app after a few minutes, it keeps its connection to your computer and
+  is ready sooner. Before, every return after about 2.5 minutes made a new connection and loaded
+  all servers again.
+- When the phone moves from Wi-Fi to mobile data or back, the app renews its connection at once.
+  Before, the connection could stop with no data for up to half a minute.
+- A new connection to a server is faster, because the app starts the next steps while it waits for
+  the account service.
+- Tables in chat messages look as the desktop data tables do: a rounded card with the header on it, and the rows on an inset panel with a line between them.
+- A table in a message stands out of the bubble, between the text before and after it, and its columns are as wide as their content.
+- A table has Copy as Markdown and Copy as CSV under it, as on desktop.
+- A code block looks as a table does: the language and the copy button on a card, and the code on an inset panel.
+
+### Fixed
+
+- A tap on a chat in the home list now always opens the chat. Before, after the app opened from a
+  notification or connected to a server, a tap on a chat could do nothing until you restarted the app.
+- A tap on a notification now opens its chat. Before, it could stop on the home list.
+- An attachment download from a server that the server stops, or that arrives damaged, now fails at once. Before, it waited one minute for a timeout.
+- Leaving a chat while dictation stops no longer leaves the voice action waiting.
+- The back button of a chat always goes back to the chat list. Before, after a swipe back that you
+  started and did not finish, the back button did nothing until you opened the chat again.
+- When the selected server does not answer at start, the app no longer stops on the "Connecting to
+  server" screen for up to 30 seconds. After 5 seconds the home shows the server as offline, and you
+  can open the drawer or select another server while the app continues to connect.
+- Chat and channel list previews, awaiting replies and search show a pasted file by its name, not as `@image.png`.
+- When ElevenLabs refuses your key or a voice, the app now shows the reason that ElevenLabs gives,
+  such as a free plan that does not allow the voice. Before, it showed "ElevenLabs did not answer",
+  also when ElevenLabs answered.
+- When you open a chat again, the messages that came while you were away show at once. They no
+  longer play word by word with haptics, as if they were new. Only a reply that comes while the chat
+  is open plays.
+- The text of your messages is white on a dark message color. Before, the text was always dark and was hard to read on a dark agent color.
+- After dictation ends, one press of **Send** sends the message. Before, after an earlier message,
+  **Send** could do nothing until you touched the text field. This occurred mostly on Android, and
+  sometimes on iPhone.
+- In a voice conversation, the voice no longer reads the start of an agent's thinking before the answer.
+- Search shows the agents whose name matches first. Before, an agent that had the word only in its
+  description or last message could show above it, and the agent you named could be hidden in **All**.
+- A connection that the app restarted many times, such as after many returns to the app, no longer
+  drops when you open the app.
+- In a message with a message color, code blocks, inline code, tables and mention chips follow the text color of the bubble: darker on a dark color with white text, lighter on a light color with dark text. The code has the color of the message text. Before, they stayed grey on the color, and code could be white on a light color.
+- A code block in an agent's reply has a background that you can see. Before, it had the same grey as the bubble.
+- When the first server in your list does not connect at start, such as a computer that is turned off, the app opens your first online server again. Before, a server that the phone kept from the last visit stayed open, and its chats did not load.
+- Dictation in Chinese, Japanese or Thai no longer puts a space between two parts of what you said.
+- The thinking sheet of a long run opens at once. Before, a run of many steps made the app stop or close when you opened its thinking.
+- The thinking sheet shows all the steps of a long run, also after the app starts again. It reads the earlier steps from the server when you scroll up. Before, it showed only the newest steps.
+
+## [1.4.7] - 2026-11-06 (iOS), 2026-11-09 (Android)
+
+### Added
+
+- The workflow editor shows Slack triggers and Slack outputs that you made on the desktop.
+- Add lime and indigo to the agent colors. Agents that had lime show lime again, not green, and
+  agents that had indigo show indigo, not violet.
+- Agents can use more colors: sky blue, navy, pink, wine, brown, sand and gray. A server that keeps
+  agent colors shows and saves the exact color. On an older server, the app saves the nearest hue.
+- Use the app in Arabic. After a restart, the layout mirrors from right to left.
+- Show each chat paragraph in the direction of its text, in all languages. Code blocks always read
+  from left to right.
+- In the workflow editor, a Condition step has a Model choice and an Effort choice, as an LLM step
+  has.
+- The agent's Runtime settings show the usage limit under the model when a spent plan window stops
+  that model, with the time when the limit resets, as the desktop model picker does. The note uses
+  the readings of the Usage screen and goes when the window resets.
+- You can delete a message in a chat. Touch and hold the message, then select Delete. This works in
+  agent chats, tasks and channels. The message goes from the chat for everyone. The agent can still
+  remember it. You can delete your own messages. Admins, and members who can manage the agent, can
+  delete any message. The server must have the latest version of OpenBot.
+- You can send the text of a message in an agent chat to a channel. Touch and hold the message,
+  select Send to channel, then select the channel. The channel opens with the text in its composer.
+- A task thread shows the name of each other member who wrote a message in it.
+- Change the speed of a message that is read aloud: 0.75x, 1x, 1.25x, 1.5x or 2x. The speed button is
+  in the Read aloud row of the message sheet. The voice keeps its pitch, and the speed also applies
+  to voice conversations.
+- Connect a Coinbase or Robinhood account from the Apps marketplace. Agents can read balances, positions and prices, and place orders.
+- Connect RevenueCat from the Apps marketplace with a secret API key to manage products, offerings and paywalls, look up customers, and read revenue charts.
+- Add Download to the Hermes Agent page of a server. The server runs the official Hermes installer
+  and shows its progress. Then Connect signs in with the Nous Portal code.
+- Connect TickTick from the Apps marketplace with browser sign-in to see and add tasks, organize lists and tags, and track habits and focus records.
+- **Settings → Support** has a link to open a ticket on the OpenBot Discord, the fastest way to get help.
+- Add Mark unread to the actions of an agent's message. That message and the messages after it
+  become unread, and the chat stays unread until you open it again. The server must have the
+  latest version.
+- Show a NEW line above the first unread message when you open an agent's chat, as on desktop.
+  With chat colors on, the line has the agent's color. The line grows in from the NEW label.
+- Owners and admins can add and change Telegram and Slack triggers and outputs in the workflow editor.
+  Choose the chat, the Slack workspace and channel, the text filter, the action and the emoji, as on
+  the desktop. The server must run a new OpenBot version and have a linked Telegram chat or Slack
+  workspace.
+- Owners and admins can link and manage the WhatsApp numbers of a server from the phone. Link a
+  number with a pairing code, add the WhatsApp Orchestrator, choose the contacts and groups that can
+  write, and approve pairing requests. The server must run a new OpenBot version.
+- The Marketplace shows the connectors of the server under Apps, as on the desktop: Slack, Discord,
+  Telegram, WhatsApp, GitHub, 1Password and Bitwarden, with the status of each. It also shows the MCP
+  servers that you added. Owners and admins see them; a tap opens the settings of the connector or
+  the server.
+- You can select the Plush or Flat avatar style when you create or edit an agent. A flat agent shows the flat face of the desktop app in the agent list, chats and Live Activities, and breathes while it works. The face and colour stay the same when you change the style.
+- Connect a server to Proton Pass from Marketplace › Apps. Sign in to Proton on the phone, or
+  paste an access key. Agents on the server can then sign in to sites with the logins of one shared
+  vault. The Proton Pass CLI needs a paid Proton plan.
+- Settings > Voice has a "Pause before sending" slider, from 1 to 10 seconds. A voice conversation sends your words when it recognizes no new words for this long. The default is 1.5 seconds. (#5006)
+- Settings > Voice > Speaking has a "Reply speed" choice for the replies that OpenBot reads aloud.
+- Connect Higgsfield from the Apps marketplace with browser sign-in to generate images, videos and audio, and check credits and assets. Each generation uses Higgsfield credits.
+
+### Changed
+
+- Agent faces move less while they rest: the eyes look round a little and more slowly, and the
+  group of characters on the welcome and empty home screens floats less. The "Agent faces" switch in
+  Settings now also stops the group's float.
+- In the live browser view, a pinch or a two-finger pan follows the fingers smoothly while the page
+  streams.
+- The app keeps your channels and their latest messages in its encrypted copy on the phone, as it
+  does for chats. After a start the channels show at once, before the server connects.
+- The picture of a chat with more than one agent shows the members as a cluster, as on desktop.
+  The faces are larger and overlap. One member fills the picture, two sit side by side, and three
+  make a triangle. A chat with more than four members shows "+" and the number of the other members.
+- A new chat or channel shows a short hint at the left, without a card: what you can do and how to
+  start. The hint has no suggested options and no close button.
+- The support log keeps 5,000 events, not 1,000, and records each step of a reconnect after a return to the app. A saved log now shows where a slow reconnect stops.
+- **Show log** in **Settings → Support** opens the support log on its own page, newest first, and **Show older events** shows more of it. New events appear while the top of the log is in view. Before, the Support page showed only the last 100 events.
+- Show the number of unread messages on the corner of an agent's avatar in the chat list, as on
+  desktop. The count includes the agent's threads. Before, a dot next to the name showed only that
+  the agent had unread messages.
+- Connectors are now only in the Marketplace, as on the desktop. Server settings › AI no longer has
+  a Connectors row. Open Marketplace › Apps to connect or change Slack, Discord, Telegram, WhatsApp,
+  GitHub, 1Password or Bitwarden.
+- A filtered or searched Marketplace list has Load more, as on the desktop, so it shows more than the first 50 agents and skills.
+- The avatar editor has the groups of the desktop editor: Style, Shape, Eyes and Color. You select the shape and the eyes separately. Random face and Reset to ID are next to the Shape name.
+- When an agent has no name, the "Enter a name for this agent." message shows under the Name field after you tap Create or Save, not at the bottom of the sheet while you edit.
+
+### Fixed
+
+- Felt agent avatars no longer have a dark outline in the light theme. The edge of the fur now has
+  the colour of the avatar.
+- A question card of an agent shows a Markdown link in the question as a link that you can open. Before, it
+  showed the link text and the address as plain text. The answered summary shows it the same way.
+- To confirm an action that needs a second step, or the main button of a dangerous card, touch and
+  hold the button; a tap does not send it. With VoiceOver or TalkBack, a tap asks again in the card.
+  Before, one tap sent the action.
+- A confirm card shows the draft with its formatting and links. A long draft stops at a fixed
+  height, and "Show all" opens the whole draft on its own screen, where you can copy it.
+- A confirm card with a choice, such as the sender address, shows the options as buttons in the
+  card.
+- A list with more than one answer, or with many options, shows the options in the card. Before,
+  you typed the option names.
+- A link in a question opens. Before, it showed as text with brackets.
+- An expired, cancelled or answered form still shows what it asked, such as the draft of a confirm
+  card and the options of a question, as on desktop. Before, it showed only the title.
+- When you drag a chat to the top or bottom of the list, the list scrolls at the same speed at any
+  frame rate. Before, it scrolled faster or slower when the frame rate changed.
+- With Reduce Motion on, the group of characters fades away when you continue from the welcome
+  screen. Before, it flew off the screen.
+- The blinking OpenBot logo uses less battery: it draws no frames between blinks.
+- When another app, such as a keyboard or Safari, opens `openbot://` while OpenBot runs, the app
+  comes back on the same screen. Before, every server connected again and again until the
+  connection service stopped the app for 60 seconds.
+- Each chat and channel keeps its unsent text. Go to another agent and come back, and the text you typed is still in the message box.
+- The agent list shows the work of an agent's side threads on the agent. The agent shows as working
+  while one of its threads works. It shows as needing you, and moves to "Needs you", while a thread
+  waits for an answer, an approval or a takeover. It shows as unread while a thread has a reply that
+  you did not read, also in the count of a closed folder. Only reading the thread clears it. Before,
+  you saw these states only in the agent's thread list.
+- A message with a file and text that wraps to a second line no longer covers the reply under it.
+- An agent's unread dot goes when you read its latest reply in the chat. Before, the dot sometimes stayed until you used Mark as read.
+- On Android, the app no longer runs out of memory after you paste, insert or share a large image into a chat.
+- On Android, the app could close when you turned or unfolded the phone, or changed the size of its window.
+- On Android, the app no longer closes suddenly during animations. Before, a view could update at the
+  same time on two threads, and the app crashed.
+- Stop the Android app from crashing when a screen closes while another screen opens.
+- Stop the Android app from crashing when you drag the keyboard in a chat two times quickly.
+- After a return to the app, the open chat, the queue and the other requests answer sooner. Before,
+  the app loaded every chat that it kept on the phone again after each connect, and your requests
+  waited behind them for up to a minute. A closed chat now loads when you open it.
+- When a server does not send the agent list or the read state in 15 seconds, the app connects
+  again. Before, it could wait up to 10 minutes and showed the server as connected while nothing
+  loaded. A chat or a queue that does not load in 15 seconds now shows an error, as on desktop.
+- On iOS 17, the agent status in the Dynamic Island and on the Lock Screen shows again. Before, it
+  stopped each time it opened.
+- The mobile app uses less memory while a reply streams. Before, on iPhone, the app could stop
+  after some hours of chat.
+- When a voice conversation starts to listen while a reply plays, the iPhone app no longer stops.
+  Only that part of the reply does not play.
+- When the microphone changes while dictation starts, such as when headphones connect, the
+  dictation stops with an error, and the iPhone app continues.
+- On iPhone, the app no longer closes when you open the browser of an agent with an open tab, or
+  when you open a new tab.
+- On Android, a vertical scroll of the agent or channel list no longer moves a row to the side and shows Pin (#5102).
+- A voice conversation with Parakeet or ElevenLabs Scribe no longer keeps listening in a loud room. Only new words keep the turn open, not noise.
+- A chat no longer shows "Queue unavailable" when the connection drops.
+
+## [1.4.6] - 2026-11-04 (iOS), 2026-11-05 (Android)
+
+### Added
+
+- The task actions of a channel now have a Cancel task button for a stopped or failed task, on a
+  server that supports it. It ends the whole run of
+  that task, and keeps the messages.
+- The queue above the message field now shows the next queued message with Edit, Steer and Delete
+  buttons. Steer needs one tap while the agent works. When more messages wait, a row under it opens
+  the queue, and the card grows smoothly to show that row.
+- You can now attach SVG images to a chat on a server that supports them. The agent gets the SVG
+  file and reads its text. Replace on an SVG opens the file picker.
+- On Android, the app icon can follow the themed icons setting of the phone, and its colors match the
+  wallpaper. The launcher also gives the icon its own shape. Before, the icon did not change with
+  this setting.
+- The app keeps an encrypted copy of your agents and recent chats on the phone. After a start they
+  show at once, while the app connects to the server. Sign-out deletes the copy.
+- You can swipe left on your own message to reply to it, as you swipe right on a message of an
+  agent. Before, only the Reply button under your message did this.
+- Connect a ClickUp account from the Apps marketplace to search and update tasks, docs and team comments.
+- Keep pinned agents and channels the same on the phone and on the desktop app. The server keeps the
+  pins of each user, and a pin or unpin on the phone shows on the computer, and the reverse. A pin
+  made without a connection goes to the server at the next connect. A server with an earlier version
+  keeps the pins of each phone, as before.
+- Hold a chat or a pinned chat, then move your finger to drag it. Drop it in the pins to pin it or
+  to change the order of the pins. Drop it in the list to move it in its section or to another
+  section, and to unpin a pinned chat. The list scrolls when you drag near its top or bottom. Hold
+  without a move to open the menu, as before. On Android, the menu opens when you lift your finger.
+- The chat list shows the folders of a desktop sidebar. A folder inside a folder shows its path,
+  such as "Clients / Acme".
+- Choose the None, Minimal and Ultra reasoning levels for an agent or a workflow step when the model
+  on the server offers them.
+- Server settings has an Audit log. Owners and admins see who joined or left, who changed a member's role or a custom role, and who changed the access of each agent, with a filter and a search.
+- When an agent asks you to add a card, an address or a login to the Vault, the chat shows a Vault card. Add opens the Vault form with the values that the agent filled in. You type the card number, security code or password, and the agent gets only the name of the item.
+- The Vault item form shows an example value in each empty field, in the format of the chosen country for an address, and says which fields are required.
+- The folder menu has "New folder inside" and "Move to", so a folder can go into another folder or
+  to the top level. The "Move to folder" menu of a chat has "New folder".
+- An owner or admin can start a workflow from GitHub events and change GitHub from a workflow on the phone: choose the repository, the event, the labels and the filters of a GitHub trigger, and the action of a GitHub output.
+- The workflow page shows the newest GitHub events of a GitHub trigger and what each one did. "Run with last event" runs the workflow with the newest issue or pull request that matches the trigger.
+- The run of a GitHub event shows its issue or pull request, which opens on GitHub.
+- A step of a workflow can run from that step, or alone. The workflow page shows the newest result of each step that ran alone.
+- A step that runs has a Stop step button.
+- Version history: open a saved version of a workflow, read its steps and make it current.
+- A workflow with a Discord trigger or a Discord output shows its settings. Change them in OpenBot on the computer that runs it.
+- Turn on Fast mode for an agent whose model has a fast tier, such as GPT-6.1-Sol, in the agent's Model page.
+- Owners and admins can edit an agent's instructions file (`AGENTS.md`) on its server. When the agent changes the file during your edit, the app tells you, and a second Save replaces the agent's version.
+- Compact the context of an agent's chat from the agent's Advanced page. The messages stay.
+- Create a server on a computer that runs OpenBot: tap + in the server list, then "New local server on the computer". The server has its own agents, chats and files. The servers that OpenBot runs on that computer now show in the server list, with notifications.
+- Hold a server that runs on a computer beside its own server and choose Delete server. OpenBot on that computer moves the server's data to its Trash. The server of the desktop app itself no longer shows Remove server.
+- Dictate in a chat with the mic to the left of the main button. The words go into the message box
+  while you speak, and you can edit them before you send. A wave shows your voice next to the time.
+  Tap the mic again, now Stop, to keep the text. With an empty message box, the main button starts a
+  voice conversation; with text, it is Send. Dictation uses the recognizer you chose in
+  Settings > Voice.
+- A message with two or more images, from you or from an agent, shows them as a stack of cards. Swipe the top card to the side to see the next image, and tap it to open the image.
+- Tap the image count under the stack to see all the images of the message on one screen. Its menu saves all of them to Photos or shares all of them at once.
+- The image viewer shows small tiles of all the images at the bottom. Tap a tile, or drag along the tiles, to go to an image.
+- Server settings › Providers shows Kimi and Hermes when the server has them. You can download Kimi, and sign in Kimi and Hermes with a device code.
+- The chat shows the day and time above the first message of each day, such as "Today 3:04 PM" or
+  "Mon, Nov 1 9:12 AM", as on desktop.
+- Branch from here: touch and hold the last agent answer of a finished turn, in an agent chat or a
+  thread, and choose Branch from here. A new thread opens with a copy of the conversation through
+  that turn, as on desktop. The server must have OpenBot with thread branches. While a turn runs, no
+  message shows the action.
+- A branch thread shows "Branched from …" after the copied messages, also for a branch made on
+  another device. A tap opens the source chat or thread at the message that the branch came from.
+- Workflows show their Telegram triggers and outputs. Change them in OpenBot on the computer that runs them.
+
+### Changed
+
+- An agent notification on iPhone, Apple Watch and Android now shows the agent picture, its photo
+  or its bloub, in place of the OpenBot app icon. A notification whose picture is not ready yet
+  looks as before.
+- On iPhone, you can swipe right anywhere in a chat, a task or a channel to go back, and the chat
+  follows your finger. Before, the swipe started only at the left edge of the screen. A swipe to the
+  right on a message still replies to it.
+- On iPhone, the headers of a chat and of the agent's browser use the native bar. When you open or
+  leave a chat or the browser, its buttons change into the buttons of the screen under it, as on the
+  other screens.
+- On iPhone, a chat now slides in from the side. It no longer zooms out of its avatar in the list,
+  and Settings > Animations no longer has the Zoom into chats switch.
+- Product analytics and error reports now go also when analytics is off, with a random install ID in place of your account ID and email. The ID changes after 13 months. Message contents and files are never sent. The setting in Settings → Privacy is now called "Link analytics to my account".
+- This update cannot read what the earlier versions kept in the iPhone keychain. You sign in again
+  one time, and the app settings, such as appearance, language, haptics and voice, go back to their
+  defaults. App lock is off until you turn it on again. Link analytics to my account is on until you
+  sign in and the app loads your account's choice. If you turned it off only on this phone, it stays
+  on.
+- **Sign in again after you upgrade.**
+- **Turn on App lock again in Settings if you used it.**
+- **Check Link analytics to my account in Settings → Privacy if you turned it off.**
+- Chat messages have tighter lines and less space between paragraphs and list items, so a reply takes less of the screen.
+- A private answer to an agent's question, such as an API key, is typed in a masked field in the place of the message field, as a browser password is. The chat no longer shows a second field in the question card.
+- Chat list folders look and work as on the desktop. A folder shows a folder icon, and a folder in a
+  folder shows its parent name before its own name. A closed folder hides the folders in it and
+  shows its unread count.
+- Agents that have no photo now show the soft felt plush of the desktop app, in the agent list, chats,
+  mentions, search, notifications and the Live Activity. A working agent looks up while three felt
+  dots pulse, an agent that waits for you shows a felt dot, a failed turn shakes "no" once, and an
+  asleep agent closes its eyes as z's rise. The orbit rings now turn only around an agent photo.
+- When you choose a new face or colour for an agent, the old plush shrinks away and the new one pops
+  out.
+- After a start, the drawer shows the last member count, usage cost, next routine, thread and
+  workflow values and pinned workflows at once. The server's own values replace them when they
+  arrive. Before, these values were empty and then appeared one by one.
+- In an agent chat, Send and Stop in the message box have the agent's colour. Before, they were
+  blue.
+- In a channel, a tap on the mic dictates into the message box. Before, the words showed on a
+  separate screen and you could only send them as they were.
+- The app opens your servers faster after a start. It keeps the server list on the phone and
+  connects at once, while the account service answers. The first reads of each server go out with
+  its connection check, and the account session request starts while the connection page loads.
+- After a return to the app, the other servers no longer wait for the selected server when it
+  cannot connect.
+- Connect, Reconnect, Add account and Sign in again open their own sign-in page. The page closes when the sign-in ends.
+- A provider sign-in shows numbered steps before you go to the browser. A page whose address you must copy back no longer opens before you see the steps.
+- The code and address fields of a sign-in have a placeholder and a Paste button. The API key field has a Paste button too.
+- A provider page shows its actions, such as Reconnect and Check for updates, at the bottom. The API key and its field are one section.
+- Touch and hold a message to open its actions in a sheet: reactions, Reply, Copy, Read aloud and
+  Select text, with the time the message was sent. The row of buttons under each message is gone, so
+  the chat shows more messages. Reactions stay under their message, and a swipe still replies. While
+  you hold, the message presses in, so you see when the sheet is about to open.
+- To select part of a message, touch and hold it and choose Select text.
+- Messages sit closer together, and chat bubbles have smaller rounded corners.
+- Server settings is now a short list of pages: General (status, role, timezone, memories per agent and server key), People (members, roles and audit log), AI and tools, Data (vault, browser profiles, sites, storage, import and transfer) and Maintenance (updates, refresh and restart). Each row names the items on its page. A page that has no items for your role does not show. Leave, Delete and Remove stay at the bottom of the list.
+
+### Fixed
+
+- With a large text size, a settings row puts a long value, such as a model name or an account,
+  under its title. Before, the value squeezed the title to one letter a line.
+- On iPhone, the model and account menus show each name in full. Only the selected name in the row
+  is shortened.
+- On iPhone, headings in a finished reply were not bold, and its text changed from Inter to the system font when the reply finished.
+- Inline code in a message sat higher than the text around it.
+- On iPhone, a message bubble with text on more than one line was wider than its text, with empty space on the right.
+- A GitHub or Discord output showed as "Notification" in the steps of a workflow.
+- The Dynamic Island and the Lock Screen now show the photo of an agent. Before, they showed an
+  empty grey circle in its place, because the photo was too large for the Live Activity. While a
+  photo loads, the activity shows the plush of the agent.
+- In a voice conversation the microphone opens again after a reply. Before, the app could stop, or
+  show "Dictation stopped", when the reply or a new audio route changed the microphone.
+- On iPhone Duo, the app now fills the screen. Before, it showed in a small window in the middle of the open screen.
+- In a voice conversation, "Speak now" shows only when the microphone listens. Before, it showed while
+  the microphone was still opening, and the first words were lost.
+- In the image viewer, an image could show under the buttons at the top.
+- The first time the image viewer opened, its buttons showed under the status bar.
+- SVG images in a chat now show as pictures, as on desktop, not as file cards. They also show in
+  the image viewer, the gallery, the queue and the agent files. The photo library does not take SVG
+  files, so Save to Photos is not available for an SVG, and Save all skips SVG files.
+- When you send two or more images in one message, the chat now shows them as a stack of cards at once. Before, it showed each image separately until the upload was complete.
+- The reply preview now opens together with the composer and the keyboard, with no height jump first.
+- On Android, notifications and the sound preview in Settings play the sound that you choose. Before,
+  they always played the Android notification sound.
+- In a voice conversation in a loud room or outside, your turn now ends when you stop speaking. Before,
+  the noise kept the microphone listening, and the message was never sent.
+- On iPhone, the ⋯ button of a thread and of the browser opens its menu again. Before, the menu had
+  no items, so a tap did nothing.
+
+## [1.4.5] - 2026-11-01 (iOS), Skipped (Android)
 
 ### Added
 

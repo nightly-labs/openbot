@@ -160,6 +160,7 @@ export const messages = {
   "billing.order.server.summary": "Gestiamo OpenBot per il tuo team.",
   "billing.order.server.none": "Nessun server",
   "billing.order.server.noneDetail": "Esegui OpenBot sul tuo computer",
+  "billing.order.server.thisComputer": "Il tuo computer",
   "billing.order.server.bestValue": "Più conveniente",
   "billing.order.server.bestFor.starter": "Ideale per una persona",
   "billing.order.server.bestFor.standard": "Ideale per un piccolo team",
@@ -201,6 +202,7 @@ export const messages = {
   "billing.order.cta.server": "Crea un server",
   "billing.order.cta.license": "Acquista una licenza",
   "billing.order.cta.download": "Scarica",
+  "billing.order.cta.keepComputer": "Resta su questo computer",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Aggiungere un utente alla licenza?",
   "billing.license.invite.description": "Questo invito aggiunge 1 utente alla tua licenza: {price} in più al mese.",

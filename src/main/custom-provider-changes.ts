@@ -1,6 +1,6 @@
 import { Effect, Semaphore } from "effect";
 import { type ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
-// The user's own model endpoints: list, add, remove. The local IPC handlers and the `providers-v1`
+// The user's own model endpoints: list, add, edit, remove. The local IPC handlers and the Team API
 // host routes share one instance, so a change from a joined admin and a change from this window
 // wait for each other.
 //
@@ -39,8 +39,13 @@ export interface CustomProviderChanges {
   /** The endpoints without their keys or header values. */
   list(): CustomProviderSummary[];
   save(input: SaveCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
-  /** This computer only: the Team API routes take `PeerCustomProviderChanges`. */
+  /** This computer: every field of the edit applies, the model settings and the harness too. */
   update(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
+  /**
+   * A joined admin's edit (`custom-provider-edit-v1`). The wire carries no harness and no model
+   * settings, so the endpoint keeps its harness and each kept model id keeps its saved settings.
+   */
+  peerUpdate(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
   remove(id: string): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
 }
 
@@ -96,6 +101,50 @@ export function createCustomProviderChanges({
     return gate.withPermit(Effect.suspend(run));
   }
 
+  /**
+   * Like `save`, and the agents on a model that the edit takes out move first. The store checks
+   * the edit before that, so an edit it refuses moves no agent.
+   */
+  const update = (input: UpdateCustomProviderInput) =>
+    Effect.fn("CustomProviderChanges.update")(function* () {
+      yield* runtimeSync(() => customProviders.checkUpdate(input));
+      const saved = customProviders.list().find((provider) => provider.id === input.id);
+      const previous = saved?.harness;
+      const kept = new Set(input.models.map((model) => model.id));
+      const removed = (saved?.models ?? []).filter((model) => !kept.has(model.id)).map((model) => model.id);
+      const providers = yield* service
+        .updateCustomProvider(input.id, input.harness ?? previous ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, removed, () =>
+          customProviders
+            .update(input)
+            .pipe(
+              Effect.mapError(
+                (error) => new AgentLifecycleFailed({ operation: "updateCustomProvider", cause: error.cause }),
+              ),
+            ),
+        )
+        .pipe(toProviderRuntimeFailure);
+      return {
+        providers,
+        restart: yield* serve(input.id, previous).pipe(toProviderRuntimeFailure),
+      };
+    })().pipe(Effect.uninterruptible);
+  const withSavedModelSettings = (input: UpdateCustomProviderInput): UpdateCustomProviderInput => {
+    const saved = new Map(
+      (customProviders.list().find((provider) => provider.id === input.id)?.models ?? []).map((model) => [
+        model.id,
+        model,
+      ]),
+    );
+    return {
+      id: input.id,
+      name: input.name,
+      baseUrl: input.baseUrl,
+      models: input.models.map((model) => ({ ...saved.get(model.id), id: model.id, name: model.name })),
+      ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+      ...(input.headers !== undefined ? { headers: input.headers } : {}),
+    };
+  };
+
   return {
     list: () => customProviders.list(),
     /**
@@ -129,35 +178,10 @@ export function createCustomProviderChanges({
           };
         })().pipe(Effect.uninterruptible),
       ),
-    /**
-     * Like `save`, and the agents on a model that the edit takes out move first. The store checks
-     * the edit before that, so an edit it refuses moves no agent.
-     */
-    update: (input) =>
-      serialize(() =>
-        Effect.fn("CustomProviderChanges.update")(function* () {
-          yield* runtimeSync(() => customProviders.checkUpdate(input));
-          const saved = customProviders.list().find((provider) => provider.id === input.id);
-          const previous = saved?.harness;
-          const kept = new Set(input.models.map((model) => model.id));
-          const removed = (saved?.models ?? []).filter((model) => !kept.has(model.id)).map((model) => model.id);
-          const providers = yield* service
-            .updateCustomProvider(input.id, input.harness ?? previous ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, removed, () =>
-              customProviders
-                .update(input)
-                .pipe(
-                  Effect.mapError(
-                    (error) => new AgentLifecycleFailed({ operation: "updateCustomProvider", cause: error.cause }),
-                  ),
-                ),
-            )
-            .pipe(toProviderRuntimeFailure);
-          return {
-            providers,
-            restart: yield* serve(input.id, previous).pipe(toProviderRuntimeFailure),
-          };
-        })().pipe(Effect.uninterruptible),
-      ),
+    update: (input) => serialize(() => update(input)),
+    // The saved settings are read inside the permit, so a change that waits for this one cannot
+    // replace them between the read and the write.
+    peerUpdate: (input) => serialize(() => update(withSavedModelSettings(input))),
     /**
      * Agents move off the endpoint's models *before* it is removed, so no agent is left naming a
      * model the restarted CLI does not list.
@@ -189,5 +213,5 @@ export function createCustomProviderChanges({
   };
 }
 
-/** What a joined admin may change through the Team API. There is no edit route. */
-export type PeerCustomProviderChanges = Pick<CustomProviderChanges, "list" | "save" | "remove">;
+/** What a joined admin may change through the Team API. An edit keeps the harness and model settings. */
+export type PeerCustomProviderChanges = Pick<CustomProviderChanges, "list" | "save" | "peerUpdate" | "remove">;

@@ -222,6 +222,41 @@ export function InstallOpenBotVPS() {
         routines and their times before leaving scheduled work running.
       </p>
 
+      <h3>Use Hermes Agent on the server</h3>
+
+      <p>
+        Open the server's provider settings and select Download on the Hermes row. OpenBot installs Hermes Agent for its
+        service user, then the row shows Connect.
+      </p>
+
+      <p>
+        To install Hermes from a terminal instead, install it as the service user, not as your SSH login. For the Ubuntu
+        installer, run this on the VPS:
+      </p>
+
+      <pre>
+        <code>
+          {
+            "sudo -u openbot -i bash -c \\\n  'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'\nsudo openbot restart"
+          }
+        </code>
+      </pre>
+
+      <p>For Docker, install it in the container. Hermes stays in the data volume when you replace the container:</p>
+
+      <pre>
+        <code>
+          {
+            "sudo docker compose exec openbot bash -c \\\n  'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive'\nsudo docker compose restart openbot"
+          }
+        </code>
+      </pre>
+
+      <p>
+        Then select Connect on the Hermes row and enter the Nous Portal code. You can also run <code>hermes setup</code>{" "}
+        or <code>hermes model</code> as that user to choose another model provider.
+      </p>
+
       <h2>5. Read logs and keep the server updated</h2>
 
       <p>For the direct Ubuntu installation, these are the main commands:</p>

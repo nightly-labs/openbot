@@ -23,6 +23,7 @@ const multipleQuestions: AgentPromptQuestion[] = [
     id: "approach",
     header: "Approach",
     question: "Which auth approach should we use?",
+    detail: "Sign-in for the desktop app and the web client.",
     isSecret: false,
     options: [
       { label: "Session cookies", description: "Best fit for the desktop session." },
@@ -97,6 +98,7 @@ const meta = {
   args: {
     questions: singleQuestion,
     onSubmit: fn(async () => false),
+    onOpenLink: fn(),
   },
   // The bubble alone on a canvas. "In chat" sets `stage: false`, because the real chat fills the window.
   decorators: [
@@ -157,6 +159,11 @@ export const MultipleQuestions: Story = {
   args: { questions: multipleQuestions },
 };
 
+/** The send succeeds, so the last answer opens the summary. */
+export const AnswersSent: Story = {
+  args: { questions: multipleQuestions, onSubmit: fn(async () => true) },
+};
+
 export const CustomAnswer: Story = {
   args: { questions: customQuestion },
 };
@@ -200,6 +207,20 @@ export const PersistedAnswered: Story = {
       },
     },
   },
+};
+
+export const PersistedMultiSelect: Story = {
+  args: {
+    questions: multiSelectQuestion,
+    resolution: {
+      status: "answered",
+      responses: { checks: { status: "answered", answers: ["Unit tests", "Smoke test", "Lint the changed files"] } },
+    },
+  },
+};
+
+export const PersistedCancelled: Story = {
+  args: { questions: multipleQuestions, resolution: { status: "cancelled" } },
 };
 
 export const PersistedExpired: Story = {

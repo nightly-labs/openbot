@@ -3,13 +3,19 @@ import {
   agentAutomationAllowed,
   agentNotificationLevelMap,
   assignedSkillCount,
+  type BrowserProfileSummary,
+  type BrowserProxyComputer,
+  type BrowserProxySummary,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
   type ServerNotificationLevel,
+  type TestRoutineInput,
 } from "@openbot/contracts/ipc";
 import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { BrowserProfileSelectProfile } from "@openbot/ui/features/browser/BrowserProfileSelect";
+import { browserProfileProxyNames } from "@openbot/ui/features/browser/BrowserProxies";
 import {
   type AgentInstructionsCalls,
   AgentInstructionsView,
@@ -28,19 +34,27 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import type { SkillCatalogCalls } from "../../skills-port";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
+import { filesPort } from "../files/files-port";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
-import { agentMemoriesPort } from "./memories-port";
+import { type AgentMemoriesApi, agentMemoriesPort, type MemoriesPort } from "./memories-port";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
-import { type AgentRoutinesApi, agentRoutinesPort, eventRoutinesPort, type RoutinesPort } from "./routines-port";
+import {
+  type AgentRoutinesApi,
+  agentRoutinesPort,
+  eventRoutinesPort,
+  type RoutineResultsCalls,
+  type RoutinesPort,
+} from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
 
 interface AgentSettingsPanelProps
@@ -49,10 +63,15 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles" | "notificationLevel"
   > {
   remoteClient?: boolean;
+  /** The marketplace skills catalog of a remote client. Absent, its skills show only what the host sends. */
+  skillCatalog?: SkillCatalogCalls | undefined;
   /** Routines can copy local run commands only on the computer that runs the agent. */
   localHost?: boolean;
   sessionSettingsEditable?: boolean;
-  /** The memory cap of an agent on this computer. Absent for a remote agent: its host enforces its own. */
+  /**
+   * The memory cap of the agent's server: this computer's, or a joined server's for an owner or admin.
+   * Absent for a member of a joined server: its host still refuses a memory past the cap.
+   */
   memoryLimit?: number | undefined;
   /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"] | undefined;
@@ -60,13 +79,18 @@ interface AgentSettingsPanelProps
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
-  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
+  /**
+   * The instruction file in the agent's workspace: on this computer, or on a joined server through
+   * `agent-instructions-v1` for an owner or admin.
+   */
   instructionsFile?: AgentInstructionsCalls | undefined;
   /** Opens the Instructions page, from the chat line that says the agent changed the file. */
   instructionsRequest?: { agentId: string } | null | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  onOpenRoutineRun?: ((messageId: string) => void) | undefined;
+  onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
+  /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
+  onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;
   /** The joined server that runs the agent, for the `host` skills mode. */
   skillsServerId?: string | undefined;
@@ -81,6 +105,23 @@ interface AgentSettingsPanelProps
   eventRoutines?: EventRoutinesApi | undefined;
   /** The released schedule API of a client without the desktop port. Absent, preload sends it. */
   routines?: AgentRoutinesApi | undefined;
+  /** A joined host that advertises `routine-run-place-v1` keeps where each routine runs. */
+  routineRunPlace?: boolean | undefined;
+  /** A joined host that advertises `routines-once-v1` lists and saves the routines that run once. */
+  routinesOnce?: boolean | undefined;
+  /**
+   * Gives the command that runs a routine from a script on the host: this computer, or a joined host
+   * that serves `routine-run-command-v1` to this owner or admin. The panel offers it only when the
+   * agent allows Local scripts.
+   */
+  routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
+  /**
+   * A joined server whose host serves `routine-results-v1` to this owner or admin: its id on desktop,
+   * or the calls of the web client.
+   */
+  routineResultsServerId?: string | RoutineResultsCalls | undefined;
+  /** The memory calls of a client without the desktop port. Absent there, the Memories row is hidden. */
+  memoriesApi?: AgentMemoriesApi | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
   /** Reads a file in the agent workspace, on the computer that runs the agent. */
@@ -101,6 +142,19 @@ interface AgentSettingsPanelProps
 }
 
 export type { AgentSkillsMode };
+
+/** Each named profile with the name of its proxy, as the server settings show it. */
+function profilesWithProxies(
+  state: {
+    profiles: readonly BrowserProfileSummary[] | undefined;
+    proxies: readonly BrowserProxySummary[] | undefined;
+    computers: readonly BrowserProxyComputer[] | undefined;
+  },
+  t: ReturnType<typeof useText>["t"],
+): BrowserProfileSelectProfile[] | undefined {
+  const names = browserProfileProxyNames(state.proxies ?? [], state.computers ?? [], t);
+  return state.profiles?.map((profile) => ({ ...profile, proxy: names.get(profile.id) }));
+}
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
@@ -180,7 +234,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     const current = hostChoice();
     if (!store || !manage || (!props.localHost && !current)) return undefined;
     return {
-      profiles: store.state.profiles,
+      profiles: profilesWithProxies(store.state, t),
       current,
       onChange: async (agentId, profile) => {
         const saved = await store.assign(agentId, profile);
@@ -190,14 +244,29 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       onManage: manage,
     };
   };
-  const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name, props.memoryLimit ?? null));
+  const memoriesPort = createMemo(() =>
+    agentMemoriesPort(props.agent.id, props.agent.name, props.memoryLimit ?? null, props.memoriesApi),
+  );
+  /** The web client shows memories and routines only when its runtime has their calls. */
+  const memoriesShown = () => !props.remoteClient || props.memoriesApi !== undefined;
+  const routinesShown = () => !props.remoteClient || props.routines !== undefined;
   const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,
-      props.localHost === true && agentAutomationAllowed(props.agent, props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS),
+      // A joined host sends the Local scripts switch of the agent only to an owner or admin.
+      (
+        props.localHost === true
+          ? agentAutomationAllowed(props.agent, props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS)
+          : props.agent.allowAutomation === true
+      )
+        ? props.routineRunCommand
+        : undefined,
       // Set only for the host on this computer, the one place the policy is kept.
       props.localHost === true,
       props.routines,
+      props.localHost === true || props.routineRunPlace === true,
+      props.routineResultsServerId,
+      props.localHost === true || props.routinesOnce === true,
     ),
   );
   const routinesPort = createMemo(() => {
@@ -207,13 +276,18 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       : legacyRoutinesPort();
   });
   const skillsMode = () => props.skillsMode ?? "mutable";
+  /** `undefined` uses this computer's catalog; `null` shows only what the host sends. */
+  const skillCatalog = () => (props.remoteClient ? (props.skillCatalog ?? null) : undefined);
   const tableCalls = (): SharedTableCalls => props.adminCalls?.sharedTables ?? conversationPort().agent;
   const skillCalls = () =>
     props.adminCalls?.skills ?? agentSkillCalls(skillsMode() === "host" ? props.skillsServerId : undefined);
-  const storage = createStorageUsage(() => {
-    const files = props.files;
-    return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
-  });
+  const storage = createStorageUsage(
+    () => {
+      const files = props.files;
+      return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
+    },
+    () => props.files?.calls ?? filesPort(),
+  );
   let lastSkillsMarketplaceOpen = untrack(() => props.skillsMarketplaceOpen === true);
   createEffect(
     () => panelWidth(),
@@ -278,8 +352,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       // Read here, not in the callback: a prop can be a compiled memo, and the callback has no owner.
       remoteClient: untrack(() => props.remoteClient === true),
       tablesVisible: untrack(() => props.tablesVisible !== false),
+      memories: untrack(memoriesShown),
+      routines: untrack(routinesShown),
     }),
-    ({ agentId, remoteClient, tablesVisible }) => {
+    ({ agentId, remoteClient, tablesVisible, memories, routines }) => {
       setDraft((state) => {
         state.tables.open = false;
         state.memories.open = false;
@@ -300,31 +376,30 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           });
       }
       void untrack(() => loadSkillsCount(agentId));
-      if (!remoteClient) {
-        loadMemoriesCount(agentId);
-        untrack(() => loadRoutinesCount(routinesPort()));
-      }
+      if (memories) untrack(() => loadMemoriesCount(memoriesPort()));
+      if (routines) untrack(() => loadRoutinesCount(routinesPort()));
     },
   );
 
   // The counts follow a memory or routine change, also one that the agent makes in a turn.
   createEffect(
-    () => (props.remoteClient ? null : ([currentAgentId(), memoriesPort(), routinesPort()] as const)),
-    (sources) => {
-      if (!sources) return;
-      const [agentId, memories, routines] = sources;
-      const stopMemories = memories.subscribe(() => loadMemoriesCount(agentId));
-      const stopRoutines = routines.subscribe(() => loadRoutinesCount(routines));
+    () => ({
+      memories: memoriesShown() ? memoriesPort() : null,
+      routines: routinesShown() ? routinesPort() : null,
+    }),
+    ({ memories, routines }) => {
+      const stopMemories = memories?.subscribe(() => loadMemoriesCount(memories));
+      const stopRoutines = routines?.subscribe(() => loadRoutinesCount(routines));
       return () => {
-        stopMemories();
-        stopRoutines();
+        stopMemories?.();
+        stopRoutines?.();
       };
     },
   );
 
-  function loadMemoriesCount(agentId: string): void {
-    void conversationPort()
-      .agent.listMemories(agentId)
+  function loadMemoriesCount(port: MemoriesPort): void {
+    void port
+      .list()
       .catch(() => [])
       .then((items) => {
         setDraft((state) => {
@@ -433,6 +508,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
+      onUnshownSaveError={(message) =>
+        actionToast.error(message, {
+          id: "agent-settings-save-failed",
+          report: { operation: "settings", source: "action", cause_code: "unknown" },
+        })
+      }
       detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>
@@ -447,7 +528,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           </Show>
           <Show
             when={
-              !props.remoteClient ||
+              memoriesShown() ||
               skillsMode() !== "hidden" ||
               props.tablesVisible !== false ||
               props.files ||
@@ -466,7 +547,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                 />
               </Show>
-              <Show when={!props.remoteClient}>
+              <Show when={memoriesShown()}>
                 <SettingsLinkRow
                   icon={<BookMarked aria-hidden="true" />}
                   label={t("agentSettings.links.memories")}
@@ -516,9 +597,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Show>
             </SettingsLinkGroup>
           </Show>
-          <Show when={!props.remoteClient || props.onPublish}>
+          <Show when={routinesShown() || props.onOpenUsage || props.onPublish}>
             <SettingsLinkGroup inset title={t("agentSettings.groups.does")}>
-              <Show when={!props.remoteClient}>
+              <Show when={routinesShown()}>
                 <SettingsLinkRow
                   icon={<CalendarClock aria-hidden="true" />}
                   label={t("agentSettings.links.routines")}
@@ -530,7 +611,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                 />
               </Show>
-              <Show when={!props.remoteClient && props.onOpenUsage}>
+              <Show when={props.onOpenUsage}>
                 <SettingsLinkRow
                   icon={<Gauge aria-hidden="true" />}
                   label={t("agentSettings.links.usage")}
@@ -598,6 +679,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
+            onOpenThread={props.onOpenRoutineThread}
           />
         </div>
       </Show>
@@ -642,7 +724,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           skillsMode={skillsMode()}
           serverId={props.skillsServerId}
           calls={props.adminCalls?.skills}
-          catalog={props.remoteClient ? null : undefined}
+          catalog={skillCatalog()}
           onCreateSkill={props.onCreateSkill}
           onTrySkill={props.onTrySkill}
           previewWorkspaceFile={props.previewWorkspaceFile}

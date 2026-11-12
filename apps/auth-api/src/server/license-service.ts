@@ -54,6 +54,7 @@ import type { SmtpLicenseMessage } from "./smtp-email-delivery";
 import {
   isBillingCurrency,
   isLicensePrice,
+  priceHasCurrency,
   type StripeClient,
   type StripePrice,
   StripeRequestError,
@@ -313,7 +314,8 @@ export class LicenseService {
         bundle: yield* this.#bundle(user.id),
       };
       const price = yield* this.#price(plan);
-      if (!price) return yield* licenseUnavailable();
+      // A currency such as BRL is optional: only a Price with that currency option can sell in it.
+      if (!price || !priceHasCurrency(price, request.currency)) return yield* licenseUnavailable();
       if (yield* this.#openLicense(user.id)) return yield* licenseExists();
       // The account service refuses a join above the license, so a license cannot start below the
       // people that it counts now.

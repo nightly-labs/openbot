@@ -94,7 +94,7 @@ export const messages = defineMessages("vault", {
   "vault.importMenu": "Import from CSV",
   "vault.importTitle": "Import from a CSV file",
   "vault.importDescription":
-    "Import logins from a CSV file that 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords or LastPass exports. OpenBot reads the file on this computer and does not upload it.",
+    "Import logins from a CSV file that 1Password, Bitwarden, Chrome, Edge, Firefox, Safari, Apple Passwords, LastPass or Proton Pass exports. OpenBot reads the file on this computer and does not upload it.",
   "vault.importChoose": "Choose CSV file",
   "vault.importDone": "Imported: {imported}. Skipped: {skipped}.",
   "vault.unavailableTitle": "This computer cannot keep secrets",
@@ -123,6 +123,31 @@ export const messages = defineMessages("vault", {
   "vault.request.addLogin": "Add login",
   "vault.request.addCard": "Add card",
   "vault.request.addContact": "Add address",
-  "vault.request.notNow": "Not now",
   "vault.request.saved": "Saved to Vault",
+  // Two-step (TOTP) code of a login: the live code, and the setup of its key in the login dialog.
+  "vault.twoStep.title": "Two-step code",
+  "vault.twoStep.on": "On",
+  "vault.twoStep.off": "Off. Agents ask you for the code.",
+  "vault.twoStep.setUp": "Set up",
+  "vault.twoStep.copy": "Copy code",
+  "vault.twoStep.copyFor": "Copy the two-step code for {site}: {code}",
+  "vault.twoStep.remaining": {
+    one: "{count} second until the next code",
+    other: "{count} seconds until the next code",
+  },
+  "vault.twoStep.setupTitle": "Set up two-step code",
+  "vault.twoStep.setupIntro":
+    "On {site}, turn on two-step verification with an authenticator app. When the site shows a QR code, give OpenBot its key.",
+  "vault.twoStep.keyLabel": "Setup key or otpauth:// link",
+  "vault.twoStep.keyHint": "Most sites show it under the QR code, as “Can’t scan it?” or “Enter the key manually”.",
+  "vault.twoStep.keyInvalid": "This is not a two-step key.",
+  "vault.twoStep.or": "or",
+  "vault.twoStep.chooseImage": "Choose a screenshot of the QR code",
+  "vault.twoStep.noQrCode": "No QR code was found in this image.",
+  "vault.twoStep.checkIntro": "Enter this code on {site} to finish. When the site accepts it, select Done.",
+  "vault.twoStep.checkHint": {
+    one: "The code changes every {count} second. The site also accepts the previous one.",
+    other: "The code changes every {count} seconds. The site also accepts the previous one.",
+  },
+  "vault.twoStep.theSite": "the site",
 });

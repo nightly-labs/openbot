@@ -19,6 +19,11 @@ const DEFAULT_SERVER_NOTIFICATIONS: ServerNotificationSetting = { level: "all", 
 interface StoredPreference {
   enabled: boolean;
   preview: boolean;
+  /**
+   * Whether the end of a turn in a side thread of an agent notifies (`push-notification-threads-v1`).
+   * The requests of a thread for input or an approval do not read it.
+   */
+  threadReplies: boolean;
   /** Whether notifications and the Live Activity play `sound`. Off keeps the choice for later. */
   playSound: boolean;
   sound: NotificationSound;
@@ -36,6 +41,7 @@ export const usePushNotificationPreference = create<
 >(() => ({
   enabled: true,
   preview: true,
+  threadReplies: true,
   playSound: true,
   sound: "openbot",
   servers: {},
@@ -110,8 +116,8 @@ async function save(change: (stored: StoredPreference) => StoredPreference): Pro
   const next = change(state);
   usePushNotificationPreference.setState({ ...next, saving: true });
   try {
-    const { enabled, preview, playSound, sound, servers } = next;
-    await SecureStore.setItemAsync(key, JSON.stringify({ enabled, preview, playSound, sound, servers }));
+    const { enabled, preview, threadReplies, playSound, sound, servers } = next;
+    await SecureStore.setItemAsync(key, JSON.stringify({ enabled, preview, threadReplies, playSound, sound, servers }));
   } finally {
     usePushNotificationPreference.setState({ saving: false });
   }
@@ -142,6 +148,8 @@ function decode(value: string | null): StoredPreference | null {
   return {
     enabled: parsed.enabled !== false,
     preview: parsed.preview !== false,
+    // A build from before the choice saved none: the thread replies are on.
+    threadReplies: parsed.threadReplies !== false,
     // An earlier build saved "none" as a sound.
     playSound: sound !== "none" && parsed.playSound !== false,
     sound: NOTIFICATION_SOUNDS.find((known) => known === sound) ?? "openbot",

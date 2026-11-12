@@ -18,7 +18,7 @@ import {
 } from "./dynamic-island-presentation";
 
 type ServerRuntime = DynamicIslandPresentationInput & {
-  turnProgress: Record<string, { turnId: string; detail: string } | undefined>;
+  turnProgress: Record<string, { turnId: string; detail: string; running?: boolean; activity?: string } | undefined>;
   incomingMessageAnchors: Map<string, string>;
   completedAgents: Set<string>;
   lastRecordedMessageIds: Map<string, string>;
@@ -220,6 +220,8 @@ export class DynamicIslandCoordinator {
         runtime.turnProgress[event.agentId] = {
           turnId: event.turnId,
           detail: cleanAgentMessageText(event.detail),
+          ...(event.running ? { running: true } : {}),
+          ...(event.activity ? { activity: event.activity } : {}),
         };
         return;
       case "turn-completed":
@@ -305,6 +307,50 @@ export class DynamicIslandCoordinator {
     if (action.type === "dismiss-failure" && runtime.failedTurns[action.agentId] === action.turnId) {
       runtime.dismissedFailures.set(action.agentId, action.turnId);
     }
+  }
+
+  /**
+   * The thread of the request that `presentation` shows: the question, the approval or the browser
+   * step of its agent. Null when it shows no request, or when the request is gone. The request can be
+   * of a side thread or of a channel thread, so a Live Activity link carries this thread, and a tap
+   * opens it and not only the agent's own chat.
+   */
+  requestThreadId(presentation: DynamicIslandPresentation): string | null {
+    if (presentation.mode !== "question" && presentation.mode !== "approval" && presentation.mode !== "takeover")
+      return null;
+    const runtime = this.#servers.get(presentation.serverId);
+    if (!runtime) return null;
+    const { agent, requestId } = presentation.item;
+    const same = (other: string | number) => String(other) === String(requestId);
+    if (presentation.mode === "approval") {
+      const approval = runtime.pendingApprovals[agent.id];
+      return approval && same(approval.requestId) ? approval.threadId : null;
+    }
+    const pending = runtime.pendingPrompts[agent.id];
+    if (pending?.type === "prompt")
+      return presentation.mode === "question" && same(pending.requestId) ? pending.threadId : null;
+    if (pending?.type === "browser-takeover-requested")
+      return presentation.mode === "takeover" && same(pending.request.requestId) ? pending.request.threadId : null;
+    return null;
+  }
+
+  /**
+   * The agent and the turn of the work that `presentation` shows first, or null when it shows no work
+   * or the turn has not started. The runtime work of an agent has the work of its side threads too, so
+   * the turn can run in a side thread. The caller finds that thread, and a Live Activity link then
+   * opens it.
+   */
+  workingTurn(presentation: DynamicIslandPresentation): { agentId: string; turnId: string } | null {
+    if (presentation.mode !== "working") return null;
+    const agentId = presentation.working[0]?.agent.id;
+    const runtime = this.#servers.get(presentation.serverId);
+    if (!agentId || !runtime) return null;
+    // The view shows the text of the running delivery, so the turn of that delivery comes first.
+    const running = runtime.queues[agentId]?.deliveries.find(
+      (delivery) => delivery.status === "starting" || delivery.status === "running",
+    );
+    const turnId = running?.turnId ?? runtime.activeTurns[agentId] ?? null;
+    return turnId ? { agentId, turnId } : null;
   }
 
   presentation(serverOrder: readonly string[]): DynamicIslandPresentation {

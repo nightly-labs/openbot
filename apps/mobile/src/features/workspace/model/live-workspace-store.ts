@@ -2,16 +2,21 @@ import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import type { MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
 import type { PendingApproval } from "./pending-approvals";
+import type { MobileThreadWait } from "./thread-waits";
 import type { TurnStepLines } from "./turn-step-lines";
 
 /** Workspace state that host events change many times in one turn. */
 export interface LiveWorkspaceState {
   activityByServer: Record<string, MobileAgentActivities>;
+  /** The pending requests of the agents, by server. Those with `task` are side-thread waits that the chat does not show. */
+  threadWaitsByServer: Record<string, readonly MobileThreadWait[]>;
   /** The progress lines of the newest turns, by server. The host stores none. */
   turnLinesByServer: Record<string, TurnStepLines>;
   unreadAgentIds: string[];
   /** The unread message count of each agent, from the host read state. `unreadAgentIds` decides which count. */
   unreadCounts: Record<string, number>;
+  /** The first unread message of each agent chat, from the host read state. */
+  firstUnreadMessageIds: Record<string, string | null>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   /** The host's browser tabs, by server. Absent for a host that serves no live view. */
   browserTabs: Record<string, MobileBrowserTabs>;
@@ -25,9 +30,11 @@ export interface LiveWorkspaceState {
 export class LiveWorkspaceStore {
   #state: LiveWorkspaceState = {
     activityByServer: {},
+    threadWaitsByServer: {},
     turnLinesByServer: {},
     unreadAgentIds: [],
     unreadCounts: {},
+    firstUnreadMessageIds: {},
     browserRequests: {},
     browserTabs: {},
     approvalRequests: {},

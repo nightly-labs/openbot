@@ -1,0 +1,33 @@
+{
+  "slug": "ibkr",
+  "name": "IBKR",
+  "tagline": "Brokerage account data",
+  "description": "IBKR lets agents read positions, balances, orders, and market data for the signed-in Interactive Brokers account. Each user signs in to their own Interactive Brokers account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Interactive Brokers",
+  "iconUrl": "https://www.interactivebrokers.com/images/web/favicons/home-screen-icon-192x192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-positions", "text": "Summarize my current positions and their unrealized profit and loss." },
+    { "id": "prompt-balances", "text": "What are my cash balance and buying power?" },
+    { "id": "prompt-quote", "text": "Show the latest quote and daily range for AAPL." }
+  ],
+  "apps": [
+    {
+      "id": "app-ibkr-mcp",
+      "name": "IBKR",
+      "description": "Positions, balances, orders, and market data, over Interactive Brokers' MCP server with browser sign-in.",
+      "iconUrl": "https://www.interactivebrokers.com/images/web/favicons/home-screen-icon-192x192.png",
+      "server": {
+        "name": "ibkr",
+        "transport": "http",
+        "url": "https://api.ibkr.com/v1/api/mcp-public",
+        "auth": [{ "id": "ibkr-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.interactivebrokers.com",
+  "privacyPolicyUrl": "https://www.interactivebrokers.com/en/accounts/legalDocuments/privacy.php",
+  "termsUrl": "https://www.interactivebrokers.com/en/accounts/forms-and-disclosures-client-agreements.php"
+}

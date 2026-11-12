@@ -1,9 +1,11 @@
 import type { TranslatedLocale } from "./locale";
 import type { PartialTranslation } from "./message";
+import { arMobile } from "./messages/ar/mobile";
 import { deMobile } from "./messages/de/mobile";
 import { type AppMobileMessages, enMobile } from "./messages/en/mobile";
 import { esMobile } from "./messages/es/mobile";
 import { frMobile } from "./messages/fr/mobile";
+import { heMobile } from "./messages/he/mobile";
 import { itMobile } from "./messages/it/mobile";
 import { jaMobile } from "./messages/ja/mobile";
 import { koMobile } from "./messages/ko/mobile";
@@ -15,10 +17,12 @@ import { trMobile } from "./messages/tr/mobile";
 import { zhMobile } from "./messages/zh/mobile";
 
 const catalogs = {
+  ar: arMobile,
   de: deMobile,
   es: esMobile,
   en: enMobile,
   fr: frMobile,
+  he: heMobile,
   it: itMobile,
   ja: jaMobile,
   ko: koMobile,

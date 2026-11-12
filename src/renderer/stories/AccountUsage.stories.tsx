@@ -57,6 +57,7 @@ const mixedRows = accountUsageProviderRows({
       id: "cursor",
       primary: { usedPercent: 37, windowDurationMins: 43_200, resetsAt: monthlyReset },
       secondary: { usedPercent: 82, windowDurationMins: 43_200, resetsAt: monthlyReset },
+      tertiary: { usedPercent: 60, windowDurationMins: 43_200, resetsAt: monthlyReset },
     },
     {
       id: "opencode",
@@ -83,6 +84,23 @@ const unreportedRows = accountUsageProviderRows(
     { id: "antigravity", state: "available" },
   ],
 );
+const claudeGroupOnlyRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "antigravity",
+      primary: null,
+      secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: weeklyReset },
+      groups: [
+        {
+          name: "Claude and GPT models",
+          models: ["Claude Opus", "Claude Sonnet", "GPT-OSS"],
+          primary: null,
+          secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: weeklyReset },
+        },
+      ],
+    },
+  ],
+});
 const warningRows = accountUsageProviderRows({
   limits: [
     {
@@ -123,6 +141,11 @@ export const ConnectedProviders: Story = {};
 
 export const OneProvider: Story = {
   args: { rows: oneProviderRows },
+};
+
+/** A Gemini plan for which Google sends no Gemini group: the one group still shows its name. */
+export const AntigravityClaudeGroupOnly: Story = {
+  args: { rows: claudeGroupOnlyRows },
 };
 
 export const Warning: Story = {

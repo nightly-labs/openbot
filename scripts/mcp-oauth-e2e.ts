@@ -412,6 +412,8 @@ async function startResourceServer(authorizationServer: string) {
   const hits: ResourceHit[] = [];
   const waiters: Array<() => void> = [];
   const valid = new Set(["access-on-file"]);
+  /** Refuses valid tokens too, as a server does for a tool that the account cannot use. */
+  let refusing = false;
   const sessions = new Map<string, StreamableHTTPServerTransport>();
   /** The `clientInfo` of each session, in the order the sessions started. */
   const clients: Array<ReturnType<Server["getClientVersion"]>> = [];
@@ -439,9 +441,10 @@ async function startResourceServer(authorizationServer: string) {
     }
     if (url.pathname !== "/mcp") return json(response, 404, {});
     const bearer = request.headers.authorization?.replace(/^Bearer /u, "") ?? "";
-    if (!valid.has(bearer)) {
+    if (!valid.has(bearer) || refusing) {
+      const error = refusing ? 'error="insufficient_scope", ' : "";
       response.writeHead(401, {
-        "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource${url.pathname}"`,
+        "www-authenticate": `Bearer ${error}resource_metadata="${base}/.well-known/oauth-protected-resource${url.pathname}"`,
       });
       return response.end();
     }
@@ -471,6 +474,9 @@ async function startResourceServer(authorizationServer: string) {
     hits,
     clients,
     valid,
+    setRefusing: (refuse: boolean) => {
+      refusing = refuse;
+    },
     /** Resolves when the hits satisfy `done`, and fails at the deadline. */
     waitFor: (done: () => boolean, what: string) =>
       new Promise<void>((resolveWait, reject) => {
@@ -732,7 +738,8 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       websiteUrl: "https://openbot.run",
     });
     assert.deepEqual(resource.clients.at(-1), openbotClient("OpenBot"));
-    assert.ok(upstream.every((hit) => hit.userAgent === "OpenBot/9.9.9-e2e"));
+    // n8n answers each `User-Agent` with "bot" in it with an empty 204 (#6497).
+    assert.ok(upstream.every((hit) => !/bot/iu.test(hit.userAgent ?? "")));
     const titleOf = async (route: { url: string; bearer: string }) => {
       const before = resource.clients.length;
       const named = await connect(route.url, route.bearer);
@@ -763,7 +770,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       controlCharacters: "Ops Bot (OpenBot)",
       renamed: "Renamed Bot (OpenBot)",
       unknownAgent: "OpenBot",
-      userAgent: "OpenBot/9.9.9-e2e",
+      userAgentWithoutBot: true,
       crossAgentBearers: 403,
     };
 
@@ -832,6 +839,36 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(!resource.hits.some((hit) => hit.path.includes("account")), "The account fragment went upstream.");
     const accountRefresh = { ownSignInRefreshed: true, fragmentUpstream: false };
 
+    // The server refuses a call with a sign-in that is still good (#6914): it refuses the renewed
+    // token too. The agent reads that the sign-in is active, not that it ended, and the row keeps it.
+    const staleToken = () => {
+      const current = records.get(direct.url);
+      assert.ok(current?.tokens);
+      records.set(direct.url, { ...current, tokens: { ...current.tokens, access_token: "access-stale" } });
+    };
+    const refusedCall = (text: string) =>
+      client.callTool({ name: "echo", arguments: { text } }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+    resource.setRefusing(true);
+    staleToken();
+    const refusal = await refusedCall("refused");
+    assert.ok(refusal instanceof McpError, "The refused call did not fail with a JSON-RPC error.");
+    assert.equal(refusal.code, -32001);
+    assert.ok(refusal.message.includes(sourceText("error.backend.mcpOAuthRequestRefused")), refusal.message);
+    assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated", "The refusal ended the sign-in.");
+    // A renewal that does not reach the authorization server proves nothing: the sign-in has ended for now.
+    staleToken();
+    auth.setTokenMode("drop");
+    const unrenewed = await refusedCall("unrenewed");
+    auth.setTokenMode("rotate");
+    resource.setRefusing(false);
+    assert.ok(unrenewed instanceof McpError, "The unrenewed call did not fail with a JSON-RPC error.");
+    assert.ok(unrenewed.message.includes(sourceText("error.backend.mcpOAuthSignInNeeded")), unrenewed.message);
+    assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "again" } })), "again");
+    const refusedWithSignIn = { code: refusal.code, signInKept: true, unrenewedSaysEnded: true };
+
     // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
@@ -842,6 +879,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     );
     assert.ok(failure instanceof McpError, "The call after a sign-out did not fail with a JSON-RPC error.");
     assert.equal(failure.code, -32001);
+    assert.ok(failure.message.includes(sourceText("error.backend.mcpOAuthSignInNeeded")), failure.message);
     assert.equal(resource.hits.filter((hit) => hit.method === "POST").length, postsBefore);
     assert.ok(!resource.hits.slice(hitsAtSignOut).some((hit) => hit.path.startsWith("/.well-known")));
     const signedOut = { code: failure.code, upstreamRequests: 0, discoveryRequests: 0 };
@@ -909,6 +947,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       refused,
       midSessionRefresh,
       accountRefresh,
+      refusedWithSignIn,
       signedOut,
       expiredWithoutRefresh,
       restart,

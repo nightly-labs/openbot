@@ -1,5 +1,5 @@
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
-import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -69,6 +69,8 @@ const AgentActions = createSimpleContext({
       userHiddenAgents,
       userHiddenAgentIds,
       applyUserHiddenAgents,
+      ownAgentLevels,
+      applyOwnAgentLevels,
     } = useAgents();
     const { initializeConversation, removeConversation } = useConversation();
     const threads = useAgentThreads();
@@ -81,9 +83,10 @@ const AgentActions = createSimpleContext({
 
     /** Asks the host for the agent. */
     function requestNewAgent(draft: NewAgentDraft) {
-      const createModelSupported =
-        activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
-      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported));
+      const local = activeServer()?.kind !== "remote";
+      const createModelSupported = local || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
+      const welcomeSupported = local || activeServerSupportsCapability(AGENT_WELCOME_CAPABILITY);
+      return agentsPort().agent.createAgent(newAgentInput(draft, createModelSupported, welcomeSupported));
     }
 
     /** Synchronous, so a caller that also selects the agent does both in the same update. */
@@ -414,6 +417,36 @@ const AgentActions = createSimpleContext({
       }
     }
 
+    /**
+     * Mutes an agent for the user, or gives it the server level again. The menu shows the change at
+     * once, and the server's answer then replaces the levels. If the server refuses, the level of
+     * this agent goes back. The server keeps the level for all devices of the user.
+     */
+    async function setAgentMuted(agentId: string, muted: boolean): Promise<void> {
+      const previous = ownAgentLevels().get(agentId) ?? null;
+      const level = muted ? "nothing" : null;
+      if (previous === level) return;
+      const serverId = activeServerId();
+      const withLevel = (next: typeof previous) => ({
+        agents: [
+          ...[...ownAgentLevels()].flatMap(([id, own]) => (id === agentId ? [] : [{ agentId: id, level: own }])),
+          ...(next ? [{ agentId, level: next }] : []),
+        ],
+      });
+      applyOwnAgentLevels(withLevel(level));
+      try {
+        applyOwnAgentLevels(await agentsPort().agent.setAgentNotificationLevel({ agentId, level }, serverId));
+      } catch (error) {
+        if (!scopeIsCurrent()) return;
+        applyOwnAgentLevels(withLevel(previous));
+        const { t, errorMessage } = currentText();
+        actionToast.error(t("agent.error.muteFailed"), {
+          description: errorMessage(error, t("agent.error.hiddenFailed")),
+          report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
+        });
+      }
+    }
+
     return {
       createAgent,
       createAgentInPlace,
@@ -423,6 +456,7 @@ const AgentActions = createSimpleContext({
       duplicatingSectionIds,
       deleteAgent,
       setAgentHiddenByUser,
+      setAgentMuted,
     };
   },
 });

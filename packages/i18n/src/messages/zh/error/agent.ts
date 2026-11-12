@@ -4,7 +4,15 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "该请求的历史记录不可用，请重新读取最近的历史，或在频道工作中使用 channel_history。",
+  "error.agent.historyArgumentsInvalid":
+    "历史记录参数不正确：{detail} 请更正参数后重试。openbot.tool_describe 可提供架构。",
   "error.agent.toolRequestInvalid": "工具发现参数无效。请使用声明的 schema 和原始的完整工具名。",
+  "error.agent.toolCallArgumentsNotObject":
+    "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
+  "error.agent.toolCallDiscoveryTool":
+    "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
@@ -39,6 +47,7 @@ export const messages = {
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
+  "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
     "{provider} 没有可用模型，其他已登录的服务商也没有。请登录某个服务商，或在“服务器设置 → 服务商”中更改默认服务商。",
   "error.agent.noStartingModel":
@@ -47,6 +56,7 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange": "该助手的任务正在运行，请等它们结束或先停止它们，再更改服务商。",
   "error.agent.waitBeforeClearContext": "请等当前轮次和队列结束后再开始新对话。",
   "error.agent.waitBeforeCompactContext": "请等当前轮次和队列结束后再压缩上下文。",
+  "error.agent.waitBeforeDeleteHistory": "请等当前轮次和队列结束后再删除历史记录。",
   "error.agent.compactContextUnavailable": "该助手现在无法压缩上下文。",
   "error.agent.unknown": "未知助手：{id}",
   "error.agent.onlyUserWidensSettings": "只有用户可以给助手完全访问权限或开启 Computer Use，请让用户在助手设置中修改。",
@@ -61,6 +71,8 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.compactionConnectionLost":
+    "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",
@@ -89,6 +101,9 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "只有运行该助手的电脑才能更改该设置。",
   "error.agent.sideQuestionBusy": "同时进行的旁问过多，请稍后重试。",
   "error.agent.sideQuestionFailed": "助手无法回答旁问，请重试。",
+  "error.agent.webSearchSignIn": "网页搜索需要使用 ChatGPT 账号登录 Codex。",
+  "error.agent.webSearchBusy": "正在运行的搜索和旁支问题过多。请稍后重试。",
+  "error.agent.webSearchFailed": "网页搜索未完成。请重试。",
   "error.agent.busyMessageModeLocalOnly": "忙碌时消息的处理方式只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsLocalOnly": "备用模型只能在运行该助手的电脑上设置。",
   "error.agent.taskLimitLocalOnly": "任务并发数只能在运行该助手的电脑上设置。",
@@ -114,6 +129,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerBuiltIn":
+    "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
   "error.agent.screenCaptureWindowMissing": "该窗口当前未打开，请调用 list_capture_sources 获取当前窗口 ID。",
   "error.agent.screenCaptureDisplayMissing": "该显示器当前未连接，请调用 list_capture_sources 获取当前显示器 ID。",

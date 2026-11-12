@@ -97,7 +97,9 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack のメンションとダイレクトメッセージ",
   "marketplace.app.discordTagline": "Discord のメンションとダイレクトメッセージ",
   "marketplace.app.telegramTagline": "Telegram のグループとダイレクトチャット",
+  "marketplace.app.whatsappTagline": "WhatsApp の自分のチャットと、許可した人",
   "marketplace.app.bitwardenTagline": "共有フォルダーのログイン情報でサイトにサインイン",
+  "marketplace.app.protonPassTagline": "共有保管庫のログイン情報でサイトにサインイン",
   "marketplace.app.onePasswordCategory": "ログインと認証情報の管理",
   "marketplace.app.yourApps": "あなたのアプリ",
   "marketplace.app.addCustom": "カスタムを追加",
@@ -114,6 +116,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
   "marketplace.app.connection": "接続",
+  "marketplace.app.access.use": "使用可能",
+  "marketplace.app.access.noAgents": "エージェントなし",
+  "marketplace.app.access.agentsOf": "{name} を使用できるエージェント",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}。エージェントを選択",
+  "marketplace.app.access.level": "{name} に対する {role} のアクセス",
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
@@ -121,6 +128,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} デスクトップアプリの {address} で動作します。",
   "marketplace.app.setup.desktopConnected": "{address} に接続済みです。",
   "marketplace.app.setup.open": "サインインもキーも不要です。",
+  "marketplace.app.blocked.update":
+    "{host} の OpenBot は古いバージョンのため、アプリを接続できません。{host} の OpenBot をアップデートするか、オーナーにアップデートを依頼してください。",
+  "marketplace.app.blocked.member":
+    "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
@@ -190,6 +201,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
+  "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs の Honcho は、接続した他の AI ツールとも共有できる、あなたについての長期記憶をエージェントに与えます。エージェントは学んだことを保存し、Honcho はそれをもとに推論して、あなたの好み、目標、仕事の進め方のモデルを作ります。エージェントは作業を始める前に Honcho に質問します。OpenBot のエージェントにも独自の記憶があります。Honcho は他のツールでもあなたについていく記憶です。エージェントが保存したメッセージはあなたの Honcho アカウントに送られます。",
+  "marketplace.plugin.honcho.app": "1 つの MCP サーバーで、Honcho のワークスペースに長期記憶を保存して照会します。",
+  "marketplace.plugin.honcho.prompt.recall":
+    "始める前に、私の好きな仕事の進め方について Honcho が何を知っているか聞いてください。",
+  "marketplace.plugin.honcho.prompt.save": "このスレッドの決定事項を Honcho に保存してください。",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho は私の文章のスタイルについて何と言っていますか？この下書きに活かしてください。",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev でキーを作成してください。",
+  "marketplace.plugin.hindsight.tagline": "時間とともに学ぶ記憶",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize の Hindsight は、Hindsight Cloud にある長期記憶をエージェントに与えます。エージェントは事実や出来事を保持し、意味、時間、エンティティで呼び出し、それを振り返ってメンタルモデルを作ります。記憶はバンクに保管され、エージェントはプロジェクトや人ごとにバンクを作れます。OpenBot のエージェントにも独自の記憶があります。Hindsight は接続した他の AI ツールと共有できる記憶です。エージェントが保持した内容はあなたの Hindsight Cloud アカウントに送られます。",
+  "marketplace.plugin.hindsight.app":
+    "1 つの MCP サーバーで、Hindsight Cloud のバンクにある記憶を保持、呼び出し、振り返ります。",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "始める前に、このプロジェクトについて分かっていることを Hindsight から呼び出してください。",
+  "marketplace.plugin.hindsight.prompt.retain": "このスレッドの決定事項と未解決の質問を Hindsight に保持してください。",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "私の Hindsight の記憶を振り返ってください。この 1 か月の私の仕事にどんなパターンがありますか？",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",
   "marketplace.plugin.figma.description":
     "Figma を使うと、エージェントはデザインファイルを読み取り、コンポーネント、スタイル、変数を調べ、本番用の仕様をエンジニアに渡せます。このコンピューターの Figma デスクトップアプリにある MCP サーバーに接続します。サーバーはデザインの読み取りのみ可能で、書き込みには現在対応中です。",
@@ -210,6 +242,26 @@ export const messages = {
     "このリポジトリのスタイルを使って、Paper で設定ページをデザインしてください。",
   "marketplace.plugin.paper.prompt.tokens":
     "開いている Paper のファイルにあるデザイントークンを一覧にして、私たちのテーマと比較してください。",
+  "marketplace.plugin.higgsfield.tagline": "AI による画像、動画、音声",
+  "marketplace.plugin.higgsfield.description":
+    "Higgsfield を使うと、エージェントは Seedance、Kling、Veo、MiniMax Hailuo などの Higgsfield モデルで画像、動画、キャラクター、音声を生成し、クレジット残高を確認し、Asset Library を閲覧できます。結果はユーザーの Higgsfield Assets に保存されます。各ユーザーはブラウザで自分の Higgsfield アカウントにサインインします。生成のたびに、そのアカウントのクレジットが標準料金で使われます。無制限プランでも同じです。",
+  "marketplace.plugin.higgsfield.app":
+    "Higgsfield の MCP サーバー経由で、画像・動画・音声の生成、キャラクター、クレジット、アセットを扱います。ブラウザでサインインします。",
+  "marketplace.plugin.higgsfield.prompt.credits": "Higgsfield のクレジットは何残っていますか？",
+  "marketplace.plugin.higgsfield.prompt.productShot":
+    "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
+  "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
+  "marketplace.plugin.elevenlabs.description":
+    "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",
+  "marketplace.plugin.elevenlabs.app":
+    "テキスト読み上げ、ボイス、音声エージェントの管理。ブラウザーでサインインする ElevenLabs の MCP サーバー経由です。",
+  "marketplace.plugin.elevenlabs.prompt.speech":
+    "この段落を落ち着いた ElevenLabs のボイスで読み上げて、音声をください。",
+  "marketplace.plugin.elevenlabs.prompt.agents":
+    "私の ElevenLabs 音声エージェントと、それぞれが使うボイスを一覧にしてください。",
+  "marketplace.plugin.elevenlabs.prompt.conversations":
+    "サポート用音声エージェントの直近 10 件の会話を要約してください。",
   "marketplace.plugin.appleApps.tagline": "Mac のメール、カレンダーなど",
   "marketplace.plugin.appleApps.description":
     "Apple apps を使うと、エージェントはこの Mac のメール、カレンダー、連絡先、リマインダー、メモ、メッセージ、Safari を使えます。macOS でのみ動作します。OpenBot は mcp-icloud を起動します。これは Apple や OpenBot が作ったものではない、コミュニティのサーバーです。サーバーはこのコンピューター上で AppleScript を使ってアプリを操作し、アカウントもキーも不要です。インストール時に、OpenBot はこれらすべてのアプリへのアクセスを macOS にまとめて求めることができます。確認はアプリごとに 1 回表示されます。求めない場合は、エージェントが初めてアプリを使うときに macOS が確認します。後で変更するには、システム設定 › プライバシーとセキュリティ › オートメーション を開いてください。エージェントはメールや iMessage を送信し、イベント、連絡先、リマインダーを変更・削除できるので、承認する前に各書き込みを確認してください。ツールが読んだ内容（メールの本文など）は、エージェントのモデルプロバイダーに送られます。",
@@ -228,6 +280,15 @@ export const messages = {
   "marketplace.plugin.sentry.prompt.topCrash":
     "モバイルプロジェクトで最も多いクラッシュと、その原因として考えられるものを説明してください。",
   "marketplace.plugin.sentry.prompt.releaseHealth": "現在のリリースは前回と比べてどのくらい健全ですか？",
+  "marketplace.plugin.gitlab.tagline": "Issue、マージリクエスト、パイプライン",
+  "marketplace.plugin.gitlab.description":
+    "GitLab を使うと、エージェントは GitLab.com でプロジェクトを検索し、Issue を読んで作成し、マージリクエストをレビューして更新し、リポジトリーのファイルとコミットを読み、CI パイプラインとジョブを確認できます。各ユーザーはブラウザーで自分の GitLab アカウントにサインインします。エージェントにはユーザーと同じ権限があり、コミットのプッシュ、Issue とマージリクエストの変更、マージができます。セルフホストの GitLab では、MCP サーバーの設定で GitLab のアドレスの後に /api/v4/mcp を付けたサーバーを追加し、そこでサインインしてください。",
+  "marketplace.plugin.gitlab.app":
+    "プロジェクト、Issue、マージリクエスト、リポジトリー、CI パイプラインを、ブラウザーでサインインする GitLab の MCP サーバーで提供します。",
+  "marketplace.plugin.gitlab.prompt.reviewQueue": "自分のレビューを待っているマージリクエストはどれですか？",
+  "marketplace.plugin.gitlab.prompt.failedPipeline": "デフォルトブランチの最新のパイプラインはなぜ失敗したのですか？",
+  "marketplace.plugin.gitlab.prompt.newIssue":
+    "同期キューのクラッシュについて、再現手順を付けて Issue を作成してください。",
   "marketplace.plugin.vercel.tagline": "デプロイ、ビルドログ、プロジェクト",
   "marketplace.plugin.vercel.description":
     "Vercel を使うと、エージェントはプロジェクトと最近のデプロイを一覧表示し、ビルドログとランタイムログを読み、ビルドが失敗した理由を調べられます。各ユーザーはブラウザーで自分の Vercel アカウントにサインインし、エージェントが使えるチームを選びます。それらのチームでは、エージェントはユーザーのアカウントと同じ権限を持ちます。環境変数、ドメイン、DNS レコード、デプロイの変更や、ドメインの購入もできます。",
@@ -270,6 +331,19 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.payment": "この決済を調べて、失敗した理由を説明してください。",
   "marketplace.plugin.stripe.prompt.customer": "この顧客の請求書と未払い残高をまとめてください。",
   "marketplace.plugin.stripe.prompt.link": "Pro プランの月額 49 の支払いリンクの下書きを作成してください。",
+  "marketplace.plugin.revenuecat.tagline": "サブスクリプション、プロダクト、ペイウォール",
+  "marketplace.plugin.revenuecat.description":
+    "RevenueCat を使うと、エージェントはアプリ内サブスクリプションの設定を読み取り、変更できます。対象はアプリ、プロダクト、エンタイトルメント、オファリング、パッケージ、ペイウォール、実験です。エージェントは顧客とその購入を調べ、チャートと指標を読むこともできます。RevenueCat のシークレット API キーは 1 つの Authorization ヘッダーに入ります。キーが使えるのは 1 つのプロジェクトです。読み取り専用キーでは、エージェントは読み取りだけができます。書き込みキーでは、エージェントはプロダクトを App Store の審査に提出し、顧客にエンタイトルメントを付与し、パッケージ、ターゲティングルール、Webhook を削除できます。",
+  "marketplace.plugin.revenuecat.app":
+    "RevenueCat の MCP サーバーとシークレット API キーで使う、プロダクト、エンタイトルメント、オファリング、ペイウォール、指標。",
+  "marketplace.plugin.revenuecat.prompt.offerings":
+    "私の RevenueCat プロジェクトにはどのオファリングとパッケージがありますか？",
+  "marketplace.plugin.revenuecat.prompt.revenue":
+    "今月、RevenueCat の収益とアクティブなサブスクリプションはどう変わりましたか？",
+  "marketplace.plugin.revenuecat.prompt.customer":
+    "この RevenueCat の顧客にはどのエンタイトルメントがあり、いつ期限が切れますか？",
+  "marketplace.plugin.revenuecat.hint.apiKey":
+    "RevenueCat のダッシュボードでプロジェクトの API keys を開き、シークレット API キーを作成します。データを見るだけなら読み取り専用キーで十分です。",
   "marketplace.plugin.posthog.tagline": "プロダクト分析とフラグ",
   "marketplace.plugin.posthog.description":
     "PostHog を使うと、エージェントはイベントとファネルを照会し、フィーチャーフラグを調べ、リリース後に何が変わったかをまとめられます。プロジェクト設定の個人用 API キーを 1 つの Authorization ヘッダーに入れます。",
@@ -322,15 +396,32 @@ export const messages = {
   "marketplace.plugin.resend.prompt.send": "ローンチのお知らせの下書きをベータリストに送信してください。",
   "marketplace.plugin.resend.prompt.status": "請求書のメールは顧客に届きましたか？",
   "marketplace.plugin.resend.prompt.template": "新しいフロー用のパスワードリセットメールの下書きを作成してください。",
-  "marketplace.plugin.composio.tagline": "自分の Composio リンクで多数のアプリを利用",
+  "marketplace.plugin.omnisend.tagline": "メールとSMSのマーケティング",
+  "marketplace.plugin.omnisend.description":
+    "Omnisend を使うと、エージェントはキャンペーンとフォームのレポートを読み、連絡先とセグメントを探し、キャンペーン、オートメーション、メールテンプレート、フォーム、商品を作成・編集できます。各ユーザーはブラウザで自分の Omnisend アカウントにサインインし、同意画面でアクセスレベルを選びます。書き込みアクセスがあると、エージェントはキャンペーンの送信やデータの削除もできます。レポートだけが必要な場合は読み取り専用アクセスを選んでください。",
+  "marketplace.plugin.omnisend.app":
+    "キャンペーン、オートメーション、連絡先、セグメント、フォーム、レポート。ブラウザでサインインし、Omnisend の MCP サーバー経由で使います。",
+  "marketplace.plugin.omnisend.prompt.lastCampaign": "先週のキャンペーンの成果は、その前の週と比べてどうでしたか?",
+  "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
+  "marketplace.plugin.omnisend.prompt.draftCampaign":
+    "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
+  "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.postiz.description":
+    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.postiz.app":
+    "ブラウザでのサインインまたは API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz に接続されている SNS チャンネルはどれですか?",
+  "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
+  "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
-    "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など数百のアプリに接続します。Composio アカウントで使いたいアプリを接続し、その MCP URL と API キーをここに貼り付けてください。",
+    "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",
   "marketplace.plugin.composio.app":
-    "Composio MCP サーバーに追加したアプリを、Composio アカウントのリンクで提供します。",
+    "Composio アカウントで接続したアプリです。エージェントは必要になったときにアプリの接続を求めます。",
   "marketplace.plugin.composio.prompt.inbox": "未読メールをまとめて、急ぎのものに返信の下書きを作成してください。",
   "marketplace.plugin.composio.prompt.handoff": "このプルリクエストの概要をチームのチャンネルに投稿してください。",
   "marketplace.plugin.composio.prompt.apps": "Composio で使えるアプリと操作はどれですか？",
-  "marketplace.plugin.composio.hint.url": "Composio アカウントにある MCP サーバーの URL",
   "marketplace.plugin.composio.hint.apiKey": "Composio アカウントの Settings > Sessions & API Key で確認できます。",
   "marketplace.plugin.neon.tagline": "Postgres のプロジェクト、ブランチ、マイグレーション",
   "marketplace.plugin.neon.description":
@@ -395,6 +486,14 @@ export const messages = {
   "marketplace.plugin.todoist.prompt.today": "今日が期限の Todoist タスクはどれですか？",
   "marketplace.plugin.todoist.prompt.capture": "これらのアクション項目を Todoist のインボックスに追加してください。",
   "marketplace.plugin.todoist.prompt.overdue": "期限切れの Todoist タスクを明日に移してください。",
+  "marketplace.plugin.ticktick.tagline": "タスク、リスト、習慣、集中",
+  "marketplace.plugin.ticktick.description":
+    "TickTick を使うと、エージェントはタスクを検索・絞り込み、タスクを追加・変更し、リスト、セクション、フォルダー、タグ、コメントを管理できます。習慣と集中記録の読み取りと変更、TickTick に接続したカレンダーの予定の読み取りもできます。各ユーザーはブラウザーで自分の TickTick アカウントにサインインします。エージェントには読み取りと書き込みのアクセス権があり、タスクの完了、移動、削除、タグと集中記録の削除ができます。",
+  "marketplace.plugin.ticktick.app":
+    "タスク、リスト、習慣、集中記録を、ブラウザーでのサインインで TickTick の MCP サーバー経由で扱います。",
+  "marketplace.plugin.ticktick.prompt.today": "今日が期限の TickTick タスクはどれですか？",
+  "marketplace.plugin.ticktick.prompt.capture": "これらのアクション項目を TickTick の受信箱に追加してください。",
+  "marketplace.plugin.ticktick.prompt.week": "先週完了した TickTick タスクはどれですか？",
   "marketplace.plugin.trello.tagline": "ボード、リスト、カード",
   "marketplace.plugin.trello.description":
     "Trello を使うと、エージェントはボード、リスト、カード、チェックリスト、コメントを検索して読み、ボードとカードを作成し、リストとカードを移動し、カードを完了にし、チェックリスト、コメント、ラベルを追加できます。また、ユーザーの Trello インボックスのカードを読んで追加し、Planner の予定を読むこともできます。予定は、接続された Google または Outlook のカレンダーから来ることがあります。各ユーザーはブラウザーで自分の Trello アカウントにサインインし、同意画面でワークスペースを選びます。エージェントには、それらのワークスペースでユーザーと同じ権限があります。カードとリストをアーカイブできますが、サーバーは何も完全には削除できません。",
@@ -413,6 +512,23 @@ export const messages = {
     "これらのアクション項目で ClickUp タスクを作成し、私に割り当ててください。",
   "marketplace.plugin.clickup.prompt.summarizeDoc":
     "ClickUp で最新のプロジェクト更新を探し、未解決の質問を要約してください。",
+  "marketplace.plugin.coinbase.tagline": "暗号資産の価格、ポートフォリオ、取引",
+  "marketplace.plugin.coinbase.description":
+    "Coinbase を使うと、エージェントは Coinbase Advanced Trade の価格、残高、ポートフォリオ、注文、手数料を読み取り、注文のプレビューと発注、資産間の交換、ポートフォリオ間の資金移動ができます。各ユーザーはブラウザで自分の Coinbase アカウントにサインインします。エージェントにはユーザーと同じ権限があります。注文と交換には実際の資金が使われ、エージェントは USDC 残高から x402 リクエストの支払いもできます。",
+  "marketplace.plugin.coinbase.app":
+    "価格、残高、ポートフォリオ、注文、交換。Coinbase の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.coinbase.prompt.balances": "各ポートフォリオの Coinbase 残高を教えてください。",
+  "marketplace.plugin.coinbase.prompt.price": "Coinbase の BTC-USD 価格と今週の値動きを見せてください。",
+  "marketplace.plugin.coinbase.prompt.previewOrder":
+    "Coinbase で ETH を 50 USD 分成行買いする注文をプレビューしてください。発注はしないでください。",
+  "marketplace.plugin.robinhood.tagline": "証券口座とエージェントによる取引",
+  "marketplace.plugin.robinhood.description":
+    "Robinhood を使うと、エージェントは Robinhood 顧客の口座、ポジション、残高、取引履歴、ウォッチリストと市場データを読み取り、株式、オプション、暗号資産の注文を出せます。各ユーザーはブラウザで自分の Robinhood アカウントにサインインします。最初のサインイン時に、Robinhood は別の Agentic 口座を開くようユーザーに求めます。エージェントが取引できるのはその口座だけで、初期設定では注文ごとにユーザーの承認を求めずに発注します。",
+  "marketplace.plugin.robinhood.app":
+    "口座、ポジション、市場データ、取引。Robinhood の MCP サーバーとブラウザでのサインインを使います。",
+  "marketplace.plugin.robinhood.prompt.positions": "Robinhood のポジションと今日の値動きをまとめてください。",
+  "marketplace.plugin.robinhood.prompt.watchlist": "Robinhood のウォッチリストの各銘柄は今週どう動きましたか？",
+  "marketplace.plugin.robinhood.prompt.agenticCash": "Robinhood の Agentic 口座には現金がいくらありますか？",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",
@@ -423,7 +539,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "気象の時系列データセットを探して、その列を見せてください。",
   "marketplace.auth.apiKey": "API キー",
   "marketplace.auth.personalApiKey": "個人用 API キー",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "キーを作成",
 
   "marketplace.skill.doc": "SKILL.md",

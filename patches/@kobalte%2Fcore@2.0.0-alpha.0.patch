@@ -313,7 +313,7 @@ index 6b8a3617f27946fec9535b14e108400de48a4bf2..a85c7f25ba6bcba2378334683a24ccec
  				return nextItems;
  			});
 diff --git a/dist/create-list-state/C8P6E0Wr.js b/dist/create-list-state/C8P6E0Wr.js
-index 3a1c10db9009ce119539b2c8eb8d63b29f880d43..0defd369d272b01114acb420fcbb88f56c85eae5 100644
+index 3a1c10db9009ce119539b2c8eb8d63b29f880d43..8bd3c81bcc100b43d6e8da73f432410a4fe9ad95 100644
 --- a/dist/create-list-state/C8P6E0Wr.js
 +++ b/dist/create-list-state/C8P6E0Wr.js
 @@ -1,7 +1,7 @@
@@ -325,16 +325,30 @@ index 3a1c10db9009ce119539b2c8eb8d63b29f880d43..0defd369d272b01114acb420fcbb88f5
  import { access } from "@solid-primitives/utils";
  import { callHandler } from "@kobalte/utils";
  import { isAppleDevice, isMac } from "@solid-primitives/platform";
-@@ -361,7 +361,7 @@ function createSelectableCollection(props, ref, scrollRef) {
+@@ -361,8 +361,9 @@ function createSelectableCollection(props, ref, scrollRef) {
  	};
  	onSettled(() => {
  		if (mergedProps.deferAutoFocus) setTimeout(tryAutoFocus, 0);
 -		else tryAutoFocus();
 +		else untrack(tryAutoFocus);
  	});
++	let shownIn;
  	createEffect(() => [
  		finalScrollRef(),
-@@ -448,8 +448,8 @@ function createSelectableItem(props, ref) {
+ 		access(mergedProps.isVirtualized),
+@@ -370,6 +371,11 @@ function createSelectableCollection(props, ref, scrollRef) {
+ 	], ([scrollEl, isVirtualized, focusedKey]) => {
+ 		if (isVirtualized) focusedKey && mergedProps.scrollToKey?.(focusedKey);
+ 		else if (focusedKey && scrollEl) {
++			// A new list starts at its first item. Scrolling to that item without focus only lays out the page.
++			if (scrollEl !== shownIn) {
++				shownIn = scrollEl;
++				if (untrack(() => !access(mergedProps.selectionManager).isFocused() && focusedKey === access(mergedProps.selectionManager).collection().getFirstKey())) return;
++			}
+ 			const element = scrollEl.querySelector(`[data-key="${focusedKey}"]`);
+ 			if (element) element.scrollIntoView({ block: "nearest" });
+ 		}
+@@ -448,8 +454,8 @@ function createSelectableItem(props, ref) {
  		manager().focusedKey(),
  		manager().isFocused()
  	], ([refEl, itemKey, virtualFocus, focusedKey, isFocused]) => {
@@ -346,7 +360,7 @@ index 3a1c10db9009ce119539b2c8eb8d63b29f880d43..0defd369d272b01114acb420fcbb88f5
  	return {
  		isSelected,
 diff --git a/dist/create-list-state/CgkAj-2j.jsx b/dist/create-list-state/CgkAj-2j.jsx
-index 459d60819480f18a86c3b292291761620c37ffad..4ab66e7b0e016c45fda73d55134eb77d21f1b785 100644
+index 459d60819480f18a86c3b292291761620c37ffad..fd2ce6d7b83458dbfb195b4fb21bf1980c460702 100644
 --- a/dist/create-list-state/CgkAj-2j.jsx
 +++ b/dist/create-list-state/CgkAj-2j.jsx
 @@ -1,7 +1,7 @@
@@ -358,16 +372,30 @@ index 459d60819480f18a86c3b292291761620c37ffad..4ab66e7b0e016c45fda73d55134eb77d
  import { access } from "@solid-primitives/utils";
  import { callHandler } from "@kobalte/utils";
  import { isAppleDevice, isMac } from "@solid-primitives/platform";
-@@ -361,7 +361,7 @@ function createSelectableCollection(props, ref, scrollRef) {
+@@ -361,8 +361,9 @@ function createSelectableCollection(props, ref, scrollRef) {
  	};
  	onSettled(() => {
  		if (mergedProps.deferAutoFocus) setTimeout(tryAutoFocus, 0);
 -		else tryAutoFocus();
 +		else untrack(tryAutoFocus);
  	});
++	let shownIn;
  	createEffect(() => [
  		finalScrollRef(),
-@@ -448,8 +448,8 @@ function createSelectableItem(props, ref) {
+ 		access(mergedProps.isVirtualized),
+@@ -370,6 +371,11 @@ function createSelectableCollection(props, ref, scrollRef) {
+ 	], ([scrollEl, isVirtualized, focusedKey]) => {
+ 		if (isVirtualized) focusedKey && mergedProps.scrollToKey?.(focusedKey);
+ 		else if (focusedKey && scrollEl) {
++			// A new list starts at its first item. Scrolling to that item without focus only lays out the page.
++			if (scrollEl !== shownIn) {
++				shownIn = scrollEl;
++				if (untrack(() => !access(mergedProps.selectionManager).isFocused() && focusedKey === access(mergedProps.selectionManager).collection().getFirstKey())) return;
++			}
+ 			const element = scrollEl.querySelector(`[data-key="${focusedKey}"]`);
+ 			if (element) element.scrollIntoView({ block: "nearest" });
+ 		}
+@@ -448,8 +454,8 @@ function createSelectableItem(props, ref) {
  		manager().focusedKey(),
  		manager().isFocused()
  	], ([refEl, itemKey, virtualFocus, focusedKey, isFocused]) => {

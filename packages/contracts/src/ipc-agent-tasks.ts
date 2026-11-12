@@ -1,13 +1,19 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
-import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
+import {
+  type ConversationReadState,
+  type ConversationSnapshot,
+  isConversationReadState,
+  isConversationSnapshot,
+} from "./ipc-conversations";
+import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
 export const AGENT_TASK_LIMIT_MAX = 4;
 /** The task limit of an agent that has no limit of its own. */
-export const AGENT_TASK_LIMIT_DEFAULT = 2;
+export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
@@ -82,6 +88,11 @@ export interface AgentTask {
   error: string | null;
   /** The messages that wait to start in this task, oldest first. */
   queuedMessages: AgentTaskQueuedMessage[];
+  /**
+   * The same messages in full, with their files and state, for the queue of the thread. Only this
+   * computer sends it: the frozen `agent-tasks-v1` routes carry `queuedMessages` alone.
+   */
+  queue?: QueueDelivery[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -90,6 +101,11 @@ export interface AgentTask {
    * Absent from a server that cannot branch, and never sent on the frozen `agent-tasks-v1` routes.
    */
   branch?: AgentTaskBranch | null;
+  /**
+   * Set when the thread takes the runs of one routine of the agent. Absent from an older server, and
+   * never sent on the frozen `agent-tasks-v1` routes.
+   */
+  routineId?: string | null;
 }
 
 /** Where a branch was copied from. */
@@ -131,6 +147,44 @@ export interface RunQueuedMessageAsTaskInput {
 export interface AgentTaskInput {
   agentId: string;
   taskId: string;
+}
+
+/** The older messages of a side thread: the page before a message that its view holds. */
+export interface ReadAgentTaskPageInput extends AgentTaskInput {
+  beforeMessageId: string;
+  /**
+   * 0 to 100: a target. The page has whole turns, so it can have more or fewer messages, and never more
+   * than 100; a turn of more than 100 messages is split over pages. With 0, the page has no messages and tells only whether the thread has older ones.
+   */
+  limit: number;
+}
+
+/** A page of the older messages of a side thread, oldest first. */
+export interface AgentTaskPage {
+  conversation: ConversationSnapshot;
+  /** The thread has messages before this page. */
+  hasOlder: boolean;
+}
+
+export function isAgentTaskPage(value: unknown): value is AgentTaskPage {
+  return isDynamicRecord(value) && isConversationSnapshot(value.conversation) && typeof value.hasOlder === "boolean";
+}
+
+/** The messages of a side thread around one of its messages: the thread opens at that message. */
+export interface ReadAgentTaskAroundInput extends AgentTaskInput {
+  messageId: string;
+  /** 1 to 100: a target, as for a page. About half of the messages come before the message. */
+  limit: number;
+}
+
+/** A part of a side thread around one message, oldest first. It has no messages when the thread does not hold the message. */
+export interface AgentTaskWindow extends AgentTaskPage {
+  /** The thread has messages after this part: it does not reach the latest message. */
+  hasNewer: boolean;
+}
+
+export function isAgentTaskWindow(value: unknown): value is AgentTaskWindow {
+  return isAgentTaskPage(value) && isDynamicRecord(value) && typeof value.hasNewer === "boolean";
 }
 
 /**
@@ -200,10 +254,12 @@ export function isAgentTask(value: unknown): value is AgentTask {
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.agentTaskError)) &&
     Array.isArray(value.queuedMessages) &&
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
+    (value.queue === undefined || (Array.isArray(value.queue) && value.queue.every(isQueueDelivery))) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
-    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch))
+    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch)) &&
+    (value.routineId === undefined || value.routineId === null || isIdentifier(value.routineId))
   );
 }
 

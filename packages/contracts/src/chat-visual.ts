@@ -8,7 +8,8 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values"
  * from a CDN. It runs in a sandboxed frame with an opaque origin, so it cannot reach the app. The
  * app and the page talk with the JSON-RPC messages of MCP Apps: the page reports its height, asks
  * the app to open a link, to fill the window, to put a message in the user's message box or to keep
- * its state for the agent, and the app sends the theme colours and the display mode. A request that
+ * its state for the agent, and reports the text that the user selects, so the app can offer to
+ * quote it. The app sends the theme colours and the display mode. A request that
  * acts for the user needs a click or a key in the page just before it.
  */
 
@@ -30,6 +31,7 @@ export const CHAT_VISUAL_UPDATE_MODEL_CONTEXT = "ui/update-model-context";
 /** OpenBot's own notifications: MCP Apps has no method for these. */
 export const CHAT_VISUAL_OPEN_IMAGE = "openbot/notifications/open-image";
 export const CHAT_VISUAL_KEY_DOWN = "openbot/notifications/keydown";
+export const CHAT_VISUAL_SELECTION_CHANGED = "openbot/notifications/selection-changed";
 
 export type ChatVisualDisplayMode = "inline" | "fullscreen";
 const DISPLAY_MODES: readonly ChatVisualDisplayMode[] = ["inline", "fullscreen"];
@@ -145,6 +147,14 @@ export interface ChatVisualKey {
   altKey: boolean;
 }
 
+/** A box in the page viewport, in CSS pixels. */
+export interface ChatVisualRect {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
+
 /** A message from the page, after the app has checked it. */
 export type ChatVisualMessage =
   | { type: "size"; height: number }
@@ -157,7 +167,12 @@ export type ChatVisualMessage =
   /** A request with values out of range. The host refuses it, so the page's promise fails. */
   | { type: "refused"; id: number | string }
   | { type: "open-image"; src: string; name: string }
-  | { type: "key"; key: ChatVisualKey };
+  | { type: "key"; key: ChatVisualKey }
+  /**
+   * The text that the user selected in the page, and its box in the page viewport, so the app can
+   * offer to quote it. Empty text means that no text is selected.
+   */
+  | { type: "selection"; text: string; rect: ChatVisualRect };
 
 /**
  * The frame height. The height that the agent asked for is the maximum: a taller page scrolls in
@@ -256,9 +271,19 @@ export function parseChatVisualMessage(data: unknown): ChatVisualMessage | null 
       if (!metaKey && !ctrlKey && key !== "Escape") return null;
       return { type: "key", key: { key, code, metaKey, ctrlKey, shiftKey, altKey } };
     }
+    case CHAT_VISUAL_SELECTION_CHANGED: {
+      const { text, top, left, bottom, right } = params;
+      if (!isBoundedString(text, CHAT_VISUAL_CONTEXT_LIMIT)) return null;
+      if (!isEdge(top) || !isEdge(left) || !isEdge(bottom) || !isEdge(right)) return null;
+      return { type: "selection", text: text.trim(), rect: { top, left, bottom, right } };
+    }
     default:
       return null;
   }
+}
+
+function isEdge(value: unknown): value is number {
+  return isNumber(value) && Number.isFinite(value);
 }
 
 function refused(id: number | string | null): ChatVisualMessage | null {
@@ -323,7 +348,8 @@ const BASE_STYLE = [
  * It also gives the page `window.openbotPage`, which posts the MCP Apps requests: a message for the
  * user's message box, the page state for the agent, and full screen. It sends a click on an image,
  * so the app can show it large, and a key chord that the page did not use, so app shortcuts still
- * work while the page has focus. The app checks each message again. The key listener adds a second
+ * work while the page has focus. It reports the text that the user selects and its place when one of
+ * them changes, so the app can offer to quote it. The app checks each message again. The key listener adds a second
  * listener that runs last, and the image click waits a task, so each sees whether the page used
  * the key or the click first.
  *
@@ -415,6 +441,26 @@ if(url.protocol!=="http:"&&url.protocol!=="https:")return;
 event.preventDefault();
 send({id:nextId++,method:"${CHAT_VISUAL_OPEN_LINK}",params:{url:url.href}});
 },true);
+let selected="",reported="",selectionFrame=0;
+const reportSelection=()=>{
+selectionFrame=0;
+const selection=getSelection();
+let value="",box={top:0,left:0,bottom:0,right:0};
+if(selection&&selection.rangeCount>0&&!selection.isCollapsed){
+value=selection.toString().replace(/\u00a0/g," ").trim().slice(0,${CHAT_VISUAL_CONTEXT_LIMIT});
+const rect=selection.getRangeAt(0).getBoundingClientRect();
+if(value)box={top:rect.top,left:rect.left,bottom:rect.bottom,right:rect.right};
+}
+const report=value&&[value,box.top,box.left,box.bottom,box.right].join("|");
+if(report===reported)return;
+reported=report;
+selected=value;
+send({method:"${CHAT_VISUAL_SELECTION_CHANGED}",params:Object.assign({text:value},box)});
+};
+const scheduleSelection=()=>{if(!selectionFrame)selectionFrame=requestAnimationFrame(reportSelection);};
+document.addEventListener("selectionchange",scheduleSelection);
+addEventListener("scroll",()=>{if(selected)scheduleSelection();},true);
+addEventListener("resize",()=>{if(selected)scheduleSelection();});
 })();`;
 
 /** Options for a host that cannot give the theme in the URL fragment, such as a `srcdoc` frame. */

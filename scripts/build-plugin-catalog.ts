@@ -102,6 +102,11 @@ export interface PluginHttpServer {
   name: string;
   transport: "http";
   url: string;
+  /**
+   * The addresses that an earlier version of the listing saved rows on. A row with the catalog name
+   * on one of these hosts, or on a subdomain, is still the app's row.
+   */
+  earlierUrls?: string[];
   auth?: PluginAuthFlow[];
 }
 
@@ -333,7 +338,20 @@ function parseServer(slug: string, value: unknown): PluginServer {
     if (!isString(url) || !(local ? isLoopbackHttpUrl(url) : url.startsWith("https://"))) {
       throw new Error(`Plugin ${slug} server needs ${local ? "a loopback http" : "an https"} url.`);
     }
-    return auth ? { name: value.name, transport: "http", url, auth } : { name: value.name, transport: "http", url };
+    const earlierUrls = value.earlierUrls;
+    if (
+      earlierUrls !== undefined &&
+      (!Array.isArray(earlierUrls) || earlierUrls.length === 0 || !earlierUrls.every(isHttpsUrl))
+    ) {
+      throw new Error(`Plugin ${slug} earlierUrls must be a list of https urls.`);
+    }
+    return {
+      name: value.name,
+      transport: "http",
+      url,
+      ...(earlierUrls ? { earlierUrls } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   if (value.transport === "stdio") {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
@@ -555,7 +573,9 @@ function printLiteral(value: unknown, indent: string, mode: LiteralMode, prefixW
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
     const child = `${indent}  `;
-    return `[\n${value.map((item) => `${child}${printLiteral(item, child, mode)}`).join(",\n")}${closer}${indent}]`;
+    // The formatter counts the comma after an item in the line width.
+    const commaWidth = (index: number) => (mode === "ts" || index < value.length - 1 ? 1 : 0);
+    return `[\n${value.map((item, index) => `${child}${printLiteral(item, child, mode, commaWidth(index))}`).join(",\n")}${closer}${indent}]`;
   }
   if (isDynamicRecord(value)) {
     const entries = Object.entries(value);
@@ -603,8 +623,10 @@ function tsKey(key: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? key : JSON.stringify(key);
 }
 
+/** A slug can start with a digit (`21st`), and an identifier cannot. */
 function constName(slug: string): string {
-  return slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  const name = slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  return /^[0-9]/u.test(name) ? `PLUGIN_${name}` : name;
 }
 
 function renderRendererModule(plugins: PluginDetail[]): string {
@@ -728,7 +750,7 @@ export type MobilePluginAuthFlow =
     };
 
 type MobilePluginServer =
-  | { name: string; transport: "http"; url: string; auth?: MobilePluginAuthFlow[] }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
 
 export interface MobilePluginApp {
@@ -807,7 +829,7 @@ export interface PluginCatalogApp {
 }
 
 export type PluginCatalogServer =
-  | { name: string; transport: "http"; url: string; auth?: unknown }
+  | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
 
 export interface PluginCatalogDetail {

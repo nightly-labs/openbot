@@ -5,6 +5,7 @@ export const messages = {
   "error.billing.lifecycleFailed": "Sunucu planı değiştirilemedi. Faturalandırma'yı yenileyin ve tekrar deneyin.",
   "error.billing.confirmMismatch": "Silmek için sunucu adını yazın.",
   "error.billing.restartBusy": "Sunucu şu anda yeniden başlatılamıyor. Bir dakika sonra tekrar deneyin.",
+  "error.billing.restartUnavailable": "Bu sunucu buradan yeniden başlatılamıyor. Destek ekibine ulaşın.",
   "error.billing.planRequired": "Bu sunucunun planı sona erdi. Sunucuyu başlatmak için planı yenileyin.",
   "error.billing.planSoldOut": "Bu plan tükendi. Başka bir plan seçin.",
   // Masaüstü ve web istemcilerinin oluşturduğu faturalandırma hataları.

@@ -1,7 +1,9 @@
 import {
+  type AgentModelOption,
   type AgentProviderId,
   type AgentReasoningEffort,
   agentProviderName,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   type ForeignProviderId,
   type ProviderAccountStatus,
   providerDisplayName,
@@ -9,11 +11,22 @@ import {
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { useQuery } from "@tanstack/react-query";
+import { type Href, router } from "expo-router";
 import { Button, Typography } from "heroui-native";
+import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
+import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
+import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import {
+  PLAN_LIMIT_RESET_FORMAT,
+  planLimitResetDate,
+  planLimitWindowLabel,
+  usePlanLimits,
+} from "@/features/servers/model/plan-limits";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import {
@@ -45,10 +58,12 @@ const EFFORT_LABELS = {
  * names, so a cap only removes the part of a name that tells two models apart.
  */
 const MAX_PICKER_LABEL = 28;
-function pickerLabel(text: string, selected: boolean): string {
-  if (Platform.OS === "android" || !selected) return text;
+function shortLabel(text: string): string {
   const characters = Array.from(text);
   return characters.length > MAX_PICKER_LABEL ? `${characters.slice(0, MAX_PICKER_LABEL).join("").trimEnd()}…` : text;
+}
+function pickerLabel(text: string, selected: boolean): string {
+  return Platform.OS === "android" || !selected ? text : shortLabel(text);
 }
 
 /**
@@ -97,8 +112,12 @@ export function AgentRuntimeFields({
   accountId = "",
   onChange,
   onAccountChange,
+  fastMode,
+  modelPickerRoute,
 }: {
   serverId: string;
+  /** The model list page in the stack of this form. */
+  modelPickerRoute: Href;
   available: boolean;
   saving: boolean;
   provider?: AgentProviderId;
@@ -117,6 +136,8 @@ export function AgentRuntimeFields({
   accountId?: string;
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
+  /** An existing agent. Its Fast mode switch shows when the chosen model has a fast tier. */
+  fastMode?: AgentHostFieldsProps;
 }) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -129,13 +150,25 @@ export function AgentRuntimeFields({
     enabled: available,
     retry: false,
   });
-  const options = models.data?.filter((option) => option.provider === provider) ?? [];
+  const accountModels = accounts.find((account) => account.id === accountId)?.models ?? [];
+  const options = withAccountModels(models.data?.filter((option) => option.provider === provider) ?? [], accountModels);
   const selected = options.find((option) => option.id === model);
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
+  const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
+  const openModelPicker = useAgentModelPicker((state) => state.open);
+  const chooseModel = (next: AgentModelOption) => {
+    onChange({
+      model: next.id,
+      reasoningEffort:
+        reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
+          ? reasoningEffort
+          : next.defaultReasoningEffort,
+    });
+  };
   return (
     <>
-      <SettingsSection title={title}>
+      <SettingsSection title={title} footer={spentLimit}>
         <SettingsRow
           trailing={
             <SettingsPicker<string>
@@ -206,40 +239,15 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
         {showsModel ? (
+          // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
-            trailing={
-              <SettingsPicker<string>
-                value={model ?? ""}
-                options={[
-                  ...(!selected
-                    ? [
-                        {
-                          value: model ?? "",
-                          label: model ? pickerLabel(model, true) : t("mobile.agent.runtime.unavailable"),
-                        },
-                      ]
-                    : []),
-                  ...options.map((option) => ({
-                    value: option.id,
-                    label: pickerLabel(option.name, option.id === model),
-                  })),
-                ]}
-                enabled={enabled}
-                dark={theme === "dark"}
-                label={t("mobile.agent.runtime.model")}
-                onChange={(id) => {
-                  const next = options.find((option) => option.id === id);
-                  if (!next) return;
-                  onChange({
-                    model: next.id,
-                    reasoningEffort:
-                      reasoningEffort && next.supportedReasoningEfforts.includes(reasoningEffort)
-                        ? reasoningEffort
-                        : next.defaultReasoningEffort,
-                  });
-                }}
-              />
-            }
+            disabled={!enabled}
+            value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
+            onPress={() => {
+              if (!provider) return;
+              openModelPicker({ serverId, provider, model, accountModels, choose: chooseModel });
+              router.push(modelPickerRoute);
+            }}
           >
             <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
           </SettingsRow>
@@ -277,6 +285,7 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
           <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>
@@ -288,4 +297,44 @@ export function AgentRuntimeFields({
       ) : null}
     </>
   );
+}
+
+/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/**
+ * The spent plan window that stops the chosen model, as the desktop model picker and composer show it:
+ * the window and its reset time. It uses the reading of the Usage screen and asks the host for nothing
+ * new. A window that ended gives the quota back, and its reading stays as it was until the next
+ * reading, so the clock moves at the reset.
+ */
+function useSpentLimitText(
+  serverId: string,
+  provider: AgentProviderId | undefined,
+  accountId: string,
+  model: string | undefined,
+): string | null {
+  const { t, format } = useText();
+  const { usage } = usePlanLimits(serverId);
+  const [now, setNow] = useState(Date.now);
+  const spent = provider
+    ? spentUsageWindow(usage?.limits, provider, accountId || DEFAULT_PROVIDER_ACCOUNT_ID, model, now)
+    : null;
+  const spentWindow = spent?.covers ? spent.window : null;
+  const resetsAt = spentWindow?.resetsAt ?? null;
+  useEffect(() => {
+    if (resetsAt === null) return;
+    const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, resetsAt * 1_000 - Date.now()));
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [resetsAt]);
+  if (!spentWindow) return null;
+  const limit =
+    planLimitWindowKind(spentWindow.windowDurationMins).kind === "limit"
+      ? t("mobile.agent.runtime.usageLimit")
+      : t("mobile.agent.runtime.usageLimitWindow", { window: planLimitWindowLabel(spentWindow.windowDurationMins, t) });
+  const date = planLimitResetDate(spentWindow);
+  return date
+    ? t("mobile.agent.runtime.usageLimitResets", { limit, time: format.date(date, PLAN_LIMIT_RESET_FORMAT) })
+    : limit;
 }

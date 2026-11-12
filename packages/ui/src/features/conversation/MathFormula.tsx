@@ -58,12 +58,19 @@ export function MathFormula(props: { tex: string; raw: string; display: boolean;
     return renderMath(engine, props.tex, props.display);
   });
   const source = () =>
-    props.block ? <CodeBlock block={{ type: "code", code: props.tex, language: "latex" }} /> : <code>{props.raw}</code>;
+    props.block ? (
+      <CodeBlock block={{ type: "code", code: props.tex, language: "latex" }} />
+    ) : (
+      <code dir="ltr">{props.raw}</code>
+    );
   return (
     // While KaTeX loads, the formula shows its source text.
     <Show when={html() !== undefined} fallback={props.raw}>
       <Show when={html()} fallback={source()}>
-        {(value) => <span class={props.display ? "message-math-display" : undefined} innerHTML={value()} />}
+        {(value) => (
+          // A formula reads left to right in every paragraph, and its own direction isolates it.
+          <span class={props.display ? "message-math-display" : undefined} dir="ltr" innerHTML={value()} />
+        )}
       </Show>
     </Show>
   );

@@ -1,4 +1,4 @@
-import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AttachmentCards, type AttachmentDownloadState } from "@openbot/ui/features/conversation/AttachmentCards";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AUDIO_PREVIEW } from "./file-previews";
@@ -90,4 +90,31 @@ export const NarrowAudioTakes: Story = {
       <AttachmentCards {...storyArgs} />
     </div>
   ),
+};
+
+const remoteArchive = {
+  ...compactFile,
+  id: "attachment-release-archive",
+  name: "release-assets-2026-11.zip",
+  size: 412 * 1024 * 1024,
+  mimeType: "application/zip",
+  previewKind: "none" as const,
+};
+
+function downloadsOf(state: AttachmentDownloadState) {
+  return { state: () => state, stop: fn(), retry: fn() };
+}
+
+/** A file from a joined server downloads; a click on the ring stops it. */
+export const Downloading: Story = {
+  name: "Download from a joined server",
+  args: {
+    attachments: [remoteArchive],
+    downloads: downloadsOf({ phase: "downloading", received: 148 * 1024 * 1024, total: remoteArchive.size }),
+  },
+};
+
+export const DownloadFailed: Story = {
+  name: "Failed download",
+  args: { attachments: [remoteArchive], downloads: downloadsOf({ phase: "failed" }) },
 };

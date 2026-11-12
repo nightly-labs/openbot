@@ -62,6 +62,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "만드는 중…",
   "mobile.onboarding.task.withoutTask": "작업 없이 만들기",
   "mobile.onboarding.task.failed": "에이전트를 만들 수 없어요. 다시 시도해 주세요.",
+  "mobile.onboarding.task.sendFailed": "첫 작업을 보내지 못했어요. 채팅에서 보내 주세요.",
   "mobile.onboarding.idea.builder1": "간단한 할 일 목록 웹 앱을 만들어 줘.",
   "mobile.onboarding.idea.builder2": "Git 브랜치가 어떻게 동작하는지 예시와 함께 설명해 줘.",
   "mobile.onboarding.idea.builder3": "내 사진을 날짜별로 정리하는 스크립트를 작성해 줘.",

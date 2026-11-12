@@ -12,3 +12,8 @@ export const sheetHeaderInsetOptions = isAndroid
       unstable_nativeProps: { headerConfig: { disableTopInsetApplication: true } },
     }
   : {};
+
+/** Whether a page's header has `sheetHeaderInsetOptions`: a sheet header, which does not reach the status bar. */
+export function isSheetHeader(options: { statusBarTranslucent?: boolean }) {
+  return isAndroid && options.statusBarTranslucent === false;
+}

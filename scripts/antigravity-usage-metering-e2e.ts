@@ -1,16 +1,20 @@
 // Checks that Gemini token usage through Antigravity is metered once per turn, with thinking as
-// output. Runs the real agent service on a temporary profile with a fake Antigravity ACP server that
-// answers `session/prompt` as Antigravity 1.4.3 does: `usage` holds the tokens of that prompt only
-// (`_extract_turn_usage` subtracts the session's total at the turn's start), and `thoughtTokens` is
-// apart from `outputTokens`. A message `tokens=<input>,<cached>,<output>,<thought>` sets the usage of
-// its turn. Cases: a first turn, a smaller second turn in the same session (the session counter
-// before this change booked 0 for it), a larger third turn (it booked only the excess over the
-// largest turn), and a turn after the provider process starts again and resumes the session.
+// output. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4 that
+// prints its version and answers `session/prompt` as Antigravity does: `usage` holds the tokens of
+// that prompt only, and `thoughtTokens` is apart from `outputTokens`. A message
+// `tokens=<input>,<cached>,<output>,<thought>` sets the usage of its turn. Cases: a first turn, a
+// smaller second turn in the same session (the session counter before this change booked 0 for it), a
+// larger third turn (it booked only the excess over the largest turn), and a turn after the provider
+// process starts again and resumes the session. The plan quota comes from a local `node:http` fake of
+// Google's Code Assist service (`OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`) with the CLI's token in a
+// temporary `GEMINI_HOME`: a usage read after the turns gives the fake's window, sends no prompt to the
+// CLI, and adds no turn or tokens to the metering.
 // `bun scripts/antigravity-usage-metering-e2e.ts`. Writes
 // .openbot-build/antigravity-usage-metering-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -22,15 +26,54 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-usage-me
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-metering-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
-const install = join(root, "antigravity");
-const fakeAgy = join(install, "bin", "agy_acp_server");
+const install = join(root, "antigravity", "1.5.4");
+const fakeAgy = join(install, "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
+// Bun reads the home folder once at its start, so the CLI's folder is set apart: never `~/.gemini`.
+const geminiHome = join(home, ".gemini");
+const ACCESS_TOKEN = "fake-metering-access-token";
+const PROJECT = "fake-metering-project";
 
 // Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
+process.env.GEMINI_HOME = geminiHome;
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
 mkdirSync(home, { recursive: true });
+
+/** The Code Assist calls, with the token that each one carried. */
+const quotaCalls: { path: string | undefined; authorization: string | undefined }[] = [];
+const quotaServer = createServer((request, response) => {
+  request.resume();
+  request.on("end", () => {
+    quotaCalls.push({ path: request.url, authorization: request.headers.authorization });
+    response.setHeader("Content-Type", "application/json");
+    if (request.url === "/v1internal:loadCodeAssist")
+      return response.end(JSON.stringify({ cloudaicompanionProject: PROJECT }));
+    response.end(
+      JSON.stringify({
+        groups: [
+          {
+            displayName: "Gemini Models",
+            description: "Models within this group: Gemini Flash, Gemini Pro",
+            buckets: [
+              {
+                displayName: "Weekly Limit Remaining",
+                window: "weekly",
+                resetTime: "2026-11-17T11:59:31Z",
+                remainingFraction: 0.75,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+});
+await new Promise<void>((done) => quotaServer.listen(0, "127.0.0.1", done));
+const quotaAddress = quotaServer.address();
+assert.ok(quotaAddress !== null && typeof quotaAddress === "object");
+process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL = `http://127.0.0.1:${quotaAddress.port}/v1internal`;
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
@@ -38,8 +81,12 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity ACP server with the methods that the service calls. `/usage` has no plan quota. */
+/** An Antigravity CLI with the ACP methods that the service calls. It has no `/usage`. */
 const FAKE_AGY = `#!/usr/bin/env node
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4\\n");
+  process.exit(0);
+}
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify({ pid: process.pid, ...entry }) + NL);
@@ -58,6 +105,7 @@ function handle(message) {
   if (message.method === "session/resume" || message.method === "session/load") return write({ id: message.id, result: setup(params.sessionId) });
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
+    log({ prompt: text });
     const match = /tokens=(\\d+),(\\d+),(\\d+),(\\d+)/.exec(text);
     write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } } } });
     if (!match) return write({ id: message.id, result: { stopReason: "end_turn" } });
@@ -102,6 +150,7 @@ const report: {
   model?: string;
   cases: CaseReport[];
   analytics?: { processedTokens: number; turns: number; missingUsageTurns: number };
+  planUsage?: { usedPercent: number | undefined; quotaCalls: number; prompts: number };
   passed: boolean;
   error?: string;
 } = { cases: [], passed: false };
@@ -122,6 +171,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 /** Waits for a state of the service or of its database. */
@@ -140,6 +192,7 @@ interface LogEntry {
   start?: boolean;
   method?: string;
   sessionId?: string | null;
+  prompt?: string;
 }
 
 function protocol(): LogEntry[] {
@@ -156,8 +209,23 @@ function protocol(): LogEntry[] {
 }
 
 await mkdir(join(install, "bin"), { recursive: true });
-await writeFile(join(install, "antigravity-package.json"), `${JSON.stringify({ version: "1.4.3" })}\n`);
 await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
+// The CLI's own token file, as after a Google sign-in.
+await mkdir(join(geminiHome, "antigravity-acp"), { recursive: true });
+await writeFile(
+  join(geminiHome, "antigravity-acp", "antigravity-oauth-token"),
+  JSON.stringify({
+    token: {
+      access_token: ACCESS_TOKEN,
+      token_type: "Bearer",
+      refresh_token: "fake-refresh",
+      expiry: new Date(Date.now() + 3_600_000).toISOString(),
+    },
+    auth_method: "consumer",
+    id_token_email: "",
+  }),
+  { mode: 0o600 },
+);
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -277,6 +345,30 @@ try {
     "the turn after a restart resumes the session",
   );
 
+  // The plan usage comes from Code Assist, not from a prompt: it adds no turn and no tokens.
+  const promptsBefore = protocol().filter((entry) => entry.prompt !== undefined).length;
+  const plan = await runCauseEffect(agents.getUsage(agent.id));
+  const prompts = protocol().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]));
+  report.planUsage = {
+    usedPercent: plan.limits[0]?.secondary?.usedPercent,
+    quotaCalls: quotaCalls.length,
+    prompts: prompts.length,
+  };
+  assert.equal(report.planUsage.usedPercent, 25, "the plan usage is the fake's Gemini window");
+  assert.ok(
+    quotaCalls.some((call) => call.path === "/v1internal:retrieveUserQuotaSummary"),
+    "the usage read asked Code Assist",
+  );
+  assert.ok(
+    quotaCalls.every((call) => call.authorization === `Bearer ${ACCESS_TOKEN}`),
+    "every call carries the token",
+  );
+  assert.equal(prompts.length, promptsBefore, "the usage read sends no prompt");
+  assert.ok(
+    prompts.every((prompt) => !prompt.startsWith("/usage")),
+    "no prompt is `/usage`",
+  );
+
   const today = new Date().toISOString().slice(0, 10);
   const analytics = agents.getAnalytics({ agentId: agent.id, startDate: today, endDate: today, timeZone: "UTC" });
   report.analytics = {
@@ -296,6 +388,7 @@ try {
   await runCauseEffect(agents.stop()).catch(() => {});
   closeReader();
   database.close();
+  await new Promise<void>((done) => quotaServer.close(() => done()));
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });

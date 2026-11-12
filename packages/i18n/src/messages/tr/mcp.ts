@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Bağlı değil",
   "mcp.connect.close": "{name} bağlantı penceresini kapat",
   "mcp.connect.getKey": "Bir anahtar al",
+  "mcp.connect.useKey": "Bunun yerine API anahtarı kullan",
+  "mcp.connect.useSignIn": "Bunun yerine oturum aç",
   "mcp.connect.keyDescription":
     "{name} hesabınızdan bir kimlik bilgisi yapıştırın. OpenBot bununla bağlanır ve onu {host} üzerinde saklar.",
   "mcp.connect.thisComputer": "bu bilgisayar",
@@ -142,11 +144,11 @@ export const messages = {
   "mcp.panel.appSaved": "Uygulama kaydedildi. Kullanmak için oturum açın.",
   "mcp.panel.appRemoved": "Uygulama kaldırıldı.",
   "mcp.signIn.relayDescription":
-    "Oturum açma sayfasının {page} üzerinde olduğunu kontrol edin, sonra tarayıcınızda açın. Bitirdiğinizde OpenBot oturum açmayı {host} sunucusuna gönderir.",
+    "Tarayıcınızda {page} üzerinde oturum açın. Bitirdiğinizde OpenBot oturum açmayı {host} sunucusuna gönderir.",
   "mcp.signIn.relayOpenDescription":
-    "{page} oturum açma sayfasını tarayıcınızda açın. Bitirdiğinizde tarayıcının gösterdiği adresi buraya yapıştırın. OpenBot ardından oturum açmayı {host} sunucusuna gönderir.",
+    "Tarayıcınızda {page} üzerinde oturum açın. Bitirdiğinizde tarayıcının gösterdiği adresi buraya yapıştırın. OpenBot ardından oturum açmayı {host} sunucusuna gönderir.",
   "mcp.signIn.relayDeviceDescription":
-    "Oturum açma sayfasının {page} üzerinde olduğunu kontrol edin, sonra tarayıcınızda açıp oturum açmayı orada bitirin. {host} oturum açmayı kendisi algılar.",
+    "Tarayıcınızda {page} üzerinde oturum açın ve işlemi orada bitirin. {host} oturum açmayı kendisi algılar.",
   "mcp.signIn.relayOpen": "Oturum açma sayfasını aç",
   "mcp.signIn.relayPasteHint": "Tarayıcı OpenBot'a geri dönmezse gösterdiği adresi kopyalayıp buraya yapıştırın.",
   "mcp.signIn.relayPasteRequired":

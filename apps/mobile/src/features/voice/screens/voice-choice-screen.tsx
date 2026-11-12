@@ -1,4 +1,4 @@
-import { SPEECH_VOICES } from "@openbot/contracts/ipc";
+import { CODEX_LIVE_VOICES, type CodexLiveVoice, SPEECH_VOICES } from "@openbot/contracts/ipc";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -22,7 +22,7 @@ import { loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-v
 import type { ReplyVoiceChoice } from "../model/reply-voice";
 import { useSupertonicModel } from "../model/supertonic-model";
 import { saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
-import { supertonicVoiceLabel } from "./voice-settings-screen";
+import { gptLiveVoiceLabel, supertonicVoiceLabel } from "./voice-settings-screen";
 
 interface VoiceOption {
   id: string;
@@ -58,14 +58,51 @@ function PreviewButton({
 }
 
 /**
+ * The voices of GPT live voice, and Automatic, which lets OpenAI choose. OpenAI speaks them, so the
+ * phone has no sample to play.
+ */
+function GptLiveVoiceChoice() {
+  const { t } = useText();
+  const chosen = useVoiceSettings((state) => state.gptLiveVoice);
+  const accent = String(useCSSVariable("--openbot-accent"));
+  const choose = (voice: CodexLiveVoice | null) => {
+    if (voice === chosen) return;
+    void haptics.selection();
+    void saveVoiceSettings({ gptLiveVoice: voice });
+  };
+  return (
+    <SettingsContent>
+      <Stack.Screen options={{ title: t("mobile.settings.voice.gptLive.title") }} />
+      <SettingsSection footer={t("mobile.settings.voice.gptLive.choiceFooter")}>
+        {[null, ...CODEX_LIVE_VOICES].map((voice) => (
+          <SettingsRow
+            key={voice ?? "automatic"}
+            checked={voice === chosen}
+            disclosure={false}
+            trailing={voice === chosen ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+            onPress={() => choose(voice)}
+          >
+            <Typography.Paragraph>{gptLiveVoiceLabel(voice, t)}</Typography.Paragraph>
+          </SettingsRow>
+        ))}
+      </SettingsSection>
+    </SettingsContent>
+  );
+}
+
+/** The voice list of the engine in the route: GPT live voice, Supertonic 3 or ElevenLabs. */
+export function VoiceChoiceScreen() {
+  const { engine } = useLocalSearchParams<{ engine?: string }>();
+  return engine === "gpt-live" ? <GptLiveVoiceChoice /> : <VoiceList elevenLabs={engine === "elevenlabs"} />;
+}
+
+/**
  * The voices of one engine, as a list: a long ElevenLabs name such as "George - Warm, Captivating
  * Storyteller" shows its description on its own line instead of pushing the row apart. A press
  * chooses the voice; the button at the end plays a sample of it.
  */
-export function VoiceChoiceScreen() {
+function VoiceList({ elevenLabs }: { elevenLabs: boolean }) {
   const { t } = useText();
-  const { engine } = useLocalSearchParams<{ engine?: string }>();
-  const elevenLabs = engine === "elevenlabs";
   const settings = useVoiceSettings();
   const modelReady = useSupertonicModel((state) => state.phase === "ready");
   const voices = useElevenLabsVoices();
@@ -93,8 +130,9 @@ export function VoiceChoiceScreen() {
         select: () => saveVoiceSettings({ supertonicVoice: voice }),
       }));
   const canPreview = elevenLabs ? settings.hasElevenLabsKey : modelReady;
-  const failure =
-    voices.failure === "missing-voices-permission"
+  const failure = voices.reason
+    ? t("mobile.settings.voice.elevenLabs.refused", { reason: voices.reason })
+    : voices.failure === "missing-voices-permission"
       ? t("mobile.settings.voice.elevenLabs.missingVoicesPermission")
       : voices.failure === "invalid-key"
         ? t("mobile.chat.liveVoice.elevenLabsKeyInvalid")

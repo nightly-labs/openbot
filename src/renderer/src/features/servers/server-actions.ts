@@ -23,6 +23,7 @@ export function useServerActions() {
     setJoinServerOpen,
     setAddServerOpen,
     setCreateLocalServerOpen,
+    setInstallServerOpen,
     hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
@@ -90,6 +91,14 @@ export function useServerActions() {
     return hostedServersAvailable() ? undefined : createLocal;
   }
 
+  /** Opens the dialog with the command that installs a server on another computer and adds it to this account. */
+  const installServer = platform.landingPreview ? undefined : () => setInstallServerOpen(true);
+
+  /** As `addMenuCreateLocal`: the hosted server plans show the item in their "Other options" menu. */
+  function addMenuInstallServer(): (() => void) | undefined {
+    return hostedServersAvailable() ? undefined : installServer;
+  }
+
   /**
    * Hides the server on this computer. When it is open, another server opens in its place: the first
    * online one, so that the hide does not wait for or fail on an offline server.
@@ -144,6 +153,8 @@ export function useServerActions() {
     add,
     createLocal,
     addMenuCreateLocal,
+    installServer,
+    addMenuInstallServer,
     addCreatesServer: hostedServersAvailable,
     hiddenLocal,
     callbacks,

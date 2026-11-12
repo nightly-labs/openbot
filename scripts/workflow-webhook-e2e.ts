@@ -72,6 +72,9 @@ const browser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 
 const trigger = (type: "webhook" | "manual"): WorkflowNode => ({
@@ -140,6 +143,7 @@ try {
       setEnabled: () => {},
       setAccountActive: () => {},
       refresh: () => {},
+      ensureHost: () => Effect.void,
       registerRoute: (routeId) => Effect.succeed(`${RELAY_ORIGIN}/v1/webhooks/${routeId}`),
       revokeRoute: (routeId) => Effect.sync(() => void revoked.push(routeId)),
     },

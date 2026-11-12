@@ -10,11 +10,18 @@ import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
+import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
 import { createContactMessageDelivery, createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import {
+  COUNT_FEEDBACK,
+  DELETE_EARLIER_FEEDBACK_DAYS,
+  FEEDBACK_DAILY_LIMIT,
+  UNCOUNT_FEEDBACK,
+} from "./feedback-daily-counts";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
@@ -69,7 +76,28 @@ export function requestAuthService(): AuthService {
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
     attribution: new AccountAttribution({ database: bindings.DB, analytics }),
+    usesCompanySignIn: (email) =>
+      new CompanySignInService(bindings)
+        .usesCompanySignIn(email)
+        .pipe(Effect.mapError(() => new AuthOperationError({ message: "Account operation failed." }))),
   });
+}
+
+export function requestCompanySignIn(): CompanySignInService {
+  const bindings = requireWorkerBindings(env);
+  const remote = new RemoteControlPlane(bindings, { schedule });
+  return new CompanySignInService(bindings, {
+    // The revocation is already written and the cron redelivers it, so the answer does not wait.
+    flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
+    revokeMembership: (actorUserId, hostId, membershipId) =>
+      remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
+    joinServer: (hostId, userId, options) => remote.joinByCompanySignIn(hostId, userId, options),
+  });
+}
+
+export function companySignInErrorResponse(error: unknown): Response {
+  if (error instanceof CompanySignInError) return apiError(error.status, error.code, error.message);
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function requestAvatarBucket(): R2Bucket {
@@ -178,10 +206,80 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
+/**
+ * A few similar-issue searches for each account and minute. All accounts share the search quota of
+ * the one app installation, so one account must not use it all.
+ */
+export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackSearchRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `search:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many searches. Try again later.");
+  }
+});
+
+/**
+ * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
+ * that a person reads. The daily count is the only feedback data that D1 keeps. It returns the UTC day
+ * that it counted, for `uncountFeedback`.
+ */
+export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
+  const bindings = requireWorkerBindings(env);
+  const limiter = bindings.FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({ try: () => limiter.limit({ key: `user:${userId}` }), catch: unavailable });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too much feedback. Try again later.");
+  }
+  const day = new Date().toISOString().slice(0, 10);
+  const [, counted] = yield* Effect.tryPromise({
+    try: () =>
+      bindings.DB.batch([
+        bindings.DB.prepare(DELETE_EARLIER_FEEDBACK_DAYS).bind(userId, day),
+        bindings.DB.prepare(COUNT_FEEDBACK).bind(userId, day, FEEDBACK_DAILY_LIMIT),
+      ]),
+    catch: unavailable,
+  });
+  if (!counted?.results.length) {
+    return yield* new GitHubInstallationTokensError(
+      429,
+      "feedback_daily_limit",
+      "Too much feedback today. Try again tomorrow.",
+    );
+  }
+  return day;
+});
+
+/**
+ * Takes back the daily count of an issue that GitHub did not open, so a failed send does not use up the
+ * limit. A failure here keeps the count: the error of the send goes to the user.
+ */
+export const uncountFeedback = Effect.fn("GitHub.uncountFeedback")(function* (userId: string, day: string) {
+  const bindings = requireWorkerBindings(env);
+  yield* Effect.tryPromise(() => bindings.DB.prepare(UNCOUNT_FEEDBACK).bind(userId, day).run()).pipe(Effect.ignore);
+});
+
+/** The seconds to the next UTC day, when the daily feedback limit starts again. */
+function secondsToNextUtcDay(now = Date.now()): number {
+  const day = 86_400_000;
+  return Math.ceil((day - (now % day)) / 1000);
+}
+
 export function githubInstallationTokensErrorResponse(error: unknown): Response {
   if (error instanceof GitHubInstallationTokensError) {
     const response = apiError(error.status, error.code, error.message);
-    if (error.status === 429) response.headers.set("Retry-After", "60");
+    if (error.status === 429)
+      response.headers.set("Retry-After", String(error.code === "feedback_daily_limit" ? secondsToNextUtcDay() : 60));
     return response;
   }
   return authErrorResponse(error);

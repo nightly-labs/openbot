@@ -22,6 +22,21 @@ export const WEBHOOK_TIMESTAMP_PATTERN = /^[0-9]{1,12}$/u;
 export const WEBHOOK_DELIVERY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
 export const WEBHOOK_SIGNATURE_PATTERN = /^sha256=[A-Fa-f0-9]{64}$/u;
 
+// Standard Webhooks (https://www.standardwebhooks.com), the format of Composio, Svix and other
+// senders that make the secret themselves. The user copies that secret into the routine. Signal reads
+// the `webhook-*` headers, or the `svix-*` headers that Svix senders use, and forwards them as the
+// same three values with this format. Signal sends the format only to a host that names it in its
+// `ingress` hello, because an older host refuses the signature.
+export const STANDARD_WEBHOOKS_FORMAT = "standard-webhooks";
+export type WebhookSignatureFormat = typeof STANDARD_WEBHOOKS_FORMAT;
+export const STANDARD_WEBHOOK_HEADER_SETS = [
+  { deliveryId: "webhook-id", timestamp: "webhook-timestamp", signature: "webhook-signature" },
+  { deliveryId: "svix-id", timestamp: "svix-timestamp", signature: "svix-signature" },
+] as const;
+// One to eight space-separated `<version>,<base64>` signatures. The host checks each `v1` signature.
+export const STANDARD_WEBHOOK_SIGNATURE_PATTERN =
+  /^[a-z0-9]{1,8},[A-Za-z0-9+/=]{1,128}(?: [a-z0-9]{1,8},[A-Za-z0-9+/=]{1,128}){0,7}$/u;
+
 // Signal checks this when an ingress socket connects. The host asks for a fresh ticket on every
 // connection, so deleting a route takes effect when the socket reconnects as well as
 // through the revocation event.

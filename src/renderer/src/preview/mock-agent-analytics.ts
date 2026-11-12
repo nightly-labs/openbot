@@ -1,4 +1,10 @@
-import type { AnalyticsProviderDay, AnalyticsTotals, HostAnalytics, HostAnalyticsInput } from "@openbot/contracts/ipc";
+import type {
+  AnalyticsProviderDay,
+  AnalyticsSkill,
+  AnalyticsTotals,
+  HostAnalytics,
+  HostAnalyticsInput,
+} from "@openbot/contracts/ipc";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
@@ -144,5 +150,31 @@ export function mockHostAnalytics(
     providerDaily: [...providerDays.values()].sort(
       (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
     ),
+    skills: mockSkills(
+      selected.length,
+      totals.processedTokens ? (totals.estimatedCostUsd ?? 0) / totals.processedTokens : 0,
+    ),
   };
+}
+
+// Skill name, loads for each agent, and the size of its SKILL.md in tokens.
+const MOCK_SKILLS = [
+  ["release-notes", 14, 2_400],
+  ["code-review", 9, 3_900],
+  ["browser-research", 6, 5_200],
+  ["invoice-reconciliation", 3, 1_700],
+  ["incident-postmortem", 1, 2_800],
+] as const;
+
+/** The skill loads of the mock agents, ranked by tokens as the host ranks them. */
+function mockSkills(agents: number, costPerToken: number): AnalyticsSkill[] {
+  const rows = MOCK_SKILLS.map(([skill, loads, size], index) => {
+    const users = Math.max(0, agents - index);
+    const count = loads * users;
+    return { skill, loads: count, tokens: count * size, estimatedCostUsd: count * size * costPerToken, agents: users };
+  }).filter((row) => row.loads > 0);
+  const total = rows.reduce((sum, row) => sum + row.tokens, 0);
+  return rows
+    .map((row) => ({ ...row, share: total ? row.tokens / total : 0 }))
+    .sort((a, b) => b.tokens - a.tokens || b.loads - a.loads);
 }

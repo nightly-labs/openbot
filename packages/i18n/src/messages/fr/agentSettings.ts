@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Quand {model} atteint sa limite d’utilisation avant que {name} commence à écrire, {name} vous demande quel modèle utiliser.",
   "agentSettings.backupModels.introAutomatic":
-    "Quand {model} atteint sa limite d’utilisation ou échoue sur une erreur du fournisseur avant que {name} commence à écrire, {name} passe au premier modèle disponible dans l’ordre.",
+    "Quand {model} atteint sa limite d’utilisation, {name} passe au premier modèle disponible dans l’ordre. {name} change aussi de modèle quand {model} échoue sur une erreur du fournisseur avant que {name} commence à écrire.",
   "agentSettings.backupModels.ask": "Demander avant de changer",
   "agentSettings.backupModels.order": "Ordre",
   "agentSettings.backupModels.listLabel": "Modèles de secours, dans l’ordre",
@@ -97,7 +97,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
+    "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "agentSettings.groups.brain": "Cerveau",
   "agentSettings.groups.knows": "Connaissances",
   "agentSettings.groups.does": "Actions",
@@ -130,6 +130,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Réinitialiser selon l’ID",
   "agentSettings.avatar.shape": "Forme",
   "agentSettings.avatar.shuffle": "Visage au hasard",
+  "agentSettings.avatar.style": "Style d’avatar",
+  "agentSettings.avatar.stylePlush": "Peluche",
+  "agentSettings.avatar.styleFlat": "Plat",
   "agentSettings.avatar.shapes": "Formes de l’avatar",
   "agentSettings.avatar.shapeOption": "Forme {number}",
   "agentSettings.avatar.eyes": "Yeux",
@@ -145,10 +148,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "Modèle de l’agent",
   "agentSettings.runtime.modelUnavailable": "Les modèles sont disponibles après la connexion d’une CLI d’agent.",
-  "agentSettings.runtime.reasoning": "Raisonnement",
-  "agentSettings.runtime.reasoningLabel": "Niveau de raisonnement de l’agent",
-  "agentSettings.runtime.selectReasoning": "Choisir le raisonnement",
-  "agentSettings.runtime.reasoningSetByProvider": "Selon {provider}",
   "agentSettings.runtime.access": "Accès",
   "agentSettings.runtime.accessLabel": "Accès de l’agent",
   "agentSettings.runtime.busyMessage": "Pendant le travail",
@@ -191,6 +190,15 @@ export const messages = {
     "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.newChat.confirm": "Nouvelle discussion",
   "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+  "agentSettings.deleteHistory.title": "Supprimer l’historique",
+  "agentSettings.deleteHistory.description":
+    "Les messages de cette discussion sont supprimés et l’agent les oublie. Sa configuration reste.",
+  "agentSettings.deleteHistory.button": "Supprimer",
+  "agentSettings.deleteHistory.confirmTitle": "Supprimer l’historique de la discussion avec {name} ?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Tous les messages et fichiers de cette discussion sont supprimés d’OpenBot et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
+  "agentSettings.deleteHistory.confirm": "Supprimer l’historique",
+  "agentSettings.deleteHistory.failed": "Impossible de supprimer l’historique.",
 
   "agentSettings.fullAccess.title": "Donner un accès complet à cet agent ?",
   "agentSettings.fullAccess.askTitle": "Laisser cet agent travailler hors de son espace de travail ?",
@@ -227,8 +235,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "agentSettings.quickAcknowledgement.title": "Montrer le plan avant les longues tâches",
-  "agentSettings.quickAcknowledgement.description":
-    "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "agentSettings.quickAcknowledgement.description": "Avant une longue tâche, l’agent montre son plan.",
   "agentSettings.browserProfile.label": "Profil de navigateur",
   "agentSettings.browserProfile.shared": "Partagé",
   "agentSettings.browserProfile.agent": "Cet agent uniquement",

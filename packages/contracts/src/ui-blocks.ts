@@ -321,7 +321,16 @@ export interface ConversationUiBlock {
    * block.
    */
   vault?: UiBlockVaultRequest;
+  /**
+   * The block is the form of `request_api_key` with the choice of who can use the key: the app draws
+   * the field `UI_API_KEY_SCOPE_FIELD_ID` small, next to the submit button. Only the host sets it. Not
+   * on the `ui-blocks-v1` wire: a remote client shows the field in the form.
+   */
+  apiKey?: true;
 }
+
+/** The field of the `request_api_key` form that selects who can use the key: all agents or the asking agent. */
+export const UI_API_KEY_SCOPE_FIELD_ID = "scope";
 
 // ---------------------------------------------------------------------------------------------------
 // Small predicates
@@ -819,6 +828,8 @@ function readConversationUiBlock(value: unknown): ConversationUiBlock {
     state: readState(spec, record.state),
   };
   if (record.vault !== undefined) block.vault = readVaultRequest(spec, record.vault);
+  // Only a look: a wrong value drops the key, not the block.
+  if (record.apiKey === true && spec.type === "form") block.apiKey = true;
   return block;
 }
 

@@ -29,7 +29,7 @@ import {
   hostedSiteEventMessageId,
   hostedSiteTool,
 } from "./hosted-site-events";
-import { type OpenBotToolResponse, openBotToolResult, siteToolString } from "./routine-tools";
+import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult, siteToolString } from "./routine-tools";
 import { checkAgentFolders, workspaceWritableRoots } from "./workspace-sandbox";
 
 /** The openbot.site host, injected so the backend never depends on the account Worker directly. */
@@ -72,6 +72,8 @@ export interface HostedSiteCoordinatorOptions {
   hostedSites: AgentHostedSites | null;
   emitError(code: string, error: unknown, agentId?: string): void;
   isStopping(): boolean;
+  /** Takes secrets out of a failure reason before the agent reads it. */
+  redact(text: string): string;
 }
 
 interface HostedSiteApprovalDetails {
@@ -102,6 +104,7 @@ export class HostedSiteCoordinator {
   readonly #hostedSites: AgentHostedSites | null;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #isStopping: () => boolean;
+  readonly #redact: (text: string) => string;
   readonly #pendingTerminalEvents = new Map<string, PendingHostedSiteTerminalEvent>();
   readonly #pendingTerminalDeliveries = new Map<string, () => void>();
   #terminalRetryTimer: NodeJS.Timeout | null = null;
@@ -112,6 +115,7 @@ export class HostedSiteCoordinator {
     this.#hostedSites = options.hostedSites;
     this.#emitError = options.emitError;
     this.#isStopping = options.isStopping;
+    this.#redact = options.redact;
   }
 
   /** Replays markers left behind by a crash, then closes out mutations that never terminated. */
@@ -141,7 +145,14 @@ export class HostedSiteCoordinator {
       });
       return null;
     }
-    const details = yield* this.#approvalDetailsEffect(params, tool);
+    const prepared = yield* Effect.result(this.#approvalDetailsEffect(params, tool));
+    if (Result.isFailure(prepared)) {
+      // An unknown site or a bad argument is a failed tool result that the agent can correct.
+      if (client.running) client.respond(request.id, this.#failureResult(prepared.failure.cause));
+      this.#emitError("server_request_failed", prepared.failure.cause);
+      return null;
+    }
+    const details = prepared.success;
     const mutation: HostedSiteMutationContext = {
       agentId,
       operationId: randomUUID(),
@@ -201,8 +212,10 @@ export class HostedSiteCoordinator {
     const result = yield* Effect.result(this.#executeMutationEffect(mutation));
     if (Result.isFailure(result)) {
       const error = result.failure.cause;
+      // A JSON-RPC error reaches a Codex agent only as "dynamic tool request failed" (#6779). A failed tool
+      // result gives it the reason, for example a source that is not a folder, so it can correct the call.
       this.#recordTerminalEvent(mutation, "failed", mutation.eventDetails, () => {
-        target.client.respondError(target.id, { code: -32603, message: String(error) });
+        target.client.respond(target.id, this.#failureResult(error));
       });
       this.#emitError("server_request_failed", error, target.agentId);
     }
@@ -231,6 +244,10 @@ export class HostedSiteCoordinator {
     this.#terminalRetryTimer = null;
     this.#pendingTerminalEvents.clear();
     this.#pendingTerminalDeliveries.clear();
+  }
+
+  #failureResult(error: unknown): OpenBotToolResponse {
+    return openBotToolFailure(this.#redact(error instanceof Error ? error.message : String(error)));
   }
 
   #requireHostedSites(): AgentHostedSites {

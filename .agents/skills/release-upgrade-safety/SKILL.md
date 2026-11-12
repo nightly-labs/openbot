@@ -29,6 +29,33 @@ This runs *before* `docs/RELEASING.md`, which stays authoritative for the publis
 - It never runs `bun run dev:seed` or `dev:reset` — both destroy the developer's own profile — and
   never `pkill -f`, which kills other sessions' work mid-write.
 
+## Subagents and models
+
+Give each gate, and each release task after the audit, to its own subagent. Do not give every
+subagent the session model. Select the smallest tier that can do the task, and set the model
+explicitly on each spawn: an omitted model uses the session model. In Claude Code, set `model` on
+the `Agent` call. In a harness that has no model choice, use a lower reasoning effort.
+
+| Tier | Claude Code | Tasks |
+| --- | --- | --- |
+| Strong | the session model | Step 1 residue, gates A, B, C and E, gate F when `electron-updater` moved, the Step 3 verdict |
+| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the translation wording review, the Discord announcement draft |
+| Small | `haiku` | gate H, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
+
+- **Translations:** give each small-tier subagent a few locales, the English entry, and the
+  [i18n.md terms](../../../docs/i18n.md#terms). Then run `bun scripts/whats-new-translations.ts <version>`
+  once. It checks only the version, the date and the counts of notices and items, not the wording.
+  Then give all locales to one medium-tier subagent. It compares the terms, the tone, the screen
+  names and the headline endings with the i18n terms, and corrects them. Accept a translation only
+  after this review.
+- **Do not raise the tier because a gate is long.** Raise it when the task needs judgment: a hazard
+  that can lose user data, or a frozen wire format.
+- **Check the evidence of each report** before you accept it, as `AGENTS.md` says. A small-tier
+  "no hit" passes only when its command can still find a hit (see Step 2). When a report has no
+  evidence, run the task again one tier higher. Do not do it again yourself.
+- The session model writes the Step 3 table and each stop. A subagent verdict is evidence, not the
+  verdict.
+
 ## Step 1 — establish the range, then account for every file in it
 
 ```bash
@@ -128,10 +155,11 @@ a gate can be selected without opening anything:
 - **H. Signal** — no reference file.
   always triggered: an earlier release can have left Signal behind, so a range with no `remote/`
   change does not prove that Signal is current. Signal is not deployed by CI or by the release
-  workflow. Read `commit` from `curl -fsS https://signal.openbot.run/health/live`; if it is missing,
-  `unknown`, or not a commit in this repository, the verdict is **needs a human**. Pass when
-  `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
-  succeeds. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
+  workflow. Read `commit` from `curl -fsS https://signal1.openbot.run/health/live` and
+  `curl -fsS https://signal2.openbot.run/health/live` (not `signal.openbot.run`, which reaches only the
+  entry machine); if a commit is missing, `unknown`, or not a commit in this repository, the verdict is
+  **needs a human**. Pass when `git diff --quiet <running commit> HEAD -- remote packages/contracts/src/signal-protocol`
+  succeeds for both commits. Otherwise the verdict is **deploy Signal from the new tag** before the tag is pushed
   (`docs/RELEASING.md` preflight item 16); this is not a stop for the version bump. #1661 is the
   failure this catches: v0.33.0 clients sent webhook routes to a Signal older than #1520.
 

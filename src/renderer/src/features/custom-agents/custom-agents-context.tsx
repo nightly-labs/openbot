@@ -1,6 +1,6 @@
 import { onSettled } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
-import { customAgentsPort } from "./custom-agents-port";
+import { localCustomAgentsApi } from "./custom-agents-port";
 import { createCustomAgentsStore } from "./stores/custom-agents-store";
 
 /**
@@ -10,7 +10,7 @@ import { createCustomAgentsStore } from "./stores/custom-agents-store";
 const CustomAgents = createSimpleContext({
   name: "Custom agents",
   init: () => {
-    const store = createCustomAgentsStore(() => customAgentsPort().customAgents);
+    const store = createCustomAgentsStore(localCustomAgentsApi);
     onSettled(() => {
       // As for the endpoints: a failure leaves the list empty, and Settings lists again on open.
       void store.refreshCustomAgents().catch(() => undefined);

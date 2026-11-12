@@ -1,5 +1,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import type {
+  AccountUsage,
+  AccountUsageWindow,
   AgentModelId,
   AgentProviderId,
   AgentProviderStatus,
@@ -26,32 +28,36 @@ import {
   providerDisplayName,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
+import { planLimitWindowKind, spentUsageWindow } from "@openbot/team-client/plan-limits";
 import {
+  Badge,
   Button,
   Input,
+  KeyRound,
+  Layers,
   Listbox,
   Plus,
   Popover,
   Progress,
-  RadioGroup,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   SlidersHorizontal,
-  Switch,
   Tabs,
+  Text,
   Tooltip,
   Zap,
 } from "@openbot/ui";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { formatUsageReset, usageWindowLabel } from "../features/account/account-usage-view";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
-import { providerAccountName } from "./provider-accounts";
+import { findModelOption, isApiKeyAccount, providerAccountName } from "./provider-accounts";
 import {
   customProviderIds,
   groupPickerModels,
@@ -78,9 +84,13 @@ interface ProviderModelPickerProps {
   icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort | undefined;
   onReasoningEffortChange?: ((effort: AgentReasoningEffort) => void) | undefined;
-  /** Fast mode. The picker shows its switch only for a model with a fast tier, and only with `onFastModeChange`. */
+  /**
+   * Fast mode. The picker shows its Speed select only for a model with a fast tier, and only with
+   * `onFastModeChange`. With `ultrafast`, the agent asks for the Ultrafast tier in place of Fast.
+   */
   fastMode?: boolean | undefined;
-  onFastModeChange?: ((fastMode: boolean) => void) | undefined;
+  ultrafast?: boolean | undefined;
+  onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
   disabled?: boolean | undefined;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
@@ -105,12 +115,25 @@ interface ProviderModelPickerProps {
   /** The agent's account. Absent or unknown means the provider's own sign-in. */
   providerAccountId?: string | null | undefined;
   /**
+   * The plan readings that the Usage rings show. A model that a spent window limits gets a mark;
+   * without a reading, no model does. The picker does not ask the provider again.
+   */
+  accountUsage?: AccountUsage | null | undefined;
+  /**
    * The agent's provider when this build does not know it. The host still runs the agent, so the
    * picker shows its model, and it cannot open until OpenBot is updated.
    */
   foreignProvider?: ForeignProviderId | undefined;
-  /** `accountId` is passed only with `accountChoice`, for a provider with more than one account: null for its own sign-in. */
-  onChange: (model: AgentModelId, provider: AgentProviderId, accountId?: string | null) => void;
+  /**
+   * `accountId` is passed only with `accountChoice`, for a provider with more than one account: null for its own sign-in.
+   * `reasoningEffort` is the effort chosen on the model's tab before the model, when the model has it.
+   */
+  onChange: (
+    model: AgentModelId,
+    provider: AgentProviderId,
+    accountId?: string | null,
+    reasoningEffort?: AgentReasoningEffort,
+  ) => void;
 }
 
 /** Extra "custom" rail tab; widening the contract id would cost a migration. */
@@ -135,6 +158,14 @@ const RAIL_TOOLTIP = {
   skipDelayDuration: 300,
 } as const;
 
+/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/** When a spent window gives its quota back, in seconds. A window with no reset never does. */
+function resetTime(window: AccountUsageWindow | undefined): number {
+  return window?.resetsAt ?? Number.POSITIVE_INFINITY;
+}
+
 /** The part of the interface text that the provider helpers below read. */
 type PickerText = Pick<TextValue, "t" | "sourceText">;
 
@@ -146,7 +177,7 @@ const RUNTIME_ACTION_LABEL = {
   Download: "common.download",
 } as const satisfies Record<string, AppTextKey>;
 
-const REASONING_LABEL = {
+export const REASONING_LABEL = {
   none: "provider.effort.none",
   minimal: "provider.effort.minimal",
   low: "provider.effort.low",
@@ -169,14 +200,6 @@ const TRIGGER_SWAP: SwapMotion = {
   leave: { duration: 180, easing: "ease" },
 };
 
-/** More effort options than this keep the list: a row of segments gets too narrow. */
-const MAX_EFFORT_SEGMENTS = 5;
-/**
- * The labels of one segment row, in characters. The five English levels are 26 and just fit the
- * panel width; the five French levels, at 29, do not.
- */
-const MAX_EFFORT_SEGMENT_CHARACTERS = 26;
-
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const text = useText();
   const { t, format } = text;
@@ -190,33 +213,65 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const visibleProviders = createMemo(() =>
     PROVIDERS.filter((provider) => provider === CUSTOM_RAIL || !providerTurnedOff(props.agentStatus, provider)),
   );
-  /** The accounts that get rail entries: only a provider's with more than one, and only on request. */
+  /**
+   * The pool of a provider's accounts, while it is on: the provider then has one rail entry, and its
+   * agents use the account that the pool picks.
+   */
+  const railPool = (rail: RailId) => {
+    if (rail === CUSTOM_RAIL) return null;
+    const status = props.agentStatus?.providers?.find((row) => row.id === rail);
+    const pool = status?.accountPool;
+    if (!pool) return null;
+    const accounts = status?.accounts ?? [];
+    const members = accounts.filter((account) => !isApiKeyAccount(account.id) && !pool.leftOut.includes(account.id));
+    const accountsText = t("provider.account.count", { count: members.length });
+    const summary = t("provider.account.poolCount", { accounts: accountsText });
+    return {
+      inUse: pool.inUse,
+      summary:
+        pool.inUse && accounts.some((account) => account.id === pool.inUse)
+          ? t("provider.account.poolInUse", { pool: summary, name: providerAccountName(t, accounts, pool.inUse) })
+          : summary,
+    };
+  };
+  /**
+   * The accounts that get rail entries: only a provider's with more than one, and only on request. A
+   * pool has one entry for its accounts, and an entry for each API key, which is not in the pool.
+   */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
     if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
+    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id));
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
     visibleProviders().flatMap((rail): RailKey[] => {
       const accounts = railAccounts(rail);
       if (!accounts.length || rail === CUSTOM_RAIL) return [rail];
-      return accounts.map((account) =>
+      const keys = accounts.map((account) =>
         account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? rail : (`${rail}:${account.id}` as const),
       );
+      return railPool(rail) ? [rail, ...keys] : keys;
     }),
   );
-  /** The account for `onChange`: only a provider with account entries sends one. */
-  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined =>
-    railAccounts(provider).length ? accountId : undefined;
+  /**
+   * The account for `onChange`: only a provider with account entries sends one. The pool entry keeps
+   * the account that the pool picked, and sends one only to move the agent off an API key.
+   */
+  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined => {
+    if (!railAccounts(provider).length) return undefined;
+    const keepsPoolPick = railPool(provider) && accountId === null && currentAccount() === null;
+    return keepsPoolPick ? undefined : accountId;
+  };
   /** The agent's account when the rail lists it; otherwise the provider's own sign-in. */
   const currentAccount = (): string | null => {
     const id = props.providerAccountId;
     return id && railAccounts(props.provider).some((account) => account.id === id) ? id : null;
   };
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
-  const selectedModel = createMemo(() =>
-    props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
-  );
+  const modelOption = (provider: string, id: string) =>
+    findModelOption(props.modelOptions, props.agentStatus?.providers, provider, id);
+  const selectedModel = createMemo(() => modelOption(props.provider, props.value));
   const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
@@ -272,6 +327,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
   };
   /**
+   * True when each provider that runs a saved endpoint has read every one of them, so an endpoint
+   * without models was left out by the provider and no restart will bring them. A host that does not
+   * report it counts as still reading.
+   */
+  const endpointsRead = (): boolean => {
+    const harnesses = new Set<string>(customIds().values());
+    const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
+    return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
+  };
+  /**
    * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
    * and for `acp`, which runs the agents: it is available when either of the saved kinds is.
    */
@@ -291,6 +356,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const index = accounts.findIndex((account) => account.id === id);
     const account = accounts[index];
     return account ? { account, number: index + 1, name: providerAccountName(t, accounts, id) } : null;
+  };
+  /**
+   * The models of a rail entry: the provider's list, and then the models that only the entry's
+   * account serves, as a plan can serve more than the provider's own sign-in (#5217).
+   */
+  const entryModelOptions = (key: RailKey): ClientAgentModelOption[] => {
+    const shared = railModelOptions(railOf(key));
+    const own = entryAccount(key)?.account.models ?? [];
+    return own.length ? [...shared, ...own] : shared;
   };
   /** An account after the first that is not signed in cannot run its models, whatever the provider says. */
   const entryStatus = (key: RailKey): AgentProviderStatus => {
@@ -341,13 +415,89 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
-  const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
-  const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
-    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status, text);
+  /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
+  const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
+    status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
+  const railSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    return rail === CUSTOM_RAIL ? customSummary() : (poolSummary(key, status) ?? providerSummary(rail, status, text));
+  };
+  const railHeadingSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    if (rail !== CUSTOM_RAIL) return poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
+  /**
+   * A window that ended gives the quota back, and its reading stays as it was until something asks
+   * the provider again. So the clock is part of the state. It moves when the picker opens and at the
+   * next reset while it is open.
+   */
+  const [now, setNow] = createSignal(Date.now());
+  /** The spent plan window that limits a model of a rail entry now. Each account has its own quota. */
+  const spentWindow = (rail: RailId, accountId: string | null, model: string): AccountUsageWindow | undefined => {
+    if (rail === CUSTOM_RAIL) return undefined;
+    const spent = spentUsageWindow(
+      props.accountUsage?.limits,
+      rail,
+      accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID,
+      model,
+      now(),
+    );
+    return spent?.covers ? spent.window : undefined;
+  };
+  /** The spent window of each model of a rail entry, in the order of the models. */
+  const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {
+    const rail = railOf(key);
+    if (rail === CUSTOM_RAIL || !props.accountUsage) return [];
+    // A pool is spent only when the account that it uses is: it uses another one before a limit.
+    const accountId = key === rail ? (railPool(rail)?.inUse ?? null) : key.slice(rail.length + 1);
+    return entryModelOptions(key).map((model) => spentWindow(rail, accountId, model.id));
+  };
+  /**
+   * The spent window of a rail entry when one limits every model of the entry: the one that resets
+   * first, as that is when a model can run again.
+   */
+  const entrySpentWindow = (key: RailKey): AccountUsageWindow | undefined => {
+    const windows = entrySpentWindows(key);
+    let first: AccountUsageWindow | undefined;
+    for (const window of windows) {
+      if (!window) return undefined;
+      if (!first || resetTime(window) < resetTime(first)) first = window;
+    }
+    return first;
+  };
+  /** The chip beside the provider name: the spent window and its reset. */
+  const spentChipText = (window: AccountUsageWindow): string => {
+    const limit =
+      planLimitWindowKind(window.windowDurationMins).kind === "limit"
+        ? t("provider.picker.usageLimit")
+        : t("provider.picker.usageLimitWindow", { window: usageWindowLabel(window.windowDurationMins, text) });
+    const time = formatUsageReset(window.resetsAt, text);
+    return time ? t("provider.picker.usageLimitResets", { limit, time }) : limit;
+  };
+  /** A row or tab name with its spent window, for a screen reader. The rows and the tabs show no mark. */
+  const spentLabel = (name: string, window: AccountUsageWindow | undefined): string => {
+    if (!window) return name;
+    const time = formatUsageReset(window.resetsAt, text);
+    return time
+      ? t("provider.picker.usageLimitResetsLabel", { name, time })
+      : t("provider.picker.usageLimitLabel", { name });
+  };
+  createEffect(
+    () => {
+      if (!open()) return null;
+      const next = Math.min(...visibleKeys().flatMap((key) => entrySpentWindows(key).map(resetTime)));
+      return Number.isFinite(next) ? next : null;
+    },
+    (resetsAt) => {
+      if (resetsAt === null) return;
+      // A month is longer than the longest delay that a timer takes. The picker is not open that long.
+      const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, resetsAt * 1_000 - Date.now()));
+      const timer = window.setTimeout(() => setNow(Date.now()), delay);
+      return () => window.clearTimeout(timer);
+    },
+  );
 
   createEffect(
     () => ({ key: activeKey(), open: open(), visible: visibleKeys(), rail: railProvider() }),
@@ -379,21 +529,47 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     },
   );
 
+  /**
+   * An effort chosen on a tab that does not hold the agent's model. The next model picked there gets it.
+   * `variant` is the suffix of an OpenCode variant id (`<model>/<variant>`); "" is the model's default.
+   */
+  const [queuedEffort, setQueuedEffort] = createSignal<
+    { key: RailKey; effort: AgentReasoningEffort } | { key: RailKey; variant: string }
+  >();
+
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
     if (next) {
+      setNow(Date.now());
       setOpenedKeys(untrack(() => railKeys().filter(entryUsable)));
       const key = activeKey();
       setRailProvider(visibleKeys().includes(key) ? key : (visibleKeys()[0] ?? CUSTOM_RAIL));
       setSearch("");
+      setQueuedEffort(undefined);
     }
     setOpen(next);
   }
 
-  function selectModel(option: PickerModel, accountId: string | null): void {
+  function selectModel(option: PickerModel, accountId: string | null, key: RailKey): void {
     if (props.disabled || !modelAvailable(option)) return;
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
-    props.onChange(option.id, option.provider, chosenAccount(option.provider, accountId));
+    const queued = queuedEffort();
+    setQueuedEffort(undefined);
+    const account = chosenAccount(option.provider, accountId);
+    if (queued?.key !== key) {
+      props.onChange(option.id, option.provider, account);
+      return;
+    }
+    if ("variant" in queued) {
+      const variantId = queued.variant ? `${option.id}/${queued.variant}` : option.id;
+      const variant = option.variants.find((variant) => variant.id === variantId);
+      props.onChange(variant?.id ?? option.id, option.provider, account);
+      return;
+    }
+    const effort = modelOption(option.provider, option.id)?.supportedReasoningEfforts.includes(queued.effort)
+      ? queued.effort
+      : undefined;
+    props.onChange(option.id, option.provider, account, effort);
   }
 
   function selectRailProvider(provider: RailKey): void {
@@ -443,15 +619,53 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerAccount = () => {
     if (props.foreignProvider !== undefined) return null;
     const accounts = railAccounts(props.provider);
-    return accounts.length ? providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID) : null;
+    if (!accounts.length || (railPool(props.provider) && currentAccount() === null)) return null;
+    return providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID);
   };
-  /** Fast mode, only while the model has a fast tier: another model runs at standard speed. */
-  const triggerFast = () =>
-    props.foreignProvider === undefined &&
-    (selectedFixed()?.fast === true ||
-      (props.fastMode === true && props.onFastModeChange !== undefined && Boolean(selectedModel()?.fastServiceTier)));
+  /** The saved speed. It can name a tier that the model does not have. */
+  const savedSpeed = (): Speed =>
+    props.fastMode !== true ? "standard" : props.ultrafast === true ? "ultrafast" : "fast";
+  /**
+   * The tier that the next turn uses. A model without a fast tier runs at the standard tier, and
+   * Ultrafast on a model without that tier runs at Fast.
+   */
+  const speed = (): Speed => {
+    const model = selectedModel();
+    const saved = savedSpeed();
+    if (saved === "standard" || !model?.fastServiceTier) return "standard";
+    return saved === "ultrafast" && model.ultrafastServiceTier ? "ultrafast" : "fast";
+  };
+  /** The speed in the trigger, only while the model has the tier: another model runs at standard speed. */
+  const triggerSpeed = (): Speed => {
+    if (props.foreignProvider !== undefined) return "standard";
+    if (selectedFixed()?.fast === true) return "fast";
+    return props.onFastModeChange ? speed() : "standard";
+  };
+  const triggerSpeedName = () => {
+    const value = triggerSpeed();
+    return value === "standard" ? null : speedName(value, t);
+  };
+  /**
+   * The model name in the trigger. Beside an account it has no provider word, because the mark
+   * shows the provider and the account needs the room. The tooltip and the label keep the full name.
+   * A form field has the room of its row and keeps the full name.
+   */
+  const triggerShownName = () => {
+    const name = triggerModelName();
+    const prefix = `${railName(activeProvider(), t)} `;
+    return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
+  };
+  /** True while the agent's provider pools its accounts and the agent is not on an API key. */
+  const triggerPool = () =>
+    props.foreignProvider === undefined && railPool(props.provider) !== null && currentAccount() === null;
   const triggerSummary = () =>
-    [triggerModelName(), triggerEffort(), triggerFast() ? t("provider.picker.fast") : null, triggerAccount()]
+    [
+      triggerModelName(),
+      triggerEffort(),
+      triggerSpeedName(),
+      triggerAccount(),
+      triggerPool() ? t("provider.account.poolChip") : null,
+    ]
       .filter(Boolean)
       .join(" · ");
 
@@ -502,7 +716,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 );
               }}
             </For>
-            <SwapLabel class="provider-model-trigger-name" text={triggerModelName()} motion={TRIGGER_SWAP} />
+            <SwapLabel class="provider-model-trigger-name" text={triggerShownName()} motion={TRIGGER_SWAP} />
             <Show when={triggerEffort()}>
               {(effort) => (
                 <span class="provider-model-trigger-effort">
@@ -510,11 +724,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 </span>
               )}
             </Show>
-            <Show when={triggerFast()}>
-              <span class="provider-model-trigger-effort provider-model-trigger-fast">
-                <Zap aria-hidden="true" />
-                <SwapLabel text={t("provider.picker.fast")} motion={TRIGGER_SWAP} />
-              </span>
+            <Show when={triggerSpeedName()}>
+              {(name) => (
+                <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                  <Zap aria-hidden="true" />
+                  <SwapLabel text={name()} motion={TRIGGER_SWAP} />
+                </span>
+              )}
             </Show>
             <Show when={triggerAccount()}>
               {(account) => (
@@ -522,6 +738,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   <SwapLabel text={account()} motion={TRIGGER_SWAP} />
                 </span>
               )}
+            </Show>
+            <Show when={triggerPool()}>
+              <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                <Layers aria-hidden="true" />
+                {t("provider.account.poolChip")}
+              </span>
             </Show>
           </span>
           <ChevronDownIcon />
@@ -576,7 +798,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               },
                             ]}
                             data-state={status().state}
-                            aria-label={`${name()}: ${railSummary(provider, status())}`}
+                            aria-label={spentLabel(
+                              `${name()}: ${railSummary(key, status())}`,
+                              status().state === "available" ? entrySpentWindow(key) : undefined,
+                            )}
                             onClick={(event) => {
                               const target = event.currentTarget;
                               selectRailProvider(key);
@@ -599,17 +824,26 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             <ProviderMark provider={provider} large />
                             <Show when={account()}>
                               {(entry) => (
+                                // An API key bills the key's credit, not the plan of the other accounts,
+                                // so its badge is a key, not a number (#5550).
                                 <span class="provider-model-rail-account" aria-hidden="true">
-                                  {entry().number}
+                                  <Show when={isApiKeyAccount(entry().account.id)} fallback={entry().number}>
+                                    <KeyRound />
+                                  </Show>
                                 </span>
                               )}
+                            </Show>
+                            <Show when={key === provider && railPool(provider)}>
+                              <span class="provider-model-rail-account" aria-hidden="true">
+                                <Layers />
+                              </span>
                             </Show>
                           </Tabs.Trigger>
                         </Tooltip.Trigger>
                         <Tooltip.Portal>
                           <Tooltip.Content class="provider-model-rail-tooltip">
                             <strong>{name()}</strong>
-                            <small>{railSummary(provider, status())}</small>
+                            <small>{railSummary(key, status())}</small>
                           </Tooltip.Content>
                         </Tooltip.Portal>
                       </Tooltip.Root>
@@ -656,10 +890,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return id && id !== DEFAULT_PROVIDER_ACCOUNT_ID ? id : null;
                 };
                 const status = () => entryStatus(key);
-                const models = createMemo(() => pickerModels(railModelOptions(provider)));
-                const groups = createMemo(() => groupPickerModels(models(), search()));
+                const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
+                const [showOlder, setShowOlder] = createSignal(false);
+                const olderExpanded = () => (showOlder() ? "true" : "false");
                 // An endpoint and a custom agent can both list `goose/default`: match the provider too.
-                // Another account of the same provider lists the same models, but not this agent's.
+                // Another account of the same provider can list the same models, but not this agent's.
                 const selected = createMemo(() =>
                   accountId() !== currentAccount()
                     ? undefined
@@ -673,6 +908,18 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   const model = selected();
                   return model ? pickerModelKey(model) : props.value;
                 };
+                // The host folds the models that its default hides under Older models, at the end of
+                // the list. A search finds them too, and the selected model stays in the main list.
+                const searching = () => search().trim() !== "";
+                const older = createMemo(() =>
+                  models().filter((model) => model.listing === "older" && model !== selected()),
+                );
+                const main = createMemo(() =>
+                  models().filter((model) => model.listing !== "older" || model === selected()),
+                );
+                const folds = () => !searching() && older().length > 0 && main().length > 0;
+                const groups = createMemo(() => groupPickerModels(folds() ? main() : models(), search()));
+                const olderGroups = createMemo(() => (folds() && showOlder() ? groupPickerModels(older(), "") : []));
                 // OpenCode or Pi and Custom share one wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
                   provider === CUSTOM_RAIL
@@ -680,21 +927,78 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     : provider === props.provider &&
                       accountId() === currentAccount() &&
                       (!isCustomProviderHarness(props.provider) || Boolean(selected()));
-                const effortOptions = createMemo(() => {
-                  if (!ownsSelection()) return [];
-                  if (selected()?.variants.length) return selected()?.variants ?? [];
-                  return showsReasoningEffort() && selectedModel()?.reasoningEffortConfigurable !== false
-                    ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
-                        id: effort,
-                        name: reasoningLabel(effort, t),
-                      }))
-                    : [];
-                });
-                const effortValue = () => (selected()?.variants.length ? props.value : props.reasoningEffort);
+                /** One list of the rail: the main list, or the older models below the fold row. */
+                function modelList(list: { label: string; groups: PickerModelGroup[] }): JSX.Element {
+                  return (
+                    <Listbox.Root<PickerModel, PickerModelGroup>
+                      class="provider-model-list"
+                      aria-label={list.label}
+                      options={list.groups}
+                      optionGroupChildren="models"
+                      renderSection={(section) => (
+                        <Show when={section.rawValue.name}>
+                          <Listbox.Section class="provider-model-group">{section.rawValue.name}</Listbox.Section>
+                        </Show>
+                      )}
+                      optionValue={pickerModelKey}
+                      optionTextValue={(model) => displayModelName(model.name, model.id)}
+                      optionDisabled={(model) => !modelEnabled(model)}
+                      value={[selectedKey()]}
+                      selectionMode="single"
+                      disallowEmptySelection
+                      shouldFocusWrap
+                      renderItem={(item) => {
+                        const model = item.rawValue;
+                        const isSelected = () => selectedKey() === pickerModelKey(model);
+                        const settings = () =>
+                          fixedModelSettingsText(fixedModelSettings(modelOption(model.provider, model.id)), t);
+                        const label = () =>
+                          [displayModelName(model.name, model.id), settings()].filter(Boolean).join(", ");
+                        return (
+                          <Listbox.Item
+                            as="button"
+                            item={item}
+                            type="button"
+                            class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
+                            aria-label={spentLabel(
+                              model.id === railDefaultModel(provider)
+                                ? t("provider.picker.defaultModelLabel", { name: label() })
+                                : label(),
+                              spentWindow(provider, accountId(), model.id),
+                            )}
+                            disabled={!modelEnabled(model)}
+                            onClick={() => {
+                              if (!isSelected()) selectModel(model, accountId(), key);
+                            }}
+                          >
+                            <span class="provider-model-option-name">
+                              <span>{displayModelName(model.name, model.id)}</span>
+                              <Show when={settings()}>
+                                {(text) => <span class="provider-model-option-settings">{text()}</span>}
+                              </Show>
+                              <Show when={model.free}>
+                                <small>{t("provider.model.free")}</small>
+                              </Show>
+                              <Show when={model.listing === "new"}>
+                                <small>{t("provider.model.new")}</small>
+                              </Show>
+                              <Show when={model.id === railDefaultModel(provider)}>
+                                <small>{t("provider.model.default")}</small>
+                              </Show>
+                            </span>
+                            <Show when={isSelected()}>
+                              <CheckIcon />
+                            </Show>
+                          </Listbox.Item>
+                        );
+                      }}
+                    />
+                  );
+                }
                 const fades = createScrollFades();
                 onSettled(() => fades.stop);
                 createEffect(
-                  () => ({ groups: groups(), active: railProvider(), open: open() }),
+                  () => ({ groups: groups(), older: olderGroups(), active: railProvider(), open: open() }),
                   () => fades.remeasure(),
                 );
                 const available = () => status().state === "available";
@@ -702,15 +1006,57 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const modelEnabled = (model: PickerModel) =>
                   modelAvailable(model) && (accountId() === null || available());
                 const effortLocked = () => !available();
+                /** A spent window that limits every model of the tab: a chip beside the provider name. */
+                const headingSpent = createMemo(() => (available() ? entrySpentWindow(key) : undefined));
+                const pickerModelOption = (model: PickerModel | undefined) =>
+                  model && modelOption(model.provider, model.id);
+                /** The model the effort is for: the agent's model, or the one this tab starts on. */
+                const effortModel = createMemo(() => {
+                  if (ownsSelection()) return selected();
+                  const list = main().filter(modelEnabled);
+                  return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
+                });
+                const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
+                const effortOptions = createMemo(() => {
+                  const variants = effortModel()?.variants ?? [];
+                  if (variants.length) return variants;
+                  const option = effortOption();
+                  return showsReasoningEffort() && option && option.reasoningEffortConfigurable !== false
+                    ? option.supportedReasoningEfforts.map((effort) => ({
+                        id: effort,
+                        name: reasoningLabel(effort, t),
+                      }))
+                    : [];
+                });
+                const effortValue = () => {
+                  const model = effortModel();
+                  const queued = queuedEffort();
+                  if (model?.variants.length) {
+                    if (ownsSelection()) return props.value;
+                    if (queued?.key !== key || !("variant" in queued)) return model.id;
+                    return queued.variant ? `${model.id}/${queued.variant}` : model.id;
+                  }
+                  if (ownsSelection()) return props.reasoningEffort;
+                  if (queued?.key === key && "effort" in queued) return queued.effort;
+                  // A model change keeps the agent's effort when the new model has it.
+                  const option = effortOption();
+                  const current = props.reasoningEffort;
+                  return current && option?.supportedReasoningEfforts.includes(current)
+                    ? current
+                    : option?.defaultReasoningEffort;
+                };
                 function chooseEffort(id: string): void {
                   if (props.disabled || effortLocked() || id === effortValue()) return;
-                  const model = selected();
-                  if (model?.variants.length)
-                    props.onChange(id, model.provider, chosenAccount(model.provider, accountId()));
-                  else {
-                    const effort = selectedModel()?.supportedReasoningEfforts.find((effort) => effort === id);
-                    if (effort) props.onReasoningEffortChange?.(effort);
+                  const model = effortModel();
+                  if (model?.variants.length) {
+                    if (ownsSelection()) props.onChange(id, model.provider, chosenAccount(model.provider, accountId()));
+                    else setQueuedEffort({ key, variant: id === model.id ? "" : id.slice(model.id.length + 1) });
+                    return;
                   }
+                  const effort = effortOption()?.supportedReasoningEfforts.find((effort) => effort === id);
+                  if (!effort) return;
+                  if (ownsSelection()) props.onReasoningEffortChange?.(effort);
+                  else setQueuedEffort({ key, effort });
                 }
                 // The provider the tab's status is for: a custom agent has no runtime OpenBot downloads.
                 const runtime = () => {
@@ -769,12 +1115,24 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     aria-label={t("provider.picker.models", { name: entryName(key) })}
                   >
                     <div class="provider-model-heading">
-                      <div class="provider-model-heading-text">
+                      <div
+                        class={[
+                          "provider-model-heading-text",
+                          { "provider-model-heading-limited": Boolean(headingSpent()) },
+                        ]}
+                      >
                         <strong>{entryName(key)}</strong>
+                        <Show when={headingSpent()}>
+                          {(window) => (
+                            <Badge as="small" variant="destructive-light" class="provider-model-limit">
+                              {spentChipText(window())}
+                            </Badge>
+                          )}
+                        </Show>
                         <span>
                           {account() && status().state === "available"
-                            ? (account()?.account.email ?? railHeadingSummary(provider, status()))
-                            : railHeadingSummary(provider, status())}
+                            ? (account()?.account.email ?? railHeadingSummary(key, status()))
+                            : railHeadingSummary(key, status())}
                         </span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && !props.onManageProviders && props.onAddCustomProvider}>
@@ -847,125 +1205,99 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 fallback={
                                   search().trim()
                                     ? t("provider.picker.noMatches")
-                                    : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                      provider === "muse"
+                                      ? t("provider.picker.museNoModels")
+                                      : t("provider.picker.noModels", { name: railName(provider, t) })
                                 }
                               >
-                                <span>{t("provider.picker.customEmpty")}</span>
+                                {/* A saved endpoint lists no model until its provider restarts and reads it. */}
+                                <Show
+                                  when={props.customProviders?.length && endpointsRead()}
+                                  fallback={
+                                    <span>
+                                      {props.customProviders?.length
+                                        ? t("provider.picker.customPending")
+                                        : t("provider.picker.customEmpty")}
+                                    </span>
+                                  }
+                                >
+                                  <span>
+                                    {t("provider.picker.customUnlisted", { name: railName(endpointStatus().id, t) })}
+                                  </span>
+                                  <Show when={props.onManageProviders}>
+                                    {(manageProviders) => (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="outline"
+                                        onClick={() => {
+                                          trigger?.focus({ preventScroll: true });
+                                          setOpen(false);
+                                          if (trigger) manageProviders()(trigger);
+                                        }}
+                                      >
+                                        {t("provider.picker.editEndpoints")}
+                                      </Button>
+                                    )}
+                                  </Show>
+                                </Show>
                               </Show>
                             </div>
                           </Show>
                         }
                       >
-                        <Listbox.Root<PickerModel, PickerModelGroup>
-                          class="provider-model-list"
-                          aria-label={t("provider.picker.models", { name: railName(provider, t) })}
-                          options={groups()}
-                          optionGroupChildren="models"
-                          renderSection={(section) => (
-                            <Show when={section.rawValue.name}>
-                              <Listbox.Section class="provider-model-group">{section.rawValue.name}</Listbox.Section>
-                            </Show>
-                          )}
-                          optionValue={pickerModelKey}
-                          optionTextValue={(model) => displayModelName(model.name, model.id)}
-                          optionDisabled={(model) => !modelEnabled(model)}
-                          value={[selectedKey()]}
-                          selectionMode="single"
-                          disallowEmptySelection
-                          shouldFocusWrap
-                          renderItem={(item) => {
-                            const model = item.rawValue;
-                            const isSelected = () => selectedKey() === pickerModelKey(model);
-                            const settings = () =>
-                              fixedModelSettingsText(
-                                fixedModelSettings(
-                                  props.modelOptions.find(
-                                    (option) => option.provider === model.provider && option.id === model.id,
-                                  ),
-                                ),
-                                t,
-                              );
-                            const label = () =>
-                              [displayModelName(model.name, model.id), settings()].filter(Boolean).join(", ");
-                            return (
-                              <Listbox.Item
-                                as="button"
-                                item={item}
-                                type="button"
-                                class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
-                                aria-label={
-                                  model.id === railDefaultModel(provider)
-                                    ? t("provider.picker.defaultModelLabel", { name: label() })
-                                    : label()
-                                }
-                                disabled={!modelEnabled(model)}
-                                onClick={() => {
-                                  if (!isSelected()) selectModel(model, accountId());
-                                }}
-                              >
-                                <span class="provider-model-option-name">
-                                  <span>{displayModelName(model.name, model.id)}</span>
-                                  <Show when={settings()}>
-                                    {(text) => <span class="provider-model-option-settings">{text()}</span>}
-                                  </Show>
-                                  <Show when={model.free}>
-                                    <small>{t("provider.model.free")}</small>
-                                  </Show>
-                                  <Show when={model.id === railDefaultModel(provider)}>
-                                    <small>{t("provider.model.default")}</small>
-                                  </Show>
-                                </span>
-                                <Show when={isSelected()}>
-                                  <CheckIcon />
-                                </Show>
-                              </Listbox.Item>
-                            );
-                          }}
-                        />
+                        {modelList({
+                          label: t("provider.picker.models", { name: railName(provider, t) }),
+                          groups: groups(),
+                        })}
+                        <Show when={folds()}>
+                          {/* A row of the list, so it takes the look of a model row. */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            class="provider-model-option provider-model-older"
+                            aria-expanded={olderExpanded()}
+                            onClick={() => setShowOlder((shown) => !shown)}
+                          >
+                            <span class="provider-model-option-name">
+                              <span>{t("provider.picker.olderModels")}</span>
+                              <small>{older().length}</small>
+                            </span>
+                            <ChevronDownIcon />
+                          </Button>
+                        </Show>
+                        <Show when={olderGroups().length > 0}>
+                          {modelList({
+                            label: t("provider.picker.olderModelsList", { name: railName(provider, t) }),
+                            groups: olderGroups(),
+                          })}
+                        </Show>
                       </Show>
                     </div>
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.effort")}</span>
-                        <Show
-                          when={
-                            effortOptions().length <= MAX_EFFORT_SEGMENTS &&
-                            effortOptions().reduce((length, option) => length + option.name.length, 0) <=
-                              MAX_EFFORT_SEGMENT_CHARACTERS
-                          }
-                          fallback={
-                            <Select<{ id: string; name: string }>
-                              class="provider-model-effort-select"
-                              options={effortOptions()}
-                              optionValue="id"
-                              optionTextValue="name"
-                              value={effortOptions().find((option) => option.id === effortValue())}
-                              onChange={(option) => option && chooseEffort(option.id)}
-                              itemComponent={(item) => (
-                                <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>
-                              )}
-                            >
-                              <SelectTrigger
-                                size="sm"
-                                aria-label={t("provider.picker.effortLabel")}
-                                disabled={effortLocked()}
-                              >
-                                <SelectValue<{ id: string; name: string }>>
-                                  {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent class="provider-model-effort-content" />
-                            </Select>
-                          }
+                        <Select<{ id: string; name: string }>
+                          class="provider-model-effort-select"
+                          options={effortOptions()}
+                          optionValue="id"
+                          optionTextValue="name"
+                          value={effortOptions().find((option) => option.id === effortValue())}
+                          onChange={(option) => option && chooseEffort(option.id)}
+                          itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
                         >
-                          <EffortSegments
-                            label={t("provider.picker.effortLabel")}
-                            options={effortOptions()}
-                            value={effortValue()}
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t("provider.picker.effortLabel")}
                             disabled={effortLocked()}
-                            onChange={chooseEffort}
-                          />
-                        </Show>
+                          >
+                            <SelectValue<{ id: string; name: string }>>
+                              {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent class="provider-model-effort-content" />
+                        </Select>
                       </div>
                     </Show>
                     <Show when={ownsSelection() && effortOptions().length === 0 && selectedFixed()?.effort}>
@@ -983,13 +1315,42 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </Show>
                     <Show when={ownsSelection() && selectedModel()?.fastServiceTier && props.onFastModeChange}>
                       <div class="provider-model-effort">
-                        <span>{t("provider.picker.fast")}</span>
-                        <Switch
-                          aria-label={t("provider.picker.fastLabel")}
-                          checked={props.fastMode === true}
-                          disabled={props.disabled || effortLocked()}
-                          onChange={(next) => props.onFastModeChange?.(next)}
-                        />
+                        <span>{t("provider.picker.speed")}</span>
+                        <Select<SpeedOption>
+                          class="provider-model-effort-select"
+                          options={selectedModel()?.ultrafastServiceTier ? ALL_SPEEDS : FAST_SPEEDS}
+                          optionValue="id"
+                          optionTextValue={(option) => speedName(option.id, t)}
+                          value={SPEED_OPTIONS[speed()]}
+                          sameWidth={false}
+                          placement="bottom-end"
+                          onChange={(option) => {
+                            if (!option || option.id === savedSpeed() || props.disabled || effortLocked()) return;
+                            props.onFastModeChange?.(option.id !== "standard", option.id === "ultrafast");
+                          }}
+                          itemComponent={(item) => (
+                            <SelectItem item={item.item} class="provider-model-speed-item">
+                              <span class="provider-model-speed-name">{speedName(item.item.rawValue.id, t)}</span>
+                              <Text variant="caption" tone="muted">
+                                {t(SPEED_TEXT[item.item.rawValue.id])}
+                              </Text>
+                            </SelectItem>
+                          )}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t("provider.picker.speed")}
+                            disabled={props.disabled || effortLocked()}
+                          >
+                            <SelectValue<SpeedOption>>
+                              {(state) => {
+                                const option = state.selectedOption();
+                                return option ? speedName(option.id, t) : null;
+                              }}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent class="provider-model-effort-content provider-model-speed-content" />
+                        </Select>
                       </div>
                     </Show>
                   </Tabs.Content>
@@ -1098,97 +1459,38 @@ function fixedModelSettingsText(settings: FixedModelSettings | null, t: AppTrans
     .join(" · ");
 }
 
+type Speed = "standard" | "fast" | "ultrafast";
+
+interface SpeedOption {
+  id: Speed;
+}
+
+// Constant arrays: a Select that gets a new options array on each change can loop.
+const SPEED_OPTIONS: Record<Speed, SpeedOption> = {
+  standard: { id: "standard" },
+  fast: { id: "fast" },
+  ultrafast: { id: "ultrafast" },
+};
+const FAST_SPEEDS: SpeedOption[] = [SPEED_OPTIONS.standard, SPEED_OPTIONS.fast];
+const ALL_SPEEDS: SpeedOption[] = [...FAST_SPEEDS, SPEED_OPTIONS.ultrafast];
+
+const SPEED_NAME: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standard",
+  fast: "provider.picker.fast",
+  ultrafast: "provider.picker.ultrafast",
+};
+const SPEED_TEXT: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standardText",
+  fast: "provider.picker.fastText",
+  ultrafast: "provider.picker.ultrafastText",
+};
+
+function speedName(speed: Speed, t: AppTranslate): string {
+  return t(SPEED_NAME[speed]);
+}
+
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
   return t(REASONING_LABEL[effort]);
-}
-
-interface EffortOption {
-  id: string;
-  name: string;
-}
-
-/**
- * Effort as a radio group of segments. The chosen segment has a pill under it that slides to a new
- * choice, with the SlidingTabs timing. SlidingTabs itself is a tab list; this is a choice of value.
- */
-function EffortSegments(props: {
-  label: string;
-  options: readonly EffortOption[];
-  value: string | undefined;
-  disabled: boolean;
-  onChange: (id: string) => void;
-}) {
-  let group: HTMLElement | undefined;
-  let pill: HTMLSpanElement | undefined;
-  let chosen = -1;
-  let placed = false;
-
-  /** The first placement and a resize put the pill in place at once; a new choice slides it. */
-  function placePill(slide: boolean): void {
-    if (!group || !pill) return;
-    const control = group.querySelectorAll<HTMLElement>(".provider-model-effort-segment-control")[chosen];
-    pill.hidden = !control;
-    if (!control) return;
-    const still = !slide || !placed;
-    if (still) pill.dataset.initializing = "";
-    pill.style.width = `${control.offsetWidth}px`;
-    pill.style.transform = `translateX(${control.offsetLeft}px)`;
-    if (still) {
-      pill.getBoundingClientRect();
-      delete pill.dataset.initializing;
-    }
-    placed = true;
-  }
-
-  createEffect(
-    () => props.options.findIndex((option) => option.id === props.value),
-    (index) => {
-      chosen = index;
-      placePill(true);
-    },
-  );
-  const resize = new ResizeObserver(() => placePill(false));
-  onCleanup(() => resize.disconnect());
-
-  return (
-    <RadioGroup.Root
-      ref={(element: HTMLElement) => {
-        group = element;
-        resize.observe(element);
-      }}
-      class="provider-model-effort-segments"
-      aria-label={props.label}
-      orientation="horizontal"
-      value={props.value ?? ""}
-      disabled={props.disabled}
-      onChange={props.onChange}
-    >
-      <span ref={pill} class="provider-model-effort-pill" aria-hidden="true" />
-      {/* Keyed by id: the options are new objects when the effort changes, and a new radio would
-          take the keyboard focus away. */}
-      <For each={props.options} keyed={(option) => option.id}>
-        {(option) => {
-          // A new label changes the segment widths without a new choice, so each segment is watched.
-          let control: HTMLElement | undefined;
-          onCleanup(() => control && resize.unobserve(control));
-          return (
-            <RadioGroup.Item class="provider-model-effort-segment" value={option().id}>
-              <RadioGroup.ItemInput />
-              <RadioGroup.ItemControl
-                ref={(element: HTMLElement) => {
-                  control = element;
-                  resize.observe(element);
-                }}
-                class="provider-model-effort-segment-control"
-              >
-                <RadioGroup.ItemLabel>{option().name}</RadioGroup.ItemLabel>
-              </RadioGroup.ItemControl>
-            </RadioGroup.Item>
-          );
-        }}
-      </For>
-    </RadioGroup.Root>
-  );
 }
 
 /** A custom endpoint has no brand mark and must not borrow one, so the rail draws sliders instead. */

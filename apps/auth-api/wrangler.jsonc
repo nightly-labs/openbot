@@ -57,11 +57,14 @@
     "EMAIL_LICENSE_FROM": "licenses@openbot.run",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
-    // Two active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria, b is signal2.
-    // Set both lists together, so that a revoke reaches each home. An empty REMOTE_SIGNAL_HOMES rolls back.
-    "REMOTE_SIGNAL_HOMES": "a=wss://signal1.openbot.run/v1/signal,b=wss://signal2.openbot.run/v1/signal",
+    // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
+    // both in Helsinki; us is in San Jose (Leaseweb SFO-12) and au in Sydney (Leaseweb SYD-12). Keep a
+    // and b first: the entry failover tries the homes in this order. Set the three lists together, so
+    // that a revoke reaches each home and each home has a place. An empty REMOTE_SIGNAL_HOMES rolls back.
+    "REMOTE_SIGNAL_HOMES": "a=wss://signal1.openbot.run/v1/signal,b=wss://signal2.openbot.run/v1/signal,us=wss://signal-us.openbot.run/v1/signal,au=wss://signal-au.openbot.run/v1/signal",
+    "REMOTE_SIGNAL_HOME_LOCATIONS": "a=60.17:24.94,b=60.17:24.94,us=37.34:-121.89,au=-33.87:151.21",
     "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
-    "REMOTE_AUTH_WEBHOOK_URLS": "https://signal1.openbot.run/internal/auth-events,https://signal2.openbot.run/internal/auth-events",
+    "REMOTE_AUTH_WEBHOOK_URLS": "https://signal1.openbot.run/internal/auth-events,https://signal2.openbot.run/internal/auth-events,https://signal-us.openbot.run/internal/auth-events,https://signal-au.openbot.run/internal/auth-events",
     // The zone of signal.openbot.run. The entry check stays off until the secret SIGNAL_ENTRY_DNS_TOKEN
     // is set and REMOTE_SIGNAL_HOMES names two machines.
     "SIGNAL_ENTRY_ZONE_ID": "bac5e044ba951c390229f0e93673ebd3",
@@ -79,6 +82,24 @@
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
+  // Email leaves through the relay Worker (`wrangler.email-relay.jsonc`), which runs near the mail
+  // host. Only production has it: the preview and test Workers and `vite dev` send from their own
+  // socket. Deploy the relay before this Worker.
+  "services": [
+    {
+      "binding": "EMAIL_RELAY",
+      "service": "openbot-email-relay"
+    }
+  ],
+  // Cloudflare Email Service sends when the SMTP mailbox surely did not, such as when its hourly limit
+  // (500 messages) is spent. The senders must be on an onboarded Email Sending domain (openbot.run).
+  // Only production has it: the preview and test Workers keep SMTP only.
+  "send_email": [
+    {
+      "name": "EMAIL_FALLBACK",
+      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -134,6 +155,11 @@
       "name": "LIVE_ACTIVITY_RATE_LIMITER",
       "namespace_id": "2026092901",
       "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "FEEDBACK_RATE_LIMITER",
+      "namespace_id": "2026110801",
+      "simple": { "limit": 3, "period": 60 }
     }
   ],
   "env": {
@@ -216,6 +242,11 @@
           "name": "LIVE_ACTIVITY_RATE_LIMITER",
           "namespace_id": "2026092902",
           "simple": { "limit": 300, "period": 60 }
+        },
+        {
+          "name": "FEEDBACK_RATE_LIMITER",
+          "namespace_id": "2026110802",
+          "simple": { "limit": 3, "period": 60 }
         }
       ]
     },
@@ -316,6 +347,11 @@
           "name": "LIVE_ACTIVITY_RATE_LIMITER",
           "namespace_id": "2026092903",
           "simple": { "limit": 300, "period": 60 }
+        },
+        {
+          "name": "FEEDBACK_RATE_LIMITER",
+          "namespace_id": "2026110803",
+          "simple": { "limit": 3, "period": 60 }
         }
       ]
     }

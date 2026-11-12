@@ -49,6 +49,8 @@ export interface AgentThreadRecord {
   closedAt: string | null;
   /** Where a branch was copied from. Null for a thread that is not a branch. */
   branch: AgentThreadBranch | null;
+  /** The routine whose runs this thread takes. Null for every other thread. */
+  routineId: string | null;
 }
 
 /** The `branch_*` columns: all three are set, or the thread is not a branch. */
@@ -78,6 +80,8 @@ export interface AgentThreadInput {
   origin: AgentThreadOrigin;
   title: string;
   titleSource: Exclude<AgentThreadTitleSource, "user">;
+  /** Set only for the one thread of a routine. */
+  routineId?: string;
 }
 
 const SELECT_THREAD = "SELECT *, COALESCE(legacy_task_id, thread_id) AS task_id FROM projection_agent_threads";
@@ -105,6 +109,16 @@ export class AgentThreadStore {
     return row ? decodeThread(row) : null;
   }
 
+  /** The thread of this routine, open or archived. */
+  threadForRoutine(agentId: string, routineId: string): AgentThreadRecord | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(`${SELECT_THREAD} WHERE agent_id = ? AND routine_id = ?`)
+        .get(agentId, routineId),
+    );
+    return row ? decodeThread(row) : null;
+  }
+
   taskForThread(threadId: string): AgentThreadRecord | null {
     const row = databaseRow(this.#database.connection.prepare(`${SELECT_THREAD} WHERE thread_id = ?`).get(threadId));
     return row ? decodeThread(row) : null;
@@ -119,6 +133,20 @@ export class AgentThreadStore {
            ORDER BY archived_at IS NOT NULL, updated_at DESC, thread_id LIMIT ?`,
         )
         .all(agentId, INPUT_LIMITS.agentTasks),
+    ).map(decodeThread);
+  }
+
+  /**
+   * The threads of this agent, open and archived, with activity (`updated_at`: a turn start, a close
+   * or a reopen) at or after `after`. The latest activity first.
+   */
+  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+        )
+        .all(agentId, after, after, limit),
     ).map(decodeThread);
   }
 
@@ -365,9 +393,19 @@ export class AgentThreadStore {
         db.prepare(
           `INSERT INTO projection_agent_threads
              (thread_id, agent_id, legacy_task_id, origin, title, title_source, outcome, error, created_at,
-              updated_at, archived_at, last_event_sequence)
-           VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?, NULL, ?)`,
-        ).run(threadId, input.agentId, input.origin, input.title, input.titleSource, now, now, sequence);
+              updated_at, archived_at, last_event_sequence, routine_id)
+           VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?, NULL, ?, ?)`,
+        ).run(
+          threadId,
+          input.agentId,
+          input.origin,
+          input.title,
+          input.titleSource,
+          now,
+          now,
+          sequence,
+          input.routineId ?? null,
+        );
         return null;
       },
     );
@@ -385,6 +423,21 @@ export class AgentThreadStore {
         db.prepare(
           `UPDATE projection_agent_threads SET title = ?, title_source = 'user', last_event_sequence = ?
            WHERE thread_id = ?`,
+        ).run(title, sequences[0] ?? 0, threadId);
+        return null;
+      },
+    );
+  }
+
+  /** A title that OpenBot gave, such as the name of a renamed routine. A person's title stays. */
+  retitle(threadId: string, title: string): void {
+    this.#database.dispatch(
+      `agent-thread-retitled:${threadId}:${randomUUID()}`,
+      [{ aggregateType: "agent-thread", aggregateId: threadId, eventType: "agent-thread.renamed", payload: {} }],
+      (db, sequences) => {
+        db.prepare(
+          `UPDATE projection_agent_threads SET title = ?, last_event_sequence = ?
+           WHERE thread_id = ? AND title_source <> 'user'`,
         ).run(title, sequences[0] ?? 0, threadId);
         return null;
       },
@@ -560,5 +613,6 @@ function decodeThread(row: DynamicRecord): AgentThreadRecord {
       sourceThreadId !== null && sourceMessageId !== null && throughMessageId !== null
         ? { sourceThreadId, sourceMessageId, throughMessageId }
         : null,
+    routineId: optionalStringColumn(row, "routine_id"),
   };
 }

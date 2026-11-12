@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { accountUsageCoversModel, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, isAgentModel, type UsageTokens, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -7,6 +8,7 @@ import type { ProviderSession } from "../database/provider-sessions";
 import { getRecord, getString } from "../protocol";
 
 const logger = createOpenBotLogger("usage-collection");
+const GROK_USD_TICKS = 10_000_000_000;
 
 function count(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -118,7 +120,9 @@ export function collectProviderUsage(
     // OpenCode 1.19 and 2.x send the tokens of this prompt only (`state.usage.turn` starts again for
     // each prompt). `inputTokens` is the uncached input, and each cache and thinking field is left
     // out when it is 0, so a missing one is 0. Reasoning is billed as output. The cost is the
-    // session's total, so its own counter keeps the last one.
+    // session's total, so its own counter keeps the last one. From OpenCode 2.2.0 the cost is what
+    // OpenCode Console charged, and the Go subscription charges $0 for a Go model, so a Go turn has
+    // no API-equivalent cost.
     const output = count(value.outputTokens);
     usage.record({
       agentId: agent.id,
@@ -128,7 +132,7 @@ export function collectProviderUsage(
       model,
       counterId: `${session.id}:opencode:${getString(params, "promptId") ?? turnId}`,
       costCounterId: `${session.id}:opencode:cost`,
-      reportedCost: isDynamicRecord(params) ? cost(params.cost) : null,
+      reportedCost: isDynamicRecord(params) && !accountUsageCoversModel("opencode", model) ? cost(params.cost) : null,
       baseline: false,
       tokens: {
         uncachedInput: count(value.inputTokens),
@@ -139,10 +143,33 @@ export function collectProviderUsage(
     });
     return;
   }
+  if (session.provider === "grok") {
+    // Grok CLI 1.0.22 and 1.0.70 send the tokens of this prompt only, with its cost in units of
+    // 10^-10 USD. `inputTokens` include the cache reads and writes, and `outputTokens` the reasoning.
+    const ticks = cost(value.costUsdTicks);
+    usage.record({
+      agentId: agent.id,
+      sessionId: session.id,
+      turnId,
+      provider: session.provider,
+      model,
+      counterId: `${session.id}:grok:${getString(params, "promptId") ?? turnId}`,
+      baseline: false,
+      tokens: acpTokens({ ...value, cachedWriteTokens: value.cacheCreationTokens }),
+      reportedCost: ticks === null ? null : ticks / GROK_USD_TICKS,
+    });
+    return;
+  }
   // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
-  // carries tokens spent before analytics existed.
+  // carries tokens spent before analytics existed. Pi also reports its `get_session_stats` cost, a
+  // session total at the rates of Pi's model list. Its checkpoint is the token counter, so a session
+  // that ran before costs were kept prices its turns only from its second report. A turn that adds 0
+  // ran on a model with no rates in that list, not a free turn, so it stays unpriced. A custom agent
+  // reports its session total in the `cost` of `usage_update`, which is kept the same way (#4181).
+  const sessionCost = session.provider === "pi" || session.provider === "acp" || isKeyOnlyProvider(session.provider);
+  const reportedCost = sessionCost && isDynamicRecord(params) ? cost(params.cost) : null;
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -152,6 +179,8 @@ export function collectProviderUsage(
     counterId: `${session.id}:grok`,
     baseline: session.createdAt < usage.collectionStartedAt(),
     tokens: acpTokens(value),
+    reportedCost,
+    zeroCostUnpriced: sessionCost,
   });
 }
 
@@ -175,30 +204,35 @@ export function workflowUsageObserver(
 }
 
 /**
- * Collects the usage of one background memory review under its agent. The review is its own session,
- * so its counters never meet those of the agent's turns.
+ * Collects the usage of one background side session under its agent: a memory review, or an
+ * `openbot.web_search` turn. The side session has its own id, so its counters never meet those of
+ * the agent's turns.
  */
-export function memoryReviewUsageObserver(
+export function sideSessionUsageObserver(
+  kind: "memory-review" | "web-search",
   usage: AgentUsage,
   agentId: string,
   provider: ProviderSession["provider"],
   model: AgentSummary["model"],
 ): (notification: { method: string; params?: unknown }) => void {
-  const session = { id: `memory-review:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
+  const session = { id: `${kind}:${randomUUID()}`, provider, createdAt: new Date().toISOString() };
   return ({ method, params }) => {
     try {
       collectProviderUsage(usage, { id: agentId, model }, session, method, params);
     } catch (error) {
-      logger.warn("Could not save the usage of a memory review.", { provider, error });
+      logger.warn("Could not save the usage of a side session.", { kind, provider, error });
     }
   };
 }
 
-/** An ACP `Usage`, whose `inputTokens` include the cache reads and writes. */
+/**
+ * An ACP `Usage`, whose `inputTokens` include the cache reads and writes. The cache fields are
+ * optional, and agents leave them out when they are 0 (#4181).
+ */
 function acpTokens(value: DynamicRecord): UsageTokens {
   const input = count(value.inputTokens);
-  const cached = count(value.cachedReadTokens);
-  const creation = count(value.cachedWriteTokens);
+  const cached = count(value.cachedReadTokens ?? 0);
+  const creation = count(value.cachedWriteTokens ?? 0);
   return {
     uncachedInput:
       input !== null && cached !== null && creation !== null && input >= cached + creation

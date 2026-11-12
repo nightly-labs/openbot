@@ -330,7 +330,7 @@ export function ServerRoutinesScreen() {
     </Stack.Toolbar>
   );
 
-  const title = t("mobile.app.route.routines");
+  const title = t("mobile.app.route.schedule");
   if (!server)
     return (
       <LargeTitleScrollView title={title} contentContainerClassName={PAGE_CONTENT}>
@@ -452,6 +452,7 @@ function AgentStack({ agents, serverId }: { agents: MobileAgent[]; serverId: str
             agentId={agent.id}
             serverId={serverId}
             hue={agent.avatarHue}
+            color={agent.avatarColor}
             seed={agent.avatarSeed}
             size={AVATAR_SIZE}
             animateIdle={false}

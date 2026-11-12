@@ -71,6 +71,7 @@ function TaskActionCard({
               serverId={agent?.serverId}
               seed={agent?.avatarSeed ?? task.ownerAgentId}
               hue={agent?.avatarHue ?? null}
+              color={agent?.avatarColor ?? null}
               size={24}
             />
           ) : null}

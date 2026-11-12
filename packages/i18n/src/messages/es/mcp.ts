@@ -7,6 +7,8 @@ export const messages = {
   "mcp.connect.notConnected": "Sin conexión",
   "mcp.connect.close": "Cerrar el diálogo de conexión con {name}",
   "mcp.connect.getKey": "Obtener clave",
+  "mcp.connect.useKey": "Usar una clave de API en su lugar",
+  "mcp.connect.useSignIn": "Iniciar sesión en su lugar",
   "mcp.connect.keyDescription":
     "Pega una credencial de tu cuenta de {name}. OpenBot se conecta con ella y la guarda en {host}.",
   "mcp.connect.thisComputer": "este equipo",
@@ -147,11 +149,11 @@ export const messages = {
   "mcp.panel.appSaved": "App guardada. Inicia sesión para usarla.",
   "mcp.panel.appRemoved": "App eliminada.",
   "mcp.signIn.relayDescription":
-    "Comprueba que la página de inicio de sesión está en {page} y ábrela en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayOpenDescription":
-    "Abre la página de inicio de sesión de {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
+    "Inicia sesión en {page} en tu navegador. Al terminar, pega aquí la dirección que muestra el navegador. Después, OpenBot envía el inicio de sesión a {host}.",
   "mcp.signIn.relayDeviceDescription":
-    "Comprueba que la página de inicio de sesión está en {page}, ábrela en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
+    "Inicia sesión en {page} en tu navegador y termina allí. {host} detecta el inicio de sesión por sí mismo.",
   "mcp.signIn.relayOpen": "Abrir inicio de sesión",
   "mcp.signIn.relayPasteHint": "Si el navegador no vuelve a OpenBot, copia la dirección que muestra y pégala aquí.",
   "mcp.signIn.relayPasteRequired":

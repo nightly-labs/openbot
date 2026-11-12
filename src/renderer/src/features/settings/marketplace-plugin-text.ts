@@ -81,6 +81,30 @@ const PLUGIN_TEXT = {
       "prompt-save-note": "marketplace.plugin.cobrain.prompt.saveNote",
     },
   },
+  honcho: {
+    tagline: "marketplace.plugin.honcho.tagline",
+    description: "marketplace.plugin.honcho.description",
+    apps: {
+      "app-honcho-mcp": "marketplace.plugin.honcho.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.honcho.prompt.recall",
+      "prompt-save": "marketplace.plugin.honcho.prompt.save",
+      "prompt-preferences": "marketplace.plugin.honcho.prompt.preferences",
+    },
+  },
+  hindsight: {
+    tagline: "marketplace.plugin.hindsight.tagline",
+    description: "marketplace.plugin.hindsight.description",
+    apps: {
+      "app-hindsight-mcp": "marketplace.plugin.hindsight.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.hindsight.prompt.recall",
+      "prompt-retain": "marketplace.plugin.hindsight.prompt.retain",
+      "prompt-reflect": "marketplace.plugin.hindsight.prompt.reflect",
+    },
+  },
   figma: {
     tagline: "marketplace.plugin.figma.tagline",
     description: "marketplace.plugin.figma.description",
@@ -105,6 +129,30 @@ const PLUGIN_TEXT = {
       "prompt-tokens": "marketplace.plugin.paper.prompt.tokens",
     },
   },
+  higgsfield: {
+    tagline: "marketplace.plugin.higgsfield.tagline",
+    description: "marketplace.plugin.higgsfield.description",
+    apps: {
+      "app-higgsfield-mcp": "marketplace.plugin.higgsfield.app",
+    },
+    prompts: {
+      "prompt-credits": "marketplace.plugin.higgsfield.prompt.credits",
+      "prompt-product-shot": "marketplace.plugin.higgsfield.prompt.productShot",
+      "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
+    },
+  },
+  elevenlabs: {
+    tagline: "marketplace.plugin.elevenlabs.tagline",
+    description: "marketplace.plugin.elevenlabs.description",
+    apps: {
+      "app-elevenlabs-mcp": "marketplace.plugin.elevenlabs.app",
+    },
+    prompts: {
+      "prompt-speech": "marketplace.plugin.elevenlabs.prompt.speech",
+      "prompt-agents": "marketplace.plugin.elevenlabs.prompt.agents",
+      "prompt-conversations": "marketplace.plugin.elevenlabs.prompt.conversations",
+    },
+  },
   "apple-apps": {
     tagline: "marketplace.plugin.appleApps.tagline",
     description: "marketplace.plugin.appleApps.description",
@@ -127,6 +175,18 @@ const PLUGIN_TEXT = {
       "prompt-new-errors": "marketplace.plugin.sentry.prompt.newErrors",
       "prompt-top-crash": "marketplace.plugin.sentry.prompt.topCrash",
       "prompt-release-health": "marketplace.plugin.sentry.prompt.releaseHealth",
+    },
+  },
+  gitlab: {
+    tagline: "marketplace.plugin.gitlab.tagline",
+    description: "marketplace.plugin.gitlab.description",
+    apps: {
+      "app-gitlab-mcp": "marketplace.plugin.gitlab.app",
+    },
+    prompts: {
+      "prompt-review-queue": "marketplace.plugin.gitlab.prompt.reviewQueue",
+      "prompt-failed-pipeline": "marketplace.plugin.gitlab.prompt.failedPipeline",
+      "prompt-new-issue": "marketplace.plugin.gitlab.prompt.newIssue",
     },
   },
   vercel: {
@@ -187,6 +247,18 @@ const PLUGIN_TEXT = {
       "prompt-payment": "marketplace.plugin.stripe.prompt.payment",
       "prompt-customer": "marketplace.plugin.stripe.prompt.customer",
       "prompt-link": "marketplace.plugin.stripe.prompt.link",
+    },
+  },
+  revenuecat: {
+    tagline: "marketplace.plugin.revenuecat.tagline",
+    description: "marketplace.plugin.revenuecat.description",
+    apps: {
+      "app-revenuecat-mcp": "marketplace.plugin.revenuecat.app",
+    },
+    prompts: {
+      "prompt-offerings": "marketplace.plugin.revenuecat.prompt.offerings",
+      "prompt-revenue": "marketplace.plugin.revenuecat.prompt.revenue",
+      "prompt-customer": "marketplace.plugin.revenuecat.prompt.customer",
     },
   },
   posthog: {
@@ -259,6 +331,30 @@ const PLUGIN_TEXT = {
       "prompt-send": "marketplace.plugin.resend.prompt.send",
       "prompt-status": "marketplace.plugin.resend.prompt.status",
       "prompt-template": "marketplace.plugin.resend.prompt.template",
+    },
+  },
+  omnisend: {
+    tagline: "marketplace.plugin.omnisend.tagline",
+    description: "marketplace.plugin.omnisend.description",
+    apps: {
+      "app-omnisend-mcp": "marketplace.plugin.omnisend.app",
+    },
+    prompts: {
+      "prompt-last-campaign": "marketplace.plugin.omnisend.prompt.lastCampaign",
+      "prompt-segment": "marketplace.plugin.omnisend.prompt.segment",
+      "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
+    },
+  },
+  postiz: {
+    tagline: "marketplace.plugin.postiz.tagline",
+    description: "marketplace.plugin.postiz.description",
+    apps: {
+      "app-postiz-mcp": "marketplace.plugin.postiz.app",
+    },
+    prompts: {
+      "prompt-channels": "marketplace.plugin.postiz.prompt.channels",
+      "prompt-week": "marketplace.plugin.postiz.prompt.week",
+      "prompt-draft": "marketplace.plugin.postiz.prompt.draft",
     },
   },
   composio: {
@@ -357,6 +453,18 @@ const PLUGIN_TEXT = {
       "prompt-overdue": "marketplace.plugin.todoist.prompt.overdue",
     },
   },
+  ticktick: {
+    tagline: "marketplace.plugin.ticktick.tagline",
+    description: "marketplace.plugin.ticktick.description",
+    apps: {
+      "app-ticktick-mcp": "marketplace.plugin.ticktick.app",
+    },
+    prompts: {
+      "prompt-today": "marketplace.plugin.ticktick.prompt.today",
+      "prompt-capture": "marketplace.plugin.ticktick.prompt.capture",
+      "prompt-week": "marketplace.plugin.ticktick.prompt.week",
+    },
+  },
   trello: {
     tagline: "marketplace.plugin.trello.tagline",
     description: "marketplace.plugin.trello.description",
@@ -381,6 +489,30 @@ const PLUGIN_TEXT = {
       "prompt-summarize-doc": "marketplace.plugin.clickup.prompt.summarizeDoc",
     },
   },
+  coinbase: {
+    tagline: "marketplace.plugin.coinbase.tagline",
+    description: "marketplace.plugin.coinbase.description",
+    apps: {
+      "app-coinbase-mcp": "marketplace.plugin.coinbase.app",
+    },
+    prompts: {
+      "prompt-balances": "marketplace.plugin.coinbase.prompt.balances",
+      "prompt-price": "marketplace.plugin.coinbase.prompt.price",
+      "prompt-preview-order": "marketplace.plugin.coinbase.prompt.previewOrder",
+    },
+  },
+  robinhood: {
+    tagline: "marketplace.plugin.robinhood.tagline",
+    description: "marketplace.plugin.robinhood.description",
+    apps: {
+      "app-robinhood-mcp": "marketplace.plugin.robinhood.app",
+    },
+    prompts: {
+      "prompt-positions": "marketplace.plugin.robinhood.prompt.positions",
+      "prompt-watchlist": "marketplace.plugin.robinhood.prompt.watchlist",
+      "prompt-agentic-cash": "marketplace.plugin.robinhood.prompt.agenticCash",
+    },
+  },
   huggingface: {
     tagline: "marketplace.plugin.huggingface.tagline",
     description: "marketplace.plugin.huggingface.description",
@@ -402,13 +534,15 @@ const PLUGIN_TEXT = {
 const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "API key": "marketplace.auth.apiKey",
   "Personal API key": "marketplace.auth.personalApiKey",
-  "MCP URL": "marketplace.auth.mcpUrl",
   "Get a key": "mcp.connect.getKey",
   "Create a key": "marketplace.auth.createKey",
-  "The URL of an MCP server in your Composio account": "marketplace.plugin.composio.hint.url",
   "Find it in your Composio account, in Settings > Sessions & API Key.": "marketplace.plugin.composio.hint.apiKey",
+  "In the RevenueCat dashboard, open API keys in your project and create a secret API key. A read-only key is enough to view data.":
+    "marketplace.plugin.revenuecat.hint.apiKey",
   'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
     "marketplace.plugin.obsidian.hint.apiKey",
+  "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
+  "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
 };
 
 const english = translateFor("en");

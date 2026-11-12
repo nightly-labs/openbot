@@ -27,8 +27,16 @@ export const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 /** The largest zoom. A 1280-pixel page on a phone is about three times too small to read, so four leaves room. */
 export const MAX_ZOOM = 5;
 
+// The worklet plugin makes each worklet a `var` that takes its closure when the module loads, so a
+// worklet comes before the worklets that call it. Below them, `clamp` would be undefined in them.
+export function clamp(value: number, minimum: number, maximum: number): number {
+  "worklet";
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
 /** The page fitted into the stage without zoom: whole, centered, with bars where the shapes differ. */
 export function fittedRect(stage: Size, frame: Size): Rect {
+  "worklet";
   if (stage.width <= 0 || stage.height <= 0 || frame.width <= 0 || frame.height <= 0)
     return { x: 0, y: 0, width: 0, height: 0 };
   const scale = Math.min(stage.width / frame.width, stage.height / frame.height);
@@ -74,6 +82,7 @@ export function pointsPerPixel(stage: Size, frame: Size, zoom: Zoom): number {
  * point follows `to`. This is what two fingers do: they pinch about their middle, and drag it.
  */
 export function pinchZoom(from: Zoom, focal: Point, to: Point, scale: number): Zoom {
+  "worklet";
   const contentX = (focal.x - from.x) / from.scale;
   const contentY = (focal.y - from.y) / from.scale;
   return { scale, x: to.x - contentX * scale, y: to.y - contentY * scale };
@@ -84,6 +93,7 @@ export function pinchZoom(from: Zoom, focal: Point, to: Point, scale: number): Z
  * on each side where it is larger than the stage, or centered where it is not.
  */
 export function clampZoom(stage: Size, frame: Size, zoom: Zoom): Zoom {
+  "worklet";
   const scale = clamp(zoom.scale, 1, MAX_ZOOM);
   const fitted = fittedRect(stage, frame);
   const axis = (stageSize: number, offset: number, size: number, translation: number) => {
@@ -131,8 +141,4 @@ export function revealFraction(stage: Size, frame: Size, zoom: Zoom, fraction: P
     y: zoom.y + shift(point.y, stage.height),
   };
   return clampZoom(stage, frame, moved);
-}
-
-export function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
 }

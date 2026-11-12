@@ -49,6 +49,8 @@ export interface VaultLoginSummary extends VaultItemOrigin {
   username: string;
   notes: string;
   hasPassword: boolean;
+  /** The login has a two-step (TOTP) key, so agents make the sign-in code themselves. */
+  hasTwoStep: boolean;
 }
 
 export interface VaultCardSummary extends VaultItemOrigin {
@@ -118,6 +120,8 @@ export type VaultSaveInput =
       username: string;
       notes: string;
       password: string | null;
+      /** A setup key or an `otpauth://totp/` link. Omitted keeps the saved key; "" removes it. */
+      twoStepKey?: string | undefined;
     }
   | {
       kind: "card";
@@ -140,6 +144,20 @@ export interface VaultSecretRequest {
   field: VaultSecretField;
 }
 
+/** The current two-step code of each login that has a key. Main makes them; the key stays there. */
+export interface VaultTwoStepCodes {
+  codes: VaultTwoStepCode[];
+}
+
+export interface VaultTwoStepCode {
+  id: string;
+  code: string;
+  /** Seconds that one code is valid. */
+  period: number;
+  /** Milliseconds until the next code, when the answer was made. */
+  remainingMs: number;
+}
+
 /** Null when the user closed the file dialog. */
 export type VaultImportResult = { imported: number; skipped: number; state: VaultState } | null;
 
@@ -154,25 +172,257 @@ export const VAULT_API_KEY_LIMIT = 8192;
 /** An environment variable name, which is also the file name of an API key. */
 export const API_KEY_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 
-/** The countries that the Vault's contact form offers, as ISO 3166-1 alpha-2 codes. */
+/** The countries that the Vault's contact form offers: the ISO 3166-1 alpha-2 codes. */
 export const VAULT_COUNTRY_CODES = [
+  "AD",
+  "AE",
+  "AF",
+  "AG",
+  "AI",
+  "AL",
+  "AM",
+  "AO",
+  "AQ",
+  "AR",
+  "AS",
   "AT",
   "AU",
+  "AW",
+  "AX",
+  "AZ",
+  "BA",
+  "BB",
+  "BD",
   "BE",
+  "BF",
+  "BG",
+  "BH",
+  "BI",
+  "BJ",
+  "BL",
+  "BM",
+  "BN",
+  "BO",
+  "BQ",
+  "BR",
+  "BS",
+  "BT",
+  "BV",
+  "BW",
+  "BY",
+  "BZ",
   "CA",
+  "CC",
+  "CD",
+  "CF",
+  "CG",
   "CH",
+  "CI",
+  "CK",
+  "CL",
+  "CM",
+  "CN",
+  "CO",
+  "CR",
+  "CU",
+  "CV",
+  "CW",
+  "CX",
+  "CY",
+  "CZ",
   "DE",
+  "DJ",
   "DK",
+  "DM",
+  "DO",
+  "DZ",
+  "EC",
+  "EE",
+  "EG",
+  "EH",
+  "ER",
   "ES",
+  "ET",
+  "FI",
+  "FJ",
+  "FK",
+  "FM",
+  "FO",
   "FR",
+  "GA",
   "GB",
+  "GD",
+  "GE",
+  "GF",
+  "GG",
+  "GH",
+  "GI",
+  "GL",
+  "GM",
+  "GN",
+  "GP",
+  "GQ",
+  "GR",
+  "GS",
+  "GT",
+  "GU",
+  "GW",
+  "GY",
+  "HK",
+  "HM",
+  "HN",
+  "HR",
+  "HT",
+  "HU",
+  "ID",
   "IE",
+  "IL",
+  "IM",
+  "IN",
+  "IO",
+  "IQ",
+  "IR",
+  "IS",
   "IT",
+  "JE",
+  "JM",
+  "JO",
   "JP",
+  "KE",
+  "KG",
+  "KH",
+  "KI",
+  "KM",
+  "KN",
+  "KP",
+  "KR",
+  "KW",
+  "KY",
+  "KZ",
+  "LA",
+  "LB",
+  "LC",
+  "LI",
+  "LK",
+  "LR",
+  "LS",
+  "LT",
+  "LU",
+  "LV",
+  "LY",
+  "MA",
+  "MC",
+  "MD",
+  "ME",
+  "MF",
+  "MG",
+  "MH",
+  "MK",
+  "ML",
+  "MM",
+  "MN",
+  "MO",
+  "MP",
+  "MQ",
+  "MR",
+  "MS",
+  "MT",
+  "MU",
+  "MV",
+  "MW",
+  "MX",
+  "MY",
+  "MZ",
+  "NA",
+  "NC",
+  "NE",
+  "NF",
+  "NG",
+  "NI",
   "NL",
+  "NO",
+  "NP",
+  "NR",
+  "NU",
+  "NZ",
+  "OM",
+  "PA",
+  "PE",
+  "PF",
+  "PG",
+  "PH",
+  "PK",
   "PL",
+  "PM",
+  "PN",
+  "PR",
+  "PS",
+  "PT",
+  "PW",
+  "PY",
+  "QA",
+  "RE",
+  "RO",
+  "RS",
+  "RU",
+  "RW",
+  "SA",
+  "SB",
+  "SC",
+  "SD",
   "SE",
+  "SG",
+  "SH",
+  "SI",
+  "SJ",
+  "SK",
+  "SL",
+  "SM",
+  "SN",
+  "SO",
+  "SR",
+  "SS",
+  "ST",
+  "SV",
+  "SX",
+  "SY",
+  "SZ",
+  "TC",
+  "TD",
+  "TF",
+  "TG",
+  "TH",
+  "TJ",
+  "TK",
+  "TL",
+  "TM",
+  "TN",
+  "TO",
+  "TR",
+  "TT",
+  "TV",
+  "TW",
+  "TZ",
+  "UA",
+  "UG",
+  "UM",
   "US",
+  "UY",
+  "UZ",
+  "VA",
+  "VC",
+  "VE",
+  "VG",
+  "VI",
+  "VN",
+  "VU",
+  "WF",
+  "WS",
+  "YE",
+  "YT",
+  "ZA",
+  "ZM",
+  "ZW",
 ] as const;
 
 export type VaultCountryCode = (typeof VAULT_COUNTRY_CODES)[number];
@@ -184,7 +434,7 @@ export interface VaultHostImportResult {
 }
 
 const VAULT_STATUSES: readonly VaultStatus[] = ["ready", "unavailable", "unreadable"];
-const VAULT_SECRET_KEYS = ["password", "number", "securityCode", "key"] as const;
+const VAULT_SECRET_KEYS = ["password", "number", "securityCode", "key", "twoStepKey"] as const;
 
 function hostAddedBy(item: DynamicRecord): VaultItemOrigin {
   if (item.addedBy === undefined) return {};
@@ -205,6 +455,8 @@ function hostVaultItem(item: DynamicRecord): VaultItemSummary {
         username: requiredString(item, "username"),
         notes: requiredString(item, "notes"),
         hasPassword: requiredBoolean(item, "hasPassword"),
+        // Only `vault-v3` sends it. An older host keeps no key.
+        hasTwoStep: item.hasTwoStep === undefined ? false : requiredBoolean(item, "hasTwoStep"),
       };
     case "card": {
       const { brand, fillSites } = item;
@@ -256,7 +508,7 @@ function hostVaultItem(item: DynamicRecord): VaultItemSummary {
   }
 }
 
-/** The Vault of a joined server (`vault-v2` or `vault-v1`). Throws for an item that carries a secret. */
+/** The Vault of a joined server (`vault-v3`, `vault-v2` or `vault-v1`). Throws for an item that carries a secret. */
 export function decodeHostVaultState(value: unknown): VaultState {
   const state = decodeRecord(value, "Vault response");
   if (!isOneOf(VAULT_STATUSES, state.status)) throw new Error("Invalid Vault response.");
@@ -269,7 +521,24 @@ export function decodeHostVaultImport(value: unknown): VaultHostImportResult {
   return { imported: requiredNumber(answer, "imported"), skipped: requiredNumber(answer, "skipped") };
 }
 
-/** The secret that a joined server answers to `reveal` (`vault-v2` or `vault-v1`). */
+function hostTwoStepCode(item: DynamicRecord): VaultTwoStepCode {
+  const code = requiredString(item, "code");
+  if (!/^\d{6,8}$/u.test(code)) throw new Error("Invalid Vault response.");
+  return {
+    id: requiredString(item, "id"),
+    code,
+    period: requiredNumber(item, "period"),
+    remainingMs: requiredNumber(item, "remainingMs"),
+  };
+}
+
+/** The two-step codes that a joined server answers (`vault-v3`). */
+export function decodeHostVaultCodes(value: unknown): VaultTwoStepCodes {
+  const answer = decodeRecord(value, "Vault response");
+  return { codes: decodeList(answer.codes, "Vault code", hostTwoStepCode) };
+}
+
+/** The secret that a joined server answers to `reveal` (`vault-v3`, `vault-v2` or `vault-v1`). */
 export function decodeHostVaultSecret(value: unknown): string {
   const answer = decodeRecord(value, "Vault response");
   return requiredString(answer, "value");

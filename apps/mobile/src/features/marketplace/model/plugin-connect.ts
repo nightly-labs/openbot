@@ -24,12 +24,20 @@ export type PluginConnectMethod =
   | { kind: "local" }
   | { kind: "relayUnsupported" };
 
-/** The flow the connect step opens on is the first the listing declares, as on the desktop. */
+/**
+ * The flow the connect step opens on is the first the listing declares, as on the desktop. A sign-in
+ * that the host cannot relay gives way to a key, when the listing also takes one.
+ */
 export function pluginConnectMethod(app: MobilePluginApp, canRelaySignIn: boolean): PluginConnectMethod {
-  const flow = app.server.auth?.[0];
+  const flows = app.server.auth ?? [];
+  const flow = flows[0];
   if (!flow) return { kind: "none" };
   if (flow.kind === "local") return { kind: "local" };
-  if (flow.kind === "link") return canRelaySignIn ? { kind: "link", flow } : { kind: "relayUnsupported" };
+  if (flow.kind === "link") {
+    if (canRelaySignIn) return { kind: "link", flow };
+    const key = flows.find((other): other is Extract<MobilePluginAuthFlow, { kind: "key" }> => other.kind === "key");
+    return key ? { kind: "key", flow: key } : { kind: "relayUnsupported" };
+  }
   return { kind: "key", flow };
 }
 
@@ -74,9 +82,12 @@ function isPluginAppConfig(config: McpServerConfig, app: MobilePluginApp): boole
   const server = app.server;
   if (config.name !== server.name || config.transport !== server.transport) return false;
   if (server.transport === "http") {
+    if (config.url === server.url) return true;
     // A listing that asks for the user's own link cannot know the address, only its host.
     const userLink = (server.auth ?? []).some((flow) => flow.kind === "key" && flow.fields.some((field) => field.url));
-    return userLink ? isListingUrl(config.url, server.url) : config.url === server.url;
+    if (userLink && isListingUrl(config.url, server.url)) return true;
+    // A row that an earlier version of the listing saved, such as a Composio link from before its sign-in.
+    return (server.earlierUrls ?? []).some((earlier) => isListingUrl(config.url, earlier));
   }
   return (
     config.command === server.command &&
@@ -89,6 +100,11 @@ function isPluginAppConfig(config: McpServerConfig, app: MobilePluginApp): boole
 export function pluginServerId(plugin: MobilePlugin, servers: readonly McpServerConfig[]): string | null {
   const app = plugin.apps[0];
   return (app && servers.find((config) => isPluginAppConfig(config, app))?.id) || null;
+}
+
+/** The host's row is an app of this plugin, so the plugin's listing shows it. */
+export function claimedByPlugin(config: McpServerConfig, plugin: MobilePlugin): boolean {
+  return plugin.apps.some((app) => isPluginAppConfig(config, app));
 }
 
 /** Every app of the plugin is a server on the host. */

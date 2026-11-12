@@ -30,7 +30,8 @@
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-4);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4) var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
 }
 
@@ -63,7 +64,7 @@
 .trace-search-icon {
   position: absolute;
   top: 50%;
-  left: var(--openbot-space-2);
+  inset-inline-start: var(--openbot-space-2);
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
   color: var(--openbot-text-muted);
@@ -91,7 +92,7 @@
 .trace-search-kbd {
   position: absolute;
   top: 50%;
-  right: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
   translate: 0 -50%;
   pointer-events: none;
 }
@@ -100,8 +101,9 @@
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  /* The last total in each line puts its right border outside the trace, where it is clipped. */
-  margin: 0 -1px 0 0;
+  /* The last total in each line puts its end border outside the trace, where it is clipped. */
+  margin-block: 0;
+  margin-inline: 0 -1px;
 }
 
 .trace-total {
@@ -110,7 +112,7 @@
   gap: var(--openbot-space-0-5);
   min-width: 0;
   padding: var(--openbot-space-2) var(--openbot-space-3);
-  border-right: 1px solid var(--openbot-border);
+  border-inline-end: 1px solid var(--openbot-border);
   border-bottom: 1px solid var(--openbot-border);
 }
 
@@ -144,6 +146,8 @@
   overflow: auto;
   container-type: inline-size;
   scrollbar-width: none;
+  /* A time axis: the name column, the lanes and the bars keep their LTR places in RTL too. */
+  direction: ltr;
 }
 
 .trace-body::-webkit-scrollbar {
@@ -426,6 +430,32 @@
   color: var(--openbot-danger-text);
 }
 
+/* The error of a failed tool row, under the row. It covers the lines of the timeline behind it. */
+.trace-span-error-row {
+  position: relative;
+  z-index: 2;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  padding-inline-start: calc(var(--openbot-space-2) + (var(--trace-depth, 0) + 1) * var(--openbot-space-4));
+  border-bottom: 1px solid var(--openbot-border);
+  background: var(--trace-surface);
+}
+
+.trace-span-error {
+  max-height: 160px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* A light moves along the name of a running step. It repaints the text on each frame, so only the
  * few running rows have it. */
 .trace-row[data-running] .trace-span-name {
@@ -627,9 +657,12 @@
  * rows that draw parts of it do not give it their own colour. */
 .trace-handoff {
   --trace-elbow: var(--openbot-space-2);
-  top: calc((var(--trace-from) + 1.5) * var(--trace-row-height) + var(--trace-bar-height) / 2);
+  --trace-line-top: calc((var(--trace-from) + 1.5) * var(--trace-row-height) + var(--trace-bar-height) / 2);
+  --trace-line-rows: calc(var(--trace-to) - var(--trace-from) - 0.5);
+  /* An open error moves the rows under it, so the line moves and grows by the errors along it. */
+  top: calc(var(--trace-line-top) + var(--trace-from-shift, 0px));
   width: var(--trace-elbow);
-  height: calc((var(--trace-to) - var(--trace-from) - 0.5) * var(--trace-row-height) - var(--trace-bar-height) / 2);
+  height: calc(var(--trace-line-rows) * var(--trace-row-height) - var(--trace-bar-height) / 2 + var(--trace-grow, 0px));
   box-sizing: border-box;
   border-left: 2px dotted var(--trace-hue);
   translate: calc(-1 * var(--trace-elbow)) 0;
@@ -701,7 +734,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-2) var(--openbot-space-4);
-  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-4);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4) var(--openbot-space-2);
   border-top: 1px solid var(--openbot-border);
 }
 
@@ -750,7 +784,7 @@
 }
 
 .trace-replay .trace-select {
-  margin-left: var(--openbot-space-1);
+  margin-inline-start: var(--openbot-space-1);
 }
 
 .ui-dialog-content.trace-dialog {

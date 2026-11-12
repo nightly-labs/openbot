@@ -1,4 +1,5 @@
 import type { AccountSession, CentralAuthUser, ClientAgentSummary, HostAnalytics } from "@openbot/contracts/ipc";
+import { type ProfileStats, profileStats } from "@openbot/team-client/profile-stats";
 import {
   Badge,
   Button,
@@ -21,7 +22,6 @@ import { useText } from "../../text";
 import { ProfileActivity, type ProfileActivityPhase } from "./ProfileActivity";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { ProfileShareDialog } from "./ProfileShareDialog";
-import { type ProfileStats, profileStats } from "./profile-stats";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
 /** The host's report of the past year, and the agents it names. */

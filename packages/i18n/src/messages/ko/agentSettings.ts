@@ -78,7 +78,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하면, 어떤 모델을 사용할지 {name}이(가) 물어봐요.",
   "agentSettings.backupModels.introAutomatic":
-    "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하거나 제공자 오류로 실패하면, {name}이(가) 순서상 사용 가능한 첫 번째 모델로 전환해요.",
+    "{model}의 사용 한도에 도달하면 {name}이(가) 순서상 사용 가능한 첫 번째 모델로 전환해요. {name}이(가) 글을 쓰기 시작하기 전에 {model}이(가) 제공자 오류로 실패해도 전환해요.",
   "agentSettings.backupModels.ask": "전환 전에 묻기",
   "agentSettings.backupModels.order": "순서",
   "agentSettings.backupModels.listLabel": "백업 모델 (순서대로)",
@@ -91,7 +91,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name}은(는) 글을 쓰기 시작한 뒤에는 전환하지 않아요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
+    "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "agentSettings.groups.brain": "두뇌",
   "agentSettings.groups.knows": "아는 것",
   "agentSettings.groups.does": "하는 일",
@@ -122,6 +122,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "ID로 재설정",
   "agentSettings.avatar.shape": "모양",
   "agentSettings.avatar.shuffle": "무작위 얼굴",
+  "agentSettings.avatar.style": "아바타 스타일",
+  "agentSettings.avatar.stylePlush": "봉제 인형",
+  "agentSettings.avatar.styleFlat": "플랫",
   "agentSettings.avatar.shapes": "아바타 모양",
   "agentSettings.avatar.shapeOption": "모양 {number}",
   "agentSettings.avatar.eyes": "눈",
@@ -136,10 +139,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "에이전트 아바타를 처리할 수 없어요.",
   "agentSettings.runtime.model": "에이전트 모델",
   "agentSettings.runtime.modelUnavailable": "에이전트 CLI가 연결된 후에 모델을 사용할 수 있어요.",
-  "agentSettings.runtime.reasoning": "추론",
-  "agentSettings.runtime.reasoningLabel": "에이전트 추론 수준",
-  "agentSettings.runtime.selectReasoning": "추론 선택",
-  "agentSettings.runtime.reasoningSetByProvider": "{provider}에서 설정",
   "agentSettings.runtime.access": "접근 권한",
   "agentSettings.runtime.accessLabel": "에이전트 접근 권한",
   "agentSettings.runtime.busyMessage": "작업 중일 때",
@@ -178,6 +177,14 @@ export const messages = {
     "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
+  "agentSettings.deleteHistory.title": "기록 삭제",
+  "agentSettings.deleteHistory.description": "이 채팅의 메시지가 삭제되고 에이전트도 잊어요. 설정은 그대로예요.",
+  "agentSettings.deleteHistory.button": "삭제",
+  "agentSettings.deleteHistory.confirmTitle": "{name}님과의 채팅 기록을 삭제할까요?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "이 채팅의 모든 메시지와 파일이 OpenBot에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
+  "agentSettings.deleteHistory.confirm": "기록 삭제",
+  "agentSettings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
   "agentSettings.fullAccess.title": "이 에이전트에 전체 접근 권한을 줄까요?",
   "agentSettings.fullAccess.askTitle": "이 에이전트가 워크스페이스 밖에서 작업하도록 허용할까요?",
   "agentSettings.fullAccess.description":
@@ -212,8 +219,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
-  "agentSettings.quickAcknowledgement.description":
-    "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
+  "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",

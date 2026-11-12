@@ -3,6 +3,7 @@ import {
   SPEECH_LIMITS,
   SPEECH_VOICES,
   type SpeechLanguage,
+  type SpeechSpeed,
   type SpeechVoice,
 } from "@openbot/contracts/ipc";
 import { speechLanguageOf } from "@openbot/contracts/speech-language";
@@ -12,53 +13,78 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { liveSpeechParts } from "@/features/chat/model/live-conversation";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
+import { currentText } from "@/shared/lib/text";
 import { ELEVENLABS_SAMPLE_RATE, ElevenLabsError, elevenLabsSpeech } from "./elevenlabs";
 import { speechNative } from "./speech-native";
 import { supertonicModel, useSupertonicModel } from "./supertonic-model";
+import { useVoiceServer, VoiceServerError, voiceServerSpeech } from "./voice-server";
 import { type ElevenLabsVoice, readElevenLabsKey, useVoiceSettings } from "./voice-settings";
 
 /** Supertonic 3 synthesizes faster with more threads, and a phone has four or more cores. */
 const SUPERTONIC_THREADS = 4;
 
 /** Why a reply was not read to its end. */
-export type ReplyVoiceFailure = "not-ready" | "language" | "speech" | "invalid-key" | "permission" | "network";
+export type ReplyVoiceFailure =
+  | "not-ready"
+  | "language"
+  | "speech"
+  | "invalid-key"
+  | "permission"
+  | "network"
+  | "voice-server";
 
-/** What a surface says when a reply or a sample is not read to its end. */
-export const REPLY_VOICE_FAILURE_TEXT = {
+const REPLY_VOICE_FAILURE_TEXT = {
   "not-ready": "mobile.chat.liveVoice.voiceNotReady",
   language: "mobile.chat.liveVoice.languageUnsupported",
   speech: "mobile.chat.liveVoice.speakFailed",
   "invalid-key": "mobile.chat.liveVoice.elevenLabsKeyInvalid",
   permission: "mobile.chat.liveVoice.elevenLabsPermission",
   network: "mobile.chat.liveVoice.networkNeeded",
+  "voice-server": "mobile.chat.liveVoice.voiceServerFailed",
 } as const satisfies Record<ReplyVoiceFailure, MobileTextKey>;
+
+/**
+ * What a surface says when a reply or a sample is not read to its end. The reason that ElevenLabs
+ * gave, such as a plan that does not allow the voice, replaces the general text.
+ */
+export function replyVoiceFailureText(failure: ReplyVoiceFailure, reason: string | null): string {
+  const { t } = currentText();
+  return reason ? t("mobile.settings.voice.elevenLabs.refused", { reason }) : t(REPLY_VOICE_FAILURE_TEXT[failure]);
+}
 
 /** A voice to read with in place of the one in the settings, such as a voice the user previews. */
 export type ReplyVoiceChoice =
   | { engine: "supertonic"; supertonicVoice: SpeechVoice }
-  | { engine: "elevenlabs"; elevenLabsVoice: ElevenLabsVoice };
+  | { engine: "elevenlabs"; elevenLabsVoice: ElevenLabsVoice }
+  | { engine: "voice-server"; voice: string };
 
 export interface ReplyReading {
   stop: () => void;
   /**
    * Gives a reading from `streamReply` the reply so far. The text only grows. Each sentence plays
    * once a sentence after it is written; `complete` plays the rest, and the reading ends after it.
+   * `settled` plays the rest too, but more text can follow: a progress update that is complete.
    */
-  update: (markdown: string, complete: boolean) => void;
+  update: (markdown: string, complete: boolean, settled?: boolean) => void;
 }
 
 type ReplyHandlers = {
   onPart: (text: string) => void;
   /** The reading ended: it played to its end, or a newer reading stopped it. */
   onDone: () => void;
-  onError: (failure: ReplyVoiceFailure) => void;
+  /** `reason` is the reason that ElevenLabs gave, when it gave one. */
+  onError: (failure: ReplyVoiceFailure, reason: string | null) => void;
 };
 
-/** The chosen voice can read now: Supertonic 3 is downloaded, or ElevenLabs has a key and a voice. */
+/**
+ * The chosen voice can read now: Supertonic 3 is downloaded, ElevenLabs has a key and a voice, or
+ * the voice server has its spoken replies on.
+ */
 export function replyVoiceReady(engine = useVoiceSettings.getState().engine): boolean {
   if (!speechNative) return false;
   const settings = useVoiceSettings.getState();
   if (engine === "elevenlabs") return settings.hasElevenLabsKey && settings.elevenLabsVoice !== null;
+  if (engine === "voice-server") return useVoiceServer.getState().server?.routes.speech === true;
   return useSupertonicModel.getState().phase === "ready";
 }
 
@@ -86,6 +112,19 @@ if (speechNative) {
     for (const listener of listeners) listener.error(id);
   });
 }
+
+/** The build can change the reply speed: an app binary from before it plays at normal speed only. */
+export const canChangeReplySpeed = speechNative?.setSpeed !== undefined;
+
+// The native player keeps the speed, so a change applies at once to the part that plays now.
+let nativeSpeed: SpeechSpeed = 1;
+function applySpeed({ speed }: { speed: SpeechSpeed }): void {
+  if (speed === nativeSpeed) return;
+  nativeSpeed = speed;
+  speechNative?.setSpeed?.(speed);
+}
+applySpeed(useVoiceSettings.getState());
+useVoiceSettings.subscribe(applySpeed);
 
 function elevenLabsFailure(code: ElevenLabsError["code"]): ReplyVoiceFailure {
   if (code === "invalid-key" || code === "network") return code;
@@ -120,6 +159,9 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   let markdownSoFar = "";
   /** The parts that are fixed: the text after them is written. */
   const parts: string[] = [];
+  /** The text that `settled` fixed, and its parts. The text after it makes parts of its own. */
+  let settledLength = 0;
+  let settledParts: string[] = [];
   let lastDone = -1;
   let wake: (() => void) | null = null;
   const idOf = (index: number) => `${reading}:${index}`;
@@ -130,7 +172,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const release = () => {
     if (replaceActive === replace) replaceActive = null;
   };
-  const end = (failure?: ReplyVoiceFailure) => {
+  const end = (failure?: ReplyVoiceFailure, reason: string | null = null) => {
     if (ended) return;
     ended = true;
     release();
@@ -139,7 +181,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     wake?.();
     if (failure) {
       native?.stop();
-      handlers.onError(failure);
+      handlers.onError(failure, reason);
     } else handlers.onDone();
   };
   const listener: Listener = {
@@ -179,9 +221,14 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const settings = useVoiceSettings.getState();
   const engine = choice?.engine ?? settings.engine;
   const elevenLabsVoice = choice?.engine === "elevenlabs" ? choice.elevenLabsVoice : settings.elevenLabsVoice;
+  // One reading keeps one model, so its sentences do not change voice when the model changes.
+  const elevenLabsModel = settings.elevenLabsModel;
   const supertonicVoice = choice?.engine === "supertonic" ? choice.supertonicVoice : settings.supertonicVoice;
+  const serverVoice = choice?.engine === "voice-server" ? choice.voice : undefined;
   const ready =
-    engine === "elevenlabs" ? settings.hasElevenLabsKey && elevenLabsVoice !== null : replyVoiceReady("supertonic");
+    engine === "elevenlabs"
+      ? settings.hasElevenLabsKey && elevenLabsVoice !== null
+      : replyVoiceReady(engine === "voice-server" ? "voice-server" : "supertonic");
   if (!native || !ready) {
     queueMicrotask(() => end("not-ready"));
     return { stop, update: () => undefined };
@@ -210,9 +257,20 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     for (let index = 0; ; index++) {
       const part = await nextPart(index);
       if (part === null) return;
-      const pcm = await elevenLabsSpeech(key, voice.id, part, abort.signal);
+      const pcm = await elevenLabsSpeech(key, voice.id, elevenLabsModel, part, abort.signal);
       if (ended) return;
       native?.playPcm(idOf(index), pcm, ELEVENLABS_SAMPLE_RATE);
+    }
+  }
+
+  /** The voice server: each part plays while the next one is read on the server. */
+  async function playVoiceServer(): Promise<void> {
+    for (let index = 0; ; index++) {
+      const part = await nextPart(index);
+      if (part === null) return;
+      const audio = await voiceServerSpeech(part, abort.signal, serverVoice);
+      if (ended) return;
+      native?.playPcm(idOf(index), audio.pcm, audio.sampleRate);
     }
   }
 
@@ -240,19 +298,28 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
 
   async function play(): Promise<void> {
     try {
-      await (engine === "elevenlabs" ? playElevenLabs() : playSupertonic());
+      await (engine === "elevenlabs"
+        ? playElevenLabs()
+        : engine === "voice-server"
+          ? playVoiceServer()
+          : playSupertonic());
     } catch (error) {
       if (ended) return;
-      end(error instanceof ElevenLabsError ? elevenLabsFailure(error.code) : "speech");
+      if (error instanceof ElevenLabsError) end(elevenLabsFailure(error.code), error.reason);
+      else end(error instanceof VoiceServerError ? "voice-server" : "speech");
     }
   }
 
-  const update = (markdown: string, isComplete: boolean) => {
+  const update = (markdown: string, isComplete: boolean, settled = false) => {
     if (ended || complete) return;
     markdownSoFar = markdown;
-    const all = liveSpeechParts(markdown, SPEECH_LIMITS.maximumTextLength);
+    const rest = liveSpeechParts(markdown.slice(settledLength), SPEECH_LIMITS.maximumTextLength);
     // The last part can still grow, so it waits until more text follows it or the reply is complete.
-    const fixed = isComplete ? all : all.slice(0, -1);
+    const fixed = [...settledParts, ...(isComplete || settled ? rest : rest.slice(0, -1))];
+    if (settled) {
+      settledLength = markdown.length;
+      settledParts = fixed;
+    }
     if (fixed.length > parts.length) parts.push(...fixed.slice(parts.length));
     complete = isComplete;
     if (complete && lastDone === parts.length - 1) {

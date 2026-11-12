@@ -75,7 +75,7 @@ export const messages = {
   "agentSettings.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
   "agentSettings.backupModels.intro": "如果 {model} 在 {name} 开始输出之前就用完了额度，{name} 会询问你要用哪个模型。",
   "agentSettings.backupModels.introAutomatic":
-    "如果 {model} 在 {name} 开始输出之前就用完了额度或出现服务商错误，{name} 会按顺序切换到第一个可用模型。",
+    "如果 {model} 用完了额度，{name} 会按顺序切换到第一个可用模型。如果 {model} 在 {name} 开始输出之前出现服务商错误，{name} 也会切换。",
   "agentSettings.backupModels.ask": "切换前询问",
   "agentSettings.backupModels.order": "顺序",
   "agentSettings.backupModels.listLabel": "备用模型（按顺序）",
@@ -88,7 +88,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} 在开始输出后不会切换。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
+    "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "agentSettings.groups.brain": "核心",
   "agentSettings.groups.knows": "已知",
   "agentSettings.groups.does": "行为",
@@ -120,6 +120,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "恢复为标识头像",
   "agentSettings.avatar.shape": "形状",
   "agentSettings.avatar.shuffle": "随机面孔",
+  "agentSettings.avatar.style": "头像风格",
+  "agentSettings.avatar.stylePlush": "毛绒",
+  "agentSettings.avatar.styleFlat": "扁平",
   "agentSettings.avatar.shapes": "头像形状",
   "agentSettings.avatar.shapeOption": "形状 {number}",
   "agentSettings.avatar.eyes": "眼睛",
@@ -135,10 +138,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "助手模型",
   "agentSettings.runtime.modelUnavailable": "助手 CLI 连接后即可选择模型。",
-  "agentSettings.runtime.reasoning": "推理",
-  "agentSettings.runtime.reasoningLabel": "助手推理强度",
-  "agentSettings.runtime.selectReasoning": "选择推理强度",
-  "agentSettings.runtime.reasoningSetByProvider": "由 {provider} 决定",
   "agentSettings.runtime.access": "访问权限",
   "agentSettings.runtime.accessLabel": "助手访问权限",
   "agentSettings.runtime.busyMessage": "忙碌时",
@@ -177,6 +176,14 @@ export const messages = {
     "助手会忘记当前对话，消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
+  "agentSettings.deleteHistory.title": "删除历史记录",
+  "agentSettings.deleteHistory.description": "此对话的消息会被删除，智能体也会忘记它们。设置保持不变。",
+  "agentSettings.deleteHistory.button": "删除",
+  "agentSettings.deleteHistory.confirmTitle": "删除与 {name} 的对话历史记录？",
+  "agentSettings.deleteHistory.confirmDescription":
+    "此对话的所有消息和文件都会从 OpenBot 中删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
+  "agentSettings.deleteHistory.confirm": "删除历史记录",
+  "agentSettings.deleteHistory.failed": "无法删除历史记录。",
 
   "agentSettings.fullAccess.title": "授予该助手完全访问权限？",
   "agentSettings.fullAccess.askTitle": "允许该助手在其工作区之外工作？",
@@ -209,8 +216,7 @@ export const messages = {
   "agentSettings.agentNewChat.title": "助手自行开始新对话",
   "agentSettings.agentNewChat.description": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "agentSettings.quickAcknowledgement.title": "长任务开始前显示计划",
-  "agentSettings.quickAcknowledgement.description":
-    "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "agentSettings.quickAcknowledgement.description": "长任务开始前，助手会先显示计划。",
   "agentSettings.browserProfile.label": "浏览器配置文件",
   "agentSettings.browserProfile.shared": "共享",
   "agentSettings.browserProfile.agent": "仅该助手",

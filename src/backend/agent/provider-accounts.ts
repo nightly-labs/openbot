@@ -3,6 +3,7 @@ import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AccountUsage,
   type AccountUsageLimit,
+  type AgentModelOption,
   agentProviderDescriptor,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
@@ -16,7 +17,7 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Cause, Effect, Fiber, Schema, type Scope } from "effect";
-import { startAcpAuthentication } from "./../acp-sign-in";
+import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
 import type { AccountReadResult } from "./../protocol";
@@ -28,7 +29,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { type ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -45,9 +46,16 @@ function accountFailure(text: string): ProviderAccountFailed {
   return new ProviderAccountFailed({ cause: new Error(text) });
 }
 
+/** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
+interface AccountLogin {
+  email: string | null;
+  organization: string | null;
+}
+
 interface AccountState {
   state: ProviderAccountState;
   email: string | null;
+  organization: string | null;
   message: string | null;
   checkedAt: number;
 }
@@ -57,7 +65,8 @@ export interface ProviderAccountsHost {
   scope(): Scope.Scope;
   /** The CLI of the provider's own sign-in, or undefined when it is not connected. */
   cli(provider: AgentProviderId): AgentCliInfo | undefined;
-  defaultEmail(provider: AgentProviderId): string | null;
+  /** The login of the provider's own sign-in. */
+  defaultLogin(provider: AgentProviderId): AccountLogin | null;
   /** The provider's saved API key. */
   apiKey(provider: AgentProviderId): string | null;
   /** Whether the provider's own sign-in runs on its saved key, as it does with no account of its own. */
@@ -66,13 +75,13 @@ export interface ProviderAccountsHost {
   signInTemp(provider: AgentProviderId): ProviderTempOptions | undefined;
   /**
    * Starts and checks a client that signs in to the account's folder. The caller stops it.
-   * `afterSignIn`: the check that ends a sign-in, which gets the long start wait.
+   * `longStart`: an account check, which gets the long start wait.
    */
   authenticate(
     provider: AgentProviderId,
     cli: AgentCliInfo,
     accountEnvironment: Readonly<Record<string, string>>,
-    afterSignIn?: boolean,
+    longStart?: boolean,
   ): Effect.Effect<{ client: AgentClient; account: NonNullable<AccountReadResult["account"]> }, ProviderAccountFailed>;
   stopClient(client: AgentClient): Effect.Effect<void>;
   /** The running process of an agent on this account, if there is one. */
@@ -81,6 +90,8 @@ export interface ProviderAccountsHost {
   isAccountBusy(provider: AgentProviderId, accountId: string): boolean;
   stopAgentClients(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   readUsage(client: AgentClient, model?: string): Effect.Effect<AccountUsage, ProviderAccountFailed>;
+  /** The models that the client's account serves, or null when its `model/list` failed. */
+  readModels(client: AgentClient): Effect.Effect<AgentModelOption[] | null>;
   /** The usage reset credits that the client's last usage reading counted; undefined for a provider with none. */
   resetCredits(client: AgentClient): number | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
@@ -107,6 +118,11 @@ export class ProviderAccounts {
   readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
   /** Paces the usage reads of each account. A new key resets it, and a removed account drops it. */
   readonly #usageGates = new Map<string, UsageReadGate>();
+  /**
+   * The models of each account, from its last check. A plan can serve models that the provider's own
+   * sign-in does not, so the catalogue of the own sign-in is not the account's (#5217).
+   */
+  readonly #models = new Map<string, AgentModelOption[]>();
 
   constructor(store: ProviderAccountStore, host: ProviderAccountsHost) {
     this.#store = store;
@@ -166,15 +182,23 @@ export class ProviderAccounts {
         .filter((account) => !isKeyAccount(account) || !this.#host.defaultUsesApiKey(provider))
         .map((account) => {
           const state = this.#states.get(account.id);
+          const models = this.#models.get(account.id);
           return {
             id: account.id,
             label: account.label,
             email: state?.email ?? null,
             state: state?.state ?? "checking",
             message: state?.message ?? null,
+            ...(models ? { models: structuredClone(models) } : {}),
           };
         }),
     ];
+  }
+
+  /** The models of an account after the first, from its last check; empty before one listed them. */
+  models(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] {
+    const account = this.account(provider, accountId);
+    return account ? structuredClone(this.#models.get(account.id) ?? []) : [];
   }
 
   /**
@@ -228,7 +252,8 @@ export class ProviderAccounts {
       Effect.gen({ self: this }, function* () {
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
-          // The server prints Google's page, which a host shows and this computer opens itself.
+          // The server prints Google's page, which a host shows and this computer opens itself, except
+          // at a Windows computer, where the server opens it (`googleSignInByOpenBot`).
           const login = yield* startAcpAuthentication({
             executable: cli.executable,
             argv: command.argv,
@@ -237,7 +262,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            openGoogleSignIn: openExternal,
+            ...(googleSignInByOpenBot(onHost) ? { openGoogleSignIn: openExternal } : {}),
           });
           return yield* login.done;
         }
@@ -341,6 +366,42 @@ export class ProviderAccounts {
       .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
     this.#host.changed();
   }).bind(this);
+
+  /** The accounts that the provider's pool leaves out, or null while its pool is off. */
+  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+    return this.#support(provider) ? this.#store.pool(provider) : null;
+  }
+
+  /** Turns the provider's pool on with the accounts it leaves out, or off. Unknown accounts are dropped. */
+  readonly setPool = Effect.fn("ProviderAccounts.setPool")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    enabled: boolean,
+    leftOut: readonly string[],
+  ) {
+    const name = providerLabel(provider);
+    if (provider === "acp" || !this.#support(provider))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    const known = new Set([DEFAULT_PROVIDER_ACCOUNT_ID, ...this.#store.list(provider).map((account) => account.id)]);
+    yield* this.#store
+      .setPool(provider, enabled ? { leftOut: leftOut.filter((accountId) => known.has(accountId)) } : null)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    this.#host.changed();
+  }).bind(this);
+
+  /** The connected accounts after the first that have a plan. A key account has no plan to pool. */
+  planAccounts(provider: AgentProviderId): string[] {
+    if (!this.#support(provider)) return [];
+    return this.#store
+      .list(provider)
+      .filter((account) => !isKeyAccount(account) && this.#states.get(account.id)?.state === "connected")
+      .map((account) => account.id);
+  }
+
+  /** The last usage reading of an account after the first, or null before one. */
+  keptUsage(accountId: string): AccountUsageLimit | null {
+    return this.#usage.get(accountId)?.limit ?? null;
+  }
 
   /**
    * Stops the account's processes, signs it out, and removes its folder with the credentials in it.
@@ -491,7 +552,10 @@ export class ProviderAccounts {
     return limits;
   }).bind(this);
 
-  /** The reading of one account for the usage limit check: its agent's process, or the kept one. */
+  /**
+   * The reading of one account for the usage limit check: its agent's process, or the kept one. While
+   * the account's gate waits after a failed read, the process is not asked, and there is no reading.
+   */
   readonly usageFor = Effect.fn("ProviderAccounts.usageFor")(function* (
     this: ProviderAccounts,
     provider: AgentProviderId,
@@ -499,7 +563,11 @@ export class ProviderAccounts {
     model: string,
   ) {
     const client = this.#host.agentClient(provider, accountId);
-    if (client) return yield* this.#host.readUsage(client, model);
+    if (client)
+      return yield* this.#usageGate(accountId).unlessWaiting({
+        read: this.#host.readUsage(client, model),
+        waiting: (): AccountUsage => ({ limits: [] }),
+      });
     // The kept reading has no model: take the windows of the model's quota group from it.
     const kept = this.#usage.get(accountId)?.limit;
     const quota = kept && usageQuotaForModel(kept, model);
@@ -574,11 +642,12 @@ export class ProviderAccounts {
     if (this.#states.get(account.id)?.state !== "connecting")
       this.#setState(account.id, { state: "checking", message: null });
     yield* Effect.acquireUseRelease(
-      this.#host.authenticate(provider, cli, this.environment(account), afterSignIn),
+      this.#host.authenticate(provider, cli, this.environment(account), true),
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
-          if (email && this.#emailTaken(provider, account.id, email))
+          const organization = signedIn.organization ?? null;
+          if (email && this.#loginTaken(provider, account.id, { email, organization }))
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
@@ -604,9 +673,16 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
+          // After the connected state, so a slow list does not delay it; the end of the sign-in still
+          // waits for the list. A failed list keeps the last one.
+          const models = yield* this.#host.readModels(client);
+          if (models && this.#states.has(account.id)) {
+            this.#models.set(account.id, models);
+            this.#host.changed();
+          }
         }),
       ({ client }) => this.#host.stopClient(client),
     );
@@ -663,7 +739,7 @@ export class ProviderAccounts {
       return yield* accountFailure(
         sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) }),
       );
-    yield* this.#runSignOut(cli, command, {}).pipe(
+    yield* this.#runSignOut(provider, cli, command, {}).pipe(
       Effect.mapError((error) => accountFailure(this.#message(provider, error))),
     );
   });
@@ -677,7 +753,7 @@ export class ProviderAccounts {
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
-    yield* this.#runSignOut(cli, command, this.environment(account)).pipe(
+    yield* this.#runSignOut(account.provider, cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
         Effect.sync(() =>
@@ -691,18 +767,38 @@ export class ProviderAccounts {
   });
 
   #runSignOut(
+    provider: AgentProviderId,
     cli: AgentCliInfo,
     command: NonNullable<ProviderAccountSupport["signOut"]>,
     environment: Readonly<Record<string, string>>,
-  ): Effect.Effect<void, ProviderProcessFailed> {
+  ): Effect.Effect<void, ProviderProcessFailed | ProviderSignInError> {
+    const privateTemp = this.#host.signInTemp(provider);
     return Effect.scoped(
       Effect.gen(function* () {
+        const env = { ...cliPathEnvironment(cli), ...command.env(cli), ...environment };
+        if (command.acpLogout) {
+          const logout = yield* startAcpAuthentication({
+            executable: cli.executable,
+            argv: command.argv,
+            env,
+            methodId: "",
+            timeoutMs: command.timeoutMs,
+            logoutOnly: true,
+            signOutMethod: command.acpLogout === true ? undefined : command.acpLogout,
+            // The Windows Gemini server unpacks into the temporary folder at each start (`antigravityTemp`).
+            privateTemp,
+          });
+          // A refused ACP sign-out has a safe message, which the account flow shows as the reason.
+          return yield* logout.done.pipe(
+            Effect.mapError((error) => (error.cause instanceof ProviderSignInError ? error.cause : error)),
+          );
+        }
         const target = cliSpawnTarget(cli.executable, command.argv);
         const child = yield* Effect.acquireRelease(
           Effect.sync(() =>
             spawn(target.command, target.args, {
               cwd: process.cwd(),
-              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...environment },
+              env: { ...process.env, ...env },
               stdio: "ignore",
               shell: false,
               windowsHide: process.platform === "win32",
@@ -713,15 +809,20 @@ export class ProviderAccounts {
         );
         yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
       }),
+    ).pipe(
+      Effect.mapError((cause) =>
+        cause instanceof ProviderProcessFailed || cause instanceof ProviderSignInError
+          ? cause
+          : new ProviderProcessFailed({ cause }),
+      ),
     );
   }
 
-  #emailTaken(provider: AgentProviderId, accountId: string, email: string): boolean {
-    const normalized = email.toLowerCase();
-    if (this.#host.defaultEmail(provider)?.toLowerCase() === normalized) return true;
-    return this.#store
-      .list(provider)
-      .some((other) => other.id !== accountId && this.#states.get(other.id)?.email?.toLowerCase() === normalized);
+  #loginTaken(provider: AgentProviderId, accountId: string, login: AccountLogin): boolean {
+    const same = (other: AccountLogin | null | undefined) =>
+      other?.email?.toLowerCase() === login.email?.toLowerCase() && other?.organization === login.organization;
+    if (same(this.#host.defaultLogin(provider))) return true;
+    return this.#store.list(provider).some((other) => other.id !== accountId && same(this.#states.get(other.id)));
   }
 
   #interrupt(accountId: string): Effect.Effect<void> {
@@ -735,6 +836,7 @@ export class ProviderAccounts {
     this.#states.delete(accountId);
     this.#usage.delete(accountId);
     this.#usageGates.delete(accountId);
+    this.#models.delete(accountId);
   }
 
   #usageGate(accountId: string): UsageReadGate {
@@ -754,6 +856,7 @@ export class ProviderAccounts {
     this.#states.set(accountId, {
       state: patch.state ?? current?.state ?? "checking",
       email: patch.email !== undefined ? patch.email : (current?.email ?? null),
+      organization: patch.organization !== undefined ? patch.organization : (current?.organization ?? null),
       message: patch.message !== undefined ? patch.message : (current?.message ?? null),
       checkedAt: patch.state === "connected" || patch.state === "signed-out" ? Date.now() : (current?.checkedAt ?? 0),
     });

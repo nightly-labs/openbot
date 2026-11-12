@@ -4,13 +4,17 @@ import {
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MINIMUM_INTERVAL_MINUTES,
   ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutineRunPlace,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { isRecord } from "../protocol";
+import { routineScheduleZodSchema } from "../routine-tool-schema";
 
 export function routineToolArguments(value: unknown, allowedKeys: readonly string[]): DynamicRecord {
   if (!isRecord(value)) throw new RoutineInputError("Routine tool arguments are required.");
@@ -49,6 +53,16 @@ export function routineToolPolicies(args: DynamicRecord): {
   };
 }
 
+/** Where an agent routine runs, when the tool call sets it. A call that leaves it out keeps the saved place. */
+export function routineToolRunPlace(args: DynamicRecord): { runIn?: RoutineRunPlace } {
+  const { runIn } = args;
+  if (runIn === undefined) return {};
+  if (!isOneOf(ROUTINE_RUN_PLACES, runIn)) {
+    throw new RoutineInputError(`runIn must be one of: ${ROUTINE_RUN_PLACES.join(", ")}.`);
+  }
+  return { runIn };
+}
+
 export function siteToolString(value: unknown, field: string, limit: number): string {
   if (!isString(value) || !value.trim()) throw new Error(`${field} is required.`);
   if (value.length > limit) throw new Error(`${field} is too long.`);
@@ -56,7 +70,14 @@ export function siteToolString(value: unknown, field: string, limit: number): st
 }
 
 export function routineToolSchedule(value: unknown): RoutineSchedule {
-  if (!isRoutineSchedule(value)) throw new RoutineInputError("The routine schedule is invalid.");
+  if (!isRoutineSchedule(value)) {
+    // A model that guesses the shape, such as { type: "daily" }, needs to know which field to change;
+    // with "invalid" only, agents tried a dozen shapes and gave up (#6754). The schema only explains
+    // the refusal: `isRoutineSchedule` still decides what is accepted.
+    const detail = routineScheduleProblem(value);
+    if (detail === null) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
+    throw new RoutineInputError(sourceText("error.agent.routineScheduleArgumentsInvalid", { detail }));
+  }
   // Validate the polling floor before the store runs so the provider gets a clear,
   // actionable error instead of a raw failure after the request. Custom cron schedules
   // still need a timezone and are checked by the routine store.
@@ -75,6 +96,22 @@ export function routineToolSchedule(value: unknown): RoutineSchedule {
     );
   }
   return structuredClone(value);
+}
+
+/** Why `isRoutineSchedule` refused `value`, for the agent, or null when the reason is not known. */
+function routineScheduleProblem(value: unknown): string | null {
+  const parsed = routineScheduleZodSchema.safeParse(value);
+  const problems = parsed.success
+    ? // The schema checks the format of these values; `isRoutineSchedule` also checks that they exist.
+      parsed.data.kind === "interval"
+      ? ["schedule.anchorAt: Invalid date-time"]
+      : parsed.data.kind === "once"
+        ? ["schedule.date: Not a calendar date"]
+        : []
+    : parsed.error.issues.map((issue) => `${["schedule", ...issue.path.map(String)].join(".")}: ${issue.message}`);
+  if (problems.length === 0) return null;
+  const detail = `${problems.join("; ")}.`;
+  return detail.length > 600 ? `${detail.slice(0, 597)}...` : detail;
 }
 
 function intervalMinutes(amount: number, unit: "minutes" | "hours" | "days"): number {

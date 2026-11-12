@@ -9,11 +9,20 @@ import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIsl
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { useText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
+import { windowShape } from "../../window-shape";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
+/**
+ * Linux gives no pointer moves to a window that lets the pointer through. There the window shape is
+ * the island and its hover band: the pointer goes to the apps outside them, and nothing outside shows.
+ */
+const SHAPED_WINDOW = currentDevicePlatform() === "linux";
+/** The parts of the island that take the pointer while it is not in use. */
+const SHAPE_PARTS = ".dynamic-island-shell, .dynamic-island-hover-zone";
 
 export function DynamicIslandSurface() {
   const { t } = useText();
@@ -48,6 +57,48 @@ export function DynamicIslandSurface() {
   // being key, its blur collapses the island before a click on an option lands.
   let keyboardInside = false;
   let queuedPresentation: DynamicIslandPresentation | undefined;
+  let anchor: HTMLFieldSetElement | undefined;
+  let sentShape: string | undefined;
+  let shapeFrame: number | undefined;
+  // The island motion writes each new size and state to the DOM, and each write gives the window its
+  // new shape. A ResizeObserver is not used: the motion resizes the shell in its own observer callback,
+  // and the browser then reports an observer loop error. No timer runs.
+  const shapeObserver = SHAPED_WINDOW ? new MutationObserver(() => followShape()) : undefined;
+  const visible = () => presentation().mode !== "idle" || preference().idleVisible;
+
+  /** Linux: tells main the parts of the window that take the pointer. Only a change is sent. */
+  function syncShape(): Element[] {
+    const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
+    const shape = windowShape(parts.map((part) => part.getBoundingClientRect()));
+    const key = JSON.stringify(shape);
+    if (key !== sentShape) {
+      sentShape = key;
+      void dynamicIslandPort()
+        .dynamicIsland.setInputRegion(shape)
+        .catch(() => undefined);
+    }
+    return parts;
+  }
+
+  /** Sends the shape, and again on each frame while a part moves. The frames stop with the motion. */
+  function followShape(): void {
+    if (!shapeObserver || shapeFrame !== undefined) return;
+    const parts = syncShape();
+    if (!parts.some((part) => part.getAnimations().some((motion) => motion.playState === "running"))) return;
+    shapeFrame = requestAnimationFrame(() => {
+      shapeFrame = undefined;
+      followShape();
+    });
+  }
+
+  function observeShape(element: HTMLFieldSetElement): void {
+    anchor = element;
+    if (!shapeObserver) return;
+    shapeObserver.disconnect();
+    shapeObserver.observe(element, { attributes: true, childList: true, subtree: true });
+    queueMicrotask(followShape);
+  }
+  createEffect(visible, () => queueMicrotask(followShape));
 
   function applyPresentation(next: DynamicIslandPresentation): void {
     if (
@@ -216,17 +267,25 @@ export function DynamicIslandSurface() {
       void dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
     };
     window.addEventListener("blur", close);
+    window.addEventListener("resize", followShape);
     return () => {
       stopPreference();
       stopPresentation();
       stopGeometry();
       window.removeEventListener("blur", close);
+      window.removeEventListener("resize", followShape);
+      if (shapeFrame !== undefined) cancelAnimationFrame(shapeFrame);
+      shapeObserver?.disconnect();
     };
   });
   return (
-    <main class="dynamic-island-surface" aria-label={t("island.surface.label")}>
-      <Show when={presentation().mode !== "idle" || preference().idleVisible}>
+    <main
+      class="dynamic-island-surface"
+      aria-label={notchSize() ? t("island.surface.label") : t("island.surface.labelIsland")}
+    >
+      <Show when={visible()}>
         <fieldset
+          ref={observeShape}
           class="dynamic-island-surface-anchor"
           aria-label={t("island.surface.interactionArea")}
           onMouseOver={enterInteraction}

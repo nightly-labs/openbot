@@ -29,4 +29,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "테넌트 종료 시간이 초과되었어요. 애플리케이션 교체를 시작하지 않았어요.",
   "error.host.tenantHealthMissing":
     "다시 시작한 후 테넌트 상태 보고서가 없거나 비정상이에요. 다른 업데이트를 하기 전에 테넌트 세션을 점검해 주세요.",
+  "error.host.personalityInvalid": "알 수 없는 응답 스타일이에요.",
 } as const satisfies PartialTranslation<typeof source>;

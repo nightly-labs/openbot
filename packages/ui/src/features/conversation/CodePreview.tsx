@@ -121,7 +121,11 @@ export function CodePreview(props: {
             <>
               <span>{t("chat.preview.diagramInvalid")}</span>
               <Show when={invalidDiagramMessage()}>
-                {(message) => <pre class="message-preview-failure-detail">{message()}</pre>}
+                {(message) => (
+                  <pre class="message-preview-failure-detail" dir="ltr">
+                    {message()}
+                  </pre>
+                )}
               </Show>
             </>
           }

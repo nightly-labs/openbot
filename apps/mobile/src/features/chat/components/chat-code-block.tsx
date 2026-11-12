@@ -10,6 +10,8 @@ import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
+import type { BubbleTone } from "../model/bubble-tone";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
@@ -22,6 +24,11 @@ interface ChatCodeBlockProps {
   selectable?: boolean;
   /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
+  /**
+   * The colors of a bubble with a message color. The code is in the bubble's text color: the theme
+   * colors of highlighted code do not read on every message color.
+   */
+  tone?: BubbleTone;
 }
 
 export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
@@ -35,10 +42,20 @@ const CodeBlockBody = memo(function CodeBlockBody({
   language,
   selectable = true,
   finished = false,
+  tone,
   highlight: highlightAllowed,
 }: ChatCodeBlockProps & { highlight: boolean }) {
   const { t } = useText();
-  const { foreground, muted, colors } = useCodeTokenColors();
+  const theme = useCodeTokenColors();
+  const muted = tone?.muted ?? theme.muted;
+  // The block is drawn as a table: the language and the copy button on a card, and the code on an
+  // inset panel of the canvas. The card is a clear layer of the text color, so it shows on every
+  // surface: the screen, an agent's bubble or a card. A message color gives its own surfaces.
+  const [textColor, canvas] = useCSSVariable(["--openbot-text-primary", "--openbot-bg-native-canvas"]).map(String);
+  const card = tone?.panel ?? `${textColor}0f`;
+  const panel = tone?.deep ?? canvas;
+  const foreground = tone?.foreground ?? theme.foreground;
+  const colors: Partial<Record<ShjToken, ColorValue>> = tone ? { cmnt: tone.muted } : theme.colors;
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
     const tokens = cachedHighlight(text, language);
     return tokens ? { text, language, tokens } : null;
@@ -92,9 +109,15 @@ const CodeBlockBody = memo(function CodeBlockBody({
     }
   }
   return (
-    <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
-      <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
-        <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
+    <View className="overflow-hidden" style={{ borderRadius: 16, borderCurve: "continuous", backgroundColor: card }}>
+      {/* The label lines up with the code on the inset panel, as a table header does with its rows. */}
+      <View className="flex-row items-center justify-between gap-3" style={{ paddingStart: 15, paddingEnd: 4 }}>
+        <Typography.Paragraph
+          type="body-xs"
+          className="shrink text-muted"
+          numberOfLines={1}
+          style={tone ? { color: tone.muted } : undefined}
+        >
           {codeLanguageLabel(language, t)}
         </Typography.Paragraph>
         <Button
@@ -107,11 +130,24 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>
+      <View
+        style={[
+          CODE_LAYOUT_STYLE,
+          {
+            marginHorizontal: 3,
+            marginBottom: 3,
+            borderRadius: 13,
+            borderCurve: "continuous",
+            backgroundColor: panel,
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+          },
+        ]}
+      >
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
-          style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+          style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
         >
           {tokens.map((token) => (
             <Typography.Code

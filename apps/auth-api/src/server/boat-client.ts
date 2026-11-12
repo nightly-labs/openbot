@@ -28,6 +28,13 @@ const BoatSandboxState = Schema.Literals([
 ]);
 export type BoatSandboxState = typeof BoatSandboxState.Type;
 const BoatSandbox = Schema.Struct({ id: Schema.String, state: BoatSandboxState });
+/**
+ * The last stop of the sandbox while boat cannot save the disk for it. boat tries the stop again until a
+ * save works, and the sandbox keeps its usable state for this time. Only a resume ends the stop
+ * (`superseded`). Other values are `pending`, `completed` and `superseded`. A stop of another form
+ * does not match, so it does not stop the read of the state.
+ */
+const isFailingStop = Schema.is(Schema.Struct({ status: Schema.Literal("failing") }));
 const BoatCommandResult = Schema.Struct({ exitCode: Schema.NullOr(Schema.Number), stdout: Schema.String });
 
 /** Provider messages and raw causes can contain credentials and are not retained. */
@@ -96,11 +103,13 @@ const boatRequest = Effect.fn("BoatClient.request")(function* (
   return payload;
 });
 
-const parseSandbox = Effect.fn("BoatClient.decodeSandbox")((value: unknown) =>
-  Schema.decodeUnknownEffect(BoatSandbox)(
-    isDynamicRecord(value) && isDynamicRecord(value.sandbox) ? value.sandbox : value,
-  ).pipe(Effect.mapError(() => new BoatApiError(502, "invalid_response"))),
-);
+const parseSandbox = Effect.fn("BoatClient.decodeSandbox")((value: unknown) => {
+  const sandbox = isDynamicRecord(value) && isDynamicRecord(value.sandbox) ? value.sandbox : value;
+  return Schema.decodeUnknownEffect(BoatSandbox)(sandbox).pipe(
+    Effect.map((decoded) => ({ ...decoded, stopFailing: isDynamicRecord(sandbox) && isFailingStop(sandbox.stop) })),
+    Effect.mapError(() => new BoatApiError(502, "invalid_response")),
+  );
+});
 
 export class BoatClient {
   readonly #transport: Layer.Layer<BoatTransport>;

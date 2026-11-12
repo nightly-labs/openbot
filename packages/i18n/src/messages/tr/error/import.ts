@@ -31,17 +31,28 @@ export const messages = {
   "error.import.fileRenamed": "{name}: {file} zaten mevcut, bu nedenle bu kopya {saved} olarak kaydedildi.",
   "error.import.fileSkipped": "{name}: {file} dosyası atlandı. {reason}",
   "error.import.chooseZip": "Bir .zip dosyası seçin.",
-  "error.import.zipTooLarge": "Dışa aktarım 500 MB altında bir .zip olmalıdır.",
   "error.import.unsafeFile": "Dışa aktarım güvenli olmayan bir dosya içeriyor: {name}",
-  "error.import.expandedTooLarge": "Dışa aktarım açıldığında 500 MB ve {limit} dosyanın altında olmalıdır.",
+  "error.import.tooManyFiles": "Dışa aktarım en fazla {limit} dosya içermelidir.",
+  "error.import.diskSpace":
+    "{name}: dosyaları için {size} GB boş disk alanı gerekiyor, boş alan {free} GB. Yer açın, ardından ajanı yeniden içe aktarın.",
+  "error.import.remoteExpandedTooLarge": "Dışa aktarım açıldığında 500 MB ve {limit} dosyanın altında olmalıdır.",
   "error.import.zipInvalid":
     "Seçilen dosya geçerli bir .zip değil. Grok Bot dosyayı hâlâ kaydediyorsa bekleyip yeniden seçin.",
+  "error.import.entryDamaged": "Dosya, dışa aktarımda bozuk.",
+  "error.import.foldersSkipped":
+    ".git ve node_modules klasörlerindeki {number} dosya dışarıda bırakıldı. Bir araç bunları yeniden oluşturabilir.",
   "error.import.empty": "Dışa aktarım boş.",
   "error.import.remoteZipTooLarge":
     "Katılınan bir sunucuya içe aktarmak için dışa aktarım 100 MB altında bir .zip olmalıdır.",
   "error.import.hostBusy": "Sunucu diğer dışa aktarımları okuyor. Birkaç dakika sonra tekrar deneyin.",
+  "error.import.uploadDiskSpace":
+    "Dışa aktarım sunucuda {size} GB boş disk alanı gerektiriyor ve {free} GB boş. Sunucuda yer açın, ardından dışa aktarımı yeniden seçin.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Bu sunucu en fazla 100 MB'lık bir dışa aktarım kabul ediyor. Daha büyük bir dışa aktarımı içe aktarmak için sunucudaki OpenBot'u güncelleyin.",
   "error.import.skillKept":
     '{name}: sunucu zaten "{skill}" becerisine sahip, bu yüzden ajan bu beceriyi kullanıyor. Bir yöneticiden güncellemesini isteyin.',
+  "error.import.skillRenamed":
+    '{name}: "{skill}" becerisinin adı başka bir becerinin adına çok benziyor, bu yüzden "{renamed}" olarak kaydedildi.',
   "error.import.transferRemoteTooLarge":
     "Katılınan bir sunucu için aktarım dosyası 100 MB'tan küçük olmalıdır. Çalışma alanı dosyalarını kapatın veya daha az ajan dışa aktarın.",
   "error.import.transferNotFile": "Bu dosya bir OpenBot aktarım dosyası değil.",

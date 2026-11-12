@@ -21,9 +21,11 @@ import {
 import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
-import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
+import { formatMessageTime } from "../../../app-message-projection";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
+import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -33,6 +35,7 @@ import {
   routineRunTurnMessages,
   summarizeRoutineRunMessages,
 } from "../routine-run-timeline";
+import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
 import { conversationOwnerId } from "./composer-store";
 
@@ -46,6 +49,8 @@ interface ScrollStickyState {
   getStickToLatest: () => boolean;
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
+  /** Moves a following reader to the newest message. */
+  followLatest: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -55,6 +60,8 @@ export interface ScrollStoreDeps {
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   /** The user's messages the host has not drawn yet. They follow the transcript. */
   pendingMessages: () => AgentMessage[];
+  /** The row key of each sent message whose pending row drew it first, by host message id. */
+  handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
 }
@@ -73,20 +80,93 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   const [openRoutineRuns, setOpenRoutineRuns] = createSignal<RoutineRunOpenState>(new Map());
   // The thinking and the memory changes of a turn show in the steps above its answer. A turn with
-  // no answer shows its memory changes in a row of their own.
+  // no answer shows its memory changes in a row of their own. A turn with no answer and no memory
+  // changes, such as a stopped one, shows its thinking in that row. A running turn shows its steps
+  // under the activity line, and a turn that ends with no text on purpose shows none.
   const answeredTurns = createMemo(
     () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
   );
-  const shownMessages = createMemo(() =>
-    summarizeHostedSiteMessages(
-      deps.props.messages.filter(
-        (message) =>
-          message.kind !== "thinking" &&
-          !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
-          !silentAgentAnswer(message),
-      ),
-    ),
+  const thinkingRowHiddenTurns = createMemo(
+    () =>
+      new Set([
+        ...answeredTurns(),
+        ...deps.props.messages.flatMap((message) =>
+          message.kind === "memory-changes" || silentAgentAnswer(message) ? [message.turnId] : [],
+        ),
+        deps.props.activeTurnId ?? undefined,
+        ...(deps.props.channel?.workingTurns() ?? []),
+      ]),
   );
+  // A channel folds the text that a member writes after its answer into the steps, such as a "Done."
+  // (channel-service). It is not progress, so it stays in the steps. A file that the agent attaches
+  // while it works has no text and does not end the turn.
+  const channelAnswerTimes = createMemo(() => {
+    const times = new Map<string, string>();
+    if (!deps.props.channel) return times;
+    for (const message of deps.props.messages)
+      if (
+        message.turnId &&
+        message.createdAt &&
+        message.body.trim() &&
+        isTurnAnswer(message) &&
+        !times.has(message.turnId)
+      )
+        times.set(message.turnId, message.createdAt);
+    return times;
+  });
+  /*
+   * In Natural, a member's progress notes show as its own messages, as in an agent chat: a member can
+   * say "I'll check the shared folder first" and then answer. Each note waits until it is complete
+   * (`held`), so it enters as one bubble and does not grow.
+   */
+  const progressRows = (thinking: AgentMessage): AgentMessage[] => {
+    const channel = deps.props.channel;
+    if (!channel) return narrationRows(thinking, deps.props.agent?.provider);
+    // A channel row names its member, so the member's provider tells its narration from its thinking.
+    const answeredAt = thinking.turnId ? channelAnswerTimes().get(thinking.turnId) : undefined;
+    return narrationRows(thinking, channel.author(thinking).agent?.provider).filter(
+      (row) => !answeredAt || !row.createdAt || row.createdAt <= answeredAt,
+    );
+  };
+  /** The agents that write in the channel now. Their text that still arrives waits until it is complete. */
+  const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
+  /*
+   * Only the text of a member that works waits. A view keeps the copy of an older message that it
+   * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
+   * it must not stay hidden.
+   */
+  const held = (message: AgentMessage): boolean =>
+    heldWhileWritten(message) &&
+    (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  const foldedAnswerIds = createMemo(
+    () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
+  );
+  const shownMessages = createMemo(() => {
+    const progressUpdates = deps.props.responseStyle === "natural";
+    const channelTurnRows: AgentMessage[][] = [];
+    const listed = deps.props.messages.flatMap((message) => {
+      if (message.kind === "thinking") {
+        const rows = progressUpdates ? progressRows(message) : [];
+        const showsSteps =
+          message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
+        const turnRows = showsSteps ? [...rows, message] : rows;
+        if (!deps.props.channel) return turnRows;
+        channelTurnRows.push(turnRows);
+        return [];
+      }
+      if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
+      return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
+    });
+    // Members of a channel work at the same time, so each update goes where its time puts it.
+    const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
+    // Natural shows an agent's text once it is complete, as one bubble, while the activity line
+    // names the step. A bubble that grows as the text arrives moves the chat at each line.
+    const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
+    const questionTurnId = deps.props.channel ? undefined : deps.props.prompt?.turnId;
+    return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
+  });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
   const drawnMessages = createMemo(() => [
@@ -128,16 +208,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const drawn = new Set(drawnMessages().map((message) => message.id));
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
-  /* A group of agent messages or routine runs stops at the unread divider, so the divider keeps its row. */
+  /* A group of agent messages, routine runs or skill installs stops at the unread divider, so the divider keeps its row. */
   const timelineMessages = createMemo(() => {
     const group = (messages: readonly AgentMessage[]) =>
-      groupRoutineRunMarkers(groupAgentMessageMarkers(messages, unreadBoundaryMessageId()), unreadBoundaryMessageId());
+      groupSkillInstallMarkers(
+        groupRoutineRunMarkers(
+          groupAgentMessageMarkers(messages, unreadBoundaryMessageId()),
+          unreadBoundaryMessageId(),
+        ),
+        unreadBoundaryMessageId(),
+      );
     const state = deps.props.contextState;
     const startedAt =
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages(), updateAnswers());
     const boundary =
       startedAt === undefined
         ? -1
@@ -147,12 +233,23 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return expandRoutineRunGroups(rows, messages, routineRunTurns(), openRoutineRuns());
   });
   /*
-   * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
-   * changes, so a lookup by index draws the neighbouring message in the row for that tick.
+   * A sent message keeps the row of its pending copy. A new row would mount empty at an estimated
+   * height and load its images again, and the chat would jump and blink.
    */
-  const timelineIndexById = createMemo(
-    () => new Map<VirtualItem["key"], number>(timelineMessages().map((message, index) => [message.id, index])),
-  );
+  const rowKey = (message: AgentMessage): string => deps.handedOverRowKeys().get(message.id) ?? message.id;
+  /*
+   * A row finds its message by its key, and other callers by the message id. The virtualizer gives a
+   * row its new index one tick after the list changes, so a lookup by index draws the neighbouring
+   * message in the row for that tick.
+   */
+  const timelineIndexById = createMemo(() => {
+    const indexes = new Map<VirtualItem["key"], number>();
+    timelineMessages().forEach((message, index) => {
+      indexes.set(message.id, index);
+      indexes.set(rowKey(message), index);
+    });
+    return indexes;
+  });
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
@@ -208,10 +305,19 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
     estimateSize: () => rowEstimate,
-    getItemKey: (index) => timelineMessages()[index]?.id ?? index,
-    keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
+    getItemKey: (index) => {
+      const message = timelineMessages()[index];
+      return message ? rowKey(message) : index;
+    },
+    keyVersion: () => {
+      const messages = timelineMessages();
+      const first = messages[0];
+      const last = messages.at(-1);
+      return `${first ? rowKey(first) : ""}:${last ? rowKey(last) : ""}`;
+    },
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
+    followLatest: deps.sticky.followLatest,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;
@@ -230,7 +336,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollFades.measure();
     updateHistoryBoundary(element);
     const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
-    setShowScrollToLatest(remaining > 80);
+    // A chat that follows the latest message is on its way down: a new row is taller than 80px for
+    // the frames before the follow lands, and the button must not flash over it.
+    setShowScrollToLatest(remaining > 80 && !deps.sticky.getStickToLatest());
     if (remaining <= 80) clearNewMessages();
   }
 
@@ -334,6 +442,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
@@ -344,4 +453,60 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToUnreadMessages,
     jumpToLatestMessage,
   };
+}
+
+/** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
+function heldWhileWritten(message: AgentMessage): boolean {
+  return (
+    message.author === "agent" &&
+    message.streaming === true &&
+    message.kind === "text" &&
+    !message.imageGeneration &&
+    !message.videoGeneration
+  );
+}
+
+/** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
+const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
+
+/**
+ * The rows, with the agent's last words before the question that waits as a message at the end of
+ * its turn. Those words are narration, which the steps hold, but the question is often about them,
+ * such as a draft to approve (#4897). After the answer they are only in the steps again.
+ */
+function withQuestionContext(
+  shown: AgentMessage[],
+  messages: readonly AgentMessage[],
+  turnId: string | undefined,
+): AgentMessage[] {
+  if (!turnId) return shown;
+  const thinking = messages.find((message) => message.kind === "thinking" && message.turnId === turnId);
+  const context = thinking ? lastNarration(thinking) : null;
+  // With progress updates on, the narration is already a row of its own.
+  if (!context || shown.some((message) => message.id === context.id)) return shown;
+  const turnEnd = shown.findLastIndex((message) => message.turnId === turnId) + 1;
+  const at = turnEnd > 0 ? turnEnd : shown.length;
+  return [...shown.slice(0, at), context, ...shown.slice(at)];
+}
+
+function lastNarration(thinking: AgentMessage): AgentMessage | null {
+  const items = thinking.items ?? [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const id = thinking.itemIds?.[index];
+    const body = items[index] ?? "";
+    if (!id || !body.trim() || THINKING_ITEM_ID.test(id)) continue;
+    const createdAt = thinking.itemCreatedAt?.[index];
+    return {
+      id,
+      ...(thinking.turnId === undefined ? {} : { turnId: thinking.turnId }),
+      author: "agent",
+      body,
+      time: createdAt ? formatMessageTime(createdAt) : thinking.time,
+      ...(createdAt ? { createdAt } : {}),
+      // Still a step of the turn: the timeline gives it no stored-message actions.
+      itemType: "commentary",
+      kind: "text",
+    };
+  }
+  return null;
 }

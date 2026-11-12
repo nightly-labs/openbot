@@ -1,4 +1,4 @@
-import type { AgentReasoningEffort, WorkflowNode } from "@openbot/contracts/ipc";
+import { type AgentReasoningEffort, canAdministerServer, type WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -15,7 +15,22 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import {
+  SlackOutputFields,
+  TelegramOutputFields,
+  useChatAccess,
+} from "@/features/workflows/components/workflow-chat-fields";
+import { DiscordOutputFields } from "@/features/workflows/components/workflow-discord-fields";
+import { GitHubOutputFields } from "@/features/workflows/components/workflow-github-fields";
+import { useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
+import {
+  SLACK_OUTPUT_DEFAULTS,
+  slackWorkspaces,
+  TELEGRAM_OUTPUT_DEFAULTS,
+  telegramChats,
+} from "@/features/workflows/model/workflow-chats";
+import { useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { GITHUB_OUTPUT_DEFAULTS } from "@/features/workflows/model/workflow-github";
 import { canMove, outlineListOf } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
 import { kindLabel } from "@/features/workflows/model/workflow-steps";
@@ -96,6 +111,7 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
               agentId={agent.id}
               serverId={agent.serverId}
               hue={agent.avatarHue}
+              color={agent.avatarColor}
               seed={agent.avatarSeed}
               size={30}
               animateIdle={false}
@@ -115,8 +131,8 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
 }
 
 /**
- * The model of a model step and its effort. Without a model, the host uses its preferred model, as
- * the desktop does for a step whose model is gone.
+ * The model of a model step or a condition, and its effort. Without a model, the host uses its
+ * preferred model, as the desktop does for a step whose model is gone.
  */
 function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string }) {
   const { t } = useText();
@@ -188,35 +204,101 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
   );
 }
 
-/** Where an output sends its result. The phone does not choose a messaging place: an admin sets it on desktop. */
-function OutputChoice({ node }: { node: WorkflowNode }) {
+const SHOWN_TARGET_LABEL = {
+  channel: "mobile.workflow.output.channel",
+  "chat-channel": "mobile.workflow.output.chatChannel",
+  file: "mobile.workflow.output.file",
+  discord: "mobile.workflow.output.discord",
+} as const satisfies Record<string, MobileTextKey>;
+
+/** The output targets that act as the host's GitHub App or messaging bot, with the fields a new one stores. */
+const HOST_TARGETS = ["github", "discord", "telegram", "slack"];
+const TARGET_DEFAULTS = {
+  github: GITHUB_OUTPUT_DEFAULTS,
+  telegram: TELEGRAM_OUTPUT_DEFAULTS,
+  slack: SLACK_OUTPUT_DEFAULTS,
+} as const;
+
+/**
+ * Where an output sends its result. The phone does not choose a messaging place, an OpenBot channel or a
+ * Discord server: only the computer that runs OpenBot chooses them. An owner or admin adds a GitHub
+ * output on a host that runs it, and a Telegram or Slack output on a host that has a linked chat or
+ * workspace, as on desktop.
+ */
+function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const setFields = useWorkflowDraft((state) => state.setFields);
+  const admin = useMobileWorkspaceSelector((current) =>
+    canAdministerServer(current.servers.find((server) => server.id === draft.serverId)?.role),
+  );
+  const githubSupported = useWorkflowGitHubSupported(draft.serverId);
+  const chats = useChatAccess(draft);
   const target = text(node, "target");
-  const channel = target === "channel";
-  const file = target === "file";
+  const shown =
+    target === "channel" || target === "chat-channel" || target === "file" || target === "discord" ? target : null;
+  const notify = shown === null && target !== "github" && target !== "telegram" && target !== "slack";
+  const telegramOffered = chats.editable && telegramChats(chats.options ?? []).length > 0;
+  const slackOffered = chats.editable && slackWorkspaces(chats.options ?? []).length > 0;
+  const check = (on: boolean) => (on ? <Check size={18} color={accent} strokeWidth={2} /> : null);
+  const choose = (next: "notify" | keyof typeof TARGET_DEFAULTS) => {
+    if (next === target || (next === "notify" && notify)) return;
+    void haptics.selection();
+    if (next === "notify") {
+      setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined });
+      return;
+    }
+    // A GitHub, Discord, Telegram or Slack output keeps an `action`, so a change from one to another writes
+    // the defaults again.
+    setFields(node.id, {
+      target: next,
+      ...(node.fields.action === undefined || HOST_TARGETS.includes(target) ? TARGET_DEFAULTS[next] : {}),
+    });
+  };
+  const chatRow = (value: "telegram" | "slack", offered: boolean, label: MobileTextKey, hint: MobileTextKey) =>
+    offered || target === value ? (
+      <SettingsRow
+        checked={target === value}
+        disclosure={false}
+        disabled={!chats.editable}
+        supportingText={t(hint)}
+        trailing={check(target === value)}
+        onPress={() => choose(value)}
+      >
+        <Typography.Paragraph>{t(label)}</Typography.Paragraph>
+      </SettingsRow>
+    ) : null;
   return (
     <SettingsSection
       title={t("mobile.workflow.step.sendTo")}
-      footer={channel ? t("mobile.workflow.step.channelHint") : undefined}
+      footer={
+        target === "channel"
+          ? t("mobile.workflow.step.channelHint")
+          : target === "chat-channel"
+            ? t("mobile.workflow.step.chatChannelHint")
+            : undefined
+      }
     >
-      <SettingsRow
-        checked={!channel && !file}
-        disclosure={false}
-        trailing={!channel && !file ? <Check size={18} color={accent} strokeWidth={2} /> : null}
-        onPress={() => setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined })}
-      >
+      <SettingsRow checked={notify} disclosure={false} trailing={check(notify)} onPress={() => choose("notify")}>
         <Typography.Paragraph>{t("mobile.workflow.output.notify")}</Typography.Paragraph>
       </SettingsRow>
-      {channel ? (
-        <SettingsRow checked disclosure={false} trailing={<Check size={18} color={accent} strokeWidth={2} />}>
-          <Typography.Paragraph>{t("mobile.workflow.output.channel")}</Typography.Paragraph>
+      {(admin && githubSupported) || target === "github" ? (
+        <SettingsRow
+          checked={target === "github"}
+          disclosure={false}
+          disabled={!admin}
+          supportingText={t("mobile.workflow.output.githubHint")}
+          trailing={check(target === "github")}
+          onPress={() => choose("github")}
+        >
+          <Typography.Paragraph>{t("mobile.workflow.output.github")}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
-      {file ? (
-        <SettingsRow checked disclosure={false} trailing={<Check size={18} color={accent} strokeWidth={2} />}>
-          <Typography.Paragraph>{t("mobile.workflow.output.file")}</Typography.Paragraph>
+      {chatRow("telegram", telegramOffered, "mobile.workflow.output.telegram", "mobile.workflow.output.telegramHint")}
+      {chatRow("slack", slackOffered, "mobile.workflow.output.slack", "mobile.workflow.output.slackHint")}
+      {shown ? (
+        <SettingsRow checked disclosure={false} trailing={check(true)}>
+          <Typography.Paragraph>{t(SHOWN_TARGET_LABEL[shown])}</Typography.Paragraph>
         </SettingsRow>
       ) : null}
     </SettingsSection>
@@ -306,6 +388,7 @@ export function WorkflowStepScreen() {
             placeholder={t("mobile.workflow.step.ruleDefault")}
           />
           <SettingsNote>{t("mobile.workflow.step.ruleHint")}</SettingsNote>
+          <ModelChoice node={node} serverId={draft.serverId} />
         </>
       ) : null}
       {node.kind === "approval" ? (
@@ -327,7 +410,15 @@ export function WorkflowStepScreen() {
           placeholder={t("mobile.workflow.step.textPlaceholder")}
         />
       ) : null}
-      {node.kind === "output" ? <OutputChoice node={node} /> : null}
+      {node.kind === "output" ? (
+        <>
+          <OutputChoice node={node} draft={draft} />
+          {text(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
+          {text(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
+          {text(node, "target") === "telegram" ? <TelegramOutputFields node={node} draft={draft} /> : null}
+          {text(node, "target") === "slack" ? <SlackOutputFields node={node} draft={draft} /> : null}
+        </>
+      ) : null}
       {outline && (list || node.kind === "condition") ? (
         <SettingsSection>
           {list && canMove(outline, node.id, -1) ? (

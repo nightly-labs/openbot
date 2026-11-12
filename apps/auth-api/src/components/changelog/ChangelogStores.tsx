@@ -15,7 +15,7 @@ export interface ChangelogStoresProps {
 
 /**
  * The stores that have a mobile version. Each store reviews a build on its own, so a version can
- * reach one store days before the other. A store's day shows only when both stores have the
+ * reach one store days before the other, or never reach a store that a newer version replaced. A store's day shows only when both stores have the
  * version and the days differ: otherwise it is the release date.
  */
 export function ChangelogStores(props: ChangelogStoresProps) {
@@ -27,10 +27,13 @@ export function ChangelogStores(props: ChangelogStoresProps) {
       <span class="changelog-stores">
         <For each={props.stores}>
           {(entry) => (
-            <span class="changelog-store" data-state={entry.date ? "available" : "review"}>
+            <span class="changelog-store" data-state={entry.date ? "available" : entry.skipped ? "skipped" : "review"}>
               <span class="changelog-store-dot" aria-hidden="true" />
               {STORE_LABELS[entry.store]}
-              <Show when={entry.date} fallback={<span class="changelog-store-detail">· In review</span>}>
+              <Show
+                when={entry.date}
+                fallback={<span class="changelog-store-detail">· {entry.skipped ? "Skipped" : "In review"}</span>}
+              >
                 {(date) => (
                   <Show when={showDays()}>
                     <time class="changelog-store-detail" datetime={date()}>

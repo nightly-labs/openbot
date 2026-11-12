@@ -41,6 +41,8 @@ const meta = {
     open: true,
     providerName: "ChatGPT",
     state: waitingState(),
+    setupStep:
+      "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
     onOpenVerificationUrl: fn(),
     onCancel: fn(),
     onSubmitCode: fn(),

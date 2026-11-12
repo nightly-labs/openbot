@@ -10,7 +10,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
-/** The MCP server list of one host, for an owner or admin. The Server settings row needs only this. */
+/** The MCP server list of one host, for a user who manages it. The Server settings row needs only this. */
 export function useMcpServerList(serverId: string) {
   // A selector, not the whole workspace: the chat composer reads this list, and must not render again
   // for every workspace change.

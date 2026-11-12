@@ -34,4 +34,20 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",
+  "error.connector.passwordManagerUnknown": "OpenBot kennt diesen Passwortmanager nicht.",
+  "error.connector.passwordManagerMethod": "Dieser Passwortmanager kann sich so nicht verbinden.",
+  "error.connector.passwordManagerNoSignIn": "Keine Anmeldeseite ist offen. Verbinde erneut.",
+  "error.connector.protonPassFailed": "Proton Pass konnte nicht verbunden werden. Verbinde erneut.",
+  "error.connector.protonPassCliInstallFailed":
+    "Die Proton Pass CLI konnte nicht installiert werden. Prüfe die Netzwerkverbindung und verbinde dann erneut.",
+  "error.connector.protonPassPlan":
+    "Dein Proton-Tarif erlaubt die Proton Pass CLI nicht. Ändere den Tarif und verbinde dann erneut.",
+  "error.connector.protonPassExpired": "Der Zugriff auf Proton Pass ist abgelaufen. Verbinde erneut.",
+  "error.connector.protonPassKeyInvalid": "Gib einen Proton Pass-Zugriffsschlüssel ein, der mit pst_ beginnt.",
+  "error.connector.protonPassExtraPassword": "Das zusätzliche Passwort ist nicht korrekt. Gib es erneut ein.",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass hat nicht nach einem zusätzlichen Passwort gefragt.",
+  "error.connector.protonPassFileUnreadable": "Die Proton Pass-Verbindungsdatei ist nicht lesbar.",
+  "error.connector.protonPassSignInTimeout": "Die Proton-Anmeldung hat zu lange gedauert. Verbinde erneut.",
+  "error.connector.protonPassSetupFailed":
+    "Der Tresor Shared with OpenBot oder sein Zugriffsschlüssel konnte in Proton Pass nicht erstellt werden. Verbinde erneut.",
 } as const satisfies PartialTranslation<typeof source>;

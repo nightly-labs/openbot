@@ -38,7 +38,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} dk",
   "account.usage.window.cursorModels": "Cursor modelleri",
   "account.usage.window.otherModels": "Diğer modeller",
+  "account.usage.window.total": "Toplam",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "{percent} kaldı",
   "account.update.failedRetry": "Güncelleme başarısız oldu. Tekrar deneyin.",
   "account.update.managedByHost": "Ana makine yönetiyor",
   "account.update.restart": "Yeniden başlat",
@@ -64,6 +66,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot şu anda hesap hizmetine ulaşamıyor.",
   "account.login.signInDescription":
     "Oturum açmak veya hesap oluşturmak için e-postanızı kullanın. Size tek kullanımlık bir kod göndereceğiz.",
+  "account.login.keyringChangedDescription":
+    "Sistem anahtarlığı son oturumunuzu kaybetti. OpenBot artık oturumları bu bilgisayardaki kendi dosyasında saklıyor. Bir kez daha oturum açın.",
   "account.login.codeAccepted": "Kodunuz kabul edildi.",
   "account.login.codeSent": "{email} adresine bir kod gönderdik.",
   "account.login.connectingSecurely": "Güvenli bir şekilde bağlanılıyor…",

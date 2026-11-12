@@ -1,0 +1,33 @@
+{
+  "slug": "akiflow",
+  "name": "Akiflow",
+  "tagline": "Tasks and calendar planning",
+  "description": "Akiflow lets agents read and add tasks, plan the day, and check calendar events in the signed-in account. Each user signs in to their own Akiflow account through the browser.",
+  "category": "productivity",
+  "creatorName": "Akiflow",
+  "iconUrl": "https://framerusercontent.com/images/6iPdkAmt5PSRYjZma5sMZn2QrhM.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-today", "text": "What is on my plan for today?" },
+    { "id": "prompt-add-task", "text": "Add a task to review the contract draft on Friday morning." },
+    { "id": "prompt-free-time", "text": "Where do I have two free hours this week for deep work?" }
+  ],
+  "apps": [
+    {
+      "id": "app-akiflow-mcp",
+      "name": "Akiflow",
+      "description": "Task, calendar, and planning tools, over Akiflow's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/6iPdkAmt5PSRYjZma5sMZn2QrhM.png",
+      "server": {
+        "name": "akiflow",
+        "transport": "http",
+        "url": "https://mcp.akiflow.com/mcp",
+        "auth": [{ "id": "akiflow-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://akiflow.com",
+  "privacyPolicyUrl": "https://akiflow.com/privacy-policy",
+  "termsUrl": "https://akiflow.com/terms-of-service"
+}

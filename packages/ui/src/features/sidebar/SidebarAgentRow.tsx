@@ -4,8 +4,8 @@
  * A waiting agent's row sits in the "Needs you" group instead. There it does not drag, because the
  * group is not a place in the layout, and its tooltip says what the agent waits for.
  *
- * A hidden agent's row sits in the "Hidden" group. It does not drag either. It sleeps, shows no state,
- * and shows when the user hid it in place of the last message.
+ * A hidden agent's row sits in the "Hidden" group. It does not drag either. On a host that stops a
+ * hidden agent, it shows when the user hid it in place of the last message and the time.
  */
 
 import { AppWindow, Badge, buttonVariants, Clock3, ContextMenu, Lock } from "@openbot/ui";
@@ -21,16 +21,16 @@ import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } fro
 import { useSidebarScope } from "./sidebar-scope";
 
 /**
- * `waiting` is set by the "Needs you" group. The row reads it rather than the agent's state, because
- * the group holds its members still during a drag while the state moves on. `userHidden` is set by
- * the "Hidden" group.
+ * `waiting` is set by the "Needs you" and "Unread" groups. The row reads it rather than the agent's
+ * state, because the group holds its members still during a drag while the state moves on. `userHidden` is set by
+ * the "Hidden" group. A hidden agent that waits for the user is a `waiting` row of "Needs you".
  */
 export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boolean; userHidden?: boolean }) {
   const {
     dragOffset,
     draggedChatId,
     endChatDragging,
-    layoutMutable,
+    chatsDraggable,
     props,
     sidebarClickIsSuppressed,
     startChatDragging,
@@ -42,18 +42,22 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
   const accessLabel = () => (lockLabel() ? `. ${lockLabel()}` : "");
   const inWindow = () => props.windowAgentIds?.has(rowProps.agent.id) ?? false;
   const windowLabel = () => (inWindow() ? `. ${t("sidebar.agentMenu.inWindow")}` : "");
-  const state = () => (rowProps.userHidden ? undefined : props.agentStates[rowProps.agent.id]);
+  /** A host without `agent-hidden-work` stops a hidden agent, so its row shows the date and no state. */
+  const paused = () => rowProps.userHidden === true && props.userHiddenAgentsWork !== true;
+  /** A row of "Needs you" can be a hidden agent. Its menu then has the restore item. */
+  const hiddenByUser = () => userHiddenSince(rowProps.agent.id) !== undefined;
+  const state = () => (paused() ? undefined : props.agentStates[rowProps.agent.id]);
   const hiddenDetail = () => {
-    const since = rowProps.userHidden ? userHiddenSince(rowProps.agent.id) : undefined;
+    const since = paused() ? userHiddenSince(rowProps.agent.id) : undefined;
     return since
       ? t("sidebar.hidden.since", { date: format.date(new Date(since), { month: "short", day: "numeric" }) })
       : "";
   };
   // A function, not a JSX ternary: the compiler wraps a ternary in a memo, and the avatar reads its
   // mood inside an effect, where a memo cannot be created.
-  const mood = () => (rowProps.userHidden ? "asleep" : (props.agentMoods[rowProps.agent.id] ?? "idle"));
-  const hiddenLabel = () => (rowProps.userHidden ? `${t("sidebar.hidden.title")}. ` : "");
-  const draggable = () => layoutMutable() && !props.compact && !rowProps.waiting && !rowProps.userHidden;
+  const mood = () => (paused() ? "asleep" : (props.agentMoods[rowProps.agent.id] ?? "idle"));
+  const hiddenLabel = () => (hiddenByUser() ? `${t("sidebar.hidden.title")}. ` : "");
+  const draggable = () => chatsDraggable() && !props.compact && !rowProps.waiting && !rowProps.userHidden;
   const wait = () => {
     const current = state();
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
@@ -97,14 +101,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
         }}
       >
         <span class="agent-row-avatar">
-          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} />
+          <AgentAvatar agent={rowProps.agent} motion="idle" mood={mood()} workingFaces />
           <SidebarAgentIndicator state={state} />
         </span>
         <span class="agent-row-copy">
           <span class="agent-row-heading">
             <span class="agent-row-title">
               <span class="agent-row-name">
-                <strong>{rowProps.agent.name}</strong>
+                <strong dir="auto">{rowProps.agent.name}</strong>
                 <Show when={lockLabel()}>
                   <span class="agent-row-access" title={lockLabel()}>
                     <Lock aria-hidden="true" />
@@ -119,7 +123,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
               <Show when={title()}>
                 {(label) => (
                   <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
+                    <span dir="auto">{label()}</span>
                   </Badge>
                 )}
               </Show>
@@ -130,7 +134,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
                 <Show
                   when={limit()}
                   fallback={
-                    <Show when={!rowProps.userHidden}>
+                    <Show when={!paused()}>
                       <span class="agent-row-time">
                         {rowProps.agent.updatedAt
                           ? sidebarMessageTime(rowProps.agent.updatedAt, format)
@@ -151,13 +155,15 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>
-          <span class="agent-row-preview">{detail()}</span>
+          <span class="agent-row-preview" dir="auto">
+            {detail()}
+          </span>
         </span>
         <Show when={state()}>
           {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t, format)}</span>}
         </Show>
       </ContextMenu.Trigger>
-      <SidebarAgentContextMenu agent={rowProps.agent} pinned={false} userHidden={rowProps.userHidden === true} />
+      <SidebarAgentContextMenu agent={rowProps.agent} pinned={false} userHidden={hiddenByUser()} />
     </ContextMenu.Root>
   );
   return (

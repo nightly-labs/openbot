@@ -30,14 +30,23 @@ export const messages = {
   "error.import.fileRenamed": "{name}：{file} 已存在，该副本将保存为 {saved}。",
   "error.import.fileSkipped": "{name}：文件 {file} 已跳过。{reason}",
   "error.import.chooseZip": "请选择 .zip 文件。",
-  "error.import.zipTooLarge": "导出文件必须是小于 500 MB 的 .zip。",
   "error.import.unsafeFile": "导出文件包含不安全的文件：{name}",
-  "error.import.expandedTooLarge": "解压后必须小于 500 MB 且文件数不超过 {limit}。",
+  "error.import.tooManyFiles": "导出最多只能包含 {limit} 个文件。",
+  "error.import.diskSpace":
+    "{name}：其文件需要 {size} GB 可用磁盘空间，当前可用 {free} GB。请释放空间，然后重新导入该助手。",
+  "error.import.remoteExpandedTooLarge": "解压后必须小于 500 MB 且文件数不超过 {limit}。",
   "error.import.zipInvalid": "所选文件不是有效的 .zip。如果 Grok Bot 仍在保存，请稍等后重新选择。",
+  "error.import.entryDamaged": "导出中的该文件已损坏。",
+  "error.import.foldersSkipped": ".git 和 node_modules 文件夹中的 {number} 个文件不会导入，工具可以重新生成它们。",
   "error.import.empty": "该导出为空。",
   "error.import.remoteZipTooLarge": "导入到已加入的服务器时，导出文件必须是小于 100 MB 的 .zip。",
   "error.import.hostBusy": "服务器正在读取其他导出，请几分钟后重试。",
+  "error.import.uploadDiskSpace":
+    "该导出需要服务器上有 {size} GB 可用磁盘空间，目前只有 {free} GB 可用。请先释放服务器空间，然后重新选择导出文件。",
+  "error.import.remoteZipTooLargeOldHost":
+    "此服务器只接受不超过 100 MB 的导出文件。请更新服务器上的 OpenBot，以导入更大的导出文件。",
   "error.import.skillKept": "{name}：服务器已有技能“{skill}”，因该助手会使用该技能。请联系管理员更新它。",
+  "error.import.skillRenamed": "{name}：技能“{skill}”的名称与另一个技能的名称过于相似，因此保存为“{renamed}”。",
   // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles": "该文件夹中没有 Hermes 配置。请选择包含 config.yaml 或 SOUL.md 的 Hermes 文件夹。",
   "error.import.hermesClosed": "这些 Hermes 配置已不再打开，请重新读取。",

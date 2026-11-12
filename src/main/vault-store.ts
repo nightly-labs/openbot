@@ -21,6 +21,11 @@ const loginSchema = Schema.Struct({
   username: Schema.String,
   password: Schema.String,
   notes: Schema.String,
+  /**
+   * The two-step (TOTP) key, as `normalizeTwoStepKey` writes it. Absent when the login has none. A
+   * build before two-step codes drops it on its next write.
+   */
+  twoStepKey: Schema.optionalKey(Schema.String),
   addedBy,
 });
 
