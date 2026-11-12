@@ -157,6 +157,7 @@ import type {
   VaultHostImportResult,
   VaultSaveInput,
   VaultState,
+  VaultTwoStepCodes,
   WhatsAppGroupList,
   WhatsAppLinkState,
   WhatsAppOverview,
@@ -576,6 +577,8 @@ export interface MobileWorkspaceContextValue {
   canTransferServer: (serverId: string) => boolean;
   /** The same for API keys in the Vault (`vault-v2`). */
   canManageVaultApiKeys: (serverId: string) => boolean;
+  /** The same for two-step keys of Vault logins and their live codes (`vault-v3`). */
+  canManageVaultTwoStep: (serverId: string) => boolean;
   /**
    * True for an owner or admin of a host that serves its named browser profiles and the profile of
    * each agent (`browser-profiles-v1`). The host checks the role again.
@@ -615,6 +618,8 @@ export interface MobileWorkspaceContextValue {
   disconnectPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
   /** The host's Vault. No answer carries a password, a card number or a security code. */
   loadVault: (serverId: string) => Promise<VaultState>;
+  /** The current two-step code of each login with a key. The key stays on the host. */
+  loadVaultCodes: (serverId: string) => Promise<VaultTwoStepCodes>;
   /** A new secret goes to the host once; a null secret keeps the saved one. */
   saveVaultItem: (input: VaultSaveInput, serverId: string) => Promise<VaultState>;
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
@@ -1239,6 +1244,7 @@ type ServerCheckKey =
   | "canImportAgents"
   | "canTransferServer"
   | "canManageVaultApiKeys"
+  | "canManageVaultTwoStep"
   | "canManageBrowserProfiles"
   | "canManageBrowserProxies"
   | "serverUpdateAccess"

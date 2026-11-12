@@ -157,6 +157,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
@@ -216,6 +217,7 @@ import {
   listHostBrowserProxies,
   listHostedSites,
   listHostVault,
+  listHostVaultCodes,
   listMcpServers,
   listMcpSignIns,
   listPasswordManagers,
@@ -473,6 +475,7 @@ type HostRequestActions = Pick<
   | "cancelPasswordManager"
   | "disconnectPasswordManager"
   | "loadVault"
+  | "loadVaultCodes"
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
@@ -778,6 +781,8 @@ export function createHostRequestActions({
   const passwordManagersAdmin = (serverId: string) =>
     capabilityApi(serverId, PASSWORD_MANAGERS_CAPABILITY, "mobile.server.connectors.unsupported");
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
+  const vaultVersion = (serverId: string) =>
+    has(serverId, VAULT_V3_CAPABILITY) ? 3 : has(serverId, VAULT_V2_CAPABILITY) ? 2 : 1;
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
   /** Any member imports agents. The host keeps each export under a token that only its sender uses. */
@@ -871,12 +876,14 @@ export function createHostRequestActions({
       runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "cancel", manager)),
     disconnectPasswordManager: async (manager, serverId) =>
       runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "disconnect", manager)),
-    loadVault: async (serverId) =>
-      runTeamRequest(listHostVault(vaultAdmin(serverId), has(serverId, VAULT_V2_CAPABILITY))),
+    loadVault: async (serverId) => runTeamRequest(listHostVault(vaultAdmin(serverId), vaultVersion(serverId))),
+    // A host without `vault-v3` keeps no two-step keys, so it has no codes.
+    loadVaultCodes: async (serverId) =>
+      has(serverId, VAULT_V3_CAPABILITY) ? runTeamRequest(listHostVaultCodes(vaultAdmin(serverId))) : { codes: [] },
     saveVaultItem: async (input, serverId) =>
-      runTeamRequest(saveHostVaultItem(vaultAdmin(serverId), input, has(serverId, VAULT_V2_CAPABILITY))),
+      runTeamRequest(saveHostVaultItem(vaultAdmin(serverId), input, vaultVersion(serverId))),
     deleteVaultItem: async (id, serverId) =>
-      runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
+      runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, vaultVersion(serverId))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
     checkAgentExport: (size, serverId) => {
       if (!has(serverId, AGENT_IMPORT_V2_CAPABILITY) && size > AGENT_IMPORT_UPLOAD_BYTES)

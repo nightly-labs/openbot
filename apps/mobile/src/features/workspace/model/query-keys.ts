@@ -159,6 +159,7 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  serverVaultCodes: (scope: QueryScope, serverId: string) => ["server-vault-codes", ...scope, serverId],
   instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
   /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
   serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
