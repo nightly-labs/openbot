@@ -832,7 +832,9 @@ try {
       await runCauseEffect(adapter.postAnswer(target, "Done", status));
       await runCauseEffect(adapter.react(target, "IN-LID-REACT", "done", true));
       // The orchestrator can also answer the earlier messages of this contact: each send must go to the LID.
-      const sent = phone.sent.slice(sentFrom);
+      const sent = phone.sent
+        .slice(sentFrom)
+        .filter((entry) => entry.jid === LID_FRIEND_CHAT || entry.jid === `${LID_FRIEND}@s.whatsapp.net`);
       assert.ok(
         sent.every((entry) => entry.jid === LID_FRIEND_CHAT),
         "A post to a contact with a LID went to the phone number, where WhatsApp may not deliver it.",

@@ -100,6 +100,10 @@ const SEND_DEADLINE_MS = 5 * 60_000;
 const ACK_WAIT_MS = 10_000;
 /** How long a post to a contact waits for the contact's LID. Without it in this time, the post goes to the phone number. */
 const LID_WAIT_MS = 5_000;
+/** How long a contact that WhatsApp gave no LID for goes to its phone number with no new lookup. */
+const NO_LID_TTL_MS = 10 * 60_000;
+/** Contacts and posts that the session keeps a chat for. */
+const CHAT_MEMORY_LIMIT = 1_000;
 /** Posts to one chat keep at least this much time between them, plus up to half of it at random. */
 const CHAT_PACING_MS = 1_000;
 /** How long OpenBot remembers the ids of its own posts, so their echoes are not read as messages. */
@@ -188,6 +192,10 @@ export class WhatsAppSession {
   readonly #acks = new Map<string, (error: string | undefined) => void>();
   readonly #chatQueues = new Map<string, Promise<unknown>>();
   readonly #lastSend = new Map<string, number>();
+  /** The chat that each own post to a contact went to, so that its edit and its delete go to the same chat. */
+  readonly #postChats = new Map<string, string>();
+  /** The contacts that WhatsApp gave no LID for, and when. */
+  readonly #noLid = new Map<string, number>();
   readonly #groups = new Map<string, { metadata: GroupMetadata; at: number }>();
   #socket: WhatsAppSocket | null = null;
   #state: WhatsAppSessionState = "stopped";
@@ -544,7 +552,7 @@ export class WhatsAppSession {
 
   async #sendNow(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions): Promise<WAMessage> {
     const socket = await this.#openSocket();
-    const address = await this.#address(socket, jid);
+    const address = this.#postChat(content) ?? (await this.#address(socket, jid));
     const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
     if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
     // The id is known before the send, so an echo that arrives first is already an own post.
@@ -564,6 +572,7 @@ export class WhatsAppSession {
       const error = await ack.promise;
       if (error) throw new WhatsAppRefusedError(error);
       if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
+      if (isPnUser(jid)) remember(this.#postChats, messageId, address);
       return sent;
     } finally {
       ack.cancel();
@@ -576,14 +585,31 @@ export class WhatsAppSession {
    */
   async #address(socket: WhatsAppSocket, jid: string): Promise<string> {
     if (!isPnUser(jid) || (socket.user && jidNormalizedUser(socket.user.id) === jid)) return jid;
+    const missedAt = this.#noLid.get(jid);
+    if (missedAt !== undefined && this.#now() - missedAt < NO_LID_TTL_MS) return jid;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // A LID, null when WhatsApp has none, or undefined when the lookup failed or did not end in time.
     const lid = await Promise.race([
-      socket.signalRepository.lidMapping.getLIDForPN(jid).catch(() => null),
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), LID_WAIT_MS);
+      socket.signalRepository.lidMapping.getLIDForPN(jid).then(
+        (found) => (found && isLidUser(found) ? jidNormalizedUser(found) : null),
+        () => undefined,
+      ),
+      new Promise<undefined>((resolve) => {
+        const wait = setTimeout(() => resolve(undefined), LID_WAIT_MS);
+        wait.unref?.();
+        timer = wait;
       }),
     ]).finally(() => clearTimeout(timer));
-    return lid && isLidUser(lid) ? jidNormalizedUser(lid) : jid;
+    if (lid) return lid;
+    if (lid === null) remember(this.#noLid, jid, this.#now());
+    else logger.warn("WhatsApp: no LID for a contact in time; the post goes to the phone number.");
+    return jid;
+  }
+
+  /** The chat of the own post that an edit or a delete changes. */
+  #postChat(content: AnyMessageContent): string | undefined {
+    const key = "edit" in content && content.edit ? content.edit : "delete" in content ? content.delete : null;
+    return key?.id ? this.#postChats.get(key.id) : undefined;
   }
 
   /** The error of the message's ack, or undefined when the ack has none or did not come in time. */
@@ -642,6 +668,13 @@ function onAddress(content: AnyMessageContent, jid: string, address: string): An
   if ("react" in content && content.react.key)
     return { ...content, react: { ...content.react, key: onKey(content.react.key, jid, address) } };
   return content;
+}
+
+function remember<V>(memory: Map<string, V>, key: string, value: V): void {
+  memory.delete(key);
+  memory.set(key, value);
+  const oldest = memory.size > CHAT_MEMORY_LIMIT ? memory.keys().next().value : undefined;
+  if (oldest !== undefined) memory.delete(oldest);
 }
 
 function onKey<K extends WAMessageKey>(key: K, jid: string, address: string): K {
