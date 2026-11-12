@@ -620,9 +620,11 @@ export class BillingService {
     ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
       const dependencies = yield* BillingDependencies;
       const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
-      if (subscription.status !== "canceled") return false;
+      // A first payment that never came also ends the subscription, as in `cancelSubscription`.
+      const ended = subscription.status === "canceled" || subscription.status === "incomplete_expired";
+      // Also on `false`: a stale local status that Stripe shows as open leaves the expiry query of the cron.
       yield* this.#syncSubscription(subscriptionId);
-      return true;
+      return ended;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
