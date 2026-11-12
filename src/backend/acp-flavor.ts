@@ -208,6 +208,11 @@ export interface AcpFlavor {
    */
   mcpServersLoadWithSession?: true;
   /**
+   * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
+   * ACP requires stdio. OpenBot starts each one itself (`startStdioMcpRelay`) and sends it as http.
+   */
+  relayStdioMcpServers?: true;
+  /**
    * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
    * of a session server with the same name, so that server travels as `openbot_<name>`. `argv` is
    * the command line of the agent's process, which can name the folder of those files.
@@ -276,6 +281,12 @@ export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
 export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
+
+/**
+ * GitHub Copilot CLI 1.0.105 advertises only http and sse MCP servers, and drops a stdio one, so its
+ * agents had no Computer Use and no stdio server of the user (github/copilot-cli#3889).
+ */
+export const COPILOT_ACP_FLAVOR: AcpFlavor = { relayStdioMcpServers: true };
 
 /**
  * A turn that ended as done with no answer text and no tool call fails, also when it sent its

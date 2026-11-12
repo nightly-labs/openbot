@@ -72,6 +72,7 @@ import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
+  type AcpMcpServer,
   acpMcpServerName,
   acpMcpServers,
   agentMcpServers,
@@ -83,6 +84,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
+import { type StdioMcpRelay, startStdioMcpRelay } from "./mcp-stdio-relay";
 import { PendingServerRequests } from "./pending-server-requests";
 import type { SpawnTarget } from "./process-confinement";
 import {
@@ -1671,6 +1673,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const agentId = mcpAgentParam(params);
     let threadRef: AcpThread | null = null;
     let transport: AcpConnection | null = null;
+    let closeRelays: Effect.Effect<void> | null = null;
     let retained = false;
     return yield* Effect.acquireUseRelease(
       this.#bridge
@@ -1721,7 +1724,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               this.#ownMcpServerNames(cwd),
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
-            const mcpServers = [...handoff.servers, ...mcp.servers];
+            let given = handoff.servers;
+            if (this.#flavor.relayStdioMcpServers) {
+              const relayed = providerResult(yield* Effect.result(this.#relayStdioMcpServers(given, cwd)));
+              given = relayed.servers;
+              closeRelays = relayed.close;
+            }
+            const mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;
             if (enableMcpServers) {
               const names = mcp.servers.map((server) => server.name);
@@ -1775,7 +1784,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               promptsSinceInstructions: kept?.promptsSinceInstructions ?? 0,
               configOptions,
               currentModelId,
-              mcp,
+              mcp: closeRelays ? withRelays(mcp, closeRelays) : mcp,
               activeTurn: null,
               needsResume: false,
               transport: sessionTransport,
@@ -1828,9 +1837,48 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           if (transport) this.#openingSessionProcesses.delete(transport);
           if (retained) return;
           mcp.close();
+          if (closeRelays) yield* closeRelays;
           if (transport) yield* transport.stop(Effect.void).pipe(Effect.ignore);
         }),
     );
+  });
+
+  /**
+   * The session's stdio servers as http entries of relays in OpenBot, for an agent that drops stdio
+   * (`relayStdioMcpServers`). A server starts with the environment of the agent's process, in the
+   * session's folder, as the agent would start it. `close` ends the relays and their servers.
+   */
+  readonly #relayStdioMcpServers = Effect.fn("AcpAgentClient.relayStdioMcpServers")(function* (
+    this: AcpAgentClient,
+    servers: readonly AcpMcpServer[],
+    cwd: string,
+  ) {
+    const relays: StdioMcpRelay[] = [];
+    const close = Effect.suspend(() =>
+      Effect.forEach(relays, (relay) => relay.close(), { discard: true, concurrency: "unbounded" }),
+    ).pipe(Effect.ignore);
+    const environment: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) if (value !== undefined) environment[key] = value;
+    Object.assign(environment, this.options.extraEnv?.());
+    const relayed = yield* Effect.forEach(servers, (server) =>
+      Effect.gen(function* () {
+        if ("type" in server) return server;
+        const relay = yield* startStdioMcpRelay({
+          command: server.command,
+          args: server.args,
+          env: { ...environment, ...Object.fromEntries(server.env.map(({ name, value }) => [name, value])) },
+          cwd,
+        });
+        relays.push(relay);
+        return {
+          type: "http" as const,
+          name: server.name,
+          url: relay.url,
+          headers: [{ name: "Authorization", value: `Bearer ${relay.token}` }],
+        };
+      }),
+    ).pipe(Effect.onError(() => close));
+    return { servers: relayed, close };
   });
 
   /**
@@ -3960,4 +4008,20 @@ function isAuthenticationError(error: unknown): boolean {
   if (error instanceof RequestError && error.code === -32000) return true;
   const text = failureText(error);
   return classifyUserError(text) === "auth" || /\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text);
+}
+
+/**
+ * The session's OpenBot servers, whose `close` also ends its stdio relays. Each place that ends a
+ * session closes its MCP session, and none of them waits for it, so neither does this.
+ */
+function withRelays(mcp: LocalMcpSession, closeRelays: Effect.Effect<void>): LocalMcpSession {
+  return {
+    servers: mcp.servers,
+    setThreadId: (threadId) => mcp.setThreadId(threadId),
+    reached: () => mcp.reached(),
+    close: () => {
+      mcp.close();
+      Effect.runFork(closeRelays);
+    },
+  };
 }

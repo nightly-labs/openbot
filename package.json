@@ -241,6 +241,7 @@
     "test:mcp-member-access": "bun scripts/mcp-member-access-e2e.ts",
     "test:sign-in-relay-replay": "bun scripts/sign-in-relay-replay-e2e.ts",
     "test:acp-mcp-names": "bun scripts/acp-mcp-server-names-e2e.ts",
+    "test:copilot-mcp-relay": "bun scripts/copilot-mcp-relay-e2e.ts",
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
     "test:agent-database-host-start": "bun scripts/agent-database-host-start-e2e.ts",
