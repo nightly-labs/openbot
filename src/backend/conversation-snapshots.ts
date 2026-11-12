@@ -13,7 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
-import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
+import { imageGenerationFailure, isImageGenerationItem, isVideoGenerationItem } from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 
@@ -112,6 +112,24 @@ export function messagesFromThreadItems(
           ...(isString(item.revised_prompt) ? { prompt: item.revised_prompt } : {}),
           resolution: isString(item.resolution) ? item.resolution : "1024 × 1024",
           aspectRatio: isImageGenerationAspectRatio(item.aspectRatio) ? item.aspectRatio : "square",
+          ...(failure ? { error: failure } : {}),
+        },
+      });
+    }
+    if (isVideoGenerationItem(item) && isString(item.id)) {
+      const providerStatus = isString(item.status) ? item.status : turn.status;
+      const failure = imageGenerationFailure(item);
+      messages.push({
+        id: item.id,
+        turnId: turn.id,
+        author: "assistant",
+        text: "",
+        createdAt,
+        status: providerStatus === "failed" ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
+        itemType: "video_generation",
+        videoGeneration: {
+          ...(isString(item.prompt) ? { prompt: item.prompt } : {}),
+          aspectRatio: isImageGenerationAspectRatio(item.aspect_ratio) ? item.aspect_ratio : "square",
           ...(failure ? { error: failure } : {}),
         },
       });
@@ -296,6 +314,7 @@ function mergeConversationMessages(
             ...(exchange ? { exchange } : {}),
             attachments: message.attachments ?? previous.attachments,
             imageGeneration: message.imageGeneration ?? previous.imageGeneration,
+            videoGeneration: message.videoGeneration ?? previous.videoGeneration,
           }
         : message,
     );
@@ -499,11 +518,21 @@ function isStoredClaudeNotice(message: ConversationMessage): boolean {
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {
-  return message.author === "assistant" && Boolean(message.turnId) && Boolean(message.text || message.imageGeneration);
+  return (
+    message.author === "assistant" &&
+    Boolean(message.turnId) &&
+    Boolean(message.text || message.imageGeneration || message.videoGeneration)
+  );
 }
 
 function providerMessageIdentity(message: ConversationMessage): string {
-  return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
+  return JSON.stringify([
+    message.turnId,
+    message.itemType ?? null,
+    message.text,
+    message.imageGeneration ?? null,
+    ...(message.videoGeneration ? [message.videoGeneration] : []),
+  ]);
 }
 
 export function newAssistantMessage(id: string, turnId: string): ConversationMessage {

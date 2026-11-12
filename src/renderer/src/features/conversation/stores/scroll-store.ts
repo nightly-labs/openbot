@@ -458,7 +458,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {
   return (
-    message.author === "agent" && message.streaming === true && message.kind === "text" && !message.imageGeneration
+    message.author === "agent" &&
+    message.streaming === true &&
+    message.kind === "text" &&
+    !message.imageGeneration &&
+    !message.videoGeneration
   );
 }
 

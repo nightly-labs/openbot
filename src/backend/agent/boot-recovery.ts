@@ -9,7 +9,7 @@ import { providerSync } from "../provider-client-effects";
 import { importProviderHistory } from "../provider-history-import";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
-import { markIncompleteImageGeneration } from "./image-generation";
+import { markIncompleteMediaGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import { stopRunningSubagents } from "./subagent-updates";
@@ -259,7 +259,7 @@ export class BootRecovery {
           .map((message) => {
             const changed = structuredClone(message);
             changed.status = terminal;
-            markIncompleteImageGeneration(changed, terminal);
+            markIncompleteMediaGeneration(changed, terminal);
             return changed;
           });
         const revision = this.#store.database.persistConversationChanges({
@@ -304,7 +304,7 @@ export class BootRecovery {
           }
           if (turnId && changed.turnId === turnId && changed.status === "streaming") {
             changed.status = "interrupted";
-            markIncompleteImageGeneration(changed, "interrupted");
+            markIncompleteMediaGeneration(changed, "interrupted");
           }
           // A background subagent ran in the provider process, which ended with the previous run.
           const stopped = stopRunningSubagents(changed.subagents, new Date().toISOString(), { background: true });

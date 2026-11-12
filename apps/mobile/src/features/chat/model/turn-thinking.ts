@@ -90,6 +90,7 @@ function silentAnswer(message: ConversationMessage): boolean {
     !message.text.trim() &&
     !message.attachments?.length &&
     !message.imageGeneration &&
+    !message.videoGeneration &&
     !message.questionPrompt
   );
 }

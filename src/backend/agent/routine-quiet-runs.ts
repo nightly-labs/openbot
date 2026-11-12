@@ -149,7 +149,8 @@ export function isTextAnswer(message: ConversationMessage): boolean {
     !isWorkNote(message) &&
     message.itemType !== "question_prompt" &&
     !message.attachments?.length &&
-    !message.imageGeneration
+    !message.imageGeneration &&
+    !message.videoGeneration
   );
 }
 
@@ -167,6 +168,7 @@ function carriesContent(message: ConversationMessage): boolean {
     message.itemType === "question_prompt" ||
     message.text.trim() !== "" ||
     Boolean(message.attachments?.length) ||
-    Boolean(message.imageGeneration)
+    Boolean(message.imageGeneration) ||
+    Boolean(message.videoGeneration)
   );
 }

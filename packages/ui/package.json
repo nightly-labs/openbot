@@ -121,6 +121,7 @@
     "./features/conversation/SideQuestionPanel": "./src/features/conversation/SideQuestionPanel.tsx",
     "./features/conversation/SpeakingBar": "./src/features/conversation/SpeakingBar.tsx",
     "./features/conversation/VoicePanel": "./src/features/conversation/VoicePanel.tsx",
+    "./features/conversation/VideoGeneration": "./src/features/conversation/VideoGeneration.tsx",
     "./features/conversation/VoicePlayer": "./src/features/conversation/VoicePlayer.tsx",
     "./features/conversation/branch-points": "./src/features/conversation/branch-points.ts",
     "./features/conversation/threads/AgentThreadView": "./src/features/conversation/threads/AgentThreadView.tsx",
