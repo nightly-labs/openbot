@@ -77,6 +77,11 @@ export const messages = {
     "Не давать компьютеру засыпать и при работе от батареи. Батарея разряжается быстрее.",
   "settings.restoreWorkspace.title": "Восстанавливать последнее рабочее пространство при запуске",
   "settings.restoreWorkspace.description": "Открывать рабочее пространство и задачи из предыдущего сеанса.",
+  "settings.startupChat.title": "Открывать при запуске",
+  "settings.startupChat.description": "Чат, который приложение показывает при запуске.",
+  "settings.startupChat.lastChat": "Последний чат",
+  "settings.startupChat.otherServer": "Агент на другом сервере",
+  "settings.startupChat.unlistedAgent": "Агент не из списка",
   "settings.quitGuard.title": "Удерживать ⌘Q для выхода",
   "settings.quitGuard.description":
     "Удерживайте ⌘Q или нажмите дважды, чтобы выйти. С вариантом «Никогда» одно нажатие ⌘Q закрывает приложение и останавливает агентов.",

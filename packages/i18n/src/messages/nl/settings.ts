@@ -76,6 +76,11 @@ export const messages = {
     "Houd de computer ook op batterijstroom wakker. De batterij loopt dan sneller leeg.",
   "settings.restoreWorkspace.title": "Herstel de laatste werkruimte bij openen",
   "settings.restoreWorkspace.description": "Open de werkruimte en taken van je vorige sessie.",
+  "settings.startupChat.title": "Openen bij start",
+  "settings.startupChat.description": "De chat die de app toont bij het starten.",
+  "settings.startupChat.lastChat": "Laatste chat",
+  "settings.startupChat.otherServer": "Een agent op een andere server",
+  "settings.startupChat.unlistedAgent": "Een agent die niet in de lijst staat",
   "settings.quitGuard.title": "⌘Q ingedrukt houden om te stoppen",
   "settings.quitGuard.description":
     "Houd ⌘Q ingedrukt of druk twee keer om te stoppen. Met ‘Nooit’ stopt één ⌘Q OpenBot en de agents.",

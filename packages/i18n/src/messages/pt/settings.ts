@@ -78,6 +78,11 @@ export const messages = {
     "Mantenha o computador acordado também na bateria. A bateria descarrega mais rápido.",
   "settings.restoreWorkspace.title": "Restaurar o último espaço de trabalho ao iniciar",
   "settings.restoreWorkspace.description": "Abra o espaço de trabalho e as tarefas da sessão anterior.",
+  "settings.startupChat.title": "Abrir ao iniciar",
+  "settings.startupChat.description": "O chat que o app mostra ao iniciar.",
+  "settings.startupChat.lastChat": "Último chat",
+  "settings.startupChat.otherServer": "Um agente de outro servidor",
+  "settings.startupChat.unlistedAgent": "Um agente que não está na lista",
   "settings.quitGuard.title": "Manter ⌘Q para sair",
   "settings.quitGuard.description":
     "Mantenha ⌘Q pressionado ou pressione duas vezes para sair. Com “Nunca”, um ⌘Q sai e para os agentes.",

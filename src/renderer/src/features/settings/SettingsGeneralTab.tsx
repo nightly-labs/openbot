@@ -42,6 +42,8 @@ import { useInterfaceSizeChoice } from "../../interface-size";
 import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
+import type { AgentDockSettingsModel } from "./SettingsAgentDockTab";
+import { StartupAgentChatSelect } from "./StartupAgentChatSelect";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
 const quitGuardOptions = [...QUIT_GUARDS];
@@ -64,6 +66,8 @@ interface SettingsGeneralTabProps {
   /** The chat color of the account, or null for none. */
   chatColor: AvatarColor | null;
   onSetChatColor: (color: AvatarColor | null) => Promise<void>;
+  /** The agents of the active server for the chat that opens at start. Not set in a chat window. */
+  startupAgents?: AgentDockSettingsModel | undefined;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -332,6 +336,19 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.restoreWorkspace.title")}
             description={i18n.t("settings.restoreWorkspace.description")}
           />
+          <Show when={props.startupAgents}>
+            {(model) => (
+              <Item data-settings-row="settings.startupChat.title" class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.startupChat.title")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.startupChat.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <StartupAgentChatSelect model={model()} mount={props.selectMount} />
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
           <Show when={props.value.quitGuard}>
             {(quitGuard) => (
               <Item data-settings-row="settings.quitGuard.title" class="settings-modal-row">

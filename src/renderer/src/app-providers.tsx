@@ -10,6 +10,7 @@ import { AgentActionsProvider } from "./features/agents/agent-actions";
 import { AgentEventBridge } from "./features/agents/agent-event-bridge";
 import { AgentReadTrackingProvider } from "./features/agents/agent-read-tracking";
 import { AgentsProvider } from "./features/agents/agents-context";
+import { StartupAgentChat } from "./features/agents/startup-agent-chat";
 import { BrowserTabsProvider } from "./features/browser/browser-context";
 import { ChannelsProvider } from "./features/channels/channels-context";
 import { readStoredComposerDrafts } from "./features/conversation/composer-draft-storage";
@@ -199,6 +200,10 @@ function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Eleme
                                     {/* The Dynamic Island follows the main window only. */}
                                     <Show when={!platform.chatWindow}>
                                       <DynamicIslandBridge />
+                                    </Show>
+                                    {/* The chat that opens at the start of the app is in the main window. */}
+                                    <Show when={!platform.chatWindow && !platform.landingPreview}>
+                                      <StartupAgentChat />
                                     </Show>
                                     {props.children}
                                   </ServerScopeProvider>

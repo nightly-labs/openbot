@@ -74,6 +74,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "השארת המחשב ער גם בעבודה על סוללה. הסוללה מתרוקנת מהר יותר.",
   "settings.restoreWorkspace.title": "שחזור סביבת העבודה האחרונה בהפעלה",
   "settings.restoreWorkspace.description": "פתיחת סביבת העבודה והמשימות מהסשן הקודם.",
+  "settings.startupChat.title": "פתיחה בהפעלה",
+  "settings.startupChat.description": "הצ'אט שהאפליקציה מציגה כשהיא מופעלת.",
+  "settings.startupChat.lastChat": "הצ'אט האחרון",
+  "settings.startupChat.otherServer": "סוכן בשרת אחר",
+  "settings.startupChat.unlistedAgent": "סוכן שאינו ברשימה",
   "settings.quitGuard.title": "החזקת ⌘Q ליציאה",
   "settings.quitGuard.description":
     "יש להחזיק את ⌘Q או ללחוץ עליו פעמיים כדי לצאת. עם „אף פעם”, לחיצה אחת על ⌘Q יוצאת ועוצרת את הסוכנים.",

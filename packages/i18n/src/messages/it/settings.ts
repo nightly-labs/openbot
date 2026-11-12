@@ -77,6 +77,11 @@ export const messages = {
     "Mantieni il computer attivo anche a batteria. La batteria si scarica più in fretta.",
   "settings.restoreWorkspace.title": "Ripristina l'ultimo workspace all'avvio",
   "settings.restoreWorkspace.description": "Apri il workspace e le attività della sessione precedente.",
+  "settings.startupChat.title": "Apri all'avvio",
+  "settings.startupChat.description": "La chat che l'app mostra all'avvio.",
+  "settings.startupChat.lastChat": "Ultima chat",
+  "settings.startupChat.otherServer": "Un agente su un altro server",
+  "settings.startupChat.unlistedAgent": "Un agente che non è nell'elenco",
   "settings.quitGuard.title": "Tieni premuto ⌘Q per uscire",
   "settings.quitGuard.description":
     "Tieni premuto ⌘Q o premilo due volte per uscire. Con «Mai», un solo ⌘Q esce e ferma gli agenti.",

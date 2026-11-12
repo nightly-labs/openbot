@@ -304,6 +304,7 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
             chatColor={props.account.chatColor ?? null}
             onSetChatColor={props.onSetChatColor}
+            startupAgents={props.chatWindow === true ? undefined : props.agentDock}
           />
         </Tabs.Content>
 

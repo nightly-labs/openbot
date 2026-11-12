@@ -74,6 +74,11 @@ export const messages = {
   "settings.keepAwakeOnBattery.description": "إبقاء الحاسوب في وضع التشغيل على البطارية أيضًا. تنفد البطارية أسرع.",
   "settings.restoreWorkspace.title": "استعادة آخر مساحة عمل عند التشغيل",
   "settings.restoreWorkspace.description": "فتح مساحة العمل والمهام من جلستك السابقة.",
+  "settings.startupChat.title": "الفتح عند التشغيل",
+  "settings.startupChat.description": "الدردشة التي يعرضها التطبيق عند بدء تشغيله.",
+  "settings.startupChat.lastChat": "آخر دردشة",
+  "settings.startupChat.otherServer": "وكيل على خادم آخر",
+  "settings.startupChat.unlistedAgent": "وكيل غير موجود في القائمة",
   "settings.quitGuard.title": "اضغط ⌘Q مطولًا للإنهاء",
   "settings.quitGuard.description":
     "اضغط ⌘Q مطولًا أو مرتين للإنهاء. مع «أبدًا»، تؤدي ضغطة ⌘Q واحدة إلى الإنهاء وإيقاف الوكلاء.",
