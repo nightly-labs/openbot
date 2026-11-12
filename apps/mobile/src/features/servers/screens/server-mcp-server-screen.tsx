@@ -1,5 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { McpServerConfig, McpTestResult, McpTransport } from "@openbot/contracts/ipc";
+import {
+  MCP_ACCESS_LEVELS,
+  type McpAccessLevel,
+  type McpServerAccess,
+  type McpServerConfig,
+  type McpTestResult,
+  type McpTransport,
+  mcpAccessRank,
+} from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -10,6 +19,7 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { AccessLevelMenu } from "@/features/servers/components/access-level-menu";
 import { ListField, PairField } from "@/features/servers/components/repeatable-fields";
 import {
   type McpServerDraft,
@@ -18,7 +28,7 @@ import {
   mcpServerDraftChanged,
   mcpServerDraftErrors,
 } from "@/features/servers/model/mcp-server-draft";
-import { useServerMcp } from "@/features/servers/model/use-server-mcp";
+import { useMcpAccess, useServerMcp } from "@/features/servers/model/use-server-mcp";
 import {
   SettingsContent,
   SettingsNote,
@@ -27,7 +37,10 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -47,6 +60,15 @@ const WORKING_DIRECTORY_PLACEHOLDER = "~/code";
 const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
+
+const ACCESS_LEVEL_KEYS = {
+  none: "mobile.server.mcp.access.level.none",
+  use: "mobile.server.mcp.access.level.use",
+  manage: "mobile.server.mcp.access.level.manage",
+} as const satisfies Record<McpAccessLevel, MobileTextKey>;
+
+const higher = (left: McpAccessLevel, right: McpAccessLevel) =>
+  mcpAccessRank(right) > mcpAccessRank(left) ? right : left;
 
 /**
  * Server sheet > MCP servers > one server, or a new one without `mcpServerId`. The header action
@@ -88,6 +110,9 @@ function McpServerForm({
   const { saveMcpServer, removeMcpServer, setMcpServerEnabled, testMcpServer, signOutMcpServer } =
     useMobileWorkspaceActions();
   const { action, perform, setList, setSignIns } = mcp;
+  const access = useMcpAccess(serverId);
+  // A member with "Can use" reads and tests the server; only "Can manage" changes it.
+  const readOnly = saved !== undefined && access.mine(saved.id) === "use";
   const [draft, setDraft] = useState<McpServerDraft>(() => mcpServerDraft(saved));
   // A new server keeps its switch in the draft. A saved one turns on and off at once.
   const [newEnabled, setNewEnabled] = useState(true);
@@ -179,17 +204,21 @@ function McpServerForm({
     return key && SIGN_IN_ERRORS.has(key) ? t("mobile.server.mcp.signInOnComputer") : sourceText(error);
   }
 
-  const locked = action.isPending;
+  const locked = action.isPending || readOnly;
   return (
     <SettingsContent>
       <Stack.Screen options={{ title: saved ? saved.name : t("mobile.server.mcp.addTitle") }} />
-      <SheetSaveAction
-        dirty={dirty}
-        canSave={valid && !busy}
-        pending={action.isPending && dirty}
-        label={saved ? undefined : t("mobile.server.mcp.addConfirm")}
-        onSave={save}
-      />
+      {readOnly ? (
+        <SettingsNote>{t("mobile.server.mcp.access.readOnly")}</SettingsNote>
+      ) : (
+        <SheetSaveAction
+          dirty={dirty}
+          canSave={valid && !busy}
+          pending={action.isPending && dirty}
+          label={saved ? undefined : t("mobile.server.mcp.addConfirm")}
+          onSave={save}
+        />
+      )}
       <View className="gap-5">
         <SheetFormField
           label={t("mobile.server.mcp.name")}
@@ -371,7 +400,8 @@ function McpServerForm({
           </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      {signedIn && saved ? (
+      {saved && access.admin ? <McpAccessSections serverId={serverId} saved={saved} access={access} /> : null}
+      {signedIn && saved && !readOnly ? (
         <SettingsSection footer={t("mobile.server.mcp.signedInDescription", { server: mcp.server?.name ?? "" })}>
           <SettingsRow
             disclosure={false}
@@ -392,7 +422,7 @@ function McpServerForm({
           {errorMessage(action.error, t("mobile.server.mcp.saveFailed"))}
         </Typography.Paragraph>
       ) : null}
-      {saved ? (
+      {saved && !readOnly ? (
         <SettingsSection>
           <SettingsRow
             disclosure={false}
@@ -419,5 +449,130 @@ function McpServerForm({
         </SettingsSection>
       ) : null}
     </SettingsContent>
+  );
+}
+
+/**
+ * Who gets one MCP server, for an owner or admin of a host with `mcp-access-v1`: the agents that get
+ * it, and the level of Everyone and of each role. A member gets the highest level of Everyone and of
+ * their roles, so a role cannot go below Everyone, and keeps only a level above it. Each change saves
+ * at once.
+ */
+function McpAccessSections({
+  serverId,
+  saved,
+  access,
+}: {
+  serverId: string;
+  saved: McpServerConfig;
+  access: ReturnType<typeof useMcpAccess>;
+}) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const agentIds = useMobileWorkspaceSelector((workspace) => workspace.agents)
+    .filter((agent) => agent.serverId === serverId)
+    .map((agent) => agent.id);
+  const entry = access.entry(saved.id);
+  const busy = access.action.isPending;
+  const have = entry.agents === null ? agentIds.length : agentIds.filter((id) => entry.agents?.includes(id)).length;
+  const summary =
+    entry.agents === null || have === agentIds.length
+      ? t("mobile.server.mcp.access.allAgents")
+      : have === 0
+        ? t("mobile.server.mcp.access.noAgents")
+        : t("mobile.server.mcp.access.someAgents", { checked: have, total: agentIds.length });
+  const everyoneName = t("mobile.server.roles.everyone");
+  const set = (next: McpServerAccess) => void access.set(saved.id, next);
+  const setEveryone = (level: McpAccessLevel) =>
+    set({
+      ...entry,
+      everyone: level,
+      // A role keeps only a level above the new one of Everyone.
+      roles: Object.fromEntries(
+        Object.entries(entry.roles).filter(([, own]) => mcpAccessRank(own) > mcpAccessRank(level)),
+      ),
+    });
+  const setRole = (roleId: string, level: McpAccessLevel) => {
+    const roles = Object.fromEntries(Object.entries(entry.roles).filter(([id]) => id !== roleId));
+    set({
+      ...entry,
+      roles: mcpAccessRank(level) > mcpAccessRank(entry.everyone) ? { ...roles, [roleId]: level } : roles,
+    });
+  };
+  const options = (floor: McpAccessLevel | undefined) =>
+    MCP_ACCESS_LEVELS.map((level) => ({
+      value: level,
+      label: t(ACCESS_LEVEL_KEYS[level]),
+      disabled: floor !== undefined && mcpAccessRank(level) < mcpAccessRank(floor),
+    }));
+  return (
+    <>
+      <SettingsSection
+        title={t("mobile.server.mcp.access.agentsTitle")}
+        footer={t("mobile.server.mcp.access.agentsHint")}
+      >
+        <SettingsRow
+          value={summary}
+          disabled={busy}
+          onPress={() =>
+            router.push({ pathname: "/server-settings/mcp-server-agents", params: { serverId, mcpServerId: saved.id } })
+          }
+        >
+          <Typography.Paragraph>{t("mobile.server.mcp.access.agents")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection
+        title={t("mobile.server.mcp.access.roles")}
+        footer={
+          access.action.error
+            ? errorMessage(access.action.error, t("mobile.server.mcp.access.saveFailed"))
+            : t("mobile.server.mcp.access.rolesHint")
+        }
+      >
+        <SettingsRow
+          disclosure={false}
+          trailing={
+            <AccessLevelMenu
+              value={entry.everyone}
+              options={options(undefined)}
+              enabled={!busy}
+              dark={theme === "dark"}
+              label={t("mobile.server.mcp.access.levelLabel", { role: everyoneName, name: saved.name })}
+              onChange={(level) => {
+                if (level !== entry.everyone) setEveryone(level);
+              }}
+            />
+          }
+        >
+          <Typography.Paragraph numberOfLines={1}>{everyoneName}</Typography.Paragraph>
+        </SettingsRow>
+        {access.roles.map((role) => {
+          const level = higher(entry.roles[role.id] ?? "none", entry.everyone);
+          return (
+            <SettingsRow
+              key={role.id}
+              disclosure={false}
+              trailing={
+                <AccessLevelMenu
+                  value={level}
+                  options={options(entry.everyone)}
+                  source={entry.everyone !== "none" && level === entry.everyone ? everyoneName : undefined}
+                  enabled={!busy}
+                  dark={theme === "dark"}
+                  label={t("mobile.server.mcp.access.levelLabel", { role: role.name, name: saved.name })}
+                  onChange={(next) => {
+                    // A choice of the level of Everyone clears the level of the role.
+                    const kept = mcpAccessRank(next) > mcpAccessRank(entry.everyone) ? next : "none";
+                    if (kept !== (entry.roles[role.id] ?? "none")) setRole(role.id, next);
+                  }}
+                />
+              }
+            >
+              <Typography.Paragraph numberOfLines={1}>{role.name}</Typography.Paragraph>
+            </SettingsRow>
+          );
+        })}
+      </SettingsSection>
+    </>
   );
 }

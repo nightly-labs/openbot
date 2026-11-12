@@ -49,6 +49,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -2516,6 +2517,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canDeleteHostedSites: (serverId) => administers(serverId, HOSTED_SITES_CAPABILITY),
       canManageProviders: (serverId) => administers(serverId, PROVIDERS_ADMIN_CAPABILITY),
       canManageMcpServers: managesMcp,
+      canManageMcpAccess: (serverId) =>
+        administers(serverId, MCP_SERVERS_CAPABILITY) && administers(serverId, MCP_ACCESS_CAPABILITY),
+      hasMcpAccessLimits: (serverId) => {
+        const server = servers.find((candidate) => candidate.id === serverId);
+        return Boolean(
+          server &&
+            !canAdministerServer(server.role) &&
+            managesMcp(serverId) &&
+            hasCapability(serverCapabilities.current, serverId, MCP_ACCESS_CAPABILITY),
+        );
+      },
       canRelayMcpSignIn: (serverId) =>
         managesMcp(serverId) && hasCapability(serverCapabilities.current, serverId, SIGN_IN_RELAY_CAPABILITY),
       canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),

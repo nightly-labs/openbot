@@ -86,6 +86,7 @@ import type {
   InstanceTransferSummary,
   MachineMetrics,
   MarkAgentTaskReadInput,
+  McpAccessSnapshot,
   McpServerConfig,
   McpSignInState,
   McpTestResult,
@@ -123,6 +124,7 @@ import type {
   SetAgentSessionSettingInput,
   SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
+  SetMcpAccessInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
@@ -723,6 +725,21 @@ export interface MobileWorkspaceContextValue {
   mcpSignInRelay: (serverId: string) => McpSignInRelay;
   /** The http servers that the host holds a sign-in for. Empty for a host without `mcp-sign-in-v1`. */
   listMcpSignIns: (serverId: string) => Promise<McpSignInState[]>;
+  /**
+   * An owner or admin of an online host that serves `mcp-servers-v1` and `mcp-access-v1`: the phone
+   * sets the agents and the roles that get each MCP server. The host checks the role again.
+   */
+  canManageMcpAccess: (serverId: string) => boolean;
+  /**
+   * A member, not an owner or admin, who manages MCP servers on a host that serves `mcp-access-v1`:
+   * `loadMcpAccess` gives the level of this member for each MCP server, and a level below `manage`
+   * only lets the member use and test the server.
+   */
+  hasMcpAccessLimits: (serverId: string) => boolean;
+  /** Who gets each MCP server. A member reads only `mine`. */
+  loadMcpAccess: (serverId: string) => Promise<McpAccessSnapshot>;
+  /** Replaces the access of one MCP server. The host refuses a change made from an earlier revision. */
+  setMcpAccess: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
   signOutMcpServer: (mcpServerId: string, serverId: string) => Promise<McpSignInState[]>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   /**
@@ -1210,6 +1227,8 @@ type MobileWorkspaceStateKey =
   | "canDeleteHostedSites"
   | "canManageProviders"
   | "canManageMcpServers"
+  | "canManageMcpAccess"
+  | "hasMcpAccessLimits"
   | "canRelayMcpSignIn"
   | "canAddMarketplaceAgents"
   | "canUpdateMarketplaceAgents"

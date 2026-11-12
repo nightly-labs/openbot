@@ -1195,6 +1195,26 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Os agentes deste servidor deixam de receber as ferramentas dele. As configurações não são mantidas.",
   "mobile.server.mcp.remove": "Remover servidor MCP",
+  "mobile.server.mcp.access.unavailable":
+    "Só um proprietário ou admin de um servidor online pode escolher quem recebe os servidores MCP dele.",
+  "mobile.server.mcp.access.loadFailed": "Não foi possível carregar quem recebe este servidor MCP.",
+  "mobile.server.mcp.access.saveFailed": "Não foi possível salvar quem recebe este servidor MCP. Tente de novo.",
+  "mobile.server.mcp.access.agentsTitle": "Agentes",
+  "mobile.server.mcp.access.agents": "Agentes que podem usá-lo",
+  "mobile.server.mcp.access.agentsHint":
+    "Com todos os agentes ativados, um agente adicionado depois também recebe este servidor MCP.",
+  "mobile.server.mcp.access.allAgents": "Todos os agentes",
+  "mobile.server.mcp.access.noAgents": "Nenhum agente",
+  "mobile.server.mcp.access.someAgents": "{checked} de {total}",
+  "mobile.server.mcp.access.roles": "Funções",
+  "mobile.server.mcp.access.rolesHint":
+    "Pode usar: membros veem e testam este servidor MCP. Pode gerenciar: membros também o alteram e removem. Um membro recebe o nível mais alto de Todos e das funções dele. Proprietários, admins e o membro que o adicionou sempre podem gerenciá-lo.",
+  "mobile.server.mcp.access.levelLabel": "Acesso de {role} a {name}",
+  "mobile.server.mcp.access.level.none": "Sem acesso",
+  "mobile.server.mcp.access.level.use": "Pode usar",
+  "mobile.server.mcp.access.level.manage": "Pode gerenciar",
+  "mobile.server.mcp.access.readOnly":
+    "Você pode usar e testar este servidor MCP. Para alterá-lo, peça Pode gerenciar a um proprietário ou admin.",
   "mobile.server.usage.agents": "Agentes",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Nenhum uso de agente registrado neste período.",
@@ -1352,6 +1372,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agente", other: "{count} agentes" },
   "mobile.server.roles.memberCount": { one: "{count} membro", other: "{count} membros" },
   "mobile.server.roles.agentLevel": "Acesso de {role} a {agent}",
+  "mobile.server.roles.changeInEveryone": "Alterar em Todos",
+  "mobile.server.roles.setAll": "Definir todos",
+  "mobile.server.roles.setAllLabel": "Definir todos: acesso de {role} a todos os agentes",
+  "mobile.server.roles.mixed": "Misto",
   "mobile.server.roles.delete": "Excluir função",
   "mobile.server.roles.deleteTitle": "Excluir {name}?",
   "mobile.server.roles.deleteBody": "Membros com esta função perdem os agentes que ela dá a eles.",

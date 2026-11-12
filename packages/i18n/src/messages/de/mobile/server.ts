@@ -1214,6 +1214,27 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Die Agenten dieses Servers erhalten seine Werkzeuge nicht mehr. Die Einstellungen werden nicht behalten.",
   "mobile.server.mcp.remove": "MCP-Server entfernen",
+  "mobile.server.mcp.access.unavailable":
+    "Nur ein Eigentümer oder Admin eines Online-Servers kann festlegen, wer seine MCP-Server bekommt.",
+  "mobile.server.mcp.access.loadFailed": "Der Zugriff auf diesen MCP-Server konnte nicht geladen werden.",
+  "mobile.server.mcp.access.saveFailed":
+    "Der Zugriff auf diesen MCP-Server konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.mcp.access.agentsTitle": "Agenten",
+  "mobile.server.mcp.access.agents": "Agenten mit Zugriff",
+  "mobile.server.mcp.access.agentsHint":
+    "Wenn alle Agenten an sind, bekommt auch ein später hinzugefügter Agent diesen MCP-Server.",
+  "mobile.server.mcp.access.allAgents": "Alle Agenten",
+  "mobile.server.mcp.access.noAgents": "Keine Agenten",
+  "mobile.server.mcp.access.someAgents": "{checked} von {total}",
+  "mobile.server.mcp.access.roles": "Rollen",
+  "mobile.server.mcp.access.rolesHint":
+    "Kann nutzen: Mitglieder sehen und testen diesen MCP-Server. Verwalten: Mitglieder können ihn auch ändern und entfernen. Ein Mitglied bekommt die höchste Stufe von Alle und seinen Rollen. Eigentümer, Admins und das Mitglied, das ihn hinzugefügt hat, können ihn immer verwalten.",
+  "mobile.server.mcp.access.levelLabel": "Zugriff von {role} auf {name}",
+  "mobile.server.mcp.access.level.none": "Kein Zugriff",
+  "mobile.server.mcp.access.level.use": "Kann nutzen",
+  "mobile.server.mcp.access.level.manage": "Verwalten",
+  "mobile.server.mcp.access.readOnly":
+    "Du kannst diesen MCP-Server nutzen und testen. Um ihn zu ändern, bitte einen Eigentümer oder Admin um Verwalten.",
   "mobile.server.usage.agents": "Agenten",
   "mobile.server.usage.agentLine": "{tokens} Token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "In diesem Zeitraum wurde keine Agentennutzung erfasst.",
@@ -1376,6 +1397,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} Agent", other: "{count} Agenten" },
   "mobile.server.roles.memberCount": { one: "{count} Mitglied", other: "{count} Mitglieder" },
   "mobile.server.roles.agentLevel": "Zugriff von {role} auf {agent}",
+  "mobile.server.roles.changeInEveryone": "In Alle ändern",
+  "mobile.server.roles.setAll": "Alle setzen",
+  "mobile.server.roles.setAllLabel": "Alle setzen: Zugriff von {role} auf alle Agenten",
+  "mobile.server.roles.mixed": "Gemischt",
   "mobile.server.roles.delete": "Rolle löschen",
   "mobile.server.roles.deleteTitle": "{name} löschen?",
   "mobile.server.roles.deleteBody": "Mitglieder mit dieser Rolle verlieren die Agenten, die sie ihnen gibt.",
