@@ -89,11 +89,14 @@ export interface BrowserHostTab {
    * the check to pass; later reads of that document offer no click.
    */
   challengeClick?: { document: number; waited: boolean };
+  /** The origin of the page whose last read found a bot check. */
+  checkOrigin?: string;
   /**
-   * A person completed a takeover of this tab, and no read found the page without a bot check since.
-   * A check that is still there refuses this browser: another takeover does not pass it.
+   * The origin of a bot check that was on the page when a person took over the tab and selected Done.
+   * While a read of that origin still finds a check, the check refuses this browser: another takeover
+   * does not pass it.
    */
-  checkAfterTakeover?: true;
+  checkAfterTakeover?: string;
   /** The page host whose memories a snapshot gave the agent, and the turn. The next turn shows them again. */
   siteRecall?: { turnId: string; host: string };
   /**
