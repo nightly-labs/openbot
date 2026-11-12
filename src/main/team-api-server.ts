@@ -171,6 +171,7 @@ import {
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
@@ -2673,6 +2674,7 @@ export class TeamApiServer {
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
           // The workflow store posts a chat-channel output into this host's channels.
           if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
           // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.

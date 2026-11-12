@@ -49,8 +49,11 @@ import {
   type WorkflowGitHubHistory,
   type WorkflowGitHubLastEventInput,
   type WorkflowGraph,
+  type WorkflowMediaCredits,
   type WorkflowMediaKind,
-  type WorkflowMediaModel,
+  type WorkflowMediaProvider,
+  type WorkflowMediaProviders,
+  type WorkflowMediaSpecs,
   type WorkflowNode,
   type WorkflowNodeKind,
   type WorkflowRun,
@@ -65,6 +68,7 @@ import {
   type WorkflowVersionInput,
   workflowMediaKind,
   workflowMediaModel,
+  workflowMediaSpecs,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -148,6 +152,7 @@ import {
   fieldText,
   inputText,
   type MediaImageRole,
+  mediaAccount,
   mediaImages,
   mediaInputs,
   mediaStepPrompt,
@@ -196,7 +201,13 @@ interface WorkflowTextRequest {
 /** One image or video of an image step. */
 interface WorkflowMediaRequest {
   kind: WorkflowMediaKind;
-  provider: WorkflowMediaModel["provider"];
+  provider: WorkflowMediaProvider;
+  /** The id of the model at its provider. */
+  model: string;
+  /** The account of the provider that pays for the file. Null is the provider's own sign-in. */
+  account: string | null;
+  /** The frame, the length and the resolution, read for the model. */
+  specs: WorkflowMediaSpecs;
   prompt: string;
   /** The pictures of the image steps before it, as attachment ids, and how the model uses each. */
   images: readonly { role: MediaImageRole; attachmentId: string }[];
@@ -256,6 +267,10 @@ export interface WorkflowsDependencies {
     draftId: string,
     types: ReadonlySet<string>,
   ) => Effect.Effect<string | "missing" | "type", { readonly cause: unknown }>;
+  /** The media services beyond the agent providers that this host can use now. Absent: none. */
+  mediaProviders?: () => WorkflowMediaProviders;
+  /** The credits of the media services that this host can spend now. Absent: none. */
+  mediaCredits?: () => Effect.Effect<WorkflowMediaCredits>;
   notify(notice: WorkflowNotice): void;
   /** Whether a messaging connection of this host is on. */
   connectionOn(connectionId: string): boolean;
@@ -399,6 +414,10 @@ interface WorkflowsShape {
    * asset step. Answers its file id. The draft goes away.
    */
   keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
+  /** Whether this host can use Sunra for an image step now. */
+  mediaProviders(): WorkflowMediaProviders;
+  /** The credits that this host's Sunra sign-in can spend now. A failed read has none. */
+  mediaCredits(): Effect.Effect<WorkflowMediaCredits>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -568,6 +587,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         ): Effect.Effect<void> => {
           const kind = workflowMediaKind(node.fields);
           const model = workflowMediaModel(node.fields);
+          const specs = workflowMediaSpecs(node.fields, kind, model);
           const generateMedia = dependencies.generateMedia;
           // The pictures of the image steps before it: the run's newest files, or for a step that runs
           // alone, the newest files of the workflow.
@@ -584,7 +604,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                       generateMedia({
                         kind,
                         provider: model.provider,
-                        prompt: mediaStepPrompt(node.fields, kind, step.input),
+                        model: model.providerModel ?? model.id,
+                        account: mediaAccount(node.fields),
+                        specs,
+                        prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
                         images: mediaImages(node.fields, kind, inputs),
                         voice: mediaVoice(node.fields, kind, model),
                       }),
@@ -1886,6 +1909,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return kept;
         });
 
+        const mediaProviders = (): WorkflowMediaProviders => dependencies.mediaProviders?.() ?? { sunra: false };
+        const mediaCredits = (): Effect.Effect<WorkflowMediaCredits> =>
+          dependencies.mediaCredits?.() ?? Effect.succeed({ sunra: null });
+
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
           return yield* locked(
             Effect.gen(function* () {
@@ -2070,6 +2097,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           githubLastEvent,
           githubRepositories,
           keepPicture,
+          mediaProviders,
+          mediaCredits,
           runStep,
           stopStep,
           stopRun,

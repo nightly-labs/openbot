@@ -398,6 +398,29 @@ sent through `POST /v1/attachments` as a picture of the host with no owner agent
 answers `missing`. Each member who can use workflows can keep a picture, as each member can send a
 draft. A client without the capability does not offer image and asset steps.
 
+`workflows-sunra-v1` lets the host run an `image` node with a Sunra model of `WORKFLOW_MEDIA_MODELS`
+(the ids that start with `sunra-`). The host calls the tools of Sunra's MCP server with the Sunra
+sign-in of an enabled Sunra row in its Apps (`src/backend/workflows/sunra-media.ts`), and the credits
+of the selected Sunra account pay for each file. The capability adds two routes.
+`POST /v1/workflows/media/providers {}` answers `{ sunra }`: true while that sign-in exists. It
+never sends a token or the Sunra account. Each member who can use workflows can read it. A client
+shows the Sunra models only while it is true, and reads it again when its window comes to the front,
+because the sign-in ends in the browser. `POST /v1/workflows/media/credits {}` answers
+`{ sunra: { available, quota } | null }`: the credits that the host's Sunra sign-in can still spend.
+The host reads them with Sunra's `get_balance` tool, which spends no credits. For a Sunra team
+member, `available` is what is left of the member's quota and `quota` is that quota; for a personal
+account, `quota` is null. It is null with no sign-in or when Sunra does not answer. Each member who
+can use workflows can read it, because those members spend the same credits. The Canvas page rail
+shows it as a ring, and reads it again when the window comes to the front. A client of a host
+without the capability shows no Sunra models and no credits.
+
+`workflows-media-account-v1` lets an `image` node choose the account that pays for its file. The node
+reads one more field, `account`: the id of one account of the model's provider, as `provider-accounts-v1`
+lists them. An empty field and `default` mean the provider's own sign-in. When the host does not have
+that account, the step fails with "account not found"; the host never makes the file on another
+account. A Sunra model ignores the field. The capability adds no route. A client shows the accounts
+in the model picker only on a host that advertises it, because an older host ignores the field.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

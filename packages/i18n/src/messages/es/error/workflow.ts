@@ -74,4 +74,14 @@ export const messages = {
     "El cambio se detuvo a medio camino. Puede que ya esté en GitHub. Revísalo antes de ejecutar el paso de nuevo.",
   "error.workflow.githubNoEvent":
     "GitHub no tiene ninguna incidencia ni pull request con la que se inicie este activador.",
+  "error.workflow.sunraSignIn": "Inicia sesión en Sunra en Apps para usar los modelos de Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Tu cuenta de Sunra no tiene créditos suficientes. Añade créditos en sunra.ai/pricing y vuelve a ejecutar el paso.",
+  "error.workflow.sunraNeedsPlan":
+    "Este modelo de Sunra necesita un plan de Sunra. Elige un plan en sunra.ai/pricing o selecciona otro modelo.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra usa imágenes de entrada solo con una cuenta personal. Selecciona tu cuenta personal en Sunra o quita las conexiones de imágenes.",
+  "error.workflow.sunraFailed": "Sunra no pudo crear el archivo: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra no terminó el archivo a tiempo. Revisa el proyecto OpenBot en sunra.ai antes de volver a ejecutar el paso.",
 } as const satisfies PartialTranslation<typeof source>;

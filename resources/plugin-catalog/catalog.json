@@ -93,6 +93,12 @@
       "detailSha256": "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271"
     },
     {
+      "slug": "sunra",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d66c81db753e40551fde452f985a625e22e5681d63a8a4f87ed76ba5746dafdb"
+    },
+    {
       "slug": "elevenlabs",
       "version": "1.0.0",
       "featured": false,

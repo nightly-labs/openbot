@@ -63,4 +63,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "השינוי נעצר באמצע. ייתכן שהוא נמצא ב-GitHub. יש לבדוק שם לפני שמריצים את השלב שוב.",
   "error.workflow.githubNoEvent": "ב-GitHub אין issue או pull request שהטריגר הזה מתחיל מהם.",
+  "error.workflow.sunraSignIn": "כדי להשתמש במודלים של Sunra, צריך להתחבר ל-Sunra באפליקציות.",
+  "error.workflow.sunraNoCredits":
+    "אין מספיק קרדיטים בחשבון Sunra שלך. אפשר להוסיף קרדיטים ב-sunra.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.sunraNeedsPlan":
+    "המודל הזה של Sunra דורש תוכנית Sunra. אפשר לבחור תוכנית ב-sunra.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra משתמש בתמונות קלט רק עם חשבון אישי. צריך לבחור את החשבון האישי ב-Sunra או להסיר את חיבורי התמונות.",
+  "error.workflow.sunraFailed": "Sunra לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra לא סיים את הקובץ בזמן. כדאי לבדוק את הפרויקט OpenBot ב-sunra.ai לפני שמריצים את השלב שוב.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -177,7 +177,9 @@ import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
+import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
 
@@ -403,7 +405,9 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
 
@@ -609,6 +613,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -828,7 +834,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== VAULT_V4_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CAPABILITY &&
     capability !== AGENT_DEFAULTS_CAPABILITY &&
-    capability !== AGENT_SPEED_CAPABILITY,
+    capability !== AGENT_SPEED_CAPABILITY &&
+    capability !== WORKFLOWS_SUNRA_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -924,6 +932,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1102,6 +1112,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== VAULT_V4_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CAPABILITY &&
       capability !== AGENT_DEFAULTS_CAPABILITY &&
-      capability !== AGENT_SPEED_CAPABILITY,
+      capability !== AGENT_SPEED_CAPABILITY &&
+      capability !== WORKFLOWS_SUNRA_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   );
 }

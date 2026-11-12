@@ -257,6 +257,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "כמה קרדיטים של Higgsfield יש לי?",
   "marketplace.plugin.higgsfield.prompt.productShot": "צור ב-Higgsfield תמונת מוצר של ספל קרמיקה על שולחן עץ.",
   "marketplace.plugin.higgsfield.prompt.clip": "צור ב-Higgsfield סרטון של 5 שניות של גלים בשקיעה.",
+  "marketplace.plugin.sunra.tagline": "תמונות, סרטונים, אודיו ו-3D מבוססי AI",
+  "marketplace.plugin.sunra.description":
+    "Sunra מאפשר לסוכנים ליצור תמונות, סרטונים, אודיו ומודלים בתלת-ממד עם מודלים כמו GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling ו-Veo, לבדוק את יתרת הקרדיטים ולקרוא את התוצאות. התוצאות נשמרות בפרויקט בחשבון Sunra של המשתמש. כל משתמש מתחבר לחשבון Sunra שלו דרך הדפדפן. Sunra מציג קודם את העלות של כל יצירה, ומשתמש בקרדיטים של החשבון הזה רק אחרי אישור.",
+  "marketplace.plugin.sunra.app":
+    "יצירת תמונות, סרטונים, אודיו ותלת-ממד, קרדיטים ותוצאות, דרך שרת MCP של Sunra עם התחברות בדפדפן.",
+  "marketplace.plugin.sunra.prompt.balance": "כמה קרדיטים של Sunra יש לי?",
+  "marketplace.plugin.sunra.prompt.poster": "צור ב-Sunra פוסטר של שוק לילה בגשם, בפורמט לאורך.",
+  "marketplace.plugin.sunra.prompt.clip": "צור ב-Sunra סרטון של 5 שניות של סירת נייר על נהר. תגיד לי קודם כמה זה עולה.",
   "marketplace.plugin.elevenlabs.tagline": "דיבור, קולות וסוכני קול",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs מאפשר לסוכנים להפוך טקסט לדיבור, לעבוד עם קולות וליצור, לבדוק ולסקור סוכני קול של ElevenLabs ואת השיחות שלהם. האודיו שנוצר חוזר כקישור הורדה לזמן קצר. כל משתמש מתחבר לחשבון ElevenLabs שלו דרך הדפדפן, וכל יצירה משתמשת בקרדיטים של החשבון הזה.",

@@ -232,3 +232,23 @@ Troubleshooting:
 
 - The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
   listens on another port that the document does not list. Close that program and restart OpenBot.
+
+## Sunra
+
+The listing connects to Sunra's hosted MCP server at `https://mcp.sunra.ai`
+(<https://mcp.sunra.ai/.well-known/oauth-authorization-server>). The server uses OAuth 2.1 with
+dynamic client registration and client ID metadata documents, PKCE S256, refresh tokens and the
+scope `mcp`, so the user signs in through the browser and types no key. The connection pays from the
+Sunra workspace that the user selected at sign-in: Personal or a Team. `select_workspace` changes
+it; an agent must not change it without a request from the user.
+
+A create tool (`create_image`, `create_video`, `create_audio`, `create_model3d`) without
+`auto_confirm` only stages the work and returns a quote with `estimated_credits` and a `plan_id`.
+`confirm_execution`, or `auto_confirm` on the create call, spends the credits. The agent reads the
+result with `get_job`.
+
+Troubleshooting:
+
+- "Insufficient credits": the selected workspace has too few credits. Sunra gives free daily
+  credits; top-ups are only for subscribers. See <https://sunra.ai/pricing>.
+- A video generation fails: video models need an active Sunra plan.

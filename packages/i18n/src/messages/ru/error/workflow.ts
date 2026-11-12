@@ -72,4 +72,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "Изменение остановилось на полпути. Оно может уже быть на GitHub. Проверьте там, прежде чем запускать шаг снова.",
   "error.workflow.githubNoEvent": "На GitHub нет задачи или пул-реквеста, на которых запускается этот триггер.",
+  "error.workflow.sunraSignIn": "Войдите в Sunra в разделе «Приложения», чтобы использовать модели Sunra.",
+  "error.workflow.sunraNoCredits":
+    "На вашем аккаунте Sunra недостаточно кредитов. Пополните кредиты на sunra.ai/pricing и запустите шаг снова.",
+  "error.workflow.sunraNeedsPlan":
+    "Для этой модели Sunra нужен тариф Sunra. Выберите тариф на sunra.ai/pricing или другую модель.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra принимает входные изображения только с личным аккаунтом. Выберите личный аккаунт в Sunra или удалите связи с изображениями.",
+  "error.workflow.sunraFailed": "Sunra не удалось создать файл: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra не завершила файл вовремя. Проверьте проект OpenBot на sunra.ai, прежде чем запускать шаг снова.",
 } as const satisfies PartialTranslation<typeof source>;

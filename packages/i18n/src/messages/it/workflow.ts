@@ -121,6 +121,8 @@ export const messages = {
   "workflow.image.chooseModel": "Scegli modello",
   "workflow.media.subscription": "Abbonamento {name}",
   "workflow.media.apiKey": "Chiave API {name}",
+  "workflow.media.credits": "Crediti {name}",
+  "workflow.media.payers": "Paga con",
   "workflow.image.making": "Creazione dell'immagine, {time}",
   "workflow.video.title": "Video",
   "workflow.video.name": "video",

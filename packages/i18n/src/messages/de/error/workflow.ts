@@ -76,4 +76,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "Die Änderung wurde unterwegs unterbrochen. Sie kann schon auf GitHub sein. Sieh dort nach, bevor du den Schritt erneut ausführst.",
   "error.workflow.githubNoEvent": "GitHub hat kein Issue und keinen Pull Request, bei dem dieser Auslöser startet.",
+  "error.workflow.sunraSignIn": "Melde dich unter Apps bei Sunra an, um Sunra-Modelle zu verwenden.",
+  "error.workflow.sunraNoCredits":
+    "Dein Sunra-Konto hat nicht genug Credits. Füge Credits unter sunra.ai/pricing hinzu und führe den Schritt dann erneut aus.",
+  "error.workflow.sunraNeedsPlan":
+    "Dieses Sunra-Modell braucht einen Sunra-Plan. Wähle einen Plan unter sunra.ai/pricing oder ein anderes Modell.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra verwendet Eingabebilder nur mit einem persönlichen Konto. Wähle dein persönliches Konto in Sunra aus oder entferne die Bildverbindungen.",
+  "error.workflow.sunraFailed": "Sunra konnte die Datei nicht erstellen: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra hat die Datei nicht rechtzeitig fertiggestellt. Sieh im Projekt OpenBot auf sunra.ai nach, bevor du den Schritt erneut ausführst.",
 } as const satisfies PartialTranslation<typeof source>;

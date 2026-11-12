@@ -145,6 +145,10 @@ import {
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOWS_USAGE_ID,
+  type WorkflowMediaCredits,
+  type WorkflowMediaProvider,
+  type WorkflowMediaProviders,
+  type WorkflowMediaSpecs,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { AGENT_THREAD_READS_LIMIT } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
@@ -309,6 +313,7 @@ import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
 import type { WorkflowRunEnd } from "./workflows/workflows";
@@ -2825,6 +2830,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     ),
   ).bind(this);
 
+  /** The media services beyond the agent providers that a workflow step can use now. */
+  workflowMediaProviders(): WorkflowMediaProviders {
+    return { sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null };
+  }
+
+  /** The credits of the media services that a workflow step can spend now. A failed read has none. */
+  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (this: AgentService) {
+    const signIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
+    if (!signIn || this.#stopping) return { sunra: null } satisfies WorkflowMediaCredits;
+    const sunra = yield* readSunraCredits(signIn).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("Could not read the Sunra credits.", { error: failure.message });
+          return null;
+        }),
+      ),
+    );
+    return { sunra } satisfies WorkflowMediaCredits;
+  }).bind(this);
+
   /**
    * Makes the image or video of one workflow step with the media tool of `provider`, in a side turn
    * whose only tools make media. The file goes to Storage with no owner agent. Returns its attachment.
@@ -2834,13 +2859,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this: AgentService,
       input: {
         kind: GeneratedMediaKind;
-        provider: "codex" | "grok";
+        provider: WorkflowMediaProvider;
+        /** The id of the model at its provider. Sunra reads it; Codex and Grok use their default. */
+        model: string;
+        /** The account of the provider that pays. Null is its own sign-in; Sunra ignores it. */
+        account: string | null;
+        specs: WorkflowMediaSpecs;
         prompt: string;
         images: readonly { role: MediaImageRole; attachmentId: string }[];
         voice: string | null;
       },
     ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
+      if (input.provider === "sunra") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        return yield* generateSunraMedia(
+          {
+            signIn: () => this.#mcp.serviceSignIn(SUNRA_MCP_HOST),
+            resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+            store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+          },
+          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+        ).pipe(
+          Effect.tapError((failure) =>
+            Effect.sync(() => logger.warn("Could not make workflow media with Sunra.", { error: failure.message })),
+          ),
+          Effect.mapError((failure) => failed(failure.message)),
+        );
+      }
       const provider = input.provider;
       const images: { role: MediaImageRole; path: string }[] = [];
       for (const image of input.images) {
@@ -2868,8 +2914,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
         ? "low"
         : model.defaultReasoningEffort;
+      // A step on an account that the host no longer has fails: another account must never pay for it.
+      const account = input.account;
+      if (
+        account &&
+        !this.getStatus()
+          .providers?.find((row) => row.id === provider)
+          ?.accounts?.some((row) => row.id === account)
+      )
+        return yield* failed(sourceText("error.provider.accountNotFound", { provider: providerLabel(provider) }));
       const client = yield* Effect.try({
-        try: () => this.#providers.createMediaClient(provider),
+        try: () => this.#providers.createMediaClient(provider, account ?? undefined),
         catch: () => failed(sourceText("error.workflow.mediaFailed")),
       });
       const usage = workflowUsageObserver(this.#store.database.usage, provider, model.id);

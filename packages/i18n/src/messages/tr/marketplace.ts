@@ -274,6 +274,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
+  "marketplace.plugin.sunra.tagline": "Yapay zekâ ile görsel, video, ses ve 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra, ajanların GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling ve Veo gibi modellerle görsel, video, ses ve 3D model üretmesini, kredi bakiyesini kontrol etmesini ve sonuçları almasını sağlar. Sonuçlar kullanıcının Sunra hesabındaki bir projeye kaydedilir. Her kullanıcı tarayıcıda kendi Sunra hesabına giriş yapar. Sunra her üretimin maliyetini önce bildirir ve o hesabın kredilerini yalnızca onaydan sonra harcar.",
+  "marketplace.plugin.sunra.app":
+    "Sunra MCP sunucusu üzerinden, tarayıcıda girişle görsel, video, ses ve 3D üretimi, krediler ve sonuçlar.",
+  "marketplace.plugin.sunra.prompt.balance": "Kaç Sunra kredim var?",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra ile yağmurda bir gece pazarının dikey formatta posterini yap.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra ile nehirdeki kâğıt bir teknenin 5 saniyelik videosunu yap. Önce maliyetini söyle.",
   "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",

@@ -184,6 +184,8 @@
     "./team-protocol/workflows-chats-v1": "./src/team-protocol/workflows-chats-v1.ts",
     "./team-protocol/workflows-github-v1": "./src/team-protocol/workflows-github-v1.ts",
     "./team-protocol/workflows-media-v1": "./src/team-protocol/workflows-media-v1.ts",
+    "./team-protocol/workflows-sunra-v1": "./src/team-protocol/workflows-sunra-v1.ts",
+    "./team-protocol/workflows-media-account-v1": "./src/team-protocol/workflows-media-account-v1.ts",
     "./team-protocol/workflows-v1": "./src/team-protocol/workflows-v1.ts",
     "./team-protocol/vault-import-v1": "./src/team-protocol/vault-import-v1.ts",
     "./team-protocol/vault-v1": "./src/team-protocol/vault-v1.ts",

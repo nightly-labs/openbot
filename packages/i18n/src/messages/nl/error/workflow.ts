@@ -75,4 +75,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "De wijziging is onderweg gestopt. Hij kan al op GitHub staan. Kijk daar voordat je de stap opnieuw uitvoert.",
   "error.workflow.githubNoEvent": "GitHub heeft geen issue of pull request waarop deze trigger start.",
+  "error.workflow.sunraSignIn": "Meld je aan bij Sunra in Apps om Sunra-modellen te gebruiken.",
+  "error.workflow.sunraNoCredits":
+    "Je Sunra-account heeft niet genoeg credits. Voeg credits toe op sunra.ai/pricing en voer de stap daarna opnieuw uit.",
+  "error.workflow.sunraNeedsPlan":
+    "Dit Sunra-model heeft een Sunra-abonnement nodig. Kies een abonnement op sunra.ai/pricing of selecteer een ander model.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra gebruikt invoerafbeeldingen alleen met een persoonlijk account. Selecteer je persoonlijke account in Sunra of verwijder de afbeeldingsverbindingen.",
+  "error.workflow.sunraFailed": "Sunra kon het bestand niet maken: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra heeft het bestand niet op tijd gemaakt. Kijk in het project OpenBot op sunra.ai voordat je de stap opnieuw uitvoert.",
 } as const satisfies PartialTranslation<typeof source>;

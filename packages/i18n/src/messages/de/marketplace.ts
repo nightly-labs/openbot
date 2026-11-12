@@ -262,6 +262,16 @@ export const messages = {
     "Erstelle mit Higgsfield ein Produktfoto einer Keramiktasse auf einem Holztisch.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Erstelle mit Higgsfield ein 5-Sekunden-Video von Wellen bei Sonnenuntergang.",
+  "marketplace.plugin.sunra.tagline": "KI-Bilder, -Videos, -Audio und 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lässt Agenten Bilder, Videos, Audio und 3D-Modelle mit Modellen wie GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling und Veo erzeugen, das Guthaben an Credits prüfen und die Ergebnisse abrufen. Ergebnisse landen in einem Projekt im Sunra-Konto des Nutzers. Jeder Nutzer meldet sich im Browser bei seinem eigenen Sunra-Konto an. Sunra nennt zuerst die Kosten jeder Generierung und verbraucht Credits dieses Kontos erst nach der Bestätigung.",
+  "marketplace.plugin.sunra.app":
+    "Bild-, Video-, Audio- und 3D-Generierung, Credits und Ergebnisse über den MCP-Server von Sunra mit Anmeldung im Browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Wie viele Sunra-Credits habe ich?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Erstelle mit Sunra ein Poster von einem Nachtmarkt im Regen, im Hochformat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Erstelle mit Sunra ein 5-Sekunden-Video von einem Papierboot auf einem Fluss. Nenne mir zuerst die Kosten.",
   "marketplace.plugin.elevenlabs.tagline": "Sprache, Stimmen und Sprachagenten",
   "marketplace.plugin.elevenlabs.description":
     "Mit ElevenLabs wandeln Agenten Text in Sprache um, arbeiten mit Stimmen und erstellen, testen und prüfen ElevenLabs-Sprachagenten und ihre Gespräche. Erzeugtes Audio kommt als kurzlebiger Download-Link zurück. Jeder Benutzer meldet sich im Browser bei seinem eigenen ElevenLabs-Konto an, und jede Erzeugung verbraucht Credits dieses Kontos.",
