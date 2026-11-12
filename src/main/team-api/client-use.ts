@@ -2,6 +2,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -137,6 +138,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_TASK_LIMIT_ROUTES.settings,
   AGENT_NEW_CHAT_ROUTES.settings,
   AGENT_PLAN_CARD_ROUTES.settings,
+  AGENT_DEFAULTS_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.models,
   AGENT_SPEED_ROUTES.settings,

@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Instellen",
   "settings.automationLimit.sectionTitle": "Limiet",
   "settings.automationLimit.sectionDescription": "Dit geldt voor alle agents op deze computer.",
+  "settings.automationLimit.sectionDescriptionServer": "Dit geldt voor alle agents op deze server.",
   "settings.automationLimit.title": "Verzoeken per uur",
   "settings.automationLimit.option": "{limit} per uur",
   "settings.automationLimit.note":

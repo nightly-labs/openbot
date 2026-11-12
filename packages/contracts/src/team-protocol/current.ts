@@ -7,6 +7,7 @@ import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -246,6 +247,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -605,6 +607,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
 ] as const;
 
@@ -824,6 +827,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_RESTART_CAPABILITY &&
     capability !== VAULT_V4_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+    capability !== AGENT_DEFAULTS_CAPABILITY &&
     capability !== AGENT_SPEED_CAPABILITY,
 );
 /**
@@ -918,6 +922,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
   AGENT_SPEED_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1096,6 +1101,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_RESTART_CAPABILITY &&
       capability !== VAULT_V4_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+      capability !== AGENT_DEFAULTS_CAPABILITY &&
       capability !== AGENT_SPEED_CAPABILITY,
   );
 }

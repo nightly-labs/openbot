@@ -50,6 +50,7 @@ import {
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
+  agentDefaultChoiceValues,
   agentExclusionCoverage,
   agentFolderCoverage,
   agentNewChatAllowed,
@@ -2410,6 +2411,27 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
+      },
+      getAgentDefaultsOverview: async () => ({
+        defaults: clone(agentDefaults),
+        busyMessageMode: busyMessageMode.mode,
+        agents: agents.map((agent) => ({
+          agentId: agent.id,
+          allowAutomation: agent.allowAutomation ?? null,
+          allowNewChat: agent.allowNewChat ?? null,
+          quickAcknowledgement: agent.quickAcknowledgement ?? null,
+          busyMessageMode: agent.busyMessageMode ?? null,
+        })),
+      }),
+      updateAgentDefaultsOverview: async ({ busyMessageMode: mode, ...changes }, serverId) => {
+        if (mode) busyMessageMode = { mode };
+        agentDefaults = { ...agentDefaults, ...changes };
+        return api.agent.getAgentDefaultsOverview(serverId);
+      },
+      setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {
+        for (const agentId of agentIds)
+          await api.agent.updateAgent({ agentId, ...agentDefaultChoiceValues(setting, choice) });
+        return api.agent.getAgentDefaultsOverview(serverId);
       },
       // The preview has no joined server, so no member shares a computer with it.
       listBrowserProxies: async () => ({ proxies: browserProxies, computers: [] }),

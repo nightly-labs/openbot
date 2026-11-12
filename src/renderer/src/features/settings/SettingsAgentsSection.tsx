@@ -1,4 +1,6 @@
 import {
+  type AgentDefaultChoice,
+  type AgentDefaultSetting,
   type BackgroundProcess,
   type ClientAgentSummary,
   LOCAL_SERVER_ID,
@@ -7,15 +9,13 @@ import {
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { BackgroundProcessesSection } from "@openbot/ui/features/settings/BackgroundProcessesSection";
 import {
-  type AgentDefaultChoice,
-  type AgentDefaultSetting,
   type AgentDefaultsAgent,
   agentDefaultSettingTitle,
   SettingsAgentsTab,
 } from "@openbot/ui/features/settings/SettingsAgentsTab";
 import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, Show } from "solid-js";
+import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { settingsPort } from "./settings-port";
 
@@ -153,6 +153,13 @@ export function createSettingsAgentsSection(options: {
       loadProcesses();
     } else showList();
   });
+
+  // An owner or admin can change the own values of these agents from a phone or the web client.
+  onSettled(() =>
+    settingsPort().agent.onScopedEvent(({ serverId, event }) => {
+      if (serverId === LOCAL_SERVER_ID && event.type === "agents-changed" && options.visible()) load();
+    }),
+  );
 
   function changeDefault(setting: AgentDefaultSetting, on: boolean): void {
     const value = options.value();

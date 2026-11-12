@@ -17,6 +17,7 @@ import {
   type ClientAgentModelOption,
   canAdministerServer,
   decodeAgentBackupModelSettings,
+  decodeAgentDefaultsOverview,
   decodeAgentFastModeSettings,
   decodeAgentHostSettings,
   decodeAgentNewChatSettings,
@@ -33,6 +34,7 @@ import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -229,7 +231,7 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
-import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
+import { agentErrorDetails, claimErrorToast, readableAgentError } from "../agents/agent-error-text";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -266,6 +268,7 @@ import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
+import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
@@ -1771,6 +1774,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     getAuditLog: async (serverId) =>
       runTeamEffect(getHostAuditLog(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
   };
+  /** Server Settings > Agents on a host with `agent-defaults-v1`. */
+  const hostAgentDefaultsCalls: HostAgentDefaultsCalls = {
+    getAgentDefaultsOverview: (serverId) =>
+      hostRequest(serverId)("POST", AGENT_DEFAULTS_ROUTES.settings, decodeAgentDefaultsOverview, {}),
+    updateAgentDefaultsOverview: (input, serverId) =>
+      hostRequest(serverId)("POST", AGENT_DEFAULTS_ROUTES.update, decodeAgentDefaultsOverview, { ...input }),
+    setAgentDefaultChoice: ({ agentIds, setting, choice }, serverId) =>
+      hostRequest(serverId)("POST", AGENT_DEFAULTS_ROUTES.choice, decodeAgentDefaultsOverview, {
+        agentIds,
+        setting,
+        choice,
+      }),
+  };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   /** Set when the Marketplace asked for the form that adds an MCP server, until the MCP section opens it. */
   const [mcpAddRequest, setMcpAddRequest] = createSignal(false);
@@ -1960,7 +1976,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const serverId = server()?.id;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        controller.setConversationErrors((current) => ({ ...current, [key]: readableAgentError(event.message) }));
+        const message = readableAgentError(event.message);
+        controller.setConversationErrors((current) => ({ ...current, [key]: message }));
+        // The general sentence hides the cause, so the user can copy it into a report (#6410).
+        const details = agentErrorDetails(event.message, message);
+        controller.setConversationErrorRuns((current) => {
+          if (details) return { ...current, [key]: { message, run: null, details } };
+          if (!(key in current)) return current;
+          const { [key]: _replaced, ...next } = current;
+          return next;
+        });
         return;
       }
       const description = readableAgentError(event.message);
@@ -3473,6 +3498,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}
                         serverAudit={{ calls: hostServerAuditCalls, listAgents: () => workspace.runtime.listAgents() }}
+                        agentDefaults={{
+                          calls: hostAgentDefaultsCalls,
+                          listAgents: () => workspace.runtime.listAgents(),
+                          onAgentsChanged: (listener) =>
+                            workspace.onHostEvent((event) => {
+                              if (event.type === "agents-changed") listener(workspace.state.host?.hostId ?? "");
+                            }),
+                        }}
                         browserProfiles={browserProfileSettings()}
                         vault={vaultSettings()}
                         // The providers of the host are its own, so there is no sign-in here.

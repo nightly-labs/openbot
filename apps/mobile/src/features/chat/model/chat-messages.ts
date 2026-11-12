@@ -129,7 +129,7 @@ export type ChatMessage =
       kind: "thinking";
       turnId: string | undefined;
       /** `progress` marks a step that the chat also shows as a progress update. */
-      steps: { id: string; text: string; progress?: true }[];
+      steps: { id: string; text: string; progress?: true; createdAt?: string }[];
     };
 
 /** A message that shows as a bubble: text, files or a generated image. */
@@ -503,9 +503,12 @@ export function projectChatMessages(
         progressUpdates && answered
           ? shownProgressUpdate(message, progressUpdates.provider(undefined)) && beforeAnswer(message, answered)
           : false;
-      thinking.steps.push(
-        update ? { id: message.id, text: message.text, progress: true } : { id: message.id, text: message.text },
-      );
+      thinking.steps.push({
+        id: message.id,
+        text: message.text,
+        createdAt: message.createdAt,
+        ...(update ? { progress: true as const } : {}),
+      });
       if (update) result.push(projectedMarker(projectedUpdates, message, () => progressBubble(message.id, message)));
     } else {
       const cached = projectedBubbles.get(message);
@@ -562,6 +565,39 @@ function withStepsAfterUpdates(
     if (thinking) placed.push(thinking);
   }
   return placed;
+}
+
+/**
+ * The rows, with the agent's last words before the question that waits as a message above it, as on
+ * desktop. Those words are narration, which the steps hold, but the question is often about them,
+ * such as a draft to approve (#4897). After the answer they are only in the steps again.
+ * `activeTurnId` is the turn that runs: only its question waits.
+ */
+export function withQuestionContext(rows: ChatMessage[], activeTurnId: string | null | undefined): ChatMessage[] {
+  if (!activeTurnId) return rows;
+  const at = rows.findLastIndex(
+    (row) => row.kind === "question" && !row.prompt.resolution && row.turnId === activeTurnId,
+  );
+  if (at < 0) return rows;
+  const thinking = rows.findLast((row) => row.kind === "thinking" && row.turnId === activeTurnId);
+  if (thinking?.kind !== "thinking") return rows;
+  // Only narration, never thinking. The phone does not know the provider here; a Codex message id
+  // (`msg_<hex>`) is narration for each provider, because only Codex sends such ids.
+  const step = thinking.steps.findLast((item) => item.text.trim() && isNarrationItemId(item.id, "codex"));
+  // With progress updates on, the narration is already a row of its own.
+  if (!step || step.progress) return rows;
+  // Still a step of the turn: a progress bubble has no reply, reaction or delete.
+  const context: ChatBubbleMessage = {
+    id: step.id,
+    kind: "message",
+    author: "agent",
+    body: step.text,
+    streaming: false,
+    status: "completed",
+    ...(step.createdAt ? { createdAt: step.createdAt } : {}),
+    progress: true,
+  };
+  return [...rows.slice(0, at), context, ...rows.slice(at)];
 }
 
 const exchangeGroups = new WeakMap<ExchangeMarker, ExchangeGroup>();

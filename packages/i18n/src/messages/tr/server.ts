@@ -335,6 +335,8 @@ export const messages = {
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
   "server.settings.agents": "Ajanlar",
+  "server.settings.agentsDescription":
+    "Bir ajan için ayarlamadığınızda bu sunucudaki ajanların neler yapabileceğini seçin.",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",

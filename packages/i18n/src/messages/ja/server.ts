@@ -323,6 +323,8 @@ export const messages = {
   "server.settings.later": "後で",
   "server.settings.setUp": "設定",
   "server.settings.agents": "エージェント",
+  "server.settings.agentsDescription":
+    "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
     "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
