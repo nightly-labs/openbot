@@ -70,6 +70,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name} : le modèle « {model} » n’est pas encore disponible ici, donc l’agent utilise le modèle par défaut. Choisissez de nouveau le modèle quand son fournisseur est prêt.",
   "error.import.transferSettingSkipped": "{name} n’est pas importé. {reason}",
+  "error.import.transferRunsSkipped":
+    "{name} : l’historique des exécutions de la routine « {routine} » n’est pas importé.",
+  "error.import.transferSharedSkillsSkipped":
+    "Impossible de lire les compétences partagées, elles ne sont donc pas dans le fichier.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Les compétences partagées du fichier n’ont pas pu être ajoutées à ce serveur.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Les choix de {count} membre n’ont pas pu être enregistrés.",
+    other: "Les choix de {count} membres n’ont pas pu être enregistrés.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Une compétence partagée avec ce nom et d’autres fichiers existe déjà sur ce serveur.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} préférence du serveur dans le fichier n’est pas valide ici, elle n’est donc pas importée.",
+    other: "{count} préférences du serveur dans le fichier ne sont pas valides ici, elles ne sont donc pas importées.",
+  },
   "error.import.transferRoutineFlowSkipped": "L’import a laissé de côté un flux de routine. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name} : les agents personnalisés ne sont pas importés, car ils exécutent une commande. Vérifiez la commande « {command} » et ajoutez de nouveau l’agent dans les réglages.",

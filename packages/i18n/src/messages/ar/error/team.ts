@@ -110,6 +110,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "تغييرات هوية الخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
+  "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",

@@ -721,6 +721,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
+| `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -797,6 +798,15 @@ the agents to send short updates between their steps, and the chat shows them as
 the style, so each client knows what to show; only an owner or admin changes it. A change unloads the
 agents' threads, so the next turn uses the new prompt. A host without the capability reads as
 `classic`. Other clients see a change when they open the server again.
+
+`host-restart-v1` lets an owner or admin restart a self-hosted server from Restart server in the
+server menu (desktop and web client) or in Server settings (mobile). Only a host in server mode
+(`OPENBOT_SERVER=1`, not a hosted server) advertises it, because only there does a service manager
+start the app again: systemd (`Restart=always` in `openbot.service`) or the Docker restart policy.
+The host answers, then quits; it does not use `app.relaunch`, which would start the app outside
+`xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
+account service, and a server on this computer through `localServers`. A host that does not answer
+cannot get the request; then the owner runs `sudo openbot restart`.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).

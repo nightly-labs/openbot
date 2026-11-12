@@ -242,7 +242,7 @@ function vaultInstruction(vault: VaultContents): string {
       ? ""
       : "No card is saved. When the user wants you to pay, call openbot_browser.request_vault_item kind=card, or use request_takeover for the card fields.";
   return [
-    "The OpenBot Vault keeps logins, cards, and contact info for all agents of this server.",
+    "The OpenBot Vault keeps the logins, cards, and contact info that you can use.",
     saved ? `The user saved ${saved}.` : "",
     "At a checkout or address form, call openbot_browser.list_vault_items, use the item that fits the request, ask when more than one fits, and follow the browser guidance.",
     "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact, and a website password that the user pasted with kind=login. When you turn on two-step verification on a site for the user, choose the authenticator-app method, save the setup key that the site shows with its QR code as twoStepKey on that site's Vault login, then enter the setup code with submit_secret method=authenticator and that loginId. When a task needs a login, a card or contact info that the Vault does not have, call openbot_browser.request_vault_item, with the fields that you know filled in.",
@@ -507,7 +507,7 @@ export function developerInstructions(
     ...(loginsInPrompt ? [] : [ROUTINE_NO_TAKEOVER_RULE]),
     ...(options.serverHost
       ? [
-          "OpenBot runs on a server, so the browser has a data-center address. Some sites, such as X, refuse a sign-in from it: an error after correct details, a 'suspicious login' or 'try again later' message, or a check that comes back after you complete it. Then do not try the sign-in again. Call request_takeover with reason sign-in-blocked: the card asks the user to sign in on their own computer, and OpenBot sends that site's session to this browser. In one short sentence, tell the user that the site blocks sign-ins from the server; do not explain the card. When the takeover returns, take a fresh snapshot and continue.",
+          "OpenBot runs on a server, so the browser has a data-center address. Some sites, such as X, refuse a sign-in from it: an error after correct details, a 'suspicious login' or 'try again later' message, or a sign-in step that comes back after you complete it. Then do not try the sign-in again. Call request_takeover with reason sign-in-blocked: the card asks the user to sign in on their own computer, and OpenBot sends that site's session to this browser. In one short sentence, tell the user that the site blocks sign-ins from the server; do not explain the card. When the takeover returns, take a fresh snapshot and continue. A security check that the snapshot reports is not a refused sign-in: follow its next step, not this one.",
         ]
       : []),
     ...(options.hostedStorageGb ? [hostedDiskInstruction(options.hostedStorageGb)] : []),

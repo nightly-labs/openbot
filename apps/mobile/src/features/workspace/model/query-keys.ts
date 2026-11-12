@@ -51,6 +51,8 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
 export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
+  /** The plans of the account's hosted servers, as Settings > Billing reads them. */
+  billing: (...scope: [QueryScope] | []) => ["billing", ...(scope[0] ?? [])],
   /** The server IDs of the owner's hosted servers, as Server settings reads them. */
   ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
@@ -149,6 +151,9 @@ export const queryKeys = {
   /** The servers that the desktop app of `serverId` runs on its computer (`local-servers-v1`). */
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
+  skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
+  browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
   serverPersonality: (scope: QueryScope, serverId: string) => ["server-personality", ...scope, serverId],
   serverRoles: (scope: QueryScope, serverId: string) => ["server-roles", ...scope, serverId],
   serverAudit: (scope: QueryScope, serverId: string) => ["server-audit", ...scope, serverId],
@@ -162,6 +167,7 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  serverVaultCodes: (scope: QueryScope, serverId: string) => ["server-vault-codes", ...scope, serverId],
   instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
   /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
   serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
@@ -246,6 +252,8 @@ export const queryKeys = {
     "reads",
     agentId,
   ],
+  /** The pinned messages of all chats of one agent, from `message-pins-v1`. `message-pins-changed` invalidates it. */
+  messagePins: (scope: QueryScope, serverId: string, agentId: string) => ["message-pins", ...scope, serverId, agentId],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",

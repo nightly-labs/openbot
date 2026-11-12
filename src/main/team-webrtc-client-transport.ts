@@ -27,7 +27,7 @@ import {
 import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { decodeTeamProtocolV9WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
-import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
+import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
@@ -211,6 +211,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       profile: RemoteRequestProfile | null;
     }
   >();
+  /** When each host last answered a request, as `performance.now()`. A request deadline counts from it. */
+  readonly #lastAnswerAt = new Map<string, number>();
   readonly #lastEventSequence = new Map<string, number>();
   readonly #hostPublicKeys = new Map<string, string>();
   /** Set while the account directory is read at startup. A host without a pinned key waits for it. */
@@ -612,6 +614,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelIsolation: true,
                     channelPicture: true,
                     channelBrowser: true,
+                    channelSeenSubtasks: true,
                     mcpManyServers: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
@@ -682,11 +685,24 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       const reject = (cause: Error) => {
         Deferred.doneUnsafe(result, Effect.fail(new RemoteWorkflowError({ cause })));
       };
-      const timer = setTimeout(() => {
-        this.#pending.delete(requestId);
-        reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
-      }, timeoutMs);
-      this.#pending.set(requestId, { hostId, resolve, reject, timer, profile });
+      const entry = {
+        hostId,
+        resolve,
+        reject,
+        profile,
+        timer: startRemoteRequestDeadline(
+          timeoutMs,
+          () => this.#lastAnswerAt.get(hostId) ?? 0,
+          () => {
+            this.#pending.delete(requestId);
+            reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
+          },
+          (timer) => {
+            entry.timer = timer;
+          },
+        ),
+      };
+      this.#pending.set(requestId, entry);
     }
     // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
     return yield* Effect.gen({ self: this }, function* () {
@@ -762,6 +778,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#connectRetries.delete(hostId);
     this.#closes.set(hostId, (this.#closes.get(hostId) ?? 0) + 1);
     this.#hostProtocols.delete(hostId);
+    this.#lastAnswerAt.delete(hostId);
     this.#files.setPeerAuthenticated(hostId, false);
     const disconnected = yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.result);
     const disconnectError = Result.isFailure(disconnected) ? disconnected.failure.cause : undefined;
@@ -1447,6 +1464,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.#failProtocol(hostId, "The host returned a client RPC frame on the RPC channel.");
       return;
     }
+    this.#lastAnswerAt.set(hostId, performance.now());
     const pending = this.#pending.get(frame.requestId);
     if (!pending || pending.hostId !== hostId) return;
     pending.profile?.responded(data);

@@ -69,14 +69,17 @@ import type {
   HostAgentMemoryLimit,
   HostAnalytics,
   HostAnalyticsInput,
+  HostBrowsingMemory,
   HostedSiteList,
   HostGitHubConnectorStatus,
+  HostMemoryReview,
   HostMessagingConnectInput,
   HostMessagingWorkspaceInput,
   HostPersonality,
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
+  HostSkillLearning,
   HostTimezoneSettings,
   HostUpdateSettingsChange,
   HostUpdateStatus,
@@ -98,6 +101,7 @@ import type {
   PasswordManagerConnectInput,
   PasswordManagerId,
   PasswordManagerStatus,
+  PinnedMessagesSnapshot,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoteAgentImportResult,
@@ -128,6 +132,7 @@ import type {
   SetBrowserProfileProxyInput,
   SetEnabledSkillInput,
   SetMcpAccessInput,
+  SetMessagePinnedInput,
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
@@ -156,6 +161,7 @@ import type {
   VaultHostImportResult,
   VaultSaveInput,
   VaultState,
+  VaultTwoStepCodes,
   WhatsAppGroupList,
   WhatsAppLinkState,
   WhatsAppOverview,
@@ -273,6 +279,8 @@ export interface MobileAgent {
   description: string;
   preview: string;
   updatedLabel: string;
+  /** The host's last update of the agent, an ISO time, or null. The unread sort orders use it. */
+  updatedAt: string | null;
   avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
@@ -488,6 +496,13 @@ export interface MobileWorkspaceContextValue {
   localServerKind: (serverId: string) => "computer" | "onComputer" | null;
   /** Deletes a server on a computer through the computer's own server, which must be online. */
   deleteLocalServer: (serverId: string) => Promise<void>;
+  /**
+   * An owner or admin of an online self-hosted server that serves `host-restart-v1`. A hosted server
+   * restarts through the account service instead. The host checks the role again.
+   */
+  canRestartServerItself: (serverId: string) => boolean;
+  /** Asks a self-hosted server to restart now. Its service manager starts it again. */
+  restartServerItself: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -499,6 +514,21 @@ export interface MobileWorkspaceContextValue {
   /** How many memories each agent of the server can keep, and the values that the host permits. */
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  /** An owner or admin of an online host that serves `memory-review-v1`. The host checks the role again. */
+  canManageMemoryReview: (serverId: string) => boolean;
+  /** How many completed turns pass between two background memory reviews, and the values that the host permits. */
+  loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
+  setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
+  /** An owner or admin of an online host that serves `skill-learning-v1`. The host checks the role again. */
+  canManageSkillLearning: (serverId: string) => boolean;
+  /** What the memory reviews do when a chat teaches a skill, and the values that the host permits. */
+  loadSkillLearning: (serverId: string) => Promise<HostSkillLearning>;
+  setSkillLearning: (mode: string, serverId: string) => Promise<HostSkillLearning>;
+  /** An owner or admin of an online host that serves `browsing-memory-v1`. The host checks the role again. */
+  canManageBrowsingMemory: (serverId: string) => boolean;
+  /** "Learn from my browsing". Off deletes what the host recorded. */
+  loadBrowsingMemory: (serverId: string) => Promise<HostBrowsingMemory>;
+  setBrowsingMemory: (enabled: boolean, serverId: string) => Promise<HostBrowsingMemory>;
   /** An owner or admin of an online host that serves `host-personality-v1`. The host checks the role again. */
   canManageServerPersonality: (serverId: string) => boolean;
   /** An online host that serves `host-personality-v1`. Any member reads its personality. */
@@ -551,6 +581,8 @@ export interface MobileWorkspaceContextValue {
   canTransferServer: (serverId: string) => boolean;
   /** The same for API keys in the Vault (`vault-v2`). */
   canManageVaultApiKeys: (serverId: string) => boolean;
+  /** The same for two-step keys of Vault logins and their live codes (`vault-v3`). */
+  canManageVaultTwoStep: (serverId: string) => boolean;
   /**
    * True for an owner or admin of a host that serves its named browser profiles and the profile of
    * each agent (`browser-profiles-v1`). The host checks the role again.
@@ -590,6 +622,8 @@ export interface MobileWorkspaceContextValue {
   disconnectPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
   /** The host's Vault. No answer carries a password, a card number or a security code. */
   loadVault: (serverId: string) => Promise<VaultState>;
+  /** The current two-step code of each login with a key. The key stays on the host. */
+  loadVaultCodes: (serverId: string) => Promise<VaultTwoStepCodes>;
   /** A new secret goes to the host once; a null secret keeps the saved one. */
   saveVaultItem: (input: VaultSaveInput, serverId: string) => Promise<VaultState>;
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
@@ -1020,6 +1054,8 @@ export interface MobileWorkspaceContextValue {
   canReadThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-files-v1`: a message in a thread can carry files. */
   canAttachThreadFiles: (serverId: string) => boolean;
+  /** True when the host advertises `message-pins-v1`: a member who can message an agent can pin its messages. */
+  canPinMessages: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
   canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
@@ -1092,6 +1128,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentThreadReads: (agentId: string, serverId: string) => Promise<AgentTaskReadState[]>;
   /** Moves the person's read mark of a thread to a message that they see. */
   markAgentThreadRead: (input: MarkAgentTaskReadInput, serverId: string) => Promise<AgentTaskReadState>;
+  /** The pinned messages of all chats of the agent, the newest pin first. */
+  loadMessagePins: (agentId: string, serverId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Pins or unpins one message of the agent's chat or of one of its threads. Answers the new list. */
+  setMessagePinned: (input: SetMessagePinnedInput, serverId: string) => Promise<PinnedMessagesSnapshot>;
   /** Answers a question of a task turn. The host finds the question by its request, on any thread. */
   respondToTaskPrompt: (input: RespondToPromptInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
@@ -1191,6 +1231,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
+  | "canPinMessages"
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
@@ -1205,9 +1246,13 @@ type ServerCheckKey =
   | "canEditServerIdentity"
   | "canRotateServerKey"
   | "canCreateLocalServers"
+  | "canRestartServerItself"
   | "canManageServerTimezone"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMemoryReview"
+  | "canManageSkillLearning"
+  | "canManageBrowsingMemory"
   | "canManageServerPersonality"
   | "servesServerPersonality"
   | "canManageServerRoles"
@@ -1223,6 +1268,7 @@ type ServerCheckKey =
   | "canImportAgents"
   | "canTransferServer"
   | "canManageVaultApiKeys"
+  | "canManageVaultTwoStep"
   | "canManageBrowserProfiles"
   | "canManageBrowserProxies"
   | "serverUpdateAccess"

@@ -71,9 +71,11 @@ import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
   CLAUDE_API_KEY_ACCOUNT_TYPE,
+  CODEX_MODEL_PROVIDER_ACCOUNT_TYPE,
   decodeAccountRateLimitsReadResult,
   decodeAccountRateLimitsUpdated,
   decodeAccountReadResult,
+  decodeCodexAccountReadResult,
   decodeRateLimitResetCreditConsumeResult,
   decodeRecordResponse,
   getString,
@@ -144,6 +146,10 @@ const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 /** The providers whose app server spends a usage reset credit (`account/rateLimitResetCredit/consume`). */
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
+
+/** Codex reports a model provider that needs no OpenAI login as no account (#7501). */
+const accountReadDecoder = (provider: AgentProvider) =>
+  provider === "codex" ? decodeCodexAccountReadResult : decodeAccountReadResult;
 /**
  * How long a start may take when it holds back no other provider: the first start of a CLI that was
  * just installed, a start that follows a sign-in or a key change, the wake of a provider stopped when
@@ -1139,8 +1145,10 @@ export class ProviderRuntime implements ProviderPort {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
             if (!agentProviderDescriptor(provider).reportsUsage) return null;
-            // A Codex API-key login has no plan usage: Codex refuses the read.
-            if (provider === "codex" && this.#accounts.get(provider)?.type === "apiKey") return null;
+            // A Codex API-key login, or a model provider with no OpenAI login, has no plan usage:
+            // Codex refuses the read.
+            const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
+            if (codexType === "apiKey" || codexType === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) return null;
             const released = this.#released.has(provider) && !this.#clients.has(provider);
             const cli = this.#cli.get(provider);
             const accounts = ProviderAccounts.support(provider);
@@ -3109,7 +3117,7 @@ export class ProviderRuntime implements ProviderPort {
     const result = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         const account = yield* client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult, 5_000)
+          .request("account/read", { refreshToken: true }, accountReadDecoder(provider), 5_000)
           .pipe(toProviderOperationFailed);
         // An activation can replace this client while the account request is pending.
         if (this.#clients.get(provider) !== client) return;
@@ -3272,7 +3280,7 @@ export class ProviderRuntime implements ProviderPort {
             );
             logger.info("A provider answered initialize.", { provider, durationMs: durationMs() });
             const response = yield* client
-              .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+              .request("account/read", { refreshToken: true }, accountReadDecoder(provider))
               .pipe(toProviderOperationFailed);
             const account = response.account;
             if (!account)
@@ -3778,7 +3786,12 @@ export class ProviderRuntime implements ProviderPort {
           stage = "account";
           stageStartedAt = performance.now();
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, providerCheckTimeoutMs(5_000))
+            .request(
+              "account/read",
+              { refreshToken: false },
+              accountReadDecoder(provider),
+              providerCheckTimeoutMs(5_000),
+            )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);

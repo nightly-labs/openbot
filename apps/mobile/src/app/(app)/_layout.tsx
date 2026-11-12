@@ -23,6 +23,7 @@ import type { QuickActionTarget } from "@/features/quick-actions/model/quick-act
 import { setQuickActionNavigator } from "@/features/quick-actions/quick-actions-native";
 import { requestHomeSearch } from "@/features/search/model/home-search-request";
 import { AppDrawerShell, useAppDrawer } from "@/features/servers/components/app-drawer-shell";
+import { watchAndroidShares } from "@/features/share/model/android-share-watch";
 import { setShareSheetOpener } from "@/features/share/model/share-sheet-opener";
 import {
   MobileWorkspaceProvider,
@@ -171,6 +172,8 @@ function AuthenticatedStack() {
   );
   useEffect(() => setQuickActionNavigator(openQuickAction), [openQuickAction]);
   useEffect(() => setShareSheetOpener(() => whenUnlocked(() => router.push("/share"))), []);
+  // Android can give a share without a route change, so the stack looks for one itself.
+  useEffect(() => (isAndroid ? watchAndroidShares() : undefined), []);
   const workspace = useMobileWorkspaceReader();
   const queryClient = useQueryClient();
   // The scope is a new list at each render. The sources read the latest one.
@@ -682,6 +685,18 @@ function AuthenticatedStack() {
           scrollEdgeEffects: { top: "hidden", bottom: "soft" },
           presentation: "formSheet",
           sheetAllowedDetents: [0.6],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="pinned-messages"
+        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 0.85],
           sheetGrabberVisible: true,
         }}
       />

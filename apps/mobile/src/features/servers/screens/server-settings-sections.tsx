@@ -1,17 +1,15 @@
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
 import AppWindow from "lucide-react-native/icons/app-window";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import Blocks from "lucide-react-native/icons/blocks";
-import Brain from "lucide-react-native/icons/brain";
+import Bot from "lucide-react-native/icons/bot";
 import Clock from "lucide-react-native/icons/clock";
 import Download from "lucide-react-native/icons/download";
 import Earth from "lucide-react-native/icons/earth";
-import Smile from "lucide-react-native/icons/face-slightly-smiling";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
@@ -26,10 +24,16 @@ import UserRound from "lucide-react-native/icons/user-round";
 import UsersRound from "lucide-react-native/icons/users-round";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import { useUniwind } from "uniwind";
 import { confirmOwner } from "@/features/app-lock/model/app-lock";
-import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import {
+  ServerBrowsingMemoryRow,
+  ServerMemoryLimitRow,
+  ServerMemoryReviewRow,
+  ServerPersonalityRow,
+  ServerSkillLearningRow,
+} from "@/features/servers/components/server-learning-rows";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer } from "@/features/servers/model/server-settings-access";
@@ -37,16 +41,13 @@ import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
-import { RESPONSE_STYLE_LABEL_KEYS, useServerPersonality } from "@/features/servers/model/use-server-personality";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
-import { queryKeys } from "@/features/workspace/model/query-keys";
 import { type ServerRowState, serverRowState } from "@/features/workspace/model/server-row-state";
 import type { MobileServer, ServerChecks } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -239,12 +240,16 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { refreshServer, hostedServerStarting } = useMobileWorkspace();
+  const { refreshServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
   const [restarted, setRestarted] = useState<string | null>(null);
+  // A hosted server restarts through the account server. A self-hosted server restarts itself: it
+  // answers, then closes, and its service manager starts it again.
+  const hosted = canRestartServer(server, hostedServerIds);
+  const selfHosted = !hosted && canRestartServerItself(serverId);
   function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     setRestarted(null);
     return action.perform(operation, failure);
@@ -261,8 +266,8 @@ export function ServerConnectionSection({
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
         </Typography.Paragraph>
       </SettingsRow>
-      {canRestartServer(server, hostedServerIds) ? (
-        // The account server stops the hosted server and starts it again. The app connects again after it.
+      {hosted || selfHosted ? (
+        // The app connects again after the server starts.
         <SettingsRow
           leading={<RowIcon icon={RotateCcw} tone="accent" />}
           disclosure={false}
@@ -278,18 +283,21 @@ export function ServerConnectionSection({
                   onPress: () =>
                     void perform(
                       async () => {
-                        if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
                         setRestarting(true);
                         try {
-                          const hosted = await hostedServerCalls(session).restart(serverId);
-                          // The connection drops when the server stops. The app connects again, as after a wake.
-                          if (WAKE_RECONNECT_STATES.has(hosted.state)) hostedServerStarting(serverId);
+                          if (selfHosted) await restartServerItself(serverId);
+                          else {
+                            if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
+                            const restart = await hostedServerCalls(session).restart(serverId);
+                            // The connection drops when the server stops. The app connects again, as after a wake.
+                            if (WAKE_RECONNECT_STATES.has(restart.state)) hostedServerStarting(serverId);
+                          }
                         } finally {
                           setRestarting(false);
                         }
                         setRestarted(currentText().t("mobile.server.settings.restarted", { name: server.name }));
                       },
-                      // The account server explains a refusal, such as a server that cannot restart now.
+                      // The account server or the host explains a refusal, such as a server that cannot restart now.
                       (caught) => {
                         const text = currentText();
                         return text.errorMessage(caught, text.t("mobile.server.hosted.restartFailed"));
@@ -309,74 +317,45 @@ export function ServerConnectionSection({
   );
 }
 
+/** Any of the settings of the Agents page of the server, for the checks of the online or last host. */
+function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
+  return (
+    checks.canManageServerPersonality(serverId) ||
+    checks.canManageAgentMemoryLimit(serverId) ||
+    checks.canManageMemoryReview(serverId) ||
+    checks.canManageSkillLearning(serverId) ||
+    checks.canManageBrowsingMemory(serverId)
+  );
+}
+
+/** True when this user can change at least one of the settings of the Agents page of the server now. */
+export function useAgentSettingsAvailable(serverId: string): boolean {
+  return permitsAgentSettings(useMobileWorkspace(), serverId);
+}
+
 /**
- * The OpenBot update of the host, and the server timezone and the memories per agent, for an owner or
- * admin of a host that serves them. The host checks the role and the value again.
+ * The OpenBot update of the host, the server timezone and the Agents page, for an owner or admin of a
+ * host that serves them. While the server is offline, the rows that its last connection served stay
+ * disabled. The host checks the role and the value again.
  */
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const { t, errorMessage } = useText();
-  const { theme } = useUniwind();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const { canManageAgentMemoryLimit } = useMobileWorkspace();
-  const { loadAgentMemoryLimit, setAgentMemoryLimit } = useMobileWorkspaceActions();
   const timezone = useServerTimezone(serverId);
-  const personality = useServerPersonality(serverId);
   const update = useServerUpdate(serverId, { poll: false });
   const row = useServerRows(serverId);
   const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
   const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
-  const personalityRow = row((checks) => checks.canManageServerPersonality(serverId));
-  const memoryLimitRow = row((checks) => checks.canManageAgentMemoryLimit(serverId));
+  const agentsRow = row((checks) => permitsAgentSettings(checks, serverId));
   const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
-  const memoryLimitKey = queryKeys.agentMemoryLimit(queryScope, serverId);
-  const memoryLimitAvailable = canManageAgentMemoryLimit(serverId);
-  const memoryLimit = useQuery({
-    queryKey: memoryLimitKey,
-    enabled: memoryLimitAvailable,
-    retry: false,
-    staleTime: 0,
-    gcTime: 0,
-    queryFn: () => loadAgentMemoryLimit(serverId),
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  if (!updateShown && timezoneRow === "hidden" && personalityRow === "hidden" && memoryLimitRow === "hidden")
-    return null;
-  const responseStyle = personality.query.data?.responseStyle;
+  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden") return null;
   const zone = timezone.query.data;
-  const limit = memoryLimit.data;
-
-  function chooseLimit(next: number) {
-    if (saving || memoryLimitRow !== "enabled" || next === limit?.limit) return;
-    void haptics.selection();
-    setSaving(true);
-    setError(null);
-    setAgentMemoryLimit(next, serverId)
-      .then(async (saved) => {
-        await queryClient.cancelQueries({ queryKey: memoryLimitKey, exact: true });
-        queryClient.setQueryData(memoryLimitKey, saved);
-        void haptics.notification("success");
-      })
-      .catch((cause: unknown) => {
-        void haptics.notification("error");
-        setError(errorMessage(cause, t("mobile.server.settings.memoryLimitSaveFailed")));
-      })
-      .finally(() => setSaving(false));
-  }
-
   return (
     <SettingsSection
       title={t("mobile.server.settings.serverSection")}
       footer={
-        error ??
-        (memoryLimit.isError
-          ? errorMessage(memoryLimit.error, t("mobile.server.settings.memoryLimitLoadFailed"))
-          : timezone.query.isError
-            ? errorMessage(timezone.query.error, t("mobile.server.settings.timezoneLoadFailed"))
-            : memoryLimitAvailable
-              ? t("mobile.server.settings.memoryLimitDescription")
-              : undefined)
+        timezone.query.isError
+          ? errorMessage(timezone.query.error, t("mobile.server.settings.timezoneLoadFailed"))
+          : undefined
       }
     >
       {updateShown ? (
@@ -398,41 +377,40 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
         </SettingsRow>
       )}
-      {personalityRow === "hidden" ? null : (
+      {agentsRow === "hidden" ? null : (
         <SettingsRow
-          leading={<RowIcon icon={Smile} />}
-          trailing={responseStyle ? <TrailingValue value={t(RESPONSE_STYLE_LABEL_KEYS[responseStyle])} /> : undefined}
-          disabled={personalityRow === "disabled"}
-          onPress={() => router.push({ pathname: "/server-settings/personality", params: { serverId } })}
+          leading={<RowIcon icon={Bot} />}
+          disabled={agentsRow === "disabled"}
+          onPress={() => router.push({ pathname: "/server-settings/agents", params: { serverId } })}
         >
-          <Typography.Paragraph>{t("mobile.server.route.personality")}</Typography.Paragraph>
-        </SettingsRow>
-      )}
-      {memoryLimitRow === "hidden" ? null : (
-        <SettingsRow
-          leading={<RowIcon icon={Brain} />}
-          disclosure={false}
-          disabled={memoryLimitRow === "disabled"}
-          trailing={
-            limit ? (
-              <SettingsPicker
-                value={limit.limit}
-                // A host that no longer permits its saved value still shows it.
-                options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
-                  (choice) => ({ value: choice, label: String(choice) }),
-                )}
-                enabled={!saving && memoryLimitRow === "enabled"}
-                dark={theme === "dark"}
-                label={t("mobile.server.settings.memoryLimit")}
-                onChange={chooseLimit}
-              />
-            ) : null
-          }
-        >
-          <Typography.Paragraph>{t("mobile.server.settings.memoryLimit")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.server.route.agents")}</Typography.Paragraph>
         </SettingsRow>
       )}
     </SettingsSection>
+  );
+}
+
+/**
+ * The groups of the Agents page, one setting each with its description under it: the personality of
+ * the agents, the memories per agent and how the agents learn, for an owner or admin of an online host
+ * that serves them. The host checks the role and the value again.
+ */
+export function ServerAgentsSection({ serverId }: { serverId: string }) {
+  const {
+    canManageServerPersonality,
+    canManageAgentMemoryLimit,
+    canManageMemoryReview,
+    canManageSkillLearning,
+    canManageBrowsingMemory,
+  } = useMobileWorkspace();
+  return (
+    <>
+      {canManageServerPersonality(serverId) ? <ServerPersonalityRow serverId={serverId} /> : null}
+      {canManageAgentMemoryLimit(serverId) ? <ServerMemoryLimitRow serverId={serverId} /> : null}
+      {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
+      {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
+      {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+    </>
   );
 }
 

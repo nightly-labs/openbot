@@ -85,6 +85,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-restart-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
@@ -111,6 +112,7 @@ export function serverSupportsCapability(
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "instance-transfer-chunks-v1" ||
+      capability === "instance-transfer-full-copy-v1" ||
       capability === "agent-hidden-v1" ||
       capability === "agent-hidden-work" ||
       capability === "agent-tasks-v1" ||

@@ -466,6 +466,34 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
   }
 });
 
+/** A request with a short limit waits at most this long, also while answers to earlier requests arrive. */
+export const REMOTE_REQUEST_MAX_WAIT_MILLISECONDS = 60_000;
+
+/**
+ * Starts the deadline of one request and gives its first timer. Answers come back in order on one
+ * channel, so on a slow path a request waits behind earlier answers while the host works. Thus
+ * `timeoutMs` counts from the send or the last answer on the channel, whichever is later. A host
+ * that stops sends no answers and fails the request after `timeoutMs`, as before. `rearm` keeps
+ * each later timer, so that the caller can clear it. Times are `performance.now()`, which a clock
+ * change does not move.
+ */
+export function startRemoteRequestDeadline(
+  timeoutMs: number,
+  lastAnswerAt: () => number,
+  expire: () => void,
+  rearm: (timer: ReturnType<typeof setTimeout>) => void,
+): ReturnType<typeof setTimeout> {
+  const sentAt = performance.now();
+  const limitAt = sentAt + Math.max(timeoutMs, REMOTE_REQUEST_MAX_WAIT_MILLISECONDS);
+  const check = () => {
+    const now = performance.now();
+    const next = Math.min(Math.max(sentAt, lastAnswerAt()) + timeoutMs, limitAt);
+    if (now >= next) expire();
+    else rearm(setTimeout(check, next - now));
+  };
+  return setTimeout(check, timeoutMs);
+}
+
 /** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
 export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {
   const route = path.split("?")[0];

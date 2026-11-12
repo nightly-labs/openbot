@@ -300,6 +300,7 @@ export const messages = {
     "Serwer zatrzyma się i uruchomi ponownie. Trwa to około minuty. Trwające tury agentów zostaną przerwane, a członkowie stracą połączenie do powrotu serwera. Pliki i czaty zostaną zachowane.",
   "mobile.server.settings.restartConfirm": "Uruchom ponownie",
   "mobile.server.settings.restarted": "{name} uruchamia się ponownie",
+  "mobile.server.settings.restartUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby uruchomić go ponownie stąd.",
   "mobile.server.settings.leaveTitle": "Opuścić serwer {name}?",
   "mobile.server.settings.leaveBody": "Aby dołączyć ponownie, potrzebne będzie nowe zaproszenie.",
   "mobile.server.settings.leave": "Opuść serwer",
@@ -370,6 +371,7 @@ export const messages = {
   "mobile.server.route.member": "Członek",
   "mobile.server.route.timezone": "Strefa czasowa",
   "mobile.server.route.personality": "Osobowość agenta",
+  "mobile.server.route.agents": "Agenci",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -502,6 +504,30 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Nie udało się zapisać limitu wspomnień. Spróbuj ponownie.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wspomnień.",
+  "mobile.server.settings.memoryReview": "Przegląd wspomnień",
+  "mobile.server.settings.memoryReviewDescription":
+    "Jak często agenci na tym serwerze zapisują w tle trwałe fakty ze swoich czatów.",
+  "mobile.server.settings.memoryReviewOff": "Wyłączony",
+  "mobile.server.settings.memoryReviewTurns": {
+    one: "Co {count} turę",
+    few: "Co {count} tury",
+    many: "Co {count} tur",
+    other: "Co {count} tury",
+  },
+  "mobile.server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
+  "mobile.server.settings.skillLearning": "Uczenie się umiejętności",
+  "mobile.server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatycznie",
+  "mobile.server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "mobile.server.settings.skillLearningOff": "Wyłączone",
+  "mobile.server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "mobile.server.settings.browsingMemory": "Ucz się z mojego przeglądania",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Gdy sterujesz przeglądarką agenta, agent uczy się działania stron z używanych przez Ciebie stron i przycisków. Wpisany tekst nie jest zapisywany.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Nie udało się wczytać ustawienia przeglądania.",
+  "mobile.server.settings.learningSaveFailed": "Nie udało się zapisać tego ustawienia. Spróbuj ponownie.",
+  "mobile.server.settings.learningUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu to ustawienie.",
   "mobile.server.settings.responseStyleDescription":
     "Naturalny: agenci wysyłają krótkie aktualizacje podczas pracy, a czat je pokazuje. Klasyczny: agenci odpowiadają raz, gdy skończą.",
   "mobile.server.settings.responseStyleNatural": "Naturalny",
@@ -510,8 +536,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Nie udało się zapisać stylu odpowiedzi. Spróbuj ponownie.",
   "mobile.server.settings.personalityUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego styl odpowiedzi.",
-  "mobile.server.settings.personalityUnavailable":
-    "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić osobowość agenta.",
+  "mobile.server.settings.agentsUnavailable":
+    "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić ustawienia agentów.",
   "mobile.server.route.browserProfiles": "Profile przeglądarki",
   "mobile.server.browserProfiles.unavailable":
     "Tylko właściciel lub administrator serwera online może zarządzać jego profilami przeglądarki.",
@@ -1506,6 +1532,10 @@ export const messages = {
     other: "{count} członka",
   },
   "mobile.server.roles.agentLevel": "Dostęp roli {role} do agenta {agent}",
+  "mobile.server.roles.changeInEveryone": "Zmień w roli Wszyscy",
+  "mobile.server.roles.setAll": "Ustaw wszystkie",
+  "mobile.server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
+  "mobile.server.roles.mixed": "Różne",
   "mobile.server.roles.delete": "Usuń rolę",
   "mobile.server.roles.deleteTitle": "Usunąć rolę {name}?",
   "mobile.server.roles.deleteBody": "Członkowie z tą rolą stracą agentów, których im daje.",

@@ -556,7 +556,8 @@ export class BrowserCdpEngine {
             const cleared = yield* this.#callOnNode(
               send,
               node.backendNodeId,
-              `function() { this.value = ''; return this.value === ''; }`,
+              // React and similar libraries copy a field's value into its value attribute.
+              `function() { this.value = ''; this.defaultValue = ''; return this.value === ''; }`,
               [],
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (cleared !== true) return false;

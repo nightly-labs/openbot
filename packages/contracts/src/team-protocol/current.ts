@@ -63,6 +63,7 @@ import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
+import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -82,6 +83,7 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
+import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
@@ -89,10 +91,12 @@ import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
@@ -163,6 +167,7 @@ import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
+import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
@@ -286,6 +291,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
@@ -305,11 +311,13 @@ export {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -383,6 +391,7 @@ export {
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  VAULT_V4_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -588,6 +597,11 @@ export const TEAM_CURRENT_CAPABILITIES = [
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  GITHUB_SKILLS_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
+  VAULT_V4_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
 ] as const;
 
@@ -801,6 +815,11 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
+    capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+    capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
+    capability !== GITHUB_SKILLS_CAPABILITY &&
+    capability !== HOST_RESTART_CAPABILITY &&
+    capability !== VAULT_V4_CAPABILITY &&
     capability !== AGENT_DEFAULTS_CAPABILITY,
 );
 /**
@@ -889,6 +908,11 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  GITHUB_SKILLS_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
+  VAULT_V4_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1061,6 +1085,11 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
+      capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+      capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
+      capability !== GITHUB_SKILLS_CAPABILITY &&
+      capability !== HOST_RESTART_CAPABILITY &&
+      capability !== VAULT_V4_CAPABILITY &&
       capability !== AGENT_DEFAULTS_CAPABILITY,
   );
 }

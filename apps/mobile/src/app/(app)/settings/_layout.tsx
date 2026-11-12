@@ -32,6 +32,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.settings") }} />
       <Stack.Screen name="profile" options={{ title: t("mobile.app.route.profile") }} />
       <Stack.Screen name="appearance" options={{ title: t("mobile.settings.appearance.title") }} />
+      <Stack.Screen name="app-icon" options={{ title: t("mobile.settings.appearance.appIcon") }} />
       <Stack.Screen name="animations" options={{ title: t("mobile.settings.animations.title") }} />
       <Stack.Screen name="language" options={{ title: t("mobile.settings.language.title") }} />
       <Stack.Screen name="voice" options={{ title: t("mobile.settings.voice.title") }} />
@@ -47,6 +48,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="app-lock" options={{ title: t("mobile.appLock.title") }} />
       <Stack.Screen name="app-lock-pin" options={{ title: t("mobile.appLock.pinSetup.title") }} />
       <Stack.Screen name="sessions" options={{ title: t("mobile.app.route.accountSessions") }} />
+      <Stack.Screen name="billing" options={{ title: t("mobile.settings.billing.title") }} />
       <Stack.Screen name="about" options={{ title: t("mobile.app.route.about") }} />
       <Stack.Screen name="support" options={{ title: t("mobile.app.route.support") }} />
       <Stack.Screen name="support-log" options={{ title: t("mobile.app.route.supportLog") }} />

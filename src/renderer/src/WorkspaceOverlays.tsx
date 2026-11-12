@@ -660,6 +660,7 @@ function ServerSettings() {
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
   /**
@@ -1032,10 +1033,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true, copy: copyOptions() }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1"), copy: copyOptions() }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

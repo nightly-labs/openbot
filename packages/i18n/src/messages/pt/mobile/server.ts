@@ -258,6 +258,7 @@ export const messages = {
     "O servidor para e inicia novamente. Isso leva cerca de um minuto. Os turnos de agentes em andamento param, e os membros perdem a conexão até o servidor voltar. Arquivos e chats são mantidos.",
   "mobile.server.settings.restartConfirm": "Reiniciar",
   "mobile.server.settings.restarted": "{name} está reiniciando",
+  "mobile.server.settings.restartUnsupported": "Atualize o OpenBot neste servidor para reiniciá-lo aqui.",
   "mobile.server.settings.leaveTitle": "Sair de {name}?",
   "mobile.server.settings.leaveBody": "Você precisará de outro convite para entrar novamente.",
   "mobile.server.settings.leave": "Sair do servidor",
@@ -326,6 +327,7 @@ export const messages = {
   "mobile.server.route.member": "Membro",
   "mobile.server.route.timezone": "Fuso horário",
   "mobile.server.route.personality": "Personalidade do agente",
+  "mobile.server.route.agents": "Agentes",
   "mobile.server.settings.storage": "Armazenamento",
   "mobile.server.route.storage": "Armazenamento",
   "mobile.server.route.storageFiles": "Todos os arquivos",
@@ -449,6 +451,27 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Não foi possível salvar o limite de memórias. Tente de novo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Atualize o OpenBot neste servidor para alterar o limite de memórias aqui.",
+  "mobile.server.settings.memoryReview": "Revisão de memórias",
+  "mobile.server.settings.memoryReviewDescription":
+    "Com que frequência os agentes deste servidor guardam em segundo plano fatos duradouros das conversas.",
+  "mobile.server.settings.memoryReviewOff": "Desativada",
+  "mobile.server.settings.memoryReviewTurns": { one: "A cada {count} turno", other: "A cada {count} turnos" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Não foi possível carregar a configuração de revisão de memórias.",
+  "mobile.server.settings.skillLearning": "Aprendizado de habilidades",
+  "mobile.server.settings.skillLearningDescription":
+    "Se os agentes deste servidor salvam o que aprendem como habilidades.",
+  "mobile.server.settings.skillLearningAutomatic": "Automático",
+  "mobile.server.settings.skillLearningAsk": "Perguntar antes",
+  "mobile.server.settings.skillLearningOff": "Desativado",
+  "mobile.server.settings.skillLearningLoadFailed":
+    "Não foi possível carregar a configuração de aprendizado de habilidades.",
+  "mobile.server.settings.browsingMemory": "Aprender com minha navegação",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Quando você controla o navegador de um agente, o agente aprende como os sites funcionam pelas páginas e botões que você usa. O texto digitado não é guardado.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Não foi possível carregar a configuração de navegação.",
+  "mobile.server.settings.learningSaveFailed": "Não foi possível salvar esta configuração. Tente de novo.",
+  "mobile.server.settings.learningUnsupported":
+    "Atualize o OpenBot neste servidor para alterar esta configuração aqui.",
   "mobile.server.settings.responseStyleDescription":
     "Natural: os agentes enviam atualizações curtas enquanto trabalham, e o chat as mostra. Clássico: os agentes respondem uma vez, ao terminar.",
   "mobile.server.settings.responseStyleNatural": "Natural",
@@ -457,8 +480,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Não foi possível salvar o estilo de resposta. Tente de novo.",
   "mobile.server.settings.personalityUnsupported":
     "Atualize o OpenBot neste servidor para alterar o estilo de resposta aqui.",
-  "mobile.server.settings.personalityUnavailable":
-    "Conecte-se a este servidor como proprietário ou admin para alterar a personalidade do agente.",
+  "mobile.server.settings.agentsUnavailable":
+    "Conecte-se a este servidor como proprietário ou admin para alterar as configurações dos agentes.",
   "mobile.server.route.browserProfiles": "Perfis do navegador",
   "mobile.server.browserProfiles.unavailable":
     "Só o proprietário ou um administrador de um servidor online pode gerenciar os perfis do navegador dele.",
@@ -1369,6 +1392,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agente", other: "{count} agentes" },
   "mobile.server.roles.memberCount": { one: "{count} membro", other: "{count} membros" },
   "mobile.server.roles.agentLevel": "Acesso de {role} a {agent}",
+  "mobile.server.roles.changeInEveryone": "Alterar em Todos",
+  "mobile.server.roles.setAll": "Definir todos",
+  "mobile.server.roles.setAllLabel": "Definir todos: acesso de {role} a todos os agentes",
+  "mobile.server.roles.mixed": "Misto",
   "mobile.server.roles.delete": "Excluir função",
   "mobile.server.roles.deleteTitle": "Excluir {name}?",
   "mobile.server.roles.deleteBody": "Membros com esta função perdem os agentes que ela dá a eles.",

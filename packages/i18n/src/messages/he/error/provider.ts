@@ -169,6 +169,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "ה-CLI של {provider} עובד על פעולה. יש להמתין לסיומה ואז לעדכן.",
   "error.provider.cliSelectFailed": "OpenBot לא הצליח לבחור את ה-CLI המנוהל שהותקן.",
   "error.provider.noAuthenticatedAccount": "{provider} לא החזיר חשבון מאומת.",
+  "error.provider.codexModelProvider":
+    "Codex במחשב הזה משתמש בספק מודלים אחר, והספק הזה לא משתמש בהתחברות ל-ChatGPT או במפתח API של OpenAI. סוכני ChatGPT יכולים להשתמש בספק הזה כבר עכשיו. כדי להשתמש בחשבון ChatGPT שלך, יש להחזיר את ספק המודלים של Codex ל-OpenAI.",
   "error.provider.signInExpired": "ההתחברות שלך אל {provider} פגה. יש להתחבר שוב כדי להמשיך.",
   "error.provider.cliActivateFailed": "OpenBot לא הצליח להפעיל את ה-CLI המנוהל.",
   "error.provider.noMainlandChinaSignIn": "ל-{provider} אין התחברות עבור סין היבשתית.",

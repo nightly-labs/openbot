@@ -527,8 +527,11 @@ export interface TeamApiAdmin {
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"
   >;
-  /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
-  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
+  /**
+   * `skills-admin-v1`: list, install, remove and enable the skills of one agent. `github-skills-v1`:
+   * read the skills under a GitHub link.
+   */
+  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */
   sharedTables?: Pick<AgentService, "listTables" | "deleteTable">;
   /**
@@ -544,6 +547,11 @@ export interface TeamApiAdmin {
   identity?: TeamApiHostIdentity;
   /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
+  /**
+   * `host-restart-v1`: restart this host now. Only a self-hosted server has it: its service manager
+   * starts the app again after it quits. The host answers before it closes.
+   */
+  restart?: { request(memberId: string): void };
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   /** `host-personality-v1`: how the server's agents talk while they work. Any member reads it. */

@@ -70,7 +70,10 @@ import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/disc
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
@@ -88,6 +91,7 @@ import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -119,6 +123,7 @@ import {
   getStorageUsage,
   listHostBackgroundProcesses,
   listHostedSites,
+  requestHostRestart,
   setHostAgentAccess,
   setHostAgentMemoryLimit,
   setHostBrowsingMemory,
@@ -1446,9 +1451,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (gone) setRestartRequest(null);
     },
   );
+  /**
+   * A self-hosted server restarts itself (`host-restart-v1`); only the open one, because the web client
+   * reaches no other host. The account service restarts a hosted server.
+   */
+  function restartsItself(serverId: string): boolean {
+    return (
+      !hostedServers.isHosted(serverId) &&
+      server()?.id === serverId &&
+      workspace.state.status === "online" &&
+      workspace.runtime.admin !== undefined &&
+      workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
+    );
+  }
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
-    if (hostId) await hostedServers.calls.restart(hostId);
+    if (!hostId) return;
+    if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
+    else await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
   }
   createEffect(
     () => props.billingReturn,
@@ -1536,7 +1556,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     download: (serverId) => hostAdmin(serverId).download,
     listAgents: () => workspace.runtime.listAgents(),
     saveFile,
+    fullCopy: () => instanceTransferFullCopy(),
+    sendsParts: () => workspace.state.capabilities.includes(INSTANCE_TRANSFER_CHUNKS_CAPABILITY),
   });
+  // The export in parts with each part chosen: chat history, channel messages, server preferences.
+  const instanceTransferFullCopy = () =>
+    workspace.state.capabilities.includes(INSTANCE_TRANSFER_CHUNKS_CAPABILITY) &&
+    workspace.state.capabilities.includes(INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
   // Only an owner or admin moves a whole server, and the host checks the role again.
   const instanceTransferEnabled = () =>
     workspace.state.capabilities.includes(INSTANCE_TRANSFER_CAPABILITY) &&
@@ -1544,7 +1570,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   // A named function, not a ternary in the prop: the settings read the prop in a tracked effect.
   // No copy to another server: the browser client connects to one host, and only the desktop app
   // holds the connections of two servers at the same time.
-  const instanceTransferSettings = () => (instanceTransferEnabled() ? { calls: instanceTransferCalls } : undefined);
+  const instanceTransferSettings = () =>
+    instanceTransferEnabled()
+      ? {
+          calls: instanceTransferCalls,
+          history: instanceTransferFullCopy(),
+          fullCopy: instanceTransferFullCopy(),
+        }
+      : undefined;
   const memberUpdateAccess = () => !serverRoleCanAdminister(server());
   const hostUpdateCalls: HostUpdateCalls = {
     getReleaseStatus: async (serverId) =>
@@ -1774,7 +1807,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     onDelete: deleteHostedServer,
     canDelete: hostedServers.isHosted,
     onRestart: (hostId, trigger) => setRestartRequest({ hostId, trigger }),
-    canRestart: hostedServers.isHosted,
+    canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
   } satisfies ServerActionCallbacks;
   // Each time the user enters a host that has a new version, the update dialog opens. A reconnect does not offer again.
   let entry: { id: string; offered: boolean } | null = null;
@@ -2026,14 +2059,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return store ? { store, listAgents: async () => workspace.profiles() } : undefined;
   });
   // The Vault section, for an owner or admin of a host with `vault-v1`. The store follows the host id.
-  // With `vault-v2` it also keeps API keys, and with `vault-v3` two-step keys.
+  // With `vault-v2` it also keeps API keys, with `vault-v3` two-step keys, and with `vault-v4` the
+  // agents of each item.
   const vaultHostId = createMemo(() => {
     const current = server();
     return serverCanAdminister(current, VAULT_CAPABILITY) ? current?.id : undefined;
   });
   // A host that updates or rolls back keeps its id, so the store follows this capability too.
-  const vaultVersion = createMemo((): 1 | 2 | 3 => {
+  const vaultVersion = createMemo((): 1 | 2 | 3 | 4 => {
     const current = server();
+    if (serverCanAdminister(current, VAULT_V4_CAPABILITY)) return 4;
     if (serverCanAdminister(current, VAULT_V3_CAPABILITY)) return 3;
     return serverCanAdminister(current, VAULT_V2_CAPABILITY) ? 2 : 1;
   });
@@ -2045,7 +2080,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return {
       store: createVaultStore(webVaultCalls(() => hostRequest(), workspace.onHostEvent, version, vaultImport())),
       apiKeys: version > 1,
-      twoStep: version === 3,
+      twoStep: version >= 3,
+      listAgents: async () => workspace.profiles(),
     };
   });
   const openBrowserProfileSettings = (trigger: HTMLElement) => {
@@ -3611,10 +3647,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     setAgentAvatar({ avatarSeed, avatarHue, avatarColor })
                   }
                   onClose={() => setCreating(false)}
-                  onSaved={async () => {
+                  onSaved={async (agentId) => {
                     await workspace.refresh();
                     setAgentAvatar(newAgentAvatar());
-                    setCreating(false);
+                    // The new agent opens, as on the desktop. `select` also closes the form.
+                    await select(agentId);
                   }}
                 />
               </Show>

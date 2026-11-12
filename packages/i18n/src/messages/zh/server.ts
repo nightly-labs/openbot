@@ -269,7 +269,7 @@ export const messages = {
   "server.settings.generalTitle": "通用",
   "server.settings.generalDescription": "管理该服务器的名称、标志和偏好设置。",
   "server.settings.vaultTitle": "保险库",
-  "server.settings.vaultDescription": "保存登录信息、银行卡和联系方式，该服务器上的每个助手都可以填写。",
+  "server.settings.vaultDescription": "为该服务器上的助手保存登录信息、银行卡、联系方式和 API 密钥。",
   "server.settings.membersTitle": "成员",
   "server.settings.membersDescription": "发布该服务器、邀请成员并管理访问权限。",
   "server.settings.desktopTitle": "远程桌面",
