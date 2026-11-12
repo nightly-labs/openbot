@@ -898,8 +898,11 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
-  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled).pipe(Effect.map((choice) => choice.cli));
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
 }
 
 /**
