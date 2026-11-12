@@ -130,7 +130,7 @@ export interface LiveVoiceOwner {
 }
 
 /** One final line of the voice call transcript: what the user said, or what the voice said. */
-export interface LiveVoiceLine {
+interface LiveVoiceLine {
   readonly role: "user" | "assistant";
   readonly text: string;
 }
