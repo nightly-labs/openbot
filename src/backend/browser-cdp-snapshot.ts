@@ -918,10 +918,15 @@ const HIDDEN_SECURITY_CODE = "•••";
  * string goes through it. The number stays hidden for the life of the tab. A security code is three
  * or four digits and also hides prices and dates, so it stays hidden only until the filled document
  * goes. Logs do not use it: the main process registers the number with the log redaction.
+ * A password that `submit_secret` left in a field of the document is hidden in the same way, until
+ * the document goes.
  */
 export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
   #securityCodes = new Map<string, RegExp>();
+  #passwords = new Map<string, RegExp>();
+  /** Counts the replaced documents, so that a password checked in one document is not added to the next. */
+  #documents = 0;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
@@ -936,17 +941,44 @@ export class CardValueScrub {
       this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
   }
 
-  /** The filled document was replaced: its security code is no longer on the page. */
+  /**
+   * A password that stays in a field of this document. A password of one to three characters is
+   * hidden only as a whole word, so that ordinary text keeps its letters and digits.
+   */
+  addDocumentSecret(password: string): void {
+    if (!password || this.#passwords.has(password)) return;
+    const escaped = password.replace(/[\\^$.*+?()[\]{}|/]/gu, "\\$&");
+    this.#passwords.set(
+      password,
+      new RegExp(password.length < 4 ? `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])` : escaped, "gu"),
+    );
+    // A longer password goes first, so that a password inside it does not leave a part of it.
+    this.#passwords = new Map([...this.#passwords].sort(([left], [right]) => right.length - left.length));
+  }
+
+  /** The filled document was replaced: its security code and passwords are no longer on the page. */
   endDocument(): void {
     this.#securityCodes = new Map();
+    this.#passwords = new Map();
+    this.#documents += 1;
+  }
+
+  get documents(): number {
+    return this.#documents;
+  }
+
+  /** The passwords that stay in fields of the current document. */
+  get documentSecrets(): string[] {
+    return [...this.#passwords.keys()];
   }
 
   get active(): boolean {
-    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+    return this.#numbers.size > 0 || this.#securityCodes.size > 0 || this.#passwords.size > 0;
   }
 
   text(value: string): string {
     let result = value;
+    for (const pattern of this.#passwords.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
     for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     return result;

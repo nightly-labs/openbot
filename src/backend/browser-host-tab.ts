@@ -28,12 +28,17 @@ export interface BrowserHostTab {
   /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
   /**
-   * The current document received a secret and was kept, with its filled fields empty and no
-   * readable copy of the value, so a
-   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
-   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
+   * The current document received a secret and was kept, with no readable copy of the value outside
+   * a password field that keeps it, so a single-page sign-in can show its next step. Page code can
+   * still hold the value, so evaluation and recording stay blocked in its opener group until a
+   * main-frame navigation replaces it.
    */
   secretDocument?: boolean;
+  /**
+   * The passwords that stay in password fields of the current document, so that the page can send
+   * its form again. A navigation or a popup that would carry one in its address is blocked.
+   */
+  keptPasswords?: string[] | undefined;
   /**
    * `fill_card` typed a saved card into the current document. Its fields show the number and the
    * security code, and page code can read them, so screenshots, previews, evaluation and recording

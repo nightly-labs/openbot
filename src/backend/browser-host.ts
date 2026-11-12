@@ -526,6 +526,24 @@ function urlOrigin(value: string): string | null {
 }
 
 /** Whether `url` carries `secret` as typed, percent-encoded, or form-encoded. */
+/**
+ * Whether a password that stays in a field of the tab's document shows outside a password field. An
+ * image of the page would then show it to the agent.
+ */
+function keptPasswordShown(tab: BrowserHostTab, keepQueueBlocked: KeepQueueBlocked) {
+  return boundEngineOperation(
+    tab,
+    tab.engine.keptPasswordShown(),
+    10_000,
+    "The saved password check timed out.",
+    keepQueueBlocked,
+  );
+}
+
+function keptPasswordImageError(action: string): string {
+  return `${action} is unavailable while the page shows a saved password. Use snapshots until it navigates.`;
+}
+
 function urlCarriesSecret(url: string, secret: string): boolean {
   if (url.includes(secret)) return true;
   try {
@@ -1665,6 +1683,8 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            /** The password stays in its field for a page that sends the form again. */
+            let held = false;
             let leaked = false;
             // A blocked navigation ends the wait for one, so the user gets the tab at once.
             let stopWaiting = () => {};
@@ -1708,7 +1728,20 @@ export class BrowserHost {
                         return Effect.sync(cleanup);
                       });
                     }
-                    if (!protection.replaced) {
+                    if (!protection.replaced && !leaked && args.method === "password") {
+                      // A page can send the form again in this document, as after a "signed in on
+                      // another device" question, so a password field keeps the value. The engine
+                      // hides it from what the agent reads until the document goes.
+                      held = yield* boundEngineOperation(
+                        tab,
+                        entry.keep(secret),
+                        10_000,
+                        "Authentication field check timed out.",
+                        keepQueueBlocked,
+                      ).pipe(Effect.catch(() => Effect.succeed(false)));
+                      if (held && !protection.replaced) kept = true;
+                    }
+                    if (!protection.replaced && !kept) {
                       // A reload would restart a single-page sign-in at its first step. Keep the
                       // document when its fields are empty and nothing a snapshot reads shows the value.
                       const cleared = yield* boundEngineOperation(
@@ -1738,6 +1771,8 @@ export class BrowserHost {
               Effect.ensuring(
                 Effect.sync(() => {
                   contents.off("will-frame-navigate", blockLeak);
+                  // The page can still send the kept password in an address until the document goes.
+                  if (held && kept) tab.keptPasswords = [...(tab.keptPasswords ?? []), secret];
                   protection.running = false;
                   tab.diagnostics.clearDiagnostics();
                   if (protection.replaced) {
@@ -2102,6 +2137,8 @@ export class BrowserHost {
     return yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser screenshot"));
+        if (yield* keptPasswordShown(tab, keepQueueBlocked))
+          return yield* browserFailure(new Error(keptPasswordImageError("Browser screenshot")));
         const image = yield* boundEngineOperation(
           tab,
           tab.engine.screenshot(target, Date.now() + 10_000, true),
@@ -2405,6 +2442,10 @@ export class BrowserHost {
                       };
                     }
                     return;
+                  }
+                  if (yield* keptPasswordShown(tab, keepQueueBlocked)) {
+                    if (mode !== "always") return;
+                    return yield* browserFailure(new Error(keptPasswordImageError("A snapshot image")));
                   }
                   const image = yield* boundEngineOperation(
                     tab,
@@ -3798,11 +3839,24 @@ export class BrowserHost {
     contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
       if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
     });
+    // A page can send a form with a kept password again, also as GET, which puts the password in the
+    // address. The agent reads why the page did not change.
+    contents.on("will-frame-navigate", (event) => {
+      if (!tab.keptPasswords?.some((password) => urlCarriesSecret(event.url, password))) return;
+      event.preventDefault();
+      tab.diagnostics.add({
+        kind: "load",
+        level: "error",
+        message: "OpenBot stopped a page load that would put the saved password in the page address. Use takeover.",
+      });
+      this.#emitChanged();
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {
         tab.secretDocument = false;
+        tab.keptPasswords = undefined;
         contents.navigationHistory.clear();
       }
       // The next document has no card in its fields. History would bring the filled page back.
@@ -3843,17 +3897,18 @@ export class BrowserHost {
     contents.setWindowOpenHandler(({ url, referrer, postBody, disposition }) => {
       if (this.#destroying || this.#tabs.get(tab.id) !== tab) return { action: "deny" };
       const unsupported = !["foreground-tab", "background-tab", "new-window"].includes(disposition);
-      const failure = tab.secret
-        ? sourceText("error.backend.popupSecureInput")
-        : unsupported
-          ? sourceText("error.backend.popupUnsupportedType")
-          : !isAllowedMainUrl(url)
-            ? sourceText("error.backend.popupUnsupportedAddress")
-            : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
-              ? sourceText("error.backend.popupTabLimit")
-              : this.#memoryLow()
-                ? sourceText("error.backend.browserLowMemory")
-                : undefined;
+      const failure =
+        tab.secret || tab.keptPasswords?.some((password) => urlCarriesSecret(url, password))
+          ? sourceText("error.backend.popupSecureInput")
+          : unsupported
+            ? sourceText("error.backend.popupUnsupportedType")
+            : !isAllowedMainUrl(url)
+              ? sourceText("error.backend.popupUnsupportedAddress")
+              : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
+                ? sourceText("error.backend.popupTabLimit")
+                : this.#memoryLow()
+                  ? sourceText("error.backend.browserLowMemory")
+                  : undefined;
       if (failure) {
         tab.popupFailure = { id: randomUUID(), message: failure };
         this.#emitChanged();

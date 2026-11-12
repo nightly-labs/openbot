@@ -356,6 +356,7 @@ export class BrowserCdpEngine {
     {
       enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      keep: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
@@ -571,7 +572,50 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    return { enter, clear, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
+    /**
+     * Leaves a password in its field, so that a page that sends the form again in this document, as
+     * after a "signed in on another device" question, still has it. It does so only when each field is
+     * a password field, which never shows the value, and nothing else in the document holds it. A
+     * field that stops being a password field, as with a "show password" button, is emptied. The value
+     * is hidden from what the agent reads until the document goes.
+     */
+    const keep = (secret: string) =>
+      this.#leaseEffect((send) =>
+        Effect.gen({ self: this }, function* () {
+          const checkedDocument = this.#cardScrub.documents;
+          const executionContextId = yield* automationContextId(send);
+          const objectIds: string[] = [];
+          const kept = yield* Effect.gen(function* () {
+            for (const node of nodes.inputs) {
+              const resolved = yield* send("DOM.resolveNode", {
+                backendNodeId: node.backendNodeId,
+                executionContextId,
+              });
+              const objectId = stringValue(recordValue(resolved.object)?.objectId);
+              if (!objectId) return false;
+              objectIds.push(objectId);
+            }
+            const result = yield* send("Runtime.callFunctionOn", {
+              executionContextId,
+              functionDeclaration: SECRET_KEEP_FUNCTION,
+              arguments: [{ value: secret }, ...objectIds.map((objectId) => ({ objectId }))],
+              returnByValue: true,
+            });
+            return !recordValue(result.exceptionDetails) && recordValue(result.result)?.value === true;
+          }).pipe(
+            Effect.ensuring(
+              Effect.forEach(objectIds, (objectId) => send("Runtime.releaseObject", { objectId }).pipe(Effect.ignore), {
+                discard: true,
+              }),
+            ),
+          );
+          // A new document that commits during the check does not hold the field.
+          if (!kept || checkedDocument !== this.#cardScrub.documents) return false;
+          this.#cardScrub.addDocumentSecret(secret);
+          return true;
+        }),
+      ).pipe(Effect.catch(() => Effect.succeed(false)));
+    return { enter, clear, keep, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
   });
 
   /**
@@ -1950,6 +1994,28 @@ export class BrowserCdpEngine {
     this.#lastSnapshot = null;
   }
 
+  /**
+   * Whether a password that stays in a field of this document shows anywhere outside a password
+   * field, as when a "show password" control copies it to a text field. An image of the page would
+   * then show it. Snapshots hide it, as they do the card values.
+   */
+  readonly keptPasswordShown = Effect.fn("BrowserCdp.keptPasswordShown")(function* (this: BrowserCdpEngine) {
+    const passwords = this.#cardScrub.documentSecrets;
+    if (passwords.length === 0) return false;
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen(function* () {
+        const executionContextId = yield* automationContextId(send);
+        const result = yield* send("Runtime.callFunctionOn", {
+          executionContextId,
+          functionDeclaration: KEPT_PASSWORD_SHOWN_FUNCTION,
+          arguments: [{ value: passwords }],
+          returnByValue: true,
+        });
+        return Boolean(recordValue(result.exceptionDetails)) || recordValue(result.result)?.value !== false;
+      }),
+    ).pipe(Effect.catch(() => Effect.succeed(true)));
+  });
+
   /** `value` without the card values that `fillCard` typed in this tab, for a title or a URL. */
   scrubText(value: string): string {
     return this.#cardScrub.text(value);
@@ -2658,7 +2724,7 @@ export class BrowserCdpEngine {
     timeoutMs = WAIT_TIMEOUT_MS,
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#namesCardValue(condition.text, condition.url))
-      return yield* browserFailure(new Error("A wait cannot name a filled card value."));
+      return yield* browserFailure(new Error("A wait cannot name a hidden card value or password."));
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
@@ -2891,7 +2957,7 @@ export class BrowserCdpEngine {
         target.kind === "css" ? target.selector : undefined,
       )
     )
-      return yield* browserFailure(new Error("A target cannot name a filled card value."));
+      return yield* browserFailure(new Error("A target cannot name a hidden card value or password."));
     if (target.kind === "point") {
       const metrics = yield* send("Page.getLayoutMetrics");
       const viewport = recordValue(metrics.cssLayoutViewport);
@@ -3768,8 +3834,11 @@ const waitForDomQuietAcrossTargets = Effect.fn("Browser.waitForDomQuietAcrossTar
   }
 });
 
-/** Runs in the automation world. Returns true when the document shows the value anywhere a snapshot reads. */
-const SECRET_SCAN_FUNCTION = `function(secret) {
+/**
+ * Runs in the automation world. Returns true when the document shows the value anywhere a snapshot
+ * reads, outside the `skipped` fields.
+ */
+const SECRET_SCAN_FUNCTION = `function(secret, ...skipped) {
   const found = (value) => typeof value === 'string' && value.includes(secret);
   if (found(document.title) || found(location.href)) return true;
   const walk = (root) => {
@@ -3779,7 +3848,7 @@ const SECRET_SCAN_FUNCTION = `function(secret) {
         if (found(node.data)) return true;
         continue;
       }
-      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if (node.nodeType !== Node.ELEMENT_NODE || skipped.includes(node)) continue;
       if ('value' in node && found(String(node.value))) return true;
       for (const attribute of node.attributes) if (found(attribute.value)) return true;
       if (node.shadowRoot && walk(node.shadowRoot)) return true;
@@ -3787,6 +3856,43 @@ const SECRET_SCAN_FUNCTION = `function(secret) {
     return false;
   };
   return walk(document);
+}`;
+
+/**
+ * Runs in the automation world. Returns true when a text, an attribute, or the value of a field that
+ * is not a password field holds one of the passwords, so that an image of the page can show it.
+ */
+const KEPT_PASSWORD_SHOWN_FUNCTION = `function(passwords) {
+  const found = (value) => typeof value === 'string' && passwords.some((password) => value.includes(password));
+  const walk = (root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (found(node.data)) return true;
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if (node.shadowRoot && walk(node.shadowRoot)) return true;
+      if (node.localName === 'input' && node.type === 'password') continue;
+      if ('value' in node && found(String(node.value))) return true;
+      for (const attribute of node.attributes) if (found(attribute.value)) return true;
+    }
+    return false;
+  };
+  return walk(document);
+}`;
+
+/**
+ * Runs in the automation world, where the page cannot reach the observer. Returns true when each
+ * field is a password field of this document and nothing else shows the value; each field then
+ * empties itself when the page makes it another type of field.
+ */
+const SECRET_KEEP_FUNCTION = `function(secret, ...fields) {
+  const isPassword = (field) => field.isConnected && field.ownerDocument === document && field.localName === 'input' && field.type === 'password';
+  if (fields.length === 0 || !fields.every(isPassword) || (${SECRET_SCAN_FUNCTION})(secret, ...fields)) return false;
+  for (const field of fields)
+    new MutationObserver(() => { if (field.type !== 'password') field.value = ''; }).observe(field, { attributes: true, attributeFilter: ['type'] });
+  return true;
 }`;
 
 function documentIdFunctionDeclaration(): string {
