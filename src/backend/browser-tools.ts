@@ -269,7 +269,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. With codeTargets, give the length of the code. For a password alone, omit digits or use 0; no digit limit applies to the password.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])

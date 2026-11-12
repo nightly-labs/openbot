@@ -1681,11 +1681,13 @@ export class BrowserHost {
             )
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
             const spread = (value: string, fields: number) => (fields === 1 ? [value] : [...value]);
+            // After the check above, a request with code fields always has its code.
+            const filledCode = withCode ? code : undefined;
             const values = [
               ...spread(secret, args.targets.length),
-              ...(withCode && code !== undefined ? spread(code, codeTargets.length) : []),
+              ...(filledCode === undefined ? [] : spread(filledCode, codeTargets.length)),
             ];
-            const secrets = withCode && code !== undefined ? [secret, code] : [secret];
+            const secrets = filledCode === undefined ? [secret] : [secret, filledCode];
             protection.submitted = true;
             this.#invalidateViews(tab);
             protection.running = true;
