@@ -2,6 +2,7 @@ import { access, chmod, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { SharedTable } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import {
   AGENT_DATABASE_LIMITS,
@@ -75,41 +76,57 @@ export class AgentTables {
     this.#supervisor = options.supervisor;
   }
 
-  /** Every table with its owner and row count, for both the agent tool and agent settings. */
+  /**
+   * Every table with its owner and row count, for both the agent tool and agent settings.
+   *
+   * A database that could not be read is a failure, not an empty list: an agent told there are no
+   * tables makes a near-duplicate of one that exists. A missing owner or count is only a detail.
+   */
 
-  list(): Effect.Effect<AgentTableSummary[], AgentTablesError> {
-    return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTableSummary[], AgentTablesError> {
+  list(): Effect.Effect<AgentDatabaseCheck<AgentTableSummary[]>, AgentTablesError> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<
+      AgentDatabaseCheck<AgentTableSummary[]>,
+      AgentTablesError
+    > {
       const ready = yield* this.#ensure();
-      if (!ready.ok) return [];
+      if (!ready.ok) return ready;
 
       const schema = yield* this.#send({
         mode: "read",
         sql: `SELECT name, sql FROM sqlite_master WHERE type = 'table' AND ${HIDDEN_TABLES} ORDER BY name`,
       });
-      if (!schema.ok) return [];
+      if (!schema.ok) return schema;
 
       const names = schema.value.rows.map((row) => String(row[0]));
       const [owners, counts] = yield* Effect.all([this.#owners(), this.#rowCounts(names)], {
         concurrency: "unbounded",
       });
-      return schema.value.rows.map((row) => {
-        const name = String(row[0]);
-        return {
-          name,
-          ownerAgentId: owners.get(name) ?? null,
-          rowCount: counts.get(name) ?? null,
-          sql: row[1] === null ? "" : String(row[1]),
-        };
-      });
+      return {
+        ok: true,
+        value: schema.value.rows.map((row) => {
+          const name = String(row[0]);
+          return {
+            name,
+            ownerAgentId: owners.get(name) ?? null,
+            rowCount: counts.get(name) ?? null,
+            sql: row[1] === null ? "" : String(row[1]),
+          };
+        }),
+      };
     });
   }
 
-  /** What agent settings renders. The same listing, without the SQL the user has no use for. */
+  /**
+   * What agent settings renders. The same listing, without the SQL the user has no use for. A
+   * failure gets the user's sentence: the database's own message is advice for an agent's SQL.
+   */
 
   listShared(): Effect.Effect<SharedTable[], AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<SharedTable[], AgentTablesError> {
       const tables = yield* this.list();
-      return tables.map(({ name, ownerAgentId, rowCount }) => ({ name, ownerAgentId, rowCount }));
+      if (!tables.ok)
+        return yield* new AgentTablesError({ message: sourceText("error.backend.sharedDataUnavailable") });
+      return tables.value.map(({ name, ownerAgentId, rowCount }) => ({ name, ownerAgentId, rowCount }));
     });
   }
 
@@ -278,7 +295,9 @@ export class AgentTables {
       AgentTablesError
     > {
       const wanted = name.trim().toLowerCase();
-      const table = (yield* this.list()).find((entry) => entry.name.toLowerCase() === wanted);
+      const tables = yield* this.list();
+      if (!tables.ok) return tables;
+      const table = tables.value.find((entry) => entry.name.toLowerCase() === wanted);
       if (!table) return { ok: false, message: `There is no table called ${name}.` };
       return { ok: true, value: table };
     });
