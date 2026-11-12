@@ -67,7 +67,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const current = (): PageRailPage | null => {
     const page = windowPage.page();
     if (page === "agents") return layout.sidebarView();
-    return page === "server-settings" ? null : page;
+    return page === "server-settings" || page === "pricing" ? null : page;
   };
   return (
     <PageRail
@@ -86,7 +86,10 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onUsage={windowPage.openUsage}
       // An older joined server has no storage routes, so it has no Library.
       onLibrary={serverHasStorage(activeServer()) ? windowPage.openLibrary : undefined}
-      onMarketplace={() => setSkillsMarketplaceOpen(true)}
+      onMarketplace={() => {
+        windowPage.leavePricing();
+        setSkillsMarketplaceOpen(true);
+      }}
       onSettings={(button) => (updateNotice() ? openAppSettings(button, "updates") : windowPage.openSettings(button))}
       settingsNotice={updateNotice()}
       logo={logo()}

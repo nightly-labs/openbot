@@ -63,6 +63,7 @@ import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
+  BILLING_BASE_CURRENCIES,
   BILLING_CURRENCIES,
   type BillingCurrency,
   type BillingPlanId,
@@ -1159,7 +1160,8 @@ async function licensePrice(plan: LicensePlan): Promise<LicensePriceView> {
 /**
  * True when the Price sells the plan as `stripe-bootstrap.ts` makes it: its lookup key and metadata, and
  * the amounts of `LICENSE_PLAN_PRICES`. A Team Price is graduated: the base for the included users, then
- * each extra user. A 1-user Price is a flat amount.
+ * each extra user. A 1-user Price is a flat amount. EUR, USD and PLN are in every Price; BRL is checked
+ * when the Price has it (`stripe-bootstrap.ts --brl`). The Team BRL tiers are not expanded.
  */
 function licensePriceMatches(price: LicensePriceView, plan: LicensePlan): boolean {
   if (
@@ -1173,15 +1175,23 @@ function licensePriceMatches(price: LicensePriceView, plan: LicensePlan): boolea
     price.metadata[LICENSE_METADATA.bundle] !== String(plan.bundle)
   )
     return false;
+  const has = (currency: BillingCurrency) =>
+    currency === "eur" ||
+    (plan.tier === "team"
+      ? price.currency_options?.[currency]?.tiers !== undefined
+      : price.currency_options?.[currency] !== undefined);
+  const currencies = BILLING_CURRENCIES.filter(
+    (currency) => BILLING_BASE_CURRENCIES.some((base) => base === currency) || has(currency),
+  );
   if (plan.tier !== "team")
-    return BILLING_CURRENCIES.every(
+    return currencies.every(
       (currency) =>
         (currency === "eur" ? price.unit_amount : price.currency_options?.[currency]?.unit_amount) ===
         licensePlanPrice(plan, currency).base,
     );
   return (
     price.tiers_mode === "graduated" &&
-    BILLING_CURRENCIES.every((currency) => {
+    currencies.every((currency) => {
       const [base, extra] = (currency === "eur" ? price.tiers : price.currency_options?.[currency]?.tiers) ?? [];
       const amounts = licensePlanPrice(plan, currency);
       return (
