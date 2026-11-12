@@ -115,7 +115,7 @@ export class AgentApiKeys {
         yield* removeKeyFiles(vaultFolder, new Map());
         const copies = yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed });
         for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
-          yield* this.#writeAgent(join(vaultFolder, agentId), agentId, false);
+          yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
       }),
     );
   });
@@ -129,7 +129,7 @@ export class AgentApiKeys {
         const plain = yield* removeFile(path);
         const vault = this.#readyVault();
         const own = vault ? yield* vault.removeAgentApiKey(agentId, name).pipe(Effect.mapError(failed)) : false;
-        if (vault) yield* this.#writeAgent(folder, agentId, false);
+        if (vault) yield* this.#writeAgent(folder, agentId);
         return plain || own;
       }),
     );
@@ -171,25 +171,34 @@ export class AgentApiKeys {
       const vault = this.#readyVault();
       if (!vault) return;
       for (const key of yield* this.#plainKeys(agentId)) {
-        const value = yield* Effect.promise(() => readFile(key.path, "utf8").catch(() => null));
-        if (value === null || value.trim() === "") continue;
-        const saved = yield* Effect.result(
-          vault.saveApiKey({ name: key.name, key: value.trim() }, { id: agentId, name: undefined }, true),
-        );
-        if (Result.isSuccess(saved)) yield* removeFile(key.path);
+        const value = (yield* Effect.promise(() => readFile(key.path, "utf8").catch(() => null)))?.trim();
+        if (!value) continue;
+        // A file that could not be deleted earlier is not saved again: each save changes the Vault, and
+        // the change starts this sync again.
+        const kept = vault
+          .apiKeys(agentId)
+          .some((saved) => saved.own && saved.name === key.name && saved.value === value);
+        const saved =
+          kept ||
+          Result.isSuccess(
+            yield* Effect.result(
+              vault.saveApiKey({ name: key.name, key: value }, { id: agentId, name: undefined }, true),
+            ),
+          );
+        // A file that cannot be deleted stays. It holds the same key, and `list` gives it to the agent.
+        if (saved) yield* removeFile(key.path).pipe(Effect.orElseSucceed(() => false));
       }
     });
   }
 
   /**
    * Writes the Vault keys that the agent can use to `folder` and removes the files of keys that it can
-   * no longer use. Without a Vault, every key file goes. `list` passes `create` to make the folder.
+   * no longer use. Without a Vault, every key file goes.
    */
-  #writeAgent(folder: string, agentId: string, create = true): Effect.Effect<SavedApiKey[], AgentApiKeyFailed> {
+  #writeAgent(folder: string, agentId: string): Effect.Effect<SavedApiKey[], AgentApiKeyFailed> {
     return Effect.gen({ self: this }, function* () {
       const keys = (this.#readyVault()?.apiKeys(agentId) ?? []).filter(({ name }) => API_KEY_NAME_PATTERN.test(name));
       yield* removeKeyFiles(folder, new Map(keys.map(({ name, value }) => [name, value])));
-      if (!create && keys.length === 0) return [];
       const written: SavedApiKey[] = [];
       for (const { name, value, own } of keys) {
         const path = join(folder, name);

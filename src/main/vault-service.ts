@@ -545,12 +545,11 @@ export class VaultService {
     const username = login.username.trim();
     const outcome: { saved: (VaultAgentResult & { created: boolean; changed: boolean }) | null } = { saved: null };
     yield* this.#change((record) => {
-      const existing = record.logins.find(
-        (item) =>
-          vaultItemAllows(item, agent.id) &&
-          item.username === username &&
-          websiteMatchesOrigin({ url: item.website, autofill: "anywhere" }, website),
-      );
+      const matches = (item: StoredLogin) =>
+        item.username === username && websiteMatchesOrigin({ url: item.website, autofill: "anywhere" }, website);
+      const existing = record.logins.find((item) => vaultItemAllows(item, agent.id) && matches(item));
+      // The user keeps this login from this agent, so the agent's copy is for this agent only.
+      const hidden = !existing && record.logins.some(matches);
       if (existing?.password === login.password) {
         outcome.saved = {
           id: existing.id,
@@ -572,6 +571,7 @@ export class VaultService {
             password: login.password,
             notes: "",
             ...origin(undefined, agent.name),
+            ...(hidden ? { agents: [agent.id] } : {}),
           };
       outcome.saved = {
         id: stored.id,
@@ -664,9 +664,10 @@ export class VaultService {
         if (item.agents?.includes(agentId)) keys.set(item.name, { value: item.key, own: onlyFor(item, agentId) });
       return [...keys].map(([name, { value, own }]) => ({ name, value, own }));
     },
-    hasCards: (agentId) => this.#status === "ready" && this.#forAgent(this.#store.read(), agentId).cards.length > 0,
+    hasCards: (agentId) =>
+      this.#status === "ready" && this.#store.read().cards.some((item) => vaultItemAllows(item, agentId)),
     hasContacts: (agentId) =>
-      this.#status === "ready" && this.#forAgent(this.#store.read(), agentId).contacts.length > 0,
+      this.#status === "ready" && this.#store.read().contacts.some((item) => vaultItemAllows(item, agentId)),
     listForAgent: (agentId) => {
       if (this.#status !== "ready") return { logins: [], cards: [], contacts: [] };
       const record = this.#forAgent(this.#store.read(), agentId);

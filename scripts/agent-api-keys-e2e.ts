@@ -527,6 +527,17 @@ try {
         vault.items.save({ kind: "login", id: chosen.id, password: "e2e-x" }, { id: AGENT, name: "Coder" }),
       ),
     );
+    // A login that an agent types, and that the user keeps from it, reaches only the agent that typed it.
+    const typed = await Effect.runPromise(
+      vault.items.saveLogin(
+        { origin: site, username: "chosen@example.com", password: "e2e-typed-password" },
+        { id: AGENT, name: "Coder" },
+      ),
+    );
+    assert.equal(typed.created, true);
+    assert.deepEqual(vault.state().items.find((item) => item.id === typed.id)?.agents, [AGENT]);
+    assert.deepEqual(await usernames("agent-4"), ["shared@example.com"]);
+    assert.ok(await Effect.runPromise(vault.items.delete(typed.id, AGENT)));
     // An item that an agent adds is for every agent.
     const added = await Effect.runPromise(
       vault.items.save(

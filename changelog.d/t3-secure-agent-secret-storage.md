@@ -10,3 +10,5 @@
   for that agent. The keys that earlier versions kept in plain files move into the Vault when OpenBot
   starts. Agents still run as the same user of the computer, so this is not a strong wall between
   agents.
+- The key files that agents read have a new path. An agent gets the path each time it lists its keys,
+  so a script that has the old path must use the new one.

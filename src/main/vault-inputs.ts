@@ -133,7 +133,8 @@ function scope(value: unknown): VaultSaveScope {
   if (value === null) return { agents: null };
   if (!Array.isArray(value) || value.length > VAULT_AGENT_SCOPE_LIMIT) throw new Error("agents is invalid.");
   const agents = [...new Set(value.map((agent) => rawText(agent, "agents", VAULT_AGENT_ID_LIMIT)))];
-  if (agents.length === 0 || agents.some((agent) => !agent)) throw userError("error.vault.agentsRequired");
+  if (agents.some((agent) => !agent)) throw new Error("agents is invalid.");
+  if (agents.length === 0) throw userError("error.vault.agentsRequired");
   return { agents };
 }
 
