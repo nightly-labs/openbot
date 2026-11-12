@@ -38,7 +38,7 @@
     "./icons": "./src/icons.ts",
     "./image-remove-button": "./src/image-remove-button.tsx",
     "./badge": "./src/badge.tsx",
-    "./server-gradient-logo": "./src/server-gradient-logo.tsx",
+    "./server-plush-logo": "./src/server-plush-logo.tsx",
     "./message": "./src/message.tsx",
     "./button": "./src/button.tsx",
     "./marker": "./src/marker.tsx",

@@ -352,9 +352,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
               <ItemActions class="settings-identity-image-control">
                 <Show
                   when={canEditIdentity()}
-                  fallback={
-                    <ServerLogo name={panels.identity.name || props.server.name} url={panels.identity.logoUrl} />
-                  }
+                  fallback={<ServerLogo serverId={props.server.id} url={panels.identity.logoUrl} />}
                 >
                   <div class="settings-identity-image-picker ui-removable-image">
                     <Button
@@ -371,7 +369,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                         when={panels.identity.logoUrl}
                         fallback={<Image class="server-settings-logo-placeholder" aria-hidden="true" />}
                       >
-                        {(logoUrl) => <ServerLogo name={panels.identity.name || props.server.name} url={logoUrl()} />}
+                        {(logoUrl) => <ServerLogo serverId={props.server.id} url={logoUrl()} />}
                       </Show>
                     </Button>
                     <Show when={panels.identity.logoUrl}>

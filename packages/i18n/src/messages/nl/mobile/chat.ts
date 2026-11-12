@@ -481,4 +481,11 @@ export const messages = {
   "mobile.chat.vaultRequest.gone": "Dit verzoek is niet meer open.",
   "mobile.chat.vaultRequest.notAllowed":
     "Alleen de servereigenaar of een beheerder kan een item aan de Kluis toevoegen.",
+  "mobile.chat.appSuggestion.skip": "Overslaan",
+  "mobile.chat.appSuggestion.skipNamed": "{name} overslaan",
+  "mobile.chat.appSuggestion.connectNamed": "Verbind {name}",
+  "mobile.chat.appSuggestion.skipped": "{name} overgeslagen",
+  "mobile.chat.appSuggestion.undo": "Ongedaan maken",
+  "mobile.chat.appSuggestion.notAllowed": "Alleen de servereigenaar of een beheerder kan {name} verbinden.",
+  "mobile.chat.appSuggestion.unavailable": "Deze server kan {name} niet verbinden.",
 } as const satisfies PartialTranslation<typeof source>;

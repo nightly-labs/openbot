@@ -22,12 +22,15 @@ import {
   channelRoutingConversationEvent,
   isAgentAnswer,
   isContextResetMarker,
+  marketplaceSuggestionEvent,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { MOBILE_PLUGINS } from "@/features/marketplace/model/plugin-catalog.generated";
+import { isMobileConnectorId } from "@/features/servers/model/connectors";
 import { thinkingRowId } from "./turn-thinking";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
@@ -55,6 +58,8 @@ export type ChatMessage =
     }
   /** Where a new chat started: the agent does not see the messages above it. */
   | { id: string; kind: "context-reset" }
+  /** A Marketplace app that the agent suggests. The user connects it from the card, or skips it. */
+  | { id: string; kind: "app-suggestion"; appId: string }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
   | {
       id: string;
@@ -251,6 +256,15 @@ function progressBubble(id: string, message: ConversationMessage): Extract<ChatM
   };
 }
 
+const projectedSuggestions = new WeakMap<ConversationMessage, ChatMessage>();
+
+/** The app of a suggestion that this app version can draw a card for, or null. Like desktop, others get no row. */
+function suggestedApp(message: ConversationMessage): string | null {
+  const appId = marketplaceSuggestionEvent(message)?.appId;
+  if (!appId) return null;
+  return isMobileConnectorId(appId) || MOBILE_PLUGINS.some((plugin) => plugin.slug === appId) ? appId : null;
+}
+
 const ROUTINE_RUN_LABELS = {
   queued: "mobile.chat.routine.invoked",
   running: "mobile.chat.routine.running",
@@ -428,6 +442,15 @@ export function projectChatMessages(
       result.push(
         projectedMarker(projectedResets, message, () => ({ id: `context-reset:${message.id}`, kind: "context-reset" })),
       );
+      continue;
+    }
+    // A suggestion is a system message too. Like desktop, it shows as its card, not as its text.
+    if (marketplaceSuggestionEvent(message)) {
+      const appId = suggestedApp(message);
+      if (appId)
+        result.push(
+          projectedMarker(projectedSuggestions, message, () => ({ id: message.id, kind: "app-suggestion", appId })),
+        );
       continue;
     }
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
@@ -813,6 +836,10 @@ function projectChannelMessage(
           ? { ...entry.message.questionPrompt, resolution: { status: "expired" } }
           : entry.message.questionPrompt,
     };
+  }
+  if (marketplaceSuggestionEvent(entry.message)) {
+    const appId = suggestedApp(entry.message);
+    return appId ? { id: entry.id, kind: "app-suggestion", appId } : null;
   }
   const routing = channelRoutingConversationEvent(entry.message);
   if (routing) return { id: entry.id, kind: "channel-routing", event: routing };

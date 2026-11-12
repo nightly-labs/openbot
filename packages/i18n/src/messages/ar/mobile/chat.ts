@@ -566,4 +566,11 @@ export const messages = {
   "mobile.chat.vaultRequest.skipped": "لم تتم الإضافة إلى الخزنة",
   "mobile.chat.vaultRequest.gone": "هذا الطلب لم يعد مفتوحًا.",
   "mobile.chat.vaultRequest.notAllowed": "يمكن لمالك الخادم أو المسؤول فقط إضافة عنصر إلى الخزنة.",
+  "mobile.chat.appSuggestion.skip": "تخطي",
+  "mobile.chat.appSuggestion.skipNamed": "تخطي {name}",
+  "mobile.chat.appSuggestion.connectNamed": "ربط {name}",
+  "mobile.chat.appSuggestion.skipped": "تم تخطي {name}",
+  "mobile.chat.appSuggestion.undo": "تراجع",
+  "mobile.chat.appSuggestion.notAllowed": "يمكن لمالك الخادم أو المسؤول فقط ربط {name}.",
+  "mobile.chat.appSuggestion.unavailable": "لا يمكن لهذا الخادم ربط {name}.",
 } as const satisfies PartialTranslation<typeof source>;
