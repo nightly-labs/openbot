@@ -2,9 +2,10 @@
 // turn still runs. Codex 0.167.2 sends that retry as `error` with `willRetry: true`, the text
 // "Reconnecting... 2/5", `responseStreamDisconnected` as its info, and the cause only in
 // `additionalDetails` (`codex-rs/core/src/session/mod.rs` `notify_stream_error`). It waits about
-// 5 minutes between tries, so the agent showed as working with no output and no notice. A retry
-// for another cause shows no notice before the third retry. Runs the real agent service on a
-// temporary profile with a fake Codex app-server.
+// 5 minutes between tries, so the agent showed as working with no output and no notice. The notice
+// shows one time per turn, also for the `serverOverloaded` info. A retry for another cause shows no
+// notice before the third retry, and a capacity retry does not replace that notice. Runs the real
+// agent service on a temporary profile with a fake Codex app-server.
 // `bun scripts/codex-capacity-retry-e2e.ts`. Writes .openbot-build/codex-capacity-retry-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,6 +30,15 @@ const fakeCodex = join(root, "codex");
 const AT_CAPACITY = "Selected model is at capacity. Please try a different model.";
 const DISCONNECTED = "stream disconnected before completion: Connection reset by peer (os error 54)";
 const NOTICE = sourceText("error.backend.providerModelAtCapacity");
+const RETRYING = sourceText("error.backend.providerRetrying", { attempts: "3" });
+
+/** One retry that the fake Codex sends: the info of Codex's retry notice, or `serverOverloaded`. */
+interface Retry {
+  info: "disconnected" | "overloaded";
+  details: string | null;
+}
+const capacity: Retry = { info: "disconnected", details: AT_CAPACITY };
+const reset: Retry = { info: "disconnected", details: DISCONNECTED };
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -45,9 +55,9 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 /**
- * A Codex app-server with the methods that the service calls. Each turn sends two retry errors with
- * the cause that `control.json` names, as Codex sends its retries 2/5 and 3/5, and then waits until
- * `control.json` releases the turn. The turn then completes with an answer.
+ * A Codex app-server with the methods that the service calls. Each turn sends the retry errors that
+ * `control.json` lists, from retry 2/5 on, and then waits until `control.json` releases the turn.
+ * The turn then completes with an answer.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -86,16 +96,17 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      const { details } = control();
+      const { retries } = control();
       const turnId = "turn-" + (++turns);
       const threadId = params.threadId;
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
-      for (const attempt of [2, 3]) {
+      for (const [index, retry] of retries.entries()) {
         const error = {
-          message: "Reconnecting... " + attempt + "/5",
-          codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } },
-          additionalDetails: details,
+          message: "Reconnecting... " + (index + 2) + "/5",
+          codexErrorInfo:
+            retry.info === "overloaded" ? "serverOverloaded" : { responseStreamDisconnected: { httpStatusCode: null } },
+          additionalDetails: retry.details,
         };
         write({ method: "error", params: { error, willRetry: true, threadId, turnId } });
       }
@@ -135,8 +146,8 @@ process.stdin.on("data", (chunk) => {
 
 interface CaseReport {
   name: string;
-  details: string;
-  /** The delivery status when the notice arrived, or when both retries were logged. */
+  retries: Retry[];
+  /** The delivery status when all retries were logged. */
   statusDuringRetries: string;
   finalStatus: string;
   /** The `turn/start` requests of the agent's thread. Codex retries inside one turn. */
@@ -221,13 +232,15 @@ const stopLog = teeLogLines(["turn-lifecycle"], (line) => logLines.push(line));
 try {
   await runCauseEffect(agents.initialize());
 
-  const cases = [
-    { name: "model at capacity", details: AT_CAPACITY, notice: true },
-    { name: "connection reset", details: DISCONNECTED, notice: false },
-  ] as const;
+  const cases: { name: string; retries: Retry[]; notices: string[] }[] = [
+    { name: "model at capacity", retries: [capacity, capacity, capacity], notices: [NOTICE] },
+    { name: "server overloaded info", retries: [{ info: "overloaded", details: null }], notices: [NOTICE] },
+    { name: "connection reset", retries: [reset, reset], notices: [] },
+    { name: "capacity, then connection resets", retries: [capacity, reset, reset], notices: [NOTICE, RETRYING] },
+  ];
 
   for (const [index, entry] of cases.entries()) {
-    await writeFile(controlPath, JSON.stringify({ details: entry.details, release: null }));
+    await writeFile(controlPath, JSON.stringify({ retries: entry.retries, release: null }));
     const firstLogLine = logLines.length;
     const agent = await runCauseEffect(
       agents.createAgent({
@@ -241,20 +254,20 @@ try {
     const agentEvents = () => errorEvents.filter((event) => event.agentId === agent.id);
     const retryLines = () =>
       logLines.slice(firstLogLine).filter((line) => line.includes("A provider retries a request."));
-    // Both retries are in the log before the turn can end, so a notice that comes from them is in
+    // All retries are in the log before the turn can end, so a notice that comes from them is in
     // the events too: the service logs a retry and emits its notice in one synchronous step.
-    await waitFor("both retries", () => retryLines().length === 2);
+    await waitFor("all retries", () => retryLines().length === entry.retries.length);
     const running = agents
       .listQueue(agent.id)
       .deliveries.find((item) => item.status !== "completed" && item.status !== "failed");
     const statusDuringRetries = running?.status ?? "ended";
-    await writeFile(controlPath, JSON.stringify({ details: entry.details, release: true }));
+    await writeFile(controlPath, JSON.stringify({ retries: entry.retries, release: true }));
     const delivery = await waitFor("the message to end", () =>
       agents.listQueue(agent.id).deliveries.find((item) => item.status === "completed" || item.status === "failed"),
     );
     const result: CaseReport = {
       name: entry.name,
-      details: entry.details,
+      retries: entry.retries,
       statusDuringRetries,
       finalStatus: delivery.status,
       turnStarts: turnStarts(store.activeProviderSession(agent.id)?.externalSessionId ?? "missing"),
@@ -266,17 +279,16 @@ try {
     assert.notEqual(result.statusDuringRetries, "ended", `${entry.name}: the turn ended before the check`);
     assert.equal(result.finalStatus, "completed", `${entry.name}: the turn did not complete`);
     assert.equal(result.turnStarts, 1, `${entry.name}: OpenBot started the turn again`);
-    assert.ok(
-      result.retryLogLines.every((line) => line.includes(`"atCapacity":${entry.notice}`)),
+    assert.deepEqual(
+      result.retryLogLines.map((line) => line.includes('"atCapacity":true')),
+      entry.retries.map((retry) => retry !== reset),
       `${entry.name}: the log has the wrong cause`,
     );
-    if (entry.notice)
-      assert.deepEqual(
-        result.errorEvents,
-        [{ code: "agent_warning", message: NOTICE }],
-        `${entry.name}: the capacity notice did not show one time`,
-      );
-    else assert.deepEqual(result.errorEvents, [], `${entry.name}: a notice showed before the third retry`);
+    assert.deepEqual(
+      result.errorEvents,
+      entry.notices.map((message) => ({ code: "agent_warning", message })),
+      `${entry.name}: the wrong notices showed`,
+    );
     result.passed = true;
   }
   report.passed = true;

@@ -357,8 +357,8 @@ export class TurnLifecycle {
   readonly #turnErrors = new Map<string, string>();
   /** How many times the provider retried a request of each running turn. */
   readonly #turnRetries = new Map<string, number>();
-  /** The running turns that showed a retry notice. A turn shows one notice. */
-  readonly #retryNotices = new Set<string>();
+  /** The running turns that showed the model-at-capacity notice. A turn shows it one time. */
+  readonly #capacityNotices = new Set<string>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
@@ -548,7 +548,7 @@ export class TurnLifecycle {
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
     this.#turnRetries.clear();
-    this.#retryNotices.clear();
+    this.#capacityNotices.clear();
     this.#limitedTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
@@ -588,6 +588,8 @@ export class TurnLifecycle {
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
+      this.#turnRetries.delete(turnId);
+      this.#capacityNotices.delete(turnId);
       const compactionFailure = this.#compactionFailures.get(turnId);
       this.#compactionFailures.delete(turnId);
       // A routine run's own session saves no history, so its turn ends now and closes the session.
@@ -1354,11 +1356,12 @@ export class TurnLifecycle {
   /**
    * Codex sent a request of a running turn again. A turn that retries again and again looked like
    * work: Codex sent the same large request for 11 minutes, and the agent showed as working (#4374).
-   * The user gets one notice per turn. A large session also compacts before its next turn.
+   * The user gets a notice at the third retry. A large session also compacts before its next turn.
    *
-   * A model at capacity gets its notice at the first retry that OpenBot sees. Codex then waits about
-   * 5 minutes between tries and hides its first retry, so the agent showed as working with no output
-   * for more than 15 minutes before the general notice.
+   * A model at capacity gets its own notice, one time per turn, at the first capacity retry that
+   * OpenBot sees. Codex then waits about 5 minutes between tries and hides its first retry, so the
+   * agent showed as working with no output for more than 15 minutes before the general notice. A
+   * capacity retry does not count toward a compaction: the request size is not its cause.
    */
   #providerRetried(
     agentId: string | null | undefined,
@@ -1376,9 +1379,12 @@ export class TurnLifecycle {
       atCapacity,
       usedPercent: this.#compaction.usedPercent(threadId),
     });
-    if (this.#retryNotices.has(turnId) || (!atCapacity && attempts !== RETRY_NOTICE_ATTEMPTS)) return;
-    this.#retryNotices.add(turnId);
-    const compacts = this.#compaction.retrying(threadId);
+    if (atCapacity) {
+      if (this.#capacityNotices.has(turnId)) return;
+      this.#capacityNotices.add(turnId);
+    } else if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+    // Only a retry for another cause can come from a large request, so only it can start a compaction.
+    const compacts = !atCapacity && this.#compaction.retrying(threadId);
     const percent = this.#compaction.usedPercent(threadId);
     this.#hooks.emitError(
       "agent_warning",
@@ -1494,7 +1500,7 @@ export class TurnLifecycle {
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
       this.#turnRetries.delete(turnId);
-      this.#retryNotices.delete(turnId);
+      this.#capacityNotices.delete(turnId);
       // The error is kept only while the turn runs, so a refused turn always has its entry.
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
@@ -1952,6 +1958,8 @@ export class TurnLifecycle {
     const runningThreadId = running?.threadId ?? threadId;
     if (running) this.#keepTurnTiming(turnId, running);
     this.#runningTurns.delete(turnId);
+    this.#turnRetries.delete(turnId);
+    this.#capacityNotices.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#quietEmptyAnswers.delete(turnId);
     this.#markEnded(turnId);
