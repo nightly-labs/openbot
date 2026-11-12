@@ -567,9 +567,6 @@ function withStepsAfterUpdates(
   return placed;
 }
 
-/** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
-const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
-
 /**
  * The rows, with the agent's last words before the question that waits as a message above it, as on
  * desktop. Those words are narration, which the steps hold, but the question is often about them,
@@ -584,7 +581,9 @@ export function withQuestionContext(rows: ChatMessage[], activeTurnId: string | 
   if (at < 0) return rows;
   const thinking = rows.findLast((row) => row.kind === "thinking" && row.turnId === activeTurnId);
   if (thinking?.kind !== "thinking") return rows;
-  const step = thinking.steps.findLast((item) => item.text.trim() && !THINKING_ITEM_ID.test(item.id));
+  // Only narration, never thinking. The phone does not know the provider here; a Codex message id
+  // (`msg_<hex>`) is narration for each provider, because only Codex sends such ids.
+  const step = thinking.steps.findLast((item) => item.text.trim() && isNarrationItemId(item.id, "codex"));
   // With progress updates on, the narration is already a row of its own.
   if (!step || step.progress) return rows;
   // Still a step of the turn: a progress bubble has no reply, reaction or delete.

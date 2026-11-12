@@ -176,14 +176,16 @@ export function ChatQuestionPrompt({
         ) : null}
         {/* A pill holds only its label, so the bubble keeps what each option means. */}
         {described.length ? (
-          <View className="gap-1 pt-1">
+          <View className="gap-2 pt-1">
             {described.map((option) => (
-              <Typography key={option.label} type="body-sm" className="text-text-secondary">
+              <View key={option.label}>
                 <Typography type="body-sm" weight="medium">
                   {option.label}
                 </Typography>
-                {`: ${option.description}`}
-              </Typography>
+                <Typography type="body-sm" className="text-text-secondary">
+                  {option.description}
+                </Typography>
+              </View>
             ))}
           </View>
         ) : null}
@@ -202,7 +204,8 @@ export function ChatQuestionPrompt({
             key={option.label}
             size="sm"
             variant="tertiary"
-            className="rounded-full"
+            // An agent can write a long label: the pill grows to more lines, not past the screen.
+            className="h-auto min-h-10 max-w-full rounded-full py-2"
             isDisabled={disabled}
             accessibilityLabel={option.label}
             accessibilityHint={option.description}
@@ -211,7 +214,7 @@ export function ChatQuestionPrompt({
               answer([option.label]);
             }}
           >
-            <Button.Label className="font-sans font-semibold">{option.label}</Button.Label>
+            <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
           </Button>
         ))}
         {question.isSecret ? null : (
