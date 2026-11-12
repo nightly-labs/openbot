@@ -43,6 +43,8 @@ function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
   const core = [
     "Describe only a tool whose inputSchema you lack.",
     "openbot_browser is OpenBot's private persistent browser. Prefer revision-bound refs and unique role/name targets, then text, CSS, and coordinates. Input actions return a short status, not a snapshot. Tabs stay open across turns and restarts, at most 25: close a tab with close_tab when the task no longer needs it, unless the user wants to keep or see it. After navigation, a layout change, or a covered-target error, take a fresh snapshot and resolve the target again; do not reuse old coordinates or repeat coordinate clicks.",
+    // The images of snapshot and screenshot reach only the model; a saved file can go to the chat (#6271).
+    "The user does not see your page images. To show the user a page, call screenshot with save: true, then attach the saved path with openbot.attach_files_to_response.",
     "After a submit, booking, or other change on a site, read a fresh snapshot or wait_for the expected result before you report the outcome. Current confirmation of the requested item, such as a success message or a cancel control, wins over a list that did not update; a waitlist place is not a booking. When it stays unclear, say what you saw; do not submit again.",
     // `bun run bench:browser-tools` (2026-11-10, Haiku, 10 tasks x 3): the turn cost and the bans on
     // lone or confirming snapshots cut mean input tokens by 18% and tool calls from 3.6 to 2.8.
