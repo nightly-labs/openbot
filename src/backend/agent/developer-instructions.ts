@@ -5,7 +5,6 @@ import {
   serializeEssentialMemories,
 } from "@openbot/contracts/agent-memory-context";
 import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
-import { HOSTED_SERVER_BASE_IMAGE_GB } from "@openbot/contracts/hosted-servers";
 import {
   type AgentDefaults,
   type AgentInstructionFileName,
@@ -51,9 +50,10 @@ function folderToolsInstruction(workspaceOnly: boolean, addedFolders: boolean): 
 /**
  * The disk limit of a hosted server. The disk is larger than the plan, so `df` alone does not show
  * what is left. An agent filled a server with a new 10 GB container every few minutes (2026-11-09).
+ * The system part of the disk is not the same on a boat sandbox and on a VPS, so no size is named.
  */
 function hostedDiskInstruction(storageGb: number): string {
-  return `This server's plan has ${storageGb} GB for files; df counts ${HOSTED_SERVER_BASE_IMAGE_GB} GB more for the system. Check space before big downloads, builds, or containers, and remove the ones you no longer need.`;
+  return `This server's plan has ${storageGb} GB for files. df shows the whole disk, which is larger and also holds the system, so its free space is not what the plan has left; du -sh ~ shows what your files use. Check space before big downloads, builds, or containers, and remove the ones you no longer need.`;
 }
 
 /** What an agent must do while the user shares saved logins. */
