@@ -9,7 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableProvider } from "./model-tools";
+import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableChange } from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -76,8 +76,7 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       const accountOnly = AGENT_PROVIDERS.flatMap((id) =>
         (hooks.providerAccounts(id) ?? []).flatMap((account) => account.models ?? []),
       );
-      const named = requestedToolModel(runtimeRequest, [...hooks.listModels(), ...accountOnly]);
-      if (named) requireRunnableProvider(named, hooks.providerStatuses());
+      requestedToolModel(runtimeRequest, [...hooks.listModels(), ...accountOnly]);
     }
     const failed = (agentId: string, message: string): AgentResult => ({ agentId, ok: false, error: message });
     const failure = (agentId: string, cause: unknown) =>
@@ -101,6 +100,7 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
           providerAccountId: ownProvider === target.provider ? target.providerAccountId : undefined,
         });
         const runtime = yield* toolStep(() => requestedRuntime(target, runtimeRequest, models));
+        yield* toolStep(() => requireRunnableChange(target, runtime, hooks.providerStatuses()));
         const updated = yield* hooks.updateAgent(
           {
             agentId,

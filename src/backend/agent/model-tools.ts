@@ -66,25 +66,20 @@ function toolModel(model: AgentModelOption): ToolModel {
 }
 
 /** A provider row of the settings page, as `list_models` reads it. */
-export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message" | "accounts">;
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
 
 /**
- * Whether an agent can run on the provider now or soon, as the model picker lets the user choose its
- * models: it runs, starts or is checked, or one of its accounts is connected. The catalogue keeps a
- * built-in list of some providers' models when they are signed out or missing, so a listed model is
- * no proof (#7866). A provider with no row has nothing against it. Custom agents share one row,
- * and one that fails does not stop the others.
+ * Whether an agent can run on the provider now or soon: it runs, OpenBot checks it, or it is not
+ * started yet, as `workflowProvider` decides. A row has its accounts only while it is available, so a
+ * provider whose own sign-in is out cannot run. The catalogue keeps a built-in list of some
+ * providers' models when they are signed out or missing, so a listed model is no proof (#7866). A
+ * provider with no row has nothing against it. Custom agents share one row, and one that fails does
+ * not stop the others.
  */
 export function providerCanRun(provider: AgentProvider, statuses: readonly ProviderStatusRow[]): boolean {
   const row = statuses.find((candidate) => candidate.id === provider);
   if (!row || provider === "acp") return true;
-  if (row.off) return false;
-  return (
-    row.state === "available" ||
-    row.state === "checking" ||
-    row.state === "not-started" ||
-    (row.accounts?.some((account) => account.state === "connected") ?? false)
-  );
+  return !row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started");
 }
 
 /** Refuses a model whose provider cannot run, so an agent does not get one that never answers (#7866). */
@@ -96,6 +91,21 @@ export function requireRunnableProvider(
   throw new AgentSettingsRefused(
     sourceText("error.agent.modelProviderNotConnected", { model: model.id, provider: providerLabel(model.provider) }),
   );
+}
+
+/**
+ * Refuses a settings change that moves an agent to a model whose provider cannot run. A call that
+ * names the model the agent has passes, so its other fields still apply.
+ */
+export function requireRunnableChange(
+  target: Pick<AgentSummary, "provider" | "model">,
+  runtime: Pick<UpdateAgentInput, "provider" | "model">,
+  statuses: readonly ProviderStatusRow[],
+): void {
+  const { provider, model } = runtime;
+  if (provider === undefined || model === undefined) return;
+  if (provider === target.provider && model === target.model) return;
+  requireRunnableProvider({ provider, id: model }, statuses);
 }
 
 /** The states in which a provider that is on lists no model until the user acts in its settings. */

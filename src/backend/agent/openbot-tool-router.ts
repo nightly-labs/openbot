@@ -143,6 +143,7 @@ import {
   requestedRuntime,
   requestedToolModel,
   requireReasoningEffort,
+  requireRunnableChange,
   requireRunnableProvider,
 } from "./model-tools";
 import {
@@ -2740,14 +2741,7 @@ export class OpenBotToolRouter {
         runtimeRequest,
         this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
       );
-      // Only a change is refused: an agent that names the model it has keeps the other fields of the call.
-      if (
-        runtime.provider !== undefined &&
-        runtime.model !== undefined &&
-        (runtime.provider !== target.provider || runtime.model !== target.model)
-      ) {
-        requireRunnableProvider({ provider: runtime.provider, id: runtime.model }, this.#hooks.providerStatuses());
-      }
+      requireRunnableChange(target, runtime, this.#hooks.providerStatuses());
       // The model and account the agent has after this call.
       const ownProvider = runtime.provider ?? target.provider;
       const own: AgentModelChoice = {
