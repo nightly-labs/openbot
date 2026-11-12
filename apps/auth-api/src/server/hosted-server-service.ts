@@ -1,6 +1,7 @@
 import {
   BILLING_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingInterval,
@@ -438,6 +439,14 @@ export class HostedServerService {
       if (!isOneOf(BILLING_PLAN_IDS, input.plan)) return yield* invalid("plan");
       if (!isOneOf(BILLING_INTERVALS, input.interval)) return yield* invalid("interval");
       if (!isOneOf(BILLING_CURRENCIES, input.currency)) return yield* invalid("currency");
+      // An optional currency, such as BRL, sells only when the Stripe Price of the plan has it. The check
+      // comes before the server row, so a refused order leaves no unpaid server.
+      if (isOneOf(BILLING_OPTIONAL_CURRENCIES, input.currency)) {
+        const catalog = yield* billing.catalog().pipe(Effect.mapError(hostedFailure));
+        const currency = input.currency;
+        if (!catalog.plans.some((plan) => plan.id === input.plan && plan.prices[currency] !== undefined))
+          return yield* invalid("currency");
+      }
       const license = input.license === undefined ? undefined : parseLicenseOrder(input.license);
       // A Starter server has one member, so it takes only the Starter license. A Team license has no more
       // users than the plan has members.

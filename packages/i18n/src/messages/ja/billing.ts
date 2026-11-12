@@ -154,6 +154,7 @@ export const messages = {
   "billing.order.server.summary": "チームのために OpenBot を運用します。",
   "billing.order.server.none": "サーバーなし",
   "billing.order.server.noneDetail": "自分のコンピューターで OpenBot を実行",
+  "billing.order.server.thisComputer": "自分のコンピューター",
   "billing.order.server.bestValue": "おすすめ",
   "billing.order.server.bestFor.starter": "1 人での利用に最適",
   "billing.order.server.bestFor.standard": "小規模なチームに最適",
@@ -189,6 +190,7 @@ export const messages = {
   "billing.order.cta.server": "サーバーを作成",
   "billing.order.cta.license": "ライセンスを購入",
   "billing.order.cta.download": "ダウンロード",
+  "billing.order.cta.keepComputer": "このコンピューターで続ける",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "ライセンスにユーザーを追加しますか？",
   "billing.license.invite.description": "この招待でライセンスにユーザーが 1 人追加され、月額が {price} 増えます。",

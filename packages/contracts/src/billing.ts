@@ -3,7 +3,11 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runti
 
 export type BillingPlanId = "starter" | "standard" | "pro";
 export type BillingInterval = "month" | "year";
-export type BillingCurrency = "eur" | "usd" | "pln";
+export type BillingCurrency = "eur" | "usd" | "pln" | "brl";
+/** The currencies of every plan. An account server before BRL sends prices in these only. */
+export type BillingBaseCurrency = "eur" | "usd" | "pln";
+/** A currency that a plan has only when its Stripe Price has it as a currency option. */
+export type BillingOptionalCurrency = Exclude<BillingCurrency, BillingBaseCurrency>;
 /** The Stripe subscription statuses. The account server stores the status that Stripe reports. */
 export type BillingSubscriptionStatus =
   | "active"
@@ -17,7 +21,9 @@ export type BillingSubscriptionStatus =
 
 export const BILLING_PLAN_IDS: readonly BillingPlanId[] = ["starter", "standard", "pro"];
 export const BILLING_INTERVALS: readonly BillingInterval[] = ["month", "year"];
-export const BILLING_CURRENCIES: readonly BillingCurrency[] = ["eur", "usd", "pln"];
+export const BILLING_CURRENCIES: readonly BillingCurrency[] = ["eur", "usd", "pln", "brl"];
+export const BILLING_BASE_CURRENCIES: readonly BillingBaseCurrency[] = ["eur", "usd", "pln"];
+export const BILLING_OPTIONAL_CURRENCIES: readonly BillingOptionalCurrency[] = ["brl"];
 export const BILLING_SUBSCRIPTION_STATUSES: readonly BillingSubscriptionStatus[] = [
   "active",
   "trialing",
@@ -102,13 +108,13 @@ export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {
 };
 
 /**
- * The monthly list price of each plan, in minor units (cents, grosze). Each amount divides by 5, so a
- * year (12 months less 20%) is a whole number.
+ * The monthly list price of each plan, in minor units (cents, grosze, centavos). Each amount divides by 5, so
+ * a year (12 months less 20%) is a whole number. BRL is the EUR price times 6.
  */
 const BILLING_PLAN_MONTHLY_PRICES: Readonly<Record<BillingPlanId, Readonly<Record<BillingCurrency, number>>>> = {
-  starter: { eur: 2000, usd: 2500, pln: 8000 },
-  standard: { eur: 5000, usd: 6000, pln: 20000 },
-  pro: { eur: 10000, usd: 12000, pln: 40000 },
+  starter: { eur: 2000, usd: 2500, pln: 8000, brl: 12000 },
+  standard: { eur: 5000, usd: 6000, pln: 20000, brl: 30000 },
+  pro: { eur: 10000, usd: 12000, pln: 40000, brl: 60000 },
 };
 
 /**
@@ -119,7 +125,7 @@ export function billingListPrices(plan: BillingPlanId, interval: BillingInterval
   const monthly = BILLING_PLAN_MONTHLY_PRICES[plan];
   if (interval === "month") return { ...monthly };
   const year = (amount: number) => (amount * 12 * 4) / 5;
-  return { eur: year(monthly.eur), usd: year(monthly.usd), pln: year(monthly.pln) };
+  return { eur: year(monthly.eur), usd: year(monthly.usd), pln: year(monthly.pln), brl: year(monthly.brl) };
 }
 
 /** The active member limit of a server with this plan, or with no plan. */
