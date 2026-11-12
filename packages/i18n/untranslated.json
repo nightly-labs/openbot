@@ -3286,6 +3286,7 @@
   "sitePage.contact.topic.press": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.contact.topic.setup": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.landing.description": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
+  "sitePage.landing.download.apk": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.landing.download.appStore": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.landing.download.available": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
   "sitePage.landing.download.description": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "ru", "tr", "zh"],
