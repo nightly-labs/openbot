@@ -703,10 +703,23 @@ export const messages = {
   "settings.transfer.count.noSettings": "Nessuna impostazione server",
   "settings.transfer.includeAgent": "Includi {name}",
   "settings.transfer.export.title": "Esporta questo server",
-  "settings.transfer.export.files": "Includi i file del workspace",
-  "settings.transfer.export.filesDescription":
-    "I file creati dai tuoi agenti e la cartella condivisa. Disattiva per un file più piccolo.",
-  "settings.transfer.export.settings": "Includi le impostazioni del server",
+  "settings.transfer.preset.label": "Cosa va nel file",
+  "settings.transfer.preset.templates": "Modelli",
+  "settings.transfer.preset.everything": "Tutto",
+  "settings.transfer.meter.files": "di {total} nei file del workspace",
+  "settings.transfer.part.agents": "Agenti e configurazione",
+  "settings.transfer.part.agentsDescription": "{contents}. Sempre nel file.",
+  "settings.transfer.part.settings": "Impostazioni server",
+  "settings.transfer.part.chats": "Cronologia chat",
+  "settings.transfer.part.chatsDescription":
+    "Le chat e i thread laterali, con i file dei loro messaggi. Gli agenti continuano queste chat con il loro contesto.",
+  "settings.transfer.part.channels": "Messaggi dei canali",
+  "settings.transfer.part.channelsDescription": "I messaggi dei canali in cui si trovano gli agenti esportati.",
+  "settings.transfer.part.files": "File del workspace",
+  "settings.transfer.part.filesDescription": "I file creati dai tuoi agenti e la cartella condivisa.",
+  "settings.transfer.part.preferences": "Preferenze del server",
+  "settings.transfer.part.preferencesDescription":
+    "Fuso orario, personalità, predefiniti degli agenti, impostazioni di memoria e skill, e il tuo livello di notifiche.",
   "settings.transfer.export.settingsDescription":
     "Server MCP, provider di modelli personalizzati, sezioni della barra laterale e flussi di routine.",
   "settings.transfer.export.chooseAgents": "Scegli gli agenti ({selected} di {total})",
@@ -735,8 +748,8 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agenti nel file",
   "settings.transfer.import.nameExists": "Nome già in uso",
   "settings.transfer.import.settings": "Importa le impostazioni del server",
-  "settings.transfer.import.settingsDescription":
-    "Aggiunge i server MCP, i provider di modelli personalizzati e le sezioni della barra laterale che questo server non ha.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Aggiunge i server MCP, i provider di modelli personalizzati e le sezioni della barra laterale che questo server non ha. Le preferenze del server nel file sostituiscono quelle attuali.",
   "settings.transfer.import.submit": { one: "Importa {count} agente", other: "Importa {count} agenti" },
   "settings.transfer.import.submitSettings": "Importa le impostazioni del server",
   "settings.transfer.import.importing": "Importazione…",

@@ -22,6 +22,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Result, Schema } from "effect";
+import { ServerPreferencesInFile, type TransferServerPreferences } from "./instance-transfer-server-preferences";
 import { TRANSFER_WORKFLOWS } from "./instance-transfer-workflows";
 import { isUnsafeArchivePath } from "./skill-package";
 
@@ -225,6 +226,11 @@ const Manifest = Schema.Struct({
   channels: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_CHANNELS))),
   /** Added with the channels: the channel member id of the person who exported, for their own messages. */
   exporter: Schema.optionalKey(text(128)),
+  /**
+   * Added with the full copy: the host-wide preferences, each as its store reads it. The import checks
+   * each value with the parser of its Settings screen (`instance-transfer-server-preferences.ts`).
+   */
+  serverPreferences: Schema.optionalKey(ServerPreferencesInFile),
 });
 
 export type TransferAgent = typeof Agent.Type;
@@ -240,6 +246,7 @@ export interface TransferManifest {
   signedIn: readonly (typeof Provider.Type)[];
   channels: TransferChannel[];
   exporter: string | null;
+  serverPreferences: typeof ServerPreferencesInFile.Type | null;
 }
 
 /** What the export writes. The same shape that `decodeTransferManifest` reads. */
@@ -253,6 +260,7 @@ export interface TransferManifestFile {
   signedIn: (typeof Provider.Type)[];
   channels?: TransferChannel[];
   exporter?: string;
+  serverPreferences?: TransferServerPreferences;
 }
 
 const decodeManifest = Schema.decodeUnknownResult(Manifest);
@@ -290,7 +298,8 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
     if (Result.isSuccess(result)) settings = result.success;
     else warnings.push(sourceText("error.import.transferSettingsInvalid"));
   }
-  if (agents.length === 0 && settings === null) throw new Error(sourceText("error.import.transferEmpty"));
+  if (agents.length === 0 && settings === null && !file.serverPreferences)
+    throw new Error(sourceText("error.import.transferEmpty"));
   return {
     manifest: {
       appVersion: file.source.appVersion || "unknown",
@@ -302,6 +311,7 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
       signedIn: file.signedIn,
       channels: decodeChannels(file.channels ?? [], keys, warnings),
       exporter: file.exporter ?? null,
+      serverPreferences: file.serverPreferences ?? null,
     },
     warnings,
   };

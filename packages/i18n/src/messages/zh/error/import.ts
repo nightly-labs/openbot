@@ -69,6 +69,10 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}：模型“{model}”在此处暂不可用，助手将使用默认模型。待其服务商就绪后请重新选择该模型。",
   "error.import.transferSettingSkipped": "{name} 未导入。{reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+    other: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+  },
   "error.import.transferRoutineFlowSkipped": "导入时略过了一个自动化任务流程。{reason}",
   "error.import.transferCustomAgentCommand":
     "{name}：自定义助手不会导入，因为它们需要运行命令。请检查命令“{command}”，并在设置中重新添加该助手。",

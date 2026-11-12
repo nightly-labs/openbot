@@ -132,6 +132,11 @@ import {
   type TransferPreferenceAgents,
   type TransferPreferencePort,
 } from "./instance-transfer-preferences";
+import {
+  applyServerPreferences,
+  readServerPreferences,
+  type TransferServerPreferencePort,
+} from "./instance-transfer-server-preferences";
 import { exportWorkflows, importWorkflows, type TransferWorkflowPort } from "./instance-transfer-workflows";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
@@ -254,6 +259,8 @@ export interface InstanceTransferOptions {
   channelActor: () => ChannelActor;
   /** The local owner's choices for agents. A member's import does not change them. */
   preferences?: TransferPreferencePort;
+  /** The host-wide preferences of Server settings. Absent where the server keeps none. */
+  serverPreferences?: TransferServerPreferencePort;
   /** Routines that a webhook starts. Absent where the server has no events service. */
   webhookRoutines?: {
     list(owner: EventRoutineOwner): Effect.Effect<EventRoutine[], unknown>;
@@ -519,7 +526,9 @@ export class InstanceTransferService {
         ...(yield* this.#readWebhookRoutines({ kind: "channel", id: channel.id }).pipe(
           Effect.map((webhookRoutines) => (webhookRoutines.length > 0 ? { webhookRoutines } : {})),
         )),
-        ...(input.includeHistory ? channelMessages(channelPort, channel.id, channelPrefix(key)) : {}),
+        ...((input.includeChannelMessages ?? input.includeHistory)
+          ? channelMessages(channelPort, channel.id, channelPrefix(key))
+          : {}),
       });
     }
 
@@ -549,6 +558,10 @@ export class InstanceTransferService {
       shared,
       signedIn: this.options.settings.signedInProviders(),
       ...(channels.length > 0 ? { channels, exporter: exporter ?? this.options.channelActor().id } : {}),
+      // The owner's own notification level only when the owner exports on this computer.
+      ...(input.includeServerPreferences && this.options.serverPreferences
+        ? { serverPreferences: readServerPreferences(this.options.serverPreferences, exporter === undefined) }
+        : {}),
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
@@ -784,7 +797,7 @@ export class InstanceTransferService {
           nameExists: existing.has(agent.name.toLowerCase()),
         };
       }),
-      hasSettings: manifest.settings !== null,
+      hasSettings: manifest.settings !== null || manifest.serverPreferences !== null,
       warnings: bounded(warnings),
     };
   });
@@ -925,6 +938,14 @@ export class InstanceTransferService {
     if (settings?.workflows && this.options.settings.workflows)
       yield* importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings);
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
+    // With the settings: the import into a new server sets it up as the old one was.
+    if (input.includeSettings && staged.manifest.serverPreferences && this.options.serverPreferences)
+      yield* applyServerPreferences(
+        this.options.serverPreferences,
+        staged.manifest.serverPreferences,
+        staged.owner === LOCAL_OWNER,
+        warnings,
+      );
     if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
 
     const signedIn = new Set(this.options.settings.signedInProviders());

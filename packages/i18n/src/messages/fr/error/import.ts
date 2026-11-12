@@ -70,6 +70,10 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name} : le modèle « {model} » n’est pas encore disponible ici, donc l’agent utilise le modèle par défaut. Choisissez de nouveau le modèle quand son fournisseur est prêt.",
   "error.import.transferSettingSkipped": "{name} n’est pas importé. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} préférence du serveur dans le fichier n’est pas valide ici, elle n’est donc pas importée.",
+    other: "{count} préférences du serveur dans le fichier ne sont pas valides ici, elles ne sont donc pas importées.",
+  },
   "error.import.transferRoutineFlowSkipped": "L’import a laissé de côté un flux de routine. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name} : les agents personnalisés ne sont pas importés, car ils exécutent une commande. Vérifiez la commande « {command} » et ajoutez de nouveau l’agent dans les réglages.",

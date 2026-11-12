@@ -770,13 +770,25 @@ export const messages = defineMessages("settings", {
   "settings.transfer.count.noSettings": "No server settings",
   "settings.transfer.includeAgent": "Include {name}",
   "settings.transfer.export.title": "Export this server",
-  "settings.transfer.export.files": "Include workspace files",
-  "settings.transfer.export.filesDescription":
-    "Files your agents made, and the Shared folder. Turn off for a small file.",
-  "settings.transfer.export.settings": "Include server settings",
+  "settings.transfer.preset.label": "What goes into the file",
+  "settings.transfer.preset.templates": "Templates",
+  "settings.transfer.preset.everything": "Everything",
+  "settings.transfer.meter.files": "of {total} in workspace files",
+  "settings.transfer.part.agents": "Agents and their setup",
+  "settings.transfer.part.agentsDescription": "{contents}. Always in the file.",
+  "settings.transfer.part.settings": "Server settings",
+  "settings.transfer.part.chats": "Chat history",
+  "settings.transfer.part.chatsDescription":
+    "The chats and side threads, with the files of their messages. The agents continue these chats with their context.",
+  "settings.transfer.part.channels": "Channel messages",
+  "settings.transfer.part.channelsDescription": "The messages of the channels that the exported agents are in.",
+  "settings.transfer.part.files": "Workspace files",
+  "settings.transfer.part.filesDescription": "Files your agents made, and the Shared folder.",
+  "settings.transfer.part.preferences": "Server preferences",
+  "settings.transfer.part.preferencesDescription":
+    "Time zone, personality, agent defaults, memory and skill settings, and your notification level.",
   "settings.transfer.export.settingsDescription":
     "MCP servers, custom model providers, sidebar sections, and routine flows.",
-  "settings.transfer.export.history": "Include chat history",
   "settings.transfer.export.historyDescription":
     "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
@@ -805,8 +817,8 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.agentsLabel": "Agents in the file",
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
-  "settings.transfer.import.settingsDescription":
-    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have. Server preferences in the file replace the ones here.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",

@@ -92,6 +92,7 @@ import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
@@ -307,6 +308,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -583,6 +585,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -793,7 +796,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_CHANNEL_CAPABILITY &&
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
-    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+    capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+    capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -880,6 +884,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1049,6 +1054,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_CHANNEL_CAPABILITY &&
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
-      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY,
+      capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
+      capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   );
 }

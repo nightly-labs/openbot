@@ -133,6 +133,82 @@
   color: var(--openbot-text-muted);
 }
 
+/* Export: the size of the workspace files in the file, and the two presets. */
+.instance-transfer-meter {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-total {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.instance-transfer-meter-of {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.instance-transfer-presets {
+  margin-inline-start: auto;
+}
+
+.instance-transfer-preset-custom {
+  display: none;
+}
+
+/* A custom choice: the pill fades out where it is, then moves. A preset after that: the pill is at
+   its place at once and fades in. */
+.instance-transfer-presets[data-pill="none"] .ui-sliding-tabs-pill {
+  opacity: 0;
+  transition:
+    opacity 120ms var(--openbot-ease-out),
+    transform 0s 120ms,
+    width 0s 120ms;
+}
+
+.instance-transfer-presets[data-pill="appear"] .ui-sliding-tabs-pill {
+  transition: opacity 150ms var(--openbot-ease-out);
+}
+
+.instance-transfer-meter-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+}
+
+/* One fill, scaled to the share of the workspace files that goes into the file. */
+.instance-transfer-meter-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--openbot-accent);
+  transform-origin: left center;
+  /* Longer than a control change: the bar travels up to its full width. */
+  transition: transform 280ms var(--openbot-ease-out);
+}
+
+.instance-transfer-meter-fill:dir(rtl) {
+  transform-origin: right center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .instance-transfer-meter-fill {
+    transition: none;
+  }
+}
+
 .instance-transfer-not-moved {
   display: flex;
   align-items: flex-start;

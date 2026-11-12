@@ -70,6 +70,9 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: モデル「{model}」はまだここで利用できないため、エージェントはデフォルトのモデルを使います。プロバイダーの準備ができたら、モデルを選択し直してください。",
   "error.import.transferSettingSkipped": "{name} はインポートされません。{reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    other: "ファイル内のサーバーの環境設定 {count} 件はここでは無効なため、インポートされません。",
+  },
   "error.import.transferRoutineFlowSkipped": "インポートでルーティンフローが 1 つ除外されました。{reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: カスタムエージェントはコマンドを実行するため、インポートされません。コマンド「{command}」を確認し、設定でエージェントを追加し直してください。",

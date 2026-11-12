@@ -1,11 +1,15 @@
 import { type ClientAgentSummary, resolveRemoteInstanceTransferResult } from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { runTeamEffect } from "@openbot/team-client";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import {
   applyInstanceTransfer,
+  beginInstanceTransferFullCopy,
   discardInstanceTransfer,
   downloadInstanceTransfer,
+  finishInstanceTransferExport,
   loadInstanceTransferSummary,
+  readInstanceTransferExportPart,
   stageInstanceTransfer,
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
@@ -18,7 +22,8 @@ import { chooseFiles } from "./web-channels-runtime";
 /**
  * Server settings > Transfer in the browser client, with `instance-transfer-v1` of the connected host.
  * The export downloads to the browser's download folder, so there is no folder to show. The import
- * sends a file that the user chooses in the browser.
+ * sends a file that the user chooses in the browser. A host with `instance-transfer-full-copy-v1`
+ * sends the export in parts, with each part of the file chosen, so it can be larger than one request.
  */
 export function createWebInstanceTransferCalls(options: {
   /** The admin requests of the connected host. */
@@ -26,7 +31,9 @@ export function createWebInstanceTransferCalls(options: {
   /** The same requests, with a response of up to one transfer file. */
   download: (serverId: string) => TeamApiRequest;
   listAgents: () => Promise<ClientAgentSummary[]>;
-  saveFile: (file: { name: string; base64: string }) => void;
+  saveFile: (file: { name: string; base64: string } | { name: string; blob: Blob }) => void;
+  /** The host serves `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`. */
+  fullCopy: (serverId: string) => boolean;
 }): ServerTransferCalls {
   return {
     summary: (serverId) =>
@@ -34,6 +41,7 @@ export function createWebInstanceTransferCalls(options: {
         loadInstanceTransferSummary(options.request(serverId)).pipe(Effect.mapError((error) => error.cause)),
       ),
     async export(input, serverId) {
+      if (options.fullCopy(serverId)) return exportInParts(options, input, serverId);
       const file = await runTeamEffect(
         downloadInstanceTransfer(options.download(serverId), input).pipe(Effect.mapError((error) => error.cause)),
       );
@@ -70,4 +78,41 @@ export function createWebInstanceTransferCalls(options: {
         discardInstanceTransfer(options.request(serverId), token).pipe(Effect.mapError((error) => error.cause)),
       ),
   };
+}
+
+async function exportInParts(
+  options: Parameters<typeof createWebInstanceTransferCalls>[0],
+  input: Parameters<ServerTransferCalls["export"]>[0],
+  serverId: string,
+) {
+  const request = options.request(serverId);
+  const file = await runTeamEffect(
+    beginInstanceTransferFullCopy(request, input).pipe(Effect.mapError((error) => error.cause)),
+  );
+  try {
+    const parts: Uint8Array<ArrayBuffer>[] = [];
+    for (const [index, expected] of file.chunks.entries()) {
+      const part = await runTeamEffect(
+        readInstanceTransferExportPart(options.download(serverId), { exportId: file.exportId, index }).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      );
+      const bytes = base64ToBytes(part.base64);
+      const length = Math.min(file.chunkBytes, file.size - index * file.chunkBytes);
+      // Each part is checked against the SHA-256 that the host named for it.
+      if (bytes.length !== length || (await sha256Hex(bytes)) !== expected)
+        throw new Error(currentText().t("error.import.transferPartInvalid"));
+      parts.push(bytes);
+    }
+    const fileName = `openbot-transfer-${new Date().toISOString().slice(0, 10)}.zip`;
+    options.saveFile({ name: fileName, blob: new Blob(parts, { type: "application/zip" }) });
+    return { saved: true, fileName, warnings: file.warnings };
+  } finally {
+    await runTeamEffect(finishInstanceTransferExport(request, file.exportId)).catch(() => undefined);
+  }
+}
+
+async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }

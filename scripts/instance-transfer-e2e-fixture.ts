@@ -2,6 +2,7 @@
 // agents that have only workspace files. Every other boundary call fails.
 
 import { dirname, join } from "node:path";
+import { DEFAULT_AGENT_DEFAULTS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
 import { LocalSkillFailure } from "../src/main/local-skill-library";
@@ -126,8 +127,25 @@ export function emptyInstanceTransferService(
     connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
     signedInProviders: () => [],
   };
+  /** The host-wide preferences of a new server; an export reads them, and an import must not write them. */
+  const preference = <T>(name: string, value: T) => ({
+    get: () => value,
+    set: (_value: T) => Effect.fail(unexpected(`serverPreferences.${name}.set`)),
+  });
+  const serverPreferences: InstanceTransferOptions["serverPreferences"] = {
+    timezone: preference<string | null>("timezone", "Europe/Warsaw"),
+    personality: preference("personality", { responseStyle: "natural" as const }),
+    busyMessageMode: preference("busyMessageMode", { mode: "queue" as const }),
+    agentDefaults: preference("agentDefaults", DEFAULT_AGENT_DEFAULTS),
+    memoryLimit: preference("memoryLimit", { limit: 128 as const }),
+    memoryReview: preference("memoryReview", { interval: 0 as const }),
+    skillLearning: preference("skillLearning", { mode: "automatic" as const }),
+    promptCacheTtl: preference("promptCacheTtl", "5m" as const),
+    ownerNotificationLevel: preference<"all" | "needs-me" | "nothing" | null>("ownerNotificationLevel", "needs-me"),
+  };
   const options: InstanceTransferOptions = {
     uploadDirectory,
+    serverPreferences,
     channelActor: () => ({ id: "local", name: "You" }),
     sharedRoot: join(dirname(uploadDirectory), "shared"),
     appVersion: "e2e",

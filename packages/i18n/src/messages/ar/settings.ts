@@ -752,10 +752,23 @@ export const messages = {
   "settings.transfer.count.noSettings": "لا إعدادات للخادم",
   "settings.transfer.includeAgent": "تضمين {name}",
   "settings.transfer.export.title": "تصدير هذا الخادم",
-  "settings.transfer.export.files": "تضمين ملفات مساحة العمل",
-  "settings.transfer.export.filesDescription":
-    "الملفات التي أنشأها وكلاؤك، والمجلد المشترك. أوقفه للحصول على ملف صغير.",
-  "settings.transfer.export.settings": "تضمين إعدادات الخادم",
+  "settings.transfer.preset.label": "ما يدخل في الملف",
+  "settings.transfer.preset.templates": "القوالب",
+  "settings.transfer.preset.everything": "كل شيء",
+  "settings.transfer.meter.files": "من {total} في ملفات مساحة العمل",
+  "settings.transfer.part.agents": "الوكلاء وإعدادهم",
+  "settings.transfer.part.agentsDescription": "{contents}. موجودة دائمًا في الملف.",
+  "settings.transfer.part.settings": "إعدادات الخادم",
+  "settings.transfer.part.chats": "سجل الدردشات",
+  "settings.transfer.part.chatsDescription":
+    "الدردشات والسلاسل الجانبية، مع ملفات رسائلها. يتابع الوكلاء هذه الدردشات بسياقها.",
+  "settings.transfer.part.channels": "رسائل القنوات",
+  "settings.transfer.part.channelsDescription": "رسائل القنوات التي يشارك فيها الوكلاء المُصدَّرون.",
+  "settings.transfer.part.files": "ملفات مساحة العمل",
+  "settings.transfer.part.filesDescription": "الملفات التي أنشأها وكلاؤك، والمجلد المشترك.",
+  "settings.transfer.part.preferences": "تفضيلات الخادم",
+  "settings.transfer.part.preferencesDescription":
+    "المنطقة الزمنية والشخصية والإعدادات الافتراضية للوكلاء وإعدادات الذاكرة والمهارات ومستوى إشعاراتك.",
   "settings.transfer.export.settingsDescription":
     "خوادم MCP ومزوّدو النماذج المخصصون وأقسام الشريط الجانبي وتدفقات المهام الدورية.",
   "settings.transfer.export.chooseAgents": "اختيار الوكلاء ({selected} من {total})",
@@ -783,8 +796,8 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "الوكلاء في الملف",
   "settings.transfer.import.nameExists": "الاسم مستخدم بالفعل",
   "settings.transfer.import.settings": "استيراد إعدادات الخادم",
-  "settings.transfer.import.settingsDescription":
-    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.settingsAndPreferences":
+    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي غير الموجودة في هذا الخادم. تحل تفضيلات الخادم الموجودة في الملف محل التفضيلات الحالية هنا.",
   "settings.transfer.import.submit": {
     zero: "لا وكلاء للاستيراد",
     one: "استيراد وكيل واحد",

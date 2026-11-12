@@ -80,6 +80,10 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: het model “{model}” is hier nog niet beschikbaar, dus de agent gebruikt het standaardmodel. Kies het model opnieuw als de aanbieder klaar is.",
   "error.import.transferSettingSkipped": "{name} is niet geïmporteerd. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} servervoorkeur in het bestand is hier niet geldig en wordt daarom niet geïmporteerd.",
+    other: "{count} servervoorkeuren in het bestand zijn hier niet geldig en worden daarom niet geïmporteerd.",
+  },
   "error.import.transferRoutineFlowSkipped": "De import heeft een routineflow weggelaten. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: aangepaste agents worden niet geïmporteerd, omdat ze een opdracht uitvoeren. Controleer de opdracht “{command}” en voeg de agent opnieuw toe in Instellingen.",

@@ -101,6 +101,7 @@ import {
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
@@ -2641,6 +2642,8 @@ export class TeamApiServer {
           if (capability === HERMES_IMPORT_CAPABILITY) return this.#options.hermesImport !== undefined;
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === INSTANCE_TRANSFER_CHUNKS_CAPABILITY) return this.#options.instanceTransfer !== undefined;
+          if (capability === INSTANCE_TRANSFER_FULL_COPY_CAPABILITY)
+            return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;

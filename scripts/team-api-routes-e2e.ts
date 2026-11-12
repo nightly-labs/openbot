@@ -232,6 +232,10 @@ import {
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
@@ -8415,6 +8419,71 @@ try {
         uploads().length === 0 &&
         errorIs(afterDone, 400, sourceText("error.import.transferPartsClosed")),
       [summary(done), summary(afterDone)],
+    );
+
+    // instance-transfer-full-copy-v1: each part is a field of its own. The parts are read and the
+    // export ends with the chunks routes.
+    const fullCopyCapabilities = [...capabilities, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY];
+    const fullCopyInput = {
+      ...exportInput,
+      includeFiles: false,
+      includeHistory: false,
+      includeChannelMessages: false,
+      includeServerPreferences: true,
+    };
+    /** The manifest of a whole export that `begin` started, read in parts; the export then ends. */
+    const exportedManifest = async (begin: Awaited<ReturnType<typeof call>>) => {
+      const id = String(field(begin.body, "exportId"));
+      const chunks = field(begin.body, "chunks");
+      const parts = [];
+      for (let index = 0; index < (Array.isArray(chunks) ? chunks.length : 0); index++)
+        parts.push((await readPart(adaToken, id, index)).bytes);
+      await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, { exportId: id });
+      const entry = unzipSync(Buffer.concat(parts))[INSTANCE_TRANSFER_MANIFEST];
+      return entry ? parseJson(new TextDecoder().decode(entry)) : null;
+    };
+    const withoutCapability = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, fullCopyInput);
+    const fullCopyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: bobToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const { includeServerPreferences: _preferences, ...missingField } = fullCopyInput;
+    const fullCopyMissing = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: missingField,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopyManifest = fullCopy.status === 200 ? await exportedManifest(fullCopy) : null;
+    const fullCopyPreferences = field(fullCopyManifest, "serverPreferences");
+    // The chunks codec does not know the field, so an older client's export has no server preferences.
+    const chunksExport = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, fullCopyInput);
+    const chunksManifest = chunksExport.status === 200 ? await exportedManifest(chunksExport) : null;
+    check(
+      "full copy: the export start needs instance-transfer-full-copy-v1, an owner or admin and every field; an admin's file has the server preferences without the owner's notification level, and the chunks route leaves them out",
+      errorIs(withoutCapability, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(fullCopyMember, 403, sourceText("error.team.adminRequired")) &&
+        fullCopyMissing.status === 400 &&
+        fullCopy.status === 200 &&
+        field(fullCopyPreferences, "timezone") === "Europe/Warsaw" &&
+        field(fullCopyPreferences, "ownerNotificationLevel") === undefined &&
+        chunksExport.status === 200 &&
+        chunksManifest !== null &&
+        field(chunksManifest, "serverPreferences") === undefined &&
+        uploads().length === 0,
+      [
+        summary(withoutCapability),
+        summary(fullCopyMember),
+        summary(fullCopyMissing),
+        summary(fullCopy),
+        fullCopyPreferences,
+        summary(chunksExport),
+      ],
     );
 
     // The desktop workflow over this host: the three calls of `RemoteServerManager` that it uses go

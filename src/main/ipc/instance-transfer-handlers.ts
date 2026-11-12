@@ -18,6 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_REMOTE_BYTES,
@@ -107,12 +108,16 @@ export function instanceTransferIpcHandlers({
     const path = await chooseDestination();
     if (!path) return { saved: false, fileName: null, warnings: [] };
     if (inParts(serverId)) {
-      const { warnings } = await runCauseEffect(downloadTransferInParts(remoteServers, serverId, input, path));
+      const fullCopy = remoteServers.supportsCapability(serverId, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY);
+      const { warnings } = await runCauseEffect(
+        downloadTransferInParts(remoteServers, serverId, input, path, fullCopy),
+      );
       lastExport = path;
       return { saved: true, fileName: basename(path), warnings };
     }
-    // `instance-transfer-v1` carries no chat history.
-    const { includeHistory: _history, ...v1 } = input;
+    // `instance-transfer-v1` carries no chat history, channel messages or server preferences.
+    const { agentIds, includeFiles, includeSettings } = input;
+    const v1 = { agentIds, includeFiles, includeSettings };
     const bytes = await runCauseEffect(remoteServers.downloadInstanceTransfer(serverId, v1));
     // The file appears only when it is complete, as a local export does.
     const part = `${path}.part`;

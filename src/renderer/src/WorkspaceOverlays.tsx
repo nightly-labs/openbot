@@ -1004,10 +1004,15 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true }
+              ? { onSignIn: (provider) => void connection.connect(provider), history: true, fullCopy: true }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1") }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

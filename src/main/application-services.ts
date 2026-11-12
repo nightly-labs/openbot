@@ -3017,6 +3017,29 @@ export async function createApplicationServices({
           .list(agentId)
           .pipe(Effect.map((keys) => keys.filter((key) => key.source !== "vault").map((key) => key.name))),
     },
+    // The stores that Server settings and Agent defaults write, with the same follow-up steps.
+    serverPreferences: {
+      timezone: { get: () => serverTimezone.get().timezone, set: (timezone) => serverTimezone.set(timezone) },
+      personality: { get: () => serverPersonality.get(), set: (personality) => serverPersonality.set(personality) },
+      busyMessageMode: { get: () => busyMessageMode.get(), set: (mode) => busyMessageMode.set(mode) },
+      agentDefaults: {
+        get: () => agentDefaults.get(),
+        set: (defaults) => {
+          const previous = agentDefaults.get();
+          return agentDefaults
+            .set(defaults)
+            .pipe(Effect.tap(() => Effect.sync(() => service.agentDefaultsChanged(previous))));
+        },
+      },
+      memoryLimit: { get: () => agentMemoryLimit.get(), set: (limit) => agentMemoryLimit.set(limit) },
+      memoryReview: { get: () => memoryReview.get(), set: (review) => memoryReview.set(review) },
+      skillLearning: { get: () => skillLearning.get(), set: (mode) => skillLearning.set(mode) },
+      promptCacheTtl: { get: () => promptCacheTtl.get().ttl, set: (ttl) => promptCacheTtl.set(ttl) },
+      ownerNotificationLevel: {
+        get: () => agentNotificationLevels.serverLevel(OWNER_NOTIFICATION_KEY),
+        set: (level) => agentNotificationLevels.setServer(OWNER_NOTIFICATION_KEY, level),
+      },
+    },
     appVersion: app.getVersion(),
     uploadDirectory: join(app.getPath("userData"), "instance-transfer-uploads"),
     timezone: () => serverTimezone.effective(),

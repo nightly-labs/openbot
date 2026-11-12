@@ -58,6 +58,16 @@ export interface ExportInstanceInput {
    * route `instance-transfer-v1` does not carry it.
    */
   includeHistory?: boolean;
+  /**
+   * The messages of the exported channels. Absent follows `includeHistory`, which carried them before
+   * this field existed: `instance-transfer-chunks-v1` does not carry this field.
+   */
+  includeChannelMessages?: boolean;
+  /**
+   * The host-wide preferences: time zone, personality, busy-message mode, agent defaults, memory and
+   * skill settings, prompt cache, and the owner's server notification level. Absent is off.
+   */
+  includeServerPreferences?: boolean;
 }
 
 export interface InstanceExportResult {
@@ -131,12 +141,16 @@ export function parseExportInstanceInput(value: unknown): ExportInstanceInput {
   if (!isUniqueList(input.agentIds, INPUT_LIMITS.agents, isIdentifier) || input.agentIds.length === 0)
     invalid("agent selection");
   if (!isBoolean(input.includeFiles) || !isBoolean(input.includeSettings)) invalid("export request");
-  if (input.includeHistory !== undefined && !isBoolean(input.includeHistory)) invalid("export request");
+  for (const key of ["includeHistory", "includeChannelMessages", "includeServerPreferences"] as const)
+    if (input[key] !== undefined && !isBoolean(input[key])) invalid("export request");
   return {
     agentIds: input.agentIds,
     includeFiles: input.includeFiles,
     includeSettings: input.includeSettings,
     ...(input.includeHistory ? { includeHistory: true } : {}),
+    // Kept when false: false differs from absent, which follows `includeHistory`.
+    ...(isBoolean(input.includeChannelMessages) ? { includeChannelMessages: input.includeChannelMessages } : {}),
+    ...(input.includeServerPreferences ? { includeServerPreferences: true } : {}),
   };
 }
 

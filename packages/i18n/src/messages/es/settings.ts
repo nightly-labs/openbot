@@ -713,10 +713,23 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sin ajustes del servidor",
   "settings.transfer.includeAgent": "Incluir a {name}",
   "settings.transfer.export.title": "Exportar este servidor",
-  "settings.transfer.export.files": "Incluir archivos del espacio de trabajo",
-  "settings.transfer.export.filesDescription":
-    "Archivos que crearon tus agentes y la carpeta compartida. Desactívalo para obtener un archivo pequeño.",
-  "settings.transfer.export.settings": "Incluir ajustes del servidor",
+  "settings.transfer.preset.label": "Qué va en el archivo",
+  "settings.transfer.preset.templates": "Plantillas",
+  "settings.transfer.preset.everything": "Todo",
+  "settings.transfer.meter.files": "de {total} en archivos del espacio de trabajo",
+  "settings.transfer.part.agents": "Agentes y su configuración",
+  "settings.transfer.part.agentsDescription": "{contents}. Siempre en el archivo.",
+  "settings.transfer.part.settings": "Ajustes del servidor",
+  "settings.transfer.part.chats": "Historial de chats",
+  "settings.transfer.part.chatsDescription":
+    "Los chats y los hilos laterales, con los archivos de sus mensajes. Los agentes continúan estos chats con su contexto.",
+  "settings.transfer.part.channels": "Mensajes de canales",
+  "settings.transfer.part.channelsDescription": "Los mensajes de los canales en los que están los agentes exportados.",
+  "settings.transfer.part.files": "Archivos del espacio de trabajo",
+  "settings.transfer.part.filesDescription": "Archivos que crearon tus agentes y la carpeta compartida.",
+  "settings.transfer.part.preferences": "Preferencias del servidor",
+  "settings.transfer.part.preferencesDescription":
+    "Zona horaria, personalidad, valores predeterminados de los agentes, ajustes de recuerdos y habilidades, y tu nivel de notificaciones.",
   "settings.transfer.export.settingsDescription":
     "Servidores MCP, proveedores de modelos personalizados, secciones de la barra lateral y flujos de rutinas.",
   "settings.transfer.export.chooseAgents": "Elegir agentes ({selected} de {total})",
@@ -745,8 +758,8 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agentes del archivo",
   "settings.transfer.import.nameExists": "Nombre ya en uso",
   "settings.transfer.import.settings": "Importar ajustes del servidor",
-  "settings.transfer.import.settingsDescription":
-    "Añade los servidores MCP, los proveedores de modelos personalizados y las secciones de la barra lateral que este servidor no tiene.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Añade los servidores MCP, los proveedores de modelos personalizados y las secciones de la barra lateral que este servidor no tiene. Las preferencias del servidor del archivo reemplazan las de aquí.",
   "settings.transfer.import.submit": { one: "Importar {count} agente", other: "Importar {count} agentes" },
   "settings.transfer.import.submitSettings": "Importar ajustes del servidor",
   "settings.transfer.import.importing": "Importando…",

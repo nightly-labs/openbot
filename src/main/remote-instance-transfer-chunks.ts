@@ -17,6 +17,7 @@ import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schedule } from "effect";
@@ -179,16 +180,40 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
   }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));
 });
 
+/**
+ * The export start that a host takes: with `instance-transfer-full-copy-v1` each part is a field of
+ * its own; without it, the chunks codec keeps only the fields it knows, and the channel messages
+ * follow `includeHistory`.
+ */
+export function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
+  if (!fullCopy) return { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };
+  const includeHistory = input.includeHistory === true;
+  return {
+    route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin,
+    body: {
+      agentIds: input.agentIds,
+      includeFiles: input.includeFiles,
+      includeSettings: input.includeSettings,
+      includeHistory,
+      includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+      includeServerPreferences: input.includeServerPreferences === true,
+    },
+  };
+}
+
 /** Writes the host's transfer file to `destination`. The file appears only when it is complete. */
 export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.download")(function* (
   remote: Remote,
   serverId: string,
   input: ExportInstanceInput,
   destination: string,
+  /** The host serves `instance-transfer-full-copy-v1`. */
+  fullCopy = false,
 ): Effect.fn.Return<{ warnings: string[] }, TransferError> {
-  const file = yield* remote.request(serverId, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, decodeExportState, {
+  const begin = transferExportBegin(input, fullCopy);
+  const file = yield* remote.request(serverId, begin.route, decodeExportState, {
     method: "POST",
-    body: input,
+    body: begin.body,
     timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
   });
   const part = `${destination}.part`;

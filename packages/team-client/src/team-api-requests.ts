@@ -105,6 +105,8 @@ import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-thr
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -549,6 +551,85 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
       includeSettings: input.includeSettings,
     }),
   );
+});
+
+/** The host's export in parts: the whole file's size and SHA-256, and the SHA-256 of each part. */
+export interface InstanceTransferExportState {
+  exportId: string;
+  size: number;
+  sha256: string;
+  chunkBytes: number;
+  chunks: string[];
+  warnings: string[];
+}
+
+const SHA256 = /^[0-9a-f]{64}$/u;
+
+const isPartBytes = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
+
+function decodeExportState(value: unknown): InstanceTransferExportState {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.exportId) ||
+    typeof value.size !== "number" ||
+    !Number.isSafeInteger(value.size) ||
+    value.size <= 0 ||
+    !isString(value.sha256) ||
+    !SHA256.test(value.sha256) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.chunks) ||
+    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
+    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every(isString)
+  )
+    throw new Error("The host returned an invalid transfer export.");
+  return {
+    exportId: value.exportId,
+    size: value.size,
+    sha256: value.sha256,
+    chunkBytes: value.chunkBytes,
+    chunks: value.chunks,
+    warnings: value.warnings,
+  };
+}
+
+/**
+ * Starts an export in parts with each part of the file chosen. Send it only to a host that serves
+ * `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`.
+ */
+export const beginInstanceTransferFullCopy = Effect.fn("TeamClient.beginInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ExportInstanceInput,
+): Effect.fn.Return<InstanceTransferExportState, TeamRequestError> {
+  const includeHistory = input.includeHistory === true;
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeExportState, {
+      agentIds: input.agentIds,
+      includeFiles: input.includeFiles,
+      includeSettings: input.includeSettings,
+      includeHistory,
+      includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+      includeServerPreferences: input.includeServerPreferences === true,
+    }),
+  );
+});
+
+/** One part of the host's export, as Base64. The transport must let one part answer this request. */
+export const readInstanceTransferExportPart = Effect.fn("TeamClient.readInstanceTransferExportPart")(function* (
+  request: TeamApiRequest,
+  part: { exportId: string; index: number },
+): Effect.fn.Return<RemoteFileUpload, TeamRequestError> {
+  return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, decodeTransferFile, part));
+});
+
+/** Ends the host's export, which removes its file. */
+export const finishInstanceTransferExport = Effect.fn("TeamClient.finishInstanceTransferExport")(function* (
+  request: TeamApiRequest,
+  exportId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, ignoreResponse, { exportId }));
 });
 
 /** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */

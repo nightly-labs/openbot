@@ -5,8 +5,9 @@
 // branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
 // It also has two hidden agents with active routines: one stays as written, and the file of the other
 // is changed to the file of an app that stopped a hidden agent, so its routines arrive turned off.
-// The export includes workspace files, server settings and chat history. The import goes into the
-// second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
+// The export includes workspace files, server settings, chat history, channel messages and the
+// server preferences, one of which is changed to a value the import does not accept. A second export
+// has the chats without the channel messages. The import goes into the second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
 // messages in order with the file's bytes, the side thread, and that the first turn of an imported
 // agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
 // `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
@@ -16,7 +17,20 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentEvent, type AgentSummary } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentDefaults,
+  type AgentEvent,
+  type AgentMemoryLimit,
+  type AgentSummary,
+  type BusyMessageMode,
+  DEFAULT_AGENT_DEFAULTS,
+  type MemoryReviewInterval,
+  type PromptCacheTtl,
+  type ResponseStyle,
+  type ServerNotificationLevel,
+  type SkillLearningMode,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -212,6 +226,28 @@ function profile(name: string) {
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
+  // The host-wide preferences, as the Server settings stores keep them.
+  const serverPreferences: {
+    timezone: string | null;
+    personality: { responseStyle: ResponseStyle };
+    busyMessageMode: { mode: BusyMessageMode };
+    agentDefaults: AgentDefaults;
+    memoryLimit: { limit: AgentMemoryLimit };
+    memoryReview: { interval: MemoryReviewInterval };
+    skillLearning: { mode: SkillLearningMode };
+    promptCacheTtl: PromptCacheTtl;
+    ownerNotificationLevel: ServerNotificationLevel | null;
+  } = {
+    timezone: null,
+    personality: { responseStyle: "natural" },
+    busyMessageMode: { mode: "queue" },
+    agentDefaults: DEFAULT_AGENT_DEFAULTS,
+    memoryLimit: { limit: 128 },
+    memoryReview: { interval: 0 },
+    skillLearning: { mode: "automatic" },
+    promptCacheTtl: "5m",
+    ownerNotificationLevel: null,
+  };
   const transfer = new InstanceTransferService({
     agents,
     skills: { library: () => library, installLocal: () => Effect.void },
@@ -229,6 +265,44 @@ function profile(name: string) {
       autoApproves: (agentId) => approvals.get(agentId) ?? true,
       setAutoApprove: (agentId, value) => Effect.sync(() => approvals.set(agentId, value)),
       apiKeyNames: () => Effect.succeed(["WEATHER_API_KEY"]),
+    },
+    serverPreferences: {
+      timezone: {
+        get: () => serverPreferences.timezone,
+        set: (v) => Effect.sync(() => (serverPreferences.timezone = v)),
+      },
+      personality: {
+        get: () => serverPreferences.personality,
+        set: (v) => Effect.sync(() => (serverPreferences.personality = v)),
+      },
+      busyMessageMode: {
+        get: () => serverPreferences.busyMessageMode,
+        set: (v) => Effect.sync(() => (serverPreferences.busyMessageMode = v)),
+      },
+      agentDefaults: {
+        get: () => serverPreferences.agentDefaults,
+        set: (v) => Effect.sync(() => (serverPreferences.agentDefaults = v)),
+      },
+      memoryLimit: {
+        get: () => serverPreferences.memoryLimit,
+        set: (v) => Effect.sync(() => (serverPreferences.memoryLimit = v)),
+      },
+      memoryReview: {
+        get: () => serverPreferences.memoryReview,
+        set: (v) => Effect.sync(() => (serverPreferences.memoryReview = v)),
+      },
+      skillLearning: {
+        get: () => serverPreferences.skillLearning,
+        set: (v) => Effect.sync(() => (serverPreferences.skillLearning = v)),
+      },
+      promptCacheTtl: {
+        get: () => serverPreferences.promptCacheTtl,
+        set: (v) => Effect.sync(() => (serverPreferences.promptCacheTtl = v)),
+      },
+      ownerNotificationLevel: {
+        get: () => serverPreferences.ownerNotificationLevel,
+        set: (v) => Effect.sync(() => (serverPreferences.ownerNotificationLevel = v)),
+      },
     },
     appVersion: "e2e",
     timezone: () => "UTC",
@@ -259,7 +333,20 @@ function profile(name: string) {
       signedInProviders: () => [],
     },
   });
-  return { database, store, mailbox, agents, transfer, pins, levels, approvals, workflows, events, positions };
+  return {
+    database,
+    store,
+    mailbox,
+    agents,
+    transfer,
+    pins,
+    levels,
+    approvals,
+    workflows,
+    events,
+    positions,
+    serverPreferences,
+  };
 }
 
 function idle(agents: InstanceType<typeof AgentService>, agentId: string) {
@@ -467,6 +554,50 @@ try {
     },
   });
 
+  // --- Server preferences that differ from a new server's.
+  Object.assign(source.serverPreferences, {
+    timezone: "Europe/Warsaw",
+    personality: { responseStyle: "classic" },
+    busyMessageMode: { mode: "steer" },
+    agentDefaults: { ...DEFAULT_AGENT_DEFAULTS, commitCoAuthor: !DEFAULT_AGENT_DEFAULTS.commitCoAuthor },
+    memoryLimit: { limit: 256 },
+    memoryReview: { interval: 20 },
+    skillLearning: { mode: "ask" },
+    promptCacheTtl: "1h",
+    ownerNotificationLevel: "needs-me",
+  } satisfies typeof source.serverPreferences);
+
+  // --- The chats without the channel messages: each part is chosen on its own.
+  const chatsOnly = join(root, "chats-only.zip");
+  await runCauseEffect(
+    source.transfer.exportTo(chatsOnly, {
+      agentIds: [writer.id, editor.id],
+      includeFiles: false,
+      includeSettings: false,
+      includeHistory: true,
+      includeChannelMessages: false,
+    }),
+  );
+  {
+    const { unzipSync } = await import("fflate");
+    const entries = unzipSync(new Uint8Array(await readFile(chatsOnly)));
+    const chatsManifest: {
+      agents: { history?: string }[];
+      channels?: { messages?: string[] }[];
+      serverPreferences?: unknown;
+    } = JSON.parse(new TextDecoder().decode(entries[INSTANCE_TRANSFER_MANIFEST]));
+    pass(
+      "a file without channel messages keeps the chats and the channel",
+      chatsManifest.agents.some((agent) => agent.history) && (chatsManifest.channels?.length ?? 0) > 0,
+    );
+    pass(
+      "a file without channel messages has none",
+      (chatsManifest.channels ?? []).every((channel) => !channel.messages?.length) &&
+        !Object.keys(entries).some((name) => /^channels\/[^/]+\/messages-/u.test(name)),
+    );
+    pass("a file without server preferences has none", chatsManifest.serverPreferences === undefined);
+  }
+
   // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
@@ -475,6 +606,8 @@ try {
       includeFiles: true,
       includeSettings: true,
       includeHistory: true,
+      includeChannelMessages: true,
+      includeServerPreferences: true,
     }),
   );
   report.exportWarnings = exported.warnings;
@@ -483,8 +616,18 @@ try {
   report.archiveEntries = Object.keys(archive).length;
   const manifestBytes = archive[INSTANCE_TRANSFER_MANIFEST];
   assert.ok(manifestBytes, "The file has no manifest.");
-  const manifest: { agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[] } =
-    JSON.parse(new TextDecoder().decode(manifestBytes));
+  const manifest: {
+    agents: { name: string; preferences?: { hidden?: boolean; hiddenWorks?: boolean } }[];
+    serverPreferences?: { timezone?: unknown; promptCacheTtl?: unknown; ownerNotificationLevel?: unknown };
+  } = JSON.parse(new TextDecoder().decode(manifestBytes));
+  pass(
+    "the file has the server preferences",
+    manifest.serverPreferences?.timezone === "Europe/Warsaw" &&
+      manifest.serverPreferences.ownerNotificationLevel === "needs-me",
+    JSON.stringify(manifest.serverPreferences),
+  );
+  // A value that this app does not accept is left out, and the other preferences are still saved.
+  if (manifest.serverPreferences) manifest.serverPreferences.promptCacheTtl = "9h";
   const filePreferences = (name: string) => manifest.agents.find((agent) => agent.name === name)?.preferences;
   pass(
     "the file says that its hidden agents work",
@@ -518,6 +661,19 @@ try {
     }),
   );
   report.importWarnings = result.warnings;
+  const { promptCacheTtl: _ttl, ...movedPreferences } = source.serverPreferences;
+  const { promptCacheTtl: targetTtl, ...arrivedPreferences } = target.serverPreferences;
+  pass(
+    "the server preferences arrive",
+    JSON.stringify(arrivedPreferences) === JSON.stringify(movedPreferences),
+    JSON.stringify(target.serverPreferences),
+  );
+  pass("a server preference that is not valid is left out", targetTtl === "5m", targetTtl);
+  pass(
+    "the import says that one server preference was left out",
+    result.warnings.some((warning) => warning.includes("1 server preference")),
+    JSON.stringify(result.warnings),
+  );
   pass("each agent is imported", result.agents.length === 4 && result.skipped.length === 0);
   const byName = (name: string): AgentSummary => {
     const agent = target.agents.listAgents().find((candidate) => candidate.name === name);

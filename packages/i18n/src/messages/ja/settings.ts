@@ -697,10 +697,24 @@ export const messages = {
   "settings.transfer.count.noSettings": "サーバー設定なし",
   "settings.transfer.includeAgent": "{name} を含める",
   "settings.transfer.export.title": "このサーバーをエクスポート",
-  "settings.transfer.export.files": "ワークスペースのファイルを含める",
-  "settings.transfer.export.filesDescription":
-    "エージェントが作成したファイルと共有フォルダーです。ファイルを小さくするにはオフにします。",
-  "settings.transfer.export.settings": "サーバー設定を含める",
+  "settings.transfer.preset.label": "ファイルに含める内容",
+  "settings.transfer.preset.templates": "テンプレート",
+  "settings.transfer.preset.everything": "すべて",
+  "settings.transfer.meter.files": "/ {total}（ワークスペースのファイル）",
+  "settings.transfer.part.agents": "エージェントとその設定",
+  "settings.transfer.part.agentsDescription": "{contents}。常にファイルに含まれます。",
+  "settings.transfer.part.settings": "サーバー設定",
+  "settings.transfer.part.chats": "チャット履歴",
+  "settings.transfer.part.chatsDescription":
+    "チャットとサイドスレッド、およびそのメッセージのファイルです。エージェントはコンテキストを保ったままこれらのチャットを続けます。",
+  "settings.transfer.part.channels": "チャンネルのメッセージ",
+  "settings.transfer.part.channelsDescription":
+    "エクスポートするエージェントが参加しているチャンネルのメッセージです。",
+  "settings.transfer.part.files": "ワークスペースのファイル",
+  "settings.transfer.part.filesDescription": "エージェントが作成したファイルと共有フォルダーです。",
+  "settings.transfer.part.preferences": "サーバーの環境設定",
+  "settings.transfer.part.preferencesDescription":
+    "タイムゾーン、パーソナリティ、エージェントのデフォルト、メモリーとスキルの設定、通知レベルです。",
   "settings.transfer.export.settingsDescription":
     "MCP サーバー、カスタムプロバイダー、サイドバーのセクション、ルーティンフローです。",
   "settings.transfer.export.chooseAgents": "エージェントを選択 ({selected} / {total})",
@@ -730,8 +744,8 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "ファイル内のエージェント",
   "settings.transfer.import.nameExists": "名前が重複",
   "settings.transfer.import.settings": "サーバー設定をインポート",
-  "settings.transfer.import.settingsDescription":
-    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクションを追加します。",
+  "settings.transfer.import.settingsAndPreferences":
+    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクションを追加します。ファイル内のサーバーの環境設定は、ここの設定を置き換えます。",
   "settings.transfer.import.submit": { other: "エージェント {count} 件をインポート" },
   "settings.transfer.import.submitSettings": "サーバー設定をインポート",
   "settings.transfer.import.importing": "インポート中…",

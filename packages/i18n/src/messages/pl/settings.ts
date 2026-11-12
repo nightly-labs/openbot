@@ -731,10 +731,23 @@ export const messages = {
   "settings.transfer.count.noSettings": "Brak ustawień serwera",
   "settings.transfer.includeAgent": "Uwzględnij agenta {name}",
   "settings.transfer.export.title": "Eksportuj ten serwer",
-  "settings.transfer.export.files": "Uwzględnij pliki obszaru roboczego",
-  "settings.transfer.export.filesDescription":
-    "Pliki utworzone przez twoich agentów i folder współdzielony. Wyłącz, aby plik był mały.",
-  "settings.transfer.export.settings": "Uwzględnij ustawienia serwera",
+  "settings.transfer.preset.label": "Co trafia do pliku",
+  "settings.transfer.preset.templates": "Szablony",
+  "settings.transfer.preset.everything": "Wszystko",
+  "settings.transfer.meter.files": "z {total} w plikach obszaru roboczego",
+  "settings.transfer.part.agents": "Agenci i ich konfiguracja",
+  "settings.transfer.part.agentsDescription": "{contents}. Zawsze w pliku.",
+  "settings.transfer.part.settings": "Ustawienia serwera",
+  "settings.transfer.part.chats": "Historia czatów",
+  "settings.transfer.part.chatsDescription":
+    "Czaty i wątki boczne wraz z plikami ich wiadomości. Agenci kontynuują te czaty z ich kontekstem.",
+  "settings.transfer.part.channels": "Wiadomości kanałów",
+  "settings.transfer.part.channelsDescription": "Wiadomości z kanałów, w których są eksportowani agenci.",
+  "settings.transfer.part.files": "Pliki obszaru roboczego",
+  "settings.transfer.part.filesDescription": "Pliki utworzone przez twoich agentów i folder współdzielony.",
+  "settings.transfer.part.preferences": "Preferencje serwera",
+  "settings.transfer.part.preferencesDescription":
+    "Strefa czasowa, osobowość, domyślne ustawienia agentów, ustawienia wspomnień i umiejętności oraz twój poziom powiadomień.",
   "settings.transfer.export.settingsDescription":
     "Serwery MCP, własni dostawcy modeli, sekcje paska bocznego i przepływy rutyn.",
   "settings.transfer.export.chooseAgents": "Wybierz agentów ({selected} z {total})",
@@ -763,8 +776,8 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agenci w pliku",
   "settings.transfer.import.nameExists": "Nazwa zajęta",
   "settings.transfer.import.settings": "Importuj ustawienia serwera",
-  "settings.transfer.import.settingsDescription":
-    "Dodaje serwery MCP, własnych dostawców modeli i sekcje paska bocznego, których ten serwer nie ma.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Dodaje serwery MCP, własnych dostawców modeli i sekcje paska bocznego, których ten serwer nie ma. Preferencje serwera z pliku zastępują te tutaj.",
   "settings.transfer.import.submit": {
     one: "Importuj {count} agenta",
     few: "Importuj {count} agentów",

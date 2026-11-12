@@ -70,6 +70,14 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: النموذج «{model}» غير متاح هنا بعد، لذا يستخدم الوكيل النموذج الافتراضي. اختر النموذج مرة أخرى عندما يصبح مزوّده جاهزًا.",
   "error.import.transferSettingSkipped": "لا يُستورد {name}. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    zero: "{count} تفضيل للخادم في الملف غير صالح هنا، لذا لا تُستورد.",
+    one: "تفضيل واحد للخادم في الملف غير صالح هنا، لذا لا يُستورد.",
+    two: "تفضيلان للخادم في الملف غير صالحين هنا، لذا لا يُستوردان.",
+    few: "{count} تفضيلات للخادم في الملف غير صالحة هنا، لذا لا تُستورد.",
+    many: "{count} تفضيلًا للخادم في الملف غير صالح هنا، لذا لا تُستورد.",
+    other: "{count} تفضيل للخادم في الملف غير صالح هنا، لذا لا تُستورد.",
+  },
   "error.import.transferRoutineFlowSkipped": "استبعد الاستيراد تدفق مهمة دورية. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: لا تُستورد الوكلاء المخصصة لأنها تشغّل أمرًا. تحقّق من الأمر «{command}» وأضف الوكيل مرة أخرى في الإعدادات.",

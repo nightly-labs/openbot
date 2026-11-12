@@ -66,6 +66,10 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: "{model}" modeli burada henüz kullanılamıyor, bu yüzden ajan varsayılan modeli kullanıyor. Sağlayıcısı hazır olduğunda modeli yeniden seçin.',
   "error.import.transferSettingSkipped": "{name} içe aktarılmadı. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+    other: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+  },
   "error.import.transferRoutineFlowSkipped": "İçe aktarma bir rutin akışını dışarıda bıraktı. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: özel ajanlar bir komut çalıştırdıkları için içe aktarılmaz. "{command}" komutunu kontrol edin ve ajanı Ayarlar\'da yeniden ekleyin.',

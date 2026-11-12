@@ -69,6 +69,11 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: המודל "{model}" עדיין אינו זמין כאן, ולכן הסוכן משתמש במודל ברירת המחדל. יש לבחור את המודל שוב כשהספק שלו יהיה מוכן.',
   "error.import.transferSettingSkipped": "{name} לא מיובא. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "העדפת שרת אחת בקובץ אינה תקפה כאן, ולכן היא לא מיובאת.",
+    two: "שתי העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+    other: "{count} העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+  },
   "error.import.transferRoutineFlowSkipped": "הייבוא השמיט זרימת שגרה. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: סוכנים מותאמים אישית אינם מיובאים, כי הם מריצים פקודה. יש לבדוק את הפקודה "{command}" ולהוסיף את הסוכן שוב בהגדרות.',

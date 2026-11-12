@@ -68,6 +68,12 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: model „{model}” nie jest tu jeszcze dostępny, więc agent używa modelu domyślnego. Wybierz model ponownie, gdy jego dostawca będzie gotowy.",
   "error.import.transferSettingSkipped": "Nie zaimportowano: {name}. {reason}",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} preferencja serwera z pliku jest tu nieprawidłowa, więc nie zostanie zaimportowana.",
+    few: "{count} preferencje serwera z pliku są tu nieprawidłowe, więc nie zostaną zaimportowane.",
+    many: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+    other: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+  },
   "error.import.transferRoutineFlowSkipped": "Import pominął przepływ rutyny. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: własni agenci nie są importowani, ponieważ uruchamiają polecenie. Sprawdź polecenie „{command}” i dodaj agenta ponownie w Ustawieniach.",
