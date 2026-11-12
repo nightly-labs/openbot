@@ -243,7 +243,7 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "rate_limit";
   if (
-    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
+    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|payment (?:is )?past due|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
       message,
     )
   )

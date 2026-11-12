@@ -1791,6 +1791,7 @@ export function createRemoteTeamPeer(
                     channelIsolation: true,
                     channelPicture: true,
                     channelBrowser: true,
+                    channelSeenSubtasks: true,
                     mcpManyServers: true,
                   }),
                 )
